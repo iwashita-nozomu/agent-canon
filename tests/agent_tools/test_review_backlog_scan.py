@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -26,16 +27,26 @@ class ReviewBacklogScanTest(unittest.TestCase):
     def test_inventory_check_writes_json_markdown_and_summary(self) -> None:
         """The inventory check should produce machine and human reports."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            report_dir = Path(tmp_dir) / "reports"
+            root = Path(tmp_dir) / "parent"
+            subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+            fixture_tools = root / "tools" / "agent_tools"
+            fixture_tools.mkdir(parents=True)
+            for tool_name in ("file_surface_inventory.py", "surface_manifest.py"):
+                shutil.copy2(
+                    PROJECT_ROOT / "tools" / "agent_tools" / tool_name,
+                    fixture_tools / tool_name,
+                )
+            report_dir = root / "reports"
+            configured_target = root / ".agent-canon" / "cache" / "cargo-target"
             result = subprocess.run(
                 [
                     "bash",
                     str(REVIEW_SCAN),
                     "--root",
-                    str(PROJECT_ROOT),
+                    str(root),
                     "--report-dir",
                     str(report_dir),
-                    "--agentcanon-only",
+                    "--root-only",
                     "--check",
                     "inventory",
                 ],
@@ -43,12 +54,18 @@ class ReviewBacklogScanTest(unittest.TestCase):
                 check=False,
                 capture_output=True,
                 text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_PARENT_ROOT": str(root.parent / "untrusted-parent"),
+                    "AGENT_CANON_REVIEW_SCAN_TARGET_DIR": str(configured_target),
+                },
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("REVIEW_BACKLOG_SCAN=pass", result.stdout)
             self.assertTrue((report_dir / "file_surface_inventory.json").is_file())
             self.assertTrue((report_dir / "file_surface_inventory.md").is_file())
+            self.assertFalse(configured_target.exists())
             summary = (report_dir / "review_backlog_scan.md").read_text(encoding="utf-8")
             self.assertIn("| inventory | 0 |", summary)
 
@@ -60,6 +77,7 @@ class ReviewBacklogScanTest(unittest.TestCase):
             git_object.parent.mkdir(parents=True)
             git_object.write_text("subtree legacy format\n", encoding="utf-8")
             (root / "README.md").write_text("# Clean\n", encoding="utf-8")
+            subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
             report_dir = root / "reports"
 
             result = subprocess.run(
@@ -87,6 +105,38 @@ class ReviewBacklogScanTest(unittest.TestCase):
             self.assertNotIn("leak.txt", stale_output)
             self.assertIn("STALE_WORDING_SEARCH=no-matches", stale_output)
 
+    def test_review_target_override_rejects_outside_without_side_effect(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+            report_dir = root / "reports"
+            outside_target = root.parent / "outside-review-target"
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(REVIEW_SCAN),
+                    "--root",
+                    str(root),
+                    "--report-dir",
+                    str(report_dir),
+                    "--root-only",
+                    "--check",
+                    "inventory",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_REVIEW_SCAN_TARGET_DIR": str(outside_target),
+                },
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("PARENT_ROOT_SIDE_EFFECT_ERROR", result.stderr)
+            self.assertFalse(outside_target.exists())
+            self.assertFalse(report_dir.exists())
+
     def test_semantic_index_check_writes_review_artifacts(self) -> None:
         """Semantic review check should write merge, thin-doc, and search JSONL."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -94,6 +144,7 @@ class ReviewBacklogScanTest(unittest.TestCase):
             fake_bin = root / "fake-bin"
             docs = root / "documents"
             docs.mkdir()
+            subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
             repeated = (
                 "# Duplicate\n"
                 "semantic review responsibility candidate phrase\n"
@@ -118,6 +169,36 @@ class ReviewBacklogScanTest(unittest.TestCase):
                 encoding="utf-8",
             )
             stale_agent_canon.chmod(0o755)
+            fake_cargo = fake_bin / "cargo"
+            fake_cargo.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -eu\n"
+                "while [ \"$#\" -gt 0 ] && [ \"$1\" != '--' ]; do shift; done\n"
+                "shift\n"
+                "case \"$1 $2\" in\n"
+                "  'semantic-index build')\n"
+                "    while [ \"$#\" -gt 0 ]; do\n"
+                "      if [ \"$1\" = '--db' ]; then : >\"$2\"; exit 0; fi\n"
+                "      shift\n"
+                "    done ;;\n"
+                "  'semantic-index merge-candidates')\n"
+                "    printf '%s\\n' '{\"semantic_index_pairs\":[],\"candidate_bucket\":[],\"responsibility_bucket\":[]}' ;;\n"
+                "  'semantic-index thin-docs') printf '%s\\n' '{\"thin_docs\":[]}' ;;\n"
+                "  'semantic-index search') printf '%s\\n' '{\"query_chars\":42}' ;;\n"
+                "  'semantic-index eval-output')\n"
+                "    while [ \"$#\" -gt 0 ]; do\n"
+                "      if [ \"$1\" = '--report' ]; then\n"
+                "        printf '%s\\n' '{\"semantic_index_output_eval\":\"pass\"}' >\"$2\"\n"
+                "        printf '%s\\n' 'SEMANTIC_INDEX_OUTPUT_EVAL=pass'\n"
+                "        exit 0\n"
+                "      fi\n"
+                "      shift\n"
+                "    done ;;\n"
+                "esac\n"
+                "exit 2\n",
+                encoding="utf-8",
+            )
+            fake_cargo.chmod(0o755)
 
             result = subprocess.run(
                 [
@@ -149,7 +230,21 @@ class ReviewBacklogScanTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertTrue((report_dir / "semantic_index_root.sqlite").is_file())
+            self.assertTrue(
+                (report_dir / "semantic_index_root.sqlite").is_file(),
+                result.stdout
+                + result.stderr
+                + "\nartifacts="
+                + repr(sorted(path.name for path in report_dir.iterdir()))
+                + "\nlogs="
+                + repr(
+                    {
+                        path.name: path.read_text(encoding="utf-8", errors="replace")
+                        for path in report_dir.iterdir()
+                        if path.is_file()
+                    }
+                ),
+            )
             merge_jsonl = (
                 report_dir / "semantic_index_merge_candidates_root.jsonl"
             ).read_text(encoding="utf-8")
@@ -170,6 +265,7 @@ class ReviewBacklogScanTest(unittest.TestCase):
                 report_dir / "semantic_index_output_eval_root.txt"
             ).read_text(encoding="utf-8")
             self.assertIn("SEMANTIC_INDEX_OUTPUT_EVAL=pass", output_eval_summary)
+            self.assertTrue((root / "cargo-target").is_dir())
 
 
 if __name__ == "__main__":

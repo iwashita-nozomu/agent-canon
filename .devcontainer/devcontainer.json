@@ -1,23 +1,12 @@
 {
-  "_dependency_manifest": [
-    "@dependency-start",
-    "contract environment",
-    "responsibility Defines the shared VS Code devcontainer runtime entrypoint.",
-    "upstream design ../documents/contracts/github-first-module-and-devcontainer-policy.md devcontainer ownership policy",
-    "upstream design ../documents/rule/dependency-module-changes.md topic-root source visibility contract",
-    "upstream implementation ../tools/agent_tools/dependency_module_change.py source clone and workspace lifecycle",
-    "downstream implementation ../.devcontainer/post-create.sh runs workspace-mounted setup and agent CLI setup",
-    "downstream implementation ../.devcontainer/post-attach.sh reports attach-time runtime status",
-    "downstream implementation ../.devcontainer/generate-runtime-compose.sh renders devcontainer compose from repo-local docker pack",
-    "@dependency-end"
-  ],
   "name": "${localWorkspaceFolderBasename}-devcontainer",
-  "initializeCommand": "bash vendor/agent-canon/.devcontainer/bootstrap-shared-runtime.sh && AGENT_CANON_DEVCONTAINER_REPO_ROOT=. AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh",
+  "initializeCommand": "AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
   "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
   "service": "workspace",
+  "updateRemoteUserUID": false,
   "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
-  "postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace/${localWorkspaceFolderBasename} && bash .devcontainer/post-create-parent.sh /workspace/${localWorkspaceFolderBasename}",
-  "postAttachCommand": "bash vendor/agent-canon/.devcontainer/post-attach.sh",
+  "postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",
+  "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
   "shutdownAction": "stopCompose",
   "overrideCommand": false,
   "customizations": {

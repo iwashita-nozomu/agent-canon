@@ -1,10 +1,11 @@
 # @dependency-start
 # contract tool
 # responsibility Declares canonical-source marker contracts consumed by convention compliance checks.
-# upstream design ../../agents/skills/owner-bounded-routing.md owner-bounded routing skill contract
 # upstream design ../../agents/skills/oop-readability-check.md SOLID checker route ownership
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md branch reuse and checkout continuity policy
+# upstream design ../../documents/design/entrypoint-owner-map.md root entrypoint responsibility boundary
 # downstream implementation ./check_convention_compliance.py loads marker contracts
+# downstream implementation ./check_entrypoint_owner_map.py rejects operational marker ownership in root entrypoints
 # downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py verifies marker contracts
 # @dependency-end
 
@@ -12,14 +13,11 @@ schema_version = 1
 
 # Skill policy markers belong to agents/skills/<skill>.md canonical prose owners.
 # Generated .agents/skills/<skill>/SKILL.md adapters use dedicated shim readback gates.
+# AGENTS.md and ROOT_AGENTS.md are reader maps; operational marker contracts stay in owners.
 
 [[contracts]]
 id = "design_integrity_gate"
 description = "Implementation starts from an owning responsibility model and semantic decision sufficiency: owner, replaceable unit, implementation mechanism, validation route, unresolved branch, and design_issue_blocker."
-
-[[contracts.surfaces]]
-path = "ROOT_AGENTS.md"
-markers = ["Design Integrity Gate", "owning responsibility model", "owner, replaceable unit", "implementation mechanism", "validation route", "unresolved branch", "design_issue_blocker"]
 
 [[contracts.surfaces]]
 path = "agents/skills/agent-orchestration.md"
@@ -40,10 +38,6 @@ markers = ["Design Integrity Gate", "owning responsibility model", "replaceable 
 [[contracts]]
 id = "static_read_validation_policy"
 description = "Validation keeps static/read evidence primary, adds targeted runtime evidence only for changed behavior or integration risk, and records unresolved runtime or static risk before broader execution."
-
-[[contracts.surfaces]]
-path = "agents/skills/agent-orchestration.md"
-markers = ["静的解析・読み取り evidence", "targeted validation", "実行が必要な未解決 signal", "smoke run"]
 
 [[contracts.surfaces]]
 path = "agents/skills/codex-task-workflow.md"
@@ -82,54 +76,6 @@ path = "tools/agent_tools/agent_team.py"
 markers = ["$literature-survey", "$research-workflow", "research_driven_change", "selected.append"]
 
 [[contracts]]
-id = "owner_bounded_tool_route"
-description = "Owner-bounded repository edits require external public API, behavior, and schema invariance, run existing tools without a pre-use reading gate, and route every public-surface delta to scoped_change with dependency, consumer, migration, and docs closure."
-
-[[contracts.surfaces]]
-path = "agents/skills/agent-orchestration.md"
-markers = ["existing-tool route", "targeted validation", "Owner-Bounded Change", "parent-direct", "$owner-bounded-routing", "external public API/behavior/schema unchanged", "scoped_change", "dependency/consumer/migration/docs closure"]
-
-[[contracts.surfaces]]
-path = "agents/skills/codex-task-workflow.md"
-markers = ["existing-tool route", "targeted validation", "Owner-Bounded Change", "parent-direct", "$owner-bounded-routing", "external public API/behavior/schema unchanged", "scoped_change", "dependency/consumer/migration/docs closure"]
-
-[[contracts.surfaces]]
-path = "agents/skills/owner-bounded-routing.md"
-markers = ["existing tool", "owner boundary", "Owner-Bounded Change", "targeted validation", "tool_rejection_preflight.py", "structure_contract=skipped", "external public API/behavior/schema unchanged", "scoped_change", "dependency/consumer/migration/docs closure"]
-
-[[contracts.surfaces]]
-path = "agents/skills/md-style-check.md"
-markers = ["existing-tool route", "targeted validation", "format-only", "$owner-bounded-routing"]
-
-[[contracts.surfaces]]
-path = "agents/skills/long-form-writing.md"
-markers = ["existing-tool route", "targeted validation", "typo", "format-only"]
-
-[[contracts.surfaces]]
-path = "agents/skills/README.md"
-markers = ["owner-bounded-routing", "existing tool", "targeted validation", ".codex/config.toml", "external public API/behavior/schema unchanged", "scoped_change", "dependency/consumer/migration/docs closure"]
-
-[[contracts.surfaces]]
-path = "agents/skills/catalog.yaml"
-markers = ["owner-bounded-routing", "owner-bounded", "targeted validation", "Owner-Bounded Change", "external public API/behavior/schema unchanged", "scoped_change", "dependency/consumer/migration/docs closure"]
-
-[[contracts.surfaces]]
-path = "agents/task_catalog.yaml"
-markers = ["owner_bounded_change", "public interface unchanged", "external public API/behavior/schema unchanged", "scoped_change", "dependency/consumer/migration/docs closure"]
-
-[[contracts.surfaces]]
-path = "agents/canonical/CODEX_WORKFLOW.md"
-markers = ["existing tool", "bounded route", "follow-up context", "external public API/behavior/schema unchanged", "scoped_change", "dependency/consumer/migration/docs closure"]
-
-[[contracts.surfaces]]
-path = "agents/USER_GUIDE_JA.md"
-markers = ["existing tool", "読了 gate なし", "targeted validation", "external public API/behavior/schema unchanged", "scoped_change", "dependency/consumer/migration/docs closure"]
-
-[[contracts.surfaces]]
-path = "agents/COMMUNICATION_PROTOCOL.md"
-markers = ["Parent-Direct Context Note", "external public API/behavior/schema unchanged"]
-
-[[contracts]]
 id = "responsibility_preflight_gate"
 description = "Pre-edit routing keeps planned paths tied to responsibility-scope.toml owner scopes before implementation directories are selected."
 
@@ -143,10 +89,6 @@ markers = ["responsibility_scope", "responsibility-scope.toml", "owner", "class"
 
 [[contracts.surfaces]]
 path = "agents/skills/codex-task-workflow.md"
-markers = ["tool_rejection_preflight", "responsibility_scope", "owner scope", "protecting tools", "実装ディレクトリ"]
-
-[[contracts.surfaces]]
-path = "agents/skills/owner-bounded-routing.md"
 markers = ["tool_rejection_preflight", "responsibility_scope", "owner scope", "protecting tools", "実装ディレクトリ"]
 
 [[contracts.surfaces]]
@@ -199,15 +141,26 @@ markers = ["HOOK_EVENT_CONTRACTS", "HookEventContract", "ACTIVE_HOOK_HANDLERS", 
 
 [[contracts.surfaces]]
 path = "agents/canonical/CODEX_WORKFLOW.md"
-markers = ["Branch Reuse Default", "tools/agent_tools/hook_safety.py", "user が別 branch を明示", "AgentCanon branch / PR workflow", "branch_creation_reason=<reason>", "worktree_creation_reason=<reason>", "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval", "AGENT_CANON_DESTRUCTIVE_GIT_REASON=<reason>", "proven exact task ownership", "session restart", "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request", "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow", "AGENT_CANON_BRANCH_WORKTREE_REASON=<reason>"]
-
-[[contracts.surfaces]]
-path = "ROOT_AGENTS.md"
-markers = ["Multiple chats or sessions", "unknown dirty", "Proven exact task ownership", "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval", "AGENT_CANON_DESTRUCTIVE_GIT_REASON"]
-
-[[contracts.surfaces]]
-path = "AGENTS.md"
-markers = ["Multiple chats or sessions", "unknown dirty", "Proven exact task ownership", "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval", "AGENT_CANON_DESTRUCTIVE_GIT_REASON"]
+markers = [
+    "Branch Reuse Default",
+    "tools/agent_tools/hook_safety.py",
+    "user が別 branch を明示",
+    "AgentCanon branch / PR workflow",
+    "branch_creation_reason=<reason>",
+    "worktree_creation_reason=<reason>",
+    "proven exact task ownership",
+    "session restart",
+    "Git authority は操作リスクで分けます。",
+    "通常の branch create / worktree add",
+    "creation authority/reason のみを要求し",
+    "force-create または ref overwrite",
+    "creation と destructive authority/reason の両方を要求",
+    "既存 branch の checkout/switch",
+    "destructive authority/reason を要求します",
+    "`latest` / `apply` / merge update wrapper",
+    "worktree の remove/move/repair/prune/force-add",
+    "ambient 変数や prior segment は authority になりません",
+]
 
 [[contracts.surfaces]]
 path = ".codex/README.md"
@@ -236,14 +189,6 @@ markers = ["SOLID / OOP boundary assertion", "$oop-readability-check", "tools/oo
 [[contracts.surfaces]]
 path = "agents/skills/codex-task-workflow.md"
 markers = ["$oop-readability-check", "SOLID principle signal", "OOP dimension", "finding kind", "tools/oop/shared/readability_core.py", "check_solid_evidence.py", "scanned_paths", "class", "Protocol"]
-
-[[contracts.surfaces]]
-path = "agents/skills/python-review.md"
-markers = ["SOLID 原則シグナル", "OOP 可読性レポート", "tools/oop/python/readability.py", "tools/agent_tools/check_solid_evidence.py", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "readability.py", "scanned_paths"]
-
-[[contracts.surfaces]]
-path = "agents/skills/change-review.md"
-markers = ["python-review", "$oop-readability-check", "tools/agent_tools/check_solid_evidence.py", "SOLID principle signal", "OOP readability report", "class", "Protocol"]
 
 [[contracts.surfaces]]
 path = ".codex/agents/python_reviewer.toml"
@@ -280,10 +225,6 @@ markers = ["読者順序", "依存順序", "公開契約", "公開入口", "内�
 [[contracts.surfaces]]
 path = "documents/conventions/coding-conventions-house-style.md"
 markers = ["読者順序", "公開契約", "公開入口", "内部補助関数", "単一公開入口"]
-
-[[contracts.surfaces]]
-path = "agents/skills/python-review.md"
-markers = ["定義順", "読者順序", "公開入口", "内部補助関数", "check_convention_compliance.py"]
 
 [[contracts.surfaces]]
 path = "agents/skills/catalog.yaml"

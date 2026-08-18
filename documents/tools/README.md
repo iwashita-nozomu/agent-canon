@@ -4,6 +4,8 @@ contract reference
 responsibility Documents ツール入口 for this repository.
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../runtime/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
+upstream design ../design/source-owned-dependency-validation.md source-owned dependency review and PR receipt contract
+upstream design ../design/dependency-manifest-design.md dependency manifest DSL and explicit graph-analysis boundary
 upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 upstream design ../prose-reasoning-graph/dsl-spec.md graph visualization projection contract
 upstream design ../../agents/skills/code-visualization.md sole public visualization owner and closeout boundary
@@ -16,6 +18,7 @@ downstream implementation ../../tools/agent_tools/eval_accumulation_check.py val
 downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py manages mounted hook/eval/report log archive branches
 downstream implementation ../../tools/agent_tools/generated_artifact_guard.py rejects regenerated report outputs left in source tree
 downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design-document evidence claims
+downstream implementation ../../tools/ci/pr_gate_receipt.py owns the executable PR source/skipped receipt schema and parser
 downstream design dependency-tools-and-licenses.md documents dependency tool purposes and license evidence
 downstream design ../../tools/user/README.md defines stable user-facing tool entrypoint migration target
 downstream design ../../tools/internal/README.md defines skill, workflow, and compatibility helper migration targets
@@ -243,10 +246,10 @@ second command manual.
   - worktree kickoff の user-facing 入口です。
 - `tools/update_agent_canon.sh`
   - 派生 repo で AgentCanon submodule pin と shared root surface を更新する user-facing 入口です。通常は `make agent-canon-update-plan` で route を確認し、`make agent-canon-latest` で tool-first に適用します。
-  - mutating な `latest` / `apply` と低レベル委譲は、既存の4つのGit authority/reason fieldに加えて `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>` を同じcommand segmentで必須にします。digestはuser request recordまたはcanonical workflow authorization packetのexact bytesのSHA-256です。
-  - `latest` は safe な AgentCanon `main` 更新、legacy eval / hook log parking、root view check、親 repo update TODO routing / acknowledge まで進めます。dirty submodule が legacy `agents/evals/results/` だけなら `runtime_log_archive_git.py import-legacy|import-eval-results --delete-source` で `.agent-canon/log-archive/legacy-import/` へ退避してから続行します。新規蓄積は `.agent-canon/log-archive/` を使い、source tree の `agents/evals/results/` を新規作成しません。pending TODO が残る場合も更新コマンドは成功終了し、`AGENT_CANON_LATEST_TOOL_RESULT=updated_with_pending_todos` と `NEXT_ACTION=apply_agent_canon_update_todos_then_rerun_latest` を出します。runtime source、local shared-canon branch、diverged history、merge conflict は消さず、`AGENT_CANON_LATEST_WORKFLOW`、`AGENT_CANON_LATEST_CONFLICT_COMMAND`、`NEXT_ACTION=run_agentcanon_conflict_workflow` を出して agent workflow に渡します。dirty state を伴う通常運用では、手作業 stash ではなく `merge-main-into-current-preserve-dirty` を使います。
+  - mutating な `latest` / `apply` と低レベル委譲は、operation risk に応じた Git authority/reason field と `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>` を同じ command segment で必須にします。通常の update wrapper は destructive pair のみ、branch/worktree 作成は creation pair、force-create / ref-overwrite は両方を要求します。digest は user request record または canonical workflow authorization packet の exact bytes の SHA-256 です。
+  - `latest` は safe な AgentCanon `main` 更新、root view check、親 repo update TODO routing / acknowledge まで進めます。新規蓄積は `.agent-canon/log-archive/` を使い、source tree の `agents/evals/results/` を新規作成しません。pending TODO が残る場合も更新コマンドは成功終了し、`AGENT_CANON_LATEST_TOOL_RESULT=updated_with_pending_todos` と `NEXT_ACTION=apply_agent_canon_update_todos_then_rerun_latest` を出します。intended named branch の ahead / diverged / dirty state は evidence として保持し、`merge-main-into-current` は non-colliding local materialized paths をその場に残します。Git の仮想 merge conflict または exact update write set との collision だけを typed blocker として agent workflow に渡します。
   - Local bare / proposal / snapshot refresh route は user-facing command から外しています。submodule 化済み repo の通常 path は GitHub branch と AgentCanon PR です。
-  - 派生 repo 側の shared canon 差分を upstream に渡す場合は、`vendor/agent-canon/` 内で commit し、`bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` で GitHub `main` を current branch に取り込み、validation 後にその branch を GitHub へ push して AgentCanon PR を開きます。
+  - 派生 repo 側の shared canon 差分を upstream に渡す場合は、`vendor/agent-canon/` 内で commit し、source-root resolver の `exec tools/update_agent_canon.sh merge-main-into-current` で GitHub `main` を current branch に取り込み、validation 後にその branch を GitHub へ push して AgentCanon PR を開きます。
   - AgentCanon PR merge 後に `make agent-canon-ensure-latest` で template / derived repo へ持ち帰ります。この target は `make agent-canon-latest` と同じ high-level route です。
   - GitHub 管理では `iwashita-nozomu/agent-canon` と template GitHub repo の `main` SHA、AgentCanon PR URL、submodule pin を PR 本文に残します。
 - `tools/agent_tools/agent_canon_update_todos.py`
@@ -263,7 +266,7 @@ second command manual.
   - 例: `profile_surface_resolver.py` は `route.py --area surface`、`$runtime-capability-routing` は `route.py --area runtime` として扱います。
   - 新しい public tool / skill を足す前に `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳めるか確認します。
 - `tools/sync_agent_canon.sh`
-  - shared agent canon surface の drift check と再同期を行う低レベル入口です。通常の作業者は直接 `pull` せず、task 開始時の latest route、root view 修復の link-root route、drift check の `bash tools/sync_agent_canon.sh check` 経由で使います。
+  - shared agent canon surface の drift check と再同期を行う source 側の低レベル入口です。parent では `tools/agent-canon/` view または source-root resolver から実体を解決します。通常の作業者は直接 `pull` せず、task 開始時の latest route、root view 修復の link-root route、resolver 経由の `check` を使います。
   - `pull`、`ensure-latest`、`link-root` などのmutating入口は、staging・checkout・submodule update・root-view mutationの前に同じcommit request evidenceをfail-closedで検証します。自動sync commitは固定identityと `AgentCanon-*` formal trailersを持ちます。
   - `link-root` は symlink view と root copy surface を復元します。`goal.md` は repo-local state なので shared symlink に戻しません。
 - `tools/agent_tools/waterfall_gate_check.py`
@@ -405,10 +408,10 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
 - `tools/bin/agent-canon python-algorithm-contract-check`
   - Python AST を一度 JSON として抽出し、Rust 側で `algorithm_module_protocol` module の literal `__all__`、standard public surface、callable `Algorithm`、nested ownership、concrete `Info` schema、protocol-only import、syntax diagnostics、fnmatch 方式の `--exclude` を検査します。text/JSON artifact と exit status は同じ canonical route から出力し、fixture は `tests/fixtures/python_algorithm_contract/`、CLI parity test は `rust/agent-canon/tests/python_algorithm_contract_cli.rs` にあります。
 - `tools/experiments/update_latest_result.py`
-  - experiment result root の `LATEST.json` と `LATEST.md` を更新し、最新 run、summary、manifest、visual report の入口を固定します。
-- `tools/experiments/publish_result_branch.py`
-  - `main` などの source checkout で作成した `experiments/<topic>/result/<run_name>/` と `experiments/report/<run_name>.md` を、checkout を切り替えず `experiment-results/<topic>` などの result branch へ保存します。
-  - 標準形は `python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>` です。remote へ保存する場合だけ `--push` を足します。
+  - `experiments/<topic>/result/<variant>/LATEST.json` と `LATEST.md` を更新し、選択した variant 内の最新 run、summary、manifest、visual report の入口を固定します。`python3 -m tools.experiments.update_latest_result experiments/<topic>/result --variant <variant>` のように variant を必ず指定します。
+- `tools/experiments/save_experiment_result_annex.py`
+  - v2 manifest で identity を検証した 1 run を、決定的な 1 archive として clean な専用 git-annex worktree へ append-only で保存し、retention commit SHA を出します。
+  - SHA256E key、full readback、symlink / Git LFS pointer / identity mismatch rejection、pre-commit rollback を fail-closed に検証します。push は行いません。
 - `tools/push_origin.sh`
   - 旧 shell push 実装の退役入口です。GitHub publish / PR 作業は `tools/agent_tools/github_publish.py` を使います。
 
@@ -428,23 +431,32 @@ Git identities, then publishes an immutable prepared
 outcome spool before a separate hash-linked receipt is published. The command
 returns success only after the latest committed receipt is durability-
 confirmed; uncertain, malformed, colliding, or unconfirmed records block.
+Rollout discovery consumes only the explicit container-local
+`AGENT_CANON_CODEX_SESSION_ROOT` supplied by the runtime owner; host `HOME`,
+`CODEX_HOME`, and `~/.codex/sessions` are not fallback inputs.
 
-`tools/bin/agent-canon graph build` は dependency-manifest snapshot、prepared
-artifact、latest committed receipt を一つの `BuildMaterial` transaction で
-取得します。通常の `run_all_checks` は最初の graph-backed consumer より前に
-`WORKSPACE_ROOT` の graph を一度だけ build し、すべての graph-backed consumer
-は同じ fresh snapshot を共有します。AgentCanon PR gate は strict dependency
-review で作った graph と dependency-header verdict を owner、root identity、
-parent PID、prepared markers 付きの一時 receipt で quick CI に渡します。
-`run_all_checks` はその receipt を検証できた場合だけ `CANON_GRAPH_READY=1`
-として snapshot を消費し、graph/dependency-header producer を省略します。
-receipt が無い通常経路は全 producer を実行し、不正な receipt は fail closed
-です。build に失敗した場合は graph-backed checks を実行せず、一つの CI
-failure として扱います。
-`graph status/query/context` とその consumer は snapshot の参照専用で、
-`check_design_doc_claims.py` も persisted v2 snapshot を消費します。Each graph
-command performs at most one bounded freshness probe; consumers do not reparse
-repository-scoped dependency guarantees or rerun the runtime producer.
+`tools/bin/agent-canon graph build` は明示的な graph-analysis route です。
+dependency-manifest snapshot、persisted diagnostics、SQLite identity の生成と
+freshness はこの route が所有し、`--ensure-graph` を指定した呼び出しだけが
+必要な再構築を要求します。通常の PR source review は source scan、format、
+relation/cycle、TSV/DOT の source projection を実行し、graph を build、query、
+または receipt の根拠として読みません。
+`tools/ci/pr_gate_receipt.py` は PR gate の実行可能な receipt schema/parser の
+唯一の owner です。`check_agent_canon_pr.sh` は source review の結果を
+`source` または trusted header scan の `skipped` として書き、root identity、
+parent PID、selector reason/evidence とともに quick CI へ渡します。
+`run_all_checks.sh` は同じ module を一度だけ consumer として呼び、妥当な
+receipt を受け取ったときだけ重複する graph/header producer を省略します。
+`prepared` と `scoped` はこの PR receipt の退役状態であり、consumer は
+fail-closed で拒否します。receipt が無い通常経路は source review を実行し、
+明示的 graph-analysis route は独立して利用できます。
+`graph status`、非dependency relation query、token付き `context` とその consumer
+は明示的 graph-analysis route の snapshot 参照専用です。dependency query、
+tokenless path context、`check_design_doc_claims.py` は tracked source の
+projectionを使い、persisted v2 snapshotを読みません。通常の source review、
+PR receipt、header/format checkerもこのsnapshotを読みません。Each explicit
+graph command performs at most one bounded freshness probe; consumers do not
+reparse repository-scoped dependency guarantees or rerun the runtime producer.
 Explicit files outside a repository and non-Git checker fixtures retain their
 public local parser behavior without becoming graph authority. `graph_client.py`
 is the typed Python adapter for these responses, not a CLI entrypoint.

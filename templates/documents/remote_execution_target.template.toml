@@ -4,6 +4,9 @@
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 # @dependency-end
 
+# Reader map: この file は remote target の owner、transport、capability、path、enabled state を
+# 記録する。resource admission は caller/scheduler の readback、failure/cleanup は run provenance が所有する。
+
 [target]
 id = "lab-cpu-1"
 label = "Lab CPU 1"

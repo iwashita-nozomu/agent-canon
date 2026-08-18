@@ -30,8 +30,9 @@ instructions, bounded follow-ups, and checklist or evidence updates. Create a ne
 unpushable, has an unrelated ownership lane, needs explicit review isolation, or
 would mix incompatible pin / memory / eval ownership. Record
 `branch_creation_reason=<reason>` before requesting current-task user approval.
-Creation proceeds only when that approval exists and the same command segment
-carries both creation authority/reason and destructive authority/reason. If the
+Normal creation proceeds only when that approval exists and the same command
+segment carries creation authority/reason. Force-create or ref-overwrite
+routes additionally carry destructive authority/reason in that segment. If the
 checkout collides with another chat, keep it unchanged and request direction.
 
 ## Required Gates

@@ -1,4 +1,4 @@
-# Scientific Computing Review
+# Scientific Computing Review（科学計算レビュー）
 <!--
 @dependency-start
 contract template
@@ -12,11 +12,14 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
+{{>reader_map}}
+{{>review_contract}}
+
 {{>findings_required_change_table}}
 
-## Focus
+## Focus（確認点）
 
-- Incremental change discipline
-- Testability and automation
-- Prototype-to-production boundary
-- Avoidance of ad hoc manual steps
+- incremental change の規律
+- testability と automation
+- prototype と production の境界
+- ad hoc な手作業の回避

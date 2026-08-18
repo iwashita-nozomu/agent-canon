@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract environment
-# responsibility Reports shared devcontainer attach status.
+# responsibility Reports default devcontainer attach status.
 # upstream design ../documents/contracts/github-first-module-and-devcontainer-policy.md devcontainer boundary
-# upstream design ../documents/rule/dependency-module-changes.md topic-root source visibility contract
-# upstream design ../documents/experiments/gpu-admission-r5-source-packet.md observational readback receipt contract
+# upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md default startup profile boundary
 # upstream environment devcontainer.json postAttachCommand entrypoint
-# upstream implementation finalize-shared-runtime.sh publishes the exact readback receipt
 # @dependency-end
 set -euo pipefail
 
 runtime_root="${AGENT_CANON_RUNTIME_ROOT:-/var/lib/agent-canon/runtime}"
 repo_root="${AGENT_CANON_REPOSITORY_ROOT:-}"
+workspace_layout="${AGENT_CANON_WORKSPACE_LAYOUT:-managed-topic}"
+workspace_source="${DEPENDENCY_MODULE_CONTAINER_SOURCE:-}"
+workspace_target="${DEPENDENCY_MODULE_CONTAINER_TARGET:-}"
 [ -n "$repo_root" ] || {
   echo "DEPENDENCY_MODULE_CONTAINER_ERROR=repository-root-env-missing" >&2
   exit 1
@@ -32,32 +33,7 @@ esac
   exit 1
 }
 source_projection_root="${AGENT_CANON_SOURCE_PROJECTION_ROOT:-${repo_root}/reports/agents/devcontainer/runtime}"
-readback_receipt="${runtime_root}/shared-runtime-readback.json"
-
-gpu_device_visible() {
-  [ -e /dev/nvidia0 ] && return 0
-  command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1
-}
-
-gpu_status="unavailable (notice only)"
-case "${DEVCONTAINER_GPU_MODE:-unavailable}" in
-  enabled)
-    if gpu_device_visible; then
-      gpu_status="enabled"
-    else
-      gpu_status="unavailable (requested, not visible)"
-    fi
-    ;;
-  disabled)
-    gpu_status="disabled"
-    ;;
-  unavailable)
-    gpu_status="unavailable (notice only)"
-    ;;
-  *)
-    gpu_status="${DEVCONTAINER_GPU_MODE}"
-    ;;
-esac
+gpu_status="${DEVCONTAINER_GPU_MODE:-disabled}"
 
 mnt_git_status="not-mounted"
 if [ -d /mnt/git ]; then
@@ -86,12 +62,12 @@ if command -v codex >/dev/null 2>&1 && codex login status >/dev/null 2>&1; then
 fi
 
 gh_config_status="not-mounted"
-if [ -d /root/.config/gh ] || [ -d "${HOME:-/root}/.config/gh" ]; then
+if [ -d "${HOME:-}/.config/gh" ]; then
   gh_config_status="mounted"
 fi
 
 ssh_dir_status="not-mounted"
-if [ -d /root/.ssh ] || [ -d "${HOME:-/root}/.ssh" ]; then
+if [ -d "${HOME:-}/.ssh" ]; then
   ssh_dir_status="mounted"
 fi
 
@@ -115,7 +91,8 @@ if [ -f "${repo_root}/.codex/config.toml" ]; then
 fi
 
 check_dependency_module_runtime() {
-  local dependency_tool="${repo_root}/tools/agent_tools/dependency_module_change.py"
+  local dependency_tool=""
+  local candidate
   [ "${AGENT_CANON_WORKSPACE_ROOT:-}" = "/workspace" ] || {
     echo "DEPENDENCY_MODULE_CONTAINER_ERROR=AGENT_CANON_WORKSPACE_ROOT must be /workspace" >&2
     return 1
@@ -124,8 +101,44 @@ check_dependency_module_runtime() {
     echo "DEPENDENCY_MODULE_CONTAINER_ERROR=workspace-root-mount-missing:/workspace" >&2
     return 1
   }
-  [ -f "$dependency_tool" ] || {
-    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=tool-missing:${dependency_tool}" >&2
+  case "$workspace_layout" in
+  managed-topic|direct-repo) ;;
+  *)
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=workspace-layout-unsupported:${workspace_layout}" >&2
+    return 1
+    ;;
+  esac
+  [ -n "$workspace_source" ] || {
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=workspace-source-readback-missing" >&2
+    return 1
+  }
+  [ -n "$workspace_target" ] || {
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=workspace-target-readback-missing" >&2
+    return 1
+  }
+  expected_target="$repo_root"
+  [ "$workspace_target" = "$expected_target" ] || {
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=workspace-target-readback-mismatch:${workspace_target}:${expected_target}" >&2
+    return 1
+  }
+  echo "DEPENDENCY_MODULE_CONTAINER_LAYOUT=${workspace_layout}"
+  echo "DEPENDENCY_MODULE_CONTAINER_SOURCE=${workspace_source}"
+  echo "DEPENDENCY_MODULE_CONTAINER_TARGET=${workspace_target}"
+  if [ "$workspace_layout" = "direct-repo" ]; then
+    echo "DEPENDENCY_MODULE_CONTAINER=not-selected layout=direct-repo repository=${repo_root}"
+    echo "DEPENDENCY_MODULE_STATUS=not-selected layout=direct-repo"
+    return 0
+  fi
+  for candidate in \
+    "${repo_root}/tools/agent_tools/dependency_module_change.py" \
+    "${repo_root}/vendor/agent-canon/tools/agent_tools/dependency_module_change.py"; do
+    if [ -f "$candidate" ]; then
+      dependency_tool="$candidate"
+      break
+    fi
+  done
+  [ -n "$dependency_tool" ] || {
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=tool-missing:${repo_root}/tools/agent_tools/dependency_module_change.py:${repo_root}/vendor/agent-canon/tools/agent_tools/dependency_module_change.py" >&2
     return 1
   }
   if [ -f "${repo_root}/.gitmodules" ]; then
@@ -136,16 +149,55 @@ check_dependency_module_runtime() {
     }
     python3 "$dependency_tool" --root "$repo_root" status --topic "$topic"
   fi
-  echo "DEPENDENCY_MODULE_CONTAINER=pass tool=${dependency_tool} repository=${repo_root}"
+  echo "DEPENDENCY_MODULE_CONTAINER=pass layout=managed-topic tool=${dependency_tool} repository=${repo_root}"
 }
 
 check_dependency_module_runtime
+
+expected_runtime_user="project"
+expected_runtime_home="/home/project"
+[ "${AGENT_CANON_CONTAINER_USER:-}" = "$expected_runtime_user" ] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-user-marker-mismatch:${expected_runtime_user}" >&2
+  exit 1
+}
+runtime_uid="$(id -u)"
+runtime_gid="$(id -g)"
+[[ "$runtime_uid" =~ ^[1-9][0-9]*$ ]] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=project-uid-must-be-nonzero-decimal:${runtime_uid}" >&2
+  exit 1
+}
+[[ "$runtime_gid" =~ ^[0-9]+$ ]] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=project-gid-must-be-nonnegative-decimal:${runtime_gid}" >&2
+  exit 1
+}
+[ "$(id -un)" = "$expected_runtime_user" ] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-user-name-mismatch:${expected_runtime_user}:$(id -un)" >&2
+  exit 1
+}
+[ "${HOME:-}" = "$expected_runtime_home" ] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-home-mismatch:${HOME:-}:${expected_runtime_home}" >&2
+  exit 1
+}
+workspace_write_probe=""
+trap 'if [ -n "${workspace_write_probe:-}" ]; then rm -f -- "$workspace_write_probe"; fi' EXIT
+workspace_write_probe="$(mktemp "$repo_root/identity-write.XXXXXX")"
+printf '%s\n' "project" >"$workspace_write_probe"
+[ "$(cat "$workspace_write_probe")" = "project" ] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=workspace-readback-failed:${workspace_write_probe}" >&2
+  exit 1
+}
+rm -f -- "$workspace_write_probe"
+workspace_write_probe=""
 
 echo
 echo "----------------------------------------"
 echo "AgentCanon devcontainer"
 echo "----------------------------------------"
 echo "repository: ${repo_root}"
+echo "runtime-user: ${expected_runtime_user}"
+echo "runtime-uid: ${runtime_uid}"
+echo "runtime-gid: ${runtime_gid}"
+echo "runtime-home: ${HOME}"
 echo "gpu: ${gpu_status}"
 echo "gpu-notice: ${DEVCONTAINER_GPU_NOTICE:-<unset>}"
 echo "/mnt/git: ${mnt_git_status}"
@@ -153,7 +205,6 @@ echo "secret-mount: ${secret_mount_status} (${secret_mount_target}, mode=${AGENT
 echo "docker-socket: ${docker_socket_status}"
 echo "codex-state: ${codex_state_status}"
 echo "runtime-root: ${runtime_root} ($(if [ -d "$runtime_root" ]; then echo available; else echo missing; fi))"
-echo "runtime-readback: ${readback_receipt} ($(if [ -f "$readback_receipt" ]; then echo published; else echo missing; fi))"
 echo "source-projection: ${source_projection_root} ($(if [ -f "$runtime_root/tool-availability.json" ]; then echo cataloged-tools-readback; else echo missing; fi))"
 echo "codex-login: ${codex_login_status}"
 echo "host-gh-config: ${gh_config_status}"

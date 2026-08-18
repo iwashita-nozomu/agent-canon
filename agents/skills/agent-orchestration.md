@@ -56,9 +56,11 @@ handoff-ready state with existing write-packet readback; and an approved request
 the changed goal/artifact/order/handoff sparse delta state with changed-clause and delta-packet
 readback. The write route materializes request clauses that carry the explicit write authority.
 
-Before handoff, this owner consumes DIC `DIC-010` and its path+section+clause/ref
-closure packet. DIC owns traversal and forward/reverse closure; this skill owns the
-request clause, explicit-write-clause gate, owner, and write-set decision.
+When the DIC activation gate is selected, this owner consumes DIC `DIC-010` and its
+path+section+clause/ref closure packet. DIC owns traversal and forward/reverse closure;
+this skill owns the request clause, explicit-write-clause gate, owner, and write-set
+decision. Bounded owner/path/targeted-validation edits stay on the normal owner route
+without DIC fingerprint or closure requirements.
 
 ## Purpose
 
@@ -109,33 +111,109 @@ that decision.
    minimum decision fields. A structured handoff message or tool result is
    sufficient; create a durable packet only when coordination or resumption
    needs one.
-1. repo-changing execution で実装 owner が明示 path と source packet でまだ固定されていない場合は、編集 path を選ぶ前に `python3 tools/agent_tools/search.py --query-file <request.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json` を走らせる。bounded candidate path を source packet seed にし、owner、responsibility、dependency evidence から `allowed_paths`、`do_not_read`、required checks を導く。deterministic search が失敗した場合は path selection を `router_unavailable_blocker` へ遷移させ、owner、responsibility、dependency evidence が一つの canonical route を示した時点で継続する
+1. repo-changing execution では、owner、責務単位、実装機構、validation route が未確定のときだけ deterministic search を使う。明示された owner/README/user path が一つの編集先を選ぶ場合は provider 全体を走査せず、その owner evidence を source packet に記録する。`python3 tools/agent_tools/search.py --query-file <request.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json` が利用できない場合は診断を残し、実際に owner/path の曖昧さが残るときだけ `router_unavailable_blocker` とする
 1. 広い prose 読み込み、raw log 探索、subagent 起動の前に、その判定を正本として持つ canonical tool があるか確認する。tool-covered surface では tool を先に呼び、pass / finding の structured output を信頼する。ただし tool が返した path は作業 packet であり、`requested_scope` を縮める許可ではありません。owner、依存、downstream、意図的に外す surface を確認し、packet が user request を覆うことを証明してから編集に入ります
-1. repo-changing execution で構造、ownership、path selection、stale surface、document responsibility が scope に入る場合は、手作業の広い読み込みより前に `agents/COMMUNICATION_PROTOCOL.md` の `Structure Intake Packet` を作るか引用する。正本の構造読み込み tool は `repo_structure_contract.py`、`responsibility_scope.py`、`file_surface_inventory.py --submodule-aware`、`agent-canon structured-analysis document-inventory`、import boundary が関係する場合の `import_responsibility.py` です。artifact path と選択した構造要約を `llm_visible_context` に入れ、complete JSON、Markdown inventory、raw log、full document list は `local_tool_context` に残します
+1. Structure Intake Packet と構造 checker は、directory/path ownership、root view、stale surface、document responsibility などの構造変更、または owner/path の曖昧さが実際に次の編集判断を変える場合だけ作る。通常の bounded edit、直接 owner path、README/user path の変更ではこれを必須化しない。必要な場合は `repo_structure_contract.py`、`responsibility_scope.py`、`file_surface_inventory.py --submodule-aware`、`import_responsibility.py` のうち判断に必要なものだけを使い、選択した構造要約を context に残す
 1. LLM-visible context に material を追加する前に Context Input Discipline を通す。各 material は routing、編集場所、validation、review、保留判断のどれを変えるのかを持つ必要があります。既読の owner surface、tool output、artifact は path、line、artifact reference で再利用し、runtime view と canonical owner、同じ log の再出力、同じ checker 結果の全文貼り直しは重複 input として扱います。exact wording が対象でない長い raw output は durable artifact と構造要約へ移し、request coverage と design evidence を落とさずに LLM-visible context を作ります
 1. 調査、レビュー、追加確認は、継続前に次に進む作業を記録します。次の作業は、経路決定、編集場所の決定、検証、Issue 記録、担当者付きの保留、対象外記録のいずれかです。次の作業が同じ場合は、現在の記録の補助根拠に圧縮して、実装、検証、Issue 処理へ戻ります。
-1. 重いコマンドや動作確認を予定する前に、タスクに結び付いた実行前の確認記録を
-   作るか引用します。確認記録には、依頼の対応箇所、コマンドの種類、先に使った
-   静的解析・読み取り evidence、実行が必要な未解決 signal、見込み時間、使う資源、
-   停止条件、成果物の場所、担当者を入れます。重いコマンドには、動作確認、
-   smoke run、CI 全体、長いテスト一式、ベンチマーク、実験、GPU / CPU 数値実行、
-   ソルバーの一括確認、大きな乱択ケースが含まれます。
-1. 編集 path または write-capable subagent handoff の前に、調査量を task risk に合わせる。広い surface、未確定 path、multi-agent handoff では `agents/COMMUNICATION_PROTOCOL.md` の `Pre-Edit Repository Investigation Packet` を作るか引用する。明示 path で owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じている修正、Routine docs、Focused code、typo / link / format-only では、同文書の `Parent-Direct Context Note` を routing / handoff artifact として残せますが、これは親の edit authorization ではありません。note には owner、対象 path、request clause、exception rationale if any、reuse 根拠、design / OOP boundary、validation route、`llm_visible_context`、`local_tool_context`、`durable_memory_refs` を入れる。raw search hits、nearest editable file、または chat context だけで調査完了扱いにしない
+1. 実行前の時間・資源・停止条件 artifact は、選択された execution profile または
+   workflow が要求する場合だけ作成する。通常の targeted test、smoke、checker は
+   そのコマンドと結果を直接記録し、未選択の pre-test artifact を完了条件にしない。
+1. 編集 path または handoff の前に、調査量を未確定の owner/path、構造変更、または実際の設計分岐に合わせる。明示された bounded request が owner、対象 path、validation route を固定する場合は、通常の parent-direct route としてその短い context note を残せばよく、parent-direct を exception や handoff failure として再分類しない。設計/API/OOP の判断が未解決なら設計 route に戻す。raw search hits、nearest editable file、または chat context だけで owner が決まらない場合のみ追加調査する
 1. workflow family は、owner boundary、差し替え可能な単位、validation route、public behavior / schema impact の evidence がそろうまで暫定 route として扱う。現在の route と、どの evidence で固定または変更するかを記録します。task id が分かる場合も、task catalog は catalog seed であり、後続の境界 evidence を無視する根拠にはしません
 1. 実装 route を ready 扱いする前に Design Integrity Gate を通す。request clauses を owning responsibility model に対応付け、`Abstract Design Frame` または routing / handoff note を引用し、予定単位が差し替え可能であることを確認します。API shape、責務境界、path layout、命名、アルゴリズム、test oracle、依存方向、runtime contract、config surface の判断が design packet で閉じていない場合は、`design_issue_blocker=<issue>` を記録して詳細設計 / design review へ戻し、implementation shortcut として吸収しません
-1. repo-changing task では、外形的な作業量や file 数ではなく design / OOP boundary と ownership clarity で実装経路を選ぶ。`requested_scope` と `work_scope` を分け、`work_scope` は段階化、routing、委譲してよく、要求された file、workflow、check、doc、PR state を `covered_surfaces`、`deferred_surfaces`、`omitted_surfaces` のいずれかに分類します。implementation / patch / doc-edit work の handoff は、別 writer が必要な場合だけ launch または schedule し、owner、責務、context、write authority、validation route が互換な active agent は revised scope でも再利用します。parent は選択された handoff、起動、追加指示、統合、review / validation gate 判定を所有する orchestrator / integrator です。独立 review、disjoint write authority、incompatible owner/context、または failed context integrity だけが fresh agent の根拠です。parent-direct は、責務境界、対象 owner、reuse 方針、validation route が明確で、現在の work packet が requested scope を覆うか明示 deferred surface を記録し、かつ `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` と `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` を recorded exception として残した場合だけ使う。repo-wide、multi-surface、長文文書群、shared runtime surface というだけでは無制限に multi-agent を起動しない。write-capable handoff が runtime authorization や tool gate で詰まる場合は、parent-direct に黙って縮退せず、run bundle または structured local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録する
+1. repo-changing task では、外形的な作業量や file 数ではなく design / OOP boundary と ownership clarity で実装経路を選ぶ。`requested_scope` と `work_scope` を分け、`work_scope` は段階化、routing、委譲してよく、要求された file、workflow、check、doc、PR state を `covered_surfaces`、`deferred_surfaces`、`omitted_surfaces` のいずれかに分類します。implementation / patch / doc-edit work の handoff は、別 writer が必要な場合だけ launch または schedule し、owner、責務、context、write authority、validation route が互換な active agent は revised scope でも再利用します。parent は選択された handoff、起動、追加指示、統合、review / validation gate 判定を所有する orchestrator / integrator です。独立 review、disjoint write authority、incompatible owner/context、または failed context integrity だけが fresh agent の根拠です。明示された bounded owner/path/validation request は通常の parent-direct route として扱い、別 writer の handoff exception に再分類しない。repo-wide、multi-surface、長文文書群、shared runtime surface というだけでは無制限に multi-agent を起動しない。write-capable handoff が runtime authorization や tool gate で詰まる場合だけ、structured local/tool context に blocker evidence を記録する
 1. multi-agent にする場合でも、分割境界は `差し替え可能な単位` に限る。別実装、別証明、別文書責務、別 validation oracle、別 review decision に置き換え得る境界だけを slice / wave / worker scope にする。数理的に差し替えが発生しない境界、単なる記法・読解補助・固定 context・同じ oracle を共有する連続導出は分割せず、同じ packet と同じ owner scope に残す
 1. subagent scheduling は `CODEX_SUBAGENTS.md` が所有する typed capacity handshake と lifecycle ledger を消費し、ready dependency-DAG frontier の stage owner ごとに `vertical dynamic wave` を組みます。requested / configured / platform-effective / workflow-demand / write-cap / nested-reserved / available を分離し、既知制約の最小値を startup で read back してから reservation 成功時だけ spawn します。capacity が足りない ready work は失敗させず queue し、durable handback、全 descendant close readback、reservation release を終えた slot から再開します。固定 active/write 数、disposable capacity probe、または generated role view は scheduling authority になりません
 1. repo-changing execution では `team_manifest.yaml` に `run.spawn_budget.active_subagents`、`run.spawn_budget.max_write_subagents`、`run.spawn_budget.runtime_max_threads`、`run.write_scope_policy.max_write_subagents` が分離して出ることを starter / closeout evidence に含める
-1. prompt-derived skill routing が必要なら `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` を使い、`ACTIVE_SKILLS` を current stage の宣言、`DEFERRED_SKILLS` を後続 wave trigger として扱う。`task_start.py` / `bootstrap_agent_run.py` を使う場合は、`SUGGESTED_SKILLS`、`ACTIVE_SKILLS`、`DEFERRED_SKILLS` と `run.repo_tool_routing_policy` を同じ source packet として保持し、`REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` から later wave の skill を追加したらその skill の command packet を再生成する
+1. prompt-derived skill routing が必要なら `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` を使い、`ACTIVE_SKILLS` を current stage の宣言、`DEFERRED_SKILLS` を後続 wave trigger として扱う。`bootstrap_agent_run.py` を使う場合は、`SUGGESTED_SKILLS`、`ACTIVE_SKILLS`、`DEFERRED_SKILLS` と `run.repo_tool_routing_policy` を同じ source packet として保持し、`REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` から later wave の skill を追加したらその skill の command packet を再生成する
 1. `agents/skills/README.md` から current stage に必要な public skill だけを足す。依存 source clone / module lifecycle が scope の場合は `$dependency-module-change` を一般 route として先に選び、AgentCanon update はその具体例として後続に置く。routing update に全 skill family を列挙せず、後続 stage で必要になった skill を wave ごとに追加する
 1. repo-changing execution の編集では、既存 tool の実行や owner-bounded patching の前提として runtime `SKILL.md` 読了を要求しません。対象 property を正本として持つ既存 tool または command packet を先に使い、結果の解釈や修正に必要な owner surface だけを開きます。
-1. owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じている修正では `$owner-bounded-routing` を追加し、owner boundary、existing-tool route、targeted validation をそこで固定する。Routine docs、Focused code、typo / link / format-only、明示的な bounded route 依頼もこの invariance gate を迂回しない。public surface の追加、縮小、削除、rename、restriction、deprecation、意味変更は `scoped_change` または broader route に進め、`dependency/consumer/migration/docs closure` を scope 形成する。file 数、外形的な作業量、近接 owner だけで route や closure を縮めません。実装 behavior は契約完全実装ポリシーから導く
+1. owner boundary、差し替え可能な単位、validation route が閉じた bounded edit は、この routing owner の通常 route として直接実行する。既存 tool と targeted validation を記録し、別の public skill layer を追加しない。public API/behavior/schema の追加、縮小、削除、rename、restriction、deprecation、意味変更だけは `scoped_change` または broader route に進め、必要な dependency/consumer/migration/docs closure を形成する
 1. prompt / routing / subagent-config drift が task の中心なら、親が policy prose を直接広く直す前に `prompt_config_reviewer` で prompt/config audit を切る
 1. starter command と review / specialist stack を family と mode に合わせて決める
 1. repo-changing execution では `python3 tools/agent_tools/check_convention_compliance.py` を closeout gate に入れ、機械化済み規約を prompt 内で再実装しない
 1. implementation が scope に入るときだけ Codex routing を出す
 1. tool が既に check した property を `explorer` や read-only reviewer に再読解させない。subagent へ渡すのは structured tool artifact と owned finding scope で、tool output が必要な抽象を欠く場合は tool contract の不足として扱う
+
+### Local Capability Priority
+
+Local Capability Priority (LCP) の全文規則はこの節だけが所有します。LCP が
+競合する候補 operation、`issue_defer`、または `split` を含む作業として選択された
+場合だけ、既存の scope / handoff record に operation mapping を記録します。
+単純な bounded/advisory single-operation task にこの mapping を新しい universal
+gate や closeout gate として要求しません。新しい classifier、schema、state machine、
+run artifact、closeout consumer は追加しません。
+
+canonical record は、run bundle がある場合はその `work_log`/scope record、run bundle
+がなく structured handoff がある場合はその structured handoff、両方がない場合だけ
+closeout recordの順で一つだけ選びます。親 packet、Issue、closeout はこの recordを
+locatorで参照し、mappingを複製しません。既存の `requested_scope`、`work_scope`、
+`covered_surfaces`、`deferred_surfaces`、`omitted_surfaces` と Decision Sufficiency
+record は、選択した canonical recordの既存 fields として再利用します。
+
+mapping が選択された場合だけ、作業範囲の既存 record に実行順で次の項目を一行ずつ
+記録します。これは既存 record の prose/table field であり、新しい public schema では
+ありません。
+
+```text
+request_clause: <exact quote> [locator: <request contract section/line>]
+operation_id: <owner-qualified unique id>
+priority: <execution list ordinal; lower runs first>
+depends_on: <zero or more operation_id values>
+split_parent_id: <parent operation_id or none>
+split_child_id: <child operation_id or none>
+operation: <one replaceable operation and owner>
+evidence: <observed local/Pro capability or explicit absence, with locator>
+classification: mandatory|local_only|pro_capable_nonblocking
+disposition: local_execute|issue_defer|split
+state: <resulting state after the selected disposition>
+completion_evidence: <artifact, command result, local Issue, or readback>
+```
+
+mapping 内の `operation_id` は owner-qualified で一意、`depends_on` は同じ mapping
+内に存在し、priority order は topological order で cycle を持たず、同順位の候補は
+record 上の行順を維持します。split は親行と子行を ID で結び、子の行順と依存を明示
+します。request clause は原文と locator を必須とし、Pro 可否は prompt keyword や
+モデルの一般的な自己評価から導出しません。
+
+unknown は disposition 前に mapping 行にも disposition にも入れません。先に Decision Sufficiency の
+未解決 branch / `evidence_missing` として記録し、local evidence が解決するか、既存の
+明示された omitted/deferred authority が成立するまで handled/close と扱いません。
+したがって disposition は、根拠のある `mandatory`、`local_only`、または明示された
+`pro_capable_nonblocking` に対してだけ選びます。
+
+`mandatory` と `local_only` は、required owner skill が selected/activated になった
+後で `local_execute` に投入します。user must-do、現在の blocker、root-cause
+investigation、acceptance validation、Docker/devcontainer/CI、環境依存のログ取得、
+filesystem side effect、Git mutation/conflict、remote mutation/readback、PR/Issue
+integration、および後続 owner/validationを決める依存 operationもこの local routeを
+先に通します。local_execute operationの owner skillが `DEFERRED_SKILLS` 候補なら、
+先にその skill を activateし、deferred のまま実行しません。
+
+`issue_defer` は、ユーザーの明示した policy または既存の承認済み capability evidence
+により Pro-capable と確認された、非必須・非ブロッキング operation に限ります。
+docs review、analysis、explanation、read-only research など、ローカルで実行可能でも
+この条件を満たす operation は、ローカルで試してからIssueへ移す二段階にせず、分類時点
+から直接 `issue_defer` にします。local-only capability、must-do、blocker/root-cause
+investigation、acceptance validation、remote mutation/integration、およびそれらに
+必要なreadbackはこの例外に含めず、`local_execute` します。既存 `issues/open/` form の
+`issue_id`、`status`、`source`、`severity`、`problem`、`evidence`、`done` を使い、future
+operator が再開できる `required_action` と `close_condition` を必ず記録します。remote
+Issue mirrorはユーザーが明示した場合だけ既存 sync routeを使います。
+
+依存がある operationは `priority` と `depends_on` が許す順に進めます。split は
+local_executeすべき子と issue_defer できる子が同じ依頼に含まれる場合だけ使い、親子ID、
+依存順、owner、validation、completion evidenceを同じ canonical recordへ記録します。
+各 operation は `operation -> resulting state -> completion evidence` の順で完了を示し、
+退避した operation は完了ではなく durable Issue への引き渡し状態です。
+
+token削減は調査範囲を縮めません。既存 issue capsule、context packet、handoff record の
+locator を再利用して raw log の全文再掲を避けます。`DEFERRED_SKILLS` は task-routing が
+所有する後続 skill candidateであり、operationの `issue_defer` とは独立です。skill が
+deferred でも local_execute operationは先に skillをactivateして実行し、skillが active
+でも上記の明示された Pro-capable nonblocking operationだけが issue_deferできます。両者を
+結ぶ alias、schema field、route outputは追加しません。
 
 ## Validation Boundary Contract
 
@@ -207,49 +285,70 @@ Validation command scope is governed by the preceding write-capable handoff
 trust boundary; work-conservation scheduling does not authorize a worker to
 expand a selected validation route.
 
-Model the complete requested work as a dependency DAG. Each node is a full
-replaceable responsibility unit, not a file-sized chunk, timed slice, or review
-fragment. Edges represent owner, schema, dependency, validation, conflict, and
-publication prerequisites. The DAG includes the complete owner and consumer
-closure before dispatch begins; prompt-keyword routing is not a scheduling
-signal.
+Use a dependency/overlap graph only when the selected work has real ordering,
+schema, validation, publication, or collision edges. A node is a full
+replaceable responsibility unit, not a file-sized chunk or timed slice. Direct
+owner edits and one-writer tasks need no manufactured DAG or schedule artifact;
+prompt-keyword routing is never a scheduling signal.
 
-The optimization objective is to minimize makespan subject to responsibility
-completeness and correctness. Efficiency is therefore a scheduling objective,
-never permission to omit, split, weaken, or prematurely close a required node.
-Runtime observations may inform ordering, but no fixed duration, elapsed-time
-limit, or timeout cutoff may cut the requested scope. An operational timeout
-may mark a node blocked and trigger recovery; it may not turn incomplete work
-into completion.
+The optimization objective is lexicographic, in this order: request
+completeness and correctness, minimum decision-relevant total work, then
+minimum makespan. Makespan therefore never makes extra parallel review,
+implementation, or validation work free. A ready action is admissible only
+when it can change the decision tuple `(owner, implementation mechanism,
+validation route, terminal state)`, strictly decrease the unresolved measure
+defined below, or open a typed new candidate epoch from new evidence.
+Efficiency is never permission to omit, split, weaken, or prematurely close a
+required node. Runtime observations may inform ordering, but no fixed duration,
+elapsed-time limit, or timeout cutoff may cut the requested scope. An
+operational timeout may mark a node blocked and trigger recovery; it may not
+turn incomplete work into completion.
 
-At every dispatch decision:
+When coordination is selected, dispatch decisions:
 
-1. Refresh the dependency DAG and compute the complete remaining closure.
-2. Compute the critical path through the remaining DAG. Use it to prioritize
-   ready work, not to discard other ready work or to manufacture durations.
-3. Compute the ready set: nodes whose predecessors and required closure
-   evidence are satisfied. Dispatch every ready node that is non-conflicting
-   and admissible under actual capacity; do not serialize while another useful
-   ready node can run.
-4. Batch remote reads, queue snapshots, and tool operations that share an
+1. Refresh only the dependency and collision edges that can change the next
+   owner, order, or merge decision.
+2. Dispatch every ready node that is non-conflicting and admissible under actual
+   capacity; serialize colliding units and do not invent timed stages.
+3. Batch remote reads, queue snapshots, and tool operations that share an
    authority, input, or readback boundary. Preserve each node's identity and
    exact evidence even when operations are batched.
-5. Reuse the warm worker and reviewer contexts for repeated repair when the
+4. Reuse the warm worker and reviewer contexts for repeated repair when the
    responsibility unit and route are unchanged. Invalidate only evidence
    affected by the repaired node and its dependent closure; retain unaffected
    evidence.
-6. Compute owner, schema, dependency, validation, and publication closure
-   before opening the owning review. Review the exact candidate closure once;
-   accepted findings create only the affected repair nodes.
-7. Wait only when the useful ready set is empty. Record the predecessor,
+5. Compute owner, schema, dependency, validation, and publication closure only
+   when the selected workflow requires those edges. Review the exact candidate
+   closure once; accepted findings create only affected repair nodes.
+6. Wait only when the useful ready set is empty. Record the predecessor,
    conflict, capacity, or external-state blocker that makes it empty, then
    resume when that state changes. Waiting is not an elapsed-time scope gate.
 
-The schedule must continue until every required node is complete and correct,
-including its review, validation, and publication evidence. This contract is
-state- and dependency-driven; prompt keywords, arbitrary serial waits, and
-hard-coded durations cannot replace the DAG, ready-set, critical-path, or
-closure decisions.
+For autonomous review and repair, one exact candidate digest defines one
+candidate epoch. The initial owning review runs at most once in that epoch and
+returns stable blocking finding IDs separately from advisory notes. Advisory,
+style preference, duplicate, already-covered, and evidence-free findings do not
+reopen implementation. A repair targets assigned blocking finding IDs, and the
+following focused recheck may inspect only those IDs plus evidence invalidated
+by the repair. It may not restart broad review or add a new blocker unless a
+new contract, reachable-behavior witness, or structural contradiction opens a
+new candidate epoch.
+
+For a state `S`, define the unresolved measure as
+`mu(S) = |blocking_finding_ids| + |unresolved_validation_ids| +
+|unresolved_request_clause_ids|`. After the one initial review, every admitted
+action must either change the decision tuple using typed evidence or strictly
+decrease `mu`. Repeating the same state fingerprint and action fingerprint is
+a `non_convergent_cycle`; stop that action and hand back the typed cycle rather
+than starting another review or implementation pass. Zero blocking findings,
+zero unresolved request clauses, and selected validation `pass` or
+`not_applicable` form the terminal ship/handoff condition. Improvement ideas
+after that point are advisory or separate-Issue work.
+
+The selected schedule continues until its required units, validation, and
+publication evidence are complete. This contract is state- and
+dependency-driven; prompt keywords, arbitrary serial waits, and hard-coded
+durations cannot replace a real ordering or collision decision.
 
 ### Canonical Skill Invocation Order
 
@@ -261,21 +360,43 @@ with required prerequisites and derives their topological invocation order from
 that dictionary. Prompt keywords select candidates only; they do not encode a
 second call order or related-skill list.
 
-### Parallel Fresh-Clone Workstreams
+### Repository Topic Clone Workstreams
 
-Vendor-first is the default for one nonparallel source stream. It is not a
-prohibition on explicitly requested parallel independent work. A parent may
-select `workspace/<topic-slug>/<module-basename>` fresh clones from latest
-`origin/main` when the remaining DAG contains substantial replaceable
-responsibility units with disjoint write scopes, explicit dependency and merge
-order, independent validation routes, and distinct reviewer ownership. The
-typed lifecycle route is
-`dependency_module_change.py prepare --placement workspace`; its exact topic,
-module, branch, owner evidence, computed clone path, and source identity are
-part of the handoff evidence. Fresh mode always creates the requested branch
-from fetched `origin/main` and refuses an existing local or remote branch;
-continuation uses the separately typed
-`dependency_module_change.py prepare --placement workspace-continuation` route.
+親、依存、standalone の source workstream はすべて
+`repository-topic-clone` の単一 lifecycle を使います。要求された clone/edit/update
+operation を先に保ち、`workspace/<topic-slug>/<repo-name>` の exact identity が既存
+clone と一致すれば named branch を再利用し、branch が無ければ最新
+`origin/main` から作成します。repository kind は prepare 後の policy decorator
+であり、specialized skill の前提が合わない場合はその decorator だけを外して generic
+operation を続けます。
+
+canonical `repository_topic_clone.py` / `dependency_module_change.py` の
+`prepare` と `merge-main` は、task owner の非空 owner evidence、computed path、
+remote、branch、module identity が一致する repo-local workspace に対して、operation-level
+の追加承認なしで dispatch します。この carve-out は `<project-root>/workspace/<topic>/`
+の canonical lifecycle tool に限定されます。hook が保護する shared-checkout の raw Git
+mutation（checkout/switch、branch/worktree、reset/restore/clean/stash、protected update
+wrapper）は同じ command でも既存の明示 authority gate を通します。canonical tool の
+内部で必要な Git 操作を理由に、caller が raw Git authority を付けたり、manual clone、
+別 path、`rm -rf` を選んだりしてはいけません。
+
+`dependency_module_change.py status` は adapter-only の read command です。generic
+lifecycle、owner-evidence、または operation-level approval carve-out には含めません。
+
+task closeout では `repository-topic-clone` または `dependency-module-change` skill に
+`cleanup` dispatch を必ず割り当てます。canonical cleanup は request から computed clone を
+解決し、selected Git toplevel、owner evidence/marker、URL、branch、clean non-detached state、
+および fetch した `origin/<branch>` の local HEAD/tree 一致を preflight します。candidate CAS、
+PR lifecycle、publication readback は任意の追加 evidence であり、指定時だけ coherent set と
+merged publication readback を検証します。preflight が成功して `CleanupProof` / cleanup
+receipt を返したときだけ `--apply` の削除を受理し、未達・衝突・unknown dirty state・proof
+mismatch は clone/topic root を保持した typed hold として closeout packet に記録します。
+通常 cleanup に workspace packet artifact は不要で、proof-free deletion は完了状態になりません。
+
+workstream の scope は repository 構造、依存 edge、差し替え可能な責務単位、validation
+route から形成します。`.gitignore`、単一 file、行数、diff 件数は clone lifecycle や
+owner-bounded route の選択根拠になりません。複数 workstream は disjoint write scope、
+dependency/merge order、reviewer ownership が成立する場合だけ並列化します。
 
 For an eligible parallel set, the parent must launch every ready non-conflicting
 stream under actual capacity, preserve each stream's full responsibility unit,
@@ -285,9 +406,10 @@ file-sized clones, or timed fragments is not an independent workstream and is
 not admissible. Colliding or dependent streams remain ordered by the recorded
 dependency/merge order.
 
-Every stream branch must fetch and merge the latest `origin/main` before its
-candidate review or PR. The parent preserves the explicit merge order when
-integrating candidates; a base-read or CAS check without the merge is
+Every stream branch must fetch and normally merge the latest `origin/main`
+before its candidate review or PR. Dirty state and merge conflicts are preserved
+as typed evidence for intentional resolution. The parent preserves the explicit
+merge order when integrating candidates; a base-read or CAS check without the merge is
 insufficient.
 
 ## Decision Sufficiency Packet
@@ -338,7 +460,7 @@ requirement.
       "affects_owner_edit_validation": false,
       "blocking": false,
       "serialized_in_decision_packet": true,
-      "validator_owner": "absolute path to agents/skills/agent-orchestration.md#validate_decision_sufficiency_packet"
+      "validator_owner": "agents/skills/agent-orchestration.md#Decision Sufficiency Packet"
     }
   ],
   "rejection": null,
@@ -453,7 +575,7 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - scope が paper draft と broader academic prose をまたぐなら、`paper-writing` を優先し、必要なときだけ `academic-writing` を追加します
 - PR body、PR evidence comment、status update、decision brief、presentation narrative、PPT storyboard、または tool、JSON / JSONL、hook、eval、checker、experiment、review、audit の結果から reader-facing report を作る場合は `report-writing` を使います。report output は user が HTML、browser view、dashboard、web page、external browser publication を明示しない限り Markdown を既定にします。PPT / deck が scope に入る場合は visual asset plan と slide-production workflow も明示します。raw machine result を保存、コピー、蓄積する場合は `result-artifact-writeout` も併用します
 - HTML output、HTML report、browser-readable page、dashboard、local preview server、external browser publication が明示された場合は `html-output` を使います
-- HTML の experiment / Eval report が明示された場合は `html-experiment-report` と `html-output` を併用します
+- HTML の experiment / Eval artifact が明示された場合は `html-output` を直接使います。新しい実行・再実行が必要な場合だけ `experiment-lifecycle`、reader-facing claim が必要な場合だけ `report-writing` を追加します
 - report、experiment plan / report、Eval output、decision brief、presentation / PPT deck、HTML view、document、paper、refactor の構造が非自明な場合、または primary figure / table / ponchi-e / slide / section / slice、source map、source-to-slide map、invalid interpretation boundary を先に決める必要がある場合は `structure-planning` を足します
 - tool、checker、hook、static analysis を走らせて問題を探す、full finding packet と mechanical priority order を作る、implementation / refactor planning に渡す場合は `tool-finding-report` を使います。before / after impact 比較は明示された場合だけ追加します。raw result を保存する場合は `result-artifact-writeout`、reader-facing narrative を作る場合は `report-writing` も併用します。reader-facing narrative が非自明な finding packet、priority policy、metric / count contract、source map を持つ場合は `structure-planning` も併用します
 - README、workflow、guide、migration、specification docs は一般説明 prose adapter を正にしつつ、evidence-backed status、evaluation、audit、review、decision、recommendation section を含む場合は `report-writing` を overlay として足します
@@ -479,8 +601,8 @@ task id が分かる場合は、task catalog 側の family を正本にします
 ## Entrypoint Precedence
 
 - repo-editing task や kickoff command が必要な task では `bootstrap_agent_run.py` を優先します
-- `task_start.py` は routing-only starter guidance に向きます
-- `task id がある` ことだけでは `task_start.py` を優先する理由にはなりません。repo-changing execution なら task id 付きでも bootstrap を使います
+- `bootstrap_agent_run.py` は routing-only starter guidance に向きます
+- `task id がある` ことだけでは `bootstrap_agent_run.py` を優先する理由にはなりません。repo-changing execution なら task id 付きでも bootstrap を使います
 
 ## Review And Specialist Expectations
 
@@ -497,11 +619,11 @@ task id が分かる場合は、task catalog 側の family を正本にします
 ## Codex Implementation Routing
 
 - implementation が scope に入るときだけ routing を出します
-- `bootstrap_agent_run.py` か `task_start.py` の output で `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認してから route します
+- `bootstrap_agent_run.py` の output で `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認してから route します
 - prompt/config drift を含む task では、routing 決定後の詳細 diff を `prompt_config_reviewer` に監査させ、親が chat 文脈だけで共有 policy surface を広く書き換えません
 - coding / implementation / patch / doc-edit work を求める repo-changing task は、read-only survey / review role だけで完了扱いにしません。surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff scope を作ったら、追加の read-only wave より先に selected write-capable implementer を起動または schedule します。parent は実装者ではなく orchestrator / integrator として、handoff packet、起動、追加指示、統合、review / validation gate を所有します。
-- Runtime authorization や tool gate で write-capable subagent を起動できない場合は、local/tool context に `WRITE_SUBAGENT_AUTHORIZATION=required` または `write_capable_handoff_blocker=<gate>`、`selected_agent_type`、`evidence`、`parent_packet_ref`、`status=blocked` を記録します。parent-direct 実装へ進める route は、`PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` と `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` 付き revised workflow route です。
-- Routine docs / Focused code でも implementation / patch / doc-edit work は、別 writer が必要な場合だけ write-capable handoff を選びます。parent-direct は risk class、check matrix、owner boundary、targeted validation、exception rationale が実装前に記録された場合だけ使います。`worker` が既定で、`spark_worker` は Abstract Design Frame、design trace、identifier naming、test-plan artifact / evidence（active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が必須になった場合のみ）、dependency-expanded handoff scope が揃った低リスク slice に対し、parent packet が `--select-agent-type implementer=spark_worker:<evidence>` を明示し、stdout / manifest が選択を記録した場合だけ使います。選択済み candidate が blocked の場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録し、candidate を変える場合は parent packet と wave の改訂を必須にします。
+- Runtime authorization や tool gate で write-capable subagent を起動できない場合は、local/tool context に blocker evidence を記録します。
+- Routine docs / Focused code でも implementation / patch / doc-edit work は、別 writer が必要な場合だけ write-capable handoff を選びます。明示された bounded owner/path/validation request は通常の parent-direct route として扱います。`worker` が既定で、`spark_worker` は Abstract Design Frame、design trace、identifier naming、test-plan artifact / evidence（active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が必須になった場合のみ）、dependency-expanded handoff scope が揃った低リスク slice に対し、parent packet が `--select-agent-type implementer=spark_worker:<evidence>` を明示し、stdout / manifest が選択を記録した場合だけ使います。選択済み candidate が blocked の場合は parent packet を改訂します。
 - 設計解釈、衝突解決、広い architecture 判断、scope 判断を含む slice は `worker` を使います。
 - `spark_worker` は詳細設計、review、final judgment には使いません。
 

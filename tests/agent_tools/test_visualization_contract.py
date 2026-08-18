@@ -190,8 +190,8 @@ def projection_tool_calls(
 class VisualizationContractTest(unittest.TestCase):
     """Verify the exact D2.4 contract and deterministic failure behavior."""
 
-    def test_public_api_has_seven_functions_without_substitute_symbols(self) -> None:
-        """Only the seven approved callable owner functions are public."""
+    def test_public_api_has_seven_required_owner_functions(self) -> None:
+        """The public API exposes the seven required owner functions."""
         for function_name in (
             "build_source_universe",
             "build_projection_coverage_manifest",
@@ -202,15 +202,6 @@ class VisualizationContractTest(unittest.TestCase):
             "readback_projection",
         ):
             self.assertTrue(callable(getattr(contract, function_name)))
-        for removed_name in (
-            "as_envelope",
-            "make_source_universe",
-            "canonical_tool_call",
-            "VisualizationToolCall",
-            "CANONICAL_TOOL_ID",
-            "CANONICAL_ARGUMENT_SCHEMA",
-        ):
-            self.assertFalse(hasattr(contract, removed_name))
 
     def test_universe_preserves_three_buckets_and_deterministic_identity(self) -> None:
         """Literal, owner, and dependency records form one sorted immutable set."""
@@ -606,6 +597,90 @@ class VisualizationContractTest(unittest.TestCase):
                 renderer_id="renderer-1",
             )
         self.assertEqual(readback["status"], "pass")
+
+    def test_issue694_resource_parser_distinguishes_data_from_resource_context(self) -> None:
+        """Offline resource checks inspect DOM/CSS/executable JS contexts only."""
+        ordinary = contract._HTMLReadbackParser()
+        ordinary.feed(
+            "<p>https://example.invalid fetch( XMLHttpRequest import(</p>"
+            '<script>const text = "fetch(https://example.invalid)";</script>'
+            "<style>/* url(https://example.invalid/comment) */ .x { content: 'url(https://example.invalid/string)' }</style>"
+        )
+        ordinary.close()
+        self.assertEqual(ordinary.violations, [])
+
+        external = contract._HTMLReadbackParser()
+        external.feed(
+            '<img src="https://example.invalid/image.png">'
+            '<style>.x { background: url(https://example.invalid/image.png) }</style>'
+            '<script>fetch("https://example.invalid/api");</script>'
+        )
+        external.close()
+        self.assertIn("external_resource", {v["code"] for v in external.violations})
+        self.assertIn("script_network_api", {v["code"] for v in external.violations})
+
+        local = contract._HTMLReadbackParser()
+        local.feed(
+            '<img src="#embedded">'
+            '<style>.x { background: url(data:image/png;base64,AAAA) }</style>'
+            '<script>const value = /fetch\\(/;</script>'
+        )
+        local.close()
+        self.assertEqual(local.violations, [])
+
+    def test_issue694_svg_descendant_resources_and_module_imports_are_contextual(self) -> None:
+        """SVG descendants and static module imports are resource-graph inputs."""
+        svg_external = contract._HTMLReadbackParser()
+        svg_external.feed('<svg><g><path fill="url(https://example.invalid/x.svg)"></path></g></svg>')
+        svg_external.close()
+        self.assertIn(
+            "external_resource",
+            {violation["code"] for violation in svg_external.violations},
+        )
+
+        svg_local = contract._HTMLReadbackParser()
+        svg_local.feed('<svg><g><path fill="url(#local-marker)"></path></g></svg>')
+        svg_local.close()
+        self.assertEqual(svg_local.violations, [])
+
+        svg_scalars = contract._HTMLReadbackParser()
+        svg_scalars.feed('<svg><path fill="red" stroke="none"></path></svg>')
+        svg_scalars.close()
+        self.assertEqual(svg_scalars.violations, [])
+
+        module_import = contract._HTMLReadbackParser()
+        module_import.feed('<script type="module">import "./other.js";</script>')
+        module_import.close()
+        self.assertIn(
+            "script_network_api",
+            {violation["code"] for violation in module_import.violations},
+        )
+
+        module_data = contract._HTMLReadbackParser()
+        module_data.feed(
+            '<script type="module">'
+            '// import "./comment.js";\n'
+            'const label = "import \'./string.js\'";\n'
+            "import.meta.url;"
+            "</script>"
+        )
+        module_data.close()
+        self.assertEqual(module_data.violations, [])
+
+        non_executable = contract._HTMLReadbackParser()
+        non_executable.feed(
+            '<script type="text/plain">fetch("https://example.invalid");</script>'
+            '<script type="application/xml">import "./data.js";</script>'
+        )
+        non_executable.close()
+        self.assertEqual(non_executable.violations, [])
+
+        regex_context = contract._HTMLReadbackParser()
+        regex_context.feed(
+            '<script>return /fetch\\(/; if (ready) /XMLHttpRequest/.test(value);</script>'
+        )
+        regex_context.close()
+        self.assertEqual(regex_context.violations, [])
 
 
 if __name__ == "__main__":

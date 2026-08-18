@@ -61,27 +61,26 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
 ## 4. 開発環境
 
 - 共通実行環境が必要な場合は、`CONTAINER_OPERATIONS.md` を正本として repo-local `docker/` と AgentCanon-owned `.devcontainer/` の責務を分けます。
-- Python 依存を追加する場合は `docker/requirements.txt` と `docker/install_python_dependencies.sh` の契約を基準にします。Python requirements の install / copy はこの 2 ファイルルートで実施し、`docker/Dockerfile` はその処理を担わない運用です。
-- `docker/Dockerfile` または `docker/requirements.txt` を更新した変更では、`make docker-build-check` を実行します。
+- Python 依存を追加する場合は、親 `pyproject.toml` の optional extras と親 image build の image-owned dependency lifecycle / readback を契約の基準にします。固定 OS/Python capability、親が必要とする project dependencies、Node/npm は image が所有し、Node/npm は digest-pinned official Node OCI provider から image build 時に `/usr/local` へ copy します。Agent/Codex tools は typed `.devcontainer/dependencies.toml` から image build で導入します。post-create は `image-verify` と container runtime readback だけを実行します。
+- `docker/Dockerfile`、`pyproject.toml`、または `.devcontainer/` を更新した変更では、`python3 tools/ci/container_config.py` と対象 container validation を実行します。
 - 開発環境の更新では、必要な README と運用文書も同じ変更で更新します。
 - Python を使う場合でも、repo 全体の入口は language-neutral に保ちます。
-- canonical container の `safe.directory` は `docker/register_safe_directories.sh` で管理します。Docker image build 時は repo workspace の `/workspace` を登録し、devcontainer 作成時や smoke test では mount 済み workspace の `vendor/*` を列挙して `/workspace/vendor/<name>` を動的に登録します。
+- canonical container の safe-directory は shared post-create が mounted workspace の実体を検証して管理します。image build や host runtime で repository-specific な登録スクリプトを呼び出しません。
 - Template / AgentCanon 固有の machine-local remote path は `documents/contracts/template-github-remote.md` と `documents/agent-canon/agent-canon-github-remote.md` を正本にします。
-- Docker container 内から Docker を使う手順を正本にする場合は、同梱する CLI、host socket mount、または別 daemon の要件を文書へ明記します。
-- canonical container では `tools/ci/check_fresh_clone.sh` が使う `rsync` を `docker/Dockerfile` に同梱します。host runtime で `rsync` が不足する場合は、環境構築手順で `rsync` を導入してから同じ検証を再実行します。
+- Docker container 内から Docker を使う手順を正本にする場合は、明示した `docker-host` optional profile の socket bind または別 daemon の要件を文書へ明記します。default lifecycle は host Docker CLI/socket に依存しません。
 - Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth setup、host mount 方針の具体的な境界、例外、validation は `CONTAINER_OPERATIONS.md` を正本にします。
 
 ## 4.5 環境依存ツール導入提案のルール
 
 - repo-wide に使う環境依存ツールの導入提案では、`templates/agents/environment_change_proposal.md` を使って理由、影響範囲、validation、rollback を記録します。
 - host-global install 由来の要件は、必要時に `CONTAINER_OPERATIONS.md` または `docker/` の運用境界へ反映します。
-- repo-wide に必要な Python tool は、原則として `CONTAINER_OPERATIONS.md` の Python dependency rule と repo-local installer contract に反映します。Dockerfile へ入れるのは OS package、runtime library、build tool、image-level helper だけです。
+- repo-wide に必要な Python tool は、`pyproject.toml` の selected extras と、親が必要とする場合は image build の project-dependency lifecycle / readback contract に反映します。Agent/Codex tools は typed `.devcontainer/dependencies.toml` manifest が所有し、image build で fixed OS/Python/native capability、digest-pinned Node provider、manifest tools、親 project dependencies を準備します。post-create から editable install、pip setup、package mutation を呼び出しません。
 - CI でも使う tool は手元だけの補助 install に留めず、共有運用手順へ反映してから利用します。
 - 1 回限りの調査や個人補助にとどまる tool は、repo 正本へ追加する前に container 実行、checked-in script、既存依存での代替可否を確認します。
 - 導入提案では、少なくとも次を明記します。
   - 何の workflow を支えるのか
   - host / Docker / CI のどこを更新するのか
-  - `docker/Dockerfile`、`docker/requirements.txt`、`.devcontainer/` の更新要否
+  - `docker/Dockerfile`、`pyproject.toml`、`.devcontainer/` の更新要否
   - どのコマンドで validate するのか
   - 不採用または撤回するときの rollback 手順
 
@@ -89,9 +88,9 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
 
 - `docker/Dockerfile` を更新する変更では、依存追加の有無にかかわらず `README.md`、`QUICK_START.md`、関連する `documents/` の command や説明も同じ変更で見直します。
 - Docker 変更で新しい tool を同梱する場合は、その tool の用途、呼び出し入口、不要になったときの削除方針を文書へ残します。
-- Docker 変更で agent convenience tool が必要になった場合は、`CONTAINER_OPERATIONS.md` の devcontainer boundary に従って AgentCanon-owned `vendor/agent-canon/.devcontainer/post-create.sh` を更新します。
-- Docker runtime の再利用 surface は `docker/packs/*.toml`、`docker/codex-container-profiles.toml`、`docker/python-execution-rules.toml` を正本にし、path 分岐は各 surface の契約へ集約します。
-- Docker runtime、runtime pack、devcontainer 生成導線を変えた場合は `python3 tools/ci/container_config.py` を通し、`docker/Dockerfile`、`docker/packs/*.toml`、`.devcontainer/` の整合を確認します。
+- Docker 変更で agent convenience tool が必要になった場合は、`CONTAINER_OPERATIONS.md` の devcontainer boundary に従って AgentCanon-owned `.devcontainer/Dockerfile` と typed manifest を更新します。`post-create.sh` は image-verify/readback surface として保ちます。
+- Docker runtime の project 正本は `docker/Dockerfile` とし、`docker/packs/*.toml` と Python execution rules は存在するときだけ project-owned override として使います。nested-Codex の既定 profile は AgentCanon source の `tools/ci/codex-container-profiles.toml` が所有します。
+- Docker runtime、optional runtime pack、devcontainer 生成導線を変えた場合は `python3 tools/ci/container_config.py` を通し、存在する project surface と `.devcontainer/` の所有境界を確認します。
 - main server host の path、mount、builder 前提は `documents/contracts/server-host-contract.md` と `templates/documents/server_runtime_layout.template.toml` を正本にし、実行経路を都度記録して共有します。
 - C++ の canonical project entrypoint は `cpp/CMakeLists.txt` です。parent root は
   language-neutral に保ち、C++ は explicit な `cpp` source directory から configure します。
@@ -144,7 +143,7 @@ cmake --install "$ROOT/build/cpp/<profile>"
 
 - Python managed experiment の registry、run、result、report は `experiments/` 配下に集約します。
 - Native C++ experiment source と target は `cpp/experiments/` に置き、build は
-  `cpp-experiment-<name>`、run は lifecycle-owned `experiments/<topic>/result/<run_name>/`
+  `cpp-experiment-<name>`、run は lifecycle-owned `experiments/<topic>/result/<variant>/<run_name>/`
   へ分離します。
 - 1 回の run は fresh 実行として扱います。
 - 正式結果は planned run と acceptance criteria が揃った実行から採用します。

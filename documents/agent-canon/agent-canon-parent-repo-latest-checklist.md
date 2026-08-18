@@ -9,7 +9,6 @@ downstream design ./agent-canon-update-tasks.toml shared parent-repo update TODO
 downstream implementation ../../tools/agent_tools/agent_canon_preflight.py emits checklist evidence at task start
 downstream implementation ../../tools/agent_tools/agent_canon_update_todos.py manages parent update TODO state
 downstream implementation ../../tools/agent_tools/bootstrap_agent_run.py prints checklist evidence
-downstream implementation ../../tools/agent_tools/task_start.py prints checklist evidence
 downstream implementation ../../tools/sync_agent_canon.sh classifies parent pin freshness routes
 downstream implementation ../../tools/ci/check_agent_canon_latest.sh enforces latest-state CI gate
 @dependency-end
@@ -35,11 +34,12 @@ failure routes, and the legacy compatibility appendix for non-submodule repos.
 | Path | Expected State | Owner | Check |
 | --- | --- | --- | --- |
 | `vendor/agent-canon/` | AgentCanon Git submodule checkout and parent gitlink | AgentCanon | `git submodule status vendor/agent-canon` and `git rev-parse HEAD:vendor/agent-canon` |
-| `AGENTS.md`, `agents/`, `.agents/`, `.codex/`, `tools/` | root runtime view of AgentCanon | AgentCanon | `bash tools/sync_agent_canon.sh check` |
-| `templates/` | managed symlink to centralized AgentCanon template source | AgentCanon | `bash tools/sync_agent_canon.sh check` |
-| `.github/AGENTS.md` | GitHub agent root view | AgentCanon | `bash tools/sync_agent_canon.sh check` |
-| `.github/workflows/agent-coordination.yml`, `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`, `.github/scripts/checkout_agent_canon_submodule.sh` | regular root copies forced by GitHub path constraints | AgentCanon source, root copy | `bash tools/sync_agent_canon.sh check` |
-| `documents/runtime/SHARED_RUNTIME_SURFACES.md`, `documents/runtime/shared-runtime-surfaces.toml` | shared surface policy and machine manifest | AgentCanon | `python3 tools/agent_tools/check_convention_compliance.py` |
+| `AGENTS.md`, `.codex/config.toml`, `.codex/agents/`, `tools/agent-canon` | active root runtime views of AgentCanon | AgentCanon | source-root resolver `check` |
+| `agents/`, `.agents/`, `.vscode/`, `.devcontainer/` | optional parent-owned regular content | template or derived repo | parent structure/environment checks when present |
+| `tools/` | parent-owned regular container; shared tooling is only `tools/agent-canon/` | parent / AgentCanon | source-root resolver `check` |
+| `vendor/agent-canon/templates/` | centralized AgentCanon template source with no parent-root symlink view | AgentCanon | manifest `link-specs` and consumer path readback |
+| `.github/` | parent-owned GitHub workflows, templates, and automation | template or derived repo | GitHub workflow checks |
+| `documents/runtime/SHARED_RUNTIME_SURFACES.md`, `documents/runtime/shared-runtime-surfaces.toml` | shared surface policy and machine manifest | AgentCanon | source-root resolver `check-convention` |
 | `.agent-canon/update-state.toml` | parent-local AgentCanon update TODO boundary | parent repo | `python3 tools/agent_tools/agent_canon_update_todos.py status` |
 | `documents/README.md`, template bootstrap / host / server contract docs | parent repo active contracts | template or derived repo | regular file, not root symlink |
 | `goal.md`, project notes, experiments, reports | repo-local durable state and generated evidence | parent repo | must not be restored from AgentCanon |
@@ -62,13 +62,14 @@ git -C vendor/agent-canon status --short --branch --untracked-files=all 2>/dev/n
    dirty-state avoidance, small addendum, or mid-task user instruction. If a new
    branch is required, record `branch_creation_reason=<reason>` and why the
    existing branch cannot continue before requesting current-task user
-   approval. Creation requires both creation and destructive authority/reason
-   fields in the same command segment.
+   approval. Normal creation requires creation authority/reason in the same
+   command segment; force-create or ref overwrite additionally requires
+   destructive authority/reason.
 
 1. If `vendor/agent-canon/` is a submodule, unrelated parent dirty state does not block an AgentCanon update. `make agent-canon-ensure-latest` classifies the update surface directly using the [`AgentCanon parent state decision table`](../rule/dependency-module-changes.md#agentcanon-parent-state-decision-table):
 
 - clean `vendor/agent-canon/` on named `main` with worktree `HEAD` equal to the
-  staged index gitlink is the parent pin/root projection pass state.
+  staged index gitlink is the parent pin and active-root-view repair pass state.
 - clean `vendor/agent-canon/` on a named topic branch is the source-edit owner;
   `main` is only the topic-creation starting point.
 - dirty `vendor/agent-canon/` follows the table's requested-topic identity
@@ -84,8 +85,10 @@ Template-owned active contracts such as `documents/README.md`, bootstrap docs, h
 1. Update AgentCanon before planning or implementation.
 
 If the read-only update plan reports a mutation, request current-task user
-approval, then invoke `make agent-canon-ensure-latest` with all four inline Git
-authority/reason fields in the same command segment.
+approval, then invoke `make agent-canon-ensure-latest` with inline destructive
+authority/reason fields in the same command segment. Add the creation pair
+only when the route creates a branch or worktree; force-create or
+ref-overwrite routes require both pairs.
 
 The same command segment must also set
 `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>`. The digest
@@ -105,44 +108,48 @@ binary just because the source commit has not changed yet.
 
 1. If only unrelated parent paths are dirty, keep those changes intact and still run the latest update. Record that the dirty paths were outside the AgentCanon update surface.
 
-1. If latest reports dirty AgentCanon checkout state, stop and select the typed
-   repair route. Prepare the topic workspace branch clone only when another
-   topic occupies the vendor checkout. Detached head, merge conflict,
-   `.gitmodules` change, parent gitlink conflict, or AgentCanon-owned root-view
-   overwrite risk is repaired only after the source/pin owner is selected; no
-   vendor state is restored as a source route.
+1. If latest reports dirty AgentCanon checkout state on the intended named
+   source branch, retain it as evidence and continue when its local materialized
+   paths do not collide with the exact update write set. Prepare the topic
+   workspace branch clone only when another topic occupies the vendor checkout.
+   Detached head, virtual or existing merge conflict, `.gitmodules` change,
+   parent gitlink conflict, or AgentCanon-owned root-view overwrite risk is
+   repaired only after the source/pin owner is selected.
 
-Parent `latest` first handles a clean named topic source owner through the
-source PR merge route; its parent pin/root projection phase does not invoke
-`merge-main-into-current*`. A parent checkout on `main` stops at topic creation,
+Parent `latest` first handles the intended named topic source owner through the
+source PR merge route; its parent pin/active-root-view phase does not invoke
+`merge-main-into-current`. A parent checkout on `main` stops at topic creation,
 and standalone source mode retains its own source-branch merge route.
 
 1. After AgentCanon update or PR merge, restore root views from the manifest and verify drift.
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  bash tools/sync_agent_canon.sh link-root
-bash tools/sync_agent_canon.sh check
+  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
 ```
 
 Record this as `agentcanon_structure_followup=required` for every AgentCanon
 source integration, parent `vendor/agent-canon` pin update, `.gitmodules`
-change, AgentCanon-owned root runtime view change, shared root-copy surface
-change, or parent root sync PR. Record `agentcanon_structure_followup=pass` only
+change, AgentCanon-owned active root runtime view change, or parent root sync PR.
+Parent-owned regular surfaces do not require AgentCanon projection readback. Record `agentcanon_structure_followup=pass` only
 after both commands pass from the parent root. If the AgentCanon source change
 was prepared in standalone AgentCanon or in the submodule worktree, this parent
 root follow-up is still mandatory after the source PR is integrated or while
 preparing the parent pin/root-view PR.
 
-For the centralized template source update, the parent follow-up packet must also
-record the exact structural cleanup: materialize
-`templates -> vendor/agent-canon/templates`, delete parent `experiments/_template/`,
-remove only the `_template` entry from the project-owned
-`experiments/registry.toml`, remove docs/tests that only exercise that scaffold,
-and regenerate the GitHub Issue/PR copies from
-`vendor/agent-canon/templates/documents/github/`. Do not delete other experiment
-topics or mutate the AgentCanon source registry (the source tree has no project
-registry).
+For a centralized template source update, the parent follow-up packet must also
+record the exact structural cleanup. If the parent still tracks the former
+`templates -> vendor/agent-canon/templates` symlink, the parent integration
+commit runs `git rm templates` after confirming that exact tracked symlink
+identity. A parent-owned regular `templates/` directory remains unchanged.
+The same packet preserves `vendor/agent-canon/templates/`, deletes parent
+`experiments/_template/`, removes only the `_template` entry from the
+project-owned `experiments/registry.toml`, removes docs/tests that only
+exercise that scaffold, and preserves parent-owned regular GitHub content without
+regenerating it from `vendor/agent-canon/templates/documents/github/`. Do not delete other
+experiment topics or mutate the AgentCanon source registry (the source tree has
+no project registry).
 
 1. Generate and apply AgentCanon update TODOs before unrelated repo work.
 
@@ -326,7 +333,7 @@ Source window:
 
 ## Agent Task-Start Rule
 
-When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the output must include:
+When an agent starts through `bootstrap_agent_run.py`, the output must include:
 
 - `AGENT_CANON_PREFLIGHT_COMMAND`
 - `AGENT_CANON_PREFLIGHT_STATUS`
@@ -355,7 +362,7 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 
 ## Failure Routes
 
-- unrelated parent dirty state: allowed for submodule updates when the AgentCanon update surface is clean.
+- unrelated parent dirty state: allowed for submodule updates; the AgentCanon source surface is checked by exact materialization paths.
 - `blocked_eval_transient_artifacts`: task entry found an exact tracked,
   untracked, or ignored
   `reports/agent-eval-runs/<run-id>/<producer>.stdout.txt` / `.stderr.txt`
@@ -367,27 +374,28 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 - stale parent gitlink: not latest, even when `vendor/agent-canon` worktree HEAD already equals AgentCanon remote main; commit the parent gitlink pin before treating the parent repo as latest.
 - local-ahead parent gitlink without pushed branch evidence: AgentCanon branch / PR required; do not treat `local_contains_remote` as latest.
 - clean parent gitlink pinned to a pushed non-main AgentCanon branch head: classify as `deferred_branch_pr`, continue local checks, and rerun `make agent-canon-ensure-latest` after the AgentCanon PR merges.
-- local checkout branch or dirty vendor source: use the clean named topic source
-  owner when available; prepare the managed topic-workspace source clone only
-  for another topic's dirty vendor occupancy. Otherwise use the typed repair /
-  rebuild route; standalone source mode has its own source-branch merge route.
+- local checkout branch or dirty vendor source: use the intended named topic
+  source owner and retain non-colliding local materialized paths. Prepare the
+  managed topic-workspace source clone only for another topic's vendor
+  occupancy. Existing or virtual merge conflict and unpreservable
+  materialization collision have separate typed repair routes.
 - `blocked_shared_canon_workflow`: do not hide shared-canon edits in a parent-only diff; commit the AgentCanon branch, merge main into it, and open an AgentCanon PR.
 - `skipped_source_canon`: running inside standalone AgentCanon; update parent repos after AgentCanon changes are committed.
 - `missing checklist`: restore or update `vendor/agent-canon/`, then rerun
-  `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root`.
+  `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root`.
 - missing `agentcanon_structure_followup=pass`: keep the AgentCanon source, pin,
-  root-view, shared root-copy, or parent root sync PR open. Run the root-view
+  active-root-view or parent root sync PR open. Run the active-root-view
   commands from the parent root, then run the parent readiness / structure
   checks selected by the active profile:
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  bash tools/sync_agent_canon.sh link-root
-bash tools/sync_agent_canon.sh check
+  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
 ```
 
 ## Legacy Compatibility Appendix
 
 Legacy subtree or committed snapshot repos should migrate to the submodule structure above.
-Until migration, use `bash tools/update_agent_canon.sh plan` only to classify compatibility routes such as `already_current_tree`, `already_current_split`, `snapshot_import_*`, or `subtree_pull`.
+Until migration, use the source-root resolver `exec tools/update_agent_canon.sh plan` only to classify compatibility routes such as `already_current_tree`, `already_current_split`, `snapshot_import_*`, or `subtree_pull`.
 Do not copy legacy route language into this template's normal task-start rules.

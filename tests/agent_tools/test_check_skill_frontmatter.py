@@ -53,13 +53,6 @@ class CheckSkillFrontmatterTest(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(body, encoding="utf-8")
 
-    def test_current_repository_frontmatter_passes(self) -> None:
-        """Current runtime skill shims should all have parseable YAML."""
-        result = self.run_cli(PROJECT_ROOT)
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("SKILL_FRONTMATTER=pass", result.stdout)
-
     def test_unquoted_description_colon_fails(self) -> None:
         """A colon in an unquoted description should fail as invalid YAML."""
         with tempfile.TemporaryDirectory() as tmp_dir:

@@ -21,7 +21,10 @@ AgentCanon coordinated search has six provider classes:
   separate from SQLite semantic-index embedding providers.
 - `tool`: structured matches from `tools/catalog.yaml`.
 - `header-deps`: dependency-header upstream / downstream edges.
-- `code-deps`: Python symbol and direct-call facts from the AST scanner.
+- `code-deps`: canonical LSP symbol/relation facts when a manifest server is
+  available. The bounded discovery set is shared with direct LSP analysis and
+  excludes retired, generated, workspace, vendor, report, build, and symlink
+  paths. The report is loaded in-memory only when this provider is selected.
 
 ## Evidence And Assumption Ledger
 
@@ -35,6 +38,11 @@ AgentCanon coordinated search has six provider classes:
   acceptance authority.
 - Parent-doc alignment: deterministic search output is advisory and remains
   bounded by the owner and dependency evidence in the upstream design.
+
+LSP code facts are selected through `tools/agent_tools/lsp_code_analysis.py` and
+are never persisted by `search.py`. A failed or unavailable required LSP
+capability leaves the existing compatibility provider available for advisory
+search, while canonical analysis callers receive the typed failure report.
 
 ## Reader Map
 

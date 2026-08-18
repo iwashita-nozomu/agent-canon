@@ -18,6 +18,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 from publication_integrator import (  # noqa: E402
     _construct_result_commit,
+    _review_approval,
     _publication_gate,
     PublicationError,
     integrate_publication,
@@ -111,6 +112,30 @@ class PublicationIntegratorTest(unittest.TestCase):
             projection["failure_codes"],
             ["publication_eligibility:review_not_eligible"],
         )
+
+    def test_publication_consumes_only_canonical_approve_decision(self) -> None:
+        """Template aliases must be canonicalized before this exact boundary."""
+        with (
+            patch(
+                "publication_integrator.resolve_review_eligibility",
+                return_value={"outcome": "eligible"},
+            ),
+            patch(
+                "publication_integrator.resolve_current_review_state",
+                return_value={
+                    "candidate": {"candidate_id": "candidate-1"},
+                    "decision": {
+                        "candidate_id": "candidate-1",
+                        "decision": "ACCEPT",
+                    },
+                },
+            ),
+        ):
+            with self.assertRaisesRegex(
+                PublicationError,
+                "publication_eligibility:decision_mismatch",
+            ):
+                _review_approval(PROJECT_ROOT)
 
     def test_pull_request_result_starts_from_the_reviewed_head(self) -> None:
         """A PR route delegates the server result instead of predicting its SHA."""

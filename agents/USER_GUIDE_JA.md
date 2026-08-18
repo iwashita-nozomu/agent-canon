@@ -47,7 +47,7 @@ workflow family、role behavior、validation gate の正本はリンク先の ow
   と run-local instance template を先に読みます。
 - 文書構造、reader path、claim support、source map、canonical route、document responsibility が変わる Markdown 差分では、`structure-planning` と `prose-reasoning-graph` を先に使い、closeout の `Document Structure Evidence` に構造解析 evidence を残します。
 - typo / link / format-only の Markdown 差分では、`md-style-check` と `structure_contract=skipped:<reason>` を evidence に残します。
-- owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じた repo-changing 差分では `owner-bounded-routing` を使い、existing tool を読了 gate なしに先に実行し、owner boundary、existing-tool route、targeted validation を evidence に残します。public surface の追加、縮小、削除、rename、restriction、deprecation、意味変更は `scoped_change` または broader route へ進みます。
+- owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じた repo-changing 差分は通常の owner route で進め、existing tool を読了 gate なしに先に実行し、owner boundary、existing-tool route、targeted validation を evidence に残します。public surface の追加、縮小、削除、rename、restriction、deprecation、意味変更は `scoped_change` または broader route へ進みます。
 - README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書では、`long-form-writing` を DSL-to-prose adapter として使います。長さだけでは選びません。
 - 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を使います。
 - 投稿論文や thesis chapter の draft では `paper-writing` を使います。
@@ -79,7 +79,7 @@ workflow family、role behavior、validation gate の正本はリンク先の ow
 - 一般説明 prose adapter を使う文書では、`document_flow_reviewer` に加えて別 reviewer で docs completeness review を通します。
 - 学術文章では、さらに `notation_definition_reviewer` と `logic_gap_reviewer` を別 instance で通します。
 - 論文 draft では、さらに `citation_evidence_reviewer` を別 instance で通します。
-- 最後の user-facing 完了報告は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved`、`mechanical_completion_loop_complete=yes`、`diff_check_agent_complete=yes`、`user_completion_report=unlocked` になり、run-local diff-check artifact が現在 tracked diff ref の read-only independent approval を示すまで出しません。
+- 最後の user-facing 完了報告は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved`、`review_convergence_complete=yes`、`diff_check_agent_complete=yes`、`user_completion_report=unlocked` になり、run-local diff-check artifact が現在 tracked diff ref の read-only independent approval を示すまで出しません。
 
 標準 bundle:
 

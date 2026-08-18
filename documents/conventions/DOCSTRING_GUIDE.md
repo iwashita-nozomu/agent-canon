@@ -13,8 +13,7 @@ downstream design ./coding-conventions-cpp.md projects the contract into C++ doc
 downstream implementation ../../templates/documents/design-document.template.md consumes the semantic skeleton in the reusable design template
 downstream implementation ../../templates/experiments/_template/run.py projects the contract into the Python code template
 downstream implementation ../../templates/experiments/_template/cases.py projects the contract into the Python module template
-downstream implementation ../../tools/ci/run_python_quality_checks.sh checks language-level Python docstring presence and style
-downstream design ../../agents/skills/python-review.md reviews Python semantic projection when its changed-surface route is selected
+downstream design ../../agents/skills/python-review.md routes explicit Docstring review and semantic projection when selected
 downstream design ../../agents/skills/cpp-review.md reviews C++ semantic projection when its changed-surface route is selected
 downstream design ../../agents/skills/oop-type-design.md selects language-neutral responsibility and type boundaries before projection
 @dependency-end
@@ -276,7 +275,7 @@ surface に応じて semantic clause を読み戻します。catalog capability 
 
 ## Validation and review boundary
 
-- `pydocstyle` と Ruff D は、language-level の存在・syntax・format signal を検証する。
+- `pydocstyle` と Ruff D は、明示的な language-level Docstring review の存在・syntax・format signal を検証する。
 - `pyright` と C++ compiler/build は、annotation、signature、namespace、header、ABI の
   static fact を検証する。
 - OOP/readability checker は責務境界の signal を提供するが、clause の意味充足を判定しない。
@@ -285,6 +284,23 @@ surface に応じて semantic clause を読み戻します。catalog capability 
 - 全引数・全属性・`Args`/`Returns` token の存在を意味契約の gate にしない。
 - 実装 mechanism が存在し、なお未解決の behavior oracle がある場合だけ test design を
   追加する。Docstring prose 自体を test-first の対象にしない。
+
+### Explicit Docstring review boundary
+
+`pydocstyle` は compile/runtime/graph/header correctness の必要条件ではなく、
+shared PR/static gate では実行しません。明示的な Docstring review で、対象を限定して
+`tools/bin/agent-canon pydocstyle-review --target <repo-relative.py>` を実行します。このtoolは
+source-root resolverが選ぶAgentCanon canonical D213 configを適用し、toolが無い場合または
+診断がある場合は明示 command が nonzero で終了します。
+
+AgentCanon の既定 review convention は source root 配下の
+`tools/ci/pydocstyle.toml` で D213 を選択し、相反する D212 を無視します。D212 と D213
+を同時に要求しません。親固有のDocstring reviewは親ownerの別commandで実行し、AgentCanon
+canonical configのauthorityを置き換えません。
+PR の blocking predicate には pydocstyle を含めず、pydocstyle の missing/diagnostic を
+merge gateへ昇格しません。他の active profile が選択する compiler、runtime、graph、
+header、Rust、workflow、container、docs、registry、pytest、pyright などの owner gate は
+それぞれの正本に従います。
 
 ### Performance and non-enforcement evaluation
 

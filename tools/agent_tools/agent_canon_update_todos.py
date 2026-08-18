@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import os
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -27,12 +28,45 @@ UTC = timezone.utc
 from pathlib import Path
 from typing import cast
 
+try:
+    from .parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+
 DEFAULT_MANIFEST = Path("documents/agent-canon/agent-canon-update-tasks.toml")
 DEFAULT_STATE_PATH = Path(".agent-canon/update-state.toml")
 DEFAULT_GENERATED_PATH = Path(".agent-canon/update-todos.generated.md")
 DEFAULT_PENDING_JSON_PATH = Path(".agent-canon/update-todos.pending.json")
 DEFAULT_PREFIX = Path("vendor/agent-canon")
 STATE_TABLE = "agent_canon_update"
+
+
+def _write_parent_path(path: Path, payload: bytes, purpose: str) -> None:
+    """Publish TODO state/artifacts through the outer parent capability."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+        )
+        ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, payload, purpose)
+        return
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        f"{purpose}: explicit parent root is required for publication",
+    )
 
 
 @dataclass(frozen=True)
@@ -480,9 +514,8 @@ def write_plan_outputs(plan: Plan, root: Path) -> None:
     """Write generated parent-repo TODO views."""
     markdown_path = root / plan.generated_path
     json_path = root / plan.pending_json_path
-    markdown_path.parent.mkdir(parents=True, exist_ok=True)
-    markdown_path.write_text(render_plan_markdown(plan), encoding="utf-8")
-    json_path.write_text(render_pending_json(plan), encoding="utf-8")
+    _write_parent_path(markdown_path, render_plan_markdown(plan).encode("utf-8"), "update-todo-plan")
+    _write_parent_path(json_path, render_pending_json(plan).encode("utf-8"), "update-todo-plan")
 
 
 def render_plan_markdown(plan: Plan) -> str:
@@ -564,10 +597,9 @@ def render_pending_json(plan: Plan) -> str:
 
 def write_initial_state(paths: Paths, target_commit: str, *, force: bool) -> str:
     """Create the parent repository state file and scoped ignore file."""
-    paths.state_path.parent.mkdir(parents=True, exist_ok=True)
     ignore_path = paths.state_path.parent / ".gitignore"
     if not ignore_path.exists() or force:
-        ignore_path.write_text("*\n!.gitignore\n!update-state.toml\n", encoding="utf-8")
+        _write_parent_path(ignore_path, b"*\n!.gitignore\n!update-state.toml\n", "update-todo-state")
     if paths.state_path.exists() and not force:
         return "exists"
     state = UpdateState(
@@ -577,7 +609,7 @@ def write_initial_state(paths: Paths, target_commit: str, *, force: bool) -> str
         raw_completed={},
         raw_deferred={},
     )
-    paths.state_path.write_text(render_state(state), encoding="utf-8")
+    _write_parent_path(paths.state_path, render_state(state).encode("utf-8"), "update-todo-state")
     return "created"
 
 
@@ -644,7 +676,7 @@ def update_task_state(
         raw_completed=completed,
         raw_deferred=deferred,
     )
-    paths.state_path.write_text(render_state(new_state), encoding="utf-8")
+    _write_parent_path(paths.state_path, render_state(new_state).encode("utf-8"), "update-todo-state")
     print(f"AGENT_CANON_UPDATE_TODO_MARKED={task_id}")
     print(f"AGENT_CANON_UPDATE_TODO_MARKED_STATUS={status}")
     print(f"AGENT_CANON_UPDATE_TODO_TARGET_COMMIT={target_commit}")
@@ -683,7 +715,7 @@ def write_acknowledged_state(paths: Paths, state: UpdateState, target_commit: st
         raw_completed=state.raw_completed,
         raw_deferred=state.raw_deferred,
     )
-    paths.state_path.write_text(render_state(new_state), encoding="utf-8")
+    _write_parent_path(paths.state_path, render_state(new_state).encode("utf-8"), "update-todo-state")
 
 
 def print_plan(plan: Plan) -> None:

@@ -163,22 +163,19 @@ skill_families:
         - ["長い", "候補名"]
         - ["long", "candidate", "names"]
   - id: start-repository
-    purpose: Start a new GitHub/submodule-first repository from the template clone.
+    purpose: Start a repository from the template clone through the project-owned source-free bootstrap.
     canonical_doc: agents/skills/start-repository.md
     shim: .agents/skills/start-repository/SKILL.md
     discovery:
       name: start-repository
-      description: "Use when starting a new GitHub/submodule-first repository from this template after clone, including project slug/display-name setup and AgentCanon submodule validation."
+      description: "Use when starting a repository from this template after clone, including project identity setup, source-free static-seed validation, and destination-remote setup without live AgentCanon integration."
     tool_commands:
       required: []
       conditional:
       - git clone <template> <new-project>
+      - git status --short --branch
       - bash scripts/start_repository.sh --project-slug <slug> --display-name "<name>"
       - bash scripts/start_repository.sh --validate-only
-      - git clone <template>
-      - make agent-canon-ensure-latest
-      - git status --short --branch
-      - bash scripts/start_repository.sh
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check
@@ -209,36 +206,6 @@ skill_families:
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check
-  - id: owner-bounded-routing
-    purpose: Route repository edits through the owner-bounded path only when external public API, behavior, and schema are invariant.
-    canonical_doc: agents/skills/owner-bounded-routing.md
-    shim: .agents/skills/owner-bounded-routing/SKILL.md
-    discovery:
-      name: owner-bounded-routing
-      description: "Use for owner-bounded repository edits only after routing evidence shows a bounded owner, replaceable unit, targeted validation route, and `external public API/behavior/schema unchanged`; route every public-surface addition, contraction, removal, rename, restriction, deprecation, or semantic change to `scoped_change` or a broader route with dependency/consumer/migration/docs closure. Also use for typo/link/format-only edits and Owner-Bounded Change work where Codex should run existing tools directly and record owner/tool/validation evidence."
-    tool_commands:
-      required: []
-      conditional:
-      - tools/bin/agent-canon docs check <changed-docs>
-      maintenance:
-      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
-      - python3 tools/agent_tools/skill_tool_commands.py check
-    routing:
-      stage_policy: active
-      reason: public-surface-invariant owner-bounded edit needs an existing-tool route and targeted-validation evidence
-      triggers:
-        - ["owner-bounded"]
-        - ["bounded", "route"]
-        - ["bounded", "edit"]
-        - ["targeted", "validation"]
-        - ["Owner-Bounded Change"]
-        - ["コードファイル", "順序"]
-        - ["定義順"]
-        - ["コード", "順序", "わかりにく"]
-        - ["typo", "link"]
-        - ["format-only"]
-        - ["existing-tool", "route"]
-        - ["tool", "first"]
   - id: subagent-bootstrap
     purpose: Start the right specialist run bundle and make stage subagents explicit before implementation.
     canonical_doc: agents/skills/subagent-bootstrap.md
@@ -449,8 +416,8 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name>
-        --branch experiment-results/<topic>
+      - python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<variant>/<run_name>
+        --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
       - python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir
         reports/agents/<run-id>
       - python3 tools/agent_tools/runtime_log_archive_git.py push
@@ -746,8 +713,38 @@ skill_families:
         - ["sync_agent_canon.sh"]
         - ["agent-canon", "pr"]
         - ["agentcanon", "更新"]
+  - id: repository-topic-clone
+    purpose: Prepare, reuse, merge, publish-readback, and reconstructibly clean one generic repository topic clone before repository-kind policy decoration.
+    canonical_doc: agents/skills/repository-topic-clone.md
+    shim: .agents/skills/repository-topic-clone/SKILL.md
+    discovery:
+      name: repository-topic-clone
+      description: "Use for any parent, dependency, or standalone repository topic clone lifecycle under workspace/<topic>/<repo>; repository kind is a post-clone policy decorator."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/repository_topic_clone.py prepare --url <url> --repo-name <repo> --workspace-root <root> --topic <topic> --branch <branch> --owner-evidence <path>
+      - python3 tools/agent_tools/repository_topic_clone.py merge-main --url <url> --repo-name <repo> --workspace-root <root> --topic <topic> --branch <branch> --owner-evidence <path>
+      - python3 tools/agent_tools/repository_topic_clone.py cleanup --url <url> --repo-name <repo> --workspace-root <root> --topic <topic> --branch <branch> --owner-evidence <path> [--candidate-cas <path> --pr-lifecycle <path> [--publication-readback <path>]] [--apply]
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: a requested repository clone, branch reuse, origin/main merge, or reconstructibility cleanup operation is in scope
+      triggers:
+        - ["repository", "topic", "clone"]
+        - ["workspace", "topic", "repo", "clone"]
+        - ["existing", "branch", "reuse"]
+        - ["origin/main", "merge", "topic"]
+        - ["reconstructibility", "clone", "cleanup"]
+        - ["repository", "clone", "lifecycle"]
+        - ["repository", "clone", "cleanup"]
+        - ["topic", "clone", "cleanup"]
+        - ["repository", "クローン"]
+        - ["topic", "clone"]
   - id: dependency-module-change
-    purpose: Manage independent dependency source clones and reconstructibility-based cleanup without editing vendored source checkouts.
+    purpose: Decorate the generic repository topic clone lifecycle with .gitmodules, gitlink, pin, and projection policy.
     canonical_doc: agents/skills/dependency-module-change.md
     shim: .agents/skills/dependency-module-change/SKILL.md
     discovery:
@@ -756,13 +753,16 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare
+      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare --topic <topic> --module <path> --branch <branch> --owner-evidence <path>
+      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> merge-main --topic <topic> --module <path> --branch <branch> --owner-evidence <path>
+      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> status --topic <topic> [--module <path>]
+      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup --topic <topic> --module <path> --branch <branch> --owner-evidence <path> [--candidate-cas <path> --pr-lifecycle <path> [--publication-readback <path>]] [--apply]
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check
     routing:
       stage_policy: active
-      reason: dependency source clone, module lifecycle, or reconstructibility cleanup is in scope
+      reason: dependency module identity, gitlink, pin, or projection policy decorates a generic repository topic clone lifecycle
       triggers:
         - ["dependency", "module", "change"]
         - ["dependency", "source", "clone"]
@@ -1019,22 +1019,6 @@ skill_families:
         - ["browser-readable"]
         - ["browser", "readable"]
         - ["ブラウザ"]
-  - id: html-experiment-report
-    purpose: Produce browser-readable HTML experiment or Eval reports by choosing the primary figure, planning from it, reusing existing artifacts, and rendering bounded evidence.
-    canonical_doc: agents/skills/html-experiment-report.md
-    shim: .agents/skills/html-experiment-report/SKILL.md
-    discovery:
-      name: html-experiment-report
-      description: "Use when producing a browser-readable HTML experiment or Eval report; first decide the primary figure, then plan and run an evidence-backed report renderer while keeping domain authority in the original tool."
-    tool_commands:
-      required: []
-      conditional:
-      - python3 -m http.server --bind 0.0.0.0
-      - agent-canon semantic-index compare-providers
-      - python3 tools/agent_tools/semantic_provider_html_report.py
-      maintenance:
-      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
-      - python3 tools/agent_tools/skill_tool_commands.py check
   - id: test-design
     purpose: After the owning implementation mechanism exists, classify explicit unresolved oracle, specification, regression, or failure-mode risk beyond static analysis, existing checkers, and targeted validation.
     canonical_doc: agents/skills/test-design.md
@@ -1424,6 +1408,31 @@ skill_families:
         - ["古い", "ツール"]
         - ["旧", "文書"]
         - ["生成", "文書"]
+  - id: parent-repository-audit
+    purpose: Audit a complete parent tracked tree by canonical responsibility units and close findings through owner repair and readback.
+    canonical_doc: agents/skills/parent-repository-audit.md
+    shim: .agents/skills/parent-repository-audit/SKILL.md
+    discovery:
+      name: parent-repository-audit
+      description: "Use when auditing an AgentCanon-consuming parent repository across structure, ownership, environment, dependencies, code and types, OOP, tests, docs and design trace, CI/hooks/skills, templates, or Git/PR lifecycle, with owner-routed repair and finding closure."
+    tool_commands:
+      required:
+      - python3 tools/agent_tools/parent_repository_audit.py list --root <parent-root> --format text
+      conditional:
+      - python3 tools/agent_tools/parent_repository_audit.py check --root <parent-root> --format text
+      - python3 tools/agent_tools/skill_tool_commands.py show --skill parent-repository-audit --format json
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: parent repository audit capability requires deterministic unit selection and owner-routed finding closure
+      capabilities:
+      - id: parent_repository_audit
+        owner: parent_repository_audit
+        phase: repo_changing_audit
+        activation: explicit_capability
+        exclusive: true
   - id: dependency-analysis
     visualization_owner: code-visualization
     visualization_role: adapter
@@ -1518,12 +1527,12 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/experiments/create_experiment_topic.py <topic>
-      - python3 tools/ci/check_experiment_registry.py
-      - python3 tools/experiments/run_managed_experiment.py --topic <topic> --variant
-        formal -- python3 experiments/<topic>/run.py
-      - python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name>
-        --branch experiment-results/<topic>
+      - python3 -m tools.experiments.create_experiment_topic <topic>
+      - python3 -m tools.ci.check_experiment_registry
+      - python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant
+        <variant> -- python3 experiments/<topic>/run.py
+      - python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<variant>/<run_name>
+        --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
       - python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>
       - python3 -m pytest tests/tools/test_run_managed_experiment.py -q
       - agent-canon semantic-index discourse-relations --profile experiment-report
@@ -1547,34 +1556,6 @@ skill_families:
         - ["実験", "実行"]
         - ["実験結果"]
         - ["実験", "結果"]
-  - id: save-experiment-results
-    purpose: Save experiment run results with raw artifacts, manifests, reports, and branch-safe publication to dedicated experiment result branches.
-    canonical_doc: agents/skills/save-experiment-results.md
-    shim: .agents/skills/save-experiment-results/SKILL.md
-    discovery:
-      name: save-experiment-results
-      description: "Save and publish experiment run results with branch-safe retention. Use when Codex needs to preserve experiments/<topic>/result/<run_name>, create or verify experiment result manifests, write experiment reader reports, publish to experiment-results/<topic>, prevent overwrites, or keep failed/partial experiment runs as durable evidence."
-    tool_commands:
-      required: []
-      conditional:
-      - python3 tools/experiments/publish_result_branch.py
-      maintenance:
-      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
-      - python3 tools/agent_tools/skill_tool_commands.py check
-    routing:
-      stage_policy: active
-      reason: experiment result retention, manifest writeout, overwrite prevention, or result-branch publication is in scope
-      triggers:
-        - ["実験結果", "保存"]
-        - ["実験", "結果", "保存"]
-        - ["実験結果", "残"]
-        - ["実験", "result", "保存"]
-        - ["experiment", "result", "save"]
-        - ["experiment", "result", "publish"]
-        - ["experiment", "result", "branch"]
-        - ["publish", "result", "branch"]
-        - ["formal", "result", "retention"]
-        - ["run", "artifact", "preserve"]
   - id: experiment-review
     purpose: Review experiment topics for the managed runner route and run.py inner entrypoint, GPU/JAX environment ownership, artifact schemas, notebook explanations, and README run contracts.
     canonical_doc: agents/skills/experiment-review.md
@@ -1585,8 +1566,8 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/experiments/run_managed_experiment.py --topic <topic> --variant
-        formal -- python3 experiments/<topic>/run.py
+      - python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant
+        <variant> -- python3 experiments/<topic>/run.py
       - git grep -n -E "ExperimentRunner|EXPERIMENT_RUN_DIR|JAX_|XLA_|CUDA_VISIBLE|PREALLOC|prealloc|gpu_max_slots|max_workers|subprocess|ProcessPool|multiprocessing|env="
         --
       maintenance:
@@ -1606,26 +1587,33 @@ skill_families:
         - ["preallocation", "experiment"]
         - ["notebook", "artifact", "experiment"]
   - id: gpu-execution
-    purpose: Route GPU/CUDA/JAX/XLA/IREE execution through managed ExperimentRunner-backed runs with preallocation disabled and GPU blocker evidence preserved.
+    purpose: Route GPU/CUDA/JAX/XLA/IREE execution through provider-independent full-UUID admission by default, with the managed ExperimentRunner adapter only for managed experiment lifecycle contracts.
     canonical_doc: agents/skills/gpu-execution.md
     shim: .agents/skills/gpu-execution/SKILL.md
     discovery:
       name: gpu-execution
-      description: "Use when planning, running, validating, or diagnosing GPU/CUDA/JAX/XLA/IREE backend execution, GPU validation blockers, nvidia-smi evidence, CUDA_VISIBLE_DEVICES handling, ExperimentRunner-based Python runs, or JAX/XLA preallocation-disabled execution."
+      description: "Use when planning, running, validating, or diagnosing GPU/CUDA/JAX/XLA/IREE execution, free-GPU admission, full UUID or MIG selection, nvidia-smi evidence, arbitrary pytest/benchmark/diagnostic argv, managed ExperimentRunner runs, GPU validation blockers, or preallocation-disabled JAX/XLA execution."
     tool_commands:
       required: []
       conditional:
+      - python3 tools/experiments/run_gpu_command.py --gpu-count 1 --min-free-memory <bytes> -- <argv...>
+      - python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant <variant> -- <inner argv...>
+      - python3 -m pytest tests/tools/test_run_gpu_command.py -q
       - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check
     routing:
       stage_policy: active
-      reason: GPU/CUDA/JAX/XLA execution, ExperimentRunner Python execution, or preallocation-disabled validation is in scope
+      reason: GPU/CUDA/JAX/XLA execution, provider-independent direct admission, managed experiment execution, or preallocation-disabled validation is in scope
       triggers:
         - ["gpu", "実行"]
         - ["gpu", "利用"]
         - ["gpu", "検証"]
+        - ["gpu", "空き"]
+        - ["free gpu"]
+        - ["gpu", "command"]
+        - ["run_gpu_command"]
         - ["cuda", "実行"]
         - ["cuda", "backend"]
         - ["jax", "gpu"]
@@ -1638,6 +1626,8 @@ skill_families:
         - ["experiment_runner"]
         - ["python", "experimentrunner"]
         - ["python", "実行", "experimentrunner"]
+        - ["pytest", "gpu"]
+        - ["benchmark", "gpu"]
         - ["preallocation", "disable"]
         - ["preallocate", "false"]
         - ["xla_python_client_preallocate"]
@@ -1936,6 +1926,36 @@ skill_families:
         - ["agent", "tools", "manifest"]
         - ["依存", "設計"]
         - ["依存", "manifest"]
+  - id: devcontainer-exec
+    purpose: Execute targeted commands inside an existing Dev Container without changing its lifecycle or configuration.
+    canonical_doc: agents/skills/devcontainer-exec.md
+    shim: .agents/skills/devcontainer-exec/SKILL.md
+    discovery:
+      name: devcontainer-exec
+      description: "Use when an existing Dev Container needs targeted execution or validation through devcontainer exec, including a zsh shell, while preserving exact output and exit evidence."
+    tool_commands:
+      required: []
+      conditional:
+      - devcontainer exec --workspace-folder <root> zsh -lc '<command>'
+      - devcontainer exec --workspace-folder <root> zsh -lic '<command>'
+      - devcontainer exec --workspace-folder <root> zsh -l
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: targeted execution or validation belongs in an existing Dev Container
+      triggers:
+        - ["devcontainer", "exec"]
+        - ["existing container", "zsh"]
+        - ["container-internal", "validation"]
+        - ["container-internal", "testing"]
+        - ["container", "internal", "validation"]
+        - ["container", "internal", "testing"]
+        - ["コンテナ内", "テスト"]
+        - ["コンテナ内", "確認"]
+        - ["既存コンテナ", "zsh"]
+        - ["既存コンテナ", "入る"]
   - id: environment-maintenance
     purpose: Update Docker, CI, dependencies, and runtime guidance coherently.
     canonical_doc: agents/skills/environment-maintenance.md
@@ -1951,7 +1971,7 @@ skill_families:
       - python3 tools/ci/container_config.py
       - make docker-build-check
       - make docker-build-check-host-docker
-      - python3 tools/ci/run_container_pack.py --pack docker/packs/default.toml --print-only
+      - python3 tools/ci/run_container_pack.py --print-only
       - make server-check
       - make ci-quick
       - make ci
@@ -1964,7 +1984,11 @@ skill_families:
       reason: Docker, CI, dependency, or runtime environment maintenance is in scope
       triggers:
         - ["docker"]
-        - ["devcontainer"]
+        - ["devcontainer", "config"]
+        - ["devcontainer", "configuration"]
+        - ["devcontainer", "build"]
+        - ["devcontainer", "update"]
+        - ["devcontainer", "dependency"]
         - ["github", "actions"]
         - ["ci"]
         - ["lockfile"]
@@ -1972,27 +1996,13 @@ skill_families:
         - ["container", "runtime"]
         - ["environment-maintenance"]
         - ["環境メンテ"]
-  - id: user-preference-sync
-    purpose: Distill durable user preferences from notes into stable AGENTS.md guidance.
-    canonical_doc: agents/skills/user-preference-sync.md
-    shim: .agents/skills/user-preference-sync/SKILL.md
-    discovery:
-      name: user-preference-sync
-      description: "Use when memory/USER_PREFERENCES.md should be distilled into stable AGENTS.md preferences without carrying over task-local instructions."
-    tool_commands:
-      required: []
-      conditional:
-      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
-      maintenance:
-      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
-      - python3 tools/agent_tools/skill_tool_commands.py check
   - id: agent-learning
-    purpose: Log agent-side working philosophy, interaction lessons, and task retrospectives with evidence.
+    purpose: Curate searchable problem-solving memory records and learn from runtime agent behavior, interaction lessons, routing misses, and task retrospectives with evidence.
     canonical_doc: agents/skills/agent-learning.md
     shim: .agents/skills/agent-learning/SKILL.md
     discovery:
       name: agent-learning
-      description: "Use when agent-side working philosophy, interaction lessons, task retrospectives, repeated routing misses, missed skill invocation, or recurrence-prevention feedback should be logged without mixing them into user preferences."
+      description: "Use when problem-solving memory curation or runtime agent behavior learning should capture recurrence evidence without mixing it into user preferences."
     tool_commands:
       required: []
       conditional:
@@ -2003,11 +2013,14 @@ skill_families:
         action=<prompt_repair|eval_update|memory_record|no_op>"
       - python3 tools/agent_tools/evaluate_agent_run.py --report-dir reports/agents/<run-id>
         --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write
-      - python3 tools/agent_tools/persist_agent_memory.py --commit --push
+      - python3 tools/agent_tools/memory_record.py search --root . --search-path <owner> --failure-evidence <evidence>
+      - python3 tools/agent_tools/memory_record.py plan --root . --record-id <record-id> --search-path <owner> --recurrence-decision <decision>
+      - python3 tools/agent_tools/memory_record.py create --root . --record-id <record-id> --title <title> --problem <problem> --symptom <symptom> --context <context> --root-cause <cause> --effective-resolution <resolution> --failed-approaches <failed> --applicability-limits <limits> --evidence-source <source> --owner-ref <owner>
+      - python3 tools/agent_tools/memory_record.py update --root . --record-id <record-id> --section <section> --text <replacement>
+      - python3 tools/agent_tools/memory_record.py promote --root . --record-id <record-id> --owner-ref <owner> --reason <reason>
+      - python3 tools/agent_tools/memory_record.py validate --root .
       - python3 tools/agent_tools/evaluate_agent_run.py
       - python3 tools/agent_tools/workflow_monitor.py
-      - python3 tools/agent_tools/log_agent_learning.py
-      - python3 tools/agent_tools/persist_agent_memory.py
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check

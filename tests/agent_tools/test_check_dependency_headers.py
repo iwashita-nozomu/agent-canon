@@ -2,11 +2,12 @@
 
 # @dependency-start
 # contract test
-# responsibility Tests changed-file dependency header detection.
+# responsibility Tests source-owned changed-file dependency header detection.
 # upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
+# upstream design ../../documents/design/source-owned-dependency-validation.md tracked source authority boundary
 # upstream implementation ../../tools/agent_tools/check_dependency_headers.py changed-file checks
-# upstream implementation ../../tools/agent_tools/graph_client.py validates persisted graph responses
 # upstream implementation ../../tools/agent_tools/visualization_contract.py canonical visualization contract dependency target
+# downstream implementation ../../tools/ci/run_standalone_static_gate_unit.sh runs this source regression
 # @dependency-end
 
 from __future__ import annotations
@@ -18,10 +19,9 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
-from tools.agent_tools import check_dependency_headers as graph_checker
+from tools.agent_tools import check_dependency_headers as header_checker
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "check_dependency_headers.py"
@@ -65,55 +65,83 @@ VISUALIZATION_QUEUE_PATHS = (
 )
 
 
+def manifest(
+    *,
+    contract: str | None = "design",
+    responsibility: str = "Documents a source fixture.",
+) -> str:
+    """Return one valid source manifest, optionally without a contract line."""
+    lines = ["<!--", "@dependency-start"]
+    if contract is not None:
+        lines.append(f"contract {contract}")
+    lines.extend(
+        [
+            f"responsibility {responsibility}",
+            "upstream design README.md repository overview",
+            "@dependency-end",
+            "-->",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def run_cli(root: Path, *paths: str, allow_frontmatter: bool = False) -> subprocess.CompletedProcess[str]:
+    """Run the production CLI against one explicit repository root."""
+    command = [sys.executable, str(SCRIPT), "--root", str(root)]
+    if allow_frontmatter:
+        command.append("--allow-frontmatter")
+    command.extend(paths)
+    return subprocess.run(
+        command,
+        cwd=PROJECT_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def write_contract_registry(root: Path, declaration: str) -> None:
+    """Write one dependency registry fixture with header selection and kinds."""
+    registry = root / "documents" / "design" / "dependency-contract-kinds.toml"
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    registry.write_text(
+        'schema = "agent_canon.dependency_contract_kinds.v1"\n'
+        'allowed_kinds = [\n'
+        '  "tool",\n'
+        ']\n'
+        + declaration,
+        encoding="utf-8",
+    )
+
+
 class DependencyHeaderCheckTest(unittest.TestCase):
-    """Exercise dependency header checks through the CLI."""
+    """Exercise source-owned dependency header checks through the CLI."""
 
     def test_accepts_markdown_dependency_manifest(self) -> None:
-        """Markdown files may declare dependency manifest markers near the top."""
+        """Accept a Markdown file with one valid dependency manifest."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            doc = Path(tmp_dir) / "doc.md"
-            doc.write_text(
-                "\n".join(
-                    [
-                        "# Doc",
-                        "",
-                        "<!--",
-                        "@dependency-start",
-                        "contract design",
-                        "responsibility Documents a markdown file under test.",
-                        "upstream design README.md repo overview",
-                        "@dependency-end",
-                        "-->",
-                        "",
-                        "Body.",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), str(doc)],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            root = Path(tmp_dir)
+            (root / "doc.md").write_text("# Doc\n\n" + manifest(), encoding="utf-8")
+
+            result = run_cli(root, "doc.md")
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
 
     def test_external_provenance_stays_outside_dependency_manifest(self) -> None:
-        """External provenance links remain prose metadata, not graph targets."""
+        """Keep external provenance below, rather than inside, the manifest."""
         path = PROJECT_ROOT / "agents" / "skills" / "agent-log-analysis.md"
         text = path.read_text(encoding="utf-8")
-        manifest = text.split("@dependency-start", 1)[1].split("@dependency-end", 1)[0]
+        header = text.split("@dependency-start", 1)[1].split("@dependency-end", 1)[0]
         provenance = "https://github.com/iwashita-nozomu/agent-canon-log/pull/4"
 
-        self.assertNotIn(provenance, manifest)
+        self.assertNotIn(provenance, header)
         self.assertIn(provenance, text.split("@dependency-end", 1)[1])
 
     def test_visualization_completion_queue_has_canonical_contract_edges(self) -> None:
-        """Every queue surface declares its canonical visualization dependency."""
+        """Require visualization queue files to expose canonical contract edges."""
+        patterns = header_checker.declared_surface_patterns(PROJECT_ROOT)
         for relative_path in VISUALIZATION_QUEUE_PATHS:
             with self.subTest(path=relative_path):
                 header = "\n".join(
@@ -123,306 +151,251 @@ class DependencyHeaderCheckTest(unittest.TestCase):
                 )
                 self.assertIn("@dependency-start", header)
                 self.assertIn("@dependency-end", header)
-                self.assertTrue(
-                    "code-visualization.md" in header
-                    or "visualization_contract.py" in header
-                    or "visualization_contract.md" in header,
-                    relative_path,
-                )
+                if header_checker.matches_declared_surface(relative_path, patterns):
+                    self.assertTrue(
+                        "code-visualization.md" in header
+                        or "visualization_contract.py" in header
+                        or "visualization_contract.md" in header,
+                        relative_path,
+                    )
 
     def test_accepts_skill_frontmatter_before_dependency_manifest(self) -> None:
-        """SKILL.md may keep YAML frontmatter before the dependency manifest."""
+        """Accept skill frontmatter before a valid dependency manifest."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            skill = Path(tmp_dir) / "SKILL.md"
-            skill.write_text(
+            root = Path(tmp_dir)
+            (root / "SKILL.md").write_text(
                 "\n".join(
                     [
                         "---",
                         "name: demo-skill",
-                        "description: Demonstrates frontmatter before the dependency manifest.",
+                        "description: Demonstrates frontmatter before a manifest.",
                         "---",
-                        "<!--",
-                        "@dependency-start",
-                        "contract skill",
-                        "responsibility Documents a skill under test.",
-                        "upstream design README.md repo overview",
-                        "@dependency-end",
-                        "-->",
-                        "",
+                        manifest(contract="skill"),
                     ]
                 ),
                 encoding="utf-8",
             )
 
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), "--allow-frontmatter", str(skill)],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = run_cli(root, "SKILL.md", allow_frontmatter=True)
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
 
     def test_rejects_missing_contract_kind(self) -> None:
-        """Manifest-bearing files declare exactly one registered contract kind."""
+        """Reject a manifest that omits its registered contract kind."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            doc = Path(tmp_dir) / "doc.md"
-            doc.write_text(
-                "\n".join(
-                    [
-                        "# Doc",
-                        "",
-                        "<!--",
-                        "@dependency-start",
-                        "responsibility Documents a markdown file under test.",
-                        "upstream design README.md repo overview",
-                        "@dependency-end",
-                        "-->",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), str(doc)],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            root = Path(tmp_dir)
+            (root / "doc.md").write_text(manifest(contract=None), encoding="utf-8")
+
+            result = run_cli(root, "doc.md")
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("exactly one contract line", result.stdout)
             self.assertIn("fix: add 'contract <registered-kind>'", result.stdout)
-            self.assertIn("documents/design/dependency-contract-kinds.toml", result.stdout)
             self.assertIn("DEPENDENCY_HEADERS=fail", result.stdout)
 
     def test_rejects_unregistered_contract_kind(self) -> None:
-        """Contract kinds come from the registry rather than per-file invention."""
+        """Reject a manifest that names an unknown contract kind."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            doc = Path(tmp_dir) / "doc.md"
-            doc.write_text(
-                "\n".join(
-                    [
-                        "# Doc",
-                        "",
-                        "<!--",
-                        "@dependency-start",
-                        "contract invented-kind",
-                        "responsibility Documents a markdown file under test.",
-                        "upstream design README.md repo overview",
-                        "@dependency-end",
-                        "-->",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
+            root = Path(tmp_dir)
+            (root / "doc.md").write_text(
+                manifest(contract="invented-kind"), encoding="utf-8"
             )
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), str(doc)],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+
+            result = run_cli(root, "doc.md")
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("unregistered dependency contract kind", result.stdout)
             self.assertIn("fix: use an existing allowed_kinds entry", result.stdout)
-            self.assertIn("documents/design/dependency-contract-kinds.toml", result.stdout)
             self.assertIn("DEPENDENCY_HEADERS=fail", result.stdout)
 
     def test_rejects_missing_dependency_manifest(self) -> None:
-        """Checkable text files must declare dependency manifest markers near the top."""
+        """Reject a checkable source file without a dependency manifest."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            script = Path(tmp_dir) / "tool.py"
-            script.write_text(
-                "\n".join(
-                    [
-                        '"""Missing dependency header."""',
-                        "",
-                        "from __future__ import annotations",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), str(script)],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            root = Path(tmp_dir)
+            (root / "tool.py").write_text('"""Missing dependency header."""\n', encoding="utf-8")
+
+            result = run_cli(root, "tool.py")
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("DEPENDENCY_HEADERS=fail", result.stdout)
             self.assertIn("missing top dependency manifest block", result.stdout)
+            self.assertIn("DEPENDENCY_HEADERS=fail", result.stdout)
 
     def test_rejects_legacy_dependency_files_block(self) -> None:
-        """Legacy Dependency Files blocks are no longer sufficient."""
+        """Reject the retired Dependency Files block format."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            doc = Path(tmp_dir) / "doc.md"
-            doc.write_text(
-                "\n".join(
-                    [
-                        "# Doc",
-                        "",
-                        "Dependency Files:",
-                        "- README.md",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
+            root = Path(tmp_dir)
+            (root / "doc.md").write_text(
+                "# Doc\n\nDependency Files:\n- README.md\n", encoding="utf-8"
             )
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), str(doc)],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+
+            result = run_cli(root, "doc.md")
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("DEPENDENCY_HEADERS=fail", result.stdout)
 
     def test_skips_commentless_json(self) -> None:
-        """JSON files are skipped because adding a comment header would break syntax."""
+        """Skip commentless JSON that cannot carry a dependency manifest."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            data = Path(tmp_dir) / "data.json"
-            data.write_text('{"ok": true}\n', encoding="utf-8")
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), str(data)],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            root = Path(tmp_dir)
+            (root / "data.json").write_text('{"ok": true}\n', encoding="utf-8")
+
+            result = run_cli(root, "data.json")
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
 
     def test_skips_reports_artifacts(self) -> None:
-        """Generated reports are not source manifest targets."""
+        """Skip generated report artifacts from header enforcement."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             artifact = root / "reports" / "some-run" / "generated_summary.md"
             artifact.parent.mkdir(parents=True)
             artifact.write_text("README.md\n", encoding="utf-8")
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--root",
-                    str(root),
-                    "reports/some-run/generated_summary.md",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = run_cli(root, "reports/some-run/generated_summary.md")
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
 
 
-class FakeDependencyGraphClient:
-    """Provide already-materialized dependency facts without producer execution."""
-
-    def __init__(
-        self,
-        _root: Path,
-        *,
-        status: str = "fresh",
-        nodes: list[dict[str, object]] | None = None,
-    ) -> None:
-        self._status = status
-        self._nodes = nodes or []
-
-    def status(self) -> SimpleNamespace:
-        return SimpleNamespace(
-            status=self._status,
-            exit_code=0 if self._status == "fresh" else 2,
-        )
-
-    def query(self, **_kwargs: object) -> SimpleNamespace:
-        return SimpleNamespace(
-            status=self._status,
-            exit_code=0 if self._status == "fresh" else 2,
-            payload={"nodes": self._nodes},
-        )
-
-
-class DependencyHeaderGraphConsumerTest(unittest.TestCase):
-    """Exercise consume-only dependency facts and freshness refusal."""
+class DependencyHeaderSourceSelectionTest(unittest.TestCase):
+    """Verify selection and validation use source bytes without graph runtime state."""
 
     def run_main(
         self,
         root: Path,
-        graph: FakeDependencyGraphClient,
-        *paths: str,
+        argv: list[str],
+        *,
+        changed: list[Path] | None = None,
     ) -> tuple[int, str]:
+        """Run the checker entry point with optional changed-path selection."""
         output = io.StringIO()
-        argv = ["check_dependency_headers.py", "--root", str(root), *paths]
-        with (
-            patch.object(sys, "argv", argv),
-            patch.object(graph_checker, "GraphClient", lambda _root: graph),
-            contextlib.redirect_stdout(output),
-        ):
-            result = graph_checker.main()
+        patches = [patch.object(sys, "argv", ["check_dependency_headers.py", *argv])]
+        if changed is not None:
+            patches.append(
+                patch.object(header_checker, "changed_paths", lambda _root: changed)
+            )
+        with contextlib.ExitStack() as stack:
+            for active_patch in patches:
+                stack.enter_context(active_patch)
+            with contextlib.redirect_stdout(output):
+                result = header_checker.main()
         return result, output.getvalue()
 
-    def test_consumes_fresh_manifest_node(self) -> None:
+    def test_source_manifest_passes_without_graph_executable_or_state(self) -> None:
+        """Validate source headers without graph runtime state."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / ".git").mkdir()
-            (root / "doc.md").write_text("# doc\n", encoding="utf-8")
-            graph = FakeDependencyGraphClient(
-                root,
-                nodes=[
-                    {
-                        "id": "node:doc",
-                        "path": "doc.md",
-                        "payload": {
-                            "manifest_present": True,
-                            "contract_kind": "design",
-                        },
-                    }
-                ],
-            )
-            result, output = self.run_main(root, graph, "doc.md")
-            self.assertEqual(result, 0, output)
-            self.assertIn("DEPENDENCY_HEADERS=pass", output)
+            (root / "doc.md").write_text(manifest(), encoding="utf-8")
 
-    def test_missing_graph_manifest_fact_fails_closed(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            (root / ".git").mkdir()
-            (root / "doc.md").write_text("# doc\n", encoding="utf-8")
             result, output = self.run_main(
                 root,
-                FakeDependencyGraphClient(root),
-                "doc.md",
+                ["--root", str(root), "doc.md"],
             )
+
+            self.assertEqual(result, 0, output)
+            self.assertIn("DEPENDENCY_HEADERS=pass", output)
+            self.assertFalse((root / ".agent-canon").exists())
+
+    def test_missing_source_manifest_fails_closed(self) -> None:
+        """Fail closed when the selected source manifest is absent."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / ".git").mkdir()
+            (root / "doc.md").write_text("# doc\n", encoding="utf-8")
+
+            result, output = self.run_main(
+                root,
+                ["--root", str(root), "doc.md"],
+            )
+
             self.assertNotEqual(result, 0)
             self.assertIn("missing top dependency manifest block", output)
 
-    def test_stale_graph_snapshot_is_refused(self) -> None:
+    def test_changed_mode_takes_precedence_over_positional_paths(self) -> None:
+        """Prefer changed-path selection when changed mode is requested."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / ".git").mkdir()
-            (root / "doc.md").write_text("# doc\n", encoding="utf-8")
+            write_contract_registry(
+                root,
+                'header_surfaces = ["scoped.py"]\n',
+            )
+            scoped = root / "scoped.py"
+            scoped.write_text("# scoped\n" + manifest(contract="tool"), encoding="utf-8")
+
             result, output = self.run_main(
                 root,
-                FakeDependencyGraphClient(root, status="stale"),
-                "doc.md",
+                ["--root", str(root), "--changed", "missing.py"],
+                changed=[scoped],
             )
-            self.assertNotEqual(result, 0)
-            self.assertIn("graph snapshot is not fresh", output)
+
+            self.assertEqual(result, 0, output)
+            self.assertIn("DEPENDENCY_HEADERS=pass", output)
+
+    def test_no_path_mode_uses_changed_untracked_selection(self) -> None:
+        """Use changed untracked selection when no explicit path is provided."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / ".git").mkdir()
+            write_contract_registry(
+                root,
+                'header_surfaces = ["scoped.py"]\n',
+            )
+            (root / "scoped.py").write_text("# no header\n", encoding="utf-8")
+
+            result, output = self.run_main(
+                root,
+                ["--root", str(root)],
+                changed=[],
+            )
+
+            self.assertEqual(result, 0, output)
+            self.assertIn("DEPENDENCY_HEADERS=pass", output)
+
+    def test_changed_mode_uses_canonical_registry_without_parent_copy(self) -> None:
+        """Consume AgentCanon's dependency registry without mirroring it into a parent."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / ".git").mkdir()
+            changed = root / "tools" / "agent_tools" / "scoped.py"
+            changed.parent.mkdir(parents=True)
+            changed.write_text(
+                "# scoped\n" + manifest(contract="tool"), encoding="utf-8"
+            )
+
+            result, output = self.run_main(
+                root,
+                ["--root", str(root), "--changed"],
+                changed=[changed],
+            )
+
+            self.assertEqual(result, 0, output)
+            self.assertIn("DEPENDENCY_HEADERS=pass", output)
+
+    def test_changed_mode_fails_closed_for_invalid_or_empty_registry(self) -> None:
+        """Fail closed for invalid or empty changed-path scope declarations."""
+        for declaration in (
+            "header_surfaces = [\n",
+            "header_surfaces = []\n",
+        ):
+            with self.subTest(declaration=declaration), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                (root / ".git").mkdir()
+                write_contract_registry(root, declaration)
+                changed = root / "scoped.py"
+                changed.write_text("# scoped\n", encoding="utf-8")
+
+                result, output = self.run_main(
+                    root,
+                    ["--root", str(root), "--changed"],
+                    changed=[changed],
+                )
+
+                self.assertNotEqual(result, 0)
+                self.assertIn("dependency contract registry", output)
 
 
 if __name__ == "__main__":

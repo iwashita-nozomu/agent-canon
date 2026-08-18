@@ -6,6 +6,7 @@ responsibility Documents the verifier pre-review entrypoint for this repository.
 upstream design ../README.md shared automation index
 upstream implementation ./pre_review.sh verifier entrypoint
 upstream implementation ./run_python_quality_checks.sh shared Python quality gate
+downstream implementation ../agent_tools/pydocstyle_review.py explicit AgentCanon Docstring review
 @dependency-end
 -->
 
@@ -51,6 +52,29 @@ needed:
 ```bash
 bash tools/ci/run_python_quality_checks.sh
 ```
+
+The PR quick chain intentionally runs pytest and pyright while skipping Ruff;
+the explicit full Python quality command adds Ruff. Neither shared path invokes
+pydocstyle.
+
+For `check_agent_canon_pr.sh`, standalone and derived AgentCanon gates run
+shared AgentCanon surfaces only. A derived parent emits
+`AGENT_CANON_PR_PROJECT_QUALITY=delegated` with owner `parent_ci`; its workflow
+must expose that owner marker and canonical `make ci` command, regardless of
+job name. Project tests, type checks, and lint remain in that selected parent
+CI route. Standalone AgentCanon keeps its existing `static-gates` shared owner
+and adds no repository-wide project-quality job. The shared gate does not
+invoke `run_all_checks.sh`.
+
+Explicit Docstring review for selected Python targets:
+
+    tools/bin/agent-canon pydocstyle-review --target <repo-relative.py>
+
+This command resolves the canonical AgentCanon source root and applies its D213
+configuration. Parent-specific Docstring review remains a separate parent-owner
+command and does not substitute its authority. Missing pydocstyle or reported
+diagnostics fail this explicit review only; the shared PR correctness gate is
+unaffected.
 
 ## Report Evidence
 

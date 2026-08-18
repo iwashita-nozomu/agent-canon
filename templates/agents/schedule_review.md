@@ -1,4 +1,4 @@
-# Schedule Review
+# Schedule Review（schedule レビュー）
 <!--
 @dependency-start
 contract template
@@ -12,28 +12,31 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
-## Stage Order Review
+{{>reader_map}}
+{{>review_contract}}
 
-<!-- Check stage ordering, dependency realism, and rollback points. -->
+## Stage Order Review（stage 順序レビュー）
 
-## Reviewer Separation Review
+<!-- stage の順序、dependency の現実性、rollback point を確認します。 -->
 
-<!-- Check that plan review, detailed design review, and document flow review are assigned to different agents. -->
+## Reviewer Separation Review（reviewer 分離レビュー）
 
-## Subagent Adequacy Review
+<!-- plan review、detailed design review、document flow review が異なる agent に割り当てられているか確認します。 -->
 
-<!-- Check that the chosen subagents are appropriate for requirements, research, planning, design, and implementation. Return revise if any Agent Wave Ledger row lacks spawn_budget, allowed_paths, do_not_read, write_scope, review_gate, or closeout evidence path. -->
+## Subagent Adequacy Review（subagent 妥当性レビュー）
 
-## Completion Boundary Review
+<!-- 選択した subagent が requirements、research、planning、design、implementation に適切か確認します。Agent Wave Ledger に spawn_budget、allowed_paths、do_not_read、write_scope、review_gate、closeout evidence path のいずれかがない場合は revise とします。 -->
 
-<!-- Check that the schedule separates task-level completion from chunks, slices, checkpoints, and subpasses. Return revise if user-facing completion can unlock before all active clauses and planned work units are resolved. -->
+## Completion Boundary Review（完了境界レビュー）
 
-## Risks
+<!-- schedule が task-level completion と chunk、slice、checkpoint、subpass を分けるか確認します。active clause と planned work unit の解決前に user-facing completion が unlock される場合は revise とします。 -->
 
-<!-- Note schedule risks or sequencing issues. -->
+## Risks（リスク）
 
-## Revision Loop
+<!-- schedule のリスクと sequencing issue を記録します。 -->
 
-<!-- Record which stage the planner must revisit, what must change, and what blocks approval. -->
+## Revision Loop（改訂ループ）
+
+<!-- planner が戻る stage、変更内容、承認を止める事項を記録します。 -->
 
 {{>decision_approve_revise_escalate}}

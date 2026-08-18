@@ -3,7 +3,7 @@
 # responsibility AgentTeam packets owner module.
 # upstream design ../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
 # downstream implementation ./agent_team.py facade consumes packet APIs.
-# downstream implementation ./task_start.py consumes packet APIs.
+# downstream implementation ./bootstrap_agent_run.py consumes packet APIs.
 # downstream implementation ./waterfall_gate_check.py consumes packet APIs.
 # @dependency-end
 """Own AgentTeam packet identity, normalization, and document references."""
@@ -188,8 +188,6 @@ COMMON_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = (
     "documents/agent-canon/agent-canon-subtree-migration.md",
     "notes/guardrails/README.md",
     "notes/guardrails/engineering_avoidances.md",
-    "memory/USER_PREFERENCES.md",
-    "memory/AGENT_PHILOSOPHY.md",
 )
 
 OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = ("docker/README.md",)
@@ -300,22 +298,40 @@ class ActiveDesignPacketConfig:
 
 def resolve_cross_cutting_document_packet(
     workspace_root: Path,
+    agentcanon_source_root: Path | None = None,
 ) -> tuple[DocumentPacketEntry, ...]:
     """Resolve the common cross-cutting document packet for one workspace."""
+    if agentcanon_source_root is None:
+        raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
     required_entries = tuple(
         DocumentPacketEntry(
-            path=resolve_workspace_document_path(workspace_root, relative_path),
+            path=resolve_workspace_document_path(
+                workspace_root,
+                relative_path,
+                root_key="agentcanon",
+                agentcanon_source_root=agentcanon_source_root,
+            ),
             rationale=f"cross_cutting_doc:{relative_path}",
         )
         for relative_path in COMMON_CROSS_CUTTING_DOCUMENT_PATHS
     )
     optional_entries = tuple(
         DocumentPacketEntry(
-            path=resolve_workspace_document_path(workspace_root, relative_path),
+            path=resolve_workspace_document_path(
+                workspace_root,
+                relative_path,
+                root_key="agentcanon",
+                agentcanon_source_root=agentcanon_source_root,
+            ),
             rationale=f"cross_cutting_doc:{relative_path}",
         )
         for relative_path in OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS
-        if resolve_workspace_document_path(workspace_root, relative_path).exists()
+        if resolve_workspace_document_path(
+            workspace_root,
+            relative_path,
+            root_key="agentcanon",
+            agentcanon_source_root=agentcanon_source_root,
+        ).exists()
     )
     return required_entries + optional_entries
 
@@ -345,11 +361,68 @@ ACTIVE_PACKET_ENTRY_FIELDS = (
 ACTIVE_PACKET_REFERENCE_PREFIXES = {
     "clause_refs": (),
     "owner_refs": ("role:",),
-    "source_refs": ("repo:", "artifact:"),
+    "source_refs": ("workspace:", "agentcanon:", "artifact:"),
     "dependency_refs": ("entry:", "header:"),
     "output_refs": ("artifact:",),
     "reviewer_refs": ("role:",),
 }
+
+_LOCATOR_SEGMENT = r"[A-Za-z0-9_][A-Za-z0-9_.-]*"
+_LOCATOR_RE = re.compile(
+    rf"(?P<root>workspace|agentcanon|artifact):(?P<path>{_LOCATOR_SEGMENT}(?:/{_LOCATOR_SEGMENT})*)"
+    rf"(?P<fragment>#(?:section|symbol):{_LOCATOR_SEGMENT})?"
+)
+_HEADER_RE = re.compile(
+    rf"header:(?P<direction>{_LOCATOR_SEGMENT}):(?P<kind>{_LOCATOR_SEGMENT}):"
+    rf"(?P<source>(?:workspace|agentcanon|artifact):{_LOCATOR_SEGMENT}(?:/{_LOCATOR_SEGMENT})*(?:#(?:section|symbol):{_LOCATOR_SEGMENT})?)"
+    rf"->(?P<target>(?:workspace|agentcanon|artifact):{_LOCATOR_SEGMENT}(?:/{_LOCATOR_SEGMENT})*(?:#(?:section|symbol):{_LOCATOR_SEGMENT})?)"
+)
+
+
+def parse_typed_locator(value: str, *, field: str = "reference") -> dict[str, str | None]:
+    """Parse a raw typed locator before path normalization or file access."""
+    if not isinstance(value, str) or not value:
+        raise RuntimeError(f"active_design_packet_reference_invalid:syntax:{value}")
+    if value.startswith("repo:"):
+        raise RuntimeError(
+            f"active_design_packet_reference_ambiguous_root:{value}"
+        )
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        raise RuntimeError(f"active_design_packet_reference_invalid:syntax:{value}")
+    if "\\" in value or "%2f" in value.lower() or "%5c" in value.lower():
+        raise RuntimeError(f"active_design_packet_reference_invalid:syntax:{value}")
+    match = _LOCATOR_RE.fullmatch(value)
+    if match is None:
+        raise RuntimeError(f"active_design_packet_reference_invalid:syntax:{value}")
+    fragment = match.group("fragment")
+    fragment_kind: str | None = None
+    fragment_value: str | None = None
+    if fragment:
+        fragment_kind, fragment_value = fragment[1:].split(":", 1)
+    return {
+        "declared_ref": value,
+        "root_key": match.group("root"),
+        "relative_path": match.group("path"),
+        "fragment_kind": fragment_kind,
+        "fragment_value": fragment_value,
+        "field": field,
+    }
+
+
+def _parse_typed_header(value: str) -> tuple[dict[str, str | None], dict[str, str | None], str, str]:
+    """Parse a typed dependency header and return endpoint identities."""
+    if not isinstance(value, str) or value.startswith("header:") is False:
+        raise RuntimeError(f"active_design_packet_reference_invalid:dependency:{value}")
+    if value.startswith("header:") and ("repo:" in value or "->repo:" in value):
+        raise RuntimeError(
+            f"active_design_packet_reference_ambiguous_root:{value}"
+        )
+    match = _HEADER_RE.fullmatch(value)
+    if match is None:
+        raise RuntimeError(f"active_design_packet_reference_invalid:dependency:{value}")
+    source = parse_typed_locator(match.group("source"), field="dependency.source")
+    target = parse_typed_locator(match.group("target"), field="dependency.target")
+    return source, target, match.group("direction"), match.group("kind")
 
 ACTIVE_PACKET_SCHEMA = ACTIVE_DESIGN_PACKET_SCHEMA
 
@@ -359,9 +432,22 @@ def _active_packet_reference_tuple(value: object, field: str) -> tuple[str, ...]
     values = _as_string_tuple(value, field)
     if not values:
         raise RuntimeError(f"{field}:empty")
+    for candidate in values:
+        if candidate.startswith("repo:"):
+            raise RuntimeError(
+                f"active_design_packet_reference_ambiguous_root:{candidate}"
+            )
     prefixes = ACTIVE_PACKET_REFERENCE_PREFIXES[field.rsplit(".", 1)[-1]]
     if prefixes and any(not candidate.startswith(prefixes) for candidate in values):
         raise RuntimeError(f"{field}:invalid_reference")
+    leaf = field.rsplit(".", 1)[-1]
+    if leaf == "source_refs":
+        for candidate in values:
+            parse_typed_locator(candidate, field=field)
+    elif leaf == "dependency_refs":
+        for candidate in values:
+            if candidate.startswith("header:"):
+                _parse_typed_header(candidate)
     if field.rsplit(".", 1)[-1] == "clause_refs" and any(
         re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", candidate) is None
         for candidate in values
@@ -452,8 +538,9 @@ def normalize_active_design_packet_config(
         )
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", clause_id):
             raise RuntimeError(f"{clause_field}.clause_id:invalid")
-        if not source_ref.startswith(("repo:", "artifact:")):
+        if not source_ref.startswith(("workspace:", "agentcanon:", "artifact:")):
             raise RuntimeError(f"{clause_field}.source_ref:invalid")
+        parse_typed_locator(source_ref, field=f"{clause_field}.source_ref")
         clauses.append(ActiveDesignClause(clause_id, source_ref))
     clause_ids = tuple(clause.clause_id for clause in clauses)
     if len(set(clause_ids)) != len(clause_ids):
@@ -572,20 +659,35 @@ def _distinct_active_packet_references(
     return tuple(values)
 
 
+def _spec_source_root(spec: RunBundleSpec) -> Path:
+    """Return the explicit source root or fail closed."""
+    candidate = spec.agentcanon_source_root
+    if candidate is None and spec.repository_roots is not None:
+        candidate = spec.repository_roots.agentcanon_source_root
+    if candidate is None:
+        raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
+    return candidate.resolve()
+
+
 def _materialized_source_identity(
     spec: RunBundleSpec,
     reference: str,
 ) -> dict[str, object]:
     """Resolve one source reference and bind it to the current file bytes."""
-    root_name, separator, fragment = reference.partition("#")
-    prefix, delimiter, relative_value = root_name.partition(":")
-    if not delimiter or prefix not in {"repo", "artifact"}:
-        raise RuntimeError(f"active_design_packet_reference_invalid:source:{reference}")
-    relative = Path(relative_value)
-    if relative.is_absolute() or ".." in relative.parts:
-        raise RuntimeError(f"active_design_packet_reference_invalid:source:{reference}")
-    root = spec.report_dir if prefix == "artifact" else spec.workspace_root
-    candidate = (root / relative).resolve()
+    parsed = parse_typed_locator(reference, field="source")
+    prefix = str(parsed["root_key"])
+    relative_value = str(parsed["relative_path"])
+    root = (
+        spec.report_dir
+        if prefix == "artifact"
+        else spec.workspace_root
+        if prefix == "workspace"
+        else _spec_source_root(spec)
+    )
+    declared_candidate = root / relative_value
+    if declared_candidate.is_symlink():
+        raise RuntimeError(f"active_design_packet_reference_missing:{reference}")
+    candidate = declared_candidate.resolve()
     try:
         candidate.relative_to(root.resolve())
     except ValueError as exc:
@@ -594,18 +696,12 @@ def _materialized_source_identity(
         ) from exc
     if not candidate.is_file() or candidate.is_symlink():
         raise RuntimeError(f"active_design_packet_reference_missing:{reference}")
-    fragment_kind = "none"
-    fragment_value = None
-    if separator:
-        fragment_kind, fragment_value = fragment.split(":", 1)
-        if fragment_kind not in {"section", "symbol"} or not fragment_value:
-            raise RuntimeError(
-                f"active_design_packet_reference_invalid:source:{reference}"
-            )
+    fragment_kind = str(parsed["fragment_kind"] or "none")
+    fragment_value = parsed["fragment_value"]
     return {
         "declared_ref": reference,
         "root_key": prefix,
-        "relative_path": relative.as_posix(),
+        "relative_path": relative_value,
         "fragment_kind": fragment_kind,
         "fragment_value": fragment_value,
         "sha256": hashlib.sha256(candidate.read_bytes()).hexdigest(),
@@ -618,38 +714,38 @@ def _materialized_dependency_identity(
     reference: str,
 ) -> dict[str, object]:
     """Bind one declared dependency edge to endpoint bytes without reparsing prose."""
-    match = re.fullmatch(
-        r"header:(?P<direction>[^:]+):(?P<kind>[^:]+):repo:(?P<source>[^#]+)->repo:(?P<target>[^#]+)",
-        reference,
-    )
-    if match is None:
-        raise RuntimeError(
-            f"active_design_packet_reference_invalid:dependency:{reference}"
-        )
-    source = Path(match.group("source"))
-    target = Path(match.group("target"))
-    if (
-        source.is_absolute()
-        or target.is_absolute()
-        or ".." in source.parts
-        or ".." in target.parts
-    ):
-        raise RuntimeError(
-            f"active_design_packet_reference_invalid:dependency:{reference}"
-        )
-    source_path = (spec.workspace_root / source).resolve()
-    target_path = (spec.workspace_root / target).resolve()
+    source, target, direction, kind = _parse_typed_header(reference)
+    source_key = str(source["root_key"])
+    target_key = str(target["root_key"])
+    root_by_key = {
+        "workspace": spec.workspace_root,
+        "agentcanon": _spec_source_root(spec),
+        "artifact": spec.report_dir,
+    }
+    source_declared_path = root_by_key[source_key] / str(source["relative_path"])
+    target_declared_path = root_by_key[target_key] / str(target["relative_path"])
+    if source_declared_path.is_symlink() or target_declared_path.is_symlink():
+        raise RuntimeError(f"active_design_packet_reference_missing:{reference}")
+    source_path = source_declared_path.resolve()
+    target_path = target_declared_path.resolve()
+    for path, root in ((source_path, root_by_key[source_key]), (target_path, root_by_key[target_key])):
+        try:
+            path.relative_to(root.resolve())
+        except ValueError as exc:
+            raise RuntimeError(
+                f"active_design_packet_reference_invalid:dependency:{reference}"
+            ) from exc
     if not source_path.is_file() or not target_path.is_file():
         raise RuntimeError(f"active_design_packet_reference_missing:{reference}")
     normalized = (
-        f"header:{match.group('direction')}:{match.group('kind')}:repo:"
-        f"{source.as_posix()}->repo:{target.as_posix()}"
+        f"header:{direction}:{kind}:{source_key}:{source['relative_path']}"
+        f"->{target_key}:{target['relative_path']}"
     )
     return {
         "declared_ref": reference,
         "normalized_key": normalized,
-        "source_path": source.as_posix(),
-        "target_path": target.as_posix(),
+        "source_path": str(source["relative_path"]),
+        "target_path": str(target["relative_path"]),
         "source_sha256": hashlib.sha256(source_path.read_bytes()).hexdigest(),
         "target_sha256": hashlib.sha256(target_path.read_bytes()).hexdigest(),
         "verification": "declared_header_identity",
@@ -792,15 +888,18 @@ def iter_artifacts(
     roles: tuple[Role, ...],
     active_design_packet: ActiveDesignPacketConfig | None = None,
 ) -> tuple[str, ...]:
-    """Return unique artifact filenames in deterministic order."""
+    """Return core plus explicitly selected artifact filenames.
+
+    Core run metadata is always materialized so a bundle remains usable.  Role
+    outputs (including design and review documents) are opt-in: an inactive
+    reviewer does not leave an empty template or an implicit optional-template
+    state machine in the bundle.
+    """
     packet = active_design_packet or resolve_active_design_packet_config(config)
     return tuple(
         dict.fromkeys(
             (
                 *(config.artifacts[key] for key in STANDARD_RUN_ARTIFACT_KEYS),
-                packet.design_artifact,
-                packet.design_review_artifact,
-                packet.document_flow_review_artifact,
                 *(
                     output
                     for role in roles
@@ -817,8 +916,11 @@ def resolve_role_document_packet(
     report_dir: Path,
     workspace_root: Path,
     active_design_packet: ActiveDesignPacketConfig | None = None,
+    agentcanon_source_root: Path | None = None,
 ) -> RoleDocumentPacket:
     """Resolve explicit read-before-work packet for one role."""
+    if agentcanon_source_root is None:
+        raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
     spec = ROLE_DOCUMENT_PACKET_SPECS.get(role.id, {})
     artifact_keys = _as_string_tuple(
         spec.get("artifact_keys"),
@@ -878,7 +980,12 @@ def resolve_role_document_packet(
             )
         )
     for relative_path in workspace_paths:
-        resolved_path = resolve_workspace_document_path(workspace_root, relative_path)
+        resolved_path = resolve_workspace_document_path(
+            workspace_root,
+            relative_path,
+            root_key="agentcanon",
+            agentcanon_source_root=agentcanon_source_root,
+        )
         add_entry(
             DocumentPacketEntry(
                 path=resolved_path,
@@ -890,7 +997,10 @@ def resolve_role_document_packet(
                 ),
             )
         )
-    for entry in resolve_cross_cutting_document_packet(workspace_root):
+    for entry in resolve_cross_cutting_document_packet(
+        workspace_root,
+        agentcanon_source_root,
+    ):
         add_entry(entry)
     return RoleDocumentPacket(
         role_id=role.id,

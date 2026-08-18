@@ -4,6 +4,7 @@
 # responsibility Rebuilds local compiled AgentCanon tools after AgentCanon source updates.
 # upstream design ../CONTAINER_OPERATIONS.md compiled tool cache and devcontainer boundary.
 # upstream design ../documents/design/rust-agent-tool-migration.md Rust CLI migration and rebuild policy.
+# upstream implementation ./agent_tools/parent_root_side_effects.py validates all rebuild output and cache paths.
 # downstream implementation ./update_agent_canon.sh calls this after safe AgentCanon updates.
 # downstream implementation ../tests/tools/test_update_agent_canon.py validates rebuild behavior.
 # @dependency-end
@@ -17,9 +18,60 @@ if [ -n "$SUPERPROJECT_DIR" ]; then
 else
   ROOT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 fi
+AGENT_CANON_SOURCE_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
+PARENT_ROOT_DIR="${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}"
+PARENT_ROOT_DIR="$(cd "${PARENT_ROOT_DIR}" && pwd -P)"
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
-TOOLS_HOME="${AGENT_CANON_TOOLS_HOME:-${HOME}/.tools}"
+TOOLS_HOME="${AGENT_CANON_TOOLS_HOME:-${PARENT_ROOT_DIR}/.agent-canon/tools}"
+CARGO_HOME="${AGENT_CANON_CARGO_HOME:-${CARGO_HOME:-${PARENT_ROOT_DIR}/.agent-canon/cache/cargo-home}}"
+BUILD_TARGET_DIR="${CARGO_TARGET_DIR:-${AGENT_CANON_CLI_TARGET_DIR:-${PARENT_ROOT_DIR}/.agent-canon/cache/cargo-target}}"
 FORCE_REBUILD="${AGENT_CANON_FORCE_TOOL_REBUILD:-0}"
+BOUNDARY_SCRIPT="${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py"
+if [ ! -f "$BOUNDARY_SCRIPT" ]; then
+  echo "AGENT_CANON_TOOL_REBUILD=fail reason=missing-parent-boundary" >&2
+  exit 1
+fi
+if [[ "${PARENT_ROOT_DIR}" != "${ROOT_DIR}" \
+  && "${AGENT_CANON_CHILD_PURPOSE:-}" != "agent-canon-rebuild-script" ]]; then
+  echo "AGENT_CANON_REBUILD_PARENT_HANDOFF=missing" >&2
+  exit 2
+fi
+if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "agent-canon-rebuild-script" ]]; then
+  python3 "${BOUNDARY_SCRIPT}" verify-child \
+    --root "${PARENT_ROOT_DIR}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose agent-canon-rebuild-script \
+    --consume >/dev/null
+else
+  exec python3 "${BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${PARENT_ROOT_DIR}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose agent-canon-rebuild-script \
+    --issue-handoff \
+    -- bash "${BASH_SOURCE[0]}" "$@"
+fi
+unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
+
+resolve_parent_path() {
+  python3 "$BOUNDARY_SCRIPT" resolve \
+    --root "$PARENT_ROOT_DIR" \
+    --candidate "$1" \
+    --purpose "agent-canon-tool-rebuild-$2"
+}
+
+TOOLS_HOME="$(resolve_parent_path "$TOOLS_HOME" tools-home)"
+CARGO_HOME="$(resolve_parent_path "$CARGO_HOME" cargo-home)"
+BUILD_TARGET_DIR="$(resolve_parent_path "$BUILD_TARGET_DIR" cargo-target)"
+if [ -n "${CARGO_TARGET_DIR:-}" ] && [ -n "${AGENT_CANON_CLI_TARGET_DIR:-}" ]; then
+  CLI_TARGET_DIR="$(resolve_parent_path "$AGENT_CANON_CLI_TARGET_DIR" cli-target)"
+  if [ "$BUILD_TARGET_DIR" != "$CLI_TARGET_DIR" ]; then
+    echo "AGENT_CANON_TOOL_REBUILD=fail reason=target-alias-mismatch" >&2
+    exit 1
+  fi
+fi
+
+# shellcheck source=tools/lib/agent_canon_source_identity.sh
+source "$SCRIPT_DIR/lib/agent_canon_source_identity.sh"
 
 agent_canon_source_root() {
   if [ -f "$ROOT_DIR/$PREFIX/rust/agent-canon/Cargo.toml" ]; then
@@ -34,8 +86,7 @@ agent_canon_source_root() {
 }
 
 source_commit() {
-  local source_root="$1"
-  git -C "$source_root" rev-parse HEAD 2>/dev/null || printf '%s\n' "unknown"
+  agent_canon_source_identity "$ROOT_DIR" "$PREFIX" "$1"
 }
 
 installed_commit() {
@@ -55,22 +106,7 @@ rust_sources_newer_than_binary() {
 }
 
 maybe_link_usr_local() {
-  local binary="$1"
-  if [ "${AGENT_CANON_SKIP_USR_LOCAL_LINK:-0}" = "1" ]; then
-    echo "AGENT_CANON_TOOL_REBUILD_USR_LOCAL=skipped_by_env"
-    return
-  fi
-  if [ "$(id -u)" -eq 0 ]; then
-    ln -sf "$binary" /usr/local/bin/agent-canon
-    echo "AGENT_CANON_TOOL_REBUILD_USR_LOCAL=linked"
-    return
-  fi
-  if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-    sudo ln -sf "$binary" /usr/local/bin/agent-canon
-    echo "AGENT_CANON_TOOL_REBUILD_USR_LOCAL=linked"
-    return
-  fi
-  echo "AGENT_CANON_TOOL_REBUILD_USR_LOCAL=skipped_no_privilege"
+  echo "AGENT_CANON_TOOL_REBUILD_USR_LOCAL=skipped_parent_bounded"
 }
 
 rebuild_rust_cli() {
@@ -83,12 +119,14 @@ rebuild_rust_cli() {
   local build_binary
   local install_binary
   local source_newer
+  local source_sha_after
 
   source_root="$(agent_canon_source_root)"
   if [ -z "$source_root" ]; then
     echo "AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_rust_manifest"
     return
   fi
+  source_root="$(resolve_parent_path "$source_root" source-root)"
   if ! command -v cargo >/dev/null 2>&1; then
     echo "AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_cargo"
     echo "AGENT_CANON_TOOL_REBUILD_NEXT=rebuild_in_devcontainer_or_install_rust_toolchain"
@@ -107,15 +145,63 @@ rebuild_rust_cli() {
     return
   fi
 
-  cargo build --release --manifest-path "$manifest"
-  build_binary="$source_root/rust/agent-canon/target/release/agent-canon"
-  install -d -m 755 "$state_dir/bin" "$TOOLS_HOME/bin"
-  install -m 755 "$build_binary" "$install_binary"
-  ln -sf "$install_binary" "$TOOLS_HOME/bin/agent-canon"
+  CARGO_HOME="$(
+    python3 "$BOUNDARY_SCRIPT" ensure-dir \
+      --root "$PARENT_ROOT_DIR" \
+      --candidate "$CARGO_HOME" \
+      --purpose agent-canon-tool-rebuild-cargo-home
+  )"
+  BUILD_TARGET_DIR="$(
+    python3 "$BOUNDARY_SCRIPT" ensure-dir \
+      --root "$PARENT_ROOT_DIR" \
+      --candidate "$BUILD_TARGET_DIR" \
+      --purpose agent-canon-tool-rebuild-cargo-target
+  )"
+  CARGO_HOME="$CARGO_HOME" \
+    CARGO_TARGET_DIR="$BUILD_TARGET_DIR" \
+    cargo build --release --manifest-path "$manifest"
+  source_sha_after="$(source_commit "$source_root")"
+  if [ "$source_sha" != "$source_sha_after" ]; then
+    echo "AgentCanon source identity changed during build: $source_sha!=$source_sha_after" >&2
+    return 1
+  fi
+  build_binary="$BUILD_TARGET_DIR/release/agent-canon"
+  if [ ! -x "$build_binary" ]; then
+    echo "AgentCanon cargo build produced no executable under the parent root" >&2
+    return 1
+  fi
+  state_dir="$(
+    python3 "$BOUNDARY_SCRIPT" ensure-dir \
+      --root "$PARENT_ROOT_DIR" \
+      --candidate "$state_dir" \
+      --purpose agent-canon-tool-rebuild-state
+  )"
+  python3 "$BOUNDARY_SCRIPT" ensure-dir \
+    --root "$PARENT_ROOT_DIR" \
+    --candidate "$state_dir/bin" \
+    --purpose agent-canon-tool-rebuild-bin >/dev/null
+  python3 "$BOUNDARY_SCRIPT" ensure-dir \
+    --root "$PARENT_ROOT_DIR" \
+    --candidate "$TOOLS_HOME/bin" \
+    --purpose agent-canon-tool-rebuild-tools-bin >/dev/null
+  python3 "$BOUNDARY_SCRIPT" copy \
+    --root "$PARENT_ROOT_DIR" \
+    --source "$build_binary" \
+    --candidate "$install_binary" \
+    --preserve-mode \
+    --purpose agent-canon-tool-rebuild-install >/dev/null
+  python3 "$BOUNDARY_SCRIPT" replace-symlink \
+    --root "$PARENT_ROOT_DIR" \
+    --target "$install_binary" \
+    --candidate "$TOOLS_HOME/bin/agent-canon" \
+    --purpose agent-canon-tool-rebuild-link >/dev/null
   {
     printf 'agent_canon_source_root=%s\n' "$source_root"
     printf 'agent_canon_source_commit=%s\n' "$source_sha"
-  } >"$state_file"
+  } | python3 "$BOUNDARY_SCRIPT" write \
+    --root "$PARENT_ROOT_DIR" \
+    --candidate "$state_file" \
+    --purpose agent-canon-tool-rebuild-state >/dev/null
   maybe_link_usr_local "$TOOLS_HOME/bin/agent-canon"
   "$TOOLS_HOME/bin/agent-canon" --version >/dev/null
   echo "AGENT_CANON_TOOL_REBUILD_RUST=rebuilt"
@@ -124,6 +210,7 @@ rebuild_rust_cli() {
 main() {
   echo "AGENT_CANON_TOOL_REBUILD_ROOT=$ROOT_DIR"
   echo "AGENT_CANON_TOOL_REBUILD_TOOLS_HOME=$TOOLS_HOME"
+  echo "AGENT_CANON_TOOL_REBUILD_CARGO_HOME=$CARGO_HOME"
   rebuild_rust_cli
   echo "AGENT_CANON_TOOL_REBUILD=pass"
 }

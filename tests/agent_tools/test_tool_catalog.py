@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import runpy
 import subprocess
 import sys
 import tempfile
@@ -36,12 +37,8 @@ class CheckToolCatalogTest(unittest.TestCase):
             text=True,
         )
 
-    def test_current_repository_passes(self) -> None:
-        """The canonical repository has a valid tool catalog."""
-        result = self.run_checker(PROJECT_ROOT)
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("TOOL_CATALOG=pass", result.stdout)
+    def test_catalog_renderer_and_visualization_entries(self) -> None:
+        """Canonical renderer and visualization entries retain their contracts."""
         catalog = yaml.safe_load(
             (PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8")
         )
@@ -90,6 +87,40 @@ class CheckToolCatalogTest(unittest.TestCase):
             1,
         )
 
+    def test_workflow_command_rows_use_existing_catalog_schema(self) -> None:
+        """Workflow monitor and waterfall gate are ordinary catalog entries."""
+        catalog = yaml.safe_load(
+            (PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8")
+        )
+        rows = {
+            entry["id"]: entry
+            for entry in catalog["entries"]
+            if entry["id"] in {"workflow-monitor", "waterfall-gate-check"}
+        }
+        self.assertEqual(set(rows), {"workflow-monitor", "waterfall-gate-check"})
+        self.assertEqual(rows["workflow-monitor"]["path"], "tools/agent_tools/workflow_monitor.py")
+        self.assertEqual(rows["waterfall-gate-check"]["path"], "tools/agent_tools/waterfall_gate_check.py")
+        self.assertTrue(rows["workflow-monitor"]["writes"])
+        self.assertFalse(rows["waterfall-gate-check"]["writes"])
+        result = self.run_checker(PROJECT_ROOT, "--format", "json")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_pr_eval_entry_is_wired_through_accumulation_wrapper(self) -> None:
+        """The PR-wired role eval is owned by the accumulation wrapper."""
+        catalog = yaml.safe_load(
+            (PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8")
+        )
+        role_eval = next(
+            entry
+            for entry in catalog["entries"]
+            if entry["path"] == "tools/agent_tools/evaluate_codex_agent_roles.py"
+        )
+        wrapper = (
+            PROJECT_ROOT / "tools" / "agent_tools" / "run_accumulated_agent_evals.py"
+        ).read_text(encoding="utf-8")
+        self.assertTrue(role_eval["default_wiring"]["pr_check"])
+        self.assertIn(Path(role_eval["path"]).name, wrapper)
+
     def test_gpu_admission_route(self) -> None:
         """The catalog exposes only the canonical managed GPU admission entrypoint."""
         catalog = yaml.safe_load(
@@ -107,7 +138,7 @@ class CheckToolCatalogTest(unittest.TestCase):
         )
         self.assertEqual(
             managed["command"],
-            "python3 tools/experiments/run_managed_experiment.py",
+            "python3 -m tools.experiments.run_managed_experiment",
         )
         self.assertIn(
             "tests/tools/test_run_managed_experiment.py",
@@ -319,6 +350,26 @@ class CheckToolCatalogTest(unittest.TestCase):
                 "default_wiring:tools/agent_tools/uncataloged.py:uncataloged-tool-reference",
                 result.stdout,
             )
+
+    def test_test_paths_are_not_default_tool_references(self) -> None:
+        """Test paths are not mistaken for root tool references."""
+        sys.path.insert(0, str(CHECKER.parent))
+        try:
+            namespace = runpy.run_path(str(CHECKER))
+        finally:
+            sys.path.pop(0)
+        pattern = namespace["TOOL_REFERENCE_RE"]
+        matches = set(
+            pattern.findall(
+                "python3 tests/tools/test_catalog_fixture.py\n"
+                "python3 tests/tools/tools/run_symlink_lint.py\n"
+                "python3 tools/agent_tools/uncataloged.py\n"
+            )
+        )
+
+        self.assertNotIn("tools/test_catalog_fixture.py", matches)
+        self.assertNotIn("tools/tools/run_symlink_lint.py", matches)
+        self.assertIn("tools/agent_tools/uncataloged.py", matches)
 
     def test_entry_summary_is_required(self) -> None:
         """Catalog entries must include a reader-facing summary."""
@@ -565,6 +616,7 @@ class CheckToolCatalogTest(unittest.TestCase):
             "documents/tools/repo-local-tool-imports.md",
             "documents/tools/tool_catalog.md",
             "tools/ci/check_agent_canon_pr.sh",
+            "tools/agent_tools/run_accumulated_agent_evals.py",
             "agents/workflows/agent-canon-pr-workflow.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",

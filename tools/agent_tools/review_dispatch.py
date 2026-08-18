@@ -28,7 +28,7 @@ import json
 import re
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -58,13 +58,139 @@ MINIMAL_HANDOFF_KEYS = (
 DECISION_PATTERN = re.compile(r"\b(APPROVE|REVISE|ESCALATE)\b", re.IGNORECASE)
 DECISION_LINE_PATTERN = re.compile(
     r"(?im)^\s*(?:[-*]\s*)?(?:decision|review_decision)\s*[:=]\s*"
-    r"(APPROVE|REVISE|ESCALATE)\s*$"
+    r"(APPROVE|ACCEPT|REVISE|CHANGES-REQUIRED|ESCALATE)\s*$"
 )
 TERMINAL_RUNTIME_STATUSES = frozenset({"completed", "errored", "shutdown"})
 ALLOWED_REVIEW_ROLES = {
     "change_reviewer": "diff_triage_reviewer",
     "final_reviewer": "ship_reviewer",
 }
+
+# Finding status is the review contract.  Keep the vocabulary small and
+# explicit so that a style observation or an unanswered question cannot be
+# promoted to a publication blocker by a renderer or a reviewer role.
+FINDING_STATUSES = frozenset(
+    {
+        "blocking",
+        "non-blocking",
+        "question",
+        "not-applicable",
+        "accepted-risk",
+    }
+)
+FINDING_STATUS_ALIASES = {
+    "nonblocking": "non-blocking",
+    "notapplicable": "not-applicable",
+    "acceptedrisk": "accepted-risk",
+}
+DECISION_ALIASES = {
+    "ACCEPT": "APPROVE",
+    "CHANGES-REQUIRED": "REVISE",
+}
+REVIEW_OUTCOMES = frozenset({"accept", "changes-required"})
+
+
+def normalize_finding_status(value: object) -> str:
+    """Return one canonical finding status or reject an unknown value."""
+    if not isinstance(value, str):
+        raise AutomaticReviewError("automatic_review:finding_status_invalid")
+    normalized = value.strip().lower().replace("_", "-").replace(" ", "-")
+    normalized = FINDING_STATUS_ALIASES.get(normalized, normalized)
+    if normalized not in FINDING_STATUSES:
+        raise AutomaticReviewError(
+            "automatic_review:finding_status_invalid",
+            normalized or "empty",
+        )
+    return normalized
+
+
+def canonicalize_review_decision(value: object) -> str:
+    """Canonicalize template-facing decision aliases at the dispatch boundary."""
+    if not isinstance(value, str):
+        raise AutomaticReviewError("automatic_review:decision_invalid")
+    normalized = value.strip().upper().replace("_", "-").replace(" ", "-")
+    normalized = DECISION_ALIASES.get(normalized, normalized)
+    if normalized not in {"APPROVE", "REVISE", "ESCALATE"}:
+        raise AutomaticReviewError(
+            "automatic_review:decision_invalid",
+            normalized or "empty",
+        )
+    return normalized
+
+
+def derive_review_outcome(findings: Sequence[Mapping[str, object]]) -> str:
+    """Derive the review outcome from unresolved blocking findings only.
+
+    Non-blocking findings, questions, not-applicable observations, and
+    explicitly accepted risks remain useful review evidence but do not force a
+    changes-required outcome.
+    """
+    for finding in findings:
+        if normalize_finding_status(finding.get("status")) == "blocking":
+            return "changes-required"
+    return "accept"
+
+
+def parse_finding_rows(markdown: str) -> tuple[dict[str, str], ...]:
+    """Parse status-bearing Markdown finding rows for outcome derivation.
+
+    The parser intentionally accepts the existing area/chunk/finding tables
+    and does not make a particular review template a second policy source.
+    Rows without a recognized status are ignored; malformed explicit statuses
+    are rejected by the caller when a status-bearing row is present.
+    """
+    rows: list[dict[str, str]] = []
+    lines = markdown.splitlines()
+
+    def table_cells(line: str) -> list[str] | None:
+        stripped = line.strip()
+        if not stripped.startswith("|") or stripped.count("|") < 2:
+            return None
+        return [cell.strip() for cell in stripped.strip("|").split("|")]
+
+    def separator_row(cells: Sequence[str]) -> bool:
+        return bool(cells) and all(
+            bool(re.fullmatch(r":?-+:?", cell.replace(" ", "")))
+            for cell in cells
+        )
+
+    def header_name(value: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
+
+    for index, line in enumerate(lines):
+        header = table_cells(line)
+        if header is None or separator_row(header):
+            continue
+        names = [header_name(cell) for cell in header]
+        if "status" not in names:
+            continue
+        status_index = names.index("status")
+        severity_index = names.index("severity") if "severity" in names else None
+        row_index = index + 1
+        while row_index < len(lines):
+            cells = table_cells(lines[row_index])
+            if cells is None:
+                break
+            row_index += 1
+            if separator_row(cells) or status_index >= len(cells):
+                continue
+            status = cells[status_index].lower().replace("_", "-").replace(" ", "-")
+            status = FINDING_STATUS_ALIASES.get(status, status)
+            if status not in FINDING_STATUSES:
+                continue
+            severity = (
+                cells[severity_index]
+                if severity_index is not None and severity_index < len(cells)
+                else ""
+            )
+            rows.append(
+                {
+                    "finding": cells[0] if cells else "",
+                    "severity": severity,
+                    "status": status,
+                }
+            )
+    return tuple(rows)
 
 
 class AutomaticReviewError(ValueError):
@@ -703,7 +829,7 @@ def dispatch_current_candidate_review(
         "proposed_from_review_state": "dispatch_pending",
         "proposed_to_review_state": "dispatched",
         "event_order_index": _required_event_order_index(frame) + 1,
-        "observed_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "observed_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "resume_event_body_sha256": "",
     }
     event["resume_event_body_sha256"] = canonical_body_sha256(
@@ -779,12 +905,22 @@ def record_current_review_decision(
         raise AutomaticReviewError("automatic_review:review_artifact_missing")
     identity = materialize_artifact_identity(root, absolute_artifact)
     text = absolute_artifact.read_text(encoding="utf-8")
+    finding_rows = parse_finding_rows(text)
+    derived_outcome = derive_review_outcome(finding_rows) if finding_rows else None
     decisions = DECISION_LINE_PATTERN.findall(text)
-    if not decisions:
+    if derived_outcome is None and not decisions:
         raise AutomaticReviewError("automatic_review:decision_missing")
-    if len({decision.upper() for decision in decisions}) != 1:
+    if decisions and len({decision.upper() for decision in decisions}) != 1:
         raise AutomaticReviewError("automatic_review:decision_ambiguous")
-    decision = decisions[-1].upper()
+    decision = decisions[-1].upper() if decisions else derived_outcome.upper()
+    explicit_escalate_decision = "ESCALATE" in {decision.upper() for decision in decisions}
+    if derived_outcome == "changes-required" and decision in {"APPROVE", "ACCEPT"}:
+        raise AutomaticReviewError("automatic_review:approve_with_blocking_finding")
+    if derived_outcome == "accept" and decision in {"REVISE", "ESCALATE"}:
+        # A reviewer may still explicitly escalate a question.
+        if not explicit_escalate_decision:
+            decision = "ACCEPT"
+    decision = canonicalize_review_decision(decision)
     if decision == "APPROVE" and re.search(
         r"(?im)^\s*(?:[-*]|\|)\s*.*\b(?:fail|revise|required_change|blocker)\b",
         _review_text_without_rejected_hypotheses(text),
@@ -879,7 +1015,8 @@ def resolve_current_review_state(workspace: Path) -> dict[str, object]:
         "decision": decision,
         "dispatch_blocker": dispatch_blockers[-1] if dispatch_blockers else None,
         "publication_unlocked": bool(
-            isinstance(decision, Mapping) and decision.get("decision") == "APPROVE"
+            isinstance(decision, Mapping)
+            and decision.get("decision") == "APPROVE"
         ),
     }
 

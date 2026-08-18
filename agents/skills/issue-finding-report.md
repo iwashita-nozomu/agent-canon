@@ -20,8 +20,9 @@ downstream design ../../.agents/skills/issue-finding-report/SKILL.md exposes thi
 - Purpose: turn accumulated runtime, prompt, hook, skill, tool, workflow, and
   eval evidence into durable AgentCanon operational issue candidates.
 - Section path: Purpose and Use When set the route; Inputs and Abstract Cause
-  Taxonomy define evidence and grouping; Multi-Agent Partition, Issue Candidate
-  Contract, Output Packet, and Validation define production and checks.
+  Taxonomy define evidence and grouping; Multi-Agent Partition, Confirmed
+  Occurrence Location Contract, Issue Candidate Contract, Output Packet, and
+  Validation define production and checks.
 - Use when: repeated agent behavior, routing misses, workflow evidence, or log
   dashboard signals should become issue-backed repair work.
 - Boundary: compact analysis comes from `agent-log-analysis`; this skill writes
@@ -31,9 +32,9 @@ downstream design ../../.agents/skills/issue-finding-report/SKILL.md exposes thi
 ## Purpose
 
 Convert accumulated prompt, run-bundle, hook, skill, tool, workflow, and eval
-evidence into durable AgentCanon operational issues. The skill groups repeated
-signals by abstract cause, assigns multi-agent review partitions, and writes
-issue candidates that cite structured evidence.
+evidence into durable AgentCanon operational issues. The shared finding
+normalization/grouping owner groups repeated signals by owner, root cause, and
+fix; one resulting group becomes one issue candidate with structured evidence.
 
 This skill is the issue-production follow-up to `agent-log-analysis`. It
 receives structured dashboard artifacts and produces issue records or a finding
@@ -46,8 +47,8 @@ with their owner skills.
   skill issues.
 - A structured dashboard exposes repeated skill, workflow, tool, hook, wave, eval,
   or token evidence that should survive the current run.
-- Multi-agent review is needed to separate abstract causes before writing
-  `issues/open/AC-*.md` files.
+- An explicit repo-wide sweep is requested. Otherwise use changed-surface,
+  user-request, or owner-bounded scope.
 - The task asks why agent behavior keeps recurring and wants issue-backed
   repair work.
 
@@ -95,6 +96,14 @@ Assign each cluster to one primary cause and optional secondary causes:
 Create one issue per abstract recurring cause cluster, with structured evidence
 counts and route target.
 
+## Grouping And Dispatch Boundary
+
+Use `tools/agent_tools/issue_sync.py` as the shared normalization/grouping
+owner for tool and issue findings. A group is keyed by `(owner, root_cause,
+fix)` and remains one issue candidate; do not automatically partition a group
+into multiple agents. Warnings add a closeout obligation only when they are
+actionable or blocking.
+
 ## Multi-Agent Partition
 
 Use a parent-created `Issue Finding Packet` before spawning. Each packet fixes:
@@ -104,10 +113,16 @@ cause: <abstract-cause>
 evidence_cells: <structured dashboard headings or API JSON paths>
 instance_partition: <repo_key|hook_family|skill_name|workflow_name|tool_name|issue_id|path_scope>
 candidate_issue_slug: <lowercase-ascii-slug>
-affected_surfaces: <candidate repo paths>
+affected_surfaces: <candidate edit or verification paths>
+occurrence_locations: <confirmed location records from the contract below>
 duplicate_search: <rg query>
 expected_output: <issue_candidate|defer_with_reason|merge_with_existing>
 ```
+
+`affected_surfaces` is planning scope. It may include files that need edits or
+verification, but it is not evidence that the defect occurred there.
+`occurrence_locations` names the observed sites and cannot be inferred from a
+repository name, directory, or broad affected surface.
 
 Recommended review partition:
 
@@ -116,10 +131,48 @@ Recommended review partition:
 - `project_reviewer`: `archive_hygiene`, `wave_execution`, `structure_boundary`
 - `artifact_reviewer`: raw/structured artifact sufficiency and evidence paths
 
-When several independent clusters exist, spawn same-role instances by
-`instance_partition`. Each instance receives only its packet, structured artifact
-paths, allowed issue paths, candidate affected surfaces, validation route, and
-return schema. The parent deduplicates returned candidates before writing files.
+When several independent clusters exist, parent-owned routing may dispatch
+distinct groups. A single group is never split solely to increase fan-out.
+Each optional instance receives only its packet, structured artifact paths,
+allowed issue paths, candidate affected surfaces, validation route, and return
+schema; the parent consumes the shared grouping result before writing files.
+
+## Confirmed Occurrence Location Contract
+
+Before an issue candidate is complete, record at least one confirmed occurrence
+location tied to the source or artifact snapshot where the behavior was
+observed. Use one record per distinct site:
+
+```text
+repository: <owner/name or local repository identity>
+snapshot: <commit SHA or immutable artifact/run identity>
+path: <repo-relative source path or artifact path>
+locator_type: <symbol|config-key|heading|data-field|workflow-step|command-phase|absence-query>
+locator: <function/class/type, table.key, heading/anchor, JSON/TOML field, job/step, or bounded query>
+lines: <Lx-Ly|unavailable:reason>
+observation: <behavior or conflicting contract observed at this locator>
+evidence: <command and output/artifact reference that confirms the observation>
+```
+
+Apply these rules:
+
+- A repository name, directory, subsystem, or `affected_surfaces` value alone is
+  not a confirmed occurrence location.
+- `path` and a stable `locator` are required. Add the line or range from the
+  recorded snapshot when available; a line number without a stable locator is
+  insufficient because lines move.
+- For a cross-surface disconnect, list every endpoint needed to demonstrate the
+  broken invariant, such as both producer and consumer, rather than naming only
+  the subsystem that contains them.
+- For an absence defect, do not invent a source location. Record the bounded
+  search universe, immutable snapshot, exact query, and zero-match or missing
+  field result with `locator_type: absence-query`.
+- For generated or runtime evidence, name both the producer surface when known
+  and the immutable artifact/run field where the bad state was observed.
+- When no occurrence location can yet be confirmed, return
+  `defer_with_reason`, keep the issue in investigation with the
+  `need verification` label, and do not present a root cause or required fix as
+  confirmed.
 
 ## Issue Candidate Contract
 
@@ -139,22 +192,32 @@ Before writing a new issue:
      --search-hits-file reports/agents/<run-id>/<slug>-search-hits.txt
    ```
 
+1. Confirm the occurrence locations using the contract above. Keep the
+   observation location separate from the proposed edit scope.
 1. Write `issues/open/AC-YYYYMMDD-short-slug.md` after the duplicate search
    shows that the cause cluster needs a new durable record.
-1. Populate the required fields from `issues/README.md`:
-   `issue_id`, `status`, `source`, `severity`, `evidence`,
-   `affected_surfaces`, `edit_scope`, `required_action`, and
-   `close_condition`.
-1. Use `github_issue: pending` for a GitHub mirror created in the same branch
-   or explicit follow-up.
+1. Populate the minimum issue form from `issues/README.md`: `problem`,
+   `evidence`, and `done`, plus identity fields. Add a structured
+   `occurrence_locations` block even when no extended planning fields are
+   needed.
+1. Use `github_issue: pending` or `github_issue: not-created` only for a mirror
+   being prepared in the same branch or explicit follow-up. These markers are
+   unresolved until `--apply` replaces them with one real GitHub Issue URL;
+   `--github-check` must report them and `--require-github-link` must fail.
 
 Issue body sections:
 
 - `## Finding`: observed recurring behavior and structured evidence counts
+- `## Occurrence Locations`: one structured record per confirmed observation
+  site, including snapshot, path, stable locator, observation, and evidence
 - `## Abstract Cause`: why the cluster belongs to the selected cause
 - `## Required Fix`: skill, workflow, tool, or logging repair expected
-- `## Evidence`: structured dashboard, run bundle, dependency review, or existing
-  issue links
+- `## Evidence`: commands and artifacts tied to the occurrence records,
+  dependency review, or existing issue links
+
+Do not call an issue candidate complete when `## Occurrence Locations` is
+missing, contains only broad affected surfaces, or lacks evidence tied to the
+recorded snapshot.
 
 ## Output Packet
 
@@ -168,6 +231,7 @@ candidate_count: <n>
 new_issue_count: <n>
 merged_existing_count: <n>
 deferred_count: <n>
+confirmed_occurrence_location_count: <n>
 issue_paths: <paths>
 subagent_partitions: <role_id:instance_id:agent_type:packet>
 validation: <commands>

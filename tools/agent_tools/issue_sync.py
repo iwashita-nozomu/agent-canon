@@ -15,11 +15,29 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
 
 REQUIRED_FIELDS = (
     "issue_id",
@@ -32,10 +50,30 @@ REQUIRED_FIELDS = (
     "required_action",
     "close_condition",
 )
+MINIMUM_ISSUE_FIELDS = ("issue_id", "status", "source", "severity", "evidence")
+MINIMUM_ISSUE_CONTENT_FIELDS = ("problem", "done")
+FINDING_SCOPES = frozenset({"changed", "user", "owner-bounded", "repo-wide"})
+GITHUB_ISSUE_MARKERS = frozenset({"pending", "not-created"})
 OPEN_STATUSES = {"open", "in_progress", "deferred"}
 CLOSED_STATUSES = {"resolved", "wontfix", "deferred"}
 ISSUE_ID_RE = re.compile(r"^AC-\d{8}-[a-z0-9]+(?:-[a-z0-9]+)*$")
 FIELD_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$")
+
+
+def _write_issue_output(path: Path, payload: bytes, purpose: str) -> None:
+    """Publish issue evidence/source updates through the parent root."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+        )
+        ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, payload, purpose)
+        return
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        f"{purpose}: explicit parent root is required for publication",
+    )
 
 
 @dataclass(frozen=True)
@@ -51,6 +89,81 @@ class Finding:
         return f"ISSUE_SYNC_FINDING={self.check}:{self.path}:{self.detail}"
 
 
+def normalize_finding(record: Mapping[str, object], *, default_scope: str = "changed") -> dict[str, object]:
+    """Normalize one tool or issue finding at the shared pipeline boundary.
+
+    Findings default to the changed/user/owner-bounded view.  Repo-wide scope
+    is accepted only when explicitly supplied by the caller; no path-based
+    inference silently broadens a run.
+    """
+    scope_value = record.get("scope", default_scope)
+    if not isinstance(scope_value, str):
+        raise ValueError("finding scope must be a string")
+    scope = scope_value.strip().lower().replace("_", "-")
+    if scope not in FINDING_SCOPES:
+        raise ValueError(f"unsupported finding scope: {scope}")
+    owner = str(record.get("owner", "")).strip()
+    root_cause = str(record.get("root_cause", record.get("cause", ""))).strip()
+    fix = str(record.get("fix", record.get("required_action", ""))).strip()
+    if not owner or not root_cause or not fix:
+        raise ValueError("finding owner, root_cause, and fix are required")
+    status = str(record.get("status", "warning")).strip().lower().replace("_", "-")
+    return {
+        "owner": owner,
+        "root_cause": root_cause,
+        "fix": fix,
+        "scope": scope,
+        "status": status,
+        "evidence": str(record.get("evidence", "")).strip(),
+        "actionable": bool(record.get("actionable", status in {"blocking", "error", "warning"})),
+        "path": str(record.get("path", "")).strip(),
+    }
+
+
+def group_findings(
+    records: Iterable[Mapping[str, object]],
+    *,
+    scope: str = "changed",
+) -> tuple[dict[str, object], ...]:
+    """Group findings by owner, root cause, and fix into one issue candidate.
+
+    Multiple agents or paths describing the same repair remain one candidate;
+    this owner deliberately does not partition a group into agents.
+    """
+    normalized = [normalize_finding(record, default_scope=scope) for record in records]
+    grouped: dict[tuple[str, str, str], dict[str, object]] = {}
+    for finding in normalized:
+        key = (
+            str(finding["owner"]),
+            str(finding["root_cause"]),
+            str(finding["fix"]),
+        )
+        current = grouped.setdefault(
+            key,
+            {
+                "owner": key[0],
+                "root_cause": key[1],
+                "fix": key[2],
+                "scope": finding["scope"],
+                "status": finding["status"],
+                "actionable": finding["actionable"],
+                "evidence": [],
+                "paths": [],
+            },
+        )
+        evidence = current["evidence"]
+        paths = current["paths"]
+        if isinstance(evidence, list) and finding["evidence"] and finding["evidence"] not in evidence:
+            evidence.append(finding["evidence"])
+        path = finding.get("path")
+        if isinstance(paths, list) and isinstance(path, str) and path and path not in paths:
+            paths.append(path)
+        if finding["status"] == "blocking":
+            current["status"] = "blocking"
+        current["actionable"] = bool(current["actionable"] or finding["actionable"])
+    return tuple(grouped[key] for key in sorted(grouped))
+
+
 @dataclass(frozen=True)
 class IssueRecord:
     """One parsed local issue file."""
@@ -58,6 +171,8 @@ class IssueRecord:
     path: Path
     directory_state: str
     fields: dict[str, str]
+    body: str = ""
+    github_issue_values: tuple[str, ...] = ()
 
     @property
     def issue_id(self) -> str:
@@ -67,6 +182,8 @@ class IssueRecord:
     @property
     def github_issue(self) -> str:
         """Return the linked GitHub Issue URL or marker."""
+        if self.github_issue_values:
+            return canonical_github_issue(self.github_issue_values)
         return self.fields.get("github_issue", "")
 
 
@@ -113,7 +230,7 @@ class GitHubIssueCreator:
         """Create one GitHub Issue from a local issue file."""
         if not self.repo:
             raise ValueError("--repo is required with --apply")
-        title = issue.path.read_text(encoding="utf-8").splitlines()[0].lstrip("# ").strip()
+        title = issue_title(issue.path)
         body = issue.path.read_text(encoding="utf-8")
         result = subprocess.run(
             ["gh", "issue", "create", "--repo", self.repo, "--title", title, "--body", body],
@@ -244,6 +361,26 @@ def parse_fields(text: str) -> dict[str, str]:
     return fields
 
 
+def compact_issue_sections(text: str) -> dict[str, str]:
+    """Read the compact Problem/Evidence/Done headings from an issue body."""
+    sections: dict[str, str] = {}
+    heading: str | None = None
+    content: list[str] = []
+    for line in text.splitlines():
+        match = re.match(r"^##+\s+(.+?)\s*$", line)
+        if match:
+            if heading is not None:
+                sections[heading] = "\n".join(content).strip()
+            heading = match.group(1).strip().lower().replace("-", " ")
+            content = []
+            continue
+        if heading is not None:
+            content.append(line)
+    if heading is not None:
+        sections[heading] = "\n".join(content).strip()
+    return sections
+
+
 def issue_files(root: Path) -> tuple[Path, ...]:
     """Return local issue files under open and closed directories."""
     paths: list[Path] = []
@@ -259,24 +396,56 @@ def read_issues(root: Path) -> tuple[IssueRecord, ...]:
     records: list[IssueRecord] = []
     for path in issue_files(root):
         directory_state = path.parent.name
+        body = path.read_text(encoding="utf-8")
         records.append(
             IssueRecord(
                 path=path,
                 directory_state=directory_state,
-                fields=parse_fields(path.read_text(encoding="utf-8")),
+                fields=parse_fields(body),
+                body=body,
+                github_issue_values=parse_github_issue_values(body),
             )
         )
     return tuple(records)
 
 
 def validate_required_fields(root: Path, issue: IssueRecord) -> list[Finding]:
-    """Validate required local issue fields."""
+    """Validate legacy metadata or the compact problem/evidence/done form."""
     rel_path = relative(root, issue.path)
     findings = [
         Finding("field", rel_path, f"missing:{field}")
-        for field in REQUIRED_FIELDS
+        for field in MINIMUM_ISSUE_FIELDS
         if not issue.fields.get(field)
     ]
+    has_extended = all(issue.fields.get(field) for field in (
+        "affected_surfaces", "edit_scope", "required_action", "close_condition"
+    ))
+    compact_sections = compact_issue_sections(issue.body)
+    has_compact = all(
+        issue.fields.get(field) or compact_sections.get(field)
+        for field in MINIMUM_ISSUE_CONTENT_FIELDS
+    )
+    if not has_extended and not has_compact:
+        extended_fields = (
+            "affected_surfaces",
+            "edit_scope",
+            "required_action",
+            "close_condition",
+        )
+        if any(issue.fields.get(field) for field in extended_fields):
+            findings.extend(
+                Finding("field", rel_path, f"missing:{field}")
+                for field in extended_fields
+                if not issue.fields.get(field)
+            )
+        else:
+            findings.append(
+                Finding(
+                    "field",
+                    rel_path,
+                    "missing:problem-evidence-done-or-extended-fields",
+                )
+            )
     if issue.directory_state == "closed" and not issue.fields.get("resolved_by"):
         findings.append(Finding("field", rel_path, "missing:resolved_by"))
     return findings
@@ -303,11 +472,11 @@ def validate_issue_identity(root: Path, issue: IssueRecord) -> list[Finding]:
 def github_link_findings(root: Path, issue: IssueRecord, required: bool) -> list[Finding]:
     """Validate optional GitHub Issue link fields."""
     value = issue.github_issue
-    if value and value not in {"pending", "not-created"} and github_issue_reference(value, "") is None:
+    if value and value not in GITHUB_ISSUE_MARKERS and github_issue_reference(value, "") is None:
         return [Finding("github", relative(root, issue.path), "invalid-github_issue")]
     if not required:
         return []
-    if value.startswith("https://github.com/") or value in {"pending", "not-created"}:
+    if github_issue_reference(value, "") is not None:
         return []
     return [Finding("github", relative(root, issue.path), "missing-github_issue")]
 
@@ -337,9 +506,9 @@ def plan_lines(root: Path, issues: Sequence[IssueRecord], repo: str) -> tuple[st
     """Return a deterministic GitHub sync plan for unlinked issues."""
     lines: list[str] = []
     for issue in issues:
-        if issue.github_issue:
+        if issue.github_issue and issue.github_issue not in GITHUB_ISSUE_MARKERS:
             continue
-        title = issue.path.read_text(encoding="utf-8").splitlines()[0].lstrip("# ").strip()
+        title = issue_title(issue.path)
         command = f"gh issue create --repo {repo or '<owner/name>'} --title {json.dumps(title)} --body-file {relative(root, issue.path)}"
         lines.append(f"{issue.issue_id}:{command}")
     return tuple(lines)
@@ -353,9 +522,31 @@ def issue_title(path: Path) -> str:
     return path.stem
 
 
+def parse_github_issue_values(text: str) -> tuple[str, ...]:
+    """Parse all github_issue values from issue text."""
+    values: list[str] = []
+    for line in text.splitlines():
+        if line.startswith("github_issue:"):
+            value = line.split(":", 1)[1].strip()
+            if value:
+                values.append(value)
+    return tuple(values)
+
+
+def canonical_github_issue(values: Sequence[str]) -> str:
+    """Return canonical github_issue value preferring a resolvable URL."""
+    for value in values:
+        if github_issue_reference(value, "") is not None:
+            return value
+    for value in values:
+        if value:
+            return value
+    return ""
+
+
 def github_issue_reference(value: str, default_repo: str) -> GitHubIssueReference | None:
     """Parse a GitHub Issue URL or issue number."""
-    if not value or value in {"pending", "not-created"}:
+    if not value or value in GITHUB_ISSUE_MARKERS:
         return None
     url_match = re.fullmatch(r"https://github\.com/([^/]+/[^/]+)/issues/(\d+)", value)
     if url_match is not None:
@@ -392,8 +583,15 @@ def github_mirror_findings(
     unavailable = 0
     client = GitHubIssueClient(repo)
     for issue in issues:
-        reference = github_issue_reference(issue.github_issue, repo)
+        # Read-only checks require a canonical URL. Numeric shorthand remains
+        # available only to the explicit sync client compatibility path.
+        reference = github_issue_reference(issue.github_issue, "")
         if reference is None:
+            marker = issue.github_issue or "empty"
+            findings.append(
+                Finding("github", relative(root, issue.path), f"unresolved-github_issue:{marker}")
+            )
+            drift += 1
             continue
         rel_path = relative(root, issue.path)
         try:
@@ -429,29 +627,60 @@ def github_mirror_findings(
 
 def github_missing_link_count(issues: Sequence[IssueRecord]) -> int:
     """Return how many local issue files have no GitHub mirror link."""
-    return sum(1 for issue in issues if not issue.github_issue)
+    return sum(
+        1
+        for issue in issues
+        if not issue.github_issue or issue.github_issue in GITHUB_ISSUE_MARKERS
+    )
 
 
-def insert_github_issue(path: Path, url: str) -> None:
-    """Insert a github_issue field into one local issue file."""
+def replace_github_issue(path: Path, url: str) -> None:
+    """Replace any marker/link with one canonical GitHub Issue field."""
     lines = path.read_text(encoding="utf-8").splitlines()
+    replaced = False
+    filtered: list[str] = []
+    for line in lines:
+        if line.startswith("github_issue:"):
+            if not replaced:
+                filtered.append(f"github_issue: {url}")
+                replaced = True
+            continue
+        filtered.append(line)
+    lines = filtered
+    if replaced:
+        _write_issue_output(path, ("\n".join(lines) + "\n").encode("utf-8"), "issue-sync-source")
+        return
     for index, line in enumerate(lines):
         if line.startswith("evidence:"):
             lines.insert(index + 1, f"github_issue: {url}")
-            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            _write_issue_output(path, ("\n".join(lines) + "\n").encode("utf-8"), "issue-sync-source")
             return
-    path.write_text("\n".join([*lines, f"github_issue: {url}"]) + "\n", encoding="utf-8")
+    _write_issue_output(
+        path,
+        ("\n".join([*lines, f"github_issue: {url}"]) + "\n").encode("utf-8"),
+        "issue-sync-source",
+    )
 
 
 def apply_missing_links(issues: Sequence[IssueRecord], repo: str) -> tuple[str, ...]:
-    """Create GitHub Issues for unlinked local issues."""
+    """Create GitHub Issues for empty or temporary-marker local issues."""
     creator = GitHubIssueCreator(repo)
     created: list[str] = []
     for issue in issues:
-        if issue.github_issue:
+        canonical = canonical_github_issue(issue.github_issue_values)
+        has_multiple_links = len(issue.github_issue_values) > 1
+        if canonical and canonical not in GITHUB_ISSUE_MARKERS:
+            if canonical != issue.github_issue or has_multiple_links:
+                replace_github_issue(issue.path, canonical)
             continue
+        if issue.github_issue != canonical:
+            replace_github_issue(issue.path, canonical or "pending")
         creator.create(issue)
-        insert_github_issue(issue.path, creator.created_url)
+        if github_issue_reference(creator.created_url, "") is None:
+            raise RuntimeError(
+                f"gh issue create returned a non-URL for {issue.issue_id}: {creator.created_url!r}"
+            )
+        replace_github_issue(issue.path, creator.created_url)
         created.append(f"{issue.issue_id}:{creator.created_url}")
     return tuple(created)
 
@@ -583,26 +812,62 @@ def render_markdown_summary(report: IssueSyncReport) -> str:
 
 def append_summary(path: Path, report: IssueSyncReport) -> None:
     """Append Markdown summary output to a file."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(render_markdown_summary(report))
+    rendered = render_markdown_summary(report)
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="issue-sync-summary")
+        )
+        boundary = ParentRootSideEffectBoundary()
+        with boundary.open_parent_owned_file(
+            attestation,
+            path,
+            "issue-sync-summary",
+            create=True,
+            mode="a+",
+        ) as handle:
+            handle.write(rendered)
+        return
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        "issue-sync-summary: explicit parent root is required",
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run issue validation and optional GitHub sync planning."""
     args = build_parser().parse_args(argv)
-    report = validate(args.root, args.require_github_link, args.repo, github_check=False)
-    if args.apply and not report.findings:
-        created = apply_missing_links(report.issues, args.repo)
-        print(f"ISSUE_SYNC_CREATED={len(created)}")
-        for item in created:
-            print(f"ISSUE_SYNC_CREATED_ITEM={item}")
-        report = validate(args.root, args.require_github_link, args.repo, github_check=False)
-    if args.sync_github and not report.findings:
-        synced = sync_linked_github_issues(report.issues, args.repo)
-        print(f"ISSUE_SYNC_GITHUB_SYNCED={len(synced)}")
-        for item in synced:
-            print(f"ISSUE_SYNC_GITHUB_SYNCED_ITEM={item}")
+    report = validate(
+        args.root,
+        args.require_github_link and not args.apply,
+        args.repo,
+        github_check=False,
+    )
+    try:
+        if args.apply and not report.findings:
+            created = apply_missing_links(report.issues, args.repo)
+            print(f"ISSUE_SYNC_CREATED={len(created)}")
+            for item in created:
+                print(f"ISSUE_SYNC_CREATED_ITEM={item}")
+            report = validate(args.root, args.require_github_link, args.repo, github_check=False)
+            if created and not report.findings:
+                created_ids = {item.split(":", 1)[0] for item in created if ":" in item}
+                synced = sync_linked_github_issues(
+                    tuple(issue for issue in report.issues if issue.issue_id in created_ids),
+                    args.repo,
+                )
+                print(f"ISSUE_SYNC_GITHUB_SYNCED={len(synced)}")
+                for item in synced:
+                    print(f"ISSUE_SYNC_GITHUB_SYNCED_ITEM={item}")
+        if args.sync_github and not report.findings:
+            synced = sync_linked_github_issues(report.issues, args.repo)
+            print(f"ISSUE_SYNC_GITHUB_SYNCED={len(synced)}")
+            for item in synced:
+                print(f"ISSUE_SYNC_GITHUB_SYNCED_ITEM={item}")
+    except (RuntimeError, ValueError, OSError) as error:
+        print(f"ISSUE_SYNC_APPLY_ERROR={error}")
+        return 1
     report = validate(
         args.root,
         args.require_github_link,

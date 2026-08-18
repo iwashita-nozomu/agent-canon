@@ -22,13 +22,16 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import cast
+from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-CONFIG = PROJECT_ROOT / ".codex" / "config.toml"
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 HOOK_DISPATCHER = PROJECT_ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+sys.path.insert(0, str(PROJECT_ROOT / ".codex" / "hooks"))
+import hook_dispatcher  # noqa: E402
+import hook_event_log  # noqa: E402
 from prompt_classifier import (  # noqa: E402
     PromptClassifierInputs,
     prompt_intake_signals,
@@ -357,11 +360,6 @@ class CodexHooksTest(unittest.TestCase):
 
     def test_active_hook_config_has_exact_three_events(self) -> None:
         """Project config and hooks JSON expose only the three active dispatcher events."""
-        config_text = CONFIG.read_text(encoding="utf-8")
-        self.assertIn("[features]", config_text)
-        self.assertIn("hooks = true", config_text)
-        self.assertNotIn("codex_hooks", config_text)
-
         hooks = cast("dict[str, object]", json.loads(HOOKS_JSON.read_text(encoding="utf-8")))
         self.assertEqual(set(hooks), {"hooks"})
         hook_groups = cast("dict[str, object]", hooks["hooks"])
@@ -712,8 +710,6 @@ class CodexHooksTest(unittest.TestCase):
             "true && git clean --force -d",
             "git branch -Dtopic",
             "git branch -mtopic",
-            "git branch --edit-description topic",
-            "git worktree lock ../topic",
         ]
         for command in commands:
             with self.subTest(command=command):
@@ -842,7 +838,17 @@ class CodexHooksTest(unittest.TestCase):
             "git branch",
             "git branch --show-current",
             "git branch --list 'topic/*'",
+            "git branch --edit-description topic",
+            "git branch --set-upstream-to=origin/main topic",
+            "git branch --set-upstream-to origin/main topic",
+            "git branch --unset-upstream topic",
+            "git branch -u origin/main topic",
+            "git branch -uorigin/main topic",
             "git worktree list --porcelain",
+            "git worktree lock ../topic",
+            "git worktree lock --reason maintenance ../topic",
+            "git worktree lock --reason=maintenance ../topic",
+            "git worktree unlock ../topic",
             "git stash list",
             "git stash show stash@{0}",
             "git clean -n",
@@ -857,7 +863,7 @@ class CodexHooksTest(unittest.TestCase):
                 self.assertIsNone(self._run_shared_checkout_guard(command))
 
     def test_shared_checkout_guard_enforces_overlap_authority_matrix(self) -> None:
-        """Creation and destructive-overwrite intents require their full authority sets."""
+        """Creation and destructive-overwrite intents use their distinct authority sets."""
         creation = (
             "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
             "AGENT_CANON_BRANCH_WORKTREE_REASON=requested"
@@ -895,8 +901,9 @@ class CodexHooksTest(unittest.TestCase):
         for command in normal_create:
             with self.subTest(command=command, route="normal"):
                 self.assertIsNotNone(self._run_shared_checkout_guard(command))
-                self.assertIsNotNone(self._run_shared_checkout_guard(f"{creation} {command}"))
-                self.assertIsNotNone(self._run_shared_checkout_guard(f"{workflow} {command}"))
+                self.assertIsNone(self._run_shared_checkout_guard(f"{creation} {command}"))
+                self.assertIsNone(self._run_shared_checkout_guard(f"{workflow} {command}"))
+                self.assertIsNotNone(self._run_shared_checkout_guard(f"{destructive} {command}"))
                 self.assertIsNone(
                     self._run_shared_checkout_guard(f"{creation} {destructive} {command}")
                 )
@@ -912,7 +919,7 @@ class CodexHooksTest(unittest.TestCase):
                 )
 
     def test_shared_checkout_guard_protects_agent_canon_update_wrappers(self) -> None:
-        """Update wrappers inherit the creation plus destructive authority profile."""
+        """Update wrappers require destructive authority, not branch/worktree creation authority."""
         approved = (
             "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
             "AGENT_CANON_BRANCH_WORKTREE_REASON=approved-update "
@@ -925,7 +932,6 @@ class CodexHooksTest(unittest.TestCase):
             "./tools/update_agent_canon.sh apply",
             "bash tools/update_agent_canon.sh apply",
             "bash tools/update_agent_canon.sh merge-main-into-current",
-            "bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty",
             "bash tools/sync_agent_canon.sh ensure-latest",
             "./tools/sync_agent_canon.sh ensure-latest",
             "bash --rcfile /tmp/agent-canon-test-rc tools/update_agent_canon.sh latest",
@@ -937,7 +943,6 @@ class CodexHooksTest(unittest.TestCase):
             "exec -a canon -l ./tools/sync_agent_canon.sh ensure-latest",
             "exec -c ./tools/sync_agent_canon.sh ensure-latest",
             "exec -l ./tools/update_agent_canon.sh merge-main-into-current",
-            "exec -cl ./tools/update_agent_canon.sh merge-main-into-current-preserve-dirty",
             "make agent-canon-ensure-latest",
             "make agent-canon-latest",
             "make agent-canon-update",
@@ -949,12 +954,40 @@ class CodexHooksTest(unittest.TestCase):
                 assert payload is not None
                 reason = cast("str", payload["reason"])
                 self.assertIn("DESTRUCTIVE_GIT_GUARD=block", reason)
-                self.assertIn("BRANCH_WORKTREE_CREATION_GUARD=block", reason)
+                self.assertNotIn("BRANCH_WORKTREE_CREATION_GUARD=block", reason)
                 self.assertEqual(
                     payload["next_action"],
-                    "request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason",
+                    "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+                )
+                self.assertIsNotNone(
+                    self._run_shared_checkout_guard(
+                        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
+                        "AGENT_CANON_BRANCH_WORKTREE_REASON=creation-only "
+                        f"{command}"
+                    )
+                )
+                self.assertIsNone(
+                    self._run_shared_checkout_guard(
+                        "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
+                        "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved-update "
+                        f"{command}"
+                    )
                 )
                 self.assertIsNone(self._run_shared_checkout_guard(f"{approved} {command}"))
+
+    def test_removed_dirty_preservation_wrapper_is_absent_from_active_surfaces(self) -> None:
+        """The deleted stash-based update wrapper must not remain discoverable."""
+        obsolete = "merge-main-into-current-" + "preserve-dirty"
+        active_surfaces = (
+            PROJECT_ROOT / "tools" / "agent_tools" / "hook_safety.py",
+            PROJECT_ROOT / "tools" / "update_agent_canon.sh",
+            PROJECT_ROOT / "tools" / "README.md",
+            PROJECT_ROOT / "documents" / "tools" / "README.md",
+            PROJECT_ROOT / "documents" / "agent-canon" / "agent-canon-subtree-migration.md",
+        )
+        for surface in active_surfaces:
+            with self.subTest(surface=surface.relative_to(PROJECT_ROOT)):
+                self.assertNotIn(obsolete, surface.read_text(encoding="utf-8"))
 
     def test_shared_checkout_guard_wrapper_authority_does_not_leak(self) -> None:
         """Prior segments and ambient variables never authorize an update wrapper."""
@@ -1001,17 +1034,47 @@ class CodexHooksTest(unittest.TestCase):
     def test_shared_checkout_guard_blocks_generic_branch_worktree_mutation(self) -> None:
         """Only explicit branch/worktree read-only allowlists stay quiet."""
         commands = [
-            "git branch --set-upstream-to=origin/main topic",
-            "git branch --unset-upstream topic",
             "git branch -Mtopic",
+            "git branch --set-upstream-to --delete topic",
             "git worktree remove ../topic",
             "git worktree move ../old ../new",
             "git worktree repair ../topic",
-            "git worktree unlock ../topic",
+            "git worktree lock --reason --force ../topic",
+            "git worktree unlock --force ../topic",
         ]
         for command in commands:
             with self.subTest(command=command):
                 self.assertIsNotNone(self._run_shared_checkout_guard(command))
+
+
+def test_hook_event_publish_rejects_unattested_parent_without_raw_fallback() -> None:
+    """Missing parent capability returns typed failure without touching the path."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        target = Path(tmp_dir) / "event.json"
+        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": ""}):
+            result = hook_event_log.publish_hook_event_noreplace(target, b"event\n")
+        assert result == ("failed", "parent_unattested")
+        assert not target.exists()
+
+
+def test_hook_report_requires_parent_capability() -> None:
+    """Report projection stays disabled until the parent capability is present."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        target = Path(tmp_dir) / "report"
+        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": ""}):
+            assert hook_dispatcher._parent_bound_report(target, "hook-report") is None
+
+
+def test_pointer_targets_reject_missing_and_containment_escapes() -> None:
+    """The focused module node delegates to the existing pointer contract."""
+    with mock.patch.dict(
+        os.environ,
+        {
+            "AGENT_CANON_HOOK_EVENT_SPOOL_DIR": "",
+            "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": "",
+        },
+    ):
+        CodexHooksTest().test_pointer_targets_reject_missing_and_containment_escapes()
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-# Infrastructure Notes
+# Infrastructure Notes（infrastructure メモ）
 <!--
 @dependency-start
 contract template
@@ -12,14 +12,16 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
-## Surface Area
+{{>reader_map}}
 
-<!-- List the CI, Docker, experiment runner, automation, or platform surfaces touched. -->
+## Surface Area（対象 surface）
 
-## Changes
+<!-- 変更した CI、Docker、experiment runner、automation、platform surface を列挙します。 -->
 
-<!-- Record infra changes, migrations, or expansion tasks. -->
+## Changes（変更）
 
-## Operational Checks
+<!-- infra change、migration、拡張作業を記録します。 -->
 
-<!-- Record rollout considerations, compatibility notes, or follow-up infra work. -->
+## Operational Checks（運用確認）
+
+<!-- rollout の考慮事項、互換性メモ、後続 infra 作業を記録します。 -->

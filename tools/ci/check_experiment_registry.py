@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import subprocess
 import sys
 
@@ -21,6 +22,21 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
+
+if __package__:
+    from tools.experiments.experiment_identity import validate_segment
+else:
+    _IDENTITY_PATH = Path(__file__).resolve().parents[1] / "experiments" / "experiment_identity.py"
+    _IDENTITY_SPEC = importlib.util.spec_from_file_location(
+        "agentcanon_experiment_identity", _IDENTITY_PATH
+    )
+    if _IDENTITY_SPEC is None or _IDENTITY_SPEC.loader is None:
+        raise ImportError(f"experiment identity source is unavailable: {_IDENTITY_PATH}")
+    _IDENTITY_MODULE = importlib.util.module_from_spec(_IDENTITY_SPEC)
+    sys.modules[_IDENTITY_SPEC.name] = _IDENTITY_MODULE
+    _IDENTITY_SPEC.loader.exec_module(_IDENTITY_MODULE)
+    validate_segment = _IDENTITY_MODULE.validate_segment
 
 MANAGED_RUN_ARTIFACTS = frozenset(
     {
@@ -47,17 +63,29 @@ class Finding:
     message: str
 
 
-def repo_root_from_script() -> Path:
-    """Return the repository root from the checkout or script path."""
-    result = subprocess.run(
+def run_git_root_lookup() -> subprocess.CompletedProcess[str]:
+    """Run the git root lookup used by the CLI default."""
+    return subprocess.run(
         ["git", "rev-parse", "--show-toplevel"],
         cwd=Path.cwd(),
         check=False,
         capture_output=True,
         text=True,
     )
+
+
+def extract_git_root(result: subprocess.CompletedProcess[str]) -> Path | None:
+    """Extract a repository root from one completed git lookup."""
     if result.returncode == 0 and result.stdout.strip():
         return Path(result.stdout.strip())
+    return None
+
+
+def resolve_repo_root() -> Path:
+    """Return the repository root from the checkout or script path."""
+    discovered_root = extract_git_root(run_git_root_lookup())
+    if discovered_root is not None:
+        return discovered_root
     return Path(__file__).absolute().parents[2]
 
 
@@ -66,7 +94,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Validate experiments/registry.toml.")
     parser.add_argument(
         "--repo-root",
-        default=str(repo_root_from_script()),
+        default=str(resolve_repo_root()),
         help="Repository root. Defaults to the path inferred from this script.",
     )
     parser.add_argument(
@@ -149,15 +177,47 @@ def normalize_optional_topics(raw_topics: object, table_name: str) -> list[dict[
     return topics
 
 
-def require_string(
-    findings: list[Finding], topic_name: str, entry: dict[str, object], key: str
-) -> str | None:
+def require_string(entry: dict[str, object], key: str) -> str | None:
     """Return one required non-empty string field."""
     raw_value = entry.get(key)
     if not isinstance(raw_value, str) or not raw_value.strip():
-        findings.append(Finding("error", f"{topic_name}: missing required string field: {key}"))
         return None
     return raw_value
+
+
+def required_field_finding(topic_name: str, key: str) -> Finding:
+    """Build the finding for one missing required string field."""
+    return Finding("error", f"{topic_name}: missing required string field: {key}")
+
+
+def append_missing_required_field_findings(
+    findings: list[Finding], topic_name: str, values: dict[str, str | None]
+) -> None:
+    """Append findings for missing required string fields in declaration order."""
+    for key, value in values.items():
+        if value is None:
+            findings.append(required_field_finding(topic_name, key))
+
+
+def required_topic_values(topic: dict[str, object]) -> dict[str, str | None]:
+    """Extract the required ordinary topic fields."""
+    keys = (
+        "status",
+        "topic_dir",
+        "topic_readme",
+        "canonical_entrypoint",
+        "result_root",
+        "report_root",
+        "default_variant",
+    )
+    return {key: require_string(topic, key) for key in keys}
+
+
+def complete_required_values(values: dict[str, str | None]) -> dict[str, str] | None:
+    """Return required values only when every field was present."""
+    if any(value is None for value in values.values()):
+        return None
+    return {key: value for key, value in values.items() if value is not None}
 
 
 def maybe_string(entry: dict[str, object], key: str) -> str | None:
@@ -181,46 +241,43 @@ def registered_command_value(entry: dict[str, object], command_kind: str) -> str
     return None
 
 
-def require_registered_command(
-    findings: list[Finding],
-    topic_name: str,
-    entry: dict[str, object],
-    command_kind: str,
-) -> str | None:
-    """Return one required registered command."""
-    command = registered_command_value(entry, command_kind)
-    if command is None:
-        findings.append(
-            Finding(
-                "error",
-                f"{topic_name}: missing registered command field for {command_kind}",
-            )
-        )
-    return command
+def registered_command_finding(topic_name: str, command_kind: str) -> Finding:
+    """Build the finding for one missing registered command."""
+    return Finding(
+        "error",
+        f"{topic_name}: missing registered command field for {command_kind}",
+    )
 
 
-def maybe_string_list(
-    findings: list[Finding],
-    scope_name: str,
-    entry: dict[str, object],
-    key: str,
-) -> list[str]:
-    """Return one optional string list, recording validation findings."""
-    raw_value = entry.get(key)
+def optional_string_list_value(entry: dict[str, object], key: str) -> object:
+    """Extract one optional string-list value without recording findings."""
+    return entry.get(key)
+
+
+def normalize_optional_string_list(raw_value: object) -> list[str]:
+    """Normalize valid non-empty strings from one optional list value."""
     if raw_value is None:
         return []
     if not isinstance(raw_value, list):
-        findings.append(Finding("error", f"{scope_name}: {key} must be an array of strings"))
         return []
-    values: list[str] = []
-    for index, item in enumerate(raw_value):
-        if not isinstance(item, str) or not item.strip():
-            findings.append(
-                Finding("error", f"{scope_name}: {key}[{index}] must be a non-empty string")
-            )
-            continue
-        values.append(item.strip())
-    return values
+    items = cast(list[object], raw_value)
+    return [item.strip() for item in items if isinstance(item, str) and item.strip()]
+
+
+def optional_string_list_findings(
+    scope_name: str, key: str, raw_value: object
+) -> list[Finding]:
+    """Build validation findings for one optional string-list value."""
+    if raw_value is None:
+        return []
+    if not isinstance(raw_value, list):
+        return [Finding("error", f"{scope_name}: {key} must be an array of strings")]
+    items = cast(list[object], raw_value)
+    return [
+        Finding("error", f"{scope_name}: {key}[{index}] must be a non-empty string")
+        for index, item in enumerate(items)
+        if not isinstance(item, str) or not item.strip()
+    ]
 
 
 def validate_eval_patterns(
@@ -236,14 +293,14 @@ def validate_eval_patterns(
             findings.append(
                 Finding(
                     "error",
-                    f"{scope_name}: {key} must stay relative to result/<run_name>: {pattern}",
+                    f"{scope_name}: {key} must stay relative to result/<variant>/<run_name>: {pattern}",
                 )
             )
         if ".." in pattern_path.parts:
             findings.append(
                 Finding(
                     "error",
-                    f"{scope_name}: {key} must not escape result/<run_name>: {pattern}",
+                    f"{scope_name}: {key} must not escape result/<variant>/<run_name>: {pattern}",
                 )
             )
         if pattern in MANAGED_RUN_ARTIFACTS:
@@ -256,49 +313,28 @@ def validate_eval_patterns(
             )
 
 
-def validate_topic(
+def validate_topic_layout(
     repo_root: Path,
     defaults: dict[str, object],
-    topic: dict[str, object],
+    topic_name: str,
+    fields: dict[str, str],
     findings: list[Finding],
 ) -> None:
-    """Validate one topic entry."""
-    topic_name = require_string(findings, "<unknown>", topic, "name")
-    if topic_name is None:
-        return
-
-    status = require_string(findings, topic_name, topic, "status")
-    topic_dir_raw = require_string(findings, topic_name, topic, "topic_dir")
-    readme_raw = require_string(findings, topic_name, topic, "topic_readme")
-    entrypoint_raw = require_string(findings, topic_name, topic, "canonical_entrypoint")
-    result_root_raw = require_string(findings, topic_name, topic, "result_root")
-    report_root_raw = require_string(findings, topic_name, topic, "report_root")
-    default_variant = require_string(findings, topic_name, topic, "default_variant")
-    default_command = require_registered_command(findings, topic_name, topic, "default")
-    formal_command = maybe_string(topic, "formal_inner_command")
-    if any(
-        value is None
-        for value in (
-            status,
-            topic_dir_raw,
-            readme_raw,
-            entrypoint_raw,
-            result_root_raw,
-            report_root_raw,
-            default_variant,
-            default_command,
-        )
+    """Validate one topic's paths, status, and required files."""
+    status = fields["status"]
+    topic_dir_raw = fields["topic_dir"]
+    readme_raw = fields["topic_readme"]
+    entrypoint_raw = fields["canonical_entrypoint"]
+    result_root_raw = fields["result_root"]
+    report_root_raw = fields["report_root"]
+    for field, value in (
+        ("topic", topic_name),
+        ("default_variant", fields["default_variant"]),
     ):
-        return
-    assert status is not None
-    assert topic_dir_raw is not None
-    assert readme_raw is not None
-    assert entrypoint_raw is not None
-    assert result_root_raw is not None
-    assert report_root_raw is not None
-    assert default_variant is not None
-    assert default_command is not None
-
+        try:
+            validate_segment(value, field)
+        except ValueError as exc:
+            findings.append(Finding("error", f"{topic_name}: {exc}"))
     allowed_status = {"template", "draft", "active", "paused", "archived"}
     if status not in allowed_status:
         findings.append(
@@ -321,6 +357,7 @@ def validate_topic(
     expected_topic_dir = repo_root / expected_topic_dir_raw
     expected_entrypoint_raw = f"{expected_topic_dir_raw}/run.py"
     expected_config_raw = f"{expected_topic_dir_raw}/config.yaml"
+    expected_result_root_raw = f"{expected_topic_dir_raw}/result"
     expected_entrypoint = repo_root / expected_entrypoint_raw
     expected_config = repo_root / expected_config_raw
 
@@ -338,6 +375,14 @@ def validate_topic(
                 "error",
                 f"{topic_name}: canonical_entrypoint must be the topic-local run.py "
                 f"({expected_entrypoint_raw}), got {entrypoint_raw}",
+            )
+        )
+    if result_root_raw != expected_result_root_raw:
+        findings.append(
+            Finding(
+                "error",
+                f"{topic_name}: result_root must be {expected_result_root_raw} "
+                f"(variant/run names are appended by the lifecycle owner), got {result_root_raw}",
             )
         )
     if not topic_dir.is_dir():
@@ -363,8 +408,19 @@ def validate_topic(
     if not report_root.is_dir():
         findings.append(Finding("error", f"{topic_name}: report_root is missing: {report_root}"))
 
+
+def validate_topic_commands(
+    defaults: dict[str, object],
+    topic_name: str,
+    topic: dict[str, object],
+    entrypoint_raw: str,
+    default_command: str,
+    findings: list[Finding],
+) -> None:
+    """Validate registered topic commands against the canonical entrypoint."""
     managed_runner = defaults.get("managed_runner")
     registered_commands = [("default", default_command)]
+    formal_command = maybe_string(topic, "formal_inner_command")
     if formal_command is not None:
         registered_commands.append(("formal", formal_command))
     for command_kind, command_text in registered_commands:
@@ -384,10 +440,18 @@ def validate_topic(
                     "{config_path} so managed runs consume the saved config snapshot",
                 )
             )
+        managed_runner_module = None
+        if isinstance(managed_runner, str) and managed_runner.endswith(".py"):
+            managed_runner_module = managed_runner[:-3].replace("/", ".")
         if (
-            managed_runner is not None
-            and isinstance(managed_runner, str)
-            and managed_runner in command_text
+            isinstance(managed_runner, str)
+            and (
+                managed_runner in command_text
+                or (
+                    managed_runner_module is not None
+                    and managed_runner_module in command_text
+                )
+            )
         ):
             findings.append(
                 Finding(
@@ -397,14 +461,19 @@ def validate_topic(
                 )
             )
 
-    if default_variant not in {"default", "formal", "manual", "smoke"}:
-        findings.append(
-            Finding(
-                "error",
-                f"{topic_name}: default_variant must be default, formal, or manual; "
-                f"got {default_variant!r}",
-            )
-        )
+
+def validate_topic_variant(
+    topic_name: str,
+    topic: dict[str, object],
+    default_variant: str,
+    findings: list[Finding],
+) -> None:
+    """Validate the selected topic command variant."""
+    formal_command = maybe_string(topic, "formal_inner_command")
+    try:
+        validate_segment(default_variant, "default_variant")
+    except ValueError as exc:
+        findings.append(Finding("error", f"{topic_name}: {exc}"))
     if default_variant == "formal" and formal_command is None:
         findings.append(
             Finding(
@@ -413,6 +482,14 @@ def validate_topic(
             )
         )
 
+
+def validate_topic_references(
+    repo_root: Path,
+    topic_name: str,
+    topic: dict[str, object],
+    findings: list[Finding],
+) -> None:
+    """Validate optional branch and note references for one topic."""
     active_branch = maybe_string(topic, "active_branch")
     if active_branch is not None and not git_branch_exists(repo_root, active_branch):
         findings.append(
@@ -435,18 +512,27 @@ def validate_topic(
                 )
             )
 
-    required_eval_artifacts = maybe_string_list(
-        findings,
-        topic_name,
-        topic,
-        "required_eval_artifacts",
+
+def validate_topic_eval_artifacts(
+    topic_name: str,
+    topic: dict[str, object],
+    findings: list[Finding],
+) -> None:
+    """Validate required and optional topic evaluation artifact patterns."""
+    required_raw = optional_string_list_value(topic, "required_eval_artifacts")
+    findings.extend(
+        optional_string_list_findings(
+            topic_name, "required_eval_artifacts", required_raw
+        )
     )
-    optional_eval_artifacts = maybe_string_list(
-        findings,
-        topic_name,
-        topic,
-        "optional_eval_artifacts",
+    required_eval_artifacts = normalize_optional_string_list(required_raw)
+    optional_raw = optional_string_list_value(topic, "optional_eval_artifacts")
+    findings.extend(
+        optional_string_list_findings(
+            topic_name, "optional_eval_artifacts", optional_raw
+        )
     )
+    optional_eval_artifacts = normalize_optional_string_list(optional_raw)
     validate_eval_patterns(
         findings,
         topic_name,
@@ -461,24 +547,63 @@ def validate_topic(
     )
 
 
+def validate_topic(
+    repo_root: Path,
+    defaults: dict[str, object],
+    topic: dict[str, object],
+    findings: list[Finding],
+) -> None:
+    """Validate one topic entry through focused responsibility stages."""
+    topic_name = require_string(topic, "name")
+    if topic_name is None:
+        findings.append(required_field_finding("<unknown>", "name"))
+        return
+
+    required_values = required_topic_values(topic)
+    append_missing_required_field_findings(findings, topic_name, required_values)
+    default_command = registered_command_value(topic, "default")
+    if default_command is None:
+        findings.append(registered_command_finding(topic_name, "default"))
+    complete_values = complete_required_values(required_values)
+    if complete_values is None or default_command is None:
+        return
+
+    validate_topic_layout(repo_root, defaults, topic_name, complete_values, findings)
+    validate_topic_commands(
+        defaults,
+        topic_name,
+        topic,
+        complete_values["canonical_entrypoint"],
+        default_command,
+        findings,
+    )
+    validate_topic_variant(topic_name, topic, complete_values["default_variant"], findings)
+    validate_topic_references(repo_root, topic_name, topic, findings)
+    validate_topic_eval_artifacts(topic_name, topic, findings)
+
+
 def validate_branch_topic(
     repo_root: Path,
     topic: dict[str, object],
     findings: list[Finding],
 ) -> None:
     """Validate one branch-only topic entry."""
-    topic_name = require_string(findings, "<unknown>", topic, "name")
+    topic_name = require_string(topic, "name")
     if topic_name is None:
+        findings.append(required_field_finding("<unknown>", "name"))
         return
 
-    status = require_string(findings, topic_name, topic, "status")
-    remote_branch = require_string(findings, topic_name, topic, "remote_branch")
-    primary_note = require_string(findings, topic_name, topic, "primary_note")
-    if any(value is None for value in (status, remote_branch, primary_note)):
+    required_values = {
+        key: require_string(topic, key)
+        for key in ("status", "remote_branch", "primary_note")
+    }
+    append_missing_required_field_findings(findings, topic_name, required_values)
+    complete_values = complete_required_values(required_values)
+    if complete_values is None:
         return
-    assert status is not None
-    assert remote_branch is not None
-    assert primary_note is not None
+    status = complete_values["status"]
+    remote_branch = complete_values["remote_branch"]
+    primary_note = complete_values["primary_note"]
 
     allowed_status = {"active", "paused", "archived"}
     if status not in allowed_status:
@@ -557,18 +682,20 @@ def collect_findings(repo_root: Path, registry_path: Path) -> list[Finding]:
                 Finding("error", f"defaults.topic_template_dir is missing: {resolved_template_dir}")
             )
 
-    required_eval_artifacts = maybe_string_list(
-        findings,
-        "defaults",
-        defaults,
-        "required_eval_artifacts",
+    required_raw = optional_string_list_value(defaults, "required_eval_artifacts")
+    findings.extend(
+        optional_string_list_findings(
+            "defaults", "required_eval_artifacts", required_raw
+        )
     )
-    optional_eval_artifacts = maybe_string_list(
-        findings,
-        "defaults",
-        defaults,
-        "optional_eval_artifacts",
+    required_eval_artifacts = normalize_optional_string_list(required_raw)
+    optional_raw = optional_string_list_value(defaults, "optional_eval_artifacts")
+    findings.extend(
+        optional_string_list_findings(
+            "defaults", "optional_eval_artifacts", optional_raw
+        )
     )
+    optional_eval_artifacts = normalize_optional_string_list(optional_raw)
     validate_eval_patterns(
         findings,
         "defaults",

@@ -8,10 +8,10 @@
 # downstream implementation ../../../../tools/ci/check_github_workflows.py validates GitHub surface conventions.
 # @dependency-end
 
-# Canonical source: templates/documents/github/issue/config.yml. Generated projection targets .github/ISSUE_TEMPLATE/config.yml; edit this source only.
+# Canonical source and checked-in standalone target: update templates/documents/github/issue/config.yml and .github/ISSUE_TEMPLATE/config.yml together.
 
 blank_issues_enabled: true
 contact_links:
-  - name: AgentCanon maintenance runbook
+  - name: AgentCanon 保守 runbook
     url: https://github.com/iwashita-nozomu/agent-canon/tree/main/documents
-    about: Use the documents index when the issue is an operational runbook update.
+    about: 運用 runbook の更新は documents index の canonical owner を確認してください。

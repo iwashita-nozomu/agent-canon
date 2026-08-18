@@ -3,8 +3,10 @@
 # contract tool
 # responsibility Checks fresh-clone bootstrap, AgentCanon update, and runtime surfaces.
 # upstream design ../README.md shared automation index
+# upstream design ../../documents/agent-canon/agent-canon-update-route.md owns update materialization acceptance
 # upstream environment ../../documents/contracts/linux-wsl-host-requirements.md documents host tool requirements for fresh clone checks
 # upstream implementation ../agent_tools/update_lifecycle_contract.py owns source projection aggregation and validation.
+# upstream implementation ../agent_tools/source_projection_handoff.py owns the sole cross-namespace packet handoff.
 # upstream implementation ./check_agent_canon_pr.py owns the authoritative G2 materializer API.
 # upstream implementation ../agent_tools/github_publish.py owns the authoritative G3 materializer API.
 # @dependency-end
@@ -14,26 +16,175 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_DIR}/../lib/repo_paths.sh"
 ROOT_DIR="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
-CANON_TOOLS_ROOT="$(agent_canon_tools_root "$ROOT_DIR")"
-TMP_DIR="$(mktemp -d -t template-fresh-clone-XXXXXX)"
+CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$ROOT_DIR")"
+FRESH_CLONE_SOURCE_ROOT="$(git -C "${CANON_TOOLS_ROOT}" rev-parse --show-toplevel)"
+AGENT_CANON_BOUNDARY_SCRIPT="${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py"
+if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "fresh-clone-script" ]]; then
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" verify-child \
+    --root "${ROOT_DIR}" \
+    --source-root "${FRESH_CLONE_SOURCE_ROOT}" \
+    --purpose fresh-clone-script \
+    --consume >/dev/null
+else
+  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${ROOT_DIR}" \
+    --source-root "${FRESH_CLONE_SOURCE_ROOT}" \
+    --purpose fresh-clone-script \
+    --issue-handoff \
+    -- bash "${BASH_SOURCE[0]}" "$@"
+fi
+unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
+
+PARENT_TMP_CANDIDATE="${AGENT_CANON_PARENT_TMP_ROOT:-${ROOT_DIR}/.agent-canon/tmp/fresh-clone}"
+PARENT_TMP_ROOT="$(python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+  ensure-dir --root "${ROOT_DIR}" --candidate "${PARENT_TMP_CANDIDATE}" --purpose fresh-clone)"
+parent_ensure_dir() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    ensure-dir --root "${ROOT_DIR}" --candidate "$1" --purpose "${2:-fresh-clone}"
+}
+parent_temp_dir() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    temp-dir --root "${ROOT_DIR}" --candidate "$1" --prefix "$2" --purpose "${3:-fresh-clone}"
+}
+parent_write_file() {
+  local candidate="$1" content="${2-}"
+  printf '%s' "$content" | python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    write --root "${ROOT_DIR}" --candidate "$candidate" --purpose "${3:-fresh-clone}" >/dev/null
+}
+parent_capture_subprocess() {
+  local candidate="$1"
+  shift
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    capture-subprocess --root "${ROOT_DIR}" --candidate "${candidate}" \
+    --purpose fresh-clone -- "$@"
+}
+run_parent_bound_update() {
+  local source_root="$1" update_script="$2"
+  shift 2
+  AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${ROOT_DIR}" \
+    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${ROOT_DIR}" \
+    --source-root "${source_root}" \
+    --purpose agent-canon-update-script \
+    --issue-handoff \
+    -- bash "${update_script}" "$@"
+}
+run_update_for_parent_root() {
+  local parent_root="$1" source_root="$2" update_script="$3"
+  local boundary_script="${source_root}/tools/agent_tools/parent_root_side_effects.py"
+  shift 3
+  AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${parent_root}" \
+    python3 "${boundary_script}" exec-parent-bound \
+    --root "${parent_root}" \
+    --source-root "${source_root}" \
+    --purpose agent-canon-update-script \
+    --issue-handoff \
+    -- bash "${update_script}" "$@"
+}
+
+run_parent_bound_sync() {
+  local source_root="$1" sync_script="$2"
+  shift 2
+  AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${ROOT_DIR}" \
+    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${ROOT_DIR}" \
+    --source-root "${source_root}" \
+    --purpose agent-canon-sync-script \
+    --issue-handoff \
+    -- bash "${sync_script}" "$@"
+}
+capture_parent_bound_update() {
+  local candidate="$1" source_root="$2" update_script="$3"
+  shift 3
+  parent_capture_subprocess "${candidate}" \
+    env AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${ROOT_DIR}" \
+      python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+      --root "${ROOT_DIR}" \
+      --source-root "${source_root}" \
+      --purpose agent-canon-update-script \
+      --issue-handoff \
+      -- bash "${update_script}" "$@"
+}
+parent_git_config_add() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    git-config-add --root "${ROOT_DIR}" --candidate "$1" --key "$2" --value "$3" \
+    --purpose "${4:-fresh-clone}" >/dev/null
+}
+parent_remove_file() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    remove-file --root "${ROOT_DIR}" --candidate "$1" --purpose "${2:-fresh-clone}" >/dev/null
+}
+parent_remove_tree() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    remove-tree --root "${ROOT_DIR}" --candidate "$1" --purpose "${2:-fresh-clone}" >/dev/null
+}
+parent_copy_file() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    copy --root "${ROOT_DIR}" --source "$1" --candidate "$2" --purpose "${3:-fresh-clone}" >/dev/null
+}
+parent_copy_tree() {
+  local source="$1" candidate="$2"
+  shift 2
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    copy-tree --root "${ROOT_DIR}" --source "${source}" --candidate "${candidate}" \
+    --exclude .git --exclude .state --exclude .agent-canon "$@" \
+    --purpose fresh-clone >/dev/null
+}
+TMP_DIR="$(parent_temp_dir "${PARENT_TMP_ROOT}" template-fresh-clone)"
 TOPIC_ROOT="${TMP_DIR}/workspace/fresh-clone"
 CLONE_DIR="${TOPIC_ROOT}/agent-canon"
 CLONE_TOOLS_ROOT=""
-trap 'rm -rf "${TMP_DIR}"' EXIT
+CLONE_SOURCE_ROOT=""
+GIT_TEMP_CONFIG="${TMP_DIR}/safe.directory.gitconfig"
+ORIGINAL_GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL-}"
+FRESH_CLONE_CLEANUP_DONE=0
 
-mkdir -p "${TOPIC_ROOT}"
+add_safe_directory_to_config() {
+  local repo_dir="$1"
+  parent_git_config_add "${GIT_TEMP_CONFIG}" safe.directory "${repo_dir}"
+}
+
+cleanup() {
+  if [ "${FRESH_CLONE_CLEANUP_DONE}" -eq 1 ]; then
+    return 0
+  fi
+  FRESH_CLONE_CLEANUP_DONE=1
+  if [ -n "${ORIGINAL_GIT_CONFIG_GLOBAL-}" ]; then
+    export GIT_CONFIG_GLOBAL="${ORIGINAL_GIT_CONFIG_GLOBAL}"
+  else
+    unset GIT_CONFIG_GLOBAL
+  fi
+  parent_remove_tree "${TMP_DIR}"
+}
+
+cleanup_on_signal() {
+  local signal_name="$1"
+  local exit_code="$2"
+  cleanup
+  case "${signal_name}" in
+    "INT") exit 130 ;;
+    "TERM") exit 143 ;;
+    "HUP") exit 129 ;;
+    *) exit "${exit_code}" ;;
+  esac
+}
+
+trap cleanup EXIT
+trap 'cleanup_on_signal INT 130' INT
+trap 'cleanup_on_signal TERM 143' TERM
+trap 'cleanup_on_signal HUP 129' HUP
+
+parent_write_file "${GIT_TEMP_CONFIG}" ""
+export GIT_CONFIG_GLOBAL="${GIT_TEMP_CONFIG}"
+add_safe_directory_to_config "${CLONE_DIR}"
+
+TOPIC_ROOT="$(parent_ensure_dir "${TMP_DIR}/workspace/fresh-clone")"
 
 echo "fresh-clone source: ${ROOT_DIR}"
 echo "fresh-clone target: ${CLONE_DIR}"
 
 overlay_current_tree() {
-  if ! command -v rsync >/dev/null 2>&1; then
-    echo "fresh_clone_overlay=fail"
-    echo "fresh_clone_overlay_error=rsync_required"
-    echo "fresh_clone_overlay_next_action=install rsync via docker/Dockerfile or host requirements"
-    exit 1
-  fi
-  rsync -a --delete --exclude .git --exclude .state "${ROOT_DIR}/" "${CLONE_DIR}/" >/dev/null
+  parent_copy_tree "${ROOT_DIR}" "${CLONE_DIR}" --exclude reports
 }
 
 attach_submodule_main_to_staged_pin() {
@@ -66,12 +217,8 @@ attach_submodule_main_to_staged_pin() {
     return 1
   fi
   main_oid="$(git -C "$submodule_path" rev-parse --verify refs/heads/main 2>/dev/null || true)"
-  if [[ -n "$main_oid" && "$main_oid" != "$pinned_oid" ]]; then
-    echo "fresh_clone_submodule_attach=main_pin_mismatch" >&2
-    return 1
-  fi
-
   if [[ -n "$main_oid" ]]; then
+    git -C "$submodule_path" branch -f main "$pinned_oid" >/dev/null
     git -C "$submodule_path" switch main >/dev/null
   else
     git -C "$submodule_path" switch -c main "$pinned_oid" >/dev/null
@@ -94,16 +241,55 @@ attach_submodule_main_to_staged_pin() {
   echo "FRESH_CLONE_SUBMODULE_STATUS=clean"
 }
 
+resolve_clone_tools_root_or_fail() {
+  local repo_root="$1"
+  local resolved=""
+  local diagnostics=""
+
+  if ! diagnostics="$(agent_canon_source_tools_root "${repo_root}" 2> >(cat >&2))"; then
+    echo "fresh_clone_tools_root=missing" >&2
+    echo "fresh_clone_tools_root_reason=agent_canon_source_tools_root_failed" >&2
+    printf '%s\n' "${diagnostics}" >&2
+    exit 1
+  fi
+  resolved="${diagnostics}"
+  printf '%s' "${resolved}"
+}
+
+assert_update_plan_acceptance() {
+  local plan_path="$1"
+  local allowed_routes="$2"
+
+  grep -Eq "agent_canon_plan_route=(${allowed_routes})" "${plan_path}"
+  if grep -q '^agent_canon_plan_prefix_mode=submodule$' "${plan_path}"; then
+    grep -q '^agent_canon_plan_requires_clean=no$' "${plan_path}"
+    grep -q '^agent_canon_plan_unresolved_merge_conflict=no$' "${plan_path}"
+    grep -q '^agent_canon_plan_merge_conflict=no$' "${plan_path}"
+    grep -q '^agent_canon_plan_merge_conflict_type=none$' "${plan_path}"
+    grep -q '^agent_canon_plan_materialization_collision=no$' "${plan_path}"
+    grep -q '^agent_canon_plan_acceptance_predicate=materialization_merge_conflict_or_unpreservable_materialization_collision$' "${plan_path}"
+  fi
+}
+
 git clone --no-local "${ROOT_DIR}" "${CLONE_DIR}" >/dev/null
-git config --global --add safe.directory "${CLONE_DIR}"
 overlay_current_tree
 cd "${CLONE_DIR}"
-CLONE_TOOLS_ROOT="$(agent_canon_tools_root "${CLONE_DIR}")"
 if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1; then
-  rm -rf vendor/agent-canon
-  git -c protocol.file.allow=always submodule update --init --recursive vendor/agent-canon
+  if [ -L "${CLONE_DIR}/vendor/agent-canon" ]; then
+    parent_remove_file "${CLONE_DIR}/vendor/agent-canon"
+  else
+    parent_remove_tree "${CLONE_DIR}/vendor/agent-canon"
+  fi
+  if ! submodule_init_output="$(git -c protocol.file.allow=always submodule update --init --recursive vendor/agent-canon 2>&1)"; then
+    echo "fresh_clone_submodule_init=failed"
+    echo "fresh_clone_submodule_init_reason=submodule_update_failed"
+    printf '%s\n' "${submodule_init_output}"
+    exit 1
+  fi
   attach_submodule_main_to_staged_pin "vendor/agent-canon"
 fi
+CLONE_TOOLS_ROOT="$(resolve_clone_tools_root_or_fail "${CLONE_DIR}")"
+CLONE_SOURCE_ROOT="$(git -C "${CLONE_TOOLS_ROOT}" rev-parse --show-toplevel)"
 if [[ -n "$(git status --short)" ]]; then
   git config user.name "Fresh Clone Check"
   git config user.email "fresh-clone-check@example.invalid"
@@ -111,22 +297,23 @@ if [[ -n "$(git status --short)" ]]; then
   git commit -m "test: overlay current working tree for fresh clone check" >/dev/null
 fi
 
-for path in AGENTS.md agents .agents .codex/config.toml .codex/hooks.json agents/workflows/README.md agents/workflows/paper-writing-workflow.md; do
-  if [ ! -e "${path}" ]; then
-    echo "missing runtime surface: ${path}" >&2
-    exit 1
-  fi
-done
-
-COMMIT_REQUEST_EVIDENCE_DIGEST="$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')"
-AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:${COMMIT_REQUEST_EVIDENCE_DIGEST}"
-echo "fresh-clone commit request evidence: ${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}"
-
 python3 -m json.tool .devcontainer/devcontainer.json >/dev/null
-AGENT_CANON_DEVCONTAINER_REPO_ROOT=. \
-AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml \
-bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh >/dev/null
-python3 - <<'PY'
+
+parent_projection_mode=false
+if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1 \
+  && [ -d vendor/agent-canon ]; then
+  parent_projection_mode=true
+fi
+if [ "$parent_projection_mode" = false ]; then
+  runtime_compose_generator="${CLONE_DIR}/.devcontainer/generate-runtime-compose.sh"
+  if [ ! -f "${runtime_compose_generator}" ]; then
+    runtime_compose_generator="${CLONE_DIR}/vendor/agent-canon/.devcontainer/generate-runtime-compose.sh"
+  fi
+  test -f "${runtime_compose_generator}"
+  AGENT_CANON_DEVCONTAINER_REPO_ROOT=. \
+  AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml \
+    bash "${runtime_compose_generator}" >/dev/null
+  python3 - <<'PY'
 from __future__ import annotations
 
 from pathlib import Path
@@ -139,21 +326,63 @@ assert "services" in data and "workspace" in data["services"], "workspace servic
 expected_working_dir = f"/workspace/{Path.cwd().name}"
 assert data["services"]["workspace"]["working_dir"] == expected_working_dir
 PY
-
-parent_projection_mode=false
-if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1 \
-  || [ -d vendor/agent-canon ]; then
-  parent_projection_mode=true
 fi
-if [ "$parent_projection_mode" = false ]; then
+
+if [ "$parent_projection_mode" = true ]; then
+  FRESH_CLONE_RUNTIME_SURFACES=(
+    AGENTS.md
+    .codex/config.toml
+    tools/agent-canon
+    vendor/agent-canon
+  )
+  AGENT_CANON_COMMIT_REQUEST_WORKFLOW_PATH=vendor/agent-canon/agents/workflows/agent-canon-pr-workflow.md
+  echo "FRESH_CLONE_PARENT_PROJECTION=enabled"
+else
   echo "FRESH_CLONE_AGENT_CANON_MODE=standalone"
   echo "FRESH_CLONE_PARENT_PROJECTION=not-applicable"
   echo "FRESH_CLONE_REPOSITORY_CI_OWNER=repository_ci_job"
+  FRESH_CLONE_RUNTIME_SURFACES=(
+    AGENTS.md
+    agents
+    .agents
+    .codex/config.toml
+    .codex/hooks.json
+    agents/workflows/README.md
+    agents/workflows/paper-writing-workflow.md
+  )
+  AGENT_CANON_COMMIT_REQUEST_WORKFLOW_PATH=agents/workflows/agent-canon-pr-workflow.md
+  for path in "${FRESH_CLONE_RUNTIME_SURFACES[@]}"; do
+    if [ ! -e "${path}" ]; then
+      echo "missing runtime surface: ${path}" >&2
+      exit 1
+    fi
+  done
+
+  COMMIT_REQUEST_EVIDENCE_DIGEST="$(sha256sum "${AGENT_CANON_COMMIT_REQUEST_WORKFLOW_PATH}" | awk '{print $1}')"
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:${COMMIT_REQUEST_EVIDENCE_DIGEST}"
+  export AGENT_CANON_COMMIT_REQUEST_EVIDENCE
+  echo "fresh-clone commit request evidence: ${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}"
+
   echo "FRESH_CLONE_ACCEPTANCE=pass"
   exit 0
 fi
 
-bash "${CLONE_TOOLS_ROOT}/sync_agent_canon.sh" check
+for path in "${FRESH_CLONE_RUNTIME_SURFACES[@]}"; do
+  if [ ! -e "${path}" ]; then
+    echo "missing runtime surface: ${path}" >&2
+    exit 1
+  fi
+done
+
+COMMIT_REQUEST_EVIDENCE_DIGEST="$(sha256sum "${AGENT_CANON_COMMIT_REQUEST_WORKFLOW_PATH}" | awk '{print $1}')"
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:${COMMIT_REQUEST_EVIDENCE_DIGEST}"
+export AGENT_CANON_COMMIT_REQUEST_EVIDENCE
+echo "fresh-clone commit request evidence: ${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}"
+
+run_parent_bound_sync \
+  "${CLONE_SOURCE_ROOT}" \
+  "${CLONE_TOOLS_ROOT}/sync_agent_canon.sh" \
+  check
 AGENT_CANON_TEST_REMOTE="${TMP_DIR}/agent-canon-upstream.git"
 AGENT_CANON_TEST_WORK="${TMP_DIR}/agent-canon-work"
 git init --bare "${AGENT_CANON_TEST_REMOTE}" >/dev/null
@@ -166,7 +395,7 @@ else
 fi
 git --git-dir="${AGENT_CANON_TEST_REMOTE}" symbolic-ref HEAD refs/heads/main
 git clone --no-local "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_TEST_WORK}" >/dev/null
-git config --global --add safe.directory "${AGENT_CANON_TEST_WORK}"
+add_safe_directory_to_config "${AGENT_CANON_TEST_WORK}"
 (
   cd "${AGENT_CANON_TEST_WORK}"
   printf "fresh clone update marker\n" > .fresh-clone-agent-canon-marker
@@ -178,6 +407,8 @@ if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 
   git config -f .gitmodules submodule.vendor/agent-canon.url "${AGENT_CANON_TEST_REMOTE}"
   git submodule sync vendor/agent-canon >/dev/null
   git -C vendor/agent-canon remote set-url origin "${AGENT_CANON_TEST_REMOTE}"
+  git -C vendor/agent-canon fetch --force origin \
+    "refs/heads/main:refs/remotes/origin/main" >/dev/null
 else
   git remote add agent-canon "${AGENT_CANON_TEST_REMOTE}"
 fi
@@ -187,9 +418,8 @@ materialize_current_lifecycle_projection() {
   local candidate_tree_sha=""
   local publication_sha=""
   local publication_tree_sha=""
-  local packet_path="${AGENT_CANON_TEST_WORK}/.agent-canon/update-lifecycle/state/source-publication-ready.json"
-  local source_namespace="${AGENT_CANON_TEST_WORK}/.agent-canon/update-lifecycle"
   local target_namespace="${PWD}/.agent-canon/update-lifecycle"
+  local packet_path="${target_namespace}/state/source-publication-ready.json"
 
   candidate_sha="$(git -C vendor/agent-canon rev-parse HEAD)"
   candidate_tree_sha="$(git -C vendor/agent-canon rev-parse HEAD^{tree})"
@@ -198,7 +428,7 @@ materialize_current_lifecycle_projection() {
 
   PYTHONPATH="${AGENT_CANON_TEST_WORK}/tools/agent_tools:${AGENT_CANON_TEST_WORK}/tools/ci" \
     python3 - "${packet_path}" "${candidate_sha}" "${candidate_tree_sha}" \
-      "${publication_sha}" "${publication_tree_sha}" <<'PY'
+      "${publication_sha}" "${publication_tree_sha}" "${CLONE_DIR}" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -208,6 +438,10 @@ from check_agent_canon_pr import (
     materialize_generated_completeness_receipt,
 )
 from github_publish import materialize_pr_identity_gate
+from parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+)
 from update_lifecycle_contract import (
     SourceProjectionGateOwnerApis,
     materialize_fresh_clone_source_projection_packet,
@@ -215,6 +449,7 @@ from update_lifecycle_contract import (
 )
 
 packet_path = Path(sys.argv[1])
+root_dir = Path(sys.argv[6])
 packet = materialize_fresh_clone_source_projection_packet(
     candidate_sha=sys.argv[2],
     candidate_tree_sha=sys.argv[3],
@@ -227,30 +462,34 @@ packet = materialize_fresh_clone_source_projection_packet(
     ),
 )
 validate_source_projection_packet(packet)
-packet_path.parent.mkdir(parents=True, exist_ok=True)
-packet_path.write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+boundary = ParentRootSideEffectBoundary()
+attestation = boundary.attest(
+    ParentRootAttestationRequest(cwd=root_dir, explicit_root=root_dir, purpose="fresh-clone-packet")
+)
+boundary.write_parent_owned_file(
+    attestation,
+    packet_path,
+    (json.dumps(packet, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+    "fresh-clone-packet",
+)
 print("AGENT_CANON_FRESH_CLONE_SOURCE_PACKET=valid")
 PY
 
 (
   cd "${AGENT_CANON_TEST_WORK}"
-  AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
-  AGENT_CANON_BRANCH_WORKTREE_REASON="fresh clone acceptance materializes the canonical source lifecycle" \
   AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
   AGENT_CANON_DESTRUCTIVE_GIT_REASON="fresh clone acceptance uses a disposable temporary repository" \
   AGENT_CANON_COMMIT_REQUEST_EVIDENCE="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \
-    bash tools/update_agent_canon.sh latest
+  AGENT_CANON_SOURCE_PROJECTION_HANDOFF="${packet_path}" \
+    run_update_for_parent_root \
+      "${CLONE_DIR}" \
+      "${AGENT_CANON_TEST_WORK}" \
+      "${AGENT_CANON_TEST_WORK}/tools/update_agent_canon.sh" \
+      latest
 )
 
-for lifecycle_path in \
-  state/current-transaction \
-  projection-queue/queue.accepted.json \
-  projection-queue/frontier.accepted.json \
-  evidence/g4.parent-projection-integrity.json; do
-  test -f "${source_namespace}/${lifecycle_path}"
-  mkdir -p "${target_namespace}/$(dirname "${lifecycle_path}")"
-  cp "${source_namespace}/${lifecycle_path}" "${target_namespace}/${lifecycle_path}"
-done
+echo "AGENT_CANON_FRESH_CLONE_DERIVED_RECEIPT_COPY=forbidden"
+test ! -e "${AGENT_CANON_TEST_WORK}/.agent-canon/update-lifecycle/projection-queue"
 
 PYTHONPATH="${CLONE_TOOLS_ROOT}/agent_tools" \
   python3 - "${target_namespace}" <<'PY'
@@ -300,14 +539,21 @@ PY
 git config user.name "Fresh Clone Check"
 git config user.email "fresh-clone-check@example.invalid"
 materialize_current_lifecycle_projection
-bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" plan | tee "${TMP_DIR}/agent-canon-plan.txt"
-grep -Eq "agent_canon_plan_route=(already_current_submodule|subtree_pull|submodule_update)" "${TMP_DIR}/agent-canon-plan.txt"
-AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
-AGENT_CANON_BRANCH_WORKTREE_REASON="fresh clone acceptance exercises the canonical submodule update workflow" \
+capture_parent_bound_update \
+  "${TMP_DIR}/agent-canon-plan.txt" \
+  "${CLONE_SOURCE_ROOT}" \
+  "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" \
+  plan
+assert_update_plan_acceptance \
+  "${TMP_DIR}/agent-canon-plan.txt" \
+  "already_current_submodule|deferred_branch_pr|subtree_pull|submodule_update"
 AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
 AGENT_CANON_DESTRUCTIVE_GIT_REASON="fresh clone acceptance uses a disposable temporary repository" \
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \
-  bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" apply
+  run_parent_bound_update \
+    "${CLONE_SOURCE_ROOT}" \
+    "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" \
+    apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
 (
   cd "${AGENT_CANON_TEST_WORK}"
@@ -316,18 +562,26 @@ test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
   git -c user.name="Fresh Clone Check" -c user.email="fresh-clone-check@example.invalid" commit -m "test: advance agent canon without subtree" >/dev/null
   git push origin main >/dev/null
 )
-mkdir -p "${TMP_DIR}/missing-git-exec"
-GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" plan | tee "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
-grep -Eq "agent_canon_plan_route=(snapshot_import_tree_match|snapshot_import_no_subtree|submodule_update)" "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
-AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
-AGENT_CANON_BRANCH_WORKTREE_REASON="fresh clone acceptance exercises the canonical submodule update workflow" \
+parent_ensure_dir "${TMP_DIR}/missing-git-exec"
+GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" \
+  capture_parent_bound_update \
+    "${TMP_DIR}/agent-canon-no-subtree-plan.txt" \
+    "${CLONE_SOURCE_ROOT}" \
+    "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" \
+    plan
+assert_update_plan_acceptance \
+  "${TMP_DIR}/agent-canon-no-subtree-plan.txt" \
+  "deferred_branch_pr|snapshot_import_tree_match|snapshot_import_no_subtree|submodule_update"
 AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
 AGENT_CANON_DESTRUCTIVE_GIT_REASON="fresh clone acceptance uses a disposable temporary repository" \
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \
 GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" \
-  bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" apply
+  run_parent_bound_update \
+    "${CLONE_SOURCE_ROOT}" \
+    "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" \
+    apply
 test -f vendor/agent-canon/.fresh-clone-agent-canon-no-subtree-marker
-make -C "${CLONE_DIR}" agent-checks
+make -C "${CLONE_DIR}" agent-canon-check
 echo "FRESH_CLONE_REPOSITORY_CI_OWNER=repository_ci_job"
 
 echo "FRESH_CLONE_ACCEPTANCE=pass"

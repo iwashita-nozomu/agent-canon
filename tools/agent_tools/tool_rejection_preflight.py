@@ -5,8 +5,6 @@
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md defines handoff packet fields
 # upstream design ../../agents/skills/codex-task-workflow.md owns implementation preflight routing
 # upstream design ../../.agents/skills/codex-task-workflow/SKILL.md exposes implementation preflight routing
-# upstream design ../../agents/skills/owner-bounded-routing.md owns owner-bounded preflight routing
-# upstream design ../../.agents/skills/owner-bounded-routing/SKILL.md exposes owner-bounded preflight routing
 # upstream design ../../agents/skills/experiment-lifecycle.md owns experiment execution lifecycle routing
 # upstream design ../../.agents/skills/experiment-lifecycle/SKILL.md exposes experiment execution lifecycle routing
 # upstream design ../../documents/experiments/experiment-registry.md defines managed experiment registry contract
@@ -128,7 +126,7 @@ EXPERIMENT_EXECUTION_SURFACE_PATHS = frozenset(
         "documents/design/experiment_runner.md",
         "experiments/registry.toml",
         "tools/ci/check_experiment_registry.py",
-        "tools/experiments/publish_result_branch.py",
+        "tools/experiments/save_experiment_result_annex.py",
         "tools/experiments/registry_lib.py",
         "tools/experiments/run_managed_experiment.py",
     }
@@ -405,7 +403,7 @@ EXPERIMENT_EXECUTION_SURFACE_GATE_TEMPLATES = (
         gate="experiment_execution_surface_guard",
         command_template=(
             "if [ -e experiments/registry.toml ]; then "
-            "python3 tools/ci/check_experiment_registry.py; "
+            "python3 -m tools.ci.check_experiment_registry; "
             "else echo EXPERIMENT_REGISTRY_CHECK=skipped_no_project_registry; "
             "fi && "
             "python3 -m pytest tests/tools/test_run_managed_experiment.py -q"
@@ -413,7 +411,7 @@ EXPERIMENT_EXECUTION_SURFACE_GATE_TEMPLATES = (
         handoff=(
             "route planned edits through $experiment-lifecycle and $test-design; "
             "preserve the managed runner, registry checker, registry contract, "
-            "and result-branch publication contract with lightweight registry and "
+            "and compressed git-annex retention contract with lightweight registry and "
             "runner validation evidence"
         ),
     ),

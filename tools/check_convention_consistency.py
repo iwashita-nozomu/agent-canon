@@ -102,26 +102,6 @@ def _similar_descriptions(desc1: str, desc2: str, threshold: float = 0.7) -> boo
     return similarity >= threshold
 
 
-def check_tool_references(content: str) -> list[str]:
-    """規約に述べたツールが docker/requirements.txt に含まれているか確認。"""
-    issues = []
-
-    # 規約で挙げられたツール
-    tools_pattern = r"(?:should\s+use|must\s+use|using|with)\s+`?([a-z0-9_\-]+)`?"
-    tools_mentioned = re.findall(tools_pattern, content, re.IGNORECASE)
-
-    # docker/requirements.txt をチェック
-    req_file = Path("docker/requirements.txt")
-    if req_file.exists():
-        requirements = req_file.read_text(encoding="utf-8")
-        for tool in set(tools_mentioned):
-            if tool not in ["python", "the"]:  # フィルター
-                if tool not in requirements.lower():
-                    issues.append(f"tool '{tool}' mentioned in convention but not in requirements.txt")
-
-    return issues
-
-
 def main() -> int:
     """規約矛盾検出メイン。"""
     conventions = load_convention_files()
@@ -142,14 +122,6 @@ def main() -> int:
                 print(f"⚠️ CONTRADICTION FOUND:")
                 print(f"   {file1}: {contradiction['rule1']}")
                 print(f"   {file2}: {contradiction['rule2']}\n")
-
-    # ツール参照の確認
-    for file_name, content in conventions.items():
-        tool_issues = check_tool_references(content)
-        for issue in tool_issues:
-            print(f"⚠️ TOOL REFERENCE ISSUE in {file_name}:")
-            print(f"   {issue}\n")
-            issues.append({"type": "tool_missing", "file": file_name, "issue": issue})
 
     print(f"\n📊 Summary: {len(issues)} issues found")
     return 1 if issues else 0

@@ -26,6 +26,23 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+
 from artifact_identity import canonical_body_sha256, canonical_json_bytes
 from review_dispatch import resolve_current_review_state, resolve_review_eligibility
 from update_lifecycle_contract import (
@@ -45,6 +62,24 @@ CANONICAL_INTERFACE_PATH = (
 )
 ZERO_OID = "0" * 40
 ALLOWED_MODES = frozenset({"100644", "100755", "120000"})
+
+
+def _publication_temp_dir() -> str | None:
+    """Return an attested parent-local staging directory for Git's index."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "publication-staging: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="publication-integrator")
+    )
+    directory = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
+        attestation, parent / ".agent-canon" / "tmp" / "publication", "publication-staging"
+    )
+    return str(directory.physical_path)
 
 
 class PublicationError(ValueError):
@@ -693,7 +728,7 @@ def _construct_result_commit(
         != 0
     ):
         raise PublicationError("publication_authority:target_not_source_successor")
-    with tempfile.TemporaryDirectory() as temp_dir:
+    with tempfile.TemporaryDirectory(dir=_publication_temp_dir()) as temp_dir:
         index_path = Path(temp_dir) / "index"
         environment = {**os.environ, "GIT_INDEX_FILE": str(index_path)}
         _run(

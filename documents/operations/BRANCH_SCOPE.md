@@ -83,7 +83,7 @@ validation route を同じ entrypoint で再実行できることを指します
 - push 前に、その branch で必須の test / lint / document check を実行します。
 - 初回 push と PR 作成は `python3 tools/agent_tools/github_publish.py publish-pr --user-task "<current user task>" --repo <owner/name> --title "<title>" --body-file <body.md>` を使います。branch push だけなら `github_publish.py push` を使います。
 - user-facing の完了報告は、原則として commit と push を終えてから行います。
-- さらに `verification.txt` が `status=pass`、`closeout_gate.md` が `auditor_status=resolved`、`mechanical_completion_loop_complete=yes`、`diff_check_agent_complete=yes`、`user_completion_report=unlocked` になり、run-local diff-check artifact が現在 tracked diff ref の read-only independent approval を示すまで完了報告を出しません。
+- さらに `verification.txt` が `status=pass`、`closeout_gate.md` が `auditor_status=resolved`、`review_convergence_complete=yes`、`diff_check_agent_complete=yes`、`user_completion_report=unlocked` になり、run-local diff-check artifact が現在 tracked diff ref の read-only independent approval を示すまで完了報告を出しません。
 - push を行わない task が許されるのは、review-only、no-change、または user が明示的に commit / push を止めた場合です。
 - push が自然な完了条件に含まれる task では、agent は push の許可を取りに戻りません。required review と validation が揃い、repo policy 的に自然ならそのまま push します。
 - push に失敗した場合は、完了扱いにせず、branch、commit、`github_publish.py` の `NEXT_ACTION` と失敗理由を明記して報告します。literal URL push や remote 推測の alternate route は使いません。

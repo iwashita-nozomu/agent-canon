@@ -1,0 +1,20 @@
+# @dependency-start
+# contract environment
+# responsibility Defines AgentCanon-owned defaults for nested Codex container sessions.
+# upstream design ../../CONTAINER_OPERATIONS.md AgentCanon Codex tooling ownership boundary
+# downstream implementation run_codex_in_repo_container.py resolves the default profile from the AgentCanon source tree
+# @dependency-end
+
+[defaults]
+container_home_root = "/workspace/workspace/.nested-codex"
+use_host_user = true
+tty = true
+mount_host_gitconfig = true
+mount_host_git_credentials = false
+mount_host_ssh_dir = false
+forward_ssh_auth_sock = true
+forward_env = ["OPENAI_API_KEY", "OPENAI_BASE_URL", "GH_TOKEN", "GITHUB_TOKEN"]
+
+[[profile]]
+name = "default"
+description = "Default nested Codex session using the project Dockerfile."

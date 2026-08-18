@@ -29,6 +29,20 @@ metrics = ["<metric>"]
 stopping_rule = "<stopping-rule>"
 acceptance_oracle = "<oracle>"
 
+[plan.algorithm_contract]
+public_entrypoint = "<entrypoint>"
+input_schema = "<input-schema>"
+state_transition = "<state-transition-or-recurrence>"
+invariants = ["<invariant>"]
+stopping_rule = "<stopping-rule>"
+failure_semantics = "<typed-failure-and-preserved-state>"
+
+[plan.oracle_boundary]
+necessary_observations = ["<observation>"]
+sufficient_observations = ["<observation>"]
+not_proven = ["<claim-outside-oracle>"]
+test_activation = "<required-or-not-applicable-with-reason>"
+
 [[plan.options]]
 id = "option-a"
 mechanism = "<mechanism-and-cost>"
@@ -63,6 +77,7 @@ selection_reason = "<capability-or-scheduler-reason>"
 gpu_visibility = "caller-provided"
 parallelism_policy = "scheduler-or-caller"
 environment_limit = "<none-or-recorded-limit>"
+allocation_evidence = "<caller-or-scheduler-record>"
 
 [source]
 repository = "<repository>"
@@ -74,6 +89,7 @@ dirty_state = "clean"
 config_path = "<config-path>"
 config_snapshot = "<result-path>/config_snapshot.json"
 seed_policy = "<seed-policy>"
+environment_snapshot = "<result-path>/environment.json"
 
 [run]
 runner = "<managed-runner>"
@@ -86,7 +102,9 @@ exit_status = "<exit-status>"
 [result]
 path = "<result-path>"
 summary = "<result-path>/summary.json"
+cases = "<result-path>/cases.jsonl"
 manifest = "<result-path>/artifact-manifest.json"
+visualization_status = "<result-path>/visualization-status.json"
 state = "incomplete"
 status = "incomplete"
 accepted_failure = false
@@ -96,6 +114,8 @@ accepted_failure_reason = "<required-reason-or-none>"
 preserved_artifacts = ["<required-path-or-none>"]
 close_condition = "<required-close-condition>"
 validation_oracle = "<required-oracle-and-observation>"
+failure_cause_owner = "<owner>"
+conflict_intent = "<preserved-intent-or-none>"
 # success と failed は相互排他的。success は exit_status=0、validation_oracle=pass、
 # acceptance pass が必要。failed は failure_evidence と preserved_artifacts が必要。
 # blocked は未完了状態であり、close_condition が満たされるまで結論にしない。
@@ -103,9 +123,20 @@ validation_oracle = "<required-oracle-and-observation>"
 [reproducibility]
 readback_command = "<command>"
 required_artifacts = ["summary.json", "artifact-manifest.json"]
+required_case_artifact = "cases.jsonl"
+config_snapshot = "<result-path>/config_snapshot.json"
+environment_snapshot = "<result-path>/environment.json"
 known_nondeterminism = "<none-or-description>"
 retention_owner = "<owner>"
 cleanup_policy = "<policy>"
+cleanup_command = "<command>"
+reconstructibility_readback = "<evidence-path-or-command>"
+
+[review]
+independent_reviewer = "<reviewer>"
+source_snapshot = "<commit-or-artifact>"
+selection_evidence = "<evidence-path-or-record>"
+review_decision = "<pass-or-revise-or-reject>"
 
 [[cases]]
 id = "<case-id>"

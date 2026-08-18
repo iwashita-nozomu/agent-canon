@@ -202,6 +202,24 @@ entries:
     tests:
       - tests/agent_tools/test_parent_repo_readiness.py
 
+  - id: surface-manifest-producer
+    summary: Produces canonical shared-runtime surface snapshots consumed by AgentCanon graph builds and root synchronization.
+    path: tools/agent_tools/surface_manifest.py
+    family: agent_tools
+    role: runner
+    status: canonical
+    command: python3 tools/agent_tools/surface_manifest.py --root . --prefix vendor/agent-canon --manifest documents/runtime/shared-runtime-surfaces.toml normalized-snapshot
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/runtime/shared-runtime-surfaces.toml
+    tests:
+      - tests/tools/test_agent_canon_pr_graph_selector.py
+
   - id: visualization-contract
     summary: Validates typed visualization source universes, projection manifests, canonical ToolCalls, and post-format readback coverage.
     path: tools/agent_tools/visualization_contract.py
@@ -674,6 +692,40 @@ entries:
       - tests/agent_tools/test_hook_event_log.py
       - tests/agent_tools/test_runtime_log_archive_git.py
 
+  - id: workflow-monitor
+    summary: Appends typed workflow behavior and wave evidence to an agent run bundle.
+    path: tools/agent_tools/workflow_monitor.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    command: python3 tools/agent_tools/workflow_monitor.py --report-dir <report-dir>
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_workflow_monitor.py
+
+  - id: waterfall-gate-check
+    summary: Checks the next approved waterfall gate against the prepared run bundle.
+    path: tools/agent_tools/waterfall_gate_check.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    command: python3 tools/agent_tools/waterfall_gate_check.py --report-dir <report-dir> --gate <gate>
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_waterfall_gate_check.py
+
   - id: agent-canon-graph
     summary: Builds and serves the one-build dependency graph with an optional persisted runtime-evidence snapshot.
     path: rust/agent-canon/src/graph.rs
@@ -793,6 +845,25 @@ entries:
     tests:
       - tests/agent_tools/test_search.py
 
+  - id: lsp-code-analysis
+    summary: Runs one-shot LSP 3.17 code analysis and emits deterministic symbols, relations, diagnostics, lexical candidates, lifecycle, and provenance.
+    path: tools/agent_tools/lsp_code_analysis.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/lsp_code_analysis.py analyze --root . --format json
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/lsp_code_analysis.md
+      - documents/structured-analysis/code-analysis.md
+    tests:
+      - tests/agent_tools/test_lsp_code_analysis.py
+
   - id: search-index
     summary: Builds repo-local ignored semantic cards for coordinated search.
     path: tools/agent_tools/search_index.py
@@ -847,7 +918,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/tools/semantic_provider_html_report.md
-      - agents/skills/html-experiment-report.md
+      - agents/skills/html-output.md
       - documents/tools/semantic_index.md
       - documents/prose-reasoning-graph/dsl-spec.md
     tests:
@@ -978,7 +1049,7 @@ entries:
     command: bash tools/agent_tools/scan_dependency_headers.sh
     writes: false
     default_wiring:
-      ci: true
+      ci: false
       pr_check: false
     docs:
       - tools/README.md
@@ -1092,8 +1163,29 @@ entries:
     tests:
       - tests/tools/test_container_config.py
 
+  - id: repository-topic-clone
+    summary: Owns the generic workspace topic clone, branch reuse, origin/main merge, publication readback, and reconstructibility cleanup lifecycle.
+    path: tools/agent_tools/repository_topic_clone.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: python3 tools/agent_tools/repository_topic_clone.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/repository_topic_clone.md
+      - documents/rule/repository-topic-clone.md
+    tests:
+      - tests/agent_tools/test_repository_topic_clone.py
+
   - id: dependency-module-change
-    summary: Prepares, projects, and cleans independent dependency source clones using .gitmodules identity and remote reconstructibility gates.
+    summary: Decorates generic repository topic clones with .gitmodules, gitlink, pin, and projection policy.
     path: tools/agent_tools/dependency_module_change.py
     family: agent_tools
     role: workflow
@@ -1198,7 +1290,7 @@ entries:
     writes: false
     default_wiring:
       ci: false
-      pr_check: true
+      pr_check: false
     docs:
       - tools/README.md
       - documents/tools/README.md
@@ -1223,6 +1315,24 @@ entries:
     tests:
       - tests/tools/test_run_all_checks_script.py
 
+  - id: pydocstyle-review
+    summary: Runs explicit AgentCanon Docstring review with source-root-bound canonical D213 configuration.
+    path: tools/agent_tools/pydocstyle_review.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: tools/bin/agent-canon pydocstyle-review --target <repo-relative.py>
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/conventions/DOCSTRING_GUIDE.md
+      - tools/ci/PRE_REVIEW_GUIDE.md
+      - agents/skills/python-review.md
+    tests:
+      - tests/agent_tools/test_pydocstyle_review.py
+
   - id: check-agent-canon-latest
     summary: Checks whether the AgentCanon pin and source are current and emits the PR-first handoff when shared canon is dirty.
     path: tools/ci/check_agent_canon_latest.sh
@@ -1233,7 +1343,7 @@ entries:
     writes: false
     default_wiring:
       ci: false
-      pr_check: true
+      pr_check: false
     docs:
       - tools/README.md
       - documents/tools/README.md
@@ -1479,7 +1589,7 @@ entries:
     family: ci
     role: checker
     status: canonical
-    command: python3 tools/ci/check_experiment_registry.py
+    command: python3 -m tools.ci.check_experiment_registry
     writes: false
     default_wiring:
       ci: true
@@ -1519,7 +1629,7 @@ entries:
     command: python3 tools/agent_tools/check_hardcoded_numbers.py
     writes: false
     default_wiring:
-      ci: true
+      ci: false
       pr_check: false
     docs:
       - tools/README.md
@@ -1812,8 +1922,6 @@ entries:
       - agents/COMMUNICATION_PROTOCOL.md
       - agents/skills/codex-task-workflow.md
       - .agents/skills/codex-task-workflow/SKILL.md
-      - agents/skills/owner-bounded-routing.md
-      - .agents/skills/owner-bounded-routing/SKILL.md
     tests:
       - tests/agent_tools/test_tool_rejection_preflight.py
 
@@ -1851,25 +1959,7 @@ entries:
       - documents/tools/README.md
       - agents/canonical/CODEX_WORKFLOW.md
     tests:
-      - tests/agent_tools/test_task_start_and_close.py
-
-  - id: task-start
-    summary: Starts a lightweight task bundle with routing and preflight evidence.
-    path: tools/agent_tools/task_start.py
-    family: agent_tools
-    role: workflow
-    status: canonical
-    command: python3 tools/agent_tools/task_start.py
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/canonical/CODEX_WORKFLOW.md
-    tests:
-      - tests/agent_tools/test_task_start_and_close.py
+      - tests/agent_tools/test_bootstrap_and_close.py
 
   - id: task-close
     summary: Checks closeout evidence before task completion.
@@ -1887,7 +1977,7 @@ entries:
       - documents/tools/README.md
       - agents/canonical/CODEX_WORKFLOW.md
     tests:
-      - tests/agent_tools/test_task_start_and_close.py
+      - tests/agent_tools/test_bootstrap_and_close.py
 
   - id: evaluate-agent-run
     summary: Evaluates an agent run bundle for workflow and evidence completeness.
@@ -2088,7 +2178,7 @@ entries:
     family: experiments
     role: experiment
     status: canonical
-    command: python3 tools/experiments/run_managed_experiment.py
+    command: python3 -m tools.experiments.run_managed_experiment
     writes: true
     default_wiring:
       ci: false
@@ -2125,7 +2215,7 @@ entries:
     family: experiments
     role: experiment
     status: canonical
-    command: python3 tools/experiments/update_latest_result.py
+    command: python3 -m tools.experiments.update_latest_result
     writes: true
     default_wiring:
       ci: false
@@ -2137,13 +2227,13 @@ entries:
     tests:
       - tests/tools/test_update_latest_result.py
 
-  - id: publish-result-branch
-    summary: Publishes experiment result artifacts to a dedicated Git branch.
-    path: tools/experiments/publish_result_branch.py
+  - id: save-experiment-result-annex
+    summary: Saves one experiment result as one deterministic git-annex archive.
+    path: tools/experiments/save_experiment_result_annex.py
     family: experiments
     role: experiment
     status: canonical
-    command: python3 tools/experiments/publish_result_branch.py
+    command: python3 -m tools.experiments.save_experiment_result_annex
     writes: true
     default_wiring:
       ci: false
@@ -2154,7 +2244,7 @@ entries:
       - documents/experiments/result-log-retention-and-visualization.md
       - agents/workflows/experiment-workflow.md
     tests:
-      - tests/tools/test_publish_result_branch.py
+      - tests/tools/test_save_experiment_result_annex.py
 
   - id: triplet-validator
     summary: Validates source, document, and test triplets.

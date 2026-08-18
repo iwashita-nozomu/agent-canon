@@ -12,6 +12,11 @@ version: 2
 review_activation_policy:
   mode: candidate_only
   owner_gate_cardinality: one_gate_per_replaceable_responsibility
+  review_dispatch_owner: change_reviewer
+  domain_validators:
+    - python_reviewer
+    - cpp_reviewer
+  domain_validator_mode: bounded_claims_only
   specialist_activation: distinct_unresolved_claim_or_risk_only
   task_default_specialists: candidate_only
   default_review_packs: candidate_only
@@ -22,8 +27,11 @@ review_activation_policy:
     checker_owned_properties: route_to_static_or_deterministic_checker
     private_helpers_and_incidental_apis: do_not_freeze
   review_finding_rework:
-    rework_when: behavior_owner_boundary_correctness_validation_or_publication_changes
-    record_without_new_wave: duplicate_stylistic_already_covered_or_evidence_free
+    initial_review: one_per_candidate_epoch_with_stable_blocking_finding_ids
+    focused_recheck: addressed_blockers_and_invalidated_evidence_only
+    rework_when: stable_blocker_closure_or_typed_new_epoch_evidence
+    record_without_new_wave: advisory_duplicate_stylistic_already_covered_or_evidence_free
+    same_state_action: non_convergent_cycle
   validation:
     owner_ref: "agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary"
     route_source: parent_packet.validation_route
@@ -31,20 +39,28 @@ review_activation_policy:
     full_suite_or_remote_ci: see_owner_ref
   artifacts:
     empty_reviewer_or_template_files: do_not_materialize
+    selected_outputs_only: true
 
 execution_time_policy:
   owner_ref: "agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract"
   applies_to: repo-changing execution
   projection: templates/agents/schedule.md#Execution-Time-Aware Plan
+  graph_activation: only_when_selected_ordering_or_collision_edges_exist
+  graph_scope: selected_dependency_and_collision_edges_only
   executable_fields:
     - dependency_dag
-    - makespan_objective
     - responsibility_completeness
     - correctness
+    - decision_relevant_total_work
+    - makespan_objective
     - critical_path
     - ready_set
     - context_reuse
     - affected_evidence_invalidation
+    - candidate_epoch
+    - blocking_finding_ids
+    - focused_recheck
+    - terminal_state
 
 role_topology_defaults: &standard_role_topology
   capacity_derivation: declared_team_peak_plus_nested_reservations_v1
@@ -86,8 +102,10 @@ role_topology_defaults: &standard_role_topology
     status: allowed_with_distinct_packets
     identity_key: role_id+instance_id+agent_type
     read_only: allowed_when_input_packets_or_review_focus_are_distinct
-    write_capable: allowed_only_with_disjoint_write_scopes_and_parent_integration_order
+    write_capable: allowed_only_for_worker_or_spark_worker
+    current_checkout_parallel_requirements: disjoint_paths+no_shared_git_index_or_head+no_generated_or_formatter_effects
     collision_policy: serialize_current_checkout_waves
+    isolated_worktree_policy: explicit_alternative_implementation_experiment_only
     runtime_threads_are_cardinality_source: false
   stage_waves:
     - id: intake
@@ -181,6 +199,8 @@ role_topology_defaults: &standard_role_topology
         - change_reviewer
         - python_reviewer
         - cpp_reviewer
+      owner_gate: change_reviewer
+      domain_validators_are_bounded: true
     - id: final_review
       stage_class: final
       role_ids:

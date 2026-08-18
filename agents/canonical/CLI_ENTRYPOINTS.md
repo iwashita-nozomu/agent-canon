@@ -4,6 +4,7 @@
 contract agent-runtime
 responsibility Documents CLI Entrypoints for this repository.
 upstream design README.md canonical workflow index
+upstream design ../../documents/design/source-owned-dependency-validation.md source dependency and persisted graph authority boundary
 @dependency-end
 -->
 
@@ -52,7 +53,7 @@ upstream design README.md canonical workflow index
 - 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
 - planning を含む parent session では、parent session 側の plan-mode command を使う。official Codex CLI では `/plan`
 - runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を直接見る
-- `task_start.py` / `bootstrap_agent_run.py` の出力では
+- `bootstrap_agent_run.py` の出力では
   `REPO_TOOL_ROUTING_SEQUENCE`、`REPO_TOOL_ROUTING_NEXT_COMMAND`、
   `REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` を確認する
 
@@ -61,7 +62,7 @@ upstream design README.md canonical workflow index
 標準 bundle を作るときは次を使います。
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent-canon/agent_tools/bootstrap_agent_run.py \
   --task "short task summary" \
   --task-id T1 \
   --owner "human-or-agent" \
@@ -69,14 +70,14 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 ```
 
 nonstandard design packet を run-local input として固定する場合は、
-`bootstrap_agent_run.py` と `task_start.py` の共通 flag
+`bootstrap_agent_run.py` の flag
 `--active-design-packet JSON` を使います。JSON は schema、3 つの相対 artifact
 path、`document_flow_required` からなる closed record です。unknown field を reject
 し、全 field がそろった場合だけ run を作成します。生成後の authority は `team_manifest.yaml` の
 `run.active_design_packet` です。
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent-canon/agent_tools/bootstrap_agent_run.py \
   --task "design packet run" \
   --task-id T12 \
   --owner codex \
@@ -92,7 +93,7 @@ decision または distinct unresolved claim/risk が選択したものだけ ma
 へ反映されます。
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent-canon/agent_tools/bootstrap_agent_run.py \
   --task "research-backed change" \
   --task-id T4 \
   --owner "codex" \
@@ -107,7 +108,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 unresolved claim/risk が選択した role だけを materialize します。
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent-canon/agent_tools/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
   --task-id T12 \
   --owner "codex" \
@@ -138,7 +139,7 @@ The generic source-bound context certificate is created first from native
 Codex rollout evidence and the active run bundle:
 
 ```bash
-python3 tools/agent_tools/runtime_log_archive_git.py append-context-discovery \
+python3 tools/agent-canon/agent_tools/runtime_log_archive_git.py append-context-discovery \
   --run-id <run-id> --agent-context-id <agent-context-id> --turn-id <turn-id>
 ```
 
@@ -150,7 +151,7 @@ Missing, duplicate, malformed, or mismatched native evidence fails closed.
 The runtime-event materializer then consumes exactly one certificate:
 
 ```bash
-python3 tools/agent_tools/runtime_log_archive_git.py materialize-runtime-event \
+python3 tools/agent-canon/agent_tools/runtime_log_archive_git.py materialize-runtime-event \
   --result-family <requirements|design|review|validation|lifecycle> \
   --run-id <run-id> --gate-id <gate-id> --base-ref <base-ref>
 ```
@@ -178,8 +179,8 @@ the hot path without building repository/archive context, then publish one
 explicit checkpoint when requested:
 
 ```bash
-python3 tools/agent_tools/runtime_log_archive_git.py check-hook-hot-path
-python3 tools/agent_tools/runtime_log_archive_git.py sync
+python3 tools/agent-canon/agent_tools/runtime_log_archive_git.py check-hook-hot-path
+python3 tools/agent-canon/agent_tools/runtime_log_archive_git.py sync
 ```
 
 `sync` owns one nonblocking lock and one archive ensure. It snapshots, ingests,
@@ -187,22 +188,54 @@ deduplicates, projects, publishes, reads back, and only then removes certified
 spool files. `archive_transaction_busy`, `partial_retained`, `failed`, and
 `uncertain` states leave source events for a later checkpoint.
 
-The Rust graph uses one build transaction. When an active runtime event exists,
-that transaction also captures one prepared-artifact/committed-receipt pair;
-the pair is optional for source-only graph availability:
+### Source-owned dependency operations
+
+Dependency headers are tracked source, not graph-runtime state. The following
+normal operations derive dependency facts directly from current source bytes
+and canonical parent-view bindings:
+
+- changed-file dependency-header validation;
+- design-claim evidence closure;
+- tool/convention drift checks;
+- vector search `--context` dependency expansion;
+- repository dependency review and TSV/DOT rendering;
+- PR dependency completeness after trusted changed-path selection.
+
+These operations require neither Cargo nor an `agent-canon` binary, do not read
+`.agent-canon/knowledge-graph`, and do not require a fresh persisted snapshot.
+Malformed manifests, root escape, unreadable canonical source, and unsupported
+relation values still fail closed. The source-derived typed compatibility route
+is owned by `source_dependency_graph.py` and `graph_client.py`.
+
+The normal repository review command is:
 
 ```bash
-tools/bin/agent-canon graph build --root <repo-root> --format json
-tools/bin/agent-canon graph status --root <repo-root> --format json
-tools/bin/agent-canon graph query --root <repo-root> --relation dependency --all --format json
-tools/bin/agent-canon graph context --root <repo-root> --path <repo-relative-path> --format json
+bash tools/agent-canon/agent_tools/run_repo_dependency_review.sh \
+  --root <repo-root> --fail-missing --cycle-report-only
 ```
 
-`status`, `query`, and `context` are read-only consumers. They reuse the
-persisted v2 snapshot and return stale/unavailable state when present runtime
-artifact, receipt, live source identity, worktree manifest identity, or profile
-changes. A source snapshot with unresolved, ambiguous, or uncovered diagnostics
-is `incomplete` and cannot authorize query or context evidence; only an empty
-completeness set is `fresh`. If no active runtime pointer existed at build time,
-they consume the complete source-only snapshot as fresh. Each command performs
-one bounded freshness probe and does not regenerate runtime evidence.
+`--ensure-graph` is an explicit, mutually separate preparation mode. It runs
+persisted snapshot status/build preparation and exits; it is not
+dependency-correctness evidence.
+
+### Explicit persisted graph operations
+
+The Rust graph remains available for explicit graph analysis, non-dependency
+relations, token context, and runtime-evidence enrichment. One explicit build
+transaction may capture a prepared-artifact/committed-receipt pair when active
+runtime evidence exists:
+
+```bash
+tools/agent-canon/bin/agent-canon graph build --root <repo-root> --format json
+tools/agent-canon/bin/agent-canon graph status --root <repo-root> --format json
+tools/agent-canon/bin/agent-canon graph query --root <repo-root> --relation owner --all --format json
+tools/agent-canon/bin/agent-canon graph context --root <repo-root> --path <repo-relative-path> --token <token> --format json
+```
+
+These public graph commands are explicit persisted-runtime consumers. `status`,
+`query`, and token context reuse the persisted v2 snapshot and return typed
+stale/incomplete/unavailable state when their graph contract is not satisfied.
+They do not authorize source dependency validation and are not invoked by the
+normal PR dependency gate. Dependency relation queries made through the Python
+compatibility boundary with full-repository/both/depth-zero selection, and
+path context without a token, are instead source-derived as documented above.

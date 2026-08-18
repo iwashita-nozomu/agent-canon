@@ -16,13 +16,11 @@ skill_dependencies:
     routing_candidates:
     - task-routing
     - codex-task-workflow
-    - owner-bounded-routing
     - subagent-bootstrap
     - dependency-analysis
     successors:
     - task-routing
     - codex-task-workflow
-    - owner-bounded-routing
     - subagent-bootstrap
     - dependency-analysis
     order_constraints:
@@ -44,7 +42,6 @@ skill_dependencies:
     - agent-orchestration
     routing_candidates:
     - agent-orchestration
-    - owner-bounded-routing
     - structure-refactor
     - agent-log-analysis
     - issue-finding-report
@@ -52,7 +49,6 @@ skill_dependencies:
     - result-artifact-writeout
     - agent-learning
     successors:
-    - owner-bounded-routing
     - structure-refactor
     - dependency-analysis
     order_constraints: []
@@ -62,6 +58,7 @@ skill_dependencies:
     - issue-finding-report
     - agent-log-analysis
     - runtime-log-repair
+    - repository-topic-clone
     - dependency-module-change
     - agent-learning
   start-repository:
@@ -78,7 +75,6 @@ skill_dependencies:
     routing_candidates:
     - agent-orchestration
     - task-routing
-    - owner-bounded-routing
     - result-artifact-writeout
     - change-review
     successors:
@@ -86,26 +82,9 @@ skill_dependencies:
     order_constraints: []
     parallel_independent:
     - task-routing
-    - owner-bounded-routing
     - change-review
     - result-artifact-writeout
     - comprehensive-development
-  owner-bounded-routing:
-    responsibility_group: orchestration
-    required_prerequisites:
-    - agent-orchestration
-    - task-routing
-    routing_candidates:
-    - task-routing
-    - md-style-check
-    - change-review
-    successors: []
-    order_constraints: []
-    parallel_independent:
-    - codex-task-workflow
-    - change-review
-    - md-style-check
-    - wiki-publication
   subagent-bootstrap:
     responsibility_group: orchestration
     required_prerequisites:
@@ -128,7 +107,6 @@ skill_dependencies:
     order_constraints: []
     parallel_independent:
     - codex-task-workflow
-    - owner-bounded-routing
     - tool-finding-report
     - pr-processing
     - report-writing
@@ -175,14 +153,11 @@ skill_dependencies:
     - oop-readability-check
   result-artifact-writeout:
     responsibility_group: evidence
-    required_prerequisites:
-    - report-writing
+    required_prerequisites: []
     routing_candidates:
     - tool-finding-report
     - report-writing
-    - save-experiment-results
-    successors:
-    - save-experiment-results
+    successors: []
     order_constraints: []
     parallel_independent:
     - codex-task-workflow
@@ -205,7 +180,6 @@ skill_dependencies:
     - structure-planning
     - report-writing
     - html-output
-    - html-experiment-report
     - result-artifact-writeout
     - experiment-review
     - experiment-lifecycle
@@ -216,7 +190,6 @@ skill_dependencies:
     - report-writing
     - structure-planning
     - html-output
-    - html-experiment-report
     - experiment-lifecycle
     - experiment-review
   tool-finding-report:
@@ -302,6 +275,7 @@ skill_dependencies:
     responsibility_group: lifecycle
     required_prerequisites: []
     routing_candidates:
+    - repository-topic-clone
     - dependency-module-change
     - pr-processing
     - agent-update-branch
@@ -313,10 +287,26 @@ skill_dependencies:
     - pr-processing
     - agent-update-branch
     - structure-refactor
-  dependency-module-change:
+  repository-topic-clone:
     responsibility_group: lifecycle
     required_prerequisites: []
     routing_candidates:
+    - dependency-module-change
+    - agent-canon-update
+    - pr-processing
+    - task-routing
+    successors:
+    - dependency-module-change
+    order_constraints: []
+    parallel_independent:
+    - task-routing
+    - pr-processing
+  dependency-module-change:
+    responsibility_group: lifecycle
+    required_prerequisites:
+    - repository-topic-clone
+    routing_candidates:
+    - repository-topic-clone
     - agent-canon-update
     - dependency-analysis
     - structure-refactor
@@ -339,6 +329,7 @@ skill_dependencies:
     successors: []
     order_constraints: []
     parallel_independent:
+    - repository-topic-clone
     - change-review
     - result-artifact-writeout
     - agent-canon-update
@@ -442,14 +433,6 @@ skill_dependencies:
     - result-visualize
     - report-writing
     - code-visualization
-  html-experiment-report:
-    responsibility_group: documents
-    required_prerequisites: []
-    routing_candidates: []
-    successors: []
-    order_constraints: []
-    parallel_independent:
-    - result-visualize
   test-design:
     responsibility_group: design
     required_prerequisites: []
@@ -544,13 +527,27 @@ skill_dependencies:
     successors: []
     order_constraints: []
     parallel_independent:
-    - owner-bounded-routing
     - prose-reasoning-graph
     - document-canon-cleanup
   mvp-skeleton:
     responsibility_group: delivery
     required_prerequisites: []
     routing_candidates: []
+    successors: []
+    order_constraints: []
+    parallel_independent: []
+  parent-repository-audit:
+    responsibility_group: delivery
+    required_prerequisites:
+    - agent-orchestration
+    - codex-task-workflow
+    - structure-refactor
+    - dependency-analysis
+    - subagent-bootstrap
+    routing_candidates:
+    - change-review
+    - document-canon-cleanup
+    - tool-finding-report
     successors: []
     order_constraints: []
     parallel_independent: []
@@ -606,7 +603,6 @@ skill_dependencies:
     required_prerequisites: []
     routing_candidates:
     - result-artifact-writeout
-    - save-experiment-results
     - structure-planning
     - experiment-review
     - test-design
@@ -617,25 +613,10 @@ skill_dependencies:
     - result-visualize
     - structure-planning
     - test-design
-    - save-experiment-results
     - experiment-review
     - gpu-execution
     - adaptive-improvement-loop
     - research-workflow
-  save-experiment-results:
-    responsibility_group: experiments
-    required_prerequisites:
-    - result-artifact-writeout
-    routing_candidates:
-    - experiment-lifecycle
-    - result-artifact-writeout
-    - report-writing
-    - experiment-review
-    successors: []
-    order_constraints: []
-    parallel_independent:
-    - experiment-lifecycle
-    - experiment-review
   experiment-review:
     responsibility_group: experiments
     required_prerequisites: []
@@ -645,7 +626,6 @@ skill_dependencies:
     parallel_independent:
     - result-visualize
     - experiment-lifecycle
-    - save-experiment-results
   gpu-execution:
     responsibility_group: experiments
     required_prerequisites: []
@@ -774,6 +754,15 @@ skill_dependencies:
     successors: []
     order_constraints: []
     parallel_independent: []
+  devcontainer-exec:
+    responsibility_group: runtime
+    required_prerequisites: []
+    routing_candidates:
+    - environment-maintenance
+    - gpu-execution
+    successors: []
+    order_constraints: []
+    parallel_independent: []
   environment-maintenance:
     responsibility_group: delivery
     required_prerequisites:
@@ -853,13 +842,6 @@ skill_dependencies:
     parallel_independent:
     - environment-cleanup
     - code-cleanup
-  user-preference-sync:
-    responsibility_group: runtime
-    required_prerequisites: []
-    routing_candidates: []
-    successors: []
-    order_constraints: []
-    parallel_independent: []
   agent-learning:
     responsibility_group: runtime
     required_prerequisites: []
@@ -874,10 +856,8 @@ skill_dependencies:
     responsibility_group: lifecycle
     required_prerequisites: []
     routing_candidates:
-    - owner-bounded-routing
     - result-artifact-writeout
     successors: []
     order_constraints: []
     parallel_independent:
-    - owner-bounded-routing
     - result-artifact-writeout

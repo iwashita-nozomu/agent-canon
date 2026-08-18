@@ -11,6 +11,11 @@ downstream implementation ../../templates/documents/github/pull-request/agent_ca
 
 # AgentCanon Issue Label Taxonomy
 
+The machine-readable status lifecycle mapping is owned by
+[`issue-label-taxonomy.toml`](issue-label-taxonomy.toml). Tools load that TOML
+record and verify the canonical labels against the remote repository catalog;
+this Markdown page remains explanatory documentation.
+
 Use labels to make runtime profile, affected surface, and evaluation need visible
 before implementation starts.
 
@@ -30,6 +35,14 @@ Core labels:
 | `submodule` | AgentCanon pin/update/root-view propagation behavior. |
 
 Issue templates require runtime profile, affected path, validation, eval
-decision, rollback consideration, and closeout evidence. Existing issues should
-be backfilled opportunistically when they are edited or resolved; do not rewrite
-issue history just to add labels.
+decision, rollback consideration, and closeout evidence. The maintenance form
+also requires an operational current snapshot: what happened, why the change is
+needed, completed/in-progress work, remaining work, and the blocked update
+operation with evidence and an unblock condition. A missing blocker is recorded
+as `none` with a reason so that "not observed" and "not blocked" remain distinct.
+Status labels describe lifecycle state; the form snapshot supplies the evidence
+behind that state and does not define a second status state machine.
+
+Existing issues should be backfilled opportunistically when they are edited or
+resolved; do not rewrite issue history just to add labels or the new snapshot
+fields.

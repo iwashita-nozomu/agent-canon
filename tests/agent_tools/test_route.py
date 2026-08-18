@@ -662,11 +662,11 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("task-routing", decision["matched_skills"])
         self.assertIn("task-routing", decision["active_skills"])
-        self.assertIn("owner-bounded-routing", decision["related_skill_candidates"])
-        self.assertNotIn("owner-bounded-routing", decision["active_skills"])
+        self.assertNotIn("bounded-owner-route", decision["related_skill_candidates"])
+        self.assertNotIn("bounded-owner-route", decision["active_skills"])
         self.assertIn("task-routing", decision["related_skills"])
-        self.assertIn(
-            "owner-bounded-routing", decision["related_skills"]["task-routing"]
+        self.assertNotIn(
+            "bounded-owner-route", decision["related_skills"].get("task-routing", ())
         )
 
     def test_prompt_preserves_test_design_related_skills_for_validation_failure(
@@ -722,6 +722,39 @@ class RouteToolTest(unittest.TestCase):
                 self.assertIn("user-guided-debugging", decision["active_skills"])
                 self.assertNotIn("refactor-loop", decision["matched_skills"])
                 self.assertNotIn("refactor-loop", decision["active_skills"])
+
+    def test_repository_topic_clone_routes_repository_kind_as_decorator(self) -> None:
+        """Parent, dependency, and standalone clones share one generic owner."""
+        scenarios = (
+            (
+                "Clone a parent repository topic branch into workspace/<topic>/<repo>.",
+                False,
+            ),
+            (
+                "Clone a dependency source topic branch and then update its gitlink.",
+                True,
+            ),
+            (
+                "Clone a standalone repository into a workspace topic branch.",
+                False,
+            ),
+            (
+                "Clone the repository topic, then make a small .gitignore change whose broader owner also requires workflow docs.",
+                False,
+            ),
+        )
+        for prompt, dependency_expected in scenarios:
+            with self.subTest(prompt=prompt):
+                result = self.run_route("--prompt", prompt, "--format", "json")
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                self.assertIn("repository-topic-clone", decision["active_skills"])
+                self.assertEqual(
+                    "dependency-module-change" in decision["matched_skills"],
+                    dependency_expected,
+                )
+                if ".gitignore" in prompt:
+                    self.assertNotIn("bounded-owner-route", decision["matched_skills"])
 
     def test_prompt_routes_patch_only_no_validation_as_implementation(self) -> None:
         """No-validation clauses after patch-only work should not mean no patch."""
@@ -1199,18 +1232,18 @@ class RouteToolTest(unittest.TestCase):
         self.assertIsNone(decision.visualization_tool_call)
 
     def test_code_visualization_small_model_route_is_exact_and_early(self) -> None:
-        """The runtime skill exposes the exact renderer route before generic guidance."""
+        """The canonical owner exposes the exact renderer route."""
         runtime_text = (
             PROJECT_ROOT / ".agents" / "skills" / "code-visualization" / "SKILL.md"
         ).read_text(encoding="utf-8")
-        direct_start = runtime_text.index("## Small-Model Direct Route")
-        canonical_read = runtime_text.index(
-            "1. Read `agents/skills/code-visualization.md`."
-        )
-        generic_tree = runtime_text.index("1. Infer the context question")
-        direct_text = runtime_text[direct_start:canonical_read]
-        self.assertLess(direct_start, canonical_read)
-        self.assertLess(canonical_read, generic_tree)
+        self.assertIn("Canonical workflow and policy", runtime_text)
+        canonical_text = (
+            PROJECT_ROOT / "agents" / "skills" / "code-visualization.md"
+        ).read_text(encoding="utf-8")
+        direct_start = canonical_text.index("## Source Evidence Routes")
+        renderer_choice = canonical_text.index("## Renderer Choice")
+        direct_text = canonical_text[direct_start:renderer_choice]
+        self.assertLess(direct_start, renderer_choice)
         for command in (
             "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
             "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
@@ -1219,7 +1252,7 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotIn("<path>", direct_text)
         self.assertNotIn("<provided-path>", direct_text)
         self.assertIn(
-            "--scope changed` only when the request explicitly asks for changed scope",
+            "Use this exact changed-scope command only when changed scope is explicit",
             direct_text,
         )
         self.assertIn("`--json` is invalid", direct_text)
@@ -1706,6 +1739,54 @@ class RouteToolTest(unittest.TestCase):
             decision["active_skills"].index("environment-maintenance"),
         )
 
+    def test_devcontainer_exec_routes_existing_container_only(self) -> None:
+        """Existing-container exec prompts must avoid maintenance routes."""
+        result = self.run_route(
+            "--prompt",
+            "devcontainer exec --workspace-folder . zsh これで行けるっしょ？",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("devcontainer-exec", decision["matched_skills"])
+        self.assertIn("devcontainer-exec", decision["active_skills"])
+        self.assertNotIn("environment-maintenance", decision["matched_skills"])
+        self.assertNotIn("environment-maintenance", decision["active_skills"])
+        self.assertNotIn("dependency-design", decision["matched_skills"])
+        self.assertNotIn("dependency-design", decision["active_skills"])
+
+    def test_devcontainer_maintenance_terms_still_route_maintenance(self) -> None:
+        """Devcontainer configuration/build prompts retain maintenance routing."""
+        result = self.run_route(
+            "--prompt",
+            "devcontainer configuration build update",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("environment-maintenance", decision["matched_skills"])
+        self.assertIn("environment-maintenance", decision["active_skills"])
+        self.assertNotIn("devcontainer-exec", decision["matched_skills"])
+
+    def test_japanese_existing_container_test_prompt_routes_exec(self) -> None:
+        """Japanese existing-container test prompts activate devcontainer-exec."""
+        result = self.run_route(
+            "--prompt",
+            "コンテナ内に一時的に入ってテストすれば？",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("devcontainer-exec", decision["matched_skills"])
+        self.assertIn("devcontainer-exec", decision["active_skills"])
+        self.assertNotIn("environment-maintenance", decision["matched_skills"])
+
     def test_prompt_does_not_route_ordinary_url_or_report_text_to_runtime_log_repair(
         self,
     ) -> None:
@@ -1822,8 +1903,8 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
-        self.assertIn("owner-bounded-routing", decision["matched_skills"])
-        self.assertIn("owner-bounded-routing", decision["active_skills"])
+        self.assertNotIn("bounded-owner-route", decision["matched_skills"])
+        self.assertNotIn("bounded-owner-route", decision["active_skills"])
         self.assertIn("python-review", decision["matched_skills"])
         self.assertIn("python-review", decision["deferred_skills"])
         self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")
@@ -2679,6 +2760,34 @@ class CapabilityRouteTest(unittest.TestCase):
         self.assertIsNone(payload["visualization_owner_skill"])
         self.assertIsNone(payload["visualization_tool_call"])
         self.assertIsNone(payload["visualization_rejection"])
+
+    def test_parent_repository_audit_requires_explicit_capability(self) -> None:
+        """Audit keywords remain inert until the capability is explicit."""
+        prompt_result = self.run_route(
+            "--prompt", "repository audit repair", "--format", "json"
+        )
+        self.assertEqual(
+            prompt_result.returncode, 0, prompt_result.stdout + prompt_result.stderr
+        )
+        prompt_payload = json.loads(prompt_result.stdout)
+        self.assertNotIn("parent-repository-audit", prompt_payload["matched_skills"])
+        self.assertNotIn("parent-repository-audit", prompt_payload["active_skills"])
+
+        capability_result = self.run_route(
+            "--capability", "parent_repository_audit", "--format", "json"
+        )
+        self.assertEqual(
+            capability_result.returncode,
+            0,
+            capability_result.stdout + capability_result.stderr,
+        )
+        capability_payload = json.loads(capability_result.stdout)
+        self.assertEqual(
+            capability_payload["matches"][0]["activation"], "explicit_capability"
+        )
+        self.assertIn(
+            "parent-repository-audit", capability_payload["active_skills"]
+        )
 
     def test_capability_route_selects_dependency_visualization_owner(self) -> None:
         """Visualization capability maps to canonical code-visualization ownership."""

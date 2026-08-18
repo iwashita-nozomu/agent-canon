@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import argparse
-import shlex
 import subprocess
 import sys
 
@@ -18,12 +17,15 @@ from container_runtime import (
     apply_pack_overrides,
     build_build_command,
     build_run_command,
-    build_shell_invocation,
-    join_shell_lines,
+    emit_not_created_lifecycle_receipt,
+    lifecycle_context,
     load_or_default_pack,
     print_label_and_command,
     resolve_builder,
+    scope_pack_image_tag,
+    start_container_lifecycle,
     workspace_path,
+    write_lifecycle_receipt,
 )
 
 
@@ -59,9 +61,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--skip-build", action="store_true", help="Skip the build step."
     )
     parser.add_argument(
-        "--keep-image", action="store_true", help="Keep the built image."
-    )
-    parser.add_argument(
         "--print-only",
         action="store_true",
         help="Print the resolved commands without executing them.",
@@ -74,8 +73,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--container-workspace",
         help=(
-            "Container mount point for the host workspace. "
-            "Default: pack runtime value"
+            "Container mount point for the host workspace. Default: pack runtime value"
         ),
     )
     parser.add_argument("--workdir", help="Container working directory override.")
@@ -114,14 +112,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Open the configured shell instead of running a command.",
     )
     parser.add_argument(
-        "--skip-workspace-setup",
-        action="store_true",
-        help=(
-            "Skip the workspace-mounted setup step. By default, the runner "
-            "runs docker/install_python_dependencies.sh when present."
-        ),
-    )
-    parser.add_argument(
         "command",
         nargs=argparse.REMAINDER,
         help=(
@@ -132,15 +122,6 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def cleanup_image(builder: str, image_tag: str) -> None:
-    """Remove one image quietly."""
-    subprocess.run(
-        [builder, "image", "rm", "-f", image_tag],
-        check=False,
-        capture_output=True,
-    )
-
-
 def normalize_command(command: list[str], shell_session: bool) -> list[str]:
     """Normalize the user command tail."""
     normalized = list(command)
@@ -149,30 +130,6 @@ def normalize_command(command: list[str], shell_session: bool) -> list[str]:
     if shell_session:
         return []
     return normalized
-
-
-def workspace_setup_command(
-    command: list[str],
-    *,
-    shell: str,
-    container_workspace: str,
-    skip_setup: bool,
-) -> list[str]:
-    """Return a command that runs workspace setup before the requested command."""
-    if skip_setup:
-        return command
-
-    installer = f"{container_workspace.rstrip('/')}/docker/install_python_dependencies.sh"
-    lines = [
-        "set -euo pipefail",
-        (
-            f"if [ -f {shlex.quote(installer)} ]; then "
-            f"bash {shlex.quote(installer)} {shlex.quote(container_workspace)}; "
-            "fi"
-        ),
-        f"exec {shlex.join(command)}",
-    ]
-    return build_shell_invocation(shell, join_shell_lines(lines))
 
 
 def main() -> int:
@@ -188,19 +145,20 @@ def main() -> int:
         )
         builder = resolve_builder(args.builder, print_only=args.print_only)
         workspace_root = workspace_path(args.workspace_root)
+        lifecycle = lifecycle_context(workspace_root, builder, "repo-container")
+        if not args.skip_build:
+            pack = scope_pack_image_tag(pack, lifecycle)
+        lifecycle = lifecycle.bind_image_tag(pack.image_tag)
         command = normalize_command(args.command, shell_session=args.shell_session)
-        container_workspace = args.container_workspace or pack.runtime.workspace_mount
         shell = args.shell or pack.runtime.shell
         run_payload = command if command else [shell]
-        run_payload = workspace_setup_command(
-            run_payload,
-            shell=shell,
-            container_workspace=container_workspace,
-            skip_setup=args.skip_workspace_setup,
-        )
 
         build_command = build_build_command(
-            builder, pack, pull=args.pull, no_cache=args.no_cache
+            builder,
+            pack,
+            pull=args.pull,
+            no_cache=args.no_cache,
+            labels=lifecycle.labels(),
         )
         run_command = build_run_command(
             builder,
@@ -216,6 +174,7 @@ def main() -> int:
             gpus=args.gpus,
             user=args.user,
             tty=args.tty,
+            labels=lifecycle.labels(),
         )
 
         print_label_and_command("build", build_command)
@@ -223,24 +182,37 @@ def main() -> int:
             print_label_and_command("run", run_command)
 
         if args.print_only:
+            emit_not_created_lifecycle_receipt(workspace_root, lifecycle)
             return 0
 
-        image_built_here = False
-        if not args.skip_build:
-            build_result = subprocess.run(build_command, check=False)
-            if build_result.returncode != 0:
-                return build_result.returncode
-            image_built_here = True
+        lifecycle_run = start_container_lifecycle(
+            workspace_root, builder, "repo-container", context=lifecycle
+        )
+        if lifecycle_run.receipt.state != "snapshot":
+            write_lifecycle_receipt(workspace_root, lifecycle_run.receipt)
+            print(
+                f"container lifecycle unavailable: {lifecycle_run.receipt.failure or lifecycle_run.receipt.before.query_status}",
+                file=sys.stderr,
+            )
+            return 2
 
-        if args.build_only:
-            return 0
-
+        command_exit = 0
         try:
-            run_result = subprocess.run(run_command, check=False)
-            return run_result.returncode
+            if not args.skip_build:
+                command_exit = subprocess.run(build_command, check=False).returncode
+            if command_exit == 0 and not args.build_only:
+                command_exit = subprocess.run(run_command, check=False).returncode
         finally:
-            if image_built_here and not args.keep_image:
-                cleanup_image(builder, pack.image_tag)
+            cleanup_result = lifecycle_run.finish(cleanup=True)
+
+        if cleanup_result.state not in {"cleaned", "not-created"}:
+            print(
+                f"container lifecycle cleanup state={cleanup_result.state}: {cleanup_result.failure}",
+                file=sys.stderr,
+            )
+            if command_exit == 0:
+                command_exit = 2
+        return command_exit
     except (RuntimeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 2

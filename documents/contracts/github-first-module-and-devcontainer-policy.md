@@ -6,7 +6,7 @@ downstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface o
 downstream design ../rule/dependency-module-changes.md general dependency source-clone rule
 downstream design ../conventions/coding-conventions-project.md project environment rules
 upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
-downstream environment ../../.devcontainer/devcontainer.json shared devcontainer entrypoint
+downstream environment ../../.devcontainer/devcontainer.json parent-owned devcontainer entrypoint; standalone source is invoked through the source-root resolver
 downstream implementation ../../tools/ci/container_config.py validates Dockerfile and devcontainer boundaries
 @dependency-end
 -->
@@ -29,7 +29,7 @@ The normal route is:
 1. Update template or derived repos by advancing the `vendor/agent-canon`
    submodule pin.
 1. Repair root views with the request-evidence-authorized
-   `bash tools/sync_agent_canon.sh link-root` route.
+   source-root resolver `link-root` route.
 
 Local Git remotes must not define the normal distribution path for
 self-authored reusable modules.
@@ -88,10 +88,11 @@ Docker docs and validation. Agent convenience is not enough.
 
 ## Devcontainer Boundary
 
-`.devcontainer/` is AgentCanon-owned runtime ergonomics. Template and derived
-repos expose it as a root symlink view into `vendor/agent-canon/.devcontainer`.
+`.devcontainer/` is parent-owned regular environment content in template and
+derived repositories. Standalone AgentCanon keeps its own `.devcontainer/`
+source contract; that source is not projected into parent roots.
 
-The shared devcontainer owns:
+The standalone AgentCanon devcontainer source owns:
 
 - declarative `.devcontainer/dependencies.toml` records for Codex, npm/Node
   when needed for Codex, and GitHub CLI / `gh`;
@@ -112,11 +113,34 @@ The shared devcontainer owns:
 - agent bootstrap ergonomics that should stay consistent across template
   clones.
 
-The shared devcontainer consumes repo-local Docker runtime contracts instead of
-owning them. It reads `docker/packs/default.toml`, builds the repo-local
-`docker/Dockerfile`, forwards the pack runtime environment into the generated
-Compose service, and runs repo-local `docker/install_python_dependencies.sh`
-after the workspace is mounted.
+The standalone source consumes repo-local Docker runtime contracts instead of
+owning parent files. A template or derived parent keeps its own regular
+`.devcontainer/` contract and may invoke source entrypoints through the resolver.
+The project may expose only `docker/Dockerfile`; optional `docker/packs/*.toml`
+and Python execution rules remain project-owned overrides. AgentCanon-owned
+nested-Codex defaults resolve from `tools/ci/codex-container-profiles.toml`, while
+an explicit parent `--profiles` path remains an optional override. The default
+nested-Codex HOME maps to the required ignored parent `workspace/` boundary,
+and host `.git-credentials` is not projected unless an explicit profile enables it.
+
+When AgentCanon itself is opened as a standalone source checkout and no
+`docker/packs/default.toml` exists, the generator builds the source-owned
+`.devcontainer/Dockerfile` with the same canonical project UID/GID contract; it
+does not fall back to an unpinned `ubuntu:22.04` image.
+
+The default parent image contract is the #524 canonical identity: a
+digest-pinned plain `ubuntu:22.04` base whose image creates user `project` at
+`PROJECT_UID` and uses numeric `PROJECT_GID` as its primary GID. An existing group
+at that GID (including GID `0`) is reused without rename; group `project` is
+created only when the requested GID is unused, and a group-name collision is
+fail-closed. The image runs as `USER project`. The generator resolves and
+validates those decimal args: UID is non-zero, while GID is non-negative and may
+be `0`; it does not expose a public user-name override or inspect Docker daemon mapping mode. The image exposes
+passwordless container-local `sudo -n` for mounted dependency installation. This
+does not invoke host `sudo`, prompt for a host password, mutate host groups, or
+add an AgentCanon-specific group. Workspace bind acceptance is established by
+container-side usability and writability, including an expected create/remove
+probe, rather than exact host-visible numeric owner equality.
 
 `devcontainer.json` must not use a fixed AgentCanon display name for every
 parent repository. The generated Compose file must also set a top-level project
@@ -132,31 +156,55 @@ allocate the project network automatically.
 `prepare` の前にこの ignore rule を確認し、満たさない親 repository では
 dependency source work を開始しません。
 
-ここでいう topic workspace は filesystem / lifecycle と devcontainer mount の
-用語です。VS Code workspace を意味しません。devcontainer は topic workspace
-root を一度だけ `/workspace` に bind mountし、`AGENT_CANON_WORKSPACE_ROOT=/workspace`
-を固定します。`<parent-repo-root>/workspace/<topic-slug>/<parent-repo>` と
-同列の `<module-basename>` clone が host layout です。個別 clone や親 repository
-の二重 mount、host absolute path の tracked config への書き込みは行いません。
-`/workspace` mount または dependency tool の欠落は startup design error として
-post-attach と `tools/ci/container_config.py` が報告します。
+task owner の非空 owner evidence、computed path、remote、branch、module identity が
+一致する場合、canonical `repository_topic_clone.py` / `dependency_module_change.py` の
+repo-local `prepare` と `merge-main` は operation-level の追加承認なしで実行します。
+reuse は `prepare` に含まれます。これはこの管理領域の作成・再利用・使用に限定された
+route です。`dependency_module_change.py status` は adapter-only の read command であり、
+generic lifecycle、owner-evidence、または operation-level approval carve-out ではありません。
+共有 checkout に対する raw Git の checkout/switch、branch/worktree、reset/restore/clean/stash、
+protected update wrapper は既存の明示 authority gate を維持し、canonical lifecycle
+command の carve-out を継承しません。作業完了後の clone/topic root 削除は candidate CAS、
+PR lifecycle、必要な publication readback、owner evidence、expected identity を検証する
+canonical cleanup と `CleanupProof` receipt に限定します。
+
+ここでいう topic workspace は filesystem / lifecycle の用語であり、VS Code workspace
+や devcontainer の公開範囲を意味しません。devcontainer は選択した repository root
+一つだけを `/workspace/<basename>` に bind mountし、container 内の共通親 path として
+`AGENT_CANON_WORKSPACE_ROOT=/workspace` を固定します。
+`<parent-repo-root>/workspace/<topic-slug>/<parent-repo>` と同列の
+`<module-basename>` clone は host lifecycle layout ですが、選択 repository 以外の
+topic root、sibling clone、親 repository を container に公開しません。host absolute
+path を tracked config へ書き込みません。exact repository mount または dependency
+tool の欠落は startup design error として post-attach と
+`tools/ci/container_config.py` が報告します。
+
+Topic workspace の外側にある既存 repository checkout は `direct-repo` layout として
+扱います。exact repository root bind は `managed-topic` と `direct-repo` に共通です。
+dependency-module topic marker/status guard は direct-repo では要求・実行せず、
+managed-topic でだけ必須です。
+
+generator は `AGENT_CANON_WORKSPACE_LAYOUT=managed-topic|direct-repo` を Compose
+environment に出力し、post-attach は `DEPENDENCY_MODULE_CONTAINER_LAYOUT`、
+`DEPENDENCY_MODULE_CONTAINER_SOURCE`、`DEPENDENCY_MODULE_CONTAINER_TARGET` と
+exact source/target を readback します。両 layout の acceptance command は
+`devcontainer up --workspace-folder .` であり、layout env/readback が一致しない、
+source が repository root 以外、target が `/workspace/<basename>` 以外、または
+topic root/sibling/parent workspace が bind された場合は startup design failure です。
 
 ## VS Code surface の責務境界
 
 依存 source clone の表示・構成のために、VS Code multi-root workspace、
 `*.code-workspace`、`workspace.json`、その他の editor workspace metadata を
-作成、更新、管理、または要求してはなりません。`prepare` が返す
-`PARENT_ROOT`、`SOURCE_CLONE`、`CONTINUE_PATH` は filesystem / lifecycle と
-devcontainer mount の path contract であり、VS Code workspace の構成入力では
-ありません。
+作成、更新、管理、または要求してはなりません。generic lifecycle の
+`prepare` が返す `SOURCE_CLONE` は filesystem / lifecycle と devcontainer
+mount の path contract であり、VS Code workspace の構成入力ではありません。
 
-この禁止は `.vscode/` の共有 extension/settings/tasks surface を変更しません。
-`.vscode/` は親所有の regular directory container とし、template と derived repo
-には `vendor/agent-canon/.vscode` の共有ファイルを個別 symlink として公開します。
-共有面は推奨 extension、repository 間で安全な editor defaults、共有 validation
-task を所有しますが、dependency clone 群の構成責務は所有しません。個人の
-editor state、machine-local settings、host-specific path、project/product 固有の
-command は共有面に置きません。
+この禁止は `.vscode/` の shared projection を作りません。`.vscode/` は存在する
+場合に親が所有する regular directory であり、追加ファイル、editor state、
+machine-local settings、host-specific path、project/product 固有 command は親の
+contract に残します。Standalone AgentCanon は自身の regular 4-file `.vscode`
+source を検証できますが、親へ mirror しません。
 
 ## Validation
 
@@ -173,8 +221,8 @@ also run:
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  bash tools/sync_agent_canon.sh link-root
-bash tools/sync_agent_canon.sh check
+  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
 make agent-canon-pr-check
 make ci
 ```

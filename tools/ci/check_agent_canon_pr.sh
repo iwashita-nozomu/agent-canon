@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract tool
-# responsibility Checks agent canon pr CI readiness.
+# responsibility Checks AgentCanon PR readiness including source-owned dependency completeness.
 # upstream design ../../tools/README.md shared automation index
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md shared canon PR workflow
+# upstream design ../../documents/design/source-owned-dependency-validation.md source-owned PR acceptance contract
+# upstream design ../../documents/design/dependency-manifest-design.md manifest DSL projection
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone AgentCanon PR checklist
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template AgentCanon PR checklist
 # upstream design ../../templates/documents/github/pull-request/agent_canon.md canonical template-side AgentCanon PR checklist
-# upstream implementation ../agent_tools/run_repo_dependency_review.sh strict dependency review
+# upstream implementation ../agent_tools/run_repo_dependency_review.sh strict source dependency review
+# upstream implementation ./run_pr_dependency_source_gate.sh owns no-runtime PR dependency completeness
+# upstream implementation ./pr_gate_receipt.py owns source/skipped receipt schema and binding validation
+# downstream implementation ./run_all_checks.sh consumes the live receipt before producer cleanup
+# upstream implementation ../agent_tools/parent_root_side_effects.py owns PR scratch, archive, and child execution boundaries
+# upstream implementation ./agent_canon_pr_graph_selector.py selects trusted changed-path evidence for source review scope
 # upstream implementation ../agent_tools/evaluate_skill_workflow_prompts.py skill/workflow prompt parity eval
 # upstream implementation ../agent_tools/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
 # upstream implementation ../agent_tools/generated_artifact_guard.py rejects regenerated report leftovers before PR check pass
@@ -15,8 +22,10 @@
 # upstream implementation ../agent_tools/check_convention_compliance.py convention gate wiring eval
 # upstream implementation ../agent_tools/skill_tool_commands.py runtime skill command packet gate
 # upstream implementation ../agent_tools/update_lifecycle_contract.py owns G1-G3 receipt identity.
+# upstream implementation ../../rust/agent-canon/src/memory.rs owns memory CLI validation reused by the Rust build gate.
 # upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
-# upstream implementation ./run_all_checks.sh quick CI implementation
+# upstream implementation ../ci/run_python_quality_checks.sh owns shared Python static quality checks
+# downstream implementation ../../tests/tools/test_agent_canon_pr_dependency_source_gate.py verifies source-only dependency routing
 # @dependency-end
 
 set -euo pipefail
@@ -27,33 +36,83 @@ if [[ "$#" -ne 0 ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-SUPERPROJECT_ROOT="$(git -C "${SCRIPT_DIR}" rev-parse --show-superproject-working-tree 2>/dev/null || true)"
-if [ -n "${SUPERPROJECT_ROOT}" ]; then
-  WORKSPACE_ROOT="${SUPERPROJECT_ROOT}"
-else
-  WORKSPACE_ROOT="$(git -C "${SCRIPT_DIR}" rev-parse --show-toplevel)"
+source "${SCRIPT_DIR}/../lib/repo_paths.sh"
+WORKSPACE_ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
+CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "${WORKSPACE_ROOT}")"
+CANON_SYNC_TOOL="${CANON_TOOLS_ROOT}/sync_agent_canon.sh"
+if [ ! -f "${CANON_SYNC_TOOL}" ]; then
+  CANON_SYNC_TOOL="${CANON_TOOLS_ROOT}/agent-canon/sync_agent_canon.sh"
+fi
+if [ ! -f "${CANON_SYNC_TOOL}" ]; then
+  echo "AGENT_CANON_PR_SOURCE_TOOLS_ROOT=missing"
+  echo "AGENT_CANON_PR_SOURCE_TOOLS_REASON=agent_canon_source_tools_root_resolve_failed"
+  exit 1
+fi
+AGENT_CANON_CLI_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR:-${WORKSPACE_ROOT}/.agent-canon/cache/cargo-target}"
+AGENT_CANON_BOUNDARY_SCRIPT="${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py"
+AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}"
+if [ ! -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ] \
+  && [ -f "${WORKSPACE_ROOT}/vendor/agent-canon/rust/agent-canon/Cargo.toml" ]; then
+  AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
 fi
 cd "${WORKSPACE_ROOT}"
-
-AGENT_CANON_PR_TEMP_ROOT_CREATED=0
-if [[ -z "${AGENT_CANON_PR_TEMP_ROOT:-}" ]]; then
-  AGENT_CANON_PR_TEMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/agent-canon-pr-check.XXXXXX")"
-  AGENT_CANON_PR_TEMP_ROOT_CREATED=1
+export AGENT_CANON_PARENT_ROOT="${WORKSPACE_ROOT}"
+export AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${WORKSPACE_ROOT}"
+if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "agent-canon-pr-script" ]]; then
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" verify-child \
+    --root "${WORKSPACE_ROOT}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose agent-canon-pr-script \
+    --consume >/dev/null
+else
+  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${WORKSPACE_ROOT}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose agent-canon-pr-script \
+    --issue-handoff \
+    -- bash "${BASH_SOURCE[0]}"
 fi
-PR_GATE_RECEIPT="${AGENT_CANON_PR_TEMP_ROOT}/pr-gate-prepared.receipt"
+unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
+AGENT_CANON_CLI_TARGET_DIR="$(
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" resolve \
+    --root "${WORKSPACE_ROOT}" \
+    --candidate "${AGENT_CANON_CLI_TARGET_DIR}" \
+    --purpose agent-canon-pr-cli-target
+)"
+
+AGENT_CANON_PR_TEMP_BASE="${AGENT_CANON_PR_TEMP_ROOT:-${WORKSPACE_ROOT}/.agent-canon/tmp}"
+AGENT_CANON_PR_TEMP_BASE="$(
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" ensure-dir \
+    --root "${WORKSPACE_ROOT}" \
+    --candidate "${AGENT_CANON_PR_TEMP_BASE}" \
+    --purpose agent-canon-pr-temp-base
+)"
+AGENT_CANON_PR_TEMP_ROOT="$(
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" temp-dir \
+    --root "${WORKSPACE_ROOT}" \
+    --candidate "${AGENT_CANON_PR_TEMP_BASE}" \
+    --prefix pr-check. \
+    --purpose agent-canon-pr
+)"
+# Keep static-gate unit scratch under the authenticated parent-owned lifecycle.
+export TMPDIR="${AGENT_CANON_PR_TEMP_ROOT}"
+PR_GATE_RECEIPT="${AGENT_CANON_PR_TEMP_ROOT}/pr-gate-source.receipt"
 cleanup_agent_canon_pr_temp_root() {
-  if [[ -n "${PR_GATE_RECEIPT:-}" ]]; then
-    rm -f -- "${PR_GATE_RECEIPT}" 2>/dev/null || true
+  local status=$?
+  local cleanup_status=0
+  trap - EXIT
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" remove-tree \
+    --root "${WORKSPACE_ROOT}" \
+    --candidate "${AGENT_CANON_PR_TEMP_ROOT}" \
+    --purpose agent-canon-pr-cleanup >/dev/null || cleanup_status=$?
+  if [[ "$status" -eq 0 && "$cleanup_status" -ne 0 ]]; then
+    status=$cleanup_status
   fi
-  if [[ "${AGENT_CANON_PR_TEMP_ROOT_CREATED}" -eq 1 ]]; then
-    rm -rf "${AGENT_CANON_PR_TEMP_ROOT}"
-  fi
+  exit "$status"
 }
 trap cleanup_agent_canon_pr_temp_root EXIT
 PR_DEPENDENCY_REVIEW_DIR="${AGENT_CANON_PR_TEMP_ROOT}/dependency-review/agent-canon-pr"
 PR_AGENT_EVAL_LOG_DIR="${AGENT_CANON_PR_TEMP_ROOT}/agent-eval-runs/agent-canon-pr-gate"
-PR_RUN_ALL_CHECKS_LOG_DIR="${AGENT_CANON_PR_TEMP_ROOT}/agent-eval-runs/run-all-checks"
-PR_QUICK_CI_ARGS=(--quick --skip-docs --skip-github-workflows)
 AGENT_CANON_G1_BUNDLE_ACTIVE=0
 if [[ -d vendor/agent-canon && -f .gitmodules ]]; then
   PR_AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
@@ -61,7 +120,12 @@ else
   PR_AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}"
 fi
 PR_HOOK_ARCHIVE_DIR="${AGENT_CANON_HOOK_ARCHIVE_DIR:-${PR_AGENT_CANON_SOURCE_ROOT}/.agent-canon/log-archive}"
-mkdir -p "${PR_HOOK_ARCHIVE_DIR}"
+PR_HOOK_ARCHIVE_DIR="$(
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" ensure-dir \
+    --root "${WORKSPACE_ROOT}" \
+    --candidate "${PR_HOOK_ARCHIVE_DIR}" \
+    --purpose agent-canon-pr-hook-archive
+)"
 
 REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
 AGENT_CANON_GITHUB_REPO="${AGENT_CANON_GITHUB_REPO:-iwashita-nozomu/agent-canon}"
@@ -77,20 +141,22 @@ else
 fi
 run_direct_agent_checks() {
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
-    bash tools/sync_agent_canon.sh check
+    bash "${CANON_SYNC_TOOL}" check
   else
     echo "SHARED_SURFACE_DRIFT=not_applicable_standalone_source"
   fi
-  python3 tools/agent_tools/check_agent_runtime_alignment.py
-  AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
-    python3 tools/agent_tools/evaluate_codex_agent_roles.py --accumulate
-  AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
-    python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml --accumulate
+  run_convention_compliance_gate
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/skill_tool_commands.py" check
+}
+
+run_convention_compliance_gate() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json
 }
 
 run_shared_surface_status() {
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
-    bash tools/sync_agent_canon.sh status
+    bash "${CANON_SYNC_TOOL}" status
   else
     echo "SHARED_SURFACE_STATUS=not_applicable_standalone_source"
   fi
@@ -98,10 +164,162 @@ run_shared_surface_status() {
 
 run_shared_surface_check() {
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
-    bash tools/sync_agent_canon.sh check
+    bash "${CANON_SYNC_TOOL}" check
   else
     echo "SHARED_SURFACE_DRIFT=not_applicable_standalone_source"
   fi
+}
+
+run_agent_canon() {
+  local command=()
+  if [ -x "${CANON_TOOLS_ROOT}/bin/agent-canon" ]; then
+    command=("${CANON_TOOLS_ROOT}/bin/agent-canon" "$@")
+  elif [ -x "${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon" ]; then
+    command=("${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon" "$@")
+  elif [ -x "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/debug/agent-canon" ]; then
+    command=("${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/debug/agent-canon" "$@")
+  elif [ -x "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/release/agent-canon" ]; then
+    command=("${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/release/agent-canon" "$@")
+  elif command -v cargo >/dev/null 2>&1 \
+    && [ -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ]; then
+    command=(cargo run --quiet --manifest-path "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" -- "$@")
+  else
+    echo "AGENT_CANON_CLI_BLOCKER=agent_canon_cli_unavailable" >&2
+    echo "AGENT_CANON_CLI_REASON=agent-canon CLI binary/shim missing and cargo route unavailable" >&2
+    return 127
+  fi
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${WORKSPACE_ROOT}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    -- "${command[@]}"
+  return $?
+}
+
+PR_GATE_DEPENDENCY_SOURCE_REASON=""
+PR_GATE_DEPENDENCY_SOURCE_EVIDENCE=""
+PR_GATE_DEPENDENCY_GRAPH_BASE_SHA=""
+PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET=""
+AGENT_CANON_PR_SUBMODULE_SNAPSHOT_READY=0
+AGENT_CANON_PR_SUBMODULE_STATUS=""
+AGENT_CANON_PR_SUBMODULE_GITMODULES_URL=""
+AGENT_CANON_PR_SUBMODULE_MODE=""
+AGENT_CANON_PR_SUBMODULE_PIN=""
+AGENT_CANON_PR_SUBMODULE_HEAD=""
+
+agentcanon_pr_submodule_snapshot() {
+  if [[ "${AGENT_CANON_REPOSITORY_MODE}" != "template_or_derived" ]]; then
+    return 1
+  fi
+  if [[ "${AGENT_CANON_PR_SUBMODULE_SNAPSHOT_READY}" -eq 1 ]]; then
+    return 0
+  fi
+  AGENT_CANON_PR_SUBMODULE_STATUS="$(git submodule status vendor/agent-canon 2>/dev/null || true)"
+  AGENT_CANON_PR_SUBMODULE_GITMODULES_URL="$(git config -f .gitmodules --get submodule.vendor/agent-canon.url 2>/dev/null || true)"
+  AGENT_CANON_PR_SUBMODULE_MODE="$(git ls-tree HEAD vendor/agent-canon 2>/dev/null | awk '{print $1}')"
+  AGENT_CANON_PR_SUBMODULE_PIN="$(git rev-parse HEAD:vendor/agent-canon 2>/dev/null || true)"
+  AGENT_CANON_PR_SUBMODULE_HEAD="$(git -C vendor/agent-canon rev-parse HEAD 2>/dev/null || true)"
+  AGENT_CANON_PR_SUBMODULE_SNAPSHOT_READY=1
+}
+
+agentcanon_pr_dependency_graph_required() {
+  local base_fetch_output=""
+  local base_fetch_rc=0
+  local base_fetch_status=""
+  local trusted_base_sha=""
+  local selector_output=""
+  local selector_rc=0
+  local selector_status=""
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" ensure-dir \
+    --root "${WORKSPACE_ROOT}" \
+    --candidate "${PR_DEPENDENCY_REVIEW_DIR}" \
+    --purpose agent-canon-pr-dependency-review >/dev/null
+  PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET="${PR_DEPENDENCY_REVIEW_DIR}/changed-paths.json"
+  local selector_args=(
+    --root "${WORKSPACE_ROOT}"
+    --source-root "${AGENT_CANON_SOURCE_ROOT}"
+    --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}"
+  )
+
+  if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
+    echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=required reason=standalone_source"
+    PR_GATE_DEPENDENCY_SOURCE_REASON="standalone_source"
+    PR_GATE_DEPENDENCY_SOURCE_EVIDENCE="source_root=${AGENT_CANON_SOURCE_ROOT}"
+  fi
+  if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+    if base_fetch_output="$(python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py" \
+      --root "${WORKSPACE_ROOT}" \
+      --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+      --prepare-ci-base)"; then
+      base_fetch_rc=0
+    else
+      base_fetch_rc=$?
+    fi
+    printf '%s\n' "${base_fetch_output}"
+    base_fetch_status="$(awk -F= '$1 == "AGENT_CANON_PR_BASE_FETCH" {print $2}' <<<"${base_fetch_output}")"
+    trusted_base_sha="$(awk -F= '$1 == "AGENT_CANON_PR_TRUSTED_BASE_SHA" {print $2}' <<<"${base_fetch_output}")"
+    if [[ "${base_fetch_rc}:${base_fetch_status}" != "0:pass" || -z "${trusted_base_sha}" ]]; then
+      PR_GATE_DEPENDENCY_SOURCE_REASON="$(awk -F= '$1 == "AGENT_CANON_PR_BASE_FETCH_REASON" {sub(/^[^=]*=/, ""); print}' <<<"${base_fetch_output}")"
+      PR_GATE_DEPENDENCY_SOURCE_EVIDENCE="$(awk -F= '$1 == "AGENT_CANON_PR_BASE_FETCH_EVIDENCE" {sub(/^[^=]*=/, ""); print}' <<<"${base_fetch_output}")"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=fail"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON=${PR_GATE_DEPENDENCY_SOURCE_REASON:-pr_base_fetch_failed}"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE=${PR_GATE_DEPENDENCY_SOURCE_EVIDENCE:-base_fetch_status_missing}"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR=fail rc=${base_fetch_rc} status=${base_fetch_status:-missing}" >&2
+      return 2
+    fi
+    selector_args+=(--trusted-base-sha "${trusted_base_sha}")
+  else
+    if ! trusted_base_sha="$(
+      git rev-parse --verify --end-of-options 'origin/main^{commit}' 2>/dev/null
+    )"; then
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=fail"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON=local_trusted_base_tracking_ref_unavailable"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE=source=origin/main"
+      return 2
+    fi
+    if [[ ! "${trusted_base_sha}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=fail"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON=local_trusted_base_tracking_ref_invalid"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE=source=origin/main"
+      return 2
+    fi
+    selector_args+=(--trusted-base-sha "${trusted_base_sha}")
+  fi
+  if selector_output="$(python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py" \
+    "${selector_args[@]}")"; then
+    selector_rc=0
+  else
+    selector_rc=$?
+  fi
+  printf '%s\n' "${selector_output}"
+  selector_status="$(awk -F= '$1 == "AGENT_CANON_PR_DEPENDENCY_GRAPH" {print $2}' <<<"${selector_output}")"
+  PR_GATE_DEPENDENCY_SOURCE_REASON="$(awk -F= '$1 == "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON" {sub(/^[^=]*=/, ""); print}' <<<"${selector_output}")"
+  PR_GATE_DEPENDENCY_SOURCE_EVIDENCE="$(awk -F= '$1 == "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE" {sub(/^[^=]*=/, ""); print}' <<<"${selector_output}")"
+  PR_GATE_DEPENDENCY_GRAPH_BASE_SHA="$(awk -v RS=';' -F= '$1 == "base" {print $2}' <<<"${PR_GATE_DEPENDENCY_SOURCE_EVIDENCE}")"
+  case "${selector_rc}:${selector_status}" in
+    0:required)
+      if [[ ! "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+        echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR=fail reason=selected_base_missing" >&2
+        return 2
+      fi
+      if [[ ! -f "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" ]]; then
+        echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR=fail reason=changed_path_packet_missing" >&2
+        return 2
+      fi
+      return 0
+      ;;
+    10:skipped)
+      if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
+        PR_GATE_DEPENDENCY_SOURCE_REASON="standalone_source"
+        PR_GATE_DEPENDENCY_SOURCE_EVIDENCE="${PR_GATE_DEPENDENCY_SOURCE_EVIDENCE};standalone_full_graph=yes"
+        return 0
+      fi
+      return 1
+      ;;
+    *)
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR=fail rc=${selector_rc} status=${selector_status:-missing}" >&2
+      return 2
+      ;;
+  esac
 }
 
 agentcanon_pr_branch_dirty() {
@@ -113,91 +331,74 @@ agentcanon_pr_branch_dirty() {
   [[ -n "${submodule_dirty}" ]]
 }
 
-agentcanon_pr_branch_pending() {
-  local submodule_head=""
-  local parent_pin=""
-  local remote_main=""
-  if [[ "${AGENT_CANON_REPOSITORY_MODE}" != "template_or_derived" ]]; then
-    return 1
-  fi
-  if agentcanon_pr_branch_dirty; then
-    return 1
-  fi
-  submodule_head="$(git -C vendor/agent-canon rev-parse HEAD 2>/dev/null || true)"
-  parent_pin="$(git rev-parse HEAD:vendor/agent-canon 2>/dev/null || true)"
-  if [[ -z "${submodule_head}" || -z "${parent_pin}" ]]; then
-    return 1
-  fi
-  if [[ "${submodule_head}" != "${parent_pin}" ]]; then
-    return 0
-  fi
-  git -C vendor/agent-canon fetch origin main >/dev/null 2>&1 || true
-  remote_main="$(git -C vendor/agent-canon rev-parse origin/main 2>/dev/null || true)"
-  if [[ -z "${remote_main}" || "${parent_pin}" != "${remote_main}" ]]; then
-    return 0
-  fi
-  return 1
-}
-
 run_pr_agent_checks() {
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
     run_standalone_static_gate_ci
     return
   fi
   if agentcanon_pr_branch_dirty; then
-    echo "AGENT_CANON_PR_LATEST_GATE=blocked_dirty_agentcanon_branch"
-    echo "AGENT_CANON_PR_LATEST_NEXT=commit_agentcanon_artifacts_or_explicitly_stash_non_artifact_changes_then_rerun_agent-canon-pr-check"
-    return 1
+    echo "AGENT_CANON_PR_LATEST_DIRTY_AGENTCANON_WORKTREE=yes"
+    echo "AGENT_CANON_PR_LATEST_NEXT=run_make_agent-canon-ensure-latest_with_dirty_worktree_preserved"
   fi
-  if agentcanon_pr_branch_pending; then
-    echo "AGENT_CANON_PR_LATEST_GATE=deferred_branch_pr"
-    echo "AGENT_CANON_PR_LATEST_NEXT=commit_push_agentcanon_branch_then_after_merge_run_make_agent-canon-ensure-latest"
-    run_direct_agent_checks
-    return
-  fi
-  if [[ -f Makefile ]] && grep -qE "^[.]?PHONY:.*\\bagent-checks\\b|^agent-checks:" Makefile; then
-    make agent-checks
-  else
-    bash tools/ci/check_agent_canon_latest.sh
-    run_direct_agent_checks
-  fi
+  # Derived parents delegate project tests/type/lint to the parent's selected
+  # CI job; this route owns only shared AgentCanon surfaces.
+  run_direct_agent_checks
 }
 
-run_pr_quick_ci() {
+run_pr_project_quality_boundary() {
+  local owner="parent_ci"
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
-    echo "AGENT_CANON_PR_QUICK_CI=consumed_standalone_static_gate_receipt"
-    return
+    owner="agentcanon_project_ci"
   fi
-  if agentcanon_pr_branch_dirty; then
-    echo "AGENT_CANON_PR_CI_LATEST_GATE=blocked_dirty_agentcanon_branch"
-    echo "AGENT_CANON_PR_CI_NEXT=commit_agentcanon_artifacts_or_explicitly_stash_non_artifact_changes_then_rerun_agent-canon-pr-check"
-    return 1
-  fi
-  if agentcanon_pr_branch_pending; then
-    echo "AGENT_CANON_PR_CI_LATEST_GATE=deferred_branch_pr"
-    echo "AGENT_CANON_PR_CI_COMMAND=bash tools/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]} --pr-gate-receipt ${PR_GATE_RECEIPT}"
-    AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" \
-      bash tools/ci/run_all_checks.sh "${PR_QUICK_CI_ARGS[@]}" --pr-gate-receipt "${PR_GATE_RECEIPT}"
-    return
-  fi
-  echo "AGENT_CANON_PR_CI_COMMAND=bash tools/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]} --pr-gate-receipt ${PR_GATE_RECEIPT}"
-  AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" \
-    bash tools/ci/run_all_checks.sh "${PR_QUICK_CI_ARGS[@]}" --pr-gate-receipt "${PR_GATE_RECEIPT}"
+  echo "AGENT_CANON_PR_PROJECT_QUALITY=delegated"
+  echo "AGENT_CANON_PR_PROJECT_QUALITY_OWNER=${owner}"
+  echo "AGENT_CANON_PR_PROJECT_QUALITY_WORKFLOW=external_required_job"
+  return 0
 }
 
 write_pr_gate_receipt() {
-  local root_identity=""
-  if ! root_identity="$(realpath -e "${WORKSPACE_ROOT}")"; then
-    echo "Unable to record PR gate root identity" >&2
+  local source_status="${1:-}"
+  local selector_reason="${2:-}"
+  local selector_evidence="${3:-}"
+  local published_path=""
+  if ! published_path="$(python3 "${CANON_TOOLS_ROOT}/ci/pr_gate_receipt.py" write \
+    --root "${WORKSPACE_ROOT}" \
+    --parent-pid "$$" \
+    --status "${source_status}" \
+    --selector-reason "${selector_reason}" \
+    --selector-evidence "${selector_evidence}" \
+    | python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" write \
+    --root "${WORKSPACE_ROOT}" \
+    --candidate "${PR_GATE_RECEIPT}" \
+    --purpose agent-canon-pr-receipt)"; then
+    echo "AGENT_CANON_PR_GATE_RECEIPT=write_failed" >&2
     return 1
   fi
-  {
-    printf 'owner=check_agent_canon_pr.sh\n'
-    printf 'root_identity=%s\n' "${root_identity}"
-    printf 'parent_pid=%s\n' "$$"
-    printf 'strict_dependency=prepared\n'
-    printf 'graph=prepared\n'
-  } >"${PR_GATE_RECEIPT}"
+  if [[ "${published_path}" != "${PR_GATE_RECEIPT}" ]]; then
+    echo "AGENT_CANON_PR_GATE_RECEIPT=path_mismatch" >&2
+    return 1
+  fi
+  echo "AGENT_CANON_PR_GATE_RECEIPT=${PR_GATE_RECEIPT}"
+}
+
+consume_pr_gate_receipt() {
+  local consumer_command=(
+    bash "${SCRIPT_DIR}/run_all_checks.sh"
+    --quick
+    --skip-docs
+    --skip-github-workflows
+    --skip-experiments
+    --pr-gate-receipt "${PR_GATE_RECEIPT}"
+    --pr-gate-parent-pid "$$"
+  )
+  echo "AGENT_CANON_PR_GATE_RECEIPT_HANDOFF=starting"
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${WORKSPACE_ROOT}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose run-all-checks-script \
+    --issue-handoff \
+    -- "${consumer_command[@]}"
+  echo "AGENT_CANON_PR_GATE_RECEIPT_HANDOFF=consumed"
 }
 
 consume_source_correctness_receipt() {
@@ -243,26 +444,12 @@ emit_generated_completeness_receipt() {
 }
 
 run_standalone_static_gate_ci() {
-  cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check
-  cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D warnings
-  cargo test --manifest-path rust/agent-canon/Cargo.toml
-  python3 tools/agent_tools/tool_catalog.py
-  python3 tools/agent_tools/tool_proof_coverage.py
-  python3 tools/agent_tools/responsibility_scope.py
-  BASE_REF="${GITHUB_BASE_REF:-main}"
-  git fetch origin "${BASE_REF}" --depth=1 || true
-  python3 tools/agent_tools/import_responsibility.py --changed --baseline-ref "origin/${BASE_REF}"
-  python3 tools/agent_tools/issue_sync.py
-  AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
-    python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate --log-dir "${PR_AGENT_EVAL_LOG_DIR}"
-  AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
-    python3 tools/agent_tools/eval_accumulation_check.py
-  python3 tools/agent_tools/check_agent_runtime_alignment.py
-  python3 tools/agent_tools/smoke_test_research_perspective_pack.py
-  python3 tools/agent_tools/check_convention_compliance.py
-  python3 tools/agent_tools/skill_tool_commands.py check
-  python3 tools/ci/check_github_workflows.py
-  python3 tools/ci/container_config.py
+  local unit
+  local units=(rust contracts eval workflow-container)
+  for unit in "${units[@]}"; do
+    AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
+      bash "${SCRIPT_DIR}/run_standalone_static_gate_unit.sh" "${unit}"
+  done
 }
 
 github_repo_security_status() {
@@ -313,14 +500,12 @@ echo "agent_canon_repository_mode=${AGENT_CANON_REPOSITORY_MODE}"
 echo "agent_canon_remote=${REMOTE_URL}"
 consume_source_correctness_receipt
 if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
-  echo "agent_canon_submodule_status=$(git submodule status vendor/agent-canon 2>/dev/null || true)"
-  agent_canon_gitmodules_url="$(git config -f .gitmodules --get submodule.vendor/agent-canon.url 2>/dev/null || true)"
-  agent_canon_submodule_mode="$(git ls-tree HEAD vendor/agent-canon 2>/dev/null | awk '{print $1}')"
-  agent_canon_submodule_pin="$(git rev-parse HEAD:vendor/agent-canon 2>/dev/null || true)"
-  echo "agent_canon_gitmodules_url=${agent_canon_gitmodules_url:-<missing>}"
-  echo "agent_canon_submodule_mode=${agent_canon_submodule_mode:-<missing>}"
-  echo "agent_canon_submodule_pin=${agent_canon_submodule_pin:-<missing>}"
-  if [[ -z "$agent_canon_gitmodules_url" || "$agent_canon_submodule_mode" != "160000" || -z "$agent_canon_submodule_pin" ]]; then
+  agentcanon_pr_submodule_snapshot
+  echo "agent_canon_submodule_status=${AGENT_CANON_PR_SUBMODULE_STATUS}"
+  echo "agent_canon_gitmodules_url=${AGENT_CANON_PR_SUBMODULE_GITMODULES_URL:-<missing>}"
+  echo "agent_canon_submodule_mode=${AGENT_CANON_PR_SUBMODULE_MODE:-<missing>}"
+  echo "agent_canon_submodule_pin=${AGENT_CANON_PR_SUBMODULE_PIN:-<missing>}"
+  if [[ -z "$AGENT_CANON_PR_SUBMODULE_GITMODULES_URL" || "$AGENT_CANON_PR_SUBMODULE_MODE" != "160000" || -z "$AGENT_CANON_PR_SUBMODULE_PIN" ]]; then
     echo "AGENT_CANON_SUBMODULE_EVIDENCE=fail"
     exit 1
   fi
@@ -344,7 +529,7 @@ echo ""
 
 echo "2b️⃣  GitHub workflow and PR template checks"
 if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
-  python3 tools/ci/check_github_workflows.py
+  python3 "${CANON_TOOLS_ROOT}/ci/check_github_workflows.py"
 else
   echo "GITHUB_WORKFLOW_CHECK=owned_by_standalone_static_gate"
 fi
@@ -363,32 +548,70 @@ echo "5️⃣  agent runtime checks"
 run_pr_agent_checks
 echo ""
 
-echo "6️⃣  strict dependency review"
-# This graph build is the producer for the strict dependency review and the
-# prepared graph consumers in the subsequent quick CI invocation.
-tools/bin/agent-canon graph build --root . --profile default --format json
-if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
-  python3 tools/agent_tools/tool_drift.py
+echo "6️⃣  dependency source completeness"
+PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped
+PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC=0
+PR_GATE_DEPENDENCY_GRAPH_REQUIRED=0
+if agentcanon_pr_dependency_graph_required; then
+  PR_GATE_DEPENDENCY_GRAPH_REQUIRED=1
+else
+  PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC=$?
+  if [[ "${PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC}" -ne 1 ]]; then
+    echo "AGENT_CANON_PR_DEPENDENCY_SOURCE_GATE=selector_failed"
+    exit "${PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC}"
+  fi
 fi
-bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
-python3 tools/agent_tools/render_dependency_manifest_graph.py \
-  --root . \
-  --scope full \
-  --markdown-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.md" \
-  --dot-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.dot"
-write_pr_gate_receipt
+
+source_gate_output=""
+source_gate_rc=0
+if source_gate_output="$(bash "${CANON_TOOLS_ROOT}/ci/run_pr_dependency_source_gate.sh" \
+  --root "${WORKSPACE_ROOT}" \
+  --tools-root "${CANON_TOOLS_ROOT}" \
+  --report-dir "${PR_DEPENDENCY_REVIEW_DIR}" \
+  --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" \
+  --trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" \
+  --repository-mode "${AGENT_CANON_REPOSITORY_MODE}" \
+  --source-review-required "${PR_GATE_DEPENDENCY_GRAPH_REQUIRED}")"; then
+  source_gate_rc=0
+else
+  source_gate_rc=$?
+fi
+printf '%s\n' "${source_gate_output}"
+source_gate_status="$(awk -F= '$1 == "AGENT_CANON_PR_DEPENDENCY_SOURCE" {print $2}' <<<"${source_gate_output}")"
+case "${source_gate_rc}:${source_gate_status}" in
+  0:source)
+    PR_GATE_DEPENDENCY_SOURCE_STATUS=source
+    echo "AGENT_CANON_PR_DEPENDENCY_SOURCE_GATE=source_validated"
+    ;;
+  0:skipped)
+    PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped
+    echo "AGENT_CANON_PR_DEPENDENCY_SOURCE_GATE=not_required"
+    ;;
+  *)
+    echo "AGENT_CANON_PR_DEPENDENCY_SOURCE_GATE=source_gate_failed rc=${source_gate_rc} status=${source_gate_status:-missing}"
+    if [[ "${source_gate_rc}" -eq 0 ]]; then
+      exit 2
+    fi
+    exit "${source_gate_rc}"
+    ;;
+esac
+write_pr_gate_receipt \
+  "${PR_GATE_DEPENDENCY_SOURCE_STATUS}" \
+  "${PR_GATE_DEPENDENCY_SOURCE_REASON}" \
+  "${PR_GATE_DEPENDENCY_SOURCE_EVIDENCE}"
+consume_pr_gate_receipt
 echo ""
 
 echo "7️⃣  documentation checks"
-tools/bin/agent-canon docs check
+run_agent_canon docs check
 echo ""
 
-echo "8️⃣  repository quick CI"
-run_pr_quick_ci
+echo "8️⃣  project quality ownership boundary"
+run_pr_project_quality_boundary
 echo ""
 
 echo "8b️⃣  generated artifact guard"
-python3 tools/agent_tools/generated_artifact_guard.py --root "${WORKSPACE_ROOT}"
+python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"
 echo ""
 
 emit_generated_completeness_receipt

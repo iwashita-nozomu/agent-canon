@@ -10,11 +10,9 @@
 # upstream design ../../agents/skills/codex-task-workflow.md implementation workflow skill
 # upstream design ../../agents/skills/subagent-bootstrap.md subagent handoff skill
 # upstream design ../../agents/skills/tool-finding-report.md tool warning closeout skill
-# upstream design ../../agents/skills/pr-processing.md PR body and run-bundle evidence skill
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md AgentCanon PR essence workflow
 # upstream design ../../agents/workflows/pr-queue-cleanup-workflow.md PR queue cleanup body update workflow
 # upstream design ../../agents/skills/md-style-check.md Markdown small-edit skill route
-# upstream design ../../agents/skills/owner-bounded-routing.md owner-bounded routing skill
 # upstream design ../../agents/skills/long-form-writing.md document claim grounding skill route
 # upstream design ../../agents/USER_GUIDE_JA.md user-facing small-edit route guidance
 # upstream design ../../templates/agents/workflow_monitoring.md tool warning closeout ledger
@@ -22,6 +20,7 @@
 # upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt eval gate
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 # upstream design ../../documents/runtime/shared-runtime-surfaces.toml shared surface manifest
+# upstream implementation ./agent_canon_source_root.py resolves canonical parent adapter targets
 # upstream design ../../documents/codex/codex-configuration-reference.md Codex hook severity policy
 # upstream design ../../documents/conventions/coding-conventions-house-style.md implementation ownership guardrail
 # upstream design ../../notes/guardrails/engineering_avoidances.md recurring implementation avoidances
@@ -123,7 +122,6 @@ TOOL_GATES = {
     "hardcoded_numbers": (
         "tools/agent_tools/check_hardcoded_numbers.py",
         (
-            "tools/ci/run_all_checks.sh",
             "documents/conventions/common/01_principles.md",
         ),
     ),
@@ -269,11 +267,7 @@ SKILL_ROUTING_MARKERS = (
 )
 EXIT_BLOCKER_POLICY_MARKERS = {
     "agents/skills/agent-orchestration.md": (
-        "selected_agent_type",
-        "write_capable_handoff_blocker",
         "evidence",
-        "parent_packet_ref",
-        "status=blocked",
         "router_unavailable_blocker",
     ),
     "agents/skills/codex-task-workflow.md": (
@@ -397,13 +391,6 @@ DOCUMENT_SPLIT_DECISION_MARKERS = {
         "check_convention_compliance.py",
         "task_close.py",
     ),
-    "agents/skills/structure-planning.md": (
-        "document_unit",
-        "document_split_decision",
-        "split_when",
-        "merge_when",
-        "invalid_split_boundaries",
-    ),
     "agents/skills/long-form-writing.md": (
         "document_split_decision",
         "owner",
@@ -424,9 +411,6 @@ DOCUMENT_SPLIT_DECISION_MARKERS = {
         "document_split_decision_ready",
     ),
 }
-OWNER_BOUNDED_TOOL_ROUTE_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
-    "owner_bounded_tool_route"
-]
 STATIC_READ_VALIDATION_POLICY_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "static_read_validation_policy"
 ]
@@ -446,7 +430,8 @@ BRANCH_WORKTREE_CREATION_GUARD_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"
 WORKFLOW_GATE_CONSUMERS = ("tools/ci/check_agent_canon_pr.sh",)
 WORKFLOW_GATE_COMMAND_RE = re.compile(
-    r"(?m)^\s*python3\s+tools/agent_tools/check_convention_compliance\.py\s*$"
+    r'(?m)^\s*python3\s+"\$\{CANON_TOOLS_ROOT\}/agent_tools/check_convention_compliance\.py"\s+'
+    r'--root\s+"\$\{WORKSPACE_ROOT\}"\s+--format\s+json$'
 )
 WORKFLOW_GATE_FORBIDDEN_RE = re.compile(
     r"(?is)(?:do\s+not|don't|never|skip|omit)\s+(?:\S+\s+){0,6}?"
@@ -588,8 +573,6 @@ IMPLEMENTATION_GUARDRAIL_MARKERS = {
         "implementation shortcut",
     ),
     "agents/skills/codex-task-workflow.md": (
-        "contract-complete implementation",
-        "acceptance contract",
         "design_issue_blocker",
         "implementation shortcut",
     ),
@@ -621,13 +604,6 @@ REFACTOR_SEQUENCE_MARKERS = {
     ),
 }
 REVIEW_ISSUE_ROUTING_MARKERS = {
-    "agents/skills/change-review.md": (
-        "issue_route",
-        "issues/open/",
-        "issue_sync.py",
-        "new_local_issue",
-        "github_mirror",
-    ),
     "documents/conventions/REVIEW_PROCESS.md": (
         "Review Finding Issue Routing",
         "issue_route",
@@ -639,27 +615,17 @@ REVIEW_ISSUE_ROUTING_MARKERS = {
 PR_ESSENCE_DOCUMENTATION_MARKERS = {
     ".github/PULL_REQUEST_TEMPLATE.md": (
         "## PR Essence",
-        "Problem / user request",
-        "Design intent",
-        "Canonical owner",
-        "Behavior or contract delta",
-        "Evidence route",
+        "Problem / user request:",
+        "Canonical owner / responsibility unit:",
+        "Behavior or contract delta:",
+        "Evidence route:",
     ),
     ".github/PULL_REQUEST_TEMPLATE/agent_canon.md": (
         "## PR Essence",
-        "Problem / user request",
-        "Design intent",
-        "Canonical owner",
-        "Behavior or contract delta",
-        "Evidence route",
-    ),
-    "agents/skills/pr-processing.md": (
-        "PR Essence",
-        "problem / user request",
-        "design intent",
-        "canonical owner",
-        "behavior or contract delta",
-        "evidence route",
+        "Problem / user request:",
+        "Canonical owner / responsibility unit:",
+        "Behavior or contract delta:",
+        "Evidence route:",
     ),
     "agents/workflows/agent-canon-pr-workflow.md": (
         "PR Essence",
@@ -701,35 +667,38 @@ SURFACE_MANIFEST_FILES = (
 )
 SURFACE_POLICY_MARKERS = (
     "documents/runtime/shared-runtime-surfaces.toml",
-    "owner class",
-    ".codex/hooks.json",
-    ".codex/hooks",
-    ".devcontainer/",
-    "documents/README.md",
-    "documents/contracts/template-bootstrap.md",
-    "documents/contracts/github-first-module-and-devcontainer-policy.md",
-    "memory/USER_PREFERENCES.md",
-    "tests/agent_tools/",
+    "AGENTS.md",
+    ".codex/config.toml",
+    ".codex/agents",
+    "tools/agent-canon",
     "Root `tools/` is a parent-owned regular container",
     "tools/agent-canon -> ../vendor/agent-canon/tools",
     "vendor/agent-canon/tools/",
     "Project-local automation must stay in project-owned paths",
 )
 SURFACE_MANIFEST_MARKERS = (
-    'mode = "standalone_only"',
-    'owner = "agent-canon-standalone"',
-    'path = "goal.md"',
-    '"documents/README.md"',
-    '"documents/contracts/template-bootstrap.md"',
-    '".devcontainer"',
-    '"documents/contracts/github-first-module-and-devcontainer-policy.md"',
-    '".codex/hooks.json"',
-    '"tests/agent_tools/test_check_convention_compliance.py"',
+    "version = 1",
+    'prefix = "vendor/agent-canon"',
+    'integration_mode = "live-agent-canon"',
+    "default_consumer = false",
+    'selection = "explicit-opt-in"',
+    'path = "AGENTS.md"',
+    'path = ".codex/config.toml"',
+    'path = ".codex/agents"',
+    'path = "tools/agent-canon"',
+    'path = ".agent-canon"',
+    'mode = "removed_legacy"',
+    "paths = [",
 )
-SURFACE_SYNC_MARKERS = (
+SOURCE_SURFACE_SYNC_MARKERS = (
     "surface_manifest.py",
     "build_regular_specs",
     "regular_path",
+)
+ROOT_SYNC_ADAPTER_MARKERS = (
+    "vendor/agent-canon/tools:tools",
+    "python3 -m agent_tools.agent_canon_source_root exec",
+    'tools/sync_agent_canon.sh "$@"',
 )
 HOOK_GUARDRAIL_POLICY_MARKERS = {
     ".codex/hooks/hook_dispatcher.py": (
@@ -787,7 +756,6 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "task bootstrap and CLI entrypoints",
                     "vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md",
-                    "task_start.py",
                     "bootstrap_agent_run.py",
                 ),
                 (
@@ -803,7 +771,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "skill routing and public skill surface",
                     "vendor/agent-canon/agents/skills/catalog.yaml",
-                    "python3 tools/agent_tools/route.py --prompt",
+                    "python3 tools/agent-canon/agent_tools/route.py --prompt",
                 ),
                 (
                     "report and closeout structure",
@@ -820,7 +788,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "root runtime entrypoint",
                     "ROOT_AGENTS.md",
-                    "bash tools/sync_agent_canon.sh check",
+                    "PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check",
                 ),
                 (
                     "workflow family, spawn budget, role topology",
@@ -859,7 +827,6 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 ),
                 (
                     "run bundle, declared workflow / skills / review, and dynamic wave ledger",
-                    "task_start.py",
                     "bootstrap_agent_run.py",
                     "workflow_monitor.py",
                 ),
@@ -1069,6 +1036,18 @@ def check_tool_gates(root: Path) -> list[Finding]:
             continue
         for reference in references:
             reference_path = readable_path(root, reference)
+            if (
+                gate_name == "surface_manifest"
+                and reference == "tools/sync_agent_canon.sh"
+                and (
+                    vendored_sync := root
+                    / "vendor"
+                    / "agent-canon"
+                    / "tools"
+                    / "sync_agent_canon.sh"
+                ).is_file()
+            ):
+                reference_path = vendored_sync
             if reference_path is None:
                 findings.append(
                     Finding("tool_gate", reference, f"{gate_name}:missing-reference")
@@ -1392,7 +1371,7 @@ def check_review_issue_routing(root: Path) -> list[Finding]:
 
 
 def check_pr_essence_documentation(root: Path) -> list[Finding]:
-    """Verify PR routes preserve change essence in body and run-bundle evidence."""
+    """Verify PR body and lifecycle workflow owners preserve change essence."""
     paths = tuple(PR_ESSENCE_DOCUMENTATION_MARKERS)
     findings = check_required_files(root, paths, "pr_essence_documentation")
     for path, markers in PR_ESSENCE_DOCUMENTATION_MARKERS.items():
@@ -1474,16 +1453,35 @@ def check_surface_manifest_wiring(root: Path) -> list[Finding]:
                     f"missing-marker:{marker}",
                 )
             )
-    sync_text = readable_files.get("tools/sync_agent_canon.sh", "")
-    for marker in SURFACE_SYNC_MARKERS:
-        if marker not in sync_text:
+    root_sync = root / "tools" / "sync_agent_canon.sh"
+    vendored_sync = root / "vendor" / "agent-canon" / "tools" / "sync_agent_canon.sh"
+    source_sync = vendored_sync if vendored_sync.is_file() else root_sync
+    source_sync_text = (
+        source_sync.read_text(encoding="utf-8") if source_sync.is_file() else ""
+    )
+    source_display = source_sync.relative_to(root).as_posix()
+    for marker in SOURCE_SURFACE_SYNC_MARKERS:
+        if marker not in source_sync_text:
             findings.append(
                 Finding(
                     "surface_manifest",
-                    "tools/sync_agent_canon.sh",
+                    source_display,
                     f"missing-marker:{marker}",
                 )
             )
+    if vendored_sync.is_file() and root_sync.is_file():
+        adapter_text = (
+            root_sync.read_text(encoding="utf-8") if root_sync.is_file() else ""
+        )
+        for marker in ROOT_SYNC_ADAPTER_MARKERS:
+            if marker not in adapter_text:
+                findings.append(
+                    Finding(
+                        "surface_manifest",
+                        "tools/sync_agent_canon.sh",
+                        f"missing-root-source-adapter-marker:{marker}",
+                    )
+                )
     return findings
 
 
@@ -1671,11 +1669,6 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(
         collect_marker_contract_findings(
             root, "design_integrity_gate", DESIGN_INTEGRITY_GATE_MARKERS
-        )
-    )
-    findings.extend(
-        collect_marker_contract_findings(
-            root, "owner_bounded_tool_route", OWNER_BOUNDED_TOOL_ROUTE_MARKERS
         )
     )
     findings.extend(

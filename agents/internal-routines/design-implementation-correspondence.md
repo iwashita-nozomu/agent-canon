@@ -18,6 +18,15 @@ upstream design ../../documents/design/semantic-responsibility-contract.md seman
 
 このルートは、設計正本と repository-changing implementation の間に一つの対応関係を作るための内部ルートです。読者は、まず `Invariant` と `State Model` を確認し、次に `Stage Ownership`、`Handoff Record`、`Review Readback` の順に読みます。skill 個別の説明、ToolCall schema、実装レビューの詳細は各 owner surface に残し、この文書は共通の遷移と対応キーだけを持ちます。
 
+## Activation Gate
+
+この routine は、public API、behavior、schema、algorithm / state invariant / failure
+semantics、ownership、path、runtime contract のいずれかを変更する実装、または
+request が明示的に design workflow を選択した場合にだけ active です。owner、path、
+targeted validation が固定され、これらの契約を変更しない bounded edit は通常の
+owner route として短い owner/path/validation note で完了し、DIC の traversal、clause
+fingerprint、forward/reverse closure packet は要求しません。
+
 ## Responsibility / Owner Boundaries
 
 | 責務 | 正本 owner | このルートが行うこと | 行わないこと |
@@ -31,7 +40,7 @@ upstream design ../../documents/design/semantic-responsibility-contract.md seman
 
 ## Related Document Closure
 
-この節が Related Document Closure traversal policy の唯一の canonical owner です。
+active DIC route における Related Document Closure traversal policy の唯一の canonical owner です。
 他の design、skill、root view はこの節の clause/ref と closure receipt を消費します。
 設計 owner は handoff 前に、既存 source packet の path、section、clause/ref を使って関連文書を
 閉じます。たどる順序は、選択 design の dependency header の upstream/downstream、同 directory
@@ -103,12 +112,12 @@ read|fingerprinted|handed_off|implementing|review_ready -> drifted|blocked
 
 ## Invariants
 
-- `DIC-001` repository-changing implementation の前に、変更対象を所有する design document を解決して全文を read-back する。
-- `DIC-002` design document が absent、reader path 不明、責務境界不明、clause ID 欠落、implementation trace 欠落、または validation route 欠落なら、implementation handoff を作らず、design を先に create/fix して review する。
-- `DIC-003` selected document の bytes と各 clause の canonical text から fingerprint を一度だけ計算し、handoff と review はその ID/digest を参照する。
-- `DIC-004` implementation handoff の各 change target は一つ以上の clause ID と一つ以上の validation/evidence locator に対応し、`implementation_targets_sha256` と `validation_route_sha256` を持つ。digest のない list は handoff として不完全である。
-- `DIC-005` implementation review は forward coverage（design clause → implementation/evidence）と reverse coverage（changed behavior/path → design clause）の両方を確認する。
-- `DIC-006` design fingerprint、owner、target、state、validation route が変わったときは `drifted` とし、design の更新・再読・再レビューまで implementation を停止する。
+- `DIC-001` active DIC route では、変更対象を所有する design document を解決して全文を read-back する。
+- `DIC-002` active DIC route で design document が absent、reader path 不明、責務境界不明、clause ID 欠落、implementation trace 欠落、または validation route 欠落なら、implementation handoff を作らず、design を先に create/fix して review する。
+- `DIC-003` active DIC route では、selected document の bytes と各 clause の canonical text から fingerprint を一度だけ計算し、handoff と review はその ID/digest を参照する。
+- `DIC-004` active DIC route の implementation handoff の各 change target は一つ以上の clause ID と一つ以上の validation/evidence locator に対応し、`implementation_targets_sha256` と `validation_route_sha256` を持つ。digest のない list は handoff として不完全である。
+- `DIC-005` active DIC route の implementation review は forward coverage（design clause → implementation/evidence）と reverse coverage（changed behavior/path → design clause）の両方を確認する。
+- `DIC-006` active DIC route で design fingerprint、owner、target、state、validation route が変わったときは `drifted` とし、design の更新・再読・再レビューまで implementation を停止する。
 - `DIC-007` routine は capability owner、adapter、implementation owner の順序を保持し、prose keyword、近接 filename、既存の stale artifact を route verdict にしない。
 - `DIC-008` durable artifacts は repository-relative locator を持ち、absolute runtime path は execution state にしか現れない。
 - `DIC-009` この routine は case-based loophole、compatibility fallback、第二の design policy、個別 skill への全文複製を追加しない。
@@ -134,8 +143,8 @@ read|fingerprinted|handed_off|implementing|review_ready -> drifted|blocked
 
 ## Stage Ownership and Procedure
 
-1. `agent-orchestration` が request mode、owner、replaceable unit、implementation mechanism、validation route を固定する。
-2. 選択された owner が `design_locator` を解決し、DIC-001/002 と `Related Document Closure` に従って design、dependency edges、reader map、target/validation/root owner refs を読む。
+1. `agent-orchestration` が request mode、owner、replaceable unit、implementation mechanism、validation route を固定し、activation gate を判定する。
+2. active DIC route の owner が `design_locator` を解決し、DIC-001/002 と `Related Document Closure` に従って design、dependency edges、reader map、target/validation/root owner refs を読む。
 3. `oop-type-design` または該当 design owner が clause IDs、責務境界、state/invariant、implementation trace を固定する。
 4. handoff owner が `design_sha256`、clause fingerprints、allowed targets と `implementation_targets_sha256`、validation route と `validation_route_sha256`、reverse-coverage expectation を一つの参照 packet にする。
 5. implementation owner は各 change を clause ID に結び付け、追加の design divergence を作らない。
@@ -165,7 +174,7 @@ tools/bin/agent-canon docs check
 
 | clause | current/planned implementation owner | file / symbol | evidence / reverse rule |
 | --- | --- | --- | --- |
-| `DIC-001..DIC-009` | current workflow and review owners | `agents/skills/agent-orchestration.md`, `agents/skills/oop-type-design.md`, `agents/skills/change-review.md`, this routine | changed path must cite one DIC clause; missing design readback blocks |
+| `DIC-001..DIC-009` | current workflow and review owners | `agents/skills/agent-orchestration.md`, `agents/skills/oop-type-design.md`, `agents/skills/change-review.md`, this routine | active DIC route の changed path は DIC clause を cite し、missing design readback は block |
 | `DIC-003..DIC-004` | planned transport owner | `tools/agent_tools/bootstrap_agent_run.py`, `agents/COMMUNICATION_PROTOCOL.md` | handoff identity、`implementation_targets`、`validation_route` は各 digest で参照し、実行 readback は両 digest を再計算する |
 | `DIC-005..DIC-006` | current/planned review owner | `agents/skills/change-review.md`, `tools/agent_tools/check_design_doc_claims.py` | every accepted finding has forward and reverse evidence; drift is a blocker |
 | `DIC-007..DIC-008` | current routing/path owners | `tools/agent_tools/route.py`, `tools/agent_tools/agent_canon_source_root.py` | capability and locator changes map back to the clause that authorized them |

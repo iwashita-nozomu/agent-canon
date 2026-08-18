@@ -17,9 +17,11 @@ import json
 import math
 import re
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Literal, NotRequired, TypeAlias, TypedDict, TypeVar, cast
+from typing import Literal, TypeAlias, TypedDict, TypeVar, cast
 
 JsonScalar: TypeAlias = None | bool | int | float | str
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
@@ -86,6 +88,14 @@ ViolationCode: TypeAlias = Literal[
     "artifact_mismatch",
     "diagram_count_mismatch",
     "table_fallback",
+    "marker_only_identity",
+    "visible_surface_missing",
+    "visible_identity_missing",
+    "visible_identity_duplicate",
+    "ir_surface_mismatch",
+    "external_resource",
+    "script_network_api",
+    "malformed_resource_locator",
 ]
 class FilterRecord(TypedDict):
     """One reversible visualization filter."""
@@ -94,6 +104,10 @@ class FilterRecord(TypedDict):
     mode: FilterMode
     enabled: bool
     selected_item_ids: list[str]
+
+
+class _OptionalFilters(TypedDict, total=False):
+    filters: list[FilterRecord]
 
 
 class VisualizationSourceItem(TypedDict):
@@ -199,7 +213,9 @@ class ToolCall(TypedDict):
     arguments: dict[str, JsonValue]
 
 
-class CoverageArguments(TypedDict):
+class CoverageArguments(_OptionalFilters):
+    """Canonical coverage-owner ToolCall arguments."""
+
     request_id: str
     literal_request: str
     literal_items: list[VisualizationSourceItem]
@@ -208,10 +224,11 @@ class CoverageArguments(TypedDict):
     artifact_id: str
     renderer_id: str
     artifact_format: ArtifactFormat
-    filters: NotRequired[list[FilterRecord]]
 
 
-class DependencyManifestArguments(TypedDict):
+class DependencyManifestArguments(_OptionalFilters):
+    """Dependency-manifest adapter ToolCall arguments."""
+
     request_id: str
     literal_request: str
     literal_items: list[VisualizationSourceItem]
@@ -221,10 +238,11 @@ class DependencyManifestArguments(TypedDict):
     renderer_id: str
     artifact_format: ArtifactFormat
     dependency_manifest_locator: str
-    filters: NotRequired[list[FilterRecord]]
 
 
-class AlgorithmFlowchartArguments(TypedDict):
+class AlgorithmFlowchartArguments(_OptionalFilters):
+    """Algorithm-flowchart adapter ToolCall arguments."""
+
     request_id: str
     literal_request: str
     literal_items: list[VisualizationSourceItem]
@@ -236,10 +254,11 @@ class AlgorithmFlowchartArguments(TypedDict):
     jit_ir_locator: str
     lean_evidence_locator: str
     theorem_graph_locator: str
-    filters: NotRequired[list[FilterRecord]]
 
 
-class DocumentMermaidArguments(TypedDict):
+class DocumentMermaidArguments(_OptionalFilters):
+    """Document-Mermaid adapter ToolCall arguments."""
+
     request_id: str
     literal_request: str
     literal_items: list[VisualizationSourceItem]
@@ -249,10 +268,11 @@ class DocumentMermaidArguments(TypedDict):
     renderer_id: str
     artifact_format: ArtifactFormat
     document_locator: str
-    filters: NotRequired[list[FilterRecord]]
 
 
-class RepositoryGraphArguments(TypedDict):
+class RepositoryGraphArguments(_OptionalFilters):
+    """Repository-graph adapter ToolCall arguments."""
+
     request_id: str
     literal_request: str
     literal_items: list[VisualizationSourceItem]
@@ -262,10 +282,11 @@ class RepositoryGraphArguments(TypedDict):
     renderer_id: str
     artifact_format: ArtifactFormat
     repository_locator: str
-    filters: NotRequired[list[FilterRecord]]
 
 
-class KnowledgeGraphArguments(TypedDict):
+class KnowledgeGraphArguments(_OptionalFilters):
+    """Knowledge-graph adapter ToolCall arguments."""
+
     request_id: str
     literal_request: str
     literal_items: list[VisualizationSourceItem]
@@ -275,7 +296,6 @@ class KnowledgeGraphArguments(TypedDict):
     renderer_id: str
     artifact_format: ArtifactFormat
     graph_locator: str
-    filters: NotRequired[list[FilterRecord]]
 
 
 VISUALIZATION_SOURCE_UNIVERSE_SCHEMA = "agent_canon.visualization_source_universe.v1"
@@ -352,6 +372,14 @@ _VIOLATION_CODES: tuple[ViolationCode, ...] = (
     "artifact_mismatch",
     "diagram_count_mismatch",
     "table_fallback",
+    "marker_only_identity",
+    "visible_surface_missing",
+    "visible_identity_missing",
+    "visible_identity_duplicate",
+    "ir_surface_mismatch",
+    "external_resource",
+    "script_network_api",
+    "malformed_resource_locator",
 )
 _VIOLATION_CODE_BY_VALUE: dict[str, ViolationCode] = {
     value: value for value in _VIOLATION_CODES
@@ -407,10 +435,12 @@ def _normalize_json(value: object, field: str = "value") -> JsonValue:
             raise ValueError(f"invalid_payload:{field}:non-finite")
         return value
     if isinstance(value, list):
-        return [_normalize_json(item, f"{field}[]") for item in value]
+        items = cast(list[object], value)
+        return [_normalize_json(item, f"{field}[]") for item in items]
     if isinstance(value, Mapping):
         normalized: dict[str, JsonValue] = {}
-        for key, item in value.items():
+        mapping = cast(Mapping[object, object], value)
+        for key, item in mapping.items():
             if not isinstance(key, str):
                 raise ValueError(f"invalid_payload:{field}:non-string-key")
             normalized[key] = _normalize_json(item, f"{field}.{key}")
@@ -529,7 +559,7 @@ def _copy_filter(record: Mapping[str, object], item_ids: set[str]) -> FilterReco
     if not isinstance(selected, list):
         raise ValueError(f"invalid_payload:filter:{filter_id}:selected_item_ids")
     copied_selected: list[str] = []
-    for selected_item_id in selected:
+    for selected_item_id in cast(list[object], selected):
         if not isinstance(selected_item_id, str) or not selected_item_id:
             raise ValueError(f"invalid_payload:filter:{filter_id}:selected_item_ids")
         copied_selected.append(selected_item_id)
@@ -667,7 +697,7 @@ def _copy_entry(
         )
         return None
     copied_locators: list[str] = []
-    for locator in locators:
+    for locator in cast(list[object], locators):
         if not isinstance(locator, str) or not locator:
             violations.append(
                 _violation(
@@ -875,7 +905,7 @@ def _manifest_digest_fields(
     *,
     entries: Sequence[ProjectionCoverageEntry] | None = None,
     readback_counts: Mapping[SourceItemKind, int] | None = None,
-) -> dict[str, JsonValue]:
+) -> dict[str, object]:
     return {
         "schema": manifest["schema"],
         "universe_fingerprint": manifest["universe_fingerprint"],
@@ -919,10 +949,8 @@ def build_source_universe(
     filters: Sequence[FilterRecord] = (),
 ) -> VisualizationSourceUniverse:
     """Build the exact immutable source universe in canonical identity order."""
-    if not isinstance(request_id, str) or not request_id:
+    if not request_id:
         raise ValueError("invalid_identity:request_id")
-    if not isinstance(literal_request, str):
-        raise ValueError("invalid_payload:literal_request")
     literal = [
         _copy_source_item(item, "literal_request") for item in literal_items
     ]
@@ -973,9 +1001,9 @@ def build_projection_coverage_manifest(
     readback: ReadbackProjection,
 ) -> ProjectionCoverageManifest:
     """Build a complete manifest without truncating any identity or violation."""
-    if not isinstance(artifact_id, str) or not artifact_id:
+    if not artifact_id:
         raise ValueError("invalid_identity:artifact_id")
-    if not isinstance(renderer_id, str) or not renderer_id:
+    if not renderer_id:
         raise ValueError("invalid_identity:renderer_id")
     if artifact_format not in ARTIFACT_FORMATS:
         raise ValueError("invalid_payload:artifact_format")
@@ -1108,11 +1136,11 @@ def _validate_argument_items(
     if not isinstance(value, list):
         raise ValueError(f"invalid_tool_call:{field}")
     copied: list[VisualizationSourceItem] = []
-    for item in value:
+    for item in cast(list[object], value):
         if not isinstance(item, Mapping):
             raise ValueError(f"invalid_tool_call:{field}")
         try:
-            copied.append(_copy_source_item(item, origin))
+            copied.append(_copy_source_item(cast(Mapping[str, object], item), origin))
         except (TypeError, ValueError):
             raise ValueError(f"invalid_tool_call:{field}") from None
     return copied
@@ -1121,74 +1149,76 @@ def _validate_argument_items(
 def _validate_tool_call(tool_call: object) -> ToolCall:
     if not isinstance(tool_call, Mapping):
         raise ValueError("invalid_tool_call:tool_call")
+    tool_call_record = cast(Mapping[str, object], tool_call)
     try:
-        fields = frozenset(tool_call)
+        fields: set[str] = set(tool_call_record)
     except TypeError:
         raise ValueError("invalid_tool_call:fields") from None
     if fields != {"schema", "tool_id", "argument_schema", "arguments"}:
         raise ValueError("invalid_tool_call:fields")
-    schema = tool_call.get("schema")
+    schema = tool_call_record.get("schema")
     if not isinstance(schema, str):
         raise ValueError("invalid_tool_call:schema")
     if schema != TOOL_CALL_SCHEMA:
         raise ValueError("schema_mismatch:tool_call")
-    raw_tool_id = tool_call.get("tool_id")
+    raw_tool_id = tool_call_record.get("tool_id")
     tool_id = _typed_literal(raw_tool_id, _TOOL_ID_BY_VALUE)
     if tool_id is None:
         raise ValueError("invalid_tool_call:tool_id")
-    argument_schema = tool_call.get("argument_schema")
+    argument_schema = tool_call_record.get("argument_schema")
     if not isinstance(argument_schema, str):
         raise ValueError("invalid_tool_call:argument_schema")
     expected_argument_schema = TOOL_ARGUMENT_SCHEMAS[tool_id]
     if argument_schema != expected_argument_schema:
         raise ValueError("schema_mismatch:argument_schema")
-    arguments = tool_call.get("arguments")
+    arguments = tool_call_record.get("arguments")
     if not isinstance(arguments, dict):
         raise ValueError("invalid_tool_call:arguments")
+    argument_record = cast(dict[str, object], arguments)
     required = _SHARED_ARGUMENT_FIELDS | set(_TOOL_LOCATOR_FIELDS[tool_id])
     allowed = required | {"filters"}
-    if set(arguments) != required and set(arguments) != allowed:
+    if set(argument_record) != required and set(argument_record) != allowed:
         raise ValueError("invalid_tool_call:argument_fields")
     for field in ("request_id", "artifact_id", "renderer_id"):
-        if not isinstance(arguments.get(field), str) or not arguments[field]:
+        if not isinstance(argument_record.get(field), str) or not argument_record[field]:
             raise ValueError(f"invalid_tool_call:{field}")
-    if not isinstance(arguments.get("literal_request"), str):
+    if not isinstance(argument_record.get("literal_request"), str):
         raise ValueError("invalid_tool_call:literal_request")
-    if arguments.get("artifact_format") not in ARTIFACT_FORMATS:
+    if argument_record.get("artifact_format") not in ARTIFACT_FORMATS:
         raise ValueError("invalid_tool_call:artifact_format")
     literal_items = _validate_argument_items(
-        arguments.get("literal_items"),
+        argument_record.get("literal_items"),
         "literal_request",
         "literal_items",
     )
     owner_items = _validate_argument_items(
-        arguments.get("owner_closure"),
+        argument_record.get("owner_closure"),
         "owner_closure",
         "owner_closure",
     )
     dependency_items = _validate_argument_items(
-        arguments.get("dependency_closure"),
+        argument_record.get("dependency_closure"),
         "dependency_closure",
         "dependency_closure",
     )
     for locator in _TOOL_LOCATOR_FIELDS[tool_id]:
-        if not isinstance(arguments.get(locator), str) or not arguments[locator]:
+        if not isinstance(argument_record.get(locator), str) or not argument_record[locator]:
             raise ValueError(f"invalid_tool_call:{locator}")
-    filters = arguments.get("filters", [])
+    filters = argument_record.get("filters", [])
     if not isinstance(filters, list):
         raise ValueError("invalid_tool_call:filters")
     item_ids = {
         item["item_id"] for item in (*literal_items, *owner_items, *dependency_items)
     }
-    for record in filters:
+    for record in cast(list[object], filters):
         if not isinstance(record, Mapping):
             raise ValueError("invalid_tool_call:filters")
         try:
-            _copy_filter(record, item_ids)
+            _copy_filter(cast(Mapping[str, object], record), item_ids)
         except (TypeError, ValueError):
             raise ValueError("invalid_tool_call:filters") from None
     try:
-        normalized_arguments = _normalize_json(arguments, "arguments")
+        normalized_arguments = _normalize_json(argument_record, "arguments")
     except (TypeError, ValueError):
         raise ValueError("invalid_tool_call:arguments") from None
     if not isinstance(normalized_arguments, dict):
@@ -1219,7 +1249,7 @@ def _identity_token(identity: str) -> str:
     return IDENTITY_TOKEN_PREFIX + payload
 
 
-def serialize_projection_identity(identity: str) -> str:
+def serialize_projection_identity(identity: object) -> str:
     """Serialize one non-empty projection identity to its canonical token."""
     if not isinstance(identity, str) or not identity:
         raise ValueError("invalid_identity:projection")
@@ -1249,7 +1279,7 @@ def serialize_projection_coverage_manifest(
         "coverage_digest",
         "status",
     }
-    if not isinstance(manifest, Mapping) or set(manifest) != manifest_fields:
+    if set(manifest) != manifest_fields:
         raise ValueError("invalid_payload:projection_manifest")
     owner = _validate_tool_call(owner_tool_call)
     adapter = _validate_tool_call(adapter_tool_call)
@@ -1392,6 +1422,672 @@ class _CoverageMarkerHTMLParser(HTMLParser):
             self._capturing = False
 
 
+@dataclass
+class _HTMLFrame:
+    """Small deterministic DOM frame used by HTML readback."""
+
+    tag: str
+    attrs: dict[str, str | None]
+    source: str
+    hidden: bool
+    non_rendered: bool
+    svg_context: bool
+    text_parts: list[str] = dataclass_field(default_factory=lambda: list[str]())
+    cells: list[str] = dataclass_field(default_factory=lambda: list[str]())
+    child_tags: list[str] = dataclass_field(default_factory=lambda: list[str]())
+    titles: list[str] = dataclass_field(default_factory=lambda: list[str]())
+
+    @property
+    def text(self) -> str:
+        return " ".join("".join(self.text_parts).split())
+
+
+@dataclass(frozen=True)
+class _HTMLVisibleRecord:
+    """One structural visible/readable source record."""
+
+    surface: str
+    source_id: str
+    text: str
+    cells: tuple[str, ...]
+    titles: tuple[str, ...]
+    source: str
+
+
+@dataclass(frozen=True)
+class _HTMLScriptBlock:
+    """One executable or data script block."""
+
+    attrs: dict[str, str | None]
+    text: str
+    source: str
+
+
+def _html_source(parser: HTMLParser) -> str:
+    line, column = parser.getpos()
+    return f"line:{line}:column:{column}"
+
+
+def _inline_hidden(attrs: Mapping[str, str | None]) -> bool:
+    if "hidden" in attrs:
+        return True
+    if (attrs.get("aria-hidden") or "").casefold() == "true":
+        return True
+    style = (attrs.get("style") or "").casefold()
+    return bool(
+        re.search(r"(?:^|[;\s])display\s*:\s*none(?:\s*;|\s*$)", style)
+        or re.search(r"(?:^|[;\s])visibility\s*:\s*hidden(?:\s*;|\s*$)", style)
+    )
+
+
+def _css_unescape(value: str) -> str:
+    value = re.sub(r"\\\r?\n", "", value)
+    return re.sub(r"\\([0-9a-fA-F]{1,6})(?:\s)?", lambda m: chr(int(m.group(1), 16)), value)
+
+
+def _resource_violation(
+    code: ViolationCode,
+    value: str,
+    source: str,
+    context: str,
+) -> CoverageViolation:
+    return _violation(code, f"{context} resource {value!r} at {source}", artifact_locator=source)
+
+
+def _check_local_resource(
+    value: str,
+    *,
+    source: str,
+    context: str,
+) -> CoverageViolation | None:
+    candidate = _css_unescape(value).strip().strip('"\'')
+    if not candidate:
+        return _resource_violation(
+            "malformed_resource_locator", candidate, source, context
+        )
+    if candidate.startswith("#") or candidate.casefold().startswith("data:"):
+        return None
+    return _resource_violation("external_resource", candidate, source, context)
+
+
+def _scan_css_resources(text: str, *, source: str) -> list[CoverageViolation]:
+    """Scan only CSS url()/@import resource syntax, ignoring comments/strings."""
+    violations: list[CoverageViolation] = []
+    index = 0
+    length = len(text)
+
+    def skip_comment(position: int) -> int:
+        end = text.find("*/", position + 2)
+        if end < 0:
+            violations.append(
+                _resource_violation(
+                    "malformed_resource_locator", "/*", source, "CSS comment"
+                )
+            )
+            return length
+        return end + 2
+
+    def skip_quoted(position: int, quote: str) -> int:
+        position += 1
+        while position < length:
+            if text[position] == "\\":
+                position += 2
+            elif text[position] == quote:
+                return position + 1
+            else:
+                position += 1
+        violations.append(
+            _resource_violation(
+                "malformed_resource_locator", quote, source, "CSS string"
+            )
+        )
+        return length
+
+    def read_url(position: int) -> int:
+        opening = text.find("(", position)
+        if opening < 0:
+            violations.append(
+                _resource_violation(
+                    "malformed_resource_locator", text[position:], source, "CSS url"
+                )
+            )
+            return length
+        cursor = opening + 1
+        quote = text[cursor] if cursor < length and text[cursor] in "'\"" else None
+        if quote is not None:
+            end = cursor + 1
+            value_parts: list[str] = []
+            while end < length:
+                if text[end] == "\\" and end + 1 < length:
+                    value_parts.append(text[end : end + 2])
+                    end += 2
+                elif text[end] == quote:
+                    end += 1
+                    break
+                else:
+                    value_parts.append(text[end])
+                    end += 1
+            else:
+                violations.append(
+                    _resource_violation(
+                        "malformed_resource_locator", text[position:], source, "CSS url"
+                    )
+                )
+                return length
+            while end < length and text[end].isspace():
+                end += 1
+            if end >= length or text[end] != ")":
+                violations.append(
+                    _resource_violation(
+                        "malformed_resource_locator", text[position:], source, "CSS url"
+                    )
+                )
+                return length
+            value = "".join(value_parts)
+            end += 1
+        else:
+            end = cursor
+            while end < length and text[end] != ")":
+                if text[end] == "\\" and end + 1 < length:
+                    end += 2
+                else:
+                    end += 1
+            if end >= length:
+                violations.append(
+                    _resource_violation(
+                        "malformed_resource_locator", text[position:], source, "CSS url"
+                    )
+                )
+                return length
+            value = text[cursor:end].strip()
+            end += 1
+        resource_violation = _check_local_resource(
+            value, source=source, context="CSS"
+        )
+        if resource_violation is not None:
+            violations.append(resource_violation)
+        return end
+
+    while index < length:
+        if text.startswith("/*", index):
+            index = skip_comment(index)
+            continue
+        if text[index] in "'\"":
+            index = skip_quoted(index, text[index])
+            continue
+        if text[index : index + 4].casefold() == "url(" and (
+            index == 0 or not (text[index - 1].isalnum() or text[index - 1] in "_-"
+            )
+        ):
+            index = read_url(index)
+            continue
+        if text[index] == "@" and text[index : index + 7].casefold() == "@import":
+            index += 7
+            while index < length and text[index].isspace():
+                index += 1
+            if text[index : index + 4].casefold() == "url(":
+                index = read_url(index)
+                continue
+            if index < length and text[index] in "'\"":
+                quote = text[index]
+                start = index + 1
+                index = skip_quoted(index, quote)
+                value = text[start : max(start, index - 1)]
+                resource_violation = _check_local_resource(
+                    value, source=source, context="CSS @import"
+                )
+                if resource_violation is not None:
+                    violations.append(resource_violation)
+                continue
+            violations.append(
+                _resource_violation(
+                    "malformed_resource_locator", text[index:], source, "CSS @import"
+                )
+            )
+            continue
+        index += 1
+    return violations
+
+
+def _scan_javascript_network(
+    text: str,
+    *,
+    source: str,
+    module_script: bool = False,
+) -> list[CoverageViolation]:
+    """Reject executable network APIs without scanning strings, comments, or regex data."""
+    violations: list[CoverageViolation] = []
+    length = len(text)
+    index = 0
+    previous_significant = ""
+    previous_word = ""
+    control_parens: list[bool] = []
+    regex_after_control_close = False
+    regex_prefix_words = {
+        "case", "delete", "do", "else", "in", "instanceof", "of",
+        "return", "throw", "typeof", "void", "yield", "await",
+    }
+    control_words = {"catch", "for", "if", "switch", "while", "with"}
+
+    def skip_quoted(position: int, quote: str) -> int:
+        position += 1
+        while position < length:
+            if text[position] == "\\":
+                position += 2
+            elif text[position] == quote:
+                return position + 1
+            else:
+                position += 1
+        violations.append(
+            _resource_violation(
+                "malformed_resource_locator", quote, source, "JavaScript string"
+            )
+        )
+        return length
+
+    def skip_regex(position: int) -> int:
+        position += 1
+        in_class = False
+        while position < length:
+            character = text[position]
+            if character == "\\":
+                position += 2
+                continue
+            if character == "[":
+                in_class = True
+            elif character == "]":
+                in_class = False
+            elif character == "/" and not in_class:
+                position += 1
+                while position < length and text[position].isalpha():
+                    position += 1
+                return position
+            position += 1
+        violations.append(
+            _resource_violation(
+                "malformed_resource_locator", "/", source, "JavaScript regex"
+            )
+        )
+        return length
+
+    def skip_template(position: int) -> int:
+        position += 1
+        while position < length:
+            if text[position] == "\\":
+                position += 2
+                continue
+            if text[position] == "`":
+                return position + 1
+            if text.startswith("${", position):
+                depth = 1
+                cursor = position + 2
+                while cursor < length and depth:
+                    if text[cursor] in "'\"`":
+                        cursor = skip_quoted(cursor, text[cursor]) if text[cursor] != "`" else skip_template(cursor)
+                        continue
+                    if text[cursor] == "{":
+                        depth += 1
+                    elif text[cursor] == "}":
+                        depth -= 1
+                    cursor += 1
+                if depth:
+                    violations.append(
+                        _resource_violation(
+                            "malformed_resource_locator", "${", source, "JavaScript template"
+                        )
+                    )
+                    return length
+                violations.extend(
+                    _scan_javascript_network(
+                        text[position + 2 : cursor - 1],
+                        source=source,
+                        module_script=module_script,
+                    )
+                )
+                position = cursor
+                continue
+            position += 1
+        violations.append(
+            _resource_violation(
+                "malformed_resource_locator", "`", source, "JavaScript template"
+            )
+        )
+        return length
+
+    def next_word(position: int) -> tuple[str, int]:
+        end = position
+        while end < length and (text[end].isalnum() or text[end] in "_$"):
+            end += 1
+        return text[position:end], end
+
+    while index < length:
+        character = text[index]
+        if character.isspace():
+            index += 1
+            continue
+        if text.startswith("//", index):
+            newline = text.find("\n", index + 2)
+            index = length if newline < 0 else newline + 1
+            continue
+        if text.startswith("/*", index):
+            end = text.find("*/", index + 2)
+            if end < 0:
+                violations.append(
+                    _resource_violation(
+                        "malformed_resource_locator", "/*", source, "JavaScript comment"
+                    )
+                )
+                break
+            index = end + 2
+            continue
+        if character in "'\"":
+            index = skip_quoted(index, character)
+            previous_word = ""
+            regex_after_control_close = False
+            continue
+        if character == "`":
+            index = skip_template(index)
+            previous_word = ""
+            regex_after_control_close = False
+            continue
+        if character == "/" and (
+            previous_significant in "=(\\[{!?:;," or previous_significant in {"", "}"}
+            or previous_word in regex_prefix_words
+            or regex_after_control_close
+        ):
+            index = skip_regex(index)
+            previous_significant = "/"
+            previous_word = ""
+            regex_after_control_close = False
+            continue
+        if character == "(":
+            control_parens.append(previous_word in control_words)
+            previous_word = ""
+            regex_after_control_close = False
+            previous_significant = character
+            index += 1
+            continue
+        if character == ")":
+            regex_after_control_close = bool(control_parens.pop()) if control_parens else False
+            previous_word = ""
+            previous_significant = character
+            index += 1
+            continue
+        if character.isalpha() or character in "_$":
+            word, end = next_word(index)
+            cursor = end
+            while cursor < length and text[cursor].isspace():
+                cursor += 1
+            if word in {
+                "fetch", "XMLHttpRequest", "WebSocket", "EventSource", "import"
+            } and cursor < length and text[cursor] == "(":
+                violations.append(
+                    _resource_violation(
+                        "script_network_api", word, source, "JavaScript"
+                    )
+                )
+            elif (
+                module_script
+                and word == "import"
+                and cursor < length
+                and text[cursor] != "."
+                and previous_significant != "."
+            ):
+                violations.append(
+                    _resource_violation(
+                        "script_network_api", "static import", source, "JavaScript"
+                    )
+                )
+            elif word == "navigator":
+                dot = cursor
+                if dot < length and text[dot] == ".":
+                    dot += 1
+                    while dot < length and text[dot].isspace():
+                        dot += 1
+                    member, member_end = next_word(dot)
+                    call = member_end
+                    while call < length and text[call].isspace():
+                        call += 1
+                    if member == "sendBeacon" and call < length and text[call] == "(":
+                        violations.append(
+                            _resource_violation(
+                                "script_network_api", "navigator.sendBeacon", source, "JavaScript"
+                            )
+                        )
+            previous_word = word
+            regex_after_control_close = False
+            previous_significant = word[-1:] or previous_significant
+            index = end
+            continue
+        previous_word = ""
+        regex_after_control_close = False
+        previous_significant = character
+        index += 1
+    return violations
+
+
+class _HTMLReadbackParser(HTMLParser):
+    """Parse visible evidence and resource-bearing contexts in one HTML pass."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.frames: list[_HTMLFrame] = []
+        self.records: list[_HTMLVisibleRecord] = []
+        self.scripts: list[_HTMLScriptBlock] = []
+        self.styles: list[tuple[str, str]] = []
+        self.violations: list[CoverageViolation] = []
+        self.tables: set[str] = set()
+        self.svg_ids: set[str] = set()
+        self._script_frame: _HTMLFrame | None = None
+        self._style_frame: _HTMLFrame | None = None
+
+    @property
+    def _hidden_parent(self) -> bool:
+        return bool(self.frames and (self.frames[-1].hidden or self.frames[-1].non_rendered))
+
+    def _resource_attribute(
+        self,
+        tag: str,
+        name: str,
+        value: str | None,
+        source: str,
+        *,
+        svg_context: bool,
+    ) -> None:
+        if value is None:
+            return
+        lowered = name.casefold()
+        if lowered == "srcset":
+            candidates = [part.strip().split()[0] for part in value.split(",") if part.strip()]
+            for candidate in candidates:
+                violation = _check_local_resource(candidate, source=source, context=f"HTML {name}")
+                if violation is not None:
+                    self.violations.append(violation)
+            return
+        resource_attrs = {
+            "src", "href", "xlink:href", "poster", "cite", "action", "formaction",
+            "background", "manifest", "data",
+        }
+        svg_resource_attrs = {
+            "fill", "stroke", "marker-start", "marker-mid", "marker-end",
+            "clip-path", "mask", "filter", "cursor",
+        }
+        if svg_context and lowered in svg_resource_attrs:
+            scalar = value.strip()
+            if scalar.casefold().startswith("url("):
+                css_violations = _scan_css_resources(value, source=source)
+                self.violations.extend(css_violations)
+            elif scalar.startswith("#"):
+                violation = _check_local_resource(value, source=source, context=f"HTML {name}")
+                if violation is not None:
+                    self.violations.append(violation)
+            return
+        if lowered in resource_attrs:
+            if lowered == "content" and tag == "meta":
+                return
+            violation = _check_local_resource(value, source=source, context=f"HTML {name}")
+            if violation is not None:
+                self.violations.append(violation)
+        if tag == "meta" and lowered == "content":
+            refresh = ""  # The http-equiv check is applied in handle_starttag.
+            del refresh
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        normalized = {name.casefold(): value for name, value in attrs}
+        source = _html_source(self)
+        inherited_hidden = self._hidden_parent
+        non_rendered = bool(
+            inherited_hidden
+            or tag.casefold() in {"script", "template", "style", "noscript"}
+        )
+        frame = _HTMLFrame(
+            tag=tag.casefold(),
+            attrs=normalized,
+            source=source,
+            hidden=inherited_hidden or _inline_hidden(normalized),
+            non_rendered=non_rendered,
+            svg_context=bool(
+                tag.casefold() == "svg"
+                or (self.frames and self.frames[-1].svg_context)
+            ),
+        )
+        self.frames.append(frame)
+        element_id = normalized.get("id")
+        if element_id in {"node-table", "edge-table", "directory-node-table", "directory-edge-table"}:
+            self.tables.add(str(element_id))
+        if tag.casefold() == "svg" and element_id:
+            self.svg_ids.add(element_id)
+        for name, value in attrs:
+            self._resource_attribute(
+                tag.casefold(),
+                name,
+                value,
+                source,
+                svg_context=frame.svg_context,
+            )
+        if tag.casefold() == "meta" and (normalized.get("http-equiv") or "").casefold() == "refresh":
+            content = normalized.get("content") or ""
+            match = re.search(r"(?:^|;)\s*url\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^;\s]*))", content, re.I)
+            if match is None:
+                self.violations.append(
+                    _resource_violation("malformed_resource_locator", content, source, "HTML refresh")
+                )
+            else:
+                value = next(part for part in match.groups() if part is not None)
+                violation = _check_local_resource(value, source=source, context="HTML refresh")
+                if violation is not None:
+                    self.violations.append(violation)
+        style = normalized.get("style")
+        if style:
+            self.violations.extend(_scan_css_resources(style, source=source))
+        if tag.casefold() == "script":
+            self._script_frame = frame
+        if tag.casefold() == "style":
+            self._style_frame = frame
+        if tag.casefold() in {
+            "area", "base", "br", "col", "embed", "hr", "img", "input",
+            "link", "meta", "param", "source", "track", "wbr",
+        }:
+            self.frames.pop()
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.handle_starttag(tag, attrs)
+        self.handle_endtag(tag)
+
+    def handle_data(self, data: str) -> None:
+        if not self.frames:
+            return
+        for frame in self.frames:
+            frame.text_parts.append(data)
+
+    def handle_entityref(self, name: str) -> None:
+        self.handle_data(f"&{name};")
+
+    def handle_charref(self, name: str) -> None:
+        self.handle_data(f"&#{name};")
+
+    def _surface_for(self, frame: _HTMLFrame) -> str | None:
+        if frame.hidden or frame.non_rendered or "data-agent-canon-source-id" not in frame.attrs:
+            return None
+        source_id = frame.attrs.get("data-agent-canon-source-id")
+        if not source_id:
+            return None
+        ancestors = self.frames[:-1]
+        static_graph = any(parent.attrs.get("id") == "static-graph" for parent in ancestors)
+        if static_graph and "static-node" in (frame.attrs.get("class") or "").split() and frame.tag == "g":
+            return "static-node"
+        if static_graph and "static-edge" in (frame.attrs.get("class") or "").split() and frame.tag == "path":
+            return "static-edge"
+        table_id = next((parent.attrs.get("id") for parent in ancestors if parent.tag == "table"), None)
+        if frame.tag == "tr" and table_id in {
+            "node-table", "edge-table", "directory-node-table", "directory-edge-table"
+        }:
+            return str(table_id)
+        return None
+
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.casefold()
+        frame_index = next((index for index in range(len(self.frames) - 1, -1, -1) if self.frames[index].tag == tag), None)
+        if frame_index is None:
+            return
+        frame = self.frames.pop(frame_index)
+        if self.frames:
+            parent = self.frames[-1]
+            parent.child_tags.append(frame.tag)
+            if frame.tag in {"td", "th"}:
+                parent.cells.append(frame.text)
+        if frame.tag == "script":
+            self.scripts.append(_HTMLScriptBlock(frame.attrs, frame.text, frame.source))
+            self._script_frame = None
+        elif frame.tag == "style":
+            self.styles.append((frame.text, frame.source))
+            self._style_frame = None
+        if self.frames:
+            parent = self.frames[-1]
+            if frame.tag == "title":
+                parent.titles.append(frame.text)
+        surface = self._surface_for(frame)
+        if surface is not None:
+            if frame.tag == "g" and "static-node" in (frame.attrs.get("class") or "").split() and "rect" not in frame.child_tags:
+                return
+            if frame.tag == "path" and "static-edge" in (frame.attrs.get("class") or "").split() and "title" not in frame.child_tags:
+                return
+            self.records.append(
+                _HTMLVisibleRecord(
+                    surface=surface,
+                    source_id=str(frame.attrs["data-agent-canon-source-id"]),
+                    text=frame.text,
+                    cells=tuple(frame.cells),
+                    titles=tuple(frame.titles),
+                    source=frame.source,
+                )
+            )
+
+    def close(self) -> None:
+        super().close()
+        if self.frames:
+            self.violations.append(
+                _resource_violation(
+                    "malformed_resource_locator", self.frames[-1].tag, self.frames[-1].source, "HTML"
+                )
+            )
+        for text, source in self.styles:
+            self.violations.extend(_scan_css_resources(text, source=source))
+        for script in self.scripts:
+            script_type = (script.attrs.get("type") or "").casefold().split(";", 1)[0].strip()
+            if script.attrs.get("id") in {
+                "agent-canon-visualization-coverage", "graph-data"
+            } or script_type not in {"", "text/javascript", "application/javascript", "module"}:
+                continue
+            self.violations.extend(
+                _scan_javascript_network(
+                    script.text,
+                    source=script.source,
+                    module_script=script_type == "module",
+                )
+            )
+
+
 def _extract_marker(
     text: str,
     artifact_format: ArtifactFormat,
@@ -1403,9 +2099,11 @@ def _extract_marker(
         except json.JSONDecodeError:
             return None, _violation("malformed_marker", "GraphIR is not valid JSON")
         if isinstance(payload, dict):
-            marker_object = payload.get("visualization_coverage")
+            payload_record = cast(dict[str, object], payload)
+            marker_object = payload_record.get("visualization_coverage")
             if isinstance(marker_object, dict):
-                candidate = marker_object.get("marker")
+                marker_record = cast(dict[str, object], marker_object)
+                candidate = marker_record.get("marker")
                 marker = candidate if isinstance(candidate, str) else None
     elif artifact_format == "markdown_mermaid":
         match = re.search(
@@ -1446,7 +2144,10 @@ def _decode_marker(marker: str) -> ProjectionCoverageManifest:
         raw: object = json.loads(decoded)
     except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValueError("marker payload is malformed") from exc
-    if not isinstance(raw, dict) or raw.get("schema") != PROJECTION_COVERAGE_SCHEMA:
+    if not isinstance(raw, dict):
+        raise ValueError("marker manifest schema mismatch")
+    raw = cast(dict[str, object], raw)
+    if raw.get("schema") != PROJECTION_COVERAGE_SCHEMA:
         raise ValueError("marker manifest schema mismatch")
     required = {
         "schema",
@@ -1484,7 +2185,8 @@ def _decode_marker(marker: str) -> ProjectionCoverageManifest:
     if artifact_format is None:
         raise ValueError("marker artifact format mismatch")
 
-    raw_entries = raw.get("entries")
+    raw_entries_value = raw.get("entries")
+    raw_entries = cast(list[object], raw_entries_value) if isinstance(raw_entries_value, list) else None
     if not isinstance(raw_entries, list):
         raise ValueError("marker entries mismatch")
     entries: list[ProjectionCoverageEntry] = []
@@ -1492,7 +2194,7 @@ def _decode_marker(marker: str) -> ProjectionCoverageManifest:
     for raw_entry in raw_entries:
         if not isinstance(raw_entry, Mapping):
             raise ValueError("marker entry mismatch")
-        entry = _copy_entry(raw_entry, renderer_id, entry_violations)
+        entry = _copy_entry(cast(Mapping[str, object], raw_entry), renderer_id, entry_violations)
         if entry is None:
             raise ValueError("marker entry mismatch")
         entries.append(entry)
@@ -1500,11 +2202,14 @@ def _decode_marker(marker: str) -> ProjectionCoverageManifest:
         raise ValueError("marker duplicate source identity")
 
     def decode_counts(value: object, field: str) -> dict[SourceItemKind, int]:
-        if not isinstance(value, Mapping) or set(value) != set(SOURCE_ITEM_KINDS):
+        if not isinstance(value, Mapping):
+            raise ValueError(f"marker {field} mismatch")
+        value_record = cast(Mapping[str, object], value)
+        if set(value_record) != set(SOURCE_ITEM_KINDS):
             raise ValueError(f"marker {field} mismatch")
         counts = _empty_counts()
         for kind in SOURCE_ITEM_KINDS:
-            count = value.get(kind)
+            count = value_record.get(kind)
             if isinstance(count, bool) or not isinstance(count, int) or count < 0:
                 raise ValueError(f"marker {field} mismatch")
             counts[kind] = count
@@ -1514,7 +2219,8 @@ def _decode_marker(marker: str) -> ProjectionCoverageManifest:
     rendered_counts = decode_counts(raw.get("rendered_counts"), "rendered counts")
     readback_counts = decode_counts(raw.get("readback_counts"), "readback counts")
 
-    raw_omitted = raw.get("omitted_item_ids")
+    raw_omitted_value = raw.get("omitted_item_ids")
+    raw_omitted = cast(list[object], raw_omitted_value) if isinstance(raw_omitted_value, list) else None
     if not isinstance(raw_omitted, list):
         raise ValueError("marker omitted identities mismatch")
     omitted_item_ids: list[str] = []
@@ -1525,7 +2231,8 @@ def _decode_marker(marker: str) -> ProjectionCoverageManifest:
     if omitted_item_ids != sorted(set(omitted_item_ids)):
         raise ValueError("marker omitted identities are not canonical")
 
-    raw_violations = raw.get("violations")
+    raw_violations_value = raw.get("violations")
+    raw_violations = cast(list[object], raw_violations_value) if isinstance(raw_violations_value, list) else None
     if not isinstance(raw_violations, list):
         raise ValueError("marker violations mismatch")
     violations: list[CoverageViolation] = []
@@ -1537,13 +2244,16 @@ def _decode_marker(marker: str) -> ProjectionCoverageManifest:
         "detail",
     }
     for raw_violation in raw_violations:
-        if not isinstance(raw_violation, Mapping) or set(raw_violation) != violation_fields:
+        if not isinstance(raw_violation, Mapping):
             raise ValueError("marker violation mismatch")
-        code = _typed_literal(raw_violation.get("code"), _VIOLATION_CODE_BY_VALUE)
-        source_item_id = raw_violation.get("source_item_id")
-        rendered_identity = raw_violation.get("rendered_identity")
-        artifact_locator = raw_violation.get("artifact_locator")
-        detail = raw_violation.get("detail")
+        violation_record = cast(Mapping[str, object], raw_violation)
+        if set(violation_record) != violation_fields:
+            raise ValueError("marker violation mismatch")
+        code = _typed_literal(violation_record.get("code"), _VIOLATION_CODE_BY_VALUE)
+        source_item_id = violation_record.get("source_item_id")
+        rendered_identity = violation_record.get("rendered_identity")
+        artifact_locator = violation_record.get("artifact_locator")
+        detail = violation_record.get("detail")
         if code is None or not isinstance(detail, str) or not detail:
             raise ValueError("marker violation mismatch")
         if source_item_id is not None and not isinstance(source_item_id, str):
@@ -1566,7 +2276,8 @@ def _decode_marker(marker: str) -> ProjectionCoverageManifest:
     if any(violation not in violations for violation in entry_violations):
         raise ValueError("marker entry violations are incomplete")
 
-    raw_filters = raw.get("filters")
+    raw_filters_value = raw.get("filters")
+    raw_filters = cast(list[object], raw_filters_value) if isinstance(raw_filters_value, list) else None
     if not isinstance(raw_filters, list):
         raise ValueError("marker filters mismatch")
     source_item_ids = {
@@ -1577,7 +2288,7 @@ def _decode_marker(marker: str) -> ProjectionCoverageManifest:
     for raw_filter in raw_filters:
         if not isinstance(raw_filter, Mapping):
             raise ValueError("marker filter mismatch")
-        filters.append(_copy_filter(raw_filter, source_item_ids))
+        filters.append(_copy_filter(cast(Mapping[str, object], raw_filter), source_item_ids))
     filters.sort(key=lambda record: record["filter_id"])
     if len({record["filter_id"] for record in filters}) != len(filters):
         raise ValueError("marker duplicate filter identity")
@@ -1610,6 +2321,367 @@ def _decode_marker(marker: str) -> ProjectionCoverageManifest:
         "status": status,
     }
     return manifest
+
+
+def _html_entry_payload(
+    entry: ProjectionCoverageEntry,
+) -> Mapping[str, JsonValue] | None:
+    try:
+        payload = _parse_json(entry["payload_json"])
+    except ValueError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _html_identity_class(source_id: str) -> str | None:
+    if re.fullmatch(r"node:.+", source_id):
+        return "native_node"
+    if re.fullmatch(r"edge:\d+:[^:]+:[^:]+:.+:.+", source_id):
+        return "dependency_edge"
+    if re.fullmatch(r"dir:.+", source_id):
+        return "directory_node"
+    if re.fullmatch(r"contains:\d+", source_id):
+        return "containment_edge"
+    return None
+
+
+def _html_entry_ordinal(source_id: str, prefix: str) -> int | None:
+    match = re.fullmatch(rf"{re.escape(prefix)}:(\d+)(?::.*)?", source_id)
+    return int(match.group(1)) if match else None
+
+
+def _html_normalize(value: object) -> str:
+    return " ".join(str(value).split()).casefold()
+
+
+def _html_visible_record_valid(
+    record: _HTMLVisibleRecord,
+    entry: ProjectionCoverageEntry,
+) -> bool:
+    source_id = entry["readback_identity"]
+    identity_class = _html_identity_class(source_id)
+    payload = _html_entry_payload(entry)
+    if identity_class is None or payload is None:
+        return False
+    if identity_class == "native_node":
+        path = source_id[len("node:") :]
+        expected = _html_normalize(path)
+        if record.surface == "static-node":
+            return expected in {_html_normalize(title) for title in record.titles}
+        return len(record.cells) >= 4 and _html_normalize(record.cells[3]) == expected
+    if identity_class == "directory_node":
+        path = source_id[len("dir:") :]
+        return len(record.cells) >= 2 and _html_normalize(record.cells[1]) == _html_normalize(path)
+    if identity_class == "dependency_edge":
+        expected = (
+            _html_normalize(payload.get("direction")),
+            _html_normalize(payload.get("kind")),
+            _html_normalize(payload.get("source")),
+            _html_normalize(payload.get("target")),
+        )
+        if record.surface == "static-edge":
+            title = f"{payload.get('direction')}/{payload.get('kind')}: {payload.get('source')} -> {payload.get('target')}"
+            return _html_normalize(title) in {
+                _html_normalize(candidate) for candidate in record.titles
+            }
+        return len(record.cells) >= 4 and tuple(
+            _html_normalize(cell) for cell in record.cells[:4]
+        ) == expected
+    expected = (
+        _html_normalize(payload.get("parent_path")),
+        _html_normalize(payload.get("child_path")),
+        _html_normalize(payload.get("child_kind")),
+    )
+    return len(record.cells) >= 3 and tuple(
+        _html_normalize(cell) for cell in record.cells[:3]
+    ) == expected
+
+
+def _html_resource_and_ir_violations(
+    parser: _HTMLReadbackParser,
+    manifest: ProjectionCoverageManifest,
+) -> list[CoverageViolation]:
+    """Validate the embedded GraphIR/source mapping for the dependency HTML owner."""
+    violations = list(parser.violations)
+    graph_data = next(
+        (script.text for script in parser.scripts if script.attrs.get("id") == "graph-data"),
+        None,
+    )
+    if graph_data is None:
+        return [
+            *violations,
+            _violation("ir_surface_mismatch", "HTML has no embedded graph-data IR"),
+        ]
+    try:
+        raw_ir: object = json.loads(graph_data)
+    except (TypeError, json.JSONDecodeError):
+        return [
+            *violations,
+            _violation("ir_surface_mismatch", "embedded graph-data is malformed"),
+        ]
+    if not isinstance(raw_ir, dict):
+        return [
+            *violations,
+            _violation("ir_surface_mismatch", "embedded graph-data schema mismatch"),
+        ]
+    raw_ir_record = cast(dict[str, object], raw_ir)
+    if raw_ir_record.get("schema") != "agent_canon.graph_ir.v2":
+        return [
+            *violations,
+            _violation("ir_surface_mismatch", "embedded graph-data schema mismatch"),
+        ]
+    raw_nodes_value = raw_ir_record.get("nodes")
+    raw_edges_value = raw_ir_record.get("edges")
+    raw_nodes = cast(list[object], raw_nodes_value) if isinstance(raw_nodes_value, list) else None
+    raw_edges = cast(list[object], raw_edges_value) if isinstance(raw_edges_value, list) else None
+    if not isinstance(raw_nodes, list) or not isinstance(raw_edges, list):
+        return [
+            *violations,
+            _violation("ir_surface_mismatch", "embedded graph-data node/edge arrays are malformed"),
+        ]
+    entries = {entry["readback_identity"]: entry for entry in manifest["entries"]}
+    native_nodes = {
+        source_id[len("node:") :]: source_id
+        for source_id in entries
+        if _html_identity_class(source_id) == "native_node"
+    }
+    directory_nodes = {
+        source_id[len("dir:") :]: source_id
+        for source_id in entries
+        if _html_identity_class(source_id) == "directory_node"
+    }
+    dependency_edges = {
+        ordinal: source_id
+        for source_id in entries
+        if (ordinal := _html_entry_ordinal(source_id, "edge")) is not None
+        and _html_identity_class(source_id) == "dependency_edge"
+    }
+    containment_edges = {
+        ordinal: source_id
+        for source_id in entries
+        if (ordinal := _html_entry_ordinal(source_id, "contains")) is not None
+        and _html_identity_class(source_id) == "containment_edge"
+    }
+    seen_node_ids: set[str] = set()
+    seen_native: set[str] = set()
+    seen_directories: set[str] = set()
+    for node in raw_nodes:
+        if not isinstance(node, Mapping):
+            violations.append(_violation("ir_surface_mismatch", "GraphIR node is malformed"))
+            continue
+        node_record = cast(Mapping[str, object], node)
+        node_id = node_record.get("id")
+        kind = node_record.get("kind")
+        if isinstance(node_id, str):
+            if node_id in seen_node_ids:
+                violations.append(
+                    _violation(
+                        "ir_surface_mismatch",
+                        "GraphIR contains a duplicate node ID",
+                        rendered_identity=node_id,
+                    )
+                )
+            seen_node_ids.add(node_id)
+        if kind == "repo_path":
+            payload = node_record.get("payload_json")
+            payload_record = cast(Mapping[str, object], payload) if isinstance(payload, Mapping) else None
+            path = payload_record.get("path") if payload_record is not None else None
+            if (
+                not isinstance(node_id, str)
+                or node_id not in native_nodes
+                or path != node_id
+            ):
+                violations.append(_violation("ir_surface_mismatch", "GraphIR has unknown native node", rendered_identity=str(node_id)))
+            else:
+                seen_native.add(node_id)
+        elif kind == "directory":
+            payload = node_record.get("payload_json")
+            payload_record = cast(Mapping[str, object], payload) if isinstance(payload, Mapping) else None
+            path = payload_record.get("path") if payload_record is not None else None
+            if not isinstance(node_id, str) or not isinstance(path, str) or node_id != f"dir:{path}" or path not in directory_nodes:
+                violations.append(_violation("ir_surface_mismatch", "GraphIR directory mapping mismatch", rendered_identity=str(node_id)))
+            else:
+                seen_directories.add(path)
+        else:
+            violations.append(_violation("ir_surface_mismatch", "GraphIR has unknown node kind", rendered_identity=str(node_id)))
+    for path in sorted(set(native_nodes) - seen_native):
+        violations.append(_violation("ir_surface_mismatch", "GraphIR native node is missing", rendered_identity=f"node:{path}"))
+    for path in sorted(set(directory_nodes) - seen_directories):
+        violations.append(_violation("ir_surface_mismatch", "GraphIR directory node is missing", rendered_identity=f"dir:{path}"))
+
+    seen_edge_ids: set[str] = set()
+    seen_dependencies: set[int] = set()
+    seen_containment: set[int] = set()
+    for edge in raw_edges:
+        if not isinstance(edge, Mapping):
+            violations.append(_violation("ir_surface_mismatch", "GraphIR edge is malformed"))
+            continue
+        edge_record = cast(Mapping[str, object], edge)
+        edge_id = edge_record.get("id")
+        payload = edge_record.get("payload_json")
+        if not isinstance(edge_id, str):
+            violations.append(
+                _violation(
+                    "ir_surface_mismatch",
+                    "GraphIR edge has no string ID",
+                    rendered_identity=str(edge_id),
+                )
+            )
+            continue
+        if edge_id in seen_edge_ids:
+            violations.append(
+                _violation(
+                    "ir_surface_mismatch",
+                    "GraphIR contains a duplicate edge ID",
+                    rendered_identity=edge_id,
+                )
+            )
+        seen_edge_ids.add(edge_id)
+        if edge_record.get("relation") == "contains":
+            match = re.fullmatch(r"contains:(\d+)", edge_id)
+            ordinal = int(match.group(1)) if match else None
+            expected_id = containment_edges.get(ordinal) if ordinal is not None else None
+            expected_payload = _html_entry_payload(entries[expected_id]) if expected_id else None
+            if expected_id is None or expected_payload is None or not isinstance(payload, Mapping) or ordinal is None:
+                violations.append(_violation("ir_surface_mismatch", "GraphIR containment mapping mismatch", rendered_identity=str(edge_id)))
+                continue
+            payload_record = cast(Mapping[str, object], payload)
+            expected = {
+                "source": expected_payload.get("source"),
+                "target": expected_payload.get("target"),
+                "parentPath": expected_payload.get("parent_path"),
+                "childPath": expected_payload.get("child_path"),
+                "childKind": expected_payload.get("child_kind"),
+            }
+            if (
+                edge_id != f"contains:{ordinal:06d}"
+                or edge_record.get("kind") != "contains"
+                or edge_record.get("from_node_id") != expected["source"]
+                or edge_record.get("to_node_id") != expected["target"]
+                or set(payload_record) != set(expected)
+                or any(payload_record.get(key) != value for key, value in expected.items())
+            ):
+                violations.append(_violation("ir_surface_mismatch", "GraphIR containment payload mismatch", rendered_identity=str(edge_id)))
+            else:
+                seen_containment.add(ordinal)
+        else:
+            match = re.fullmatch(r"edge:(\d+)", edge_id)
+            ordinal = int(match.group(1)) if match else None
+            expected_id = dependency_edges.get(ordinal) if ordinal is not None else None
+            expected_payload = _html_entry_payload(entries[expected_id]) if expected_id else None
+            if expected_id is None or expected_payload is None or not isinstance(payload, Mapping) or ordinal is None:
+                violations.append(_violation("ir_surface_mismatch", "GraphIR dependency mapping mismatch", rendered_identity=str(edge_id)))
+                continue
+            payload_record = cast(Mapping[str, object], payload)
+            expected_values = {
+                "direction": expected_payload.get("direction"),
+                "kind": expected_payload.get("kind"),
+                "source": expected_payload.get("source"),
+                "target": expected_payload.get("target"),
+                "row": ordinal,
+            }
+            if (
+                edge_id != f"edge:{ordinal:06d}"
+                or edge_record.get("relation") != expected_values["direction"]
+                or edge_record.get("kind") != expected_values["kind"]
+                or edge_record.get("from_node_id") != expected_values["source"]
+                or edge_record.get("to_node_id") != expected_values["target"]
+                or set(payload_record) != set(expected_values)
+                or any(payload_record.get(key) != value for key, value in expected_values.items())
+            ):
+                violations.append(_violation("ir_surface_mismatch", "GraphIR dependency payload mismatch", rendered_identity=str(edge_id)))
+            else:
+                seen_dependencies.add(ordinal)
+    for ordinal in sorted(set(dependency_edges) - seen_dependencies):
+        violations.append(_violation("ir_surface_mismatch", "GraphIR dependency edge is missing", rendered_identity=f"edge:{ordinal:06d}"))
+    for ordinal in sorted(set(containment_edges) - seen_containment):
+        violations.append(_violation("ir_surface_mismatch", "GraphIR containment edge is missing", rendered_identity=f"contains:{ordinal:06d}"))
+    return violations
+
+
+def _html_readback(
+    artifact_text: str,
+    manifest: ProjectionCoverageManifest,
+    *,
+    artifact_id: str,
+    artifact_format: ArtifactFormat,
+    renderer_id: str,
+) -> ReadbackProjection:
+    parser = _HTMLReadbackParser()
+    try:
+        parser.feed(artifact_text)
+        parser.close()
+    except (TypeError, ValueError) as exc:
+        return _readback_failure(
+            artifact_id,
+            artifact_format,
+            renderer_id,
+            [_violation("malformed_resource_locator", str(exc))],
+        )
+    violations = _html_resource_and_ir_violations(parser, manifest)
+    required_surfaces = {
+        "static-graph", "node-table", "edge-table", "directory-node-table", "directory-edge-table"
+    }
+    missing_surfaces = sorted(required_surfaces - parser.svg_ids - parser.tables)
+    for surface in missing_surfaces:
+        violations.append(_violation("visible_surface_missing", f"required visible surface is absent: {surface}", artifact_locator=surface))
+    entries = {entry["readback_identity"]: entry for entry in manifest["entries"]}
+    by_surface: dict[str, dict[str, _HTMLVisibleRecord]] = {}
+    for record in parser.records:
+        if record.source_id not in entries:
+            violations.append(_violation("orphan_rendered_identity", "visible surface contains an unknown identity", rendered_identity=record.source_id, artifact_locator=record.source))
+            continue
+        surface_entries = by_surface.setdefault(record.surface, {})
+        if record.source_id in surface_entries:
+            violations.append(_violation("visible_identity_duplicate", "identity occurs more than once on one visible surface", rendered_identity=record.source_id, artifact_locator=record.surface))
+            continue
+        if not _html_visible_record_valid(record, entries[record.source_id]):
+            violations.append(_violation("ir_surface_mismatch", "visible identity payload does not match its source ID", rendered_identity=record.source_id, artifact_locator=record.surface))
+            continue
+        surface_entries[record.source_id] = record
+
+    native_ids = {source_id for source_id in entries if _html_identity_class(source_id) == "native_node"}
+    dependency_ids = {source_id for source_id in entries if _html_identity_class(source_id) == "dependency_edge"}
+    directory_ids = {source_id for source_id in entries if _html_identity_class(source_id) == "directory_node"}
+    containment_ids = {source_id for source_id in entries if _html_identity_class(source_id) == "containment_edge"}
+    required_by_surface = {
+        "static-node": native_ids,
+        "static-edge": dependency_ids,
+        "node-table": native_ids,
+        "edge-table": dependency_ids,
+        "directory-node-table": directory_ids,
+        "directory-edge-table": containment_ids,
+    }
+    for surface, expected_ids in required_by_surface.items():
+        actual = set(by_surface.get(surface, {}))
+        for source_id in sorted(expected_ids - actual):
+            violations.append(_violation("visible_identity_missing", "required visible identity is absent", rendered_identity=source_id, artifact_locator=surface))
+
+    identities: dict[str, ProjectionCoverageEntry] = {}
+    for source_id, entry in entries.items():
+        if any(source_id in surface_records for surface_records in by_surface.values()):
+            identities[entry["readback_identity"]] = entry
+        elif source_id in entries:
+            violations.append(_violation("marker_only_identity", "identity exists only in non-visible marker/IR content", source_item_id=entry["source_item_id"], rendered_identity=entry["rendered_identity"]))
+    counts = _counts_from_entries(tuple(identities.values()))
+    reconstructed_entries = sorted(
+        identities.values(),
+        key=lambda entry: (entry["source_item_id"], entry["rendered_identity"], entry["readback_identity"]),
+    )
+    digest = _coverage_digest(manifest, entries=reconstructed_entries, readback_counts=counts)
+    if digest != manifest["coverage_digest"]:
+        violations.append(_violation("readback_mismatch", "reconstructed coverage digest mismatch"))
+    complete = _sorted_violations((*manifest["violations"], *violations))
+    return {
+        "artifact_id": artifact_id,
+        "artifact_format": artifact_format,
+        "renderer_id": renderer_id,
+        "identities": identities,
+        "readback_counts": counts,
+        "coverage_digest": digest,
+        "status": "fail" if complete else "pass",
+        "violations": complete,
+    }
 
 
 def _markdown_projection_shape(artifact_text: str) -> tuple[int, bool]:
@@ -1752,6 +2824,19 @@ def readback_projection(
                     artifact_locator=artifact_id,
                 )
             )
+    if artifact_format == "html" and renderer_id == "dependency-manifest-graph":
+        html_readback = _html_readback(
+            artifact_text,
+            manifest,
+            artifact_id=artifact_id,
+            artifact_format=artifact_format,
+            renderer_id=renderer_id,
+        )
+        if violations:
+            complete = _sorted_violations((*html_readback["violations"], *violations))
+            html_readback["violations"] = complete
+            html_readback["status"] = "fail" if complete else "pass"
+        return html_readback
     identities: dict[str, ProjectionCoverageEntry] = {}
     for entry in manifest["entries"]:
         copied = _copy_entry(entry, renderer_id, violations)

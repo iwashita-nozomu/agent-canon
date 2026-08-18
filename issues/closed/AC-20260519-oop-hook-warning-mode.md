@@ -23,7 +23,7 @@ affected_surfaces: .codex/hooks/oop_readability_guard.py, .codex/hooks.json, tes
 edit_scope: reports/dependency-review/oop-hook-warning-mode-20260519/dependency_edit_scope.txt
 required_action: Change the OOP readability hook from a source-edit blocker to a warning/logging hook while keeping explicit readability validation available as a closeout gate.
 close_condition: OOP hook findings no longer stop editing tools, hook logs preserve warning evidence, and targeted hook tests cover the warning behavior.
-github_issue: pending
+github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/580
 resolved_by: PR #144; the OOP hook warning path approves edits while preserving finding evidence, and targeted hook tests cover warning behavior.
 resolved_at: 2026-06-07
 

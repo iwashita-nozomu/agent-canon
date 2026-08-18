@@ -17,13 +17,29 @@ import json
 import subprocess
 import sys
 import tempfile
+import os
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
-
-UTC = timezone.utc
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypeAlias, cast
+
+try:
+    from .parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
 
 SCHEMA = "agent_canon.git_dependency_diff_summary.v1"
 TOOL_DIR = Path(__file__).resolve().parent
@@ -40,6 +56,7 @@ CODE_SUFFIXES = {
     ".h",
     ".hpp",
     ".py",
+    ".rs",
     ".sh",
     ".zsh",
 }
@@ -99,6 +116,7 @@ class DependencyArtifacts:
     dependency_dir: Path
     commands: CommandMap
     status_code: int
+    code_analysis_path: Path | None = None
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -375,9 +393,20 @@ def code_scan_paths(root: Path, rows: Sequence[ChangedPath]) -> list[str]:
 
 def write_text(path: Path, text: str) -> Path:
     """Write UTF-8 text and return the path."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
-    return path
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="dependency-diff")
+        )
+        ParentRootSideEffectBoundary().write_parent_owned_file(
+            attestation, path, text.encode("utf-8"), "dependency-diff"
+        )
+        return path
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        "dependency-diff: explicit parent root is required",
+    )
 
 
 def run_capture(
@@ -514,10 +543,12 @@ def run_code_dependency_scan(
 ) -> tuple[Path, CommandMap, int]:
     """Run the existing code dependency scanner when source files changed."""
     code_dependencies_path = report_dir / "code_dependencies.tsv"
+    code_analysis_path = report_dir / "code_analysis.json"
     commands: CommandMap = {}
     status_code = 0
     if skip:
         write_text(code_dependencies_path, "")
+        write_text(code_analysis_path, json.dumps({"schema_version": "agent-canon.lsp-code-analysis.v1", "status": "skipped"}) + "\n")
     else:
         scan_paths = code_scan_paths(root, rows)
         if scan_paths:
@@ -528,6 +559,8 @@ def run_code_dependency_scan(
                     str(TOOL_DIR / "scan_code_dependencies.sh"),
                     "--root",
                     str(root),
+                    "--analysis-json",
+                    str(code_analysis_path),
                     *scan_paths,
                 ],
                 stdout_path=code_dependencies_path,
@@ -537,6 +570,7 @@ def run_code_dependency_scan(
             status_code = max(status_code, record.returncode)
         else:
             write_text(code_dependencies_path, "")
+            write_text(code_analysis_path, json.dumps({"schema_version": "agent-canon.lsp-code-analysis.v1", "status": "empty"}) + "\n")
     return code_dependencies_path, commands, status_code
 
 
@@ -617,6 +651,10 @@ def build_summary(
             "changed_files": diff_artifacts.changed_files_path.as_posix(),
             "git_stat": diff_artifacts.git_stat_path.as_posix(),
             "code_dependencies": dependency_artifacts.code_dependencies_path.as_posix(),
+            "code_analysis": (
+                dependency_artifacts.code_analysis_path
+                or dependency_artifacts.code_dependencies_path.with_name("code_analysis.json")
+            ).as_posix(),
             "dependency_review_dir": dependency_dir.as_posix(),
             "dependency_graph": (dependency_dir / "dependency_graph.tsv").as_posix(),
             "dependency_edit_scope": (
@@ -662,12 +700,41 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         root = Path(str(args.root)).resolve()
-        report_dir = (
-            Path(args.report_dir)
-            if args.report_dir
-            else Path(tempfile.mkdtemp(prefix="agent-canon-git-dependency-diff-"))
+        if args.report_dir:
+            report_dir = Path(args.report_dir)
+        else:
+            configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+            if configured:
+                parent = Path(configured).resolve(strict=True)
+                attestation = attest_parent_root(
+                    ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="dependency-diff-temp")
+                )
+                base = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
+                    attestation, parent / ".agent-canon" / "tmp" / "dependency-diff", "dependency-diff-temp"
+                )
+                report_dir = Path(tempfile.mkdtemp(prefix="agent-canon-git-dependency-diff-", dir=base.physical_path))
+            else:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.HANDOFF_INVALID,
+                    "dependency-diff-temp: explicit parent root is required",
+                )
+        configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+        if not configured:
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID,
+                "dependency-diff-output: explicit parent root is required",
+            )
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(
+                cwd=parent,
+                explicit_root=parent,
+                purpose="dependency-diff-output",
+            )
         )
-        report_dir.mkdir(parents=True, exist_ok=True)
+        report_dir = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
+            attestation, report_dir, "dependency-diff-output"
+        ).physical_path
         dependency_dir = report_dir / "dependency-review"
         diff = diff_spec_from_args(args)
         diff_artifacts = write_diff_artifacts(root, report_dir, diff)
@@ -677,6 +744,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             rows=diff_artifacts.rows,
             skip=args.skip_code_dependencies,
         )
+        code_analysis_path = report_dir / "code_analysis.json"
         dependency_commands, dependency_status = run_dependency_review(
             root=root,
             report_dir=report_dir,
@@ -688,6 +756,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         status = max(code_status, dependency_status)
         dependency_artifacts = DependencyArtifacts(
             code_dependencies_path=code_path,
+            code_analysis_path=code_analysis_path,
             dependency_dir=dependency_dir,
             commands={**code_commands, **dependency_commands},
             status_code=status,

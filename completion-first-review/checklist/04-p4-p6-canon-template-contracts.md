@@ -29,17 +29,17 @@ when shared-canon propagation and contract checks are ready for later layers.
 
 ### [ ] P4-002: reject root view direct edits
 
-- Target: root symlink views such as `agents/`, `.agents/`, `tools/`, `mcp/` in Template/derived repos.
+- Target: the active AgentCanon root views `AGENTS.md`, `.codex/config.toml`, and `tools/agent-canon` in Template/derived repos.
 - Problem: root view can be edited instead of source.
-- Action: classify `root_symlink_view` and require source edit route.
+- Action: classify these three paths as `root_symlink_view` and require the AgentCanon source edit route; classify other runtime directories as parent-owned regular content.
 - Acceptance: direct root view edit fails unless explicitly allowed by profile.
 
 ### [ ] P4-003: synced-copy source hash
 
-- Target: root copied surfaces such as GitHub workflow copies.
-- Problem: root copy can drift from AgentCanon source.
-- Action: record source path and source hash.
-- Acceptance: hash mismatch fails strict/release completion.
+- Target: retired regular-parent surfaces such as `.github`, `.devcontainer`, `.vscode`, `agents`, `.agents`, and other project runtime directories.
+- Problem: retired copy/symlink assumptions can overwrite parent content or recreate a second source of truth.
+- Action: classify these paths as `parent_owned_regular`; preserve their bytes and do not render, hash, or read back AgentCanon copies.
+- Acceptance: the retired regular-parent boundary is explicit and no AgentCanon projection is required.
 
 ### [ ] P4-004: submodule dirty gate
 
@@ -118,9 +118,11 @@ when shared-canon propagation and contract checks are ready for later layers.
 ### [ ] P6-002: dirty preflight policy
 
 - Target: repository start wrapper.
-- Problem: dirty state can block latest check without clear route.
-- Action: distinguish repo-local dirty from shared-canon dirty.
-- Acceptance: dirty shared-canon state routes to AgentCanon PR/proposal, not silent pin refresh.
+- Problem: path-level overwrite risk can be hidden by a coarse dirty-state gate.
+- Action: preserve dirty state as evidence and compare local materialized paths
+  with the virtual merge result write set.
+- Acceptance: only a typed merge conflict or unpreservable materialization
+  collision blocks; non-colliding dirty state continues.
 
 ### [ ] P6-003: Docker profile split
 

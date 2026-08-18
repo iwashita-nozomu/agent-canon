@@ -29,7 +29,9 @@ def write_minimal_inventory(path: Path) -> None:
         "summary": ["summary line 1", "summary line 2"],
         "profile_classes": [
             {
+                "id": "base-project",
                 "profile": "Base project",
+                "strict_dependency_graph_required": False,
                 "activates": ["`README.md`"],
                 "required_when": "Every repo",
             }

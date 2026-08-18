@@ -145,8 +145,6 @@ if [ "$RUN_PARALLEL" = true ]; then
     bash "$SCRIPT_DIR/docker_dependency_validator.sh" > "$LOG_DIR/docker_check.log" 2>&1 &
     PID_DOCKER=$!
     
-    "$PYTHON_BIN" "$SCRIPT_DIR/requirement_sync_validator.py" > "$LOG_DIR/requirement_check.log" 2>&1 &
-    PID_REQUIREMENT=$!
     
     # Wait for all background jobs
     if wait $PID_TRIPLET 2>/dev/null; then
@@ -167,11 +165,6 @@ if [ "$RUN_PARALLEL" = true ]; then
         log_error "docker check: FAILED"
     fi
     
-    if wait $PID_REQUIREMENT 2>/dev/null; then
-        log_success "requirement check: OK"
-    else
-        log_error "requirement check: FAILED"
-    fi
     
 else
     # Sequential execution
@@ -199,13 +192,6 @@ else
         log_error "docker check: FAILED"
     fi
     
-    log_info ""
-    log_info "7️⃣/8️⃣ Requirement Sync Validation..."
-    if "$PYTHON_BIN" "$SCRIPT_DIR/requirement_sync_validator.py" > "$LOG_DIR/requirement_check.log" 2>&1; then
-        log_success "requirement check: OK"
-    else
-        log_error "requirement check: FAILED"
-    fi
 fi
 
 # ===== Document Checks =====

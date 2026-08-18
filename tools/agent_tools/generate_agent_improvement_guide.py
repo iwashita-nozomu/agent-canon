@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Generates PR and push-time guidance from AgentCanon memory, eval, hook, and issue evidence.
+# responsibility Generates bounded PR/manual guidance from AgentCanon memory, eval, hook, and issue evidence.
 # upstream design ../../evidence/agent-evals/README.md eval evidence contract
 # upstream design ../../documents/runtime/runtime-log-archive.md hook result accumulation contract
 # upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
 # upstream implementation ./historical_skill_usage_reader.py reads archived skill_usage.jsonl read-only
 # upstream design ../../issues/README.md durable operational issue storage
-# downstream implementation ../../.github/workflows/agent-improvement-guide.yml runs this on PR and push
+# downstream implementation ../../.github/workflows/agent-improvement-guide.yml runs this on selected PR paths and manual dispatch
 # downstream implementation ../../tests/agent_tools/test_generate_agent_improvement_guide.py tests guide generation
 # @dependency-end
 """Generate a deterministic AgentCanon improvement guide."""
@@ -533,19 +533,9 @@ class AgentImprovementGuide:
         return tuple(sorted(reports))
 
     def memory_entry_counts(self) -> dict[str, int]:
-        """Return bullet-entry counts for shared memory notes."""
-        counts: dict[str, int] = {}
-        for relative in ("memory/USER_PREFERENCES.md", "memory/AGENT_PHILOSOPHY.md"):
-            path = self.root / relative
-            if not path.is_file():
-                counts[relative] = 0
-                continue
-            counts[relative] = sum(
-                1
-                for line in path.read_text(encoding="utf-8").splitlines()
-                if line.startswith("- ") and "まだなし" not in line
-            )
-        return counts
+        """Return the number of self-contained on-demand memory records."""
+        records_dir = self.root / "memory" / "records"
+        return {"memory/records": len(tuple(records_dir.glob("*.md")))}
 
     def skill_eval_failed(self, path: Path) -> bool:
         """Return whether one accumulated skill eval report is failing."""

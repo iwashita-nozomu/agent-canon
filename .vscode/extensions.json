@@ -1,13 +1,4 @@
 {
-  "_dependency_manifest": [
-    "@dependency-start",
-    "contract reference",
-    "responsibility Lists recommended VS Code extensions for AgentCanon-managed workspace ergonomics.",
-    "upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface policy",
-    "upstream design ../documents/contracts/github-first-module-and-devcontainer-policy.md VS Code and devcontainer boundary policy",
-    "upstream environment ../.devcontainer/devcontainer.json shared devcontainer entrypoint",
-    "@dependency-end"
-  ],
   "recommendations": [
     "ms-vscode-remote.remote-containers",
     "ms-python.python",

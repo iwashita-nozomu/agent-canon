@@ -4,103 +4,157 @@
 # responsibility Provides run managed experiment experiment workflow tooling.
 # upstream design ../README.md shared automation index
 # upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 composition and terminal frame
-# upstream design ../../documents/design/experiment_runner.md external ExperimentRunner ownership and task boundary
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md external admitted CLI ownership and task boundary
 # upstream implementation ./execution_resource_plan.py canonical admission planning and terminal owner
-# upstream implementation ../../documents/experiments/experiment-runner-ff97-lifecycle.md fixed ff97 StandardRunner lifecycle and scheduler source identity
+# upstream implementation ../../documents/experiments/experiment-runner-ff97-lifecycle.md fixed generic runner lifecycle and scheduler source identity
 # downstream implementation ../../documents/experiments/gpu-admission-r5-ordered-integration-interface.json ordered W2-W4 interface
 # downstream implementation ../../templates/experiments/_template/run.py exposes the topic main adapted from the frozen snapshot
 # downstream implementation ../../tests/tools/test_run_managed_experiment.py validates the sole composition and frozen topic adapter
 # upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md NVIDIA process/PID/MIG/UUID visibility gate
+# upstream environment ../../agent-canon-environment.toml audited ExperimentRunner provider identity and runtime item
 # @dependency-end
 
 # Static route evidence: run_cli -> execute_managed_run ->
-# StandardFullResourceScheduler.from_worker -> StandardRunner.run(worker) ->
-# terminal reducers -> cleanup. Alternate managed GPU launch routes: none; the
-# fixed opaque-UUID composition is the only managed route.
+# experiment-runner-admitted --request ... --result ... -> terminal reducers ->
+# cleanup. Alternate managed GPU launch routes: none; the fixed opaque-UUID
+# composition is the only managed route.
 
 """Run one experiment while recording canonical server-side run metadata."""
 
 from __future__ import annotations
 
 import argparse
-from contextlib import AbstractContextManager
 import hashlib
 import json
 import os
 import platform
-import runpy
+import secrets
 import shlex
 import shutil
 import socket
 import subprocess
 import sys
 import time
+from collections.abc import Callable, Mapping
+from contextlib import AbstractContextManager
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
-
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable, Mapping, cast
+from typing import TYPE_CHECKING, Literal, TypeAlias, cast
 
-from tools.experiments.execution_resource_plan import (
-    AdmittedEnvironment,
-    CALLER_ALLOCATION_PROVENANCE,
-    COMPLETION_COVERAGE_FILENAME,
-    CompletionCoverageAdapter,
-    ConcurrentRunEvidence,
-    DiscoveredResources,
-    DescendantRetentionEvidence,
-    EvidenceAbsenceField,
-    EvidenceDisposition,
-    EvidenceAbsence,
-    GPUAllocation,
-    GpuProcessOccupancyProbe,
-    GpuReservationTransaction,
-    LockPlacementEvidence,
-    LockReadback,
-    MigEvidence,
-    ProcessOccupancyEvidence,
-    FailureRecord,
-    FdReleaseEvidence,
-    GpuRunRequest,
-    HOST_RUNTIME_ROOT,
-    ManagedGpuOutcomeReducer,
-    PostToolUseProjectionReducer,
-    ResourceRequest,
-    ResourcePlanError,
-    ExecutionResourcePlan,
-    RuntimeIdentityReceipt,
-    TypedPreflightFailure,
-    NvidiaSMIResourceProbe,
-    freeze_resource_plan,
-    managed_run_adapter_integration_contract,
-    read_shared_runtime_provision,
-    read_shared_runtime_readback,
-    RuntimeIdentityReader,
-    RunGpuAdmissionReceipt,
-    SourceFreezeOwner,
-    UuidVisibilityEvidence,
-    build_completion_coverage_input,
-    build_source_path_set,
-    _normalize_failure,
-)
-from experiment_runner import (
-    ExecutionResult,
-    FullResourceCapacity,
-    FullResourceEstimate,
-    StandardFullResourceScheduler,
-    StandardRunner,
-    StandardWorker,
-    RunnerLifecycleEvidence,
-    TaskContext,
-    apply_environment_variables,
-)
-
-UTC = timezone.utc
+if __package__:
+    from tools.experiments.execution_resource_plan import (
+        CALLER_ALLOCATION_PROVENANCE,
+        COMPLETION_COVERAGE_FILENAME,
+        HOST_RUNTIME_ROOT,
+        AdmittedEnvironment,
+        CompletionCoverageAdapter,
+        ConcurrentRunEvidence,
+        DescendantRetentionEvidence,
+        DiscoveredResources,
+        EvidenceAbsence,
+        EvidenceAbsenceField,
+        EvidenceDisposition,
+        ExecutionResourcePlan,
+        FailureRecord,
+        FdReleaseEvidence,
+        GPUAllocation,
+        GpuProcessOccupancyProbe,
+        GpuReservationTransaction,
+        GpuRunRequest,
+        LockPlacementEvidence,
+        LockReadback,
+        ManagedGpuOutcomeReducer,
+        MigEvidence,
+        NvidiaSMIResourceProbe,
+        PostToolUseProjectionReducer,
+        ProcessOccupancyEvidence,
+        ResourcePlanError,
+        ResourceRequest,
+        RunGpuAdmissionReceipt,
+        RuntimeIdentityReader,
+        RuntimeIdentityReceipt,
+        SourceFreezeOwner,
+        TypedPreflightFailure,
+        UuidVisibilityEvidence,
+        _normalize_failure,
+        build_completion_coverage_input,
+        build_lock_bound_admission_receipt,
+        build_source_path_set,
+        freeze_resource_plan,
+        managed_run_adapter_integration_contract,
+        read_shared_runtime_provision,
+        read_shared_runtime_readback,
+    )
+    from tools.experiments.experiment_identity import (
+        ExperimentIdentity,
+        ExperimentIdentityError,
+        contained_path,
+        identity_from_manifest,
+        load_json_file,
+        load_json_text,
+        report_relative_path,
+        validate_segment,
+    )
+else:
+    from execution_resource_plan import (  # type: ignore[no-redef]
+        CALLER_ALLOCATION_PROVENANCE,
+        COMPLETION_COVERAGE_FILENAME,
+        HOST_RUNTIME_ROOT,
+        AdmittedEnvironment,
+        CompletionCoverageAdapter,
+        ConcurrentRunEvidence,
+        DescendantRetentionEvidence,
+        DiscoveredResources,
+        EvidenceAbsence,
+        EvidenceAbsenceField,
+        EvidenceDisposition,
+        ExecutionResourcePlan,
+        FailureRecord,
+        FdReleaseEvidence,
+        GPUAllocation,
+        GpuProcessOccupancyProbe,
+        GpuReservationTransaction,
+        GpuRunRequest,
+        LockPlacementEvidence,
+        LockReadback,
+        ManagedGpuOutcomeReducer,
+        MigEvidence,
+        NvidiaSMIResourceProbe,
+        PostToolUseProjectionReducer,
+        ProcessOccupancyEvidence,
+        ResourcePlanError,
+        ResourceRequest,
+        RunGpuAdmissionReceipt,
+        RuntimeIdentityReader,
+        RuntimeIdentityReceipt,
+        SourceFreezeOwner,
+        TypedPreflightFailure,
+        UuidVisibilityEvidence,
+        _normalize_failure,
+        build_completion_coverage_input,
+        build_lock_bound_admission_receipt,
+        build_source_path_set,
+        freeze_resource_plan,
+        managed_run_adapter_integration_contract,
+        read_shared_runtime_provision,
+        read_shared_runtime_readback,
+    )
+    from experiment_identity import (  # type: ignore[no-redef]
+        ExperimentIdentity,
+        ExperimentIdentityError,
+        contained_path,
+        identity_from_manifest,
+        load_json_file,
+        load_json_text,
+        report_relative_path,
+        validate_segment,
+    )
 
 DEFAULT_REQUIRED_EVAL_ARTIFACTS = ("summary.json", "cases.jsonl", "config.json")
 CONFIG_SOURCE_SNAPSHOT_NAME = "config_source.yaml"
@@ -111,6 +165,22 @@ ARTIFACT_MANIFEST_NAME = "artifact_manifest.json"
 STARTUP_LOG_NAME = "startup.jsonl"
 STDOUT_LOG_NAME = "stdout.log"
 STDERR_LOG_NAME = "stderr.log"
+MANAGED_RUN_EXECUTABLE = "experiment-runner-admitted"
+MANAGED_RUN_REQUEST_SCHEMA = "agentcanon-managed-run/v1"
+MANAGED_RUN_RESULT_SCHEMA = "agentcanon-managed-run-result/v1"
+MANAGED_RUN_PROVIDER_REPOSITORY = "https://github.com/iwashita-nozomu/experiment-runner"
+MANAGED_RUN_PROVIDER_COMMIT = "71b3630266151703bdf88b11741b7492eca92fb4"
+MANAGED_RUN_PROVIDER_CONTRACT_PATH = "documents/experiment-runner-admission.md"
+MANAGED_RUN_PROVIDER_CONTRACT_SHA256 = (
+    "2de2b63aac3076e6aacdf1ff10b2c35a0235e835504aeff2db92a7750a720d85"
+)
+MANAGED_RUN_PROVIDER_INVOCATION = (
+    "experiment-runner-admitted --request <path> --result <path>"
+)
+MANAGED_RUN_REQUEST_FILENAME = "managed-run-request.json"
+MANAGED_RUN_RESULT_FILENAME = "managed-run-result.json"
+MANAGED_RUN_RECEIPT_FILENAME = "managed-run-receipt.json"
+MANAGED_RUN_LIFECYCLE_FILENAME = "managed-run-lifecycle.json"
 MANAGED_RUN_ARTIFACTS = frozenset(
     {
         "run_manifest.json",
@@ -126,6 +196,8 @@ MANAGED_RUN_ARTIFACTS = frozenset(
         f"logs/{STDERR_LOG_NAME}",
     }
 )
+RESERVATION_MARKER_NAME = ".agentcanon-reservation.json"
+RESERVATION_MARKER_SCHEMA = "agentcanon.experiment-reservation/v1"
 FILE_READ_CHUNK_BYTES = 1024 * 1024
 PREFLIGHT_FAILURE_EXIT_CODE = 2
 DURATION_ROUND_DIGITS = 3
@@ -175,13 +247,12 @@ class RegistryContext:
     available: bool
 
 
-@dataclass(frozen=True)
-class RunIdentity:
-    """Stable identifiers for one managed experiment run."""
-
-    topic: str
-    run_name: str
-    variant: str
+# Compatibility name for imports in downstream adapters.  The canonical owner
+# is ExperimentIdentity; no second identity schema is maintained here.
+if TYPE_CHECKING:
+    RunIdentity: TypeAlias = ExperimentIdentity
+else:
+    RunIdentity = ExperimentIdentity
 
 
 @dataclass(frozen=True)
@@ -246,20 +317,116 @@ class RunContext:
 
 
 @dataclass(frozen=True)
-class _ManagedTopicCase:
-    """One exact topic entrypoint bound to the frozen source snapshot."""
+class ReservationReceipt:
+    """Record the exact empty paths reserved by one runner invocation."""
 
-    entrypoint_relative_path: str
-    argv: tuple[str, ...]
-    snapshot_root: str
-    environment_variables: tuple[tuple[str, str], ...]
+    result_dir: Path
+    report_path: Path
+    report_content: str | None
+    result_parent: Path
+    result_parent_preexisted: bool
+    report_parent: Path
+    report_parent_preexisted: bool
+    token: str
+    marker_path: Path
+    result_inode: int
+    marker_inode: int
+    report_reserved: bool
+    report_inode: int | None
+    result_parent_inode: int
+    report_parent_inode: int | None
+    identity: ExperimentIdentity
+
+
+@dataclass(frozen=True)
+class ManagedRunExecutionResult:
+    """Result projected from the external admitted-runner protocol."""
+
+    status: Literal["ok", "failed"]
+    raw_exit_code: int
+    failure_kind: str | None = None
+    message: str | None = None
+    source: str = MANAGED_RUN_EXECUTABLE
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "status": self.status,
+            "raw_exit_code": self.raw_exit_code,
+            "failure_kind": self.failure_kind,
+            "message": self.message,
+            "source": self.source,
+        }
+
+
+@dataclass(frozen=True)
+class ManagedRunLifecycleEvidence:
+    """Provider lifecycle evidence returned by the admitted-run CLI."""
+
+    run_id: str
+    terminal_event_id: str
+    observed_at_ns: int
+    terminal_status: str
+    total_case_count_at_start: int
+    completion_count_before: int
+    completion_count_after: int
+    scheduler_completed: bool
+    admitted_case_count: int
+    terminal_notification_count: int
+    child_process_ids: tuple[int, ...]
+    process_group_ids: tuple[int, ...]
+    direct_children_quiescent: bool
+    descendant_quiescence: Literal["proved", "no_child", "unproven"]
+    cleanup_failures: tuple[str, ...]
+    terminal_coverage_complete: bool
+    requested_case_coverage_complete: bool
+    quiescence_complete: bool
+    completion_coverage_complete: bool
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "run_id": self.run_id,
+            "terminal_event_id": self.terminal_event_id,
+            "observed_at_ns": self.observed_at_ns,
+            "terminal_status": self.terminal_status,
+            "total_case_count_at_start": self.total_case_count_at_start,
+            "completion_count_before": self.completion_count_before,
+            "completion_count_after": self.completion_count_after,
+            "scheduler_completed": self.scheduler_completed,
+            "admitted_case_count": self.admitted_case_count,
+            "terminal_notification_count": self.terminal_notification_count,
+            "child_process_ids": self.child_process_ids,
+            "process_group_ids": self.process_group_ids,
+            "direct_children_quiescent": self.direct_children_quiescent,
+            "descendant_quiescence": self.descendant_quiescence,
+            "cleanup_failures": self.cleanup_failures,
+            "terminal_coverage_complete": self.terminal_coverage_complete,
+            "requested_case_coverage_complete": self.requested_case_coverage_complete,
+            "quiescence_complete": self.quiescence_complete,
+            "completion_coverage_complete": self.completion_coverage_complete,
+        }
+
+
+def _lifecycle_quiescence_is_proven(
+    lifecycle: ManagedRunLifecycleEvidence | None,
+) -> bool:
+    """Return the provider-backed lock-release predicate without defaults."""
+    return bool(
+        lifecycle is not None
+        and lifecycle.quiescence_complete
+        and lifecycle.direct_children_quiescent
+        and lifecycle.descendant_quiescence in {"proved", "no_child"}
+        and not lifecycle.cleanup_failures
+        and lifecycle.completion_coverage_complete
+    )
 
 
 def build_admitted_environment(
     plan: ExecutionResourcePlan,
     runtime_identity: RuntimeIdentityReceipt,
+    *,
+    admission_fingerprint: str | None,
 ) -> AdmittedEnvironment:
-    """Build the exact opaque-UUID environment before generic runner construction."""
+    """Build the exact UUID environment only after plan freeze and admission."""
     if runtime_identity.runtime_route != "MANAGED_CONTAINER":
         raise TypedPreflightFailure(
             "runtime_identity_route_invalid",
@@ -267,6 +434,31 @@ def build_admitted_environment(
             runtime_route=runtime_identity.runtime_route,
         )
     selected = tuple(plan.gpu_allocation.selected_ids)
+    bound_fingerprint = admission_fingerprint
+    if selected and (not isinstance(bound_fingerprint, str) or not bound_fingerprint):
+        raise TypedPreflightFailure(
+            "admission_fingerprint_missing",
+            "admitted environment requires the lock-held composite admission fingerprint",
+        )
+    raw_gpu_resources = plan.resources.get("gpu", {})
+    plan_bound_fingerprint = (
+        raw_gpu_resources.get("admission_fingerprint")
+        if isinstance(raw_gpu_resources, Mapping)
+        else None
+    )
+    allocation_bound_fingerprint = getattr(
+        plan.gpu_allocation,
+        "admission_fingerprint",
+        None,
+    )
+    if selected and (
+        allocation_bound_fingerprint != bound_fingerprint
+        or plan_bound_fingerprint != bound_fingerprint
+    ):
+        raise TypedPreflightFailure(
+            "admission_fingerprint_mismatch",
+            "plan and admitted environment do not reference the same composite admission fingerprint",
+        )
     raw_environment = plan.execution.get("env")
     if not isinstance(raw_environment, Mapping) or any(
         not isinstance(key, str) or not isinstance(value, str)
@@ -278,19 +470,18 @@ def build_admitted_environment(
         )
     environment = {str(key): str(value) for key, value in raw_environment.items()}
     expected = ",".join(selected)
+    if selected and any(
+        name in environment
+        for name in ("CUDA_VISIBLE_DEVICES", "NVIDIA_VISIBLE_DEVICES")
+    ):
+        raise TypedPreflightFailure(
+            "gpu_visibility_before_plan_freeze",
+            "GPU visibility must be absent from the pre-freeze environment",
+            selected_uuids=selected,
+        )
     if selected:
-        if environment.get("CUDA_VISIBLE_DEVICES") != expected:
-            raise TypedPreflightFailure(
-                "admitted_environment_uuid_mismatch",
-                "CUDA_VISIBLE_DEVICES is not the exact frozen UUID set",
-                selected_uuids=selected,
-            )
-        if environment.get("NVIDIA_VISIBLE_DEVICES") != expected:
-            raise TypedPreflightFailure(
-                "admitted_environment_uuid_mismatch",
-                "NVIDIA_VISIBLE_DEVICES is not the exact frozen UUID set",
-                selected_uuids=selected,
-            )
+        environment["CUDA_VISIBLE_DEVICES"] = expected
+        environment["NVIDIA_VISIBLE_DEVICES"] = expected
     for name in ("CUDA_VISIBLE_DEVICES", "NVIDIA_VISIBLE_DEVICES"):
         value = environment.get(name)
         if value is not None and any(item.isdecimal() for item in value.split(",")):
@@ -307,6 +498,7 @@ def build_admitted_environment(
                 "exact_env_map": exact_map,
                 "cuda_visible_devices": expected,
                 "nvidia_visible_devices": expected,
+                "admission_fingerprint": bound_fingerprint,
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -320,6 +512,7 @@ def build_admitted_environment(
         cuda_visible_devices=expected,
         nvidia_visible_devices=expected,
         environment_fingerprint=fingerprint,
+        admission_fingerprint=bound_fingerprint,
     )
 
 
@@ -389,31 +582,47 @@ class RunGpuAdmissionContext(AbstractContextManager[GpuRunRequest]):
         return False
 
 
-def _runner_owned_estimate(case: _ManagedTopicCase) -> FullResourceEstimate:
-    """Return the generic runner estimate without GPU-ID ownership."""
-    del case
-    return FullResourceEstimate(
-        host_memory_bytes=0,
-        gpu_count=0,
-        gpu_memory_bytes=0,
-        gpu_slots=1,
-    )
+def _provider_gpu_ids(selected_uuids: tuple[str, ...]) -> tuple[str, ...]:
+    """Forward validated admission identifiers without changing their identity."""
+    if any(
+        not isinstance(value, str) or not value or value != value.strip()
+        for value in selected_uuids
+    ):
+        raise TypedPreflightFailure(
+            "admitted_runner_provider_gpu_identifier_invalid",
+            "selected GPU identifiers must be non-empty, trimmed strings",
+            selected_uuids=selected_uuids,
+            provider_field="selected_gpu_ids",
+        )
+    if len(set(selected_uuids)) != len(selected_uuids):
+        raise TypedPreflightFailure(
+            "admitted_runner_provider_gpu_identifier_duplicate",
+            "selected GPU identifiers must preserve the admission uniqueness contract",
+            selected_uuids=selected_uuids,
+            provider_field="selected_gpu_ids",
+        )
+    return tuple(selected_uuids)
 
 
-def _build_admitted_context(case: _ManagedTopicCase) -> TaskContext:
-    """Build one fresh generic context from the immutable admitted case."""
+def _provider_contract_identity() -> dict[str, str]:
+    """Return the merged provider identity bound into each managed request."""
     return {
-        "environment_variables": dict(case.environment_variables),
-        "working_directory": case.snapshot_root,
+        "repository": MANAGED_RUN_PROVIDER_REPOSITORY,
+        "commit": MANAGED_RUN_PROVIDER_COMMIT,
+        "contract_path": MANAGED_RUN_PROVIDER_CONTRACT_PATH,
+        "contract_sha256": MANAGED_RUN_PROVIDER_CONTRACT_SHA256,
+        "invocation": MANAGED_RUN_PROVIDER_INVOCATION,
     }
 
 
-def _bind_managed_topic_case(
+def _build_managed_run_request(
     context: RunContext,
+    request: GpuRunRequest,
+    plan: ExecutionResourcePlan,
+    admitted_environment: AdmittedEnvironment,
     source_paths: tuple[str, ...],
-    exact_environment: Mapping[str, str],
-) -> _ManagedTopicCase:
-    """Bind the selected CLI entrypoint to its immutable snapshot location."""
+) -> tuple[Path, Path, Path, Mapping[str, object]]:
+    """Serialize the schema-owned request without importing topic code."""
     expected_relative = f"experiments/{context.identity.topic}/run.py"
     try:
         topic_relative = context.topic_dir.resolve().relative_to(
@@ -458,99 +667,467 @@ def _bind_managed_topic_case(
             selected_command=command,
         )
 
-    snapshot_root = context.paths.result_dir / "source_snapshot"
-    snapshot_entrypoint = snapshot_root / expected_relative
-    return _ManagedTopicCase(
-        entrypoint_relative_path=expected_relative,
-        argv=(str(snapshot_entrypoint), *command[2:]),
-        snapshot_root=str(snapshot_root),
-        environment_variables=tuple(sorted(exact_environment.items())),
+    request_path = context.paths.result_dir / "runtime" / MANAGED_RUN_REQUEST_FILENAME
+    result_path = context.paths.result_dir / "runtime" / MANAGED_RUN_RESULT_FILENAME
+    lifecycle_path = context.paths.result_dir / "runtime" / MANAGED_RUN_LIFECYCLE_FILENAME
+    selected_uuids = tuple(plan.gpu_allocation.selected_ids)
+    selected_gpu_ids = _provider_gpu_ids(selected_uuids)
+    payload: dict[str, object] = {
+        **context.identity.to_dict(),
+        "schema": MANAGED_RUN_REQUEST_SCHEMA,
+        "run_id": context.identity.run_name,
+        "task": {
+            "module": f"experiments.{context.identity.topic}.run",
+            "callable": "main",
+        },
+        "cases": [
+            {
+                "argv": command[2:],
+                "entrypoint_relative_path": expected_relative,
+            }
+        ],
+        "environment": dict(admitted_environment.exact_env_map),
+        "capacity": {
+            "max_workers": 1,
+            "host_memory_bytes": request.host_memory_bytes,
+            "gpu_devices": [
+                {
+                    "gpu_id": gpu_id,
+                    "memory_bytes": plan.gpu_allocation.memory_bytes.get(uuid, 0),
+                    "max_slots": 1,
+                }
+                for uuid, gpu_id in zip(selected_uuids, selected_gpu_ids)
+            ],
+        },
+        "resource_estimate": {
+            "host_memory_bytes": request.host_memory_bytes,
+            "gpu_count": request.gpu_requested_count,
+            "gpu_memory_bytes": request.gpu_requested_memory_bytes,
+            "gpu_slots": 1,
+        },
+        "selected_gpu_ids": selected_gpu_ids,
+        "metadata": {
+            "agentcanon_provider_contract": _provider_contract_identity(),
+            "agentcanon_admission_fingerprint": admitted_environment.admission_fingerprint,
+            "agentcanon_plan_fingerprint": plan.plan_fingerprint,
+            "agentcanon_source_paths": source_paths,
+            "agentcanon_source_snapshot_root": str(
+                context.paths.result_dir / "source_snapshot"
+            ),
+            "agentcanon_working_directory": str(
+                context.paths.result_dir / "source_snapshot"
+            ),
+            "agentcanon_output_directory": str(context.paths.result_dir),
+            "agentcanon_lifecycle_artifact_path": str(
+                context.paths.result_dir
+                / "runtime"
+                / MANAGED_RUN_LIFECYCLE_FILENAME
+            ),
+            "agentcanon_selected_uuids": selected_uuids,
+        },
+    }
+    payload["fingerprint"] = hashlib.sha256(
+        json.dumps(
+            payload,
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    request_path.parent.mkdir(parents=True, exist_ok=True)
+    request_path.write_text(
+        json.dumps(payload, sort_keys=True, indent=2),
+        encoding="utf-8",
     )
+    return request_path, result_path, lifecycle_path, payload
 
 
-def _run_topic_case(
-    case: _ManagedTopicCase,
-    context: TaskContext,
-) -> ExecutionResult:
-    """Load the topic main from the frozen snapshot in the generic child."""
-    working_directory = context.get("working_directory")
-    if working_directory != case.snapshot_root:
+def _resolve_admitted_runner() -> str:
+    configured = os.environ.get(
+        "AGENT_CANON_EXPERIMENT_RUNNER_ADMITTED",
+        MANAGED_RUN_EXECUTABLE,
+    )
+    resolved = shutil.which(configured)
+    if resolved is None and Path(configured).is_file() and os.access(configured, os.X_OK):
+        resolved = str(Path(configured).resolve())
+    if resolved is None:
         raise TypedPreflightFailure(
-            "gpu_source_snapshot_cwd_mismatch",
-            "managed topic context did not retain the frozen source snapshot root",
+            "admitted_runner_cli_missing",
+            "experiment-runner-admitted CLI is unavailable",
+            executable=MANAGED_RUN_EXECUTABLE,
         )
-    snapshot_root = Path(case.snapshot_root)
-    entrypoint = snapshot_root / case.entrypoint_relative_path
-    try:
-        resolved_entrypoint = entrypoint.resolve(strict=True)
-        resolved_entrypoint.relative_to(snapshot_root.resolve(strict=True))
-        if not resolved_entrypoint.is_file():
-            raise OSError("topic entrypoint is not a regular file")
-    except OSError as exc:
-        raise TypedPreflightFailure(
-            "gpu_source_snapshot_entrypoint_unavailable",
-            "managed topic entrypoint is unavailable in the frozen source snapshot",
-            entrypoint_relative_path=case.entrypoint_relative_path,
-        ) from exc
-    except ValueError as exc:
-        raise TypedPreflightFailure(
-            "gpu_source_snapshot_entrypoint_escape",
-            "managed topic entrypoint escaped the frozen source snapshot root",
-            entrypoint_relative_path=case.entrypoint_relative_path,
-        ) from exc
+    return resolved
 
-    previous_argv = sys.argv
-    previous_cwd = Path.cwd()
-    previous_sys_path = list(sys.path)
+
+def _validate_admitted_result(
+    result_path: Path,
+    request_payload: Mapping[str, object],
+    process_returncode: int,
+) -> tuple[ManagedRunExecutionResult, ManagedRunLifecycleEvidence, Mapping[str, object]]:
     try:
-        os.chdir(snapshot_root)
-        sys.argv = list(case.argv)
-        sys.path = [str(resolved_entrypoint.parent), str(snapshot_root), *sys.path]
-        namespace = runpy.run_path(
-            str(resolved_entrypoint),
-            run_name="_agent_canon_managed_topic",
+        result = load_json_file(result_path)
+    except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "experiment-runner-admitted result artifact is missing or invalid JSON",
+        ) from exc
+    if not isinstance(result, Mapping):
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "experiment-runner-admitted result artifact must be a JSON object",
         )
-        topic_main = namespace.get("main")
-        if not callable(topic_main):
+    if result.get("schema") != MANAGED_RUN_RESULT_SCHEMA:
+        raise TypedPreflightFailure(
+            "admitted_runner_result_schema_mismatch",
+            "experiment-runner-admitted result schema is not the reviewed version",
+            observed_schema=result.get("schema"),
+        )
+    try:
+        request_identity = identity_from_manifest(request_payload)
+        result_identity = identity_from_manifest(result)
+    except (ExperimentIdentityError, TypeError) as exc:
+        raise TypedPreflightFailure(
+            "admitted_runner_result_identity_invalid",
+            "request and result must contain the canonical nested experiment identity",
+        ) from exc
+    if result_identity != request_identity:
+        raise TypedPreflightFailure(
+            "admitted_runner_result_identity_mismatch",
+            "provider result identity does not match the managed request identity",
+        )
+    request_fingerprint = request_payload.get("fingerprint")
+    if result.get("request_fingerprint") != request_fingerprint:
+        raise TypedPreflightFailure(
+            "admitted_runner_result_fingerprint_mismatch",
+            "result does not reference the request fingerprint",
+        )
+    if result.get("run_id") != request_payload.get("run_id"):
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "result does not reference the request run identity",
+        )
+    status = result.get("status")
+    if status not in {"ok", "failed", "rejected"}:
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "result status is not part of the provider schema",
+            observed_status=status,
+        )
+    worker_pids_raw = result.get("worker_pids")
+    if not isinstance(worker_pids_raw, list):
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "result worker_pids must be an array",
+        )
+    worker_pids = tuple(worker_pids_raw)
+    if any(
+        isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0
+        for pid in worker_pids
+    ) or len(set(worker_pids)) != len(worker_pids):
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "result worker_pids must contain unique positive process IDs",
+        )
+    worker_pid = result.get("worker_pid")
+    if worker_pids:
+        if (
+            isinstance(worker_pid, bool)
+            or not isinstance(worker_pid, int)
+            or worker_pid != worker_pids[0]
+        ):
             raise TypedPreflightFailure(
-                "experiment_runner_topic_entrypoint_invalid",
-                "managed topic run.py must expose the documented main() entrypoint",
-                entrypoint_relative_path=case.entrypoint_relative_path,
+                "admitted_runner_result_corrupt",
+                "result worker_pid must be the first provider worker PID",
             )
-        result = topic_main()
-    finally:
-        sys.path = previous_sys_path
-        sys.argv = previous_argv
-        os.chdir(previous_cwd)
-
-    if not isinstance(result, int) or isinstance(result, bool):
+    elif worker_pid is not None:
         raise TypedPreflightFailure(
-            "experiment_runner_topic_result_invalid",
-            "managed topic main() must return an integer status",
-            result_type=type(result).__name__,
+            "admitted_runner_result_corrupt",
+            "result worker_pid must be null when worker_pids is empty",
         )
-    if result == 0:
-        return ExecutionResult(
-            status="ok",
-            raw_exit_code=0,
-            source="managed_topic_main",
+    lifecycle = result.get("lifecycle")
+    quiescence = result.get("quiescence")
+    exit_record = result.get("exit")
+    completions = result.get("completions")
+    if not isinstance(lifecycle, Mapping) or not isinstance(quiescence, Mapping) or not isinstance(exit_record, Mapping):
+        raise TypedPreflightFailure(
+            "admitted_runner_descendant_quiescence_unproven",
+            "result must contain provider lifecycle and quiescence objects",
         )
-    return ExecutionResult(
-        status="failed",
-        failure_kind="topic_main_nonzero",
-        message=f"topic main returned {result}",
-        raw_exit_code=result,
-        source="managed_topic_main",
+
+    def required_int(mapping: Mapping[str, object], name: str) -> int:
+        value = mapping.get(name)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise TypedPreflightFailure(
+                "admitted_runner_result_corrupt",
+                f"provider lifecycle field {name} is invalid",
+            )
+        return value
+
+    def required_bool(mapping: Mapping[str, object], name: str) -> bool:
+        value = mapping.get(name)
+        if not isinstance(value, bool):
+            raise TypedPreflightFailure(
+                "admitted_runner_result_corrupt",
+                f"provider lifecycle field {name} is invalid",
+            )
+        return value
+
+    def required_pid_sequence(mapping: Mapping[str, object], name: str) -> tuple[int, ...]:
+        value = mapping.get(name)
+        if not isinstance(value, list):
+            raise TypedPreflightFailure(
+                "admitted_runner_result_corrupt",
+                f"provider lifecycle field {name} is invalid",
+            )
+        pids = tuple(value)
+        if any(
+            isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0
+            for pid in pids
+        ) or len(set(pids)) != len(pids):
+            raise TypedPreflightFailure(
+                "admitted_runner_result_corrupt",
+                f"provider lifecycle field {name} contains invalid process IDs",
+            )
+        return pids
+
+    lifecycle_run_id = lifecycle.get("run_id")
+    terminal_event_id = lifecycle.get("terminal_event_id")
+    terminal_status = lifecycle.get("terminal_status")
+    descendant_status = lifecycle.get("descendant_quiescence")
+    lifecycle_child_pids = required_pid_sequence(lifecycle, "child_process_ids")
+    lifecycle_group_pids = required_pid_sequence(lifecycle, "process_group_ids")
+    if (
+        lifecycle_run_id != request_payload.get("run_id")
+        or not isinstance(terminal_event_id, str)
+        or not terminal_event_id
+        or terminal_status not in {"finished", "failed", "interrupted"}
+        or descendant_status not in {"proved", "no_child", "unproven"}
+        or tuple(worker_pids) != lifecycle_child_pids
+    ):
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "provider lifecycle identity or status fields are invalid",
+        )
+    cleanup_failures_raw = lifecycle.get("cleanup_failures")
+    if not isinstance(cleanup_failures_raw, list) or any(
+        not isinstance(item, str) or not item for item in cleanup_failures_raw
+    ):
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "provider lifecycle cleanup_failures must be an array of strings",
+        )
+    cleanup_failures = tuple(cleanup_failures_raw)
+    direct_children_quiescent = required_bool(quiescence, "direct_children_quiescent")
+    result_descendant_status = quiescence.get("descendant_quiescence")
+    quiescence_cleanup_failures = quiescence.get("cleanup_failures")
+    if (
+        result.get("descendant_quiescence") != descendant_status
+        or result_descendant_status != descendant_status
+        or not isinstance(quiescence_cleanup_failures, list)
+        or tuple(quiescence_cleanup_failures) != cleanup_failures
+    ):
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "provider result and lifecycle quiescence statuses disagree",
+        )
+    quiescence_complete = required_bool(quiescence, "complete")
+    lifecycle_quiescence_complete = required_bool(lifecycle, "quiescence_complete")
+    terminal_coverage_complete = required_bool(lifecycle, "terminal_coverage_complete")
+    requested_case_coverage_complete = required_bool(
+        lifecycle,
+        "requested_case_coverage_complete",
     )
+    completion_coverage_complete = required_bool(
+        lifecycle,
+        "completion_coverage_complete",
+    )
+    scheduler_completed = required_bool(lifecycle, "scheduler_completed")
+    if not isinstance(completions, list):
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "provider result completions must be an array",
+        )
+    admitted_case_count = required_int(lifecycle, "admitted_case_count")
+    if len(completions) != admitted_case_count:
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "provider completion count does not match admitted case count",
+        )
+    if not (
+        quiescence_complete
+        and lifecycle_quiescence_complete
+        and direct_children_quiescent
+        and descendant_status in {"proved", "no_child"}
+        and not cleanup_failures
+        and terminal_coverage_complete
+        and requested_case_coverage_complete
+        and completion_coverage_complete
+        and scheduler_completed
+    ):
+        raise TypedPreflightFailure(
+            "admitted_runner_descendant_quiescence_unproven",
+            "provider terminal result does not prove complete quiescence and completion coverage",
+            quiescence_complete=quiescence_complete,
+            lifecycle_quiescence_complete=lifecycle_quiescence_complete,
+            direct_children_quiescent=direct_children_quiescent,
+            descendant_quiescence=descendant_status,
+            terminal_coverage_complete=terminal_coverage_complete,
+            requested_case_coverage_complete=requested_case_coverage_complete,
+            completion_coverage_complete=completion_coverage_complete,
+        )
+    exit_code = exit_record.get("code")
+    error = exit_record.get("error")
+    if (
+        isinstance(exit_code, bool)
+        or not isinstance(exit_code, int)
+        or exit_code != process_returncode
+    ):
+        raise TypedPreflightFailure(
+            "admitted_runner_exit_mismatch",
+            "result exit code does not match the admitted CLI process",
+            process_returncode=process_returncode,
+            result_exit_code=exit_code,
+        )
+    if result.get("exit_code") != exit_code or result.get("error") != error:
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "provider result exit projection disagrees with its exit record",
+        )
+    if (status == "ok") != (exit_code == 0):
+        raise TypedPreflightFailure(
+            "admitted_runner_exit_mismatch",
+            "provider result status disagrees with its exit code",
+        )
+    if exit_code != 0 and error in (None, ""):
+        raise TypedPreflightFailure(
+            "admitted_runner_error_missing",
+            "nonzero admitted-runner exit requires typed error evidence",
+        )
+
+    lifecycle_evidence = ManagedRunLifecycleEvidence(
+        run_id=str(lifecycle_run_id),
+        terminal_event_id=cast(str, terminal_event_id),
+        observed_at_ns=required_int(lifecycle, "observed_at_ns"),
+        terminal_status=cast(str, terminal_status),
+        total_case_count_at_start=required_int(lifecycle, "total_case_count_at_start"),
+        completion_count_before=required_int(lifecycle, "completion_count_before"),
+        completion_count_after=required_int(lifecycle, "completion_count_after"),
+        scheduler_completed=scheduler_completed,
+        admitted_case_count=admitted_case_count,
+        terminal_notification_count=required_int(
+            lifecycle,
+            "terminal_notification_count",
+        ),
+        child_process_ids=lifecycle_child_pids,
+        process_group_ids=lifecycle_group_pids,
+        direct_children_quiescent=direct_children_quiescent,
+        descendant_quiescence=cast(
+            Literal["proved", "no_child", "unproven"],
+            descendant_status,
+        ),
+        cleanup_failures=cleanup_failures,
+        terminal_coverage_complete=terminal_coverage_complete,
+        requested_case_coverage_complete=requested_case_coverage_complete,
+        quiescence_complete=lifecycle_quiescence_complete,
+        completion_coverage_complete=completion_coverage_complete,
+    )
+    execution = ManagedRunExecutionResult(
+        status="ok" if exit_code == 0 else "failed",
+        raw_exit_code=exit_code,
+        failure_kind=(
+            str(error.get("kind"))
+            if isinstance(error, Mapping) and error.get("kind")
+            else "admitted_runner_failed"
+            if exit_code
+            else None
+        ),
+        message=(
+            str(error.get("message"))
+            if isinstance(error, Mapping) and error.get("message")
+            else str(error)
+            if error not in (None, "")
+            else None
+        ),
+    )
+    return execution, lifecycle_evidence, result
 
 
-def _capture_runner_lifecycle(
-    runner: StandardRunner[_ManagedTopicCase] | None,
-) -> RunnerLifecycleEvidence | None:
-    """Read generic lifecycle evidence without inspecting process internals."""
-    if runner is None:
-        return None
-    return runner.last_lifecycle_evidence
+def _run_admitted_runner(
+    *,
+    context: RunContext,
+    request_path: Path,
+    result_path: Path,
+    lifecycle_path: Path,
+    request_payload: Mapping[str, object],
+    environment: Mapping[str, str],
+) -> tuple[ManagedRunExecutionResult, ManagedRunLifecycleEvidence, Mapping[str, object]]:
+    """Invoke the fixed shell-free admitted-runner handshake."""
+    executable = _resolve_admitted_runner()
+    argv = [executable, "--request", str(request_path), "--result", str(result_path)]
+    try:
+        with context.paths.stdout_log_path.open("ab") as stdout, context.paths.stderr_log_path.open("ab") as stderr:
+            process = subprocess.Popen(
+                argv,
+                cwd=str(context.paths.result_dir / "source_snapshot"),
+                env=dict(environment),
+                stdin=subprocess.DEVNULL,
+                stdout=stdout,
+                stderr=stderr,
+                shell=False,
+            )
+            process_returncode = process.wait()
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise TypedPreflightFailure(
+            "admitted_runner_launch_failed",
+            "experiment-runner-admitted could not be launched",
+            executable=MANAGED_RUN_EXECUTABLE,
+        ) from exc
+    execution, lifecycle, result = _validate_admitted_result(
+        result_path,
+        request_payload,
+        process_returncode,
+    )
+    lifecycle_path.parent.mkdir(parents=True, exist_ok=True)
+    lifecycle_payload = lifecycle.to_dict()
+    context_identity = cast(
+        ExperimentIdentity | None,
+        getattr(context, "identity", None),
+    )
+    if context_identity is None:
+        context_identity = identity_from_manifest(request_payload)
+    if isinstance(context_identity, ExperimentIdentity):
+        lifecycle_payload.update(context_identity.to_dict())
+    lifecycle_path.write_text(
+        json.dumps(lifecycle_payload, sort_keys=True, indent=2),
+        encoding="utf-8",
+    )
+    receipt = {
+        "schema_version": "agentcanon-managed-run-receipt/v1",
+        "provider_contract": _provider_contract_identity(),
+        "executable": MANAGED_RUN_EXECUTABLE,
+        "resolved_executable": executable,
+        "argv": argv,
+        "request_fingerprint": request_payload["fingerprint"],
+        "result_content_fingerprint": hashlib.sha256(
+            json.dumps(
+                result,
+                ensure_ascii=True,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest(),
+        "process_returncode": process_returncode,
+        "worker_pid": lifecycle.child_process_ids[0] if lifecycle.child_process_ids else None,
+    }
+    if isinstance(context_identity, ExperimentIdentity):
+        receipt.update(context_identity.to_dict())
+    receipt_path = context.paths.result_dir.joinpath("runtime", MANAGED_RUN_RECEIPT_FILENAME)
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    receipt_path.write_text(
+        json.dumps(receipt, sort_keys=True, indent=2),
+        encoding="utf-8",
+    )
+    return execution, lifecycle, result
 
 
 def repo_root_from_script() -> Path:
@@ -592,8 +1169,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--variant",
-        default="formal",
-        help="Variant label used when --run-name is omitted.",
+        required=True,
+        help="Required variant label used in the result/report/branch identity.",
     )
     parser.add_argument(
         "--registry",
@@ -608,7 +1185,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--report-path",
-        help="Optional report path. Defaults to experiments/report/<run_name>.md.",
+        help="Optional report path. Defaults to experiments/report/<topic>/<variant>/<run_name>.md.",
     )
     parser.add_argument(
         "--skip-report-init",
@@ -618,7 +1195,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config-json",
         help=(
-            "Optional JSON object file to merge into result/<run_name>/config.json. "
+            "Optional JSON object file to merge into result/<variant>/<run_name>/config.json. "
             "The file must decode to a dictionary."
         ),
     )
@@ -628,7 +1205,7 @@ def parse_args() -> argparse.Namespace:
         default=[],
         metavar="KEY=JSON",
         help=(
-            "Add one JSON-encoded config value to result/<run_name>/config.json. "
+            "Add one JSON-encoded config value to result/<variant>/<run_name>/config.json. "
             "Example: --config seed=0 --config enabled=true."
         ),
     )
@@ -637,6 +1214,7 @@ def parse_args() -> argparse.Namespace:
         nargs=argparse.REMAINDER,
         help=(
             "Command to run. Tokens may use {run_dir}, {run_name}, {report_path}, "
+            "{topic}, {variant}, "
             "{manifest_path}, {eval_manifest_path}, {config_path}, "
             "{config_source_path}, {startup_log_path}, {stdout_log_path}, "
             "or {stderr_log_path}."
@@ -735,7 +1313,7 @@ def load_command_version(name: str) -> str | None:
 
 def load_config_json(path: Path) -> dict[str, object]:
     """Load one experiment config JSON object."""
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = load_json_file(path)
     if not isinstance(data, dict):
         raise ValueError(f"--config-json must decode to a JSON object: {path}")
     config: dict[str, object] = {}
@@ -757,7 +1335,7 @@ def parse_config_pairs(pairs: list[str]) -> dict[str, object]:
         if not key:
             raise ValueError(f"--config has an empty key: {pair}")
         try:
-            config[key] = json.loads(raw_value)
+            config[key] = load_json_text(raw_value)
         except json.JSONDecodeError as exc:
             raise ValueError(
                 f"--config value for {key!r} is not valid JSON: {exc}"
@@ -784,9 +1362,7 @@ def build_run_config(
 ) -> dict[str, object]:
     """Build one JSON-serializable experiment run configuration dictionary."""
     run_config: dict[str, object] = {
-        "topic": context.identity.topic,
-        "run_name": context.identity.run_name,
-        "variant": context.identity.variant,
+        **context.identity.to_dict(),
         "paths": {
             "result_dir": str(context.paths.result_dir),
             "log_dir": str(context.paths.log_dir),
@@ -858,6 +1434,7 @@ def render_report_stub(context: RunContext) -> str:
     return f"""# {context.identity.run_name}
 
 - Topic: {context.identity.topic}
+- Variant: {context.identity.variant}
 - Created At (UTC): {context.created_at}
 - Result Dir: {context.paths.result_dir}
 - Log Dir: {context.paths.log_dir}
@@ -914,8 +1491,7 @@ def render_report_stub(context: RunContext) -> str:
 def build_manifest(context: RunContext, status: str) -> dict[str, object]:
     """Build one manifest dictionary."""
     manifest: dict[str, object] = {
-        "topic": context.identity.topic,
-        "run_name": context.identity.run_name,
+        **context.identity.to_dict(),
         "status": status,
         "created_at_utc": context.created_at,
         "repo_root": str(context.repo_root),
@@ -1110,10 +1686,9 @@ def build_source_snapshot(context: RunContext) -> dict[str, object]:
         external_file_record(path) for path in unique_paths(external_files)
     ]
     return {
+        **context.identity.to_dict(),
         "schema_version": 1,
         "captured_at_utc": utc_now(),
-        "topic": context.identity.topic,
-        "run_name": context.identity.run_name,
         "base_dir": str(context.repo_root),
         "excluded_topic_dirs": sorted(EXCLUDED_SOURCE_SNAPSHOT_DIRS),
         "git": {
@@ -1158,10 +1733,9 @@ def copy_source_config_snapshot(context: RunContext) -> dict[str, object]:
 def build_command_manifest(context: RunContext) -> dict[str, object]:
     """Build the resolved-command manifest for one run."""
     return {
+        **context.identity.to_dict(),
         "schema_version": 1,
         "created_at_utc": utc_now(),
-        "topic": context.identity.topic,
-        "run_name": context.identity.run_name,
         "command": context.command.command,
         "command_text": shlex.join(context.command.command),
         "command_source": context.command.source,
@@ -1186,10 +1760,9 @@ def append_startup_event(
     """Append one startup chronology event."""
     context.paths.startup_log_path.parent.mkdir(parents=True, exist_ok=True)
     entry: dict[str, object] = {
+        **context.identity.to_dict(),
         "timestamp_utc": utc_now(),
         "event": event,
-        "topic": context.identity.topic,
-        "run_name": context.identity.run_name,
     }
     entry.update(payload)
     with context.paths.startup_log_path.open("a", encoding="utf-8") as handle:
@@ -1205,10 +1778,9 @@ def build_artifact_manifest(context: RunContext) -> dict[str, object]:
         if path.is_file() and path != context.paths.artifact_manifest_path
     ]
     return {
+        **context.identity.to_dict(),
         "schema_version": 1,
         "captured_at_utc": utc_now(),
-        "topic": context.identity.topic,
-        "run_name": context.identity.run_name,
         "result_dir": str(context.paths.result_dir),
         "self_excluded": str(context.paths.artifact_manifest_path),
         "artifact_count": len(files),
@@ -1227,10 +1799,10 @@ def validate_eval_artifact_patterns(patterns: list[str], key: str) -> list[str]:
         pattern_path = Path(pattern)
         if pattern_path.is_absolute():
             raise ValueError(
-                f"{key} must stay relative to result/<run_name>: {pattern}"
+                f"{key} must stay relative to result/<variant>/<run_name>: {pattern}"
             )
         if ".." in pattern_path.parts:
-            raise ValueError(f"{key} must not escape result/<run_name>: {pattern}")
+            raise ValueError(f"{key} must not escape result/<variant>/<run_name>: {pattern}")
     return patterns
 
 
@@ -1339,6 +1911,7 @@ def load_eval_artifacts(
     result_dir: Path,
     *,
     topic: str,
+    variant: str,
     run_name: str,
     patterns: EvalArtifactPatterns,
 ) -> dict[str, object]:
@@ -1376,8 +1949,7 @@ def load_eval_artifacts(
         )
 
     return {
-        "topic": topic,
-        "run_name": run_name,
+        **ExperimentIdentity(topic=topic, variant=variant, run_name=run_name).to_dict(),
         "result_dir": str(result_dir),
         "collected_at_utc": utc_now(),
         "required_patterns": patterns.required,
@@ -1465,23 +2037,81 @@ def resolve_topic_dir(
 
 
 def resolve_report_path(
-    repo_root: Path, registry: RegistryContext, run_name: str, report_arg: str
+    repo_root: Path,
+    registry: RegistryContext,
+    identity: RunIdentity,
+    report_arg: str,
 ) -> Path:
     """Resolve the report path for one run."""
     if report_arg:
-        return Path(report_arg).resolve()
+        candidate = Path(report_arg)
+        if not candidate.is_absolute():
+            candidate = repo_root / candidate
+        return contained_path(repo_root, candidate)
     if registry.available:
         registry_report_root = registry.entry.get(
             "report_root"
         ) or registry.defaults.get("report_root")
         if isinstance(registry_report_root, str):
-            return (repo_root / registry_report_root / f"{run_name}.md").resolve()
-    return (repo_root / "experiments" / "report" / f"{run_name}.md").resolve()
+            return contained_path(
+                repo_root,
+                repo_root
+                / registry_report_root
+                / identity.topic
+                / identity.variant
+                / f"{identity.run_name}.md",
+            )
+    return contained_path(repo_root, repo_root / report_relative_path(identity))
 
 
-def build_run_paths(topic_dir: Path, run_name: str, report_path: Path) -> RunPaths:
-    """Build filesystem paths owned by one run."""
-    result_dir = topic_dir / "result" / run_name
+def build_run_paths(
+    topic_dir: Path, identity: RunIdentity, report_path: Path
+) -> RunPaths:
+    """Build filesystem paths after proving the canonical realpath boundary."""
+    topic_dir = topic_dir.absolute()
+    if topic_dir.name != identity.topic or topic_dir.parent.name != "experiments":
+        raise ExperimentIdentityError(
+            "topic directory must be experiments/<topic> for the identity"
+        )
+    if topic_dir.is_symlink() or topic_dir.resolve() != topic_dir:
+        raise ExperimentIdentityError(f"topic directory must not escape by symlink: {topic_dir}")
+    if not topic_dir.is_dir():
+        raise ExperimentIdentityError(f"topic directory does not exist: {topic_dir}")
+
+    result_root = topic_dir / "result"
+    for label, directory in (("result root", result_root),):
+        if directory.is_symlink() or directory.resolve() != directory:
+            raise ExperimentIdentityError(f"{label} must not escape by symlink: {directory}")
+        if directory.exists() and not directory.is_dir():
+            raise ExperimentIdentityError(f"{label} must be a directory: {directory}")
+
+    variant_root = result_root / identity.variant
+    if variant_root.is_symlink() or variant_root.resolve() != variant_root:
+        raise ExperimentIdentityError(
+            f"variant result root must not escape by symlink: {variant_root}"
+        )
+    if variant_root.exists() and not variant_root.is_dir():
+        raise ExperimentIdentityError(
+            f"variant result root must be a directory: {variant_root}"
+        )
+
+    result_dir = topic_dir / "result" / identity.variant / identity.run_name
+    if result_dir.is_symlink() or result_dir.resolve() != result_dir:
+        raise ExperimentIdentityError(
+            f"result directory must not escape by symlink: {result_dir}"
+        )
+    expected_report_path = (
+        topic_dir.parent.parent / report_relative_path(identity)
+    ).absolute()
+    report_path = report_path.absolute()
+    if report_path != expected_report_path:
+        raise ExperimentIdentityError(
+            "report path must match complete identity: "
+            f"expected {expected_report_path}, got {report_path}"
+        )
+    if report_path.is_symlink() or report_path.resolve() != report_path:
+        raise ExperimentIdentityError(f"report path must not escape by symlink: {report_path}")
+
     log_dir = result_dir / "logs"
     return RunPaths(
         result_dir=result_dir,
@@ -1509,6 +2139,7 @@ def build_placeholders(
     return {
         "repo_root": str(repo_root),
         "topic_dir": str(topic_dir),
+        "variant": identity.variant,
         "run_name": identity.run_name,
         "run_dir": str(paths.result_dir),
         "log_dir": str(paths.log_dir),
@@ -1577,25 +2208,41 @@ def select_command(
 def build_run_context(args: argparse.Namespace) -> RunContext:
     """Build setup context for one managed run."""
     repo_root = Path(args.repo_root).resolve()
-    identity = RunIdentity(
-        topic=args.topic,
-        run_name=args.run_name or f"{args.topic}_{args.variant}_{compact_timestamp()}",
-        variant=args.variant,
+    topic = validate_segment(args.topic, "topic")
+    variant = validate_segment(args.variant, "variant")
+    run_name = validate_segment(
+        args.run_name or f"{topic}_{variant}_{compact_timestamp()}", "run_name"
     )
+    identity = RunIdentity(topic=topic, variant=variant, run_name=run_name)
     registry = load_registry_context(
         resolve_registry_path(repo_root, args.registry or ""),
         identity.topic,
     )
     topic_dir = resolve_topic_dir(repo_root, identity, registry)
+    topic_dir = contained_path(repo_root, topic_dir)
+    canonical_topic_dir = contained_path(
+        repo_root, repo_root / "experiments" / identity.topic
+    )
+    if topic_dir != canonical_topic_dir:
+        raise ValueError(
+            "topic directory must match canonical identity path: "
+            f"expected {canonical_topic_dir}, got {topic_dir}"
+        )
     if not topic_dir.is_dir():
         raise ValueError(f"topic directory does not exist: {topic_dir}")
     report_path = resolve_report_path(
         repo_root,
         registry,
-        identity.run_name,
+        identity,
         args.report_path or "",
     )
-    paths = build_run_paths(topic_dir, identity.run_name, report_path)
+    expected_report_path = contained_path(repo_root, repo_root / report_relative_path(identity))
+    if report_path != expected_report_path:
+        raise ValueError(
+            "report path must match complete identity: "
+            f"expected {expected_report_path}, got {report_path}"
+        )
+    paths = build_run_paths(topic_dir, identity, report_path)
     placeholders = build_placeholders(repo_root, identity, topic_dir, paths)
     command = select_command(
         args.use_registered_command or "",
@@ -1622,9 +2269,7 @@ def write_initial_artifacts(
     skip_report_init: bool,
 ) -> dict[str, object]:
     """Write run directories, initial JSON files, and optional report stub."""
-    context.paths.result_dir.mkdir(parents=True, exist_ok=True)
     context.paths.log_dir.mkdir(parents=True, exist_ok=True)
-    context.paths.report_path.parent.mkdir(parents=True, exist_ok=True)
     source_config = copy_source_config_snapshot(context)
     run_config["source_config"] = source_config
     manifest["source_config"] = source_config
@@ -1647,12 +2292,238 @@ def write_initial_artifacts(
         },
     )
 
-    if not skip_report_init and not context.paths.report_path.exists():
-        context.paths.report_path.write_text(
-            render_report_stub(context),
-            encoding="utf-8",
-        )
     return source_config
+
+
+def reserve_run_paths(
+    context: RunContext, skip_report_init: bool
+) -> ReservationReceipt:
+    """Reserve the complete identity before writing any run artifacts.
+
+    The report existence check is intentionally before result-directory
+    reservation.  The later exclusive report create is the race gate; if it
+    loses, only this invocation's still-empty result directory is removed.
+    """
+    if context.paths.report_path.exists():
+        raise ValueError(f"report already exists for identity: {context.paths.report_path}")
+    result_parent = context.paths.result_dir.parent
+    result_parent_existed = result_parent.exists()
+    result_parent.mkdir(parents=True, exist_ok=True)
+    try:
+        context.paths.result_dir.mkdir(exist_ok=False)
+    except FileExistsError as exc:
+        if not result_parent_existed:
+            try:
+                result_parent.rmdir()
+            except OSError:
+                pass
+        raise ValueError(
+            f"result directory already exists for identity: {context.paths.result_dir}"
+        ) from exc
+    result_inode = context.paths.result_dir.stat().st_ino
+    token = secrets.token_hex(24)
+    marker_path = context.paths.result_dir / RESERVATION_MARKER_NAME
+    marker_payload = {
+        "schema": RESERVATION_MARKER_SCHEMA,
+        "state": "reserved",
+        "token": token,
+        "result_inode": result_inode,
+        **context.identity.to_dict(),
+    }
+    try:
+        with marker_path.open("x", encoding="utf-8") as marker_file:
+            marker_file.write(json.dumps(marker_payload, sort_keys=True))
+            marker_file.write("\n")
+            marker_file.flush()
+            os.fsync(marker_file.fileno())
+        marker_inode = marker_path.stat().st_ino
+    except BaseException:
+        _remove_owned_empty_dir(context.paths.result_dir, result_inode)
+        raise
+
+    report_parent = context.paths.report_path.parent
+    report_parent_existed = report_parent.exists()
+    report_content: str | None = None
+    receipt = ReservationReceipt(
+        result_dir=context.paths.result_dir,
+        report_path=context.paths.report_path,
+        report_content=None,
+        result_parent=result_parent,
+        result_parent_preexisted=result_parent_existed,
+        report_parent=report_parent,
+        report_parent_preexisted=report_parent_existed,
+        token=token,
+        marker_path=marker_path,
+        result_inode=result_inode,
+        marker_inode=marker_inode,
+        report_reserved=False,
+        report_inode=None,
+        result_parent_inode=result_parent.stat().st_ino,
+        report_parent_inode=None,
+        identity=context.identity,
+    )
+    try:
+        if not skip_report_init:
+            report_parent.mkdir(parents=True, exist_ok=True)
+            report_parent_inode = report_parent.stat().st_ino
+            receipt = replace(receipt, report_parent_inode=report_parent_inode)
+            report_content = render_report_stub(context)
+            with context.paths.report_path.open("x", encoding="utf-8") as handle:
+                report_inode = os.fstat(handle.fileno()).st_ino
+                receipt = replace(
+                    receipt,
+                    report_content=report_content,
+                    report_reserved=True,
+                    report_inode=report_inode,
+                    report_parent_inode=report_parent_inode,
+                )
+                handle.write(report_content)
+                handle.flush()
+                os.fsync(handle.fileno())
+    except BaseException:
+        rollback_empty_reservation(receipt)
+        raise
+    return receipt
+
+
+def _remove_owned_empty_dir(path: Path, inode: int) -> bool:
+    """Remove a directory only when its current inode is the recorded one."""
+    try:
+        stat_result = path.stat()
+        if path.is_symlink() or stat_result.st_ino != inode:
+            return False
+        if any(path.iterdir()):
+            return False
+        path.rmdir()
+        return True
+    except OSError:
+        return False
+
+
+def _reservation_parent_matches(
+    path: Path, preexisted: bool, inode: int | None
+) -> bool:
+    """Prove ownership of an observed parent before attempting cleanup."""
+    if preexisted or inode is None:
+        return True
+    try:
+        stat_result = path.stat()
+    except OSError:
+        return False
+    return path.is_dir() and not path.is_symlink() and stat_result.st_ino == inode
+
+
+def _reservation_owner_matches(receipt: ReservationReceipt) -> bool:
+    """Verify token, identity, state, and inode ownership before cleanup."""
+    try:
+        result_stat = receipt.result_dir.stat()
+        marker_stat = receipt.marker_path.stat()
+        if receipt.result_dir.is_symlink() or receipt.marker_path.is_symlink():
+            return False
+        if result_stat.st_ino != receipt.result_inode:
+            return False
+        if marker_stat.st_ino != receipt.marker_inode:
+            return False
+        marker = load_json_file(receipt.marker_path)
+        if not isinstance(marker, Mapping):
+            return False
+        if set(marker) != {
+            "schema",
+            "state",
+            "token",
+            "result_inode",
+            "identity",
+        }:
+            return False
+        if marker.get("schema") != RESERVATION_MARKER_SCHEMA:
+            return False
+        if marker.get("state") != "reserved":
+            return False
+        if marker.get("token") != receipt.token:
+            return False
+        if marker.get("result_inode") != receipt.result_inode:
+            return False
+        if identity_from_manifest(marker) != receipt.identity:
+            return False
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        return False
+    return True
+
+
+def rollback_empty_reservation(receipt: ReservationReceipt) -> bool:
+    """Remove only a receipt-owned empty result/report reservation."""
+    if not _reservation_owner_matches(receipt):
+        return False
+    if not _reservation_parent_matches(
+        receipt.result_parent,
+        receipt.result_parent_preexisted,
+        receipt.result_parent_inode,
+    ):
+        return False
+    if not _reservation_parent_matches(
+        receipt.report_parent,
+        receipt.report_parent_preexisted,
+        receipt.report_parent_inode,
+    ):
+        return False
+    try:
+        children = list(receipt.result_dir.iterdir())
+    except OSError:
+        return False
+    if children != [receipt.marker_path]:
+        return False
+
+    if receipt.report_reserved:
+        if receipt.report_inode is None or receipt.report_parent_inode is None:
+            return False
+        try:
+            report_stat = receipt.report_path.stat()
+            report_parent_stat = receipt.report_parent.stat()
+        except OSError:
+            return False
+        if (
+            receipt.report_path.is_symlink()
+            or report_stat.st_ino != receipt.report_inode
+            or report_parent_stat.st_ino != receipt.report_parent_inode
+        ):
+            return False
+    try:
+        receipt.marker_path.unlink()
+        receipt.result_dir.rmdir()
+    except OSError:
+        return False
+    if receipt.report_reserved:
+        try:
+            receipt.report_path.unlink()
+        except OSError:
+            return False
+    for parent, preexisted, inode in (
+        (
+            receipt.report_parent,
+            receipt.report_parent_preexisted,
+            receipt.report_parent_inode,
+        ),
+        (
+            receipt.result_parent,
+            receipt.result_parent_preexisted,
+            receipt.result_parent_inode,
+        ),
+    ):
+        if not preexisted:
+            if inode is not None:
+                _remove_owned_empty_dir(parent, inode)
+    return True
+
+
+def release_reservation_marker(receipt: ReservationReceipt) -> bool:
+    """Remove a receipt-owned marker after initial artifacts are durable."""
+    if not _reservation_owner_matches(receipt):
+        return False
+    try:
+        receipt.marker_path.unlink()
+    except OSError:
+        return False
+    return True
 
 
 def source_config_error(source_config: dict[str, object]) -> str | None:
@@ -1673,6 +2544,7 @@ def build_run_environment(context: RunContext) -> dict[str, str]:
         {
             "EXPERIMENT_RUN_NAME": context.identity.run_name,
             "EXPERIMENT_TOPIC": context.identity.topic,
+            "EXPERIMENT_VARIANT": context.identity.variant,
             "EXPERIMENT_RUN_DIR": str(context.paths.result_dir),
             "EXPERIMENT_LOG_DIR": str(context.paths.log_dir),
             "EXPERIMENT_REPORT_PATH": str(context.paths.report_path),
@@ -1703,6 +2575,7 @@ def finalize_run_manifest(
     eval_collection = load_eval_artifacts(
         context.paths.result_dir,
         topic=context.identity.topic,
+        variant=context.identity.variant,
         run_name=context.identity.run_name,
         patterns=patterns,
     )
@@ -1860,8 +2733,8 @@ def _r5_evidence_fingerprint(payload: Mapping[str, object]) -> str:
 def execute_managed_run(
     context: RunContext,
     run_config: Mapping[str, object],
-) -> ExecutionResult:
-    """Compose the fixed owners around one generic ff97 runner invocation."""
+) -> ManagedRunExecutionResult:
+    """Compose the fixed owners around one admitted-runner CLI invocation."""
     request = _resource_request_for_managed_run(context, run_config)
     raw_config = run_config.get("config", {})
     config = cast(Mapping[str, object], raw_config) if isinstance(raw_config, Mapping) else {}
@@ -1907,8 +2780,8 @@ def execute_managed_run(
     coverage_attempted: set[EvidenceAbsenceField] = set()
     primary_exception: BaseException | None = None
     lifecycle_failure: FailureRecord | None = None
-    execution_result: ExecutionResult | None = None
-    runner_lifecycle: RunnerLifecycleEvidence | None = None
+    execution_result: ManagedRunExecutionResult | None = None
+    runner_lifecycle: ManagedRunLifecycleEvidence | None = None
     runner_invoked = False
     admission_context.register_release_failure_sink(release_failures.append)
     with admission_context:
@@ -1962,7 +2835,7 @@ def execute_managed_run(
                         "GPU admission requires the strict NVIDIA inventory owner output",
                     )
                 namespace_inode = os.stat("/proc/self/ns/pid").st_ino
-                occupied_initial = GpuProcessOccupancyProbe(
+                occupancy_initial = GpuProcessOccupancyProbe(
                     inventory=inventory,
                     namespace_inode=namespace_inode,
                     processes=initial_observation.process_identities,
@@ -1971,18 +2844,29 @@ def execute_managed_run(
                         if not initial_observation.process_identities
                         else "COMPLETE"
                     ),
-                ).observe().occupied_uuids
+                    unknown_gpu_ids=initial_observation.unknown_gpu_ids,
+                ).observe()
+                occupied_initial = occupancy_initial.occupied_uuids
+                unknown_initial = occupancy_initial.unknown_uuids
                 candidates = tuple(sorted(initial_observation.caller_allocated_ids))
                 eligible = tuple(
                     uuid
                     for uuid in candidates
                     if uuid not in occupied_initial
+                    and uuid not in unknown_initial
                     and initial_observation.free_memory_bytes.get(uuid, 0)
                     >= request.gpu_requested_memory_bytes
                 )
                 reservation_transaction = GpuReservationTransaction(request.lock_root)
 
                 def release_reservation() -> None:
+                    if runner_invoked and not _lifecycle_quiescence_is_proven(
+                        runner_lifecycle
+                    ):
+                        raise TypedPreflightFailure(
+                            "gpu_reservation_release_blocked",
+                            "GPU reservation remains held until admitted-runner descendant quiescence is proven",
+                        )
                     reservation_dispositions.extend(reservation_transaction.close())
 
                 coverage_attempted.add("lock_readback")
@@ -2012,7 +2896,8 @@ def execute_managed_run(
                 final_inventory = final_observation.nvidia_inventory
                 if (
                     final_inventory is None
-                    or final_observation.fingerprint == initial_observation.fingerprint
+                    or final_observation.observation_event_id
+                    == initial_observation.observation_event_id
                 ):
                     raise TypedPreflightFailure(
                         "gpu_run_admission_raced",
@@ -2028,10 +2913,12 @@ def execute_managed_run(
                         if not final_observation.process_identities
                         else "COMPLETE"
                     ),
+                    unknown_gpu_ids=final_observation.unknown_gpu_ids,
                 ).observe()
                 selected = reservation.selected_uuids
                 occupied_final = final_occupancy.occupied_uuids
-                coverage_processes = (final_occupancy,)
+                unknown_final = final_occupancy.unknown_uuids
+                coverage_processes = (occupancy_initial, final_occupancy)
                 coverage_attempted.add("concurrent_run_evidence")
                 coverage_attempted.add("mig_evidence")
                 coverage_concurrent = ConcurrentRunEvidence(
@@ -2101,6 +2988,7 @@ def execute_managed_run(
                 if any(
                     uuid not in final_observation.caller_allocated_ids
                     or uuid in occupied_final
+                    or uuid in unknown_final
                     or final_observation.free_memory_bytes.get(uuid, 0)
                     < request.gpu_requested_memory_bytes
                     for uuid in selected
@@ -2119,6 +3007,7 @@ def execute_managed_run(
                         uuid
                         for uuid in sorted(final_observation.caller_allocated_ids)
                         if uuid not in occupied_final
+                        and uuid not in unknown_final
                         and final_observation.free_memory_bytes.get(uuid, 0)
                         >= request.gpu_requested_memory_bytes
                     ),
@@ -2131,7 +3020,7 @@ def execute_managed_run(
                     plan_fingerprint="pending",
                     caller_allocated_ids=candidates,
                     candidate_ids=candidates,
-                    occupied_ids=tuple(sorted(occupied_final)),
+                    occupied_ids=tuple(sorted(set(occupied_final) | set(unknown_final))),
                     reserved_ids=(),
                     eligible_ids=tuple(cast(tuple[str, ...], lock_readback["final_eligible_ids"])),
                     selected_ids=selected,
@@ -2187,6 +3076,37 @@ def execute_managed_run(
                     leases=(),
                 )
             if request.gpu_requested_count:
+                admission = build_lock_bound_admission_receipt(
+                    candidate_uuids=allocation.candidate_ids,
+                    occupied_uuids=tuple(sorted(occupied_final)),
+                    reserved_uuids=allocation.reserved_ids,
+                    selected_uuids=allocation.selected_ids,
+                    inventory_fingerprint=(
+                        final_inventory.evidence_fingerprint
+                        if final_inventory is not None
+                        else ""
+                    ),
+                    occupancy_fingerprint=hashlib.sha256(
+                        "|".join(
+                            (
+                                initial_observation.fingerprint,
+                                final_observation.fingerprint,
+                            )
+                        ).encode("utf-8")
+                    ).hexdigest(),
+                    reservation_fingerprint=allocation.readback_fingerprint,
+                    runtime_identity_fingerprint=runtime_identity.readback_fingerprint,
+                    lock_readback=coverage_lock_readback,
+                    actual_gpu_processes=coverage_processes,
+                    concurrent_run_evidence=coverage_concurrent,
+                    mig_evidence=coverage_mig,
+                    os_safe_lock_placement=coverage_lock_placement,
+                )
+                allocation = replace(
+                    allocation,
+                    admission_fingerprint=admission.admission_fingerprint,
+                )
+            if request.gpu_requested_count:
                 if final_probe is None:
                     raise TypedPreflightFailure(
                         "gpu_final_probe_missing",
@@ -2215,67 +3135,28 @@ def execute_managed_run(
                 observed_at=final_observation.observed_at,
                 observation_fingerprint=final_observation.fingerprint,
             )
-            exact_environment = dict(request.environment)
-            if request.gpu_requested_count:
-                exact_visible = ",".join(allocation.selected_ids)
-                exact_environment["CUDA_VISIBLE_DEVICES"] = exact_visible
-                exact_environment["NVIDIA_VISIBLE_DEVICES"] = exact_visible
+            plan_request = replace(
+                request,
+                cwd=context.paths.result_dir / "source_snapshot",
+            )
             frozen_plan = freeze_resource_plan(
-                replace(request, environment=exact_environment),
+                plan_request,
                 discovered,
                 allocation,
             )
-            execution = dict(frozen_plan.execution)
-            execution.update(
-                {
-                    "cwd": str(context.paths.result_dir / "source_snapshot"),
-                    "source_freeze_fingerprint": source_freeze.receipt_fingerprint,
-                    "source_snapshot_relative_path": source_freeze.snapshot_relative_path,
-                    "provision_receipt_fingerprint": runtime_identity.provision_fingerprint,
-                    "runtime_readback_fingerprint": runtime_identity.readback_fingerprint,
-                    "admission_snapshot_fingerprint": final_observation.fingerprint,
-                    "inventory_fingerprint": (
-                        inventory.evidence_fingerprint if inventory is not None else None
-                    ),
-                }
-            )
-            resources = dict(frozen_plan.resources)
-            gpu_resources = dict(cast(Mapping[str, object], resources["gpu"]))
-            gpu_resources.update(
-                {
-                    "reservation_owner": "GpuReservationTransaction",
-                    "planner_provenance": "gpu_admission_transaction",
-                    "reservation_ids": allocation.reservation_ids,
-                    "admission_snapshot_fingerprint": final_observation.fingerprint,
-                }
-            )
-            resources["gpu"] = gpu_resources
-            plan_spec = {
-                "schema_version": frozen_plan.schema_version,
-                "plan_id": frozen_plan.plan_id,
-                "owner": frozen_plan.owner,
-                "resources": resources,
-                "execution": execution,
-                "container": frozen_plan.container,
-                "side_effect_inventory": frozen_plan.side_effect_inventory,
-            }
-            plan_fingerprint = hashlib.sha256(
-                json.dumps(plan_spec, sort_keys=True, default=str).encode("utf-8")
-            ).hexdigest()
-            frozen_plan = replace(
-                frozen_plan,
-                plan_fingerprint=plan_fingerprint,
-                resources=resources,
-                execution=execution,
-                gpu_allocation=replace(
-                    frozen_plan.gpu_allocation,
+            plan_fingerprint = frozen_plan.plan_fingerprint
+            if admission is not None:
+                admission = replace(
+                    admission,
                     plan_fingerprint=plan_fingerprint,
-                ),
-            )
+                )
             coverage_attempted.add("effective_environment")
             admitted_environment = build_admitted_environment(
                 frozen_plan,
                 runtime_identity,
+                admission_fingerprint=(
+                    admission.admission_fingerprint if admission is not None else None
+                ),
             )
             coverage_environment = dict(admitted_environment.exact_env_map)
             if request.gpu_requested_count:
@@ -2298,76 +3179,38 @@ def execute_managed_run(
                         }
                     ),
                 )
-            admission = RunGpuAdmissionReceipt(
-                schema_version="gpu-admission/v1",
-                candidate_uuids=allocation.candidate_ids,
-                occupied_uuids=allocation.occupied_ids,
-                reserved_uuids=allocation.reserved_ids,
-                selected_uuids=allocation.selected_ids,
-                inventory_fingerprint=(
-                    inventory.evidence_fingerprint if inventory is not None else ""
-                ),
-                occupancy_fingerprint=hashlib.sha256(
-                    "|".join(
-                        (
-                            initial_observation.fingerprint,
-                            final_observation.fingerprint,
-                        )
-                    ).encode("utf-8")
-                ).hexdigest(),
-                reservation_fingerprint=allocation.readback_fingerprint,
-                runtime_identity_fingerprint=runtime_identity.readback_fingerprint,
-                plan_fingerprint=plan_fingerprint,
-                admission_fingerprint="",
-                lock_readback=coverage_lock_readback,
-                effective_environment=coverage_environment,
-                actual_gpu_processes=coverage_processes,
-                concurrent_run_evidence=coverage_concurrent,
-                mig_evidence=coverage_mig,
-                container_visible_uuid_mapping=coverage_visibility,
-                os_safe_lock_placement=coverage_lock_placement,
-            )
-            exact_environment = dict(admitted_environment.exact_env_map)
-            admitted_case = _bind_managed_topic_case(
-                context,
-                source_paths,
-                exact_environment,
-            )
-            worker = StandardWorker(
-                task=_run_topic_case,
-                resource_estimator=_runner_owned_estimate,
-                initializer=apply_environment_variables,
-            )
-            scheduler = StandardFullResourceScheduler.from_worker(
-                cases=[admitted_case],
-                worker=worker,
-                context_builder=_build_admitted_context,
-                skip_controller=None,
-                disable_gpu_preallocation=True,
-                gpu_environment_config=None,
-                resource_capacity=FullResourceCapacity(
-                    max_workers=source_request.max_workers,
-                    host_memory_bytes=source_request.host_memory_bytes,
-                    gpu_devices=(),
-                ),
-            )
-            runner = StandardRunner(
-                scheduler=scheduler,
-                monitor=None,
-                on_case_finished=None,
+            if admission is not None:
+                admission = replace(
+                    admission,
+                    effective_environment=coverage_environment,
+                    container_visible_uuid_mapping=coverage_visibility,
+                )
+            request_path, result_path, lifecycle_path, request_payload = (
+                _build_managed_run_request(
+                    context,
+                    source_request,
+                    frozen_plan,
+                    admitted_environment,
+                    source_paths,
+                )
             )
             runner_invoked = True
             runner_exception: BaseException | None = None
             try:
-                runner.run(worker)
+                execution_result, runner_lifecycle, _ = _run_admitted_runner(
+                    context=context,
+                    request_path=request_path,
+                    result_path=result_path,
+                    lifecycle_path=lifecycle_path,
+                    request_payload=request_payload,
+                    environment=dict(admitted_environment.exact_env_map),
+                )
             except BaseException as exc:
                 runner_exception = exc
-            finally:
-                runner_lifecycle = _capture_runner_lifecycle(runner)
             if runner_lifecycle is None:
                 missing_lifecycle = TypedPreflightFailure(
                     "experiment_runner_lifecycle_missing",
-                    "generic runner completed without typed lifecycle evidence",
+                    "admitted runner completed without typed lifecycle evidence",
                 )
                 if runner_exception is None:
                     raise missing_lifecycle
@@ -2377,12 +3220,6 @@ def execute_managed_run(
                 )
             if runner_exception is not None:
                 raise runner_exception
-            if not scheduler.completions:
-                raise TypedPreflightFailure(
-                    "experiment_runner_completion_missing",
-                    "generic runner completed without a scheduler terminal record",
-                )
-            execution_result = scheduler.completions[-1].result
         except BaseException as exc:
             primary_exception = exc
 
@@ -2409,19 +3246,18 @@ def execute_managed_run(
     )
     if runner_invoked:
         lifecycle = runner_lifecycle
+        lifecycle_quiescent = _lifecycle_quiescence_is_proven(lifecycle)
         coverage_descendants = DescendantRetentionEvidence(
-            child_process_ids=(),
-            process_group_ids=(),
-            descendant_quiescence="PROVEN" if lifecycle is not None else "UNPROVEN",
+            child_process_ids=(lifecycle.child_process_ids if lifecycle is not None else ()),
+            process_group_ids=(lifecycle.process_group_ids if lifecycle is not None else ()),
+            descendant_quiescence="PROVEN" if lifecycle_quiescent else "UNPROVEN",
             retained_gpu_process_uuids=(),
-            release_blocked=lifecycle is None,
+            release_blocked=not lifecycle_quiescent,
             fingerprint=_r5_evidence_fingerprint(
                 {
                     "runner_lifecycle": repr(lifecycle),
-                    "descendant_quiescence": (
-                        "PROVEN" if lifecycle is not None else "UNPROVEN"
-                    ),
-                    "release_blocked": lifecycle is None,
+                    "descendant_quiescence": "PROVEN" if lifecycle_quiescent else "UNPROVEN",
+                    "release_blocked": not lifecycle_quiescent,
                 }
             ),
         )
@@ -2430,7 +3266,6 @@ def execute_managed_run(
             admission = replace(
                 admission,
                 descendant_retention_evidence=coverage_descendants,
-                admission_fingerprint="",
             )
     outcome = ManagedGpuOutcomeReducer().reduce_terminal(
         run_id=request.run_id or request.plan_id or context.identity.run_name,
@@ -2500,15 +3335,15 @@ def execute_managed_run(
     if primary_exception is not None:
         raise primary_exception
     if execution_result is None:
-        raise ResourcePlanError("ExperimentRunner returned no execution result")
+        raise ResourcePlanError("admitted runner returned no execution result")
     return execution_result
 
 
-def _execution_exit_code(execution_result: ExecutionResult) -> int:
+def _execution_exit_code(execution_result: ManagedRunExecutionResult) -> int:
     raw_exit_code = execution_result.raw_exit_code
     if raw_exit_code is None:
         raise ResourcePlanError(
-            "ExperimentRunner returned an ExecutionResult without a raw exit code"
+            "admitted runner returned an execution result without a raw exit code"
         )
     return raw_exit_code
 
@@ -2527,17 +3362,29 @@ def run_cli(
     if not context.command.command:
         raise ValueError("a command is required")
 
+    reservation = reserve_run_paths(context, args.skip_report_init)
     manifest = build_manifest(context, "running")
     run_config = build_run_config(context, explicit_config)
     manifest["config_path"] = str(context.paths.config_path)
     manifest["config"] = run_config
     start_monotonic = time.monotonic()
-    source_config = write_initial_artifacts(
-        context,
-        manifest,
-        run_config,
-        args.skip_report_init,
-    )
+    try:
+        source_config = write_initial_artifacts(
+            context,
+            manifest,
+            run_config,
+            args.skip_report_init,
+        )
+        if not release_reservation_marker(reservation):
+            raise ResourcePlanError(
+                "reservation marker ownership changed before initial artifacts completed"
+            )
+    except BaseException:
+        # A setup failure before any artifact exists may clean only the
+        # receipt-owned empty reservation.  Once an artifact is present, the
+        # failed run remains available for diagnosis and operator cleanup.
+        rollback_empty_reservation(reservation)
+        raise
     preflight_error = source_config_error(source_config)
     if preflight_error:
         print(preflight_error, file=sys.stderr)

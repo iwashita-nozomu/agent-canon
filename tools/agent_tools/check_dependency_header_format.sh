@@ -2,6 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Validates dependency manifest syntax, contract kind metadata, and responsibility metadata.
+# upstream design ../../documents/design/source-owned-dependency-validation.md source parser authority
 # upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL design
 # upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
 # upstream implementation ./scan_dependency_headers.sh finds files with manifests
@@ -16,6 +17,7 @@ ALLOW_FRONTMATTER=0
 HEADER_SCAN_LINES="${DEPENDENCY_HEADER_SCAN_LINES:-80}"
 CONTRACT_KIND_REGISTRY="${DEPENDENCY_CONTRACT_KIND_REGISTRY:-}"
 declare -a INPUT_PATHS=()
+declare -a DECLARED_SURFACES=()
 
 usage() {
   cat <<'EOF'
@@ -59,6 +61,49 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$ROOT_DIR"
+
+load_declared_surfaces() {
+  local registry="${DEPENDENCY_CONTRACT_KIND_REGISTRY:-}"
+  if [[ -z "$registry" && -f "$ROOT_DIR/documents/design/dependency-contract-kinds.toml" ]]; then
+    registry="$ROOT_DIR/documents/design/dependency-contract-kinds.toml"
+  elif [[ -z "$registry" && -f "$ROOT_DIR/vendor/agent-canon/documents/design/dependency-contract-kinds.toml" ]]; then
+    registry="$ROOT_DIR/vendor/agent-canon/documents/design/dependency-contract-kinds.toml"
+  elif [[ -z "$registry" ]]; then
+    local script_path script_dir
+    script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+    script_dir="$(cd "$(dirname "$script_path")" && pwd)"
+    registry="$(realpath -m "$script_dir/../../documents/design/dependency-contract-kinds.toml")"
+  fi
+  [[ -f "$registry" ]] || return 0
+  awk '''
+    /^header_surfaces[[:space:]]*=[[:space:]]*\[/ { in_block = 1; next }
+    in_block && /^[[:space:]]*\]/ { exit }
+    in_block {
+      line = $0
+      while (match(line, /"[^"]+"/)) {
+        print substr(line, RSTART + 1, RLENGTH - 2)
+        line = substr(line, RSTART + RLENGTH)
+      }
+    }
+  ''' "$registry"
+}
+mapfile -t DECLARED_SURFACES < <(load_declared_surfaces)
+
+matches_declared_surface() {
+  local path="$1"
+  local pattern=""
+  for pattern in "${DECLARED_SURFACES[@]}"; do
+    case "$pattern" in
+      "$path") return 0 ;;
+      */**)
+        local prefix="${pattern%/**}"
+        [[ "$path" == "$prefix"/* ]] && return 0
+        ;;
+      *) [[ "$path" == $pattern ]] && return 0 ;;
+    esac
+  done
+  return 1
+}
 
 contract_kind_registry_path() {
   if [[ -n "$CONTRACT_KIND_REGISTRY" ]]; then
@@ -130,6 +175,19 @@ is_skip_path() {
   esac
 }
 
+display_path() {
+  local raw="$1"
+  raw="${raw#./}"
+  if [[ "$raw" = /* ]]; then
+    case "$raw" in
+      "$ROOT_DIR"/*) printf '%s\n' "${raw#$ROOT_DIR/}" ;;
+      *) realpath -m --relative-to="$ROOT_DIR" "$raw" ;;
+    esac
+    return
+  fi
+  printf '%s\n' "$raw"
+}
+
 is_historical_issue_path() {
   case "$1" in
     issues/*)
@@ -187,11 +245,24 @@ strip_manifest_line() {
 normalize_path() {
   local source_file="$1"
   local rel_path="$2"
-  local source_context
   local source_dir
-  source_context="$(source_context_file "$source_file")"
-  source_dir="$(dirname "$source_context")"
-  realpath -m --relative-to="$ROOT_DIR" "$source_dir/$rel_path"
+  local direct_target
+  local mapped_target
+  source_dir="$(dirname "$source_file")"
+  direct_target="$(realpath -m --relative-to="$ROOT_DIR" "$source_dir/$rel_path")"
+  if [[ "$direct_target" == ".." || "$direct_target" == ../* ]]; then
+    return 1
+  fi
+  if [[ -e "$direct_target" ]]; then
+    printf '%s\n' "$direct_target"
+    return
+  fi
+  source_dir="$(dirname "$(source_context_file "$source_file")")"
+  mapped_target="$(realpath -m --relative-to="$ROOT_DIR" "$source_dir/$rel_path")"
+  if [[ "$mapped_target" == ".." || "$mapped_target" == ../* ]]; then
+    return 1
+  fi
+  printf '%s\n' "$mapped_target"
 }
 
 source_context_file() {
@@ -221,6 +292,11 @@ check_file() {
   local coverage_keyword coverage_id coverage_requires coverage_terms
   local responsibility_count responsibility_text
   [[ -f "$file" && ! -L "$file" ]] || return 0
+  local display
+  display="$(display_path "$file")"
+  if [[ ${#INPUT_PATHS[@]} -eq 0 ]] && ! matches_declared_surface "$display"; then
+    return 0
+  fi
 
   start_count=0
   end_count=0
@@ -334,7 +410,10 @@ check_file() {
       echo "$file:$line_no: dependency path must be relative: $rel_path"
       return 1
     fi
-    target="$(normalize_path "$file" "$rel_path")"
+    if ! target="$(normalize_path "$file" "$rel_path")"; then
+      echo "$file:$line_no: dependency target escapes repository root: $rel_path"
+      return 1
+    fi
     if [[ ! -e "$target" ]]; then
       # Issue files are durable mirrors. Their dependency paths describe the
       # historical repository state and must not be rewritten as part of a

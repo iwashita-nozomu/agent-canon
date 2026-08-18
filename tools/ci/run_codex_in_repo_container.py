@@ -18,16 +18,22 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from container_runtime import (
+    SAFE_NAME_RE,
     apply_pack_overrides,
     build_build_command,
     build_run_command,
     build_shell_invocation,
+    emit_not_created_lifecycle_receipt,
     join_shell_lines,
+    lifecycle_context,
     load_or_default_pack,
     load_toml,
     print_label_and_command,
     resolve_builder,
+    scope_pack_image_tag,
+    start_container_lifecycle,
     workspace_path,
+    write_lifecycle_receipt,
 )
 
 
@@ -50,86 +56,140 @@ class CodexProfile:
     """One runtime profile for nested Codex."""
 
     name: str
-    pack: str
+    pack: str | None
     description: str
 
 
-def parse_bool(data: dict[str, object], key: str, default: bool) -> bool:
+NESTED_XDG_STATE_ROOT = "/workspace/.agent-canon/nested-xdg-state"
+NESTED_RUNTIME_OWNED_ENV = frozenset(
+    {"HOME", "XDG_STATE_HOME", "AGENT_CANON_CONTAINER_USER"}
+)
+AGENT_CANON_SOURCE_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_PROFILES_PATH = (
+    AGENT_CANON_SOURCE_ROOT / "tools/ci/codex-container-profiles.toml"
+)
+
+
+def validate_nested_profile_name(profile: CodexProfile) -> None:
+    """Reject profile names that cannot be one safe state-path segment."""
+    if SAFE_NAME_RE.fullmatch(profile.name) is None:
+        raise ValueError(
+            "nested profile name must be one safe path segment: "
+            f"{profile.name!r}"
+        )
+
+
+def nested_xdg_state_home(profile: CodexProfile) -> str:
+    """Return the profile-scoped container-local XDG state root."""
+    validate_nested_profile_name(profile)
+    return f"{NESTED_XDG_STATE_ROOT}/{profile.name}"
+
+
+def validate_nested_owned_environment(
+    pack_env: tuple[str, ...],
+    profile_forward_env: tuple[str, ...],
+    cli_forward_env: tuple[str, ...],
+) -> None:
+    """Reject pack/profile/CLI attempts to override nested runtime ownership."""
+    for source, values in (
+        ("pack runtime.env", pack_env),
+        ("profile forward_env", profile_forward_env),
+        ("CLI --forward-env", cli_forward_env),
+    ):
+        for value in values:
+            name = value.partition("=")[0]
+            if name in NESTED_RUNTIME_OWNED_ENV:
+                raise ValueError(
+                    f"{source} cannot override nested runtime-owned environment: {name}"
+                )
+
+
+def parse_bool(
+    data: dict[str, object], key: str, default: bool, source: Path
+) -> bool:
     """Extract a boolean option with a default."""
     value = data.get(key, default)
     if not isinstance(value, bool):
-        raise ValueError(
-            f"docker/codex-container-profiles.toml: {key} must be a boolean"
-        )
+        raise ValueError(f"{source}: {key} must be a boolean")
     return value
 
 
-def parse_string(data: dict[str, object], key: str, default: str) -> str:
+def parse_string(
+    data: dict[str, object], key: str, default: str, source: Path
+) -> str:
     """Extract a string option with a default."""
     value = data.get(key, default)
     if not isinstance(value, str):
-        raise ValueError(
-            f"docker/codex-container-profiles.toml: {key} must be a string"
-        )
+        raise ValueError(f"{source}: {key} must be a string")
     return value
 
 
-def parse_string_list(data: dict[str, object], key: str) -> tuple[str, ...]:
+def parse_string_list(
+    data: dict[str, object], key: str, source: Path
+) -> tuple[str, ...]:
     """Extract a list of strings."""
     value = data.get(key, [])
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-        raise ValueError(
-            f"docker/codex-container-profiles.toml: {key} must be a list of strings"
-        )
+        raise ValueError(f"{source}: {key} must be a list of strings")
     return tuple(value)
 
 
 def load_profiles(path_like: str) -> tuple[ProfileDefaults, list[CodexProfile]]:
     """Load nested Codex profile definitions."""
+    source = workspace_path(path_like)
     data = load_toml(path_like)
     defaults_data = data.get("defaults", {})
     if not isinstance(defaults_data, dict):
         raise ValueError(
-            "docker/codex-container-profiles.toml: [defaults] must be a table"
+            f"{source}: [defaults] must be a table"
         )
 
     defaults = ProfileDefaults(
         container_home_root=parse_string(
-            defaults_data, "container_home_root", "/workspace/.state/nested-codex"
+            defaults_data,
+            "container_home_root",
+            "/workspace/workspace/.nested-codex",
+            source,
         ),
-        use_host_user=parse_bool(defaults_data, "use_host_user", True),
-        tty=parse_bool(defaults_data, "tty", True),
-        mount_host_gitconfig=parse_bool(defaults_data, "mount_host_gitconfig", True),
+        use_host_user=parse_bool(defaults_data, "use_host_user", True, source),
+        tty=parse_bool(defaults_data, "tty", True, source),
+        mount_host_gitconfig=parse_bool(
+            defaults_data, "mount_host_gitconfig", True, source
+        ),
         mount_host_git_credentials=parse_bool(
-            defaults_data, "mount_host_git_credentials", True
+            defaults_data, "mount_host_git_credentials", False, source
         ),
-        mount_host_ssh_dir=parse_bool(defaults_data, "mount_host_ssh_dir", False),
-        forward_ssh_auth_sock=parse_bool(defaults_data, "forward_ssh_auth_sock", True),
-        forward_env=parse_string_list(defaults_data, "forward_env"),
+        mount_host_ssh_dir=parse_bool(
+            defaults_data, "mount_host_ssh_dir", False, source
+        ),
+        forward_ssh_auth_sock=parse_bool(
+            defaults_data, "forward_ssh_auth_sock", True, source
+        ),
+        forward_env=parse_string_list(defaults_data, "forward_env", source),
     )
 
     raw_profiles = data.get("profile", [])
     if not isinstance(raw_profiles, list):
         raise ValueError(
-            "docker/codex-container-profiles.toml: [[profile]] must be a list"
+            f"{source}: [[profile]] must be a list"
         )
 
     profiles: list[CodexProfile] = []
     for raw_profile in raw_profiles:
         if not isinstance(raw_profile, dict):
             raise ValueError(
-                "docker/codex-container-profiles.toml: each profile must be a table"
+                f"{source}: each profile must be a table"
             )
         name = raw_profile.get("name")
         pack = raw_profile.get("pack")
         description = raw_profile.get("description", "")
         if (
             not isinstance(name, str)
-            or not isinstance(pack, str)
+            or (pack is not None and not isinstance(pack, str))
             or not isinstance(description, str)
         ):
             raise ValueError(
-                "docker/codex-container-profiles.toml: invalid profile entry"
+                f"{source}: invalid profile entry"
             )
         profiles.append(CodexProfile(name=name, pack=pack, description=description))
     return defaults, profiles
@@ -142,8 +202,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--profiles",
-        default="docker/codex-container-profiles.toml",
-        help="Profile TOML file. Default: docker/codex-container-profiles.toml",
+        default=str(DEFAULT_PROFILES_PATH),
+        help=f"Profile TOML file. Default: {DEFAULT_PROFILES_PATH}",
     )
     parser.add_argument(
         "--profile", default="default", help="Profile name. Default: default"
@@ -159,9 +219,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--skip-build", action="store_true", help="Skip the build step."
-    )
-    parser.add_argument(
-        "--keep-image", action="store_true", help="Keep the built image."
     )
     parser.add_argument(
         "--print-only", action="store_true", help="Print commands without executing."
@@ -196,13 +253,6 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def cleanup_image(builder: str, image_tag: str) -> None:
-    """Remove one image quietly."""
-    subprocess.run(
-        [builder, "image", "rm", "-f", image_tag], check=False, capture_output=True
-    )
-
-
 def find_profile(profiles: list[CodexProfile], name: str) -> CodexProfile:
     """Return a profile by name."""
     for profile in profiles:
@@ -224,7 +274,6 @@ def host_to_container_home(
         )
     relative_home = container_home.removeprefix(container_workspace).lstrip("/")
     host_home = (workspace_root / relative_home).resolve()
-    host_home.mkdir(parents=True, exist_ok=True)
     return host_home, container_home
 
 
@@ -248,13 +297,16 @@ def build_nested_codex_script(
 ) -> str:
     """Return the shell prelude that prepares the mounted workspace before Codex."""
     quoted_command = shlex.join(command)
+    workspace_root = workspace.rstrip("/")
     post_create = shlex.quote(
-        f"{workspace.rstrip('/')}/vendor/agent-canon/.devcontainer/post-create.sh"
+        f"{workspace_root}/vendor/agent-canon/.devcontainer/post-create.sh"
     )
     lines = [
         "set -euo pipefail",
+        f'mkdir -p "{workspace_root}/.agent-canon"',
         'mkdir -p "$HOME"',
         'mkdir -p "$HOME/.codex"',
+        'export AGENT_CANON_CODEX_SESSION_ROOT="${AGENT_CANON_CODEX_SESSION_ROOT:-$HOME/.codex/sessions}"',
     ]
     lines.extend(
         [
@@ -265,6 +317,15 @@ def build_nested_codex_script(
     if mount_host_ssh_dir:
         lines.append(
             'if [ -d /tmp/host-ssh-dir ] && [ ! -e "$HOME/.ssh" ]; then ln -s /tmp/host-ssh-dir "$HOME/.ssh"; fi'
+        )
+    if run_uid is not None and run_gid is not None:
+        lines.extend(
+            [
+                f'workspace_marker="$(mktemp {shlex.quote(workspace_root)}/.agent-canon/nested-marker.XXXXXX)"',
+                'trap \'rm -f "$workspace_marker"\' EXIT',
+                "# Separate marker and post-create mtimes on coarse timestamp filesystems.",
+                "sleep 1",
+            ]
         )
     lines.extend(
         [
@@ -281,6 +342,10 @@ def build_nested_codex_script(
             [
                 'if [ "$(id -u)" -eq 0 ]; then',
                 f'  chown -R {run_uid}:{run_gid} "$HOME" || true',
+                f'  chown -h {run_uid}:{run_gid} {shlex.quote(workspace_root)}/.agent-canon || true',
+                f'  find -P {shlex.quote(workspace)} -xdev -mindepth 1 -uid 0 -newer "$workspace_marker" '
+                f'-exec chown -h {run_uid}:{run_gid} {{}} +',
+                '  rm -f "$workspace_marker"',
                 "  if command -v setpriv >/dev/null 2>&1; then",
                 f"    exec setpriv --reuid {run_uid} --regid {run_gid} --clear-groups {quoted_command}",
                 "  fi",
@@ -304,21 +369,37 @@ def main() -> int:
             return 0
 
         profile = find_profile(profiles, args.profile)
+        xdg_state_home = nested_xdg_state_home(profile)
         workspace_root = workspace_path(args.workspace_root)
         _, container_home = host_to_container_home(defaults, profile, workspace_root)
         pack = apply_pack_overrides(load_or_default_pack(profile.pack))
+        profile_forward_env = defaults.forward_env
+        cli_forward_env = tuple(args.forward_env)
+        validate_nested_owned_environment(
+            pack.runtime.env,
+            profile_forward_env,
+            cli_forward_env,
+        )
         builder = resolve_builder(args.builder, print_only=args.print_only)
+        lifecycle = lifecycle_context(workspace_root, builder, "nested-codex")
+        if not args.skip_build:
+            pack = scope_pack_image_tag(pack, lifecycle)
+        lifecycle = lifecycle.bind_image_tag(pack.image_tag)
 
         mount_host_ssh_dir = defaults.mount_host_ssh_dir or args.mount_host_ssh_dir
         forward_ssh_auth_sock = (
             defaults.forward_ssh_auth_sock and not args.no_forward_ssh_auth_sock
         )
-        forward_env = tuple(dict.fromkeys((*defaults.forward_env, *args.forward_env)))
+        forward_env = tuple(dict.fromkeys((*profile_forward_env, *cli_forward_env)))
         use_host_user = defaults.use_host_user
         tty = defaults.tty
 
         mounts: list[str] = []
-        envs: list[str] = [f"HOME={container_home}"]
+        # Nested Codex deliberately uses a profile-specific HOME rather than the
+        # dedicated image identity HOME.  Clear the dedicated identity contract
+        # so shared post-create performs the rest of setup without rejecting the
+        # nested session as a runtime-user mismatch.
+        envs: list[str] = []
 
         host_gitconfig = Path.home() / ".gitconfig"
         if defaults.mount_host_gitconfig and host_gitconfig.is_file():
@@ -333,7 +414,7 @@ def main() -> int:
             mounts.append(f"{host_ssh_dir}:/tmp/host-ssh-dir:ro")
 
         host_ssh_auth_sock = os.environ.get("SSH_AUTH_SOCK", "")
-        if forward_ssh_auth_sock and host_ssh_auth_sock:
+        if forward_ssh_auth_sock and host_ssh_auth_sock and Path(host_ssh_auth_sock).is_socket():
             mounts.append(f"{host_ssh_auth_sock}:/tmp/host-ssh-agent.sock")
             envs.append("SSH_AUTH_SOCK=/tmp/host-ssh-agent.sock")
 
@@ -342,6 +423,16 @@ def main() -> int:
             if value:
                 envs.append(f"{env_name}={value}")
 
+        # Keep owned values last so build_run_command's merged environment cannot
+        # let a later forwarding entry shadow the nested runtime contract.
+        envs.extend(
+            [
+                f"HOME={container_home}",
+                f"XDG_STATE_HOME={xdg_state_home}",
+                "AGENT_CANON_CONTAINER_USER=",
+            ]
+        )
+
         shell_script = build_nested_codex_script(
             normalize_command(args.command),
             mount_host_ssh_dir=mount_host_ssh_dir,
@@ -349,7 +440,7 @@ def main() -> int:
             run_uid=os.getuid() if use_host_user else None,
             run_gid=os.getgid() if use_host_user else None,
         )
-        build_command = build_build_command(builder, pack)
+        build_command = build_build_command(builder, pack, labels=lifecycle.labels())
         run_command = build_run_command(
             builder,
             pack,
@@ -357,28 +448,47 @@ def main() -> int:
             command=build_shell_invocation(pack.runtime.shell, shell_script),
             env=tuple(envs),
             mounts=tuple(mounts),
+            user="root" if use_host_user else None,
             tty=tty,
+            labels=lifecycle.labels(),
         )
 
         print_label_and_command("build", build_command)
         print_label_and_command("run", run_command)
 
         if args.print_only:
+            emit_not_created_lifecycle_receipt(workspace_root, lifecycle)
             return 0
 
-        image_built_here = False
-        if not args.skip_build:
-            build_result = subprocess.run(build_command, check=False)
-            if build_result.returncode != 0:
-                return build_result.returncode
-            image_built_here = True
+        lifecycle_run = start_container_lifecycle(
+            workspace_root, builder, "nested-codex", context=lifecycle
+        )
+        if lifecycle_run.receipt.state != "snapshot":
+            write_lifecycle_receipt(workspace_root, lifecycle_run.receipt)
+            print(
+                f"container lifecycle unavailable: {lifecycle_run.receipt.failure or lifecycle_run.receipt.before.query_status}",
+                file=sys.stderr,
+            )
+            return 2
 
+        command_exit = 0
         try:
-            run_result = subprocess.run(run_command, check=False)
-            return run_result.returncode
+            if not args.skip_build:
+                command_exit = subprocess.run(build_command, check=False).returncode
+            if command_exit == 0:
+                command_exit = subprocess.run(run_command, check=False).returncode
         finally:
-            if image_built_here and not args.keep_image:
-                cleanup_image(builder, pack.image_tag)
+            # Nested Codex is never allowed to retain a task-created image;
+            # lifecycle ownership ends with this invocation.
+            cleanup_result = lifecycle_run.finish(cleanup=True)
+        if cleanup_result.state not in {"cleaned", "not-created"}:
+            print(
+                f"container lifecycle cleanup state={cleanup_result.state}: {cleanup_result.failure}",
+                file=sys.stderr,
+            )
+            if command_exit == 0:
+                command_exit = 2
+        return command_exit
     except (RuntimeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 2

@@ -1,18 +1,40 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract environment
-# responsibility Renders shared devcontainer compose from repo-local Docker pack.
+# responsibility Renders shared devcontainer compose from repo-local Docker pack and the host process identity.
 # upstream design ../documents/contracts/github-first-module-and-devcontainer-policy.md devcontainer boundary
-# upstream design ../documents/rule/dependency-module-changes.md topic-root source visibility contract
 # upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell boundary
 # upstream implementation ../tools/agent_tools/dependency_module_change.py topic clone lifecycle tool
-# upstream design ../documents/experiments/gpu-admission-r5-source-packet.md exact Compose runtime identity wiring
+# upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md default startup profile boundary
+# upstream design ../documents/experiments/gpu-admission-r5-source-packet.md opt-in GPU runtime identity wiring
 # upstream environment devcontainer.json initializeCommand entrypoint
 # @dependency-end
 
 set -euo pipefail
 
-repo_root="${AGENT_CANON_DEVCONTAINER_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+yaml_scalar() {
+  local field="$1"
+  local value="$2"
+  python3 - "$field" "$value" <<'PY'
+import json
+import sys
+
+field, value = sys.argv[1:]
+if (
+    not value
+    or value != value.strip()
+    or any(ord(char) < 0x20 or ord(char) == 0x7F for char in value)
+    or any(char in value for char in ('"', "'", "\\"))
+):
+    raise SystemExit(
+        f"devcontainer YAML scalar is unsafe for {field}: quote/control/newline"
+    )
+print(json.dumps(value, ensure_ascii=False))
+PY
+}
+
+agent_canon_source_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+repo_root="${AGENT_CANON_DEVCONTAINER_REPO_ROOT:-${AGENT_CANON_ACTIVE_REPOSITORY_ROOT:-$agent_canon_source_root}}"
 repo_root="$(cd "$repo_root" && pwd -P)"
 workspace_root="$(cd "${repo_root}/.." && pwd -P)"
 [ -d "$workspace_root" ] || {
@@ -20,26 +42,72 @@ workspace_root="$(cd "${repo_root}/.." && pwd -P)"
   exit 1
 }
 workspace_parent="$(cd "${workspace_root}/.." && pwd -P)"
-if [ "$(basename "$workspace_parent")" != "workspace" ]; then
-  case "$(basename "$workspace_root")" in
-    workspace-*)
-      printf 'devcontainer rejects legacy workspace-<topic-slug> root: %s\n' "$workspace_root" >&2
-      ;;
-    *)
-      printf 'devcontainer requires a topic workspace root under workspace/<topic-slug>: %s\n' "$workspace_root" >&2
-      ;;
-  esac
+if [[ "$(basename "$workspace_root")" == workspace-* \
+  && "$(basename "$workspace_parent")" != "workspace" ]]; then
+  printf 'devcontainer legacy workspace root is rejected: %s\n' "$workspace_root" >&2
   exit 1
+fi
+is_managed_topic_root() {
+  [ "$(basename "$1")" = "workspace" ]
+}
+if is_managed_topic_root "$workspace_parent"; then
+  workspace_layout="managed-topic"
+else
+  workspace_layout="direct-repo"
 fi
 repo_basename="$(basename "$repo_root")"
 container_repo_root="/workspace/${repo_basename}"
-pack="${repo_root}/docker/packs/default.toml"
+if [[ "${PROJECT_USER+x}" = "x" ]]; then
+  printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_USER_OVERRIDE_FORBIDDEN:canonical=project:received=%s\n' "$PROJECT_USER" >&2
+  exit 1
+fi
+if [[ "${PROJECT_UID+x}" = "x" || "${PROJECT_GID+x}" = "x" ]]; then
+  printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_IDS_OVERRIDE_FORBIDDEN:canonical=host-process-identity\n' >&2
+  exit 1
+fi
+project_user="project"
+runtime_user_name="$project_user"
+project_uid="$(id -u)"
+project_gid="$(id -g)"
+if [[ ! "$project_uid" =~ ^[1-9][0-9]*$ ]]; then
+  printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_UID_MUST_BE_NONZERO_DECIMAL:uid=%s\n' "$project_uid" >&2
+  exit 1
+fi
+if [[ ! "$project_gid" =~ ^[0-9]+$ ]]; then
+  printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_GID_MUST_BE_NONNEGATIVE_DECIMAL:gid=%s\n' "$project_gid" >&2
+  exit 1
+fi
+runtime_user_uid="$project_uid"
+runtime_user_gid="$project_gid"
+project_home="/home/${project_user}"
+gpu_profile="${AGENT_CANON_GPU_ADMISSION_PROFILE:-default}"
+case "$gpu_profile" in
+  default|gpu-admission) ;;
+  *)
+    printf 'devcontainer GPU admission profile is unsupported: %s\n' "$gpu_profile" >&2
+    exit 1
+    ;;
+esac
+pack_name="default"
+if [ "$gpu_profile" = "gpu-admission" ]; then
+  pack_name="gpu-admission"
+fi
+pack="${repo_root}/docker/packs/${pack_name}.toml"
 compose_output_raw="${AGENT_CANON_DOCKER_COMPOSE_OUTPUT:-.devcontainer/docker-compose.generated.yml}"
 if [ "${compose_output_raw#/}" = "$compose_output_raw" ]; then
   compose_output="${repo_root}/${compose_output_raw}"
 else
   compose_output="$compose_output_raw"
 fi
+compose_output_real="$(realpath -m "$compose_output")"
+repo_root_real="$(realpath -m "$repo_root")"
+case "$compose_output_real/" in
+  "$repo_root_real/"*) ;;
+  *)
+    printf 'devcontainer compose output must remain under repository root: %s\n' "$compose_output" >&2
+    exit 1
+    ;;
+esac
 default_project_name="$(
   python3 - "$repo_root" <<'PY'
 from __future__ import annotations
@@ -56,37 +124,186 @@ digest = hashlib.sha1(repo_root.encode("utf-8")).hexdigest()[:8]
 print(f"{slug}-{digest}-devcontainer")
 PY
 )"
-compose_project_name="${DEVCONTAINER_PROJECT_NAME:-$default_project_name}"
+lifecycle_id="${AGENT_CANON_LIFECYCLE_ID:-$(python3 - <<'PY'
+import secrets
+print(secrets.token_hex(16))
+PY
+)}"
+compose_project_base_name="${DEVCONTAINER_PROJECT_NAME:-$default_project_name}"
+compose_project_name="${compose_project_base_name}-${lifecycle_id}"
+task_id="${AGENT_CANON_TASK_ID:-devcontainer-${compose_project_name}}"
+repo_identity="${AGENT_CANON_REPOSITORY_ID:-$repo_root}"
 
 if [ -f "$pack" ]; then
   pack_values_raw="$(
-    python3 - "$pack" <<'PY'
+    python3 - "$pack" "$repo_root" <<'PY'
 from __future__ import annotations
 
-import sys
+import base64
 import json
+import sys
 import re
+from pathlib import Path
 try:
     import tomllib
 except ModuleNotFoundError:
     import tomli as tomllib  # type: ignore[no-redef]
 
-with open(sys.argv[1], "rb") as handle:
+pack_path = sys.argv[1]
+repo_root = Path(sys.argv[2])
+with open(pack_path, "rb") as handle:
     data = tomllib.load(handle)
 pack = data["pack"]
 runtime = data.get("runtime", {})
 runtime_shell = runtime.get("shell", "/bin/bash")
 if not isinstance(runtime_shell, str) or re.fullmatch(r"/[A-Za-z0-9._/-]+", runtime_shell) is None:
     raise SystemExit("runtime.shell must be one absolute executable path")
+runtime_platform = pack.get("platform", "linux/amd64")
+if runtime_platform != "linux/amd64":
+    raise SystemExit("pack.platform must be linux/amd64")
+known_optional_profiles = {
+    "host-zshrc",
+    "host-git",
+    "host-secrets",
+    "host-credentials",
+    "ssh-agent",
+    "docker-host",
+    "linked-data-roots",
+}
+optional_mount_profiles = runtime.get("optional_mount_profiles", [])
+if not isinstance(optional_mount_profiles, list) or not all(
+    isinstance(item, str) for item in optional_mount_profiles
+):
+    raise SystemExit("runtime.optional_mount_profiles must be a string array")
+seen_profiles = set()
+for profile in optional_mount_profiles:
+    if not profile or profile != profile.strip():
+        raise SystemExit(
+            "runtime.optional_mount_profiles cannot contain empty or whitespace entries"
+        )
+    if profile not in known_optional_profiles:
+        raise SystemExit(
+            f"runtime.optional_mount_profiles contains unknown profile: {profile}"
+        )
+    if profile in seen_profiles:
+        raise SystemExit(
+            f"runtime.optional_mount_profiles contains duplicate profile: {profile}"
+        )
+    seen_profiles.add(profile)
+linked_data_roots_present = "linked_data_roots" in runtime
+linked_data_roots = runtime.get("linked_data_roots", [])
+if linked_data_roots_present and not isinstance(linked_data_roots, list):
+    raise SystemExit("runtime.linked_data_roots must be an inline table array")
+if ("linked-data-roots" in seen_profiles) != linked_data_roots_present:
+    raise SystemExit(
+        "linked-data-roots profile and linked_data_roots list must both be present or absent"
+    )
+if "linked-data-roots" in seen_profiles and not linked_data_roots:
+    raise SystemExit("linked-data-roots profile requires a non-empty linked_data_roots list")
+seen_links = set()
+seen_targets = set()
+linked_data_values = []
+target_re = re.compile(r"/mnt/[a-z]/[^/].*\Z")
+for index, item in enumerate(linked_data_roots):
+    if not isinstance(item, dict) or set(item) != {"link", "target"}:
+        raise SystemExit(
+            f"runtime.linked_data_roots entry {index} must contain only link and target"
+        )
+    link = item["link"]
+    target = item["target"]
+    if not isinstance(link, str) or not isinstance(target, str):
+        raise SystemExit(
+            f"runtime.linked_data_roots entry {index} requires string link and target"
+        )
+    link_path = Path(link)
+    if (
+        not link
+        or any(ord(char) < 32 for char in link)
+        or link_path.is_absolute()
+        or link != link_path.as_posix()
+        or any(part in {"", ".", ".."} for part in link_path.parts)
+        or not (repo_root / link).is_symlink()
+    ):
+        raise SystemExit(
+            f"runtime.linked_data_roots link is not a normalized repository symlink: {link}"
+        )
+    target_path = Path(target)
+    if (
+        not target_re.fullmatch(target)
+        or any(ord(char) < 32 for char in target)
+        or ":" in target
+        or "," in target
+        or target != target_path.as_posix()
+        or any(part in {"", ".", ".."} for part in target_path.parts)
+        or target in {"/mnt", "/mnt/l"}
+    ):
+        raise SystemExit(
+            f"runtime.linked_data_roots target is not a narrow /mnt/<letter> path: {target}"
+        )
+    if link in seen_links or target in seen_targets:
+        raise SystemExit("runtime.linked_data_roots link and target values must be unique")
+    seen_links.add(link)
+    seen_targets.add(target)
+    linked_data_values.append((link, target))
+reserved_environment = {
+    "DEVCONTAINER_RUNTIME_MODE",
+    "DEVCONTAINER_GPU_MODE",
+    "DEVCONTAINER_GPU_NOTICE",
+    "DEVCONTAINER_GPU_REQUEST",
+    "AGENT_CANON_GPU_ADMISSION_PROFILE",
+    "AGENT_CANON_SECRET_MOUNT",
+    "AGENT_CANON_SECRET_DIR_MODE",
+    "AGENT_CANON_OPTIONAL_MOUNTS",
+    "AGENT_CANON_PYTHON_EXTRAS",
+    "AGENT_CANON_RUNTIME_ROUTE",
+    "AGENT_CANON_RUNTIME_GID",
+    "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS",
+    "AGENT_CANON_SHARED_RUNTIME_SOURCE",
+    "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE",
+    "AGENT_CANON_SHARED_RUNTIME_TARGET",
+    "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
+    "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT",
+    "AGENT_CANON_CODEX_SESSION_ROOT",
+    "AGENT_CANON_WORKSPACE_LAYOUT",
+    "AGENT_CANON_WORKSPACE_ROOT",
+    "AGENT_CANON_REPOSITORY_ROOT",
+    "DEPENDENCY_MODULE_CONTAINER_SOURCE",
+    "DEPENDENCY_MODULE_CONTAINER_TARGET",
+    "AGENT_CANON_RUNTIME_IDENTITY_MODE",
+    "PROJECT_UID",
+    "PROJECT_GID",
+    "PROJECT_USER",
+    "HOME",
+    "SHELL",
+    "AGENT_CANON_CONTAINER_USER",
+}
 print(f"dockerfile={pack['dockerfile']}")
+target = pack.get("target")
+if target is not None and (
+    not isinstance(target, str)
+    or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", target) is None
+):
+    raise SystemExit("pack.target must be a safe Docker build stage name")
+if target is not None:
+    print(f"target={target}")
 print(f"runtime_shell={runtime_shell}")
+print(f"platform={runtime_platform}")
 print(f"workdir={runtime.get('workdir', '/workspace')}")
 print(f"workspace_mount={runtime.get('workspace_mount', '/workspace')}")
+for profile in optional_mount_profiles:
+    print(f"optional_profile={profile}")
+if linked_data_roots_present:
+    print("linked_data_roots_present=1")
+for link, target in linked_data_values:
+    payload = json.dumps([link, target], separators=(",", ":")).encode("utf-8")
+    print(f"linked_data_root_b64={base64.urlsafe_b64encode(payload).decode('ascii')}")
 for mount in runtime.get("mounts", []):
     print(f"mount={mount}")
 for item in runtime.get("env", []):
     name, separator, value = str(item).partition("=")
     if separator:
+        if name in reserved_environment:
+            raise SystemExit(f"runtime.env cannot override reserved key: {name}")
         print(f"ENV:{name}: {json.dumps(value)}")
 PY
   )"
@@ -94,17 +311,27 @@ PY
 
   compose_mode="repo-docker-pack"
   dockerfile=""
+  build_target=""
   runtime_shell="/bin/bash"
+  runtime_platform="linux/amd64"
   workdir="/workspace"
   workspace_mount="/workspace"
+  pack_optional_mount_profiles=()
+  linked_data_root_specs=()
+  linked_data_roots_present=false
   pack_mounts=()
   pack_environment_lines=()
   for pack_value in "${pack_values[@]}"; do
     case "$pack_value" in
       dockerfile=*) dockerfile="${pack_value#dockerfile=}" ;;
+      target=*) build_target="${pack_value#target=}" ;;
       runtime_shell=*) runtime_shell="${pack_value#runtime_shell=}" ;;
+      platform=*) runtime_platform="${pack_value#platform=}" ;;
       workdir=*) workdir="${pack_value#workdir=}" ;;
       workspace_mount=*) workspace_mount="${pack_value#workspace_mount=}" ;;
+      optional_profile=*) pack_optional_mount_profiles+=("${pack_value#optional_profile=}") ;;
+      linked_data_roots_present=1) linked_data_roots_present=true ;;
+      linked_data_root_b64=*) linked_data_root_specs+=("${pack_value#linked_data_root_b64=}") ;;
       mount=*) pack_mounts+=("${pack_value#mount=}") ;;
       ENV:*) pack_environment_lines+=("      ${pack_value#ENV:}") ;;
     esac
@@ -112,68 +339,230 @@ PY
 else
   compose_mode="agent-canon-source-only"
   dockerfile=""
+  build_target=""
   runtime_shell="/bin/bash"
+  runtime_platform="linux/amd64"
   workdir="/workspace"
   workspace_mount="/workspace"
+  pack_optional_mount_profiles=()
+  linked_data_root_specs=()
+  linked_data_roots_present=false
   pack_mounts=()
   pack_environment_lines=()
 fi
 
-parent_layout=false
-parent_environment_source="${repo_root}/.devcontainer/parent-environment.sh"
-if [ -d "${repo_root}/vendor/agent-canon" ]; then
-  parent_layout=true
-  if [ ! -f "$parent_environment_source" ] || [ -L "$parent_environment_source" ]; then
-    printf 'devcontainer parent environment source must be a regular file: %s\n' "$parent_environment_source" >&2
+if [ "$gpu_profile" = "gpu-admission" ]; then
+  if [ ! -f "$pack" ]; then
+    printf 'devcontainer GPU admission profile requires pack: %s\n' "$pack" >&2
     exit 1
   fi
+elif [ "$build_target" = "gpu-runtime" ]; then
+  printf 'devcontainer default profile rejects GPU build target: %s\n' "$build_target" >&2
+  exit 1
+fi
+parent_layout=false
+if [ -d "${repo_root}/vendor/agent-canon" ]; then
+  parent_layout=true
 fi
 
+if [ "$gpu_profile" = "gpu-admission" ]; then
+  compose_project_name="${compose_project_name}-gpu-admission"
+  [[ "$compose_project_name" =~ ^[a-z0-9][a-z0-9_-]*-gpu-admission$ ]] || {
+    printf 'devcontainer GPU admission project name is invalid: %s\n' "$compose_project_name" >&2
+    exit 1
+  }
+fi
+expected_image_tag="${AGENT_CANON_EXPECTED_IMAGE_TAG:-${compose_project_name}:task-${lifecycle_id}}"
+
+if ! compose_project_name_yaml="$(yaml_scalar compose_project_name "$compose_project_name")"; then
+  exit 1
+fi
+if ! task_id_yaml="$(yaml_scalar task_id "$task_id")"; then
+  exit 1
+fi
+if ! repo_identity_yaml="$(yaml_scalar repo_identity "$repo_identity")"; then
+  exit 1
+fi
+if ! lifecycle_id_yaml="$(yaml_scalar lifecycle_id "$lifecycle_id")"; then
+  exit 1
+fi
+if ! expected_image_tag_yaml="$(yaml_scalar expected_image_tag "$expected_image_tag")"; then
+  exit 1
+fi
+task_repository="${task_id}:${repo_identity}"
+if ! task_repository_yaml="$(yaml_scalar task_repository "$task_repository")"; then
+  exit 1
+fi
+[[ "$compose_project_name" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || {
+  printf 'devcontainer Compose project name is invalid: %s\n' "$compose_project_name" >&2
+  exit 1
+}
+
+optional_mounts=""
+env_optional_mount_profiles=()
+if [[ "${AGENT_CANON_OPTIONAL_MOUNTS+x}" = "x" ]]; then
+  optional_mounts_raw="$AGENT_CANON_OPTIONAL_MOUNTS"
+  if [ -z "$optional_mounts_raw" ] || [[ "$optional_mounts_raw" == ,* ]] \
+    || [[ "$optional_mounts_raw" == *, ]] || [[ "$optional_mounts_raw" == *",,"* ]]; then
+    printf 'devcontainer optional mount profile source cannot be empty\n' >&2
+    exit 1
+  fi
+  IFS=',' read -r -a optional_mount_values <<< "$optional_mounts_raw"
+  declare -A env_optional_mount_seen=()
+  for optional_mount in "${optional_mount_values[@]}"; do
+    if [ -z "$optional_mount" ] || [[ "$optional_mount" =~ [[:space:]] ]]; then
+      printf 'devcontainer optional mount profile source contains an empty or whitespace entry\n' >&2
+      exit 1
+    fi
+    case "$optional_mount" in
+      host-zshrc|host-git|host-secrets|host-credentials|ssh-agent|docker-host|linked-data-roots) ;;
+      *)
+        printf 'devcontainer optional mount profile is unsupported: %s\n' "$optional_mount" >&2
+        exit 1
+        ;;
+    esac
+    if [ -n "${env_optional_mount_seen[$optional_mount]:-}" ]; then
+      printf 'devcontainer optional mount profile is duplicated: %s\n' "$optional_mount" >&2
+      exit 1
+    fi
+    env_optional_mount_seen["$optional_mount"]=1
+    env_optional_mount_profiles+=("$optional_mount")
+  done
+fi
+declare -A optional_mount_seen=()
+for optional_mount in "${pack_optional_mount_profiles[@]}" "${env_optional_mount_profiles[@]}"; do
+  if [ -z "${optional_mount_seen[$optional_mount]:-}" ]; then
+    optional_mount_seen["$optional_mount"]=1
+    if [ -n "$optional_mounts" ]; then
+      optional_mounts+=","
+    fi
+    optional_mounts+="$optional_mount"
+  fi
+done
+optional_mount_enabled() {
+  local requested="$1"
+  case ",${optional_mounts}," in
+    *,"${requested}",*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+if optional_mount_enabled linked-data-roots && [ "$linked_data_roots_present" != true ]; then
+  printf 'devcontainer linked-data-roots profile requires linked_data_roots in the runtime pack\n' >&2
+  exit 1
+fi
+if [ "$linked_data_roots_present" = true ] && ! optional_mount_enabled linked-data-roots; then
+  printf 'devcontainer linked_data_roots requires the linked-data-roots profile\n' >&2
+  exit 1
+fi
 if [[ "$runtime_shell" != /* || "$runtime_shell" == *[!A-Za-z0-9._/-]* ]]; then
   printf 'devcontainer runtime.shell must be one absolute executable path: %s\n' "$runtime_shell" >&2
   exit 1
 fi
 
-workspace_root_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$workspace_root")"
+workspace_mount_source="$repo_root"
+workspace_mount_target="$container_repo_root"
+workspace_mount_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$workspace_mount_source")"
 volume_lines=(
   "      - type: bind"
-  "        source: ${workspace_root_yaml}"
-  '        target: "/workspace"'
+  "        source: ${workspace_mount_source_yaml}"
+  "        target: \"${workspace_mount_target}\""
 )
-volume_lines+=(
-  "      - type: bind"
-  "        source: /var/lib/agent-canon/runtime"
-  "        target: /var/lib/agent-canon/runtime"
-)
-if [ "$parent_layout" = true ]; then
+host_home="${HOME:-}"
+host_zshrc_source=""
+if optional_mount_enabled host-zshrc \
+  && [ -n "$host_home" ] \
+  && { [ -e "$host_home/.zshrc" ] || [ -L "$host_home/.zshrc" ]; }; then
+  resolved_zshrc="$(realpath -e -- "$host_home/.zshrc" 2>/dev/null || true)"
+  if [ -n "$resolved_zshrc" ] && [ -f "$resolved_zshrc" ]; then
+    host_zshrc_source="$resolved_zshrc"
+  fi
+fi
+if [ -n "$host_zshrc_source" ]; then
+  zshrc_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$host_zshrc_source")"
   volume_lines+=(
     "      - type: bind"
-    '        source: "${HOME}/.zshrc"'
-    '        target: "/etc/project-template/zsh/.zshrc"'
-    "        read_only: true"
-  )
-  parent_environment_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$parent_environment_source")"
-  volume_lines+=(
-    "      - type: bind"
-    "        source: ${parent_environment_source_yaml}"
-    '        target: "/etc/project-template/parent-environment.sh"'
+    "        source: ${zshrc_source_yaml}"
+    "        target: \"${project_home}/.zshrc\""
     "        read_only: true"
   )
 fi
-for pack_mount in "${pack_mounts[@]}"; do
-  case "$pack_mount" in
-    *:/workspace|*:/workspace:*)
-      printf 'devcontainer runtime pack duplicates the workspace-root mount: %s\n' "$pack_mount" >&2
-      exit 1
-      ;;
-  esac
-  volume_lines+=("      - ${pack_mount}")
+host_zsh_source=""
+if optional_mount_enabled host-zshrc \
+  && [ -n "$host_home" ] \
+  && { [ -e "$host_home/.zsh" ] || [ -L "$host_home/.zsh" ]; }; then
+  resolved_zsh="$(realpath -e -- "$host_home/.zsh" 2>/dev/null || true)"
+  if [ -n "$resolved_zsh" ] && [ -d "$resolved_zsh" ]; then
+    host_zsh_source="$resolved_zsh"
+  fi
+fi
+if [ -n "$host_zsh_source" ]; then
+  zsh_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$host_zsh_source")"
+  volume_lines+=(
+    "      - type: bind"
+    "        source: ${zsh_source_yaml}"
+    "        target: \"${project_home}/.zsh\""
+    "        read_only: true"
+  )
+fi
+declare -A linked_data_source_seen=()
+declare -A linked_data_target_seen=()
+for linked_data_root_spec in "${linked_data_root_specs[@]}"; do
+  linked_data_pair="$(python3 - "$linked_data_root_spec" <<'PY'
+from __future__ import annotations
+
+import base64
+import json
+import sys
+
+try:
+    link, target = json.loads(
+        base64.urlsafe_b64decode(sys.argv[1]).decode("utf-8")
+    )
+except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+    raise SystemExit(f"invalid linked_data_roots payload: {exc}") from exc
+print(f"{link}\t{target}")
+PY
+)"
+  IFS=$'\t' read -r linked_data_link linked_data_target <<< "$linked_data_pair"
+  linked_data_source="$(realpath -e -- "$repo_root/$linked_data_link" 2>/dev/null || true)"
+  if [ -z "$linked_data_source" ] || [ ! -d "$linked_data_source" ]; then
+    printf 'devcontainer linked_data_roots source must resolve to an existing directory: %s\n' "$linked_data_link" >&2
+    exit 1
+  fi
+  if [ "$linked_data_source" != "$linked_data_target" ]; then
+    printf 'devcontainer linked_data_roots target does not match resolved source: %s -> %s\n' "$linked_data_link" "$linked_data_target" >&2
+    exit 1
+  fi
+  if [ -n "${linked_data_source_seen[$linked_data_source]:-}" ] || [ -n "${linked_data_target_seen[$linked_data_target]:-}" ]; then
+    printf 'devcontainer linked_data_roots sources and targets must be unique\n' >&2
+    exit 1
+  fi
+  linked_data_source_seen["$linked_data_source"]=1
+  linked_data_target_seen["$linked_data_target"]=1
+  linked_data_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$linked_data_source")"
+  linked_data_target_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$linked_data_target")"
+  volume_lines+=(
+    "      - type: bind"
+    "        source: ${linked_data_source_yaml}"
+    "        target: ${linked_data_target_yaml}"
+    "        read_only: false"
+  )
 done
-if [ -d /mnt/git ]; then
+for pack_mount in "${pack_mounts[@]}"; do
+  printf 'devcontainer shared generator rejects raw runtime.mounts; use an explicit public mount profile: %s\n' "$pack_mount" >&2
+  exit 1
+done
+if optional_mount_enabled host-git && [ -d /mnt/git ]; then
   volume_lines+=("      - /mnt/git:/mnt/git")
 fi
 secret_mount_status="disabled"
-secret_target="${AGENT_CANON_SECRET_MOUNT:-/mnt/agent-canon-secrets}"
+canonical_secret_target="/mnt/agent-canon-secrets"
+if [ -n "${AGENT_CANON_SECRET_MOUNT:-}" ] \
+  && [ "${AGENT_CANON_SECRET_MOUNT}" != "$canonical_secret_target" ]; then
+  printf 'devcontainer secret target is fixed at %s; custom targets are rejected\n' "$canonical_secret_target" >&2
+  exit 1
+fi
+secret_target="$canonical_secret_target"
 secret_mode="${AGENT_CANON_SECRET_DIR_MODE:-ro}"
 secret_read_only="true"
 case "$secret_mode" in
@@ -184,7 +573,9 @@ case "$secret_mode" in
     secret_mode="invalid"
     ;;
 esac
-if [ -n "${AGENT_CANON_SECRET_DIR:-}" ] && [ "$secret_mode" != "invalid" ]; then
+if optional_mount_enabled host-secrets \
+  && [ -n "${AGENT_CANON_SECRET_DIR:-}" ] \
+  && [ "$secret_mode" != "invalid" ]; then
   if [ ! -d "${AGENT_CANON_SECRET_DIR}" ]; then
     printf 'devcontainer secret mount skipped: AGENT_CANON_SECRET_DIR is not an existing directory\n' >&2
   elif [[ "$secret_target" != /* ]]; then
@@ -201,130 +592,235 @@ if [ -n "${AGENT_CANON_SECRET_DIR:-}" ] && [ "$secret_mode" != "invalid" ]; then
     secret_mount_status="enabled"
   fi
 fi
-if [ -d "${HOME}/.config/gh" ]; then
-  volume_lines+=("      - ${HOME}/.config/gh:/root/.config/gh")
+if optional_mount_enabled host-credentials \
+  && [ -n "$host_home" ] \
+  && [ -d "$host_home/.config/gh" ]; then
+  volume_lines+=("      - ${host_home}/.config/gh:${project_home}/.config/gh:ro")
 fi
-if [ -d "${HOME}/.ssh" ]; then
-  volume_lines+=("      - ${HOME}/.ssh:/root/.ssh:ro")
+if optional_mount_enabled host-credentials \
+  && [ -n "$host_home" ] \
+  && [ -d "$host_home/.ssh" ]; then
+  volume_lines+=("      - ${host_home}/.ssh:${project_home}/.ssh:ro")
 fi
-if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
+if optional_mount_enabled ssh-agent \
+  && [ -n "${SSH_AUTH_SOCK:-}" ] \
+  && [ -S "${SSH_AUTH_SOCK}" ]; then
   volume_lines+=("      - ${SSH_AUTH_SOCK}:/ssh-agent")
 fi
+if optional_mount_enabled docker-host; then
+  if [ ! -S /var/run/docker.sock ]; then
+    printf 'devcontainer docker-host profile requires an existing Unix socket: /var/run/docker.sock\n' >&2
+    exit 1
+  fi
+  volume_lines+=("      - /var/run/docker.sock:/var/run/docker.sock")
+fi
 
-host_gpu_visible() {
-  [ -e /dev/nvidiactl ] && return 0
-  command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1
-}
+gpu_mode="disabled"
+gpu_notice="default-profile-disabled"
+runtime_route="CONTAINER_LOCAL"
+runtime_bind_source=""
+runtime_target="/var/lib/agent-canon/runtime"
+runtime_host_source=""
+provision_receipt="${runtime_target}/shared-runtime-provision.json"
+readback_receipt="${runtime_target}/shared-runtime-readback.json"
+if [ "$gpu_profile" = "gpu-admission" ]; then
+  runtime_route="MANAGED_CONTAINER"
+  runtime_bind_source="${AGENT_CANON_SHARED_RUNTIME_SOURCE:-${repo_root}/.agent-canon/runtime}"
+  runtime_host_source="${AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE:-$runtime_bind_source}"
+  runtime_target="${AGENT_CANON_SHARED_RUNTIME_TARGET:-/var/lib/agent-canon/runtime}"
+  [ "$runtime_bind_source" = "$repo_root/.agent-canon/runtime" ] || {
+    printf 'devcontainer GPU admission runtime source must be repository-local .agent-canon/runtime\n' >&2
+    exit 1
+  }
+  [ "$runtime_host_source" = "$runtime_bind_source" ] || {
+    printf 'devcontainer GPU admission host runtime source must match the bind source\n' >&2
+    exit 1
+  }
+  [ "$runtime_target" = "/var/lib/agent-canon/runtime" ] || {
+    printf 'devcontainer GPU admission runtime target must be /var/lib/agent-canon/runtime\n' >&2
+    exit 1
+  }
+  [ "${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-$runtime_bind_source/shared-runtime-provision.json}" = "$runtime_bind_source/shared-runtime-provision.json" ] || {
+    printf 'devcontainer GPU admission provision receipt path is not canonical\n' >&2
+    exit 1
+  }
+  [ "${AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT:-$runtime_bind_source/shared-runtime-readback.json}" = "$runtime_bind_source/shared-runtime-readback.json" ] || {
+    printf 'devcontainer GPU admission host readback receipt path is not canonical\n' >&2
+    exit 1
+  }
+  [ -d "$runtime_bind_source" ] || {
+    printf 'devcontainer GPU admission runtime source is not provisioned: %s\n' "$runtime_bind_source" >&2
+    exit 1
+  }
+  gpu_mode="enabled"
+  gpu_notice="explicit-gpu-admission-profile"
+else
+  for forbidden_profile_value in \
+    "${DEVCONTAINER_GPU_REQUEST:-}" \
+    "${AGENT_CANON_SHARED_RUNTIME_SOURCE:-}" \
+    "${AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE:-}" \
+    "${AGENT_CANON_SHARED_RUNTIME_TARGET:-}" \
+    "${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-}" \
+    "${AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT:-}"; do
+    [ -z "$forbidden_profile_value" ] || {
+      printf 'devcontainer GPU admission fields require the gpu-admission profile\n' >&2
+      exit 1
+    }
+  done
+fi
 
-docker_gpu_runtime_available() {
-  command -v docker >/dev/null 2>&1 || return 1
-  docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q '"nvidia"'
-}
-
-gpu_request_raw="${DEVCONTAINER_GPU_REQUEST:-auto}"
-gpu_request="auto"
-gpu_mode="unavailable"
-gpu_notice="host-gpu-not-visible"
-case "$gpu_request_raw" in
-  auto | "")
-    if host_gpu_visible; then
-      if docker_gpu_runtime_available; then
-        gpu_mode="enabled"
-        gpu_notice="docker-nvidia-runtime-available"
-      else
-        gpu_notice="docker-nvidia-runtime-unavailable"
-      fi
-    fi
-    ;;
-  disabled | off | false | FALSE | 0)
-    gpu_request="disabled"
-    gpu_mode="disabled"
-    gpu_notice="disabled-by-request"
-    ;;
-  enabled | on | true | TRUE | 1)
-    gpu_request="enabled"
-    if host_gpu_visible && docker_gpu_runtime_available; then
-      gpu_mode="enabled"
-      gpu_notice="docker-nvidia-runtime-available"
-    elif host_gpu_visible; then
-      gpu_notice="docker-nvidia-runtime-unavailable"
-    fi
-    ;;
-  *)
-    printf 'devcontainer gpu request ignored: DEVCONTAINER_GPU_REQUEST must be auto, enabled, or disabled\n' >&2
-    if host_gpu_visible && docker_gpu_runtime_available; then
-      gpu_mode="enabled"
-      gpu_notice="docker-nvidia-runtime-available"
-    fi
-    ;;
-esac
-
-if [ "$gpu_mode" = "unavailable" ]; then
-  printf 'devcontainer gpu unavailable: %s; continuing without gpus: all\n' "$gpu_notice" >&2
+if [ "$gpu_profile" = "gpu-admission" ]; then
+  runtime_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$runtime_bind_source")"
+  volume_lines+=(
+    "      - type: bind"
+    "        source: ${runtime_source_yaml}"
+    "        target: \"${runtime_target}\""
+  )
 fi
 
 environment_lines=(
   "      DEVCONTAINER_RUNTIME_MODE: \"${compose_mode}\""
   "      DEVCONTAINER_GPU_MODE: \"${gpu_mode}\""
   "      DEVCONTAINER_GPU_NOTICE: \"${gpu_notice}\""
-  "      DEVCONTAINER_GPU_REQUEST: \"${gpu_request}\""
   "      AGENT_CANON_SECRET_MOUNT: \"${secret_target}\""
   "      AGENT_CANON_SECRET_DIR_MODE: \"${secret_mode}\""
-  '      AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"'
+  "      AGENT_CANON_OPTIONAL_MOUNTS: \"${optional_mounts}\""
+  "      AGENT_CANON_RUNTIME_ROUTE: \"${runtime_route}\""
+  "      PYTHONDONTWRITEBYTECODE: \"1\""
+  "      PYTHONPATH: \"${container_repo_root}/python\""
+  "      AGENT_CANON_WORKSPACE_LAYOUT: \"${workspace_layout}\""
+  "      AGENT_CANON_CODEX_SESSION_ROOT: \"${project_home}/.codex/sessions\""
+  "      HOME: \"${project_home}\""
+  "      SHELL: \"${runtime_shell}\""
+  "      AGENT_CANON_CONTAINER_USER: \"${runtime_user_name}\""
   '      AGENT_CANON_WORKSPACE_ROOT: "/workspace"'
   "      AGENT_CANON_REPOSITORY_ROOT: \"${container_repo_root}\""
-  '      AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"'
-  '      AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/shared-runtime-provision.json"'
+  "      DEPENDENCY_MODULE_CONTAINER_SOURCE: ${workspace_mount_source_yaml}"
+  "      DEPENDENCY_MODULE_CONTAINER_TARGET: \"${workspace_mount_target}\""
   "${pack_environment_lines[@]}"
 )
-if [ "$parent_layout" = true ]; then
-  environment_lines=(
-    '      HOME: "/tmp/project-template-home"'
-    '      ZDOTDIR: "/etc/project-template/zsh"'
-    "      SHELL: \"${runtime_shell}\""
-    "${environment_lines[@]}"
+if [ "$gpu_profile" = "gpu-admission" ]; then
+  environment_lines+=(
+    '      DEVCONTAINER_GPU_REQUEST: "all"'
+    '      AGENT_CANON_GPU_ADMISSION_PROFILE: "gpu-admission"'
+    "      AGENT_CANON_SHARED_RUNTIME_SOURCE: \"${runtime_target}\""
+    "      AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE: \"${runtime_host_source}\""
+    "      AGENT_CANON_SHARED_RUNTIME_TARGET: \"${runtime_target}\""
+    "      AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: \"${runtime_target}/shared-runtime-provision.json\""
+    "      AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT: \"${runtime_target}/shared-runtime-readback.json\""
   )
 fi
-if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
+if optional_mount_enabled ssh-agent \
+  && [ -n "${SSH_AUTH_SOCK:-}" ] \
+  && [ -S "${SSH_AUTH_SOCK}" ]; then
   environment_lines+=('      SSH_AUTH_SOCK: "/ssh-agent"')
 fi
-if [ "$gpu_mode" = "enabled" ]; then
-  environment_lines+=(
-    "      NVIDIA_VISIBLE_DEVICES: all"
-    '      NVIDIA_DRIVER_CAPABILITIES: "compute,utility"'
-  )
-fi
+compose_payload="$(
+  {
+    # Compose project names are validated by yaml_scalar before this point;
+    # retain the canonical unquoted projection used by existing readers.
+    printf 'name: %s\n' "$compose_project_name"
+    printf 'services:\n'
+    printf '  workspace:\n'
+    printf '    labels:\n'
+    printf '      com.agent-canon.task-id: %s\n' "$task_id_yaml"
+    printf '      com.agent-canon.repository: %s\n' "$repo_identity_yaml"
+    printf '      com.agent-canon.task-repository: %s\n' "$task_repository_yaml"
+    printf '      com.agent-canon.lifecycle-id: %s\n' "$lifecycle_id_yaml"
+    printf '    image: %s\n' "$expected_image_tag_yaml"
+    printf '    platform: %s\n' "$runtime_platform"
+    printf '    user: "%s:%s"\n' "$runtime_user_uid" "$runtime_user_gid"
+    if [ "$gpu_profile" = "gpu-admission" ]; then
+      printf '    gpus: all\n'
+    fi
+    if [ "$compose_mode" = "repo-docker-pack" ]; then
+      printf '    build:\n'
+      printf '      context: ..\n'
+      printf '      dockerfile: %s\n' "$dockerfile"
+      if [ -n "$build_target" ]; then
+        printf '      target: %s\n' "$build_target"
+      fi
+      printf '      args:\n'
+      printf '        PROJECT_UID: "%s"\n' "$project_uid"
+      printf '        PROJECT_GID: "%s"\n' "$project_gid"
+      printf '      labels:\n'
+      printf '        com.agent-canon.task-id: %s\n' "$task_id_yaml"
+      printf '        com.agent-canon.repository: %s\n' "$repo_identity_yaml"
+      printf '        com.agent-canon.task-repository: %s\n' "$task_repository_yaml"
+      printf '        com.agent-canon.lifecycle-id: %s\n' "$lifecycle_id_yaml"
+    else
+      printf '    build:\n'
+      printf '      context: ..\n'
+      printf '      dockerfile: .devcontainer/Dockerfile\n'
+      printf '      args:\n'
+      printf '        PROJECT_UID: "%s"\n' "$project_uid"
+      printf '        PROJECT_GID: "%s"\n' "$project_gid"
+      printf '      labels:\n'
+      printf '        com.agent-canon.task-id: %s\n' "$task_id_yaml"
+      printf '        com.agent-canon.repository: %s\n' "$repo_identity_yaml"
+      printf '        com.agent-canon.task-repository: %s\n' "$task_repository_yaml"
+      printf '        com.agent-canon.lifecycle-id: %s\n' "$lifecycle_id_yaml"
+    fi
+    printf '    working_dir: %s\n' "$container_repo_root"
+    printf '    volumes:\n'
+    printf '%s\n' "${volume_lines[@]}"
+    printf '    command: %s -lc "sleep infinity"\n' "$runtime_shell"
+    printf '    tty: true\n'
+    printf '    init: true\n'
+    printf '    environment:\n'
+    printf '%s\n' "${environment_lines[@]}"
+    printf 'networks:\n'
+    printf '  default:\n'
+    printf '    labels:\n'
+    printf '      com.agent-canon.task-id: %s\n' "$task_id_yaml"
+    printf '      com.agent-canon.repository: %s\n' "$repo_identity_yaml"
+    printf '      com.agent-canon.task-repository: %s\n' "$task_repository_yaml"
+    printf '      com.agent-canon.lifecycle-id: %s\n' "$lifecycle_id_yaml"
+  }
+)"
+COMPOSE_PAYLOAD="$compose_payload" python3 - "$repo_root" "$compose_output_real" "$agent_canon_source_root" <<'PY'
+from __future__ import annotations
 
-{
-  printf 'name: %s\n' "$compose_project_name"
-  printf 'services:\n'
-  printf '  workspace:\n'
-  printf '    user: "${LOCAL_UID}:${LOCAL_GID}"\n'
-  printf '    group_add:\n'
-  printf '      - "${AGENT_CANON_RUNTIME_GID}"\n'
-  if [ "$compose_mode" = "repo-docker-pack" ]; then
-    printf '    build:\n'
-    printf '      context: ..\n'
-    printf '      dockerfile: %s\n' "$dockerfile"
-  else
-    printf '    image: mcr.microsoft.com/devcontainers/base:ubuntu-22.04\n'
-  fi
-  printf '    working_dir: %s\n' "$container_repo_root"
-  if [ "$parent_layout" = true ]; then
-    printf '    tmpfs:\n'
-    printf '      - /tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700\n'
-  fi
-  printf '    volumes:\n'
-  printf '%s\n' "${volume_lines[@]}"
-  printf '    command: %s -lc "sleep infinity"\n' "$runtime_shell"
-  printf '    tty: true\n'
-  printf '    init: true\n'
-  if [ "$gpu_mode" = "enabled" ]; then
-    printf '    gpus: all\n'
-  fi
-  printf '    environment:\n'
-  printf '%s\n' "${environment_lines[@]}"
-} > "$compose_output"
+import os
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1]).resolve()
+target = Path(sys.argv[2]).resolve(strict=False)
+agent_canon_source_root = Path(sys.argv[3]).resolve()
+try:
+    relative = target.relative_to(root)
+except ValueError as exc:
+    raise SystemExit("compose output escaped repository root") from exc
+payload = os.environ.get("COMPOSE_PAYLOAD", "").encode("utf-8") + b"\n"
+boundary_source = (
+    agent_canon_source_root / "tools" / "agent_tools" / "parent_root_side_effects.py"
+)
+if not boundary_source.is_file():
+    raise SystemExit(
+        "parent_root_side_effects capability is required for Compose publication"
+    )
+sys.path.insert(0, str(agent_canon_source_root / "tools" / "agent_tools"))
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+)
+
+boundary = ParentRootSideEffectBoundary()
+attestation = boundary.attest(
+    ParentRootAttestationRequest(
+        cwd=root,
+        explicit_root=root,
+        purpose="generate-runtime-compose",
+    )
+)
+boundary.write_parent_owned_file(
+    attestation,
+    relative,
+    payload,
+    "generate-runtime-compose",
+)
+PY
 
 
-printf 'devcontainer runtime generated: name=%s gpu=%s mode=%s network=auto secret_mount=%s pack=%s\n' "$compose_project_name" "$gpu_mode" "$compose_mode" "$secret_mount_status" "$pack"
+printf 'devcontainer runtime generated: name=%s layout=%s gpu=%s mode=%s network=auto secret_mount=%s pack=%s\n' "$compose_project_name" "$workspace_layout" "$gpu_mode" "$compose_mode" "$secret_mount_status" "$pack"

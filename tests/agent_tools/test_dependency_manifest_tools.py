@@ -15,9 +15,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -31,7 +32,6 @@ CODE_SCAN = PROJECT_ROOT / "tools" / "agent_tools" / "scan_code_dependencies.sh"
 DESIGN_CLAIMS = PROJECT_ROOT / "tools" / "agent_tools" / "check_design_doc_claims.py"
 WORKFLOW_MONITOR = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
 AGENT_TEAM = PROJECT_ROOT / "tools" / "agent_tools" / "agent_team.py"
-REQUIREMENT_SYNC = PROJECT_ROOT / "tools" / "requirement_sync_validator.py"
 DOCKER_VALIDATOR = PROJECT_ROOT / "tools" / "docker_dependency_validator.sh"
 
 
@@ -48,6 +48,94 @@ def run_tool(*args: str, root: Path) -> subprocess.CompletedProcess[str]:
 
 class DependencyManifestToolTest(unittest.TestCase):
     """Exercise the dependency manifest shell tools."""
+
+    @staticmethod
+    def git_output(root: Path, *args: str) -> str:
+        """Run one successful Git fixture command."""
+        result = subprocess.run(
+            ["git", *args],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip()
+
+    def changed_header_fixture(
+        self,
+        root: Path,
+        base_files: dict[str, str],
+        head_files: dict[str, str],
+    ) -> tuple[str, str]:
+        """Create a two-commit fixture for trusted changed-path scans."""
+        subprocess.run(
+            ["git", "init", "-b", "main"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.git_output(root, "config", "user.email", "headers@example.invalid")
+        self.git_output(root, "config", "user.name", "Header Fixture")
+        for relative, content in base_files.items():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        self.git_output(root, "add", "-A")
+        self.git_output(root, "commit", "-m", "base")
+        base = self.git_output(root, "rev-parse", "HEAD")
+        for relative in set(base_files) - set(head_files):
+            (root / relative).unlink()
+        for relative, content in head_files.items():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        self.git_output(root, "add", "-A")
+        self.git_output(root, "commit", "-m", "head")
+        return base, self.git_output(root, "rev-parse", "HEAD")
+
+    def write_changed_path_packet(
+        self,
+        root: Path,
+        base: str,
+        packet_path: Path,
+        changed_paths: list[str] | None = None,
+        root_value: str | None = None,
+    ) -> None:
+        """Write selector-compatible trusted path evidence for a fixture."""
+        head = self.git_output(root, "rev-parse", "HEAD")
+        actual_paths = self.git_output(
+            root, "diff", "--name-only", f"{base}...{head}", "--"
+        ).splitlines()
+        paths = actual_paths if changed_paths is None else changed_paths
+        packet = {
+            "schema": "agent-canon.pr-changed-paths.v1",
+            "root": str(root.resolve()) if root_value is None else root_value,
+            "base_sha": base,
+            "base_source": "fixture",
+            "base_tree": self.git_output(root, "rev-parse", f"{base}^{{tree}}"),
+            "head_sha": head,
+            "head_tree": self.git_output(root, "rev-parse", f"{head}^{{tree}}"),
+            "merge_base": self.git_output(root, "merge-base", base, head),
+            "changed_paths": paths,
+            "changed_paths_sha256": hashlib.sha256(
+                "\0".join(paths).encode("utf-8")
+            ).hexdigest(),
+        }
+        packet_path.write_text(
+            json.dumps(packet, sort_keys=True) + "\n", encoding="utf-8"
+        )
+
+    @staticmethod
+    def valid_header(label: str) -> str:
+        """Return one minimal registered dependency manifest."""
+        return (
+            "<!--\n"
+            "@dependency-start\n"
+            "contract test\n"
+            f"responsibility Defines {label}.\n"
+            "@dependency-end\n"
+        )
 
     def test_scan_reports_missing_manifest(self) -> None:
         """The scan tool reports missing markers and can fail on request."""
@@ -88,6 +176,445 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("MISSING_DEPENDENCY_MANIFEST=doc.md", result.stdout)
             self.assertIn("realpath=doc.md", result.stdout)
             self.assertIn("owner=product_file", result.stdout)
+
+    def test_code_scan_can_write_lexical_lsp_report(self) -> None:
+        """Compatibility scanner can persist the canonical lexical report."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "main.py"
+            source.write_text("import package\n", encoding="utf-8")
+            analysis = root / "reports" / "analysis.json"
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(CODE_SCAN),
+                    "--root",
+                    str(root),
+                    "--lexical-only",
+                    "--analysis-json",
+                    str(analysis),
+                    "main.py",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("CODE_DEPENDENCY_SCAN=pass", result.stdout)
+            payload = json.loads(analysis.read_text(encoding="utf-8"))
+            self.assertEqual(payload["schema_version"], "agent-canon.lsp-code-analysis.v1")
+            self.assertEqual(payload["lifecycle"]["state"], "lexical-only")
+
+    def test_code_scan_default_uses_lsp_and_fails_closed(self) -> None:
+        """The normal scanner route does not silently downgrade to lexical facts."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "main.py"
+            source.write_text("import package\n", encoding="utf-8")
+            result = subprocess.run(
+                ["bash", str(CODE_SCAN), "--root", str(root), "main.py"],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("CODE_DEPENDENCY_SCAN=pass", result.stdout)
+
+    def test_code_scan_lexical_wrapper_rejects_symlink_ancestor(self) -> None:
+        """The lexical wrapper delegates explicit path validation to LSP."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            real = root / "real"
+            real.mkdir()
+            (real / "main.py").write_text("import package\n", encoding="utf-8")
+            (root / "linked").symlink_to(real, target_is_directory=True)
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(CODE_SCAN),
+                    "--root",
+                    str(root),
+                    "--lexical-only",
+                    "linked/main.py",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("CODE_DEPENDENCY_SCAN=pass", result.stdout)
+            self.assertIn("path-escape", result.stderr)
+
+            paths_file = root / "paths.txt"
+            paths_file.write_text("linked/main.py\n", encoding="utf-8")
+            paths_result = subprocess.run(
+                [
+                    "bash",
+                    str(CODE_SCAN),
+                    "--root",
+                    str(root),
+                    "--lexical-only",
+                    "--paths-file",
+                    str(paths_file),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(paths_result.returncode, 0)
+            self.assertIn("path-escape", paths_result.stderr)
+
+    def test_code_scan_no_selector_delegates_bounded_discovery(self) -> None:
+        """No-selector wrapper calls LSP without pre-expanding repository paths."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            for relative in (
+                "python/main.py",
+                "workspace/leak.py",
+                "vendor/leak.py",
+                "reports/leak.py",
+                "build/leak.py",
+                ".venv/leak.py",
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("x = 1\n", encoding="utf-8")
+            (root / "linked.py").symlink_to(root / "python" / "main.py")
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            args_file = root / "lsp-args.txt"
+            fake_python = fake_bin / "python3"
+            fake_python.write_text(
+                "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$SCAN_ARGS_FILE\"\n",
+                encoding="utf-8",
+            )
+            os.chmod(fake_python, 0o755)
+            environment = dict(os.environ)
+            environment["PATH"] = f"{fake_bin}:{environment['PATH']}"
+            environment["SCAN_ARGS_FILE"] = str(args_file)
+
+            result = subprocess.run(
+                ["bash", str(CODE_SCAN), "--root", str(root), "--lexical-only"],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+                env=environment,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            forwarded = args_file.read_text(encoding="utf-8").splitlines()
+            self.assertIn("--lexical-only", forwarded)
+            self.assertNotIn("--files", forwarded)
+            self.assertNotIn("workspace/leak.py", forwarded)
+            self.assertNotIn("vendor/leak.py", forwarded)
+            self.assertNotIn("reports/leak.py", forwarded)
+            self.assertNotIn("build/leak.py", forwarded)
+            self.assertNotIn(".venv/leak.py", forwarded)
+            self.assertNotIn("linked.py", forwarded)
+
+    def test_code_scan_rust_is_sidecar_only(self) -> None:
+        """Rust lexical facts stay in the sidecar without fabricated TSV rows."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "main.rs"
+            source.write_text("mod helper;\nuse crate::helper;\n", encoding="utf-8")
+            analysis = root / "reports" / "analysis.json"
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(CODE_SCAN),
+                    "--root",
+                    str(root),
+                    "--lexical-only",
+                    "--analysis-json",
+                    str(analysis),
+                    "main.rs",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(result.stdout.strip(), "CODE_DEPENDENCY_SCAN=pass files=1")
+            legacy_rows = [
+                line for line in result.stdout.splitlines() if line.startswith("CODE_DEPENDENCY\t")
+            ]
+            self.assertFalse(legacy_rows)
+            self.assertTrue(all(len(line.split("\t")) == 7 for line in legacy_rows))
+            payload = json.loads(analysis.read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "complete")
+            self.assertEqual(payload["files"], ["main.rs"])
+            self.assertTrue(payload["lexical_candidates"])
+            self.assertTrue(any(item["token"] == "helper" for item in payload["lexical_candidates"]))
+
+    def test_trusted_packet_reports_unchanged_missing_as_baseline(self) -> None:
+        """Unchanged missing headers are evidence and do not fail the PR scan."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base, _ = self.changed_header_fixture(
+                root,
+                {
+                    "README.md": self.valid_header("stable readme"),
+                    "unchanged.md": "# Existing missing header\n",
+                },
+                {
+                    "README.md": self.valid_header("stable readme"),
+                    "unchanged.md": "# Existing missing header\n",
+                    "changed.md": self.valid_header("changed source"),
+                },
+            )
+            packet = root / "changed-paths.json"
+            self.write_changed_path_packet(root, base, packet)
+
+            result = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--changed-path-packet",
+                str(packet),
+                "--trusted-base-sha",
+                base,
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_BASELINE=1", result.stdout)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_BLOCKING=0", result.stdout)
+            self.assertIn(
+                "DEPENDENCY_HEADER_SCAN_BASELINE_MISSING_PATH=unchanged.md",
+                result.stdout,
+            )
+            self.assertIn("DEPENDENCY_HEADER_SCAN=pass", result.stdout)
+
+    def test_trusted_packet_blocks_changed_missing_header(self) -> None:
+        """A changed product file without a manifest remains a blocking failure."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base, _ = self.changed_header_fixture(
+                root,
+                {"changed.md": self.valid_header("base source")},
+                {"changed.md": "# Header removed in the PR\n"},
+            )
+            packet = root / "changed-paths.json"
+            self.write_changed_path_packet(root, base, packet)
+
+            result = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--changed-path-packet",
+                str(packet),
+                "--trusted-base-sha",
+                base,
+                root=root,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_BLOCKING=1", result.stdout)
+            self.assertIn(
+                "DEPENDENCY_HEADER_SCAN_CHANGED_MISSING_PATH=changed.md",
+                result.stdout,
+            )
+            self.assertIn("DEPENDENCY_HEADER_SCAN=fail", result.stdout)
+
+    def test_trusted_packet_blocks_new_missing_header(self) -> None:
+        """A newly added product file without a manifest is blocking."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base, _ = self.changed_header_fixture(
+                root,
+                {"README.md": self.valid_header("stable readme")},
+                {
+                    "README.md": self.valid_header("stable readme"),
+                    "new.md": "# New source without a manifest\n",
+                },
+            )
+            packet = root / "changed-paths.json"
+            self.write_changed_path_packet(root, base, packet)
+
+            result = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--changed-path-packet",
+                str(packet),
+                "--trusted-base-sha",
+                base,
+                root=root,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "DEPENDENCY_HEADER_SCAN_CHANGED_MISSING_PATH=new.md",
+                result.stdout,
+            )
+            self.assertIn("DEPENDENCY_HEADER_SCAN=fail", result.stdout)
+
+    def test_trusted_packet_changed_valid_header_passes(self) -> None:
+        """A changed product file with a valid manifest passes the strict scan."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base, _ = self.changed_header_fixture(
+                root,
+                {"changed.md": "# Base source\n"},
+                {"changed.md": self.valid_header("changed source")},
+            )
+            packet = root / "changed-paths.json"
+            self.write_changed_path_packet(root, base, packet)
+
+            result = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--changed-path-packet",
+                str(packet),
+                "--trusted-base-sha",
+                base,
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_MISSING=0", result.stdout)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_BLOCKING=0", result.stdout)
+
+    def test_trusted_packet_deleted_file_is_skipped(self) -> None:
+        """A deleted path from the trusted diff is not scanned as a head file."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base, _ = self.changed_header_fixture(
+                root,
+                {
+                    "README.md": self.valid_header("stable readme"),
+                    "deleted.md": "# Deleted source was missing\n",
+                },
+                {"README.md": self.valid_header("stable readme")},
+            )
+            packet = root / "changed-paths.json"
+            self.write_changed_path_packet(root, base, packet)
+
+            result = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--changed-path-packet",
+                str(packet),
+                "--trusted-base-sha",
+                base,
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_SKIPPED=1", result.stdout)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_MISSING=0", result.stdout)
+
+    def test_trusted_packet_missing_or_wrong_fails_closed(self) -> None:
+        """Missing and mismatched trusted path packets cannot widen the scan."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base, head = self.changed_header_fixture(
+                root,
+                {"changed.md": self.valid_header("base source")},
+                {"changed.md": self.valid_header("changed source")},
+            )
+            missing = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--changed-path-packet",
+                str(root / "missing.json"),
+                "--trusted-base-sha",
+                base,
+                root=root,
+            )
+            self.assertNotEqual(missing.returncode, 0)
+            self.assertIn(
+                "DEPENDENCY_HEADER_SCAN_REASON=changed_path_packet_missing_or_wrong_type",
+                missing.stdout,
+            )
+
+            wrong = root / "wrong.json"
+            self.write_changed_path_packet(root, base, wrong, changed_paths=[])
+            mismatched = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--changed-path-packet",
+                str(wrong),
+                "--trusted-base-sha",
+                base,
+                root=root,
+            )
+            self.assertNotEqual(mismatched.returncode, 0)
+            self.assertIn(
+                "DEPENDENCY_HEADER_SCAN_REASON=changed_path_packet_paths_mismatch",
+                mismatched.stdout,
+            )
+
+            packet = root / "packet.json"
+            self.write_changed_path_packet(root, base, packet)
+            substituted = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--changed-path-packet",
+                str(packet),
+                "--trusted-base-sha",
+                head,
+                root=root,
+            )
+            self.assertNotEqual(substituted.returncode, 0)
+            self.assertIn(
+                "DEPENDENCY_HEADER_SCAN_REASON=changed_path_packet_trusted_base_mismatch",
+                substituted.stdout,
+            )
+
+    def test_repo_review_header_scan_only_runs_without_graph_executable(self) -> None:
+        """The trusted header gate is independent from graph-selection readiness."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base, _ = self.changed_header_fixture(
+                root,
+                {"changed.md": self.valid_header("base source")},
+                {"changed.md": self.valid_header("changed source")},
+            )
+            tool_dir = root / "tools" / "agent_tools"
+            tool_dir.mkdir(parents=True)
+            (tool_dir / "run_repo_dependency_review.sh").symlink_to(REPO_REVIEW)
+            (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
+            (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
+            packet = root / "changed-paths.json"
+            self.write_changed_path_packet(root, base, packet)
+
+            result = run_tool(
+                str(REPO_REVIEW),
+                "--root",
+                str(root),
+                "--header-scan-only",
+                "--fail-missing",
+                "--changed-path-packet",
+                str(packet),
+                "--trusted-base-sha",
+                base,
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_SCAN=pass", result.stdout)
+            self.assertIn("REPO_DEPENDENCY_REVIEW=pass", result.stdout)
 
     def test_scan_accepts_large_file_with_manifest_markers_near_top(self) -> None:
         """Early marker matches in large files must not trip pipefail/SIGPIPE."""
@@ -331,7 +858,12 @@ class DependencyManifestToolTest(unittest.TestCase):
                 encoding="utf-8",
             )
             subprocess.run(
-                ["git", "add", "documents/design/feature.md", "tools/feature_runner.py"],
+                [
+                    "git",
+                    "add",
+                    "documents/design/feature.md",
+                    "tools/feature_runner.py",
+                ],
                 cwd=root,
                 check=True,
                 capture_output=True,
@@ -353,7 +885,9 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
             self.assertIn("REPO_DEPENDENCY_REVIEW=pass", result.stdout)
 
-    def test_repo_review_design_claim_checker_defaults_to_changed_design_docs(self) -> None:
+    def test_repo_review_design_claim_checker_defaults_to_changed_design_docs(
+        self,
+    ) -> None:
         """Wrapper claim checks stay migration-safe for legacy design backlog."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -476,7 +1010,12 @@ class DependencyManifestToolTest(unittest.TestCase):
                 encoding="utf-8",
             )
             subprocess.run(
-                ["git", "add", "documents/design/feature.md", "tools/feature_runner.py"],
+                [
+                    "git",
+                    "add",
+                    "documents/design/feature.md",
+                    "tools/feature_runner.py",
+                ],
                 cwd=root,
                 check=True,
                 capture_output=True,
@@ -512,6 +1051,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 str(CODE_SCAN),
                 "--root",
                 str(root),
+                "--lexical-only",
                 str(source),
                 root=root,
             )
@@ -538,6 +1078,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 str(CODE_SCAN),
                 "--root",
                 str(root),
+                "--lexical-only",
                 str(source),
                 root=root,
             )
@@ -548,71 +1089,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_requirement_sync_reports_pyproject_docker_summary(self) -> None:
-        """The Python dependency validator reports pyproject/docker ownership summary."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            (root / "python").mkdir()
-            (root / "docker").mkdir()
-            (root / "pyproject.toml").write_text(
-                "\n".join(
-                    [
-                        "[project]",
-                        "dependencies = [\"requests>=2\"]",
-                        "[project.optional-dependencies]",
-                        "dev = [\"pytest>=8\"]",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            (root / "docker" / "requirements.txt").write_text(
-                "requests>=2\npytest>=8\n",
-                encoding="utf-8",
-            )
-
-            result = subprocess.run(
-                [sys.executable, str(REQUIREMENT_SYNC)],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("PYPROJECT_DOCKER_DEPENDENCY_SUMMARY=pass", result.stdout)
-            self.assertIn("PYPROJECT_RUNTIME_DEPENDENCIES=1", result.stdout)
-            self.assertIn("PYPROJECT_DOCKER_RUNTIME_MISSING=0", result.stdout)
-
-    def test_requirement_sync_fails_when_runtime_dependency_missing_from_docker(self) -> None:
-        """Runtime package declarations in pyproject must be present in docker requirements."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            (root / "python").mkdir()
-            (root / "docker").mkdir()
-            (root / "pyproject.toml").write_text(
-                "[project]\ndependencies = [\"requests>=2\"]\n",
-                encoding="utf-8",
-            )
-            (root / "docker" / "requirements.txt").write_text("", encoding="utf-8")
-
-            result = subprocess.run(
-                [sys.executable, str(REQUIREMENT_SYNC)],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("PYPROJECT_DOCKER_DEPENDENCY_SUMMARY=fail", result.stdout)
-            self.assertIn(
-                "pyproject project dependency 'requests' missing from docker/requirements.txt",
-                result.stdout,
-            )
-
-    def test_docker_validator_accepts_requirement_extras_in_parent_layout(self) -> None:
-        """The parent boundary should preserve valid PEP 508 extras."""
+    def test_docker_validator_accepts_project_extras_in_parent_layout(self) -> None:
+        """The parent boundary accepts typed project extras without legacy locks."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             vendor = root / "vendor" / "agent-canon"
@@ -622,13 +1100,15 @@ class DependencyManifestToolTest(unittest.TestCase):
             (root / "tools" / "ci").mkdir(parents=True)
             (vendor / "tools" / "agent_tools").mkdir(parents=True)
             (vendor / ".devcontainer").mkdir()
-            (vendor / "tools" / "agent_tools" / "devcontainer_dependencies.py").symlink_to(
+            (
+                vendor / "tools" / "agent_tools" / "devcontainer_dependencies.py"
+            ).symlink_to(
                 PROJECT_ROOT / "tools" / "agent_tools" / "devcontainer_dependencies.py"
             )
             for relative in (
-                ".devcontainer/bootstrap-dependencies.sh",
                 ".devcontainer/dependencies.toml",
                 ".devcontainer/post-create.sh",
+                ".devcontainer/post-create-entrypoint.sh",
                 "CONTAINER_OPERATIONS.md",
             ):
                 (vendor / relative).symlink_to(PROJECT_ROOT / relative)
@@ -659,41 +1139,15 @@ class DependencyManifestToolTest(unittest.TestCase):
             )
             os.chmod(root / ".devcontainer" / "post-create-parent.sh", 0o755)
             (root / "pyproject.toml").write_text(
-                "[project]\ndependencies = []\n",
-                encoding="utf-8",
-            )
-            (root / "docker" / "requirements.txt").write_text(
-                "\n".join(
-                    [
-                        "jupyterlab",
-                        "notebook",
-                        "ipykernel",
-                        "pydeps",
-                        "snakeviz",
-                        "pyyaml[secure]>=6",
-                        "",
-                    ]
-                ),
+                "[project]\ndependencies = []\n[project.optional-dependencies]\ndev = []\n",
                 encoding="utf-8",
             )
             (root / "docker" / "Dockerfile").write_text(
-                "RUN apt-get update && apt-get install -y rsync openssh-client graphviz python3.11-venv\n",
+                "FROM ubuntu:22.04\n",
                 encoding="utf-8",
             )
-            (root / "docker" / "install_python_dependencies.sh").write_text(
-                "\n".join(
-                    [
-                        "python3 -m pip install --no-cache-dir -r docker/requirements.txt",
-                        "sha256sum docker/requirements.txt",
-                        "python3 -m pip check",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            os.chmod(root / "docker" / "install_python_dependencies.sh", 0o755)
             (root / ".devcontainer" / "devcontainer.json").write_text(
-                '{"postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace && bash .devcontainer/post-create-parent.sh"}\n',
+                '{"postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}"}\n',
                 encoding="utf-8",
             )
             (root / ".dockerignore").write_text(
@@ -709,14 +1163,6 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "Parent product image dependencies.\n",
                 encoding="utf-8",
             )
-            (root / "tools" / "ci" / "python_env_policy.py").write_text(
-                "# env policy fixture\n",
-                encoding="utf-8",
-            )
-            (root / "tools" / "requirement_sync_validator.py").symlink_to(
-                REQUIREMENT_SYNC
-            )
-
             result = subprocess.run(
                 ["bash", str(DOCKER_VALIDATOR)],
                 cwd=root,
@@ -762,8 +1208,10 @@ class DependencyManifestToolTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "documents" / "design").mkdir(parents=True)
-            (root / "documents" / "design" / "dependency-contract-kinds.toml").write_text(
-                "allowed_kinds = [\n  \"test\"\n]\n",
+            (
+                root / "documents" / "design" / "dependency-contract-kinds.toml"
+            ).write_text(
+                'allowed_kinds = [\n  "test"\n]\n',
                 encoding="utf-8",
             )
             issue = root / "issues" / "closed" / "AC-1.md"
@@ -786,6 +1234,102 @@ class DependencyManifestToolTest(unittest.TestCase):
 
             result = run_tool(str(FORMAT), "--root", str(root), str(issue), root=root)
 
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
+
+    def test_format_prefers_direct_template_target_for_vendor_path(self) -> None:
+        """Template header paths that point through the vendored source resolve directly."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            workflow = root / ".github" / "workflows" / "agent-improvement-guide.yml"
+            vendor_agent = root / "vendor" / "agent-canon" / ".github"
+            vendor_agent.mkdir(parents=True)
+            (vendor_agent / "AGENTS.md").write_text("# AGENTS\n", encoding="utf-8")
+            workflow.parent.mkdir(parents=True)
+            (root / "vendor" / "agent-canon" / ".github" / "workflows").mkdir(
+                parents=True
+            )
+            (root / "vendor" / "agent-canon" / ".github" / "workflows" / "agent-improvement-guide.yml").write_text(
+                "name: Agent Improvement Guide\n", encoding="utf-8"
+            )
+            workflow.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# contract test",
+                        "# responsibility Exercises vendored path resolution preference.",
+                        "# upstream design ../../vendor/agent-canon/.github/AGENTS.md vendor header path",
+                        "# @dependency-end",
+                        "name: Agent Improvement Guide",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(str(FORMAT), "--root", str(root), str(workflow), root=root)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
+
+    def test_format_rejects_dependency_path_escaping_root(self) -> None:
+        """Dependency targets that resolve above ROOT_DIR are rejected."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            workflow = root / ".github" / "workflows" / "agent-improvement-guide.yml"
+            outside = root / "outside.md"
+            outside.write_text("# Outside\n", encoding="utf-8")
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# contract test",
+                        "# responsibility Rejects root-escaping dependency paths.",
+                        "# upstream design ../../../outside.md escapes root",
+                        "# @dependency-end",
+                        "name: Agent Improvement Guide",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(str(FORMAT), "--root", str(root), str(workflow), root=root)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("dependency target escapes repository root", result.stdout)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=fail", result.stdout)
+
+    def test_format_falls_back_to_template_source_context_when_direct_missing(self) -> None:
+        """Fallback context is still used when direct dependency target does not exist."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            workflow = root / ".github" / "workflows" / "agent-improvement-guide.yml"
+            workflow.parent.mkdir(parents=True)
+            (root / "vendor" / "agent-canon" / ".github" / "workflows").mkdir(
+                parents=True
+            )
+            (root / "vendor" / "agent-canon" / ".github" / "AGENTS.md").write_text(
+                "# Vendor AGENTS\n", encoding="utf-8"
+            )
+            (
+                root / "vendor" / "agent-canon" / ".github" / "workflows" / "agent-improvement-guide.yml"
+            ).write_text("name: Agent Improvement Guide\n", encoding="utf-8")
+            workflow.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# contract test",
+                        "# responsibility Exercises fallback source-context resolution.",
+                        "# upstream design ../../.github/AGENTS.md context fallback",
+                        "# @dependency-end",
+                        "name: Agent Improvement Guide",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(str(FORMAT), "--root", str(root), str(workflow), root=root)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
 
@@ -918,7 +1462,9 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("exactly one contract line", result.stdout)
             self.assertIn("fix: add 'contract <registered-kind>'", result.stdout)
-            self.assertIn("documents/design/dependency-contract-kinds.toml", result.stdout)
+            self.assertIn(
+                "documents/design/dependency-contract-kinds.toml", result.stdout
+            )
             self.assertIn("DEPENDENCY_HEADER_FORMAT=fail", result.stdout)
 
     def test_format_rejects_unregistered_contract_kind(self) -> None:
@@ -956,7 +1502,9 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("unregistered contract kind", result.stdout)
             self.assertIn("fix: use an existing allowed_kinds entry", result.stdout)
-            self.assertIn("documents/design/dependency-contract-kinds.toml", result.stdout)
+            self.assertIn(
+                "documents/design/dependency-contract-kinds.toml", result.stdout
+            )
             self.assertIn("DEPENDENCY_HEADER_FORMAT=fail", result.stdout)
 
     def test_format_accepts_skill_frontmatter_before_html_manifest(self) -> None:
@@ -1023,7 +1571,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# upstream design target.md target context",
                         "# @dependency-end",
                         "[tool.demo]",
-                        'enabled = true',
+                        "enabled = true",
                         "",
                     ]
                 ),
@@ -1156,7 +1704,9 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "symlink=0 submodule_source=1 other=0",
                 result.stdout,
             )
-            self.assertIn("MISSING_DEPENDENCY_EXPLANATION_BEGIN=product.md", result.stdout)
+            self.assertIn(
+                "MISSING_DEPENDENCY_EXPLANATION_BEGIN=product.md", result.stdout
+            )
             self.assertIn(
                 "missing_start_and_end_markers_in_first_80_lines",
                 result.stdout,
@@ -1419,9 +1969,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                     encoding="utf-8",
                 )
                 source_paths.append(relative_source)
-                expected_edges.add(
-                    f"upstream\tdesign\t{relative_source}\tdesign.md"
-                )
+                expected_edges.add(f"upstream\tdesign\t{relative_source}\tdesign.md")
             graph_tsv = root / "reports" / "dependency_graph.tsv"
 
             result = run_tool(
@@ -1584,13 +2132,18 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertTrue((report_dir / "dependency_graph.tsv").is_file())
             self.assertTrue((report_dir / "dependency_edit_scope.txt").is_file())
-            self.assertIn("direction\tkind\tsource\ttarget", (report_dir / "dependency_graph.tsv").read_text(encoding="utf-8"))
+            self.assertIn(
+                "direction\tkind\tsource\ttarget",
+                (report_dir / "dependency_graph.tsv").read_text(encoding="utf-8"),
+            )
             self.assertIn(
                 "DEPENDENCY_EDIT_SCOPE_PATH role=search_hit path=source.md",
                 (report_dir / "dependency_edit_scope.txt").read_text(encoding="utf-8"),
             )
 
-    def test_repo_review_report_dir_without_search_hits_records_changed_scope(self) -> None:
+    def test_repo_review_report_dir_without_search_hits_records_changed_scope(
+        self,
+    ) -> None:
         """Report-dir dependency review persists changed-file edit scope by default."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -1789,8 +2342,8 @@ class DependencyManifestToolTest(unittest.TestCase):
             "documents/experiments/experiment-critical-review.md",
             "documents/tools/README.md",
             "documents/operations/worktree-lifecycle.md",
-            "memory/AGENT_PHILOSOPHY.md",
-            "memory/USER_PREFERENCES.md",
+            "memory/README.md",
+            "memory/records",
             "notes/README.md",
             "notes/guardrails/engineering_avoidances.md",
         ]
@@ -2334,7 +2887,9 @@ class DependencyManifestToolTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            artifact = root / "reports" / "dependency-review" / "run" / "search_hits.txt"
+            artifact = (
+                root / "reports" / "dependency-review" / "run" / "search_hits.txt"
+            )
             artifact.parent.mkdir(parents=True)
             artifact.write_text("source.md\n", encoding="utf-8")
             subprocess.run(
@@ -2361,7 +2916,9 @@ class DependencyManifestToolTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("REPO_DEPENDENCY_REVIEW_PATHS=2", result.stdout)
-            self.assertNotIn("reports/dependency-review/run/search_hits.txt", result.stdout)
+            self.assertNotIn(
+                "reports/dependency-review/run/search_hits.txt", result.stdout
+            )
 
     def test_repo_review_records_monitoring_when_report_dir_is_given(self) -> None:
         """The review wrapper records monitoring evidence when directed to a run."""
@@ -2440,6 +2997,197 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "run_repo_dependency_review.sh recorded dependency review pass",
                 text,
             )
+
+    def graph_ensure_fixture(
+        self,
+        root: Path,
+        statuses: list[tuple[str, int, object, object]],
+        build_exit: int = 0,
+    ) -> tuple[Path, Path]:
+        """Create a source-root fixture with scripted status/build readback."""
+        subprocess.run(
+            ["git", "init", "-b", "main"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.git_output(root, "config", "user.email", "graph@example.invalid")
+        self.git_output(root, "config", "user.name", "Graph Fixture")
+        (root / "README.md").write_text("fixture\n", encoding="utf-8")
+        self.git_output(root, "add", "README.md")
+        self.git_output(root, "commit", "-m", "graph fixture")
+        tools_dir = root / "tools"
+        (tools_dir / "bin").mkdir(parents=True)
+        (tools_dir / "agent_tools").mkdir()
+        (tools_dir / "sync_agent_canon.sh").write_text(
+            "#!/usr/bin/env bash\nexit 0\n", encoding="utf-8"
+        )
+        (tools_dir / "sync_agent_canon.sh").chmod(0o755)
+        script = (
+            "#!/usr/bin/env python3\n"
+            "import json\n"
+            "import os\n"
+            "import sys\n"
+            "from pathlib import Path\n"
+            "root = Path(sys.argv[sys.argv.index('--root') + 1])\n"
+            "calls = root / '.graph-calls'\n"
+            "call = ' '.join(sys.argv[1:3])\n"
+            "calls.write_text(calls.read_text() + call + '\\n' if calls.exists() else call + '\\n')\n"
+            "if sys.argv[1:3] == ['graph', 'build']:\n"
+            f"    print(json.dumps({{'exit_code': {build_exit}}}))\n"
+            f"    raise SystemExit({build_exit})\n"
+            "if sys.argv[1:3] == ['graph', 'status']:\n"
+            "    sequence = json.loads(os.environ['GRAPH_STATUS_SEQUENCE'])\n"
+            "    index = sum(1 for line in calls.read_text().splitlines() if line == 'graph status') - 1\n"
+            "    status, exit_code, reason, probe_reason = sequence[min(index, len(sequence) - 1)]\n"
+            "    payload = json.loads(os.environ['GRAPH_STATUS_JSON'])\n"
+            "    payload['status'] = status\n"
+            "    payload['exit_code'] = exit_code\n"
+            "    payload['reason'] = reason\n"
+            "    payload['probe_reason'] = probe_reason\n"
+            "    print(json.dumps(payload))\n"
+            "    raise SystemExit(exit_code)\n"
+            "raise SystemExit(2)\n"
+        )
+        executable = tools_dir / "bin" / "agent-canon"
+        executable.write_text(script, encoding="utf-8")
+        executable.chmod(0o755)
+        return executable, root / ".graph-calls"
+
+    def run_graph_ensure_fixture(
+        self,
+        root: Path,
+        statuses: list[tuple[str, int, object, object]],
+        build_exit: int = 0,
+    ) -> subprocess.CompletedProcess[str]:
+        """Run the existing dependency-review graph ensure route."""
+        _executable, calls = self.graph_ensure_fixture(root, statuses, build_exit)
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "GRAPH_STATUS_SEQUENCE": json.dumps(statuses),
+                "GRAPH_STATUS_JSON": json.dumps(
+                    {
+                        "schema": "agent-canon.graph.status.v1",
+                        "command": "status",
+                        "status": "fresh",
+                        "exit_code": 0,
+                        "reason": None,
+                        "probe_reason": None,
+                    }
+                ),
+            }
+        )
+        result = subprocess.run(
+            [
+                "bash",
+                str(REPO_REVIEW),
+                "--root",
+                str(root),
+                "--ensure-graph",
+            ],
+            cwd=PROJECT_ROOT,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        result.calls_path = calls  # type: ignore[attr-defined]
+        return result
+
+    def test_graph_ensure_fresh_does_not_build(self) -> None:
+        """Fresh status is accepted without invoking the producer."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result = self.run_graph_ensure_fixture(
+                Path(tmp_dir), [("fresh", 0, None, None)]
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GRAPH_ENSURE=pass status=fresh", result.stdout)
+            self.assertIn("GRAPH_REBUILD=not_needed", result.stdout)
+            self.assertEqual(
+                result.calls_path.read_text(encoding="utf-8").splitlines(),
+                ["graph status"],
+            )
+
+    def test_graph_ensure_source_changed_builds_once_and_reads_fresh(self) -> None:
+        """Only a typed source-change status performs one build."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result = self.run_graph_ensure_fixture(
+                Path(tmp_dir),
+                [
+                    ("stale", 2, "source_changed", "source_changed"),
+                    ("fresh", 0, None, None),
+                ],
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GRAPH_REBUILD=performed", result.stdout)
+            self.assertEqual(
+                result.calls_path.read_text(encoding="utf-8").splitlines(),
+                ["graph status", "graph build", "graph status"],
+            )
+
+    def test_graph_ensure_non_source_status_fails_without_build(self) -> None:
+        """Corruption, unknown, and non-source statuses never admit rebuilding."""
+        cases = (
+            (
+                "stale",
+                2,
+                "persisted_readback_mismatch",
+                "persisted_readback_mismatch",
+            ),
+            ("stale", 2, "unknown_reason", "unknown_reason"),
+            ("stale", 2, "runtime_evidence_changed", "runtime_evidence_changed"),
+            ("stale", 2, "producer_identity_changed", "producer_identity_changed"),
+            ("stale", 2, "source_changed", None),
+            ("stale", 2, 1, "source_changed"),
+            ("unavailable", 1, "graph_unavailable", None),
+            ("incomplete", 2, "source_completeness_incomplete", None),
+            ("invalid", 1, None, None),
+        )
+        for status in cases:
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as tmp_dir:
+                result = self.run_graph_ensure_fixture(Path(tmp_dir), [status])
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("REPO_DEPENDENCY_REVIEW=fail", result.stdout)
+                self.assertEqual(
+                    result.calls_path.read_text(encoding="utf-8").splitlines(),
+                    ["graph status"],
+                )
+
+    def test_graph_ensure_fails_closed_for_build_or_readback_failure(self) -> None:
+        """Build failure and non-fresh readback stay closed."""
+        cases = (
+            ([
+                ("stale", 2, "source_changed", "source_changed"),
+            ], 3, "GRAPH_REBUILD=failed rc=3", True),
+            ([
+                ("stale", 2, "source_changed", "source_changed"),
+                ("stale", 2, "source_changed", "source_changed"),
+            ], 0, "REPO_DEPENDENCY_REVIEW=fail", True),
+            ([
+                ("stale", 2, "source_changed", "source_changed"),
+                (
+                    "stale",
+                    2,
+                    "persisted_readback_mismatch",
+                    "persisted_readback_mismatch",
+                ),
+            ], 0, "REPO_DEPENDENCY_REVIEW=fail", True),
+        )
+        for statuses, build_exit, expected, build_expected in cases:
+            with self.subTest(statuses=statuses, build_exit=build_exit), tempfile.TemporaryDirectory() as tmp_dir:
+                result = self.run_graph_ensure_fixture(
+                    Path(tmp_dir), statuses, build_exit
+                )
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected, result.stdout)
+                calls = result.calls_path.read_text(encoding="utf-8").splitlines()
+                self.assertEqual("graph build" in calls, build_expected)
 
     def test_repo_review_reports_missing_manifests_by_default(self) -> None:
         """The repo-wide wrapper keeps missing headers report-only during migration."""

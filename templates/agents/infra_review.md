@@ -1,4 +1,4 @@
-# Infra Review
+# Infra Review（infra レビュー）
 <!--
 @dependency-start
 contract template
@@ -12,12 +12,15 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
-## Safety Review
+{{>reader_map}}
+{{>review_contract}}
 
-<!-- Check rollout, rollback, permissions, and operational risk. -->
+## Safety Review（安全性レビュー）
 
-## Maintenance Review
+<!-- rollout、rollback、permission、operational risk を確認します。 -->
 
-<!-- Note long-term complexity, observability, and support burden. -->
+## Maintenance Review（保守レビュー）
+
+<!-- 長期的な complexity、observability、support burden を記録します。 -->
 
 {{>decision_approve_revise_escalate}}

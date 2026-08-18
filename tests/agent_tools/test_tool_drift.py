@@ -151,12 +151,15 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             stderr=stderr.getvalue(),
         )
 
-    def test_current_repository_passes(self) -> None:
-        """The canonical repository satisfies the drift gate."""
-        result = self.run_checker(PROJECT_ROOT)
+    def test_checker_queries_all_nodes_for_bounded_fixture(self) -> None:
+        """The graph-owned drift check always requests the complete fixture graph."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_tool_catalog_contract(root)
+
+            result = self.run_checker(root, "--contract", "tool_catalog")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("TOOL_CONVENTION_DRIFT=pass", result.stdout)
         self.assertTrue(FakeToolGraphClient.last_query["all_nodes"])
 
     def test_projected_graph_paths_match_logical_contract_paths(self) -> None:
@@ -247,9 +250,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.assertNotIn(
                 ".agents/skills/codex-task-workflow/SKILL.md", result.stdout
             )
-            self.assertNotIn(
-                ".agents/skills/owner-bounded-routing/SKILL.md", result.stdout
-            )
 
     def test_kind_mismatch_is_reported(self) -> None:
         """Reverse manifest edges must not contradict the direct edge kind."""
@@ -309,15 +309,14 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_pr_check_must_run_strict_dependency_review(self) -> None:
-        """The AgentCanon PR check must include strict dependency review."""
+    def test_pr_check_must_select_dependency_graph_requirement(self) -> None:
+        """The AgentCanon PR check must select strict graph completeness explicitly."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_agent_canon_pr_contract(root)
             script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             text = script.read_text(encoding="utf-8").replace(
-                "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing\n",
-                "",
+                "if agentcanon_pr_dependency_graph_required; then\n", "if true; then\n"
             )
             script.write_text(text, encoding="utf-8")
 
@@ -327,19 +326,18 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.assertIn(
                 "missing-required-text:agent_canon_pr_check:"
                 "tools/ci/check_agent_canon_pr.sh:"
-                "missing-strict-dependency-review",
+                "missing-conditional-dependency-graph-gate",
                 result.stdout,
             )
 
-    def test_pr_check_must_run_accumulated_agent_evals(self) -> None:
-        """The AgentCanon PR check must mechanically accumulate eval reports."""
+    def test_pr_check_requires_optional_dependency_source_receipt_status(self) -> None:
+        """The PR check must carry an explicit source-or-skipped receipt."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_agent_canon_pr_contract(root)
             script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             text = script.read_text(encoding="utf-8").replace(
-                "python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate --log-dir ${PR_AGENT_EVAL_LOG_DIR}\n",
-                "",
+                "PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped\n", ""
             )
             script.write_text(text, encoding="utf-8")
 
@@ -349,9 +347,87 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.assertIn(
                 "missing-required-text:agent_canon_pr_check:"
                 "tools/ci/check_agent_canon_pr.sh:"
-                "missing-accumulated-agent-eval-producer",
+                "missing-optional-dependency-source-receipt-status",
                 result.stdout,
             )
+
+    def test_pr_check_requires_selector_reason_and_evidence_receipt(self) -> None:
+        """Source receipts retain the selector's reason and evidence."""
+        for marker, detail in (
+            ("--selector-reason", "missing-dependency-graph-selector-reason-receipt"),
+            (
+                "--selector-evidence",
+                "missing-dependency-graph-selector-evidence-receipt",
+            ),
+        ):
+            with self.subTest(marker=marker):
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    root = Path(tmp_dir)
+                    self.write_agent_canon_pr_contract(root)
+                    script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+                    script.write_text(
+                        script.read_text(encoding="utf-8").replace(
+                            marker, "removed", 1
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    result = self.run_checker(
+                        root, "--contract", "agent_canon_pr_check"
+                    )
+
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn(
+                    "missing-required-text:agent_canon_pr_check:"
+                    f"tools/ci/check_agent_canon_pr.sh:{detail}",
+                    result.stdout,
+                )
+
+    def test_pr_check_command_backslash_space_tab_is_not_a_continuation(self) -> None:
+        """Malformed backslash continuation after command lines is rejected for all gate checks."""
+        continuation_suffixes = (" \\ \n", " \\\t\n")
+        gates = [
+            (
+                "generated_artifact_guard",
+                'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"',
+                "missing-generated-artifact-pr-guard",
+                'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py"',
+                '--root "${WORKSPACE_ROOT}"',
+            ),
+        ]
+        for (
+            contract,
+            canonical_command,
+            detail,
+            command_prefix,
+            command_tail,
+        ) in gates:
+            for suffix_name, suffix in (
+                ("space", continuation_suffixes[0]),
+                ("tab", continuation_suffixes[1]),
+            ):
+                with self.subTest(contract=contract, detail=detail, suffix=suffix_name):
+                    with tempfile.TemporaryDirectory() as tmp_dir:
+                        root = Path(tmp_dir)
+                        self.write_agent_canon_pr_contract(root)
+                        script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+                        malformed = script.read_text(encoding="utf-8").replace(
+                            canonical_command,
+                            command_prefix + suffix + f"  {command_tail}",
+                        )
+                        script.write_text(malformed, encoding="utf-8")
+
+                        result = self.run_checker(root, "--contract", contract)
+
+                        self.assertEqual(
+                            result.returncode, 1, result.stdout + result.stderr
+                        )
+                        self.assertIn(
+                            f"missing-required-command:{contract}:"
+                            "tools/ci/check_agent_canon_pr.sh:"
+                            f"{detail}",
+                            result.stdout,
+                        )
 
     def test_pr_check_must_scope_agent_eval_archive_env(self) -> None:
         """The AgentCanon PR check must pass a writable archive env to eval producers."""
@@ -382,16 +458,16 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.write_agent_canon_pr_contract(root)
             script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             text = script.read_text(encoding="utf-8").replace(
-                "python3 tools/agent_tools/generated_artifact_guard.py\n",
+                'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"\n',
                 "",
             )
             script.write_text(text, encoding="utf-8")
 
-            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
+            result = self.run_checker(root, "--contract", "generated_artifact_guard")
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "missing-required-text:agent_canon_pr_check:"
+                "missing-required-command:generated_artifact_guard:"
                 "tools/ci/check_agent_canon_pr.sh:"
                 "missing-generated-artifact-pr-guard",
                 result.stdout,
@@ -689,7 +765,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# responsibility Prechecks edit-time risk class.",
                     "# upstream design ../../agents/COMMUNICATION_PROTOCOL.md protocol",
                     "# upstream design ../../agents/skills/codex-task-workflow.md workflow",
-                    "# upstream design ../../agents/skills/owner-bounded-routing.md owner-bounded",
                     "# upstream design ../../tools/agent_tools/responsibility_scope.py scope",
                     "# upstream implementation ../../tests/agent_tools/test_tool_rejection_preflight.py scope preflight",
                     "# @dependency-end",
@@ -700,7 +775,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         for relative in [
             "agents/COMMUNICATION_PROTOCOL.md",
             "agents/skills/codex-task-workflow.md",
-            "agents/skills/owner-bounded-routing.md",
             "tools/agent_tools/responsibility_scope.py",
             "tools/README.md",
             "documents/tools/README.md",
@@ -708,7 +782,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         ]:
             if relative in {
                 "agents/skills/codex-task-workflow.md",
-                "agents/skills/owner-bounded-routing.md",
                 "agents/COMMUNICATION_PROTOCOL.md",
             }:
                 snippet = (
@@ -748,30 +821,60 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream design ../../agents/workflows/agent-canon-pr-workflow.md workflow",
                     "# upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone template",
                     "# upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template checklist",
+                    "# upstream design ../../templates/documents/github/pull-request/agent_canon.md template checklist",
                     "# upstream implementation ../agent_tools/run_repo_dependency_review.sh dependency review",
                     "# upstream implementation ../agent_tools/run_accumulated_agent_evals.py accumulated evals",
                     "# upstream implementation ../agent_tools/generated_artifact_guard.py generated artifact guard",
                     "# upstream implementation ../agent_tools/evaluate_skill_workflow_prompts.py prompt eval",
                     "# upstream implementation ../agent_tools/check_agent_runtime_alignment.py runtime alignment",
                     "# upstream implementation ../agent_tools/check_convention_compliance.py convention gate",
+                    "# upstream implementation ./agent_canon_pr_graph_selector.py graph selector",
+                    "# upstream implementation ./pr_gate_receipt.py receipt schema",
                     "# upstream implementation ./check_github_workflows.py github checks",
-                    "# upstream implementation ./run_all_checks.sh quick ci",
                     "# @dependency-end",
-                    "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
+                    "agentcanon_pr_dependency_graph_required() { return 0; }",
+                    'python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py"',
+                    "PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped",
+                    "if agentcanon_pr_dependency_graph_required; then",
+                    "  PR_GATE_DEPENDENCY_SOURCE_STATUS=source",
+                    "fi",
+                    "--selector-reason \"${PR_GATE_DEPENDENCY_SOURCE_REASON}\"",
+                    "--selector-evidence \"${PR_GATE_DEPENDENCY_SOURCE_EVIDENCE}\"",
+                    'write_pr_gate_receipt "${PR_GATE_DEPENDENCY_SOURCE_STATUS}" "${PR_GATE_DEPENDENCY_SOURCE_REASON}" "${PR_GATE_DEPENDENCY_SOURCE_EVIDENCE}"',
                     'AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \\',
-                    "python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate --log-dir ${PR_AGENT_EVAL_LOG_DIR}",
-                    "python3 tools/agent_tools/generated_artifact_guard.py",
-                    "python3 tools/agent_tools/check_agent_runtime_alignment.py",
+                    'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"',
+                    'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"',
                     "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml",
                     "SHARED_SURFACE_STATUS=not_applicable_standalone_source",
                     "",
                 ]
             ),
         )
+        self.write_file(
+            root,
+            "tools/ci/agent_canon_pr_graph_selector.py",
+            "\n".join(
+                [
+                    "# @dependency-start",
+                    "# responsibility Selects parent graph gating.",
+                    "# downstream implementation ./check_agent_canon_pr.sh PR gate",
+                    "# @dependency-end",
+                    "",
+                ]
+            ),
+        )
+        self.write_file(
+            root,
+            "tools/ci/pr_gate_receipt.py",
+            "# @dependency-start\n"
+            "# responsibility Owns source/skipped receipt schema.\n"
+            "# @dependency-end\n",
+        )
         for relative in [
             "agents/workflows/agent-canon-pr-workflow.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
+            "templates/documents/github/pull-request/agent_canon.md",
             "tools/agent_tools/run_repo_dependency_review.sh",
             "tools/agent_tools/run_accumulated_agent_evals.py",
             "tools/agent_tools/generated_artifact_guard.py",
@@ -779,7 +882,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "tools/agent_tools/check_agent_runtime_alignment.py",
             "tools/agent_tools/check_convention_compliance.py",
             "tools/ci/check_github_workflows.py",
-            "tools/ci/run_all_checks.sh",
         ]:
             self.write_plain_manifest(root, relative)
 

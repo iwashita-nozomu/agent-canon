@@ -5,7 +5,12 @@
 # upstream design ../README.md shared automation index
 # upstream design ../../templates/documents/experiment/README.template.md canonical topic README template.
 # upstream design ../../templates/documents/experiment/experiment-provenance.template.toml canonical provenance template.
-# downstream implementation ../../templates/experiments/_template/run.py runnable topic scaffold.
+# downstream implementation ../../templates/experiments/_template/run.py runnable topic scaffold and orchestration boundary.
+# downstream implementation ../../templates/experiments/_template/case_model.py reusable case/result models.
+# downstream implementation ../../templates/experiments/_template/case_execution.py case worker and failure classification.
+# downstream implementation ../../templates/experiments/_template/artifact_schema.py stable artifact schemas.
+# downstream implementation ../../templates/experiments/_template/artifact_io.py atomic artifact publication.
+# downstream implementation ../../templates/experiments/_template/visualization.py visualization consumer status.
 # upstream design ../../documents/experiments/experiment-registry.md project experiment registry contract.
 # @dependency-end
 
@@ -17,7 +22,16 @@ import argparse
 import shutil
 from pathlib import Path
 
-from registry_lib import find_topic, load_registry, write_registry
+if __package__:
+    from tools.experiments.experiment_identity import validate_segment
+    from tools.experiments.registry_lib import find_topic, load_registry, write_registry
+else:
+    from experiment_identity import validate_segment  # type: ignore[no-redef]
+    from registry_lib import (  # type: ignore[no-redef]
+        find_topic,
+        load_registry,
+        write_registry,
+    )
 
 AGENT_CANON_TEMPLATE_DIR = "vendor/agent-canon/templates/experiments/_template"
 CANONICAL_EXPERIMENT_TEMPLATE_DIR = "vendor/agent-canon/templates/documents/experiment"
@@ -130,6 +144,11 @@ def resolve_document_templates(repo_root: Path) -> tuple[Path, Path]:
 def main() -> int:
     """Run the CLI."""
     args = build_parser().parse_args()
+    try:
+        topic_name = validate_segment(args.topic, "topic")
+        default_variant = validate_segment(args.default_variant, "default_variant")
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
     repo_root = Path(args.repo_root).resolve()
     registry_path = Path(args.registry).resolve() if args.registry else repo_root / "experiments" / "registry.toml"
     if registry_path.exists():
@@ -139,8 +158,8 @@ def main() -> int:
     else:
         raise SystemExit(f"registry is required for topic creation: {registry_path}")
 
-    if find_topic(registry, args.topic) is not None:
-        raise SystemExit(f"topic {args.topic!r} already exists in {registry_path}")
+    if find_topic(registry, topic_name) is not None:
+        raise SystemExit(f"topic {topic_name!r} already exists in {registry_path}")
 
     defaults = registry.get("defaults", {})
     if not isinstance(defaults, dict):
@@ -151,7 +170,7 @@ def main() -> int:
 
     template_dir = resolve_topic_template_dir(repo_root, template_dir_name)
     readme_template, provenance_template = resolve_document_templates(repo_root)
-    topic_dir = repo_root / "experiments" / args.topic
+    topic_dir = repo_root / "experiments" / topic_name
     required_templates = (template_dir, readme_template, provenance_template)
     missing_templates = [str(path) for path in required_templates if not path.exists()]
     if missing_templates:
@@ -167,7 +186,7 @@ def main() -> int:
         print(f"canonical_provenance_template={provenance_template}")
         print(f"topic_dir={topic_dir}")
         print(f"registry_path={registry_path}")
-        print("planned_topic_files=README.md,provenance.toml,run.py,cases.py,config.yaml,visualize.ipynb,result/.gitkeep")
+        print("planned_topic_files=README.md,provenance.toml,run.py,cases.py,case_model.py,case_execution.py,artifact_schema.py,artifact_io.py,visualization.py,config.yaml,visualize.ipynb,result/.gitkeep")
         return 0
 
     if topic_dir.exists():
@@ -176,23 +195,23 @@ def main() -> int:
     shutil.copytree(template_dir, topic_dir, ignore=shutil.ignore_patterns("README.md"))
     shutil.copyfile(readme_template, topic_dir / "README.md")
     shutil.copyfile(provenance_template, topic_dir / "provenance.toml")
-    update_copied_files(topic_dir, args.topic)
+    update_copied_files(topic_dir, topic_name)
 
     topics = registry.get("topics")
     if not isinstance(topics, list):
         raise SystemExit("registry must contain [[topics]]")
     new_entry: dict[str, object] = {
-        "name": args.topic,
+        "name": topic_name,
         "status": args.status,
-        "topic_dir": f"experiments/{args.topic}",
-        "topic_readme": f"experiments/{args.topic}/README.md",
-        "topic_provenance": f"experiments/{args.topic}/provenance.toml",
-        "canonical_entrypoint": f"experiments/{args.topic}/run.py",
-        "result_root": f"experiments/{args.topic}/result",
+        "topic_dir": f"experiments/{topic_name}",
+        "topic_readme": f"experiments/{topic_name}/README.md",
+        "topic_provenance": f"experiments/{topic_name}/provenance.toml",
+        "canonical_entrypoint": f"experiments/{topic_name}/run.py",
+        "result_root": f"experiments/{topic_name}/result",
         "report_root": "experiments/report",
-        "default_variant": args.default_variant,
+        "default_variant": default_variant,
         "default_inner_command": (
-            f"/usr/bin/python /workspace/experiments/{args.topic}/run.py "
+            f"/usr/bin/python /workspace/experiments/{topic_name}/run.py "
             "--config {config_path}"
         ),
     }
@@ -205,7 +224,7 @@ def main() -> int:
 
     print(f"topic_dir={topic_dir}")
     print(f"registry_path={registry_path}")
-    print(f"topic_name={args.topic}")
+    print(f"topic_name={topic_name}")
     return 0
 
 

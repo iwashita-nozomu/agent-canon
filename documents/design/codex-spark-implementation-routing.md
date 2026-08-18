@@ -565,7 +565,6 @@ source_paths:
   - tools/agent_tools/capacity_handshake.py
   - tools/agent_tools/implementation_route.py
   - tools/agent_tools/agent_team.py
-  - tools/agent_tools/task_start.py
   - tools/agent_tools/bootstrap_agent_run.py
   - tools/agent_tools/task_close.py
 generated_view_paths:
@@ -2020,6 +2019,14 @@ source: the checker compares each view with the registry digest, and a drifted
 view is invalid until regenerated. This is a deliberate refinement of the
 current ownership prose, not a hidden precedence rule.
 
+The same materializer also accepts the in-memory `consumer-static` projection
+selector. It preserves `generated_role_view_v1`, the existing generated
+configuration field sets, and one mode-independent `projection_digest`; it
+does not add a persisted mode field or a second role registry. The static
+renderer composes typed `ConsumerStaticClauseProjection` obligations and
+emits only path-free schema/digest comments, while the live renderer retains
+its existing instruction bytes and dependency comments.
+
 ### 4.2 Canonical materializer interface
 
 New source: `tools/agent_tools/model_profile_registry.py`.
@@ -2789,7 +2796,7 @@ may clamp it. `write_scope_cap` is the
 maximum sum of `write_slot_weight` over a legal frontier whose nonempty write
 path sets are pairwise disjoint. The witness enumerates the maximizing node
 IDs, so the result is read back rather than trusted as an unexplained number.
-`task_start.py` and `bootstrap_agent_run.py` generate the witness and manifest
+`bootstrap_agent_run.py` generate the witness and manifest
 projection; `capacity_handshake.py` independently validates graph legality and
 both canonical digests, then returns loader evidence. It does not search for a
 larger or smaller budget.
@@ -2916,7 +2923,7 @@ RequestedCapacityLoaderEvidence {
 }
 ```
 
-`task_start.py`/`bootstrap_agent_run.py` generate this manifest field from the
+`bootstrap_agent_run.py` generate this manifest field from the
 final DAG witness and canonical capacity policy; they do not copy a family
 constant. `requested_capacity` means this `loaded_value`. A mismatch among the
 policy, topology, target-state, file, and loaded identities blocks startup.
@@ -3955,7 +3962,7 @@ this design document; all rows below are planned changes after approval.
 | `.codex/config.toml` | Generated runtime registration view | Replace anchored `max_threads = 24` with topology-generated `max_threads = 26`; retain parent/runtime registration and remove duplicated workflow budget or prompt policy. The generator and alignment checker own parity; fresh-session loader readback must equal 26, while an old session emits `restart_required`. |
 | The 34 exact `.codex/agents/*.toml` paths listed in section 2.3 | Generated role-view consumer | Regenerate every listed role view from `model_profiles.toml`; retain role-specific executable instructions only through registry projection; delete duplicate hand-authored model/prompt fields. |
 | `tools/agent_tools/agent_team.py` | Team projector | Replace generic `SubagentPromptPacket` projection with profile materialization; add implementation-execution packet fields, immediate one-pass dispatch, same-Spark gap continuation, lineage, shared capacity-ledger lifecycle transitions, capacity reservations, ready queue, saturation handling, automatic close, slot reclaim, closeout packet generation, and generated-view digests. Preserve the rebound deterministic `search.py` route. |
-| `tools/agent_tools/task_start.py` and `tools/agent_tools/bootstrap_agent_run.py` | Task/run packet generators | Load the declared-team witness value 26 into `run.capacity_request.requested_total_capacity`, derive actual DAG demand/write frontiers separately, emit `RequestedCapacityLoaderEvidence` plus policy/topology digests in `team_manifest.yaml`, and remove family numeric defaults. Preserve the rebound deterministic `search.py` route in bootstrap output. |
+| `tools/agent_tools/bootstrap_agent_run.py` | Task/run packet generator | Load the declared-team witness value 26 into `run.capacity_request.requested_total_capacity`, derive actual DAG demand/write frontiers separately, emit `RequestedCapacityLoaderEvidence` plus policy/topology digests in `team_manifest.yaml`, and remove family numeric defaults. Preserve the rebound deterministic `search.py` route in bootstrap output. |
 | `tools/agent_tools/route.py` | Checked unchanged public composition/renderer | Preserve landed name/area/prompt and `capability_route.py` composition. Add no `implementation_route`, model-profile, capacity, or Decision Sufficiency imports; alignment tests enforce those negative edges. |
 | `tools/agent_tools/check_agent_runtime_alignment.py` | Runtime checker | Validate canonical registry, generated role views, profile-role exclusivity, implementation-executable TargetStateContract requirements, immediate one-pass transition, implementation-feedback/design-gap separation, same-Spark resume identity, capacity-policy references, close-agent ToolCall binding, shared-ledger fields, Decision Sufficiency decision/branch declarations, invariant-action one-Spark/one-post-completion-gate topology with no extra agent, and absence of duplicate numeric or conservative procedure claims. |
 | `.codex/README.md` | Runtime reader view | Replace “hard ceiling 24” wording with the capacity-input model and handshake/readback link. |
@@ -3981,7 +3988,7 @@ review. The implementation worker may not invent an alternate path.
 | `tests/agent_tools/test_implementation_route.py` | Add identical-action immediate direct-Spark/one-post-completion-owner-gate/no-extra-agent, same-Spark structural-gap repair/resume, compile/static same-pass feedback, prohibited compensation controls, graph-owned divergent-action Luna, divergence-only design reopen, suitable-context continuation, typed queue, stale evidence, forbidden or undeclared evidence request, and no compatibility-fallback tests. |
 | `tests/agent_tools/test_evaluate_codex_agent_roles.py` | Add role/profile and capability attribution tests, identical-packet incumbent/candidate pairing, missing/malformed runtime-metric rejection, static/external hypothesis-only behavior, and approved assignment-gate identity; retain gpt-5.4-mini only for T14. |
 | `tests/agent_tools/test_evaluate_skill_workflow_prompts.py` | Add capsule field-order and forbidden-context checklist tests. |
-| `tests/agent_tools/test_agent_team_templates.py` and `tests/agent_tools/test_task_start_and_close.py` | Add minimal worker projection, upstream-evidence identity, queue, reservation, full parent-visible topology, completed/errored handback, lifecycle, and lineage assertions. |
+| `tests/agent_tools/test_agent_team_templates.py` and `tests/agent_tools/test_bootstrap_and_close.py` | Add minimal worker projection, upstream-evidence identity, queue, reservation, full parent-visible topology, completed/errored handback, lifecycle, and lineage assertions. |
 | `tests/agent_tools/test_task_close.py` | Add closeout failures for completed-open, errored-open, missing durable handback, unknown descendant, missing per-terminal close-agent token, and reservation leaks, plus a passing full-topology lifecycle fixture. |
 | `tools/agent_tools/check_design_doc_claims.py` | Extend the existing owner with `ClaimEvidenceRecord` parsing and separate `current_state`, `request_contract`, `target_state`, and `assumption` outcomes; reject missing readback actions and never report planned targets as current implementation. |
 | `tests/agent_tools/test_check_design_doc_claims.py` | Add preimplementation approved-target, missing request clause, unresolved assumption, nonexistent planned path, and postimplementation readback-transition fixtures. |
@@ -4056,7 +4063,7 @@ Each decision is tied to the downstream surface that must change with it.
 | `tools/agent_tools/check_design_doc_claims.py` | Evidence ledger/2.9/5.4 | RC-09/10/11/17 | current dependency-backed claim checker | claim-class parsing and pre/post implementation status tests |
 | landed `skill_route_catalog.py`, `capability_route.py`, and `route.py` | 2.1/9 | RC-08 | main `404678e1` OOP successor | exact identity plus positive/negative import checker; no edit |
 | `agent_team.py` | 4.2/4.3/4.4/4.5 | RC-05/06/12/13/26 | existing prompt packet and manifest projection | immediate direct materialization, same-worker gap continuation, team/lineage/queue tests, rebound deterministic search preservation |
-| `task_start.py` and `bootstrap_agent_run.py` | 4.3/5.3/10 | RC-12/13/14 | existing task/run manifest producers | requested-capacity derivation, loader identity, and no-static-default tests |
+| `bootstrap_agent_run.py` | 4.3/5.3/10 | RC-12/13/14 | existing task/run manifest producers | requested-capacity derivation, loader identity, and no-static-default tests |
 | `agent_team.py` lifecycle transitions and `task_close.py` gate | 2.10/4.3/5.2 | RC-20/21 | existing lifecycle evidence and closeout gates | parent/child shared-ledger and leak-failure tests |
 | `route.py` checked unchanged | 2.1/5.3/9 | RC-02/08 | landed explicit-skill route composition | preserve capability-route imports; forbid implementation/profile/capacity imports |
 | `CODEX_WORKFLOW.md` and root guidance | 2.3/2.3.1/5.2/8 | RC-09/11/22/25/26 | Design Integrity Gate | docs check + executable-target/immediate-transition/post-completion-gate/implementation-feedback contradiction and task-size-budget/undeclared-evidence sweep |

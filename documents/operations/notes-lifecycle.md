@@ -43,10 +43,8 @@ closeout 前に、action log と report を見て次のどれへ昇格するか�
   - 何度も参照する短い横断知識
 - `notes/themes/`
   - 複数 run から得た topic-level synthesis
-- `memory/USER_PREFERENCES.md`
-  - 会話から得た durable preference の蓄積と、`AGENTS.md` 昇格前の整理
-- `memory/AGENT_PHILOSOPHY.md`
-  - agent の作業哲学、対話から得た学習、task retrospective の蓄積と、workflow / guardrail / `AGENTS.md` 昇格前の整理
+- `memory/README.md` と `memory/records/*.md`
+  - 同じ問題に再遭遇したときに検索して使う、owner ref 付きの self-contained knowledge
 - `notes/failures/`
   - 再発防止のために残す failure pattern
 - `documents/`
@@ -87,10 +85,11 @@ closeout ごとに最低限次を確認します。
 1. 失敗として残すべきものはあるか
 1. 既存 note を追記すべきか、新規 note を起こすべきか
 1. 文書正本へ上げるべき rule change はあるか
-1. 会話から得た durable preference を `memory/USER_PREFERENCES.md` に追記したか
-1. agent-side の作業哲学、対話上の再発防止、task retrospective を `memory/AGENT_PHILOSOPHY.md` に追記したか
-1. `memory/` への追記が shared canon update として closeout されたか
-1. `AGENTS.md`、workflow、guardrail に昇格すべき stable preference や stable philosophy が増えていないか
+1. 今回の観測を既存 record の update、独立 record の create、owner への明示変更、
+   issue/failure/evidence のどれに分類したか
+1. record が必要なら selected context で search-before-create を行ったか
+1. `agent-canon memory validate --root .` と owner ref readback が pass したか
+1. stable preference や permanent rule を対象 owner へ直接昇格したか
 
 ## Templates
 
@@ -98,5 +97,5 @@ closeout ごとに最低限次を確認します。
 - `notes/branches/BRANCH_NOTE_TEMPLATE.md`
 - `notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md`
 - `notes/themes/THEME_NOTE_TEMPLATE.md`
-- `memory/AGENT_PHILOSOPHY.md`
+- `memory/records/<domain>--<problem-slug>.md`
 - `notes/failures/FAILURE_NOTE_TEMPLATE.md`

@@ -53,11 +53,6 @@ const KEEP_PYTHON_TARGETS: &[ToolTarget] = &[
         reason: "workflow orchestration changes frequently and writes run bundles",
     },
     ToolTarget {
-        name: "task_start.py",
-        path: "tools/agent_tools/task_start.py",
-        reason: "task bootstrap policy changes with agent protocol",
-    },
-    ToolTarget {
         name: "task_close.py",
         path: "tools/agent_tools/task_close.py",
         reason: "closeout policy is agent-facing and changes with workflow gates",

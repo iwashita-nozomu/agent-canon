@@ -1728,6 +1728,7 @@ fn validate_graph_contract(connection: &Connection) -> rusqlite::Result<Vec<Grap
             "rule",
             "message",
             "suggested_action_json",
+            "payload_json",
         ],
         &mut findings,
     )?;
@@ -1775,6 +1776,7 @@ fn validate_graph_contract(connection: &Connection) -> rusqlite::Result<Vec<Grap
             "rule",
             "message",
             "suggested_action_json",
+            "payload_json",
         ],
     )?;
     if node_table_ready {
@@ -1992,7 +1994,7 @@ fn validate_diagnostic_rows(
     let node_ids = string_set_query(connection, "SELECT id FROM nodes")?;
     let edge_ids = string_set_query(connection, "SELECT id FROM edges")?;
     let mut statement = connection.prepare(
-        "SELECT id, layer, target_node_id, target_edge_id, severity, suggested_action_json FROM diagnostics",
+        "SELECT id, layer, target_node_id, target_edge_id, severity, suggested_action_json, payload_json FROM diagnostics",
     )?;
     let rows = statement.query_map([], |row| {
         Ok((
@@ -2002,10 +2004,19 @@ fn validate_diagnostic_rows(
             row.get::<_, String>(3)?,
             row.get::<_, String>(4)?,
             row.get::<_, String>(5)?,
+            row.get::<_, String>(6)?,
         ))
     })?;
     for row in rows {
-        let (id, layer, target_node_id, target_edge_id, severity, suggested_action_json) = row?;
+        let (
+            id,
+            layer,
+            target_node_id,
+            target_edge_id,
+            severity,
+            suggested_action_json,
+            payload_json,
+        ) = row?;
         if !is_registered_graph_layer(&layer) {
             findings.push(graph_contract_finding(
                 "warn",
@@ -2045,6 +2056,7 @@ fn validate_diagnostic_rows(
             &suggested_action_json,
             findings,
         );
+        validate_payload_json("diagnostic", &id, "payload_json", &payload_json, findings);
     }
     Ok(())
 }
@@ -2771,7 +2783,8 @@ pub(crate) fn initialize_graph_schema(connection: &Connection) -> rusqlite::Resu
             severity TEXT NOT NULL,
             rule TEXT NOT NULL,
             message TEXT NOT NULL,
-            suggested_action_json TEXT NOT NULL
+            suggested_action_json TEXT NOT NULL,
+            payload_json TEXT NOT NULL DEFAULT '{}'
         );
         ",
     )
@@ -3816,6 +3829,37 @@ mod tests {
             finding.severity == "blocker" && finding.rule == "unknown_diagnostic_severity"
         }));
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn diagnostics_schema_defaults_generic_payload_for_non_source_layers() {
+        let connection = Connection::open_in_memory().expect("in-memory graph");
+        initialize_graph_schema(&connection).expect("schema");
+        let document_id =
+            ensure_analysis_document(&connection, Path::new(".")).expect("analysis document");
+        connection
+            .execute(
+                "INSERT INTO nodes(id, document_id, layer, kind, label, text, source_start, source_end, confidence, payload_json) VALUES ('node:generic', ?, 'artifact', 'file', 'generic', 'generic', 0, 0, 1.0, '{}')",
+                [document_id],
+            )
+            .expect("generic node");
+        connection
+            .execute(
+                "INSERT INTO diagnostics(id, layer, target_node_id, target_edge_id, severity, rule, message, suggested_action_json) VALUES ('diag:generic', 'artifact', 'node:generic', '', 'warn', 'generic', 'generic diagnostic', '{}')",
+                [],
+            )
+            .expect("generic diagnostic");
+
+        let findings = validate_graph_contract(&connection).expect("contract validation");
+        assert!(findings.is_empty(), "unexpected findings: {findings:?}");
+        let payload: String = connection
+            .query_row(
+                "SELECT payload_json FROM diagnostics WHERE id='diag:generic'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("generic payload");
+        assert_eq!(payload, "{}");
     }
 
     #[test]

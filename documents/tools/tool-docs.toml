@@ -145,11 +145,18 @@ language = "python"
 summary = "Semantic responsibility contract schema, identity, and reference checker documentation."
 
 [[tool]]
+id = "repository-topic-clone"
+tool = "tools/agent_tools/repository_topic_clone.py"
+doc = "documents/tools/repository_topic_clone.md"
+language = "python"
+summary = "Generic repository topic clone lifecycle and reconstructibility cleanup documentation."
+
+[[tool]]
 id = "dependency-module-change"
 tool = "tools/agent_tools/dependency_module_change.py"
 doc = "documents/tools/dependency_module_change.md"
 language = "python"
-summary = "Independent dependency source clone lifecycle and reconstructibility-gated cleanup documentation."
+summary = "Dependency policy decorator for the generic repository topic clone lifecycle."
 
 [[tool]]
 id = "classify-path-risk"
@@ -220,3 +227,10 @@ tool = "tools/agent_tools/check_proof_trace_alignment.py"
 doc = "documents/tools/check_proof_trace_alignment.md"
 language = "python"
 summary = "Proof trace code-path and proposition alignment checker documentation."
+
+[[tool]]
+id = "lsp-code-analysis"
+tool = "tools/agent_tools/lsp_code_analysis.py"
+doc = "documents/tools/lsp_code_analysis.md"
+language = "python"
+summary = "Canonical LSP 3.17 code-analysis protocol, report schema, and legacy adapter documentation."

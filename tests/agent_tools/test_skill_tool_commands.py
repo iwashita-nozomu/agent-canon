@@ -20,6 +20,9 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+from agent_canon_source_root import RootResolution  # noqa: E402
+from skill_tool_commands import project_public_command  # noqa: E402
 TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "skill_tool_commands.py"
 STANDALONE_CATALOG = """version: 1
 skill_families:
@@ -28,6 +31,39 @@ skill_families:
 
 class SkillToolCommandsTest(unittest.TestCase):
     """Verify materialized skill tool command sections."""
+
+    def test_public_projection_keeps_logical_plan_and_layout_prefix(self) -> None:
+        """Derived public argv is separate from the source execution spelling."""
+        logical = (
+            "PYTHONPATH=tools python3 tools/agent_tools/workflow_monitor.py "
+            "--root . --contract vendor/agent-canon/documents/structure/repo-structure-contract.toml"
+        )
+        standalone = project_public_command(
+            logical,
+            RootResolution(Path("."), Path("."), "standalone", Path(".")),
+        )
+        derived = project_public_command(
+            logical,
+            RootResolution(Path("."), Path("."), "vendored", Path(".")),
+        )
+        self.assertEqual(standalone.public_argv[1], "tools/agent_tools/workflow_monitor.py")
+        self.assertEqual(
+            derived.public_argv[1], "tools/agent-canon/agent_tools/workflow_monitor.py"
+        )
+        self.assertEqual(
+            standalone.public_argv[2:],
+            ("--root", ".", "--contract", "documents/structure/repo-structure-contract.toml"),
+        )
+        self.assertEqual(
+            derived.public_argv[2:],
+            (
+                "--root",
+                ".",
+                "--contract",
+                "vendor/agent-canon/documents/structure/repo-structure-contract.toml",
+            ),
+        )
+        self.assertEqual(derived.public_env, (("PYTHONPATH", "tools/agent-canon"),))
 
     def run_tool(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the skill command tool against a root."""
@@ -743,19 +779,23 @@ class SkillToolCommandsTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("bare-runtime-log-archive-push:present", result.stdout)
 
-    def test_check_requires_template_root_document_resolution_marker(self) -> None:
-        """Check reports issue-backed AgentCanon document path resolution drift."""
+    def test_check_requires_project_owned_bootstrap_document_markers(self) -> None:
+        """Check keeps default repository startup on project-owned static contracts."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_skill(
                 root,
                 "start-repository",
-                "Read `documents/agent-canon/agent-canon-github-remote.md`.\n",
+                (
+                    "Read `documents/contracts/template-bootstrap.md` and "
+                    "`documents/contracts/static-seed-export.md`.\n"
+                ),
             )
             result = self.run_tool(root, "check")
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("remote-doc-template-path:missing", result.stdout)
+            self.assertIn("remote-doc-project-path:missing", result.stdout)
+            self.assertNotIn("profile-doc-template-path", result.stdout)
 
     def test_check_accepts_qualified_workflow_monitoring_paths(self) -> None:
         """Check allows run-local and template workflow monitoring paths."""

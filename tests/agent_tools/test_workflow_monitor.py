@@ -5,7 +5,6 @@
 # responsibility Tests workflow monitor accumulation behavior.
 # upstream implementation ../../tools/agent_tools/workflow_monitor.py appends evidence
 # upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py seeds evidence
-# upstream implementation ../../tools/agent_tools/task_start.py seeds evidence
 # upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns update lifecycle evidence identities
 # @dependency-end
 
@@ -13,20 +12,45 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from typing import Protocol, cast
+from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootReject,
+    ParentRootSideEffectError,
+)
+
 MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
-TASK_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_start.py"
 RUNTIME_PROFILE_INVENTORY = (
-    PROJECT_ROOT / "documents" / "runtime-profiles-and-check-matrix.json"
+    PROJECT_ROOT
+    / "documents"
+    / "runtime"
+    / "runtime-profiles-and-check-matrix.json"
 )
+
+
+def seed_bootstrap_workspace(workspace_root: Path) -> None:
+    """Copy the canonical runtime inputs required by the bootstrap fixture."""
+    for relative_path in (
+        ".codex/config.toml",
+        "agents/model_profiles.toml",
+        "agents/canonical/CODEX_WORKFLOW.md",
+        "templates/agents/design_brief.md",
+        "agents/workflows/implementation-waterfall-workflow.md",
+        "documents/design/dependency-manifest-design.md",
+    ):
+        destination = workspace_root / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes((PROJECT_ROOT / relative_path).read_bytes())
 
 
 class WorkflowMonitorModule(Protocol):
@@ -108,6 +132,32 @@ class WorkflowMonitorTest(unittest.TestCase):
         self.assertIn('"lifecycle_state":"closed"', text)
         self.assertIn(evidence_refs[0], text)
         self.assertNotIn("plausible repository state", text)
+
+    def test_monitor_append_preserves_prepared_monitoring_prefix(self) -> None:
+        """Post-move monitoring appends to prepared bytes instead of replacing them."""
+        module = load_monitor_module()
+        entries_type = getattr(module, "MonitoringEntries")
+        append_monitoring = getattr(module, "append_monitoring")
+        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT / ".agent-canon") as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            report_dir.mkdir(parents=True)
+            prepared = "prepared-monitoring-prefix\n"
+            (report_dir / "workflow_monitoring.md").write_text(
+                prepared, encoding="utf-8"
+            )
+            with mock.patch.dict(
+                os.environ, {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}
+            ):
+                append_monitoring(
+                    report_dir,
+                    entries_type(signals=("source=post-move",)),
+                )
+            text = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
+
+        self.assertTrue(text.startswith(prepared))
+        self.assertIn("source=post-move", text)
 
     def test_monitor_rejects_duplicate_lifecycle_evidence_refs(self) -> None:
         """One evidence identity may be recorded only once in a monitor event."""
@@ -374,6 +424,7 @@ class WorkflowMonitorTest(unittest.TestCase):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True)
+            seed_bootstrap_workspace(workspace_root)
             bootstrap = subprocess.run(
                 [
                     sys.executable,
@@ -1095,6 +1146,7 @@ class WorkflowMonitorTest(unittest.TestCase):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True)
+            seed_bootstrap_workspace(workspace_root)
             result = subprocess.run(
                 [
                     sys.executable,
@@ -1127,43 +1179,23 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertIn("stage owner routing active_roles=", text)
             self.assertIn("created run bundle", text)
 
-    def test_task_start_seeds_monitoring_with_routing_evidence(self) -> None:
-        """task_start should seed workflow monitoring without manual edits."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            report_root = Path(tmp_dir) / "reports"
-            workspace_root.mkdir(parents=True)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_START_SCRIPT),
-                    "--task",
-                    "monitor task start",
-                    "--task-id",
-                    "T1",
-                    "--owner",
-                    "codex",
-                    "--run-id",
-                    "monitor-task-start",
-                    "--workspace-root",
-                    str(workspace_root),
-                    "--report-root",
-                    str(report_root),
-                    "--skip-agent-canon-preflight",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
 
-            self.assertEqual(result.returncode, 0, result.stderr)
-            monitor_path = report_root / "monitor-task-start" / "workflow_monitoring.md"
-            text = monitor_path.read_text(encoding="utf-8")
-            self.assertIn("workflow=Owner-Bounded Change", text)
-            self.assertIn("skills=$agent-orchestration", text)
-            self.assertIn("stage owner routing active_roles=", text)
-            self.assertIn("created run bundle", text)
+def test_monitor_atomic_open_rejects_parent_path_replacement() -> None:
+    """The monitor boundary rejects a replaced path component before opening it."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        root = Path(tmp_dir)
+        outside = root / "outside"
+        outside.mkdir()
+        replaced = root / "reports"
+        replaced.symlink_to(outside, target_is_directory=True)
+        module = load_monitor_module()
+        target = replaced / "workflow_monitoring.md"
+        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}):
+            with unittest.TestCase().assertRaises(ParentRootSideEffectError) as rejected:
+                with module.locked_monitoring_artifact(target):
+                    pass
+        assert rejected.exception.reject is ParentRootReject.SYMLINK_ESCAPE
+        assert not (outside / "workflow_monitoring.md").exists()
 
 
 if __name__ == "__main__":

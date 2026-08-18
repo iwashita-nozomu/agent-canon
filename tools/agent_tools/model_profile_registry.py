@@ -19,7 +19,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, ClassVar, Iterable, Mapping, Sequence, cast
 
 try:
     import tomllib
@@ -34,12 +34,18 @@ SCHEMA_IDS = {
     "role_instruction_template": "role_instruction_template_v1",
     "tool_call_token": "tool_call_token_v1",
     "generated_role_view": "generated_role_view_v1",
+    "consumer_static_clause_projection": "consumer_static_clause_projection_v1",
+    "consumer_static_obligation": "consumer_static_obligation_v1",
+    "common_return": "claim_evidence_v1",
 }
+
+COMMON_RETURN_SCHEMA_ID = SCHEMA_IDS["common_return"]
 
 _ROOT_FIELDS = {
     "schema_id",
     "registry_id",
     "registry_version",
+    "writer_isolation_policy",
     "role_profile_bindings",
     "role_sandbox_bindings",
     "role_instruction_templates",
@@ -70,7 +76,132 @@ _PROFILE_FIELDS = {
     "close_tool_target_binding",
     "role_instructions",
 }
-_CLAUSE_FIELDS = {"id", "text", "priority"}
+_CLAUSE_FIELDS = {"id", "text", "priority", "consumer_static_text", "static_obligations"}
+
+# These are exact, case-normalized producer prefixes.  The static projection
+# uses the same boundary as the exporter and consumer checker, while keeping
+# the source registry itself available to the live renderer.
+STATIC_FORBIDDEN_PREFIXES = (
+    "agents/skills/",
+    "agents/model_profiles.toml",
+    "tools/agent_tools/",
+    "../../agents/",
+    "../../tools/",
+)
+
+
+@dataclass(frozen=True)
+class StaticObligation:
+    """One closed, path-free consumer-static obligation fragment."""
+
+    schema_id: str
+    obligation_id: str
+    fragment: str
+
+
+STATIC_OBLIGATION_TABLE: tuple[StaticObligation, ...] = (
+    StaticObligation(
+        schema_id=SCHEMA_IDS["consumer_static_obligation"],
+        obligation_id="validation_owner",
+        fragment="follow the parent-selected closed validation route",
+    ),
+    StaticObligation(
+        schema_id=SCHEMA_IDS["consumer_static_obligation"],
+        obligation_id="parent_assignment",
+        fragment="act only on the parent packet and assigned scope",
+    ),
+    StaticObligation(
+        schema_id=SCHEMA_IDS["consumer_static_obligation"],
+        obligation_id="parent_authority",
+        fragment="do not perform parent-only integration or final decisions",
+    ),
+    StaticObligation(
+        schema_id=SCHEMA_IDS["consumer_static_obligation"],
+        obligation_id="stop_handback",
+        fragment="return branch/head/check evidence or the role result and stop",
+    ),
+)
+_STATIC_OBLIGATIONS_BY_ID = {item.obligation_id: item for item in STATIC_OBLIGATION_TABLE}
+REQUIRED_STATIC_OBLIGATION_SETS: Mapping[str, frozenset[str]] = {
+    "python_solid_boundary": frozenset({"validation_owner", "parent_assignment"}),
+    "luna_impl": frozenset(
+        {"validation_owner", "parent_assignment", "parent_authority", "stop_handback"}
+    ),
+    "spark_impl": frozenset(
+        {"validation_owner", "parent_assignment", "parent_authority", "stop_handback"}
+    ),
+}
+
+
+def _contains_static_forbidden_prefix(text: str) -> bool:
+    lowered = text.casefold()
+    return any(prefix in lowered for prefix in STATIC_FORBIDDEN_PREFIXES)
+
+
+def _validated_string_list(value: object, field: str) -> list[str]:
+    if not isinstance(value, list):
+        raise ModelProfileRegistryError(f"{field}:must_be_string_list")
+    result: list[str] = []
+    for item in cast(list[object], value):
+        if not isinstance(item, str) or not item:
+            raise ModelProfileRegistryError(f"{field}:must_be_string_list")
+        result.append(item)
+    return result
+
+
+def _static_projection(
+    clause: Mapping[str, Any],
+    *,
+    clause_id: str,
+    field: str,
+) -> ConsumerStaticClauseProjection | None:
+    """Parse and validate one optional consumer-static clause projection."""
+    has_text = "consumer_static_text" in clause
+    has_obligations = "static_obligations" in clause
+    if not has_text and not has_obligations:
+        if _contains_static_forbidden_prefix(_text(clause["text"], f"{field}.text")):
+            raise ModelProfileRegistryError(
+                f"{field}:{clause_id}:consumer_static_projection_required"
+            )
+        return None
+    if not has_text or not has_obligations:
+        raise ModelProfileRegistryError(
+            f"{field}:{clause_id}:consumer_static_projection_incomplete"
+        )
+    consumer_static_text = _text(
+        clause["consumer_static_text"], f"{field}.consumer_static_text"
+    )
+    if _contains_static_forbidden_prefix(consumer_static_text):
+        raise ModelProfileRegistryError(
+            f"{field}:{clause_id}:consumer_static_text_contains_forbidden_prefix"
+        )
+    obligations = tuple(
+        _validated_string_list(
+            clause["static_obligations"],
+            f"{field}:{clause_id}:static_obligations",
+        )
+    )
+    if len(set(obligations)) != len(obligations):
+        raise ModelProfileRegistryError(
+            f"{field}:{clause_id}:static_obligations_duplicate"
+        )
+    unknown = sorted(set(obligations) - set(_STATIC_OBLIGATIONS_BY_ID))
+    if unknown:
+        raise ModelProfileRegistryError(
+            f"{field}:{clause_id}:unknown_static_obligations:{','.join(unknown)}"
+        )
+    required = REQUIRED_STATIC_OBLIGATION_SETS.get(clause_id)
+    if required is not None and set(obligations) != set(required):
+        raise ModelProfileRegistryError(
+            f"{field}:{clause_id}:required_static_obligations_mismatch"
+        )
+    return ConsumerStaticClauseProjection(
+        clause_id=clause_id,
+        consumer_static_text=consumer_static_text,
+        static_obligations=obligations,
+    )
+
+
 class StructuralDesignGap(Exception):
     """An input contract contradicts the fixed implementation boundary."""
 
@@ -152,12 +283,76 @@ class ValidationResult:
         return cls(SCHEMA_IDS["execution_contract"], False, tuple(issues))
 
 
+def validate_claim_evidence_result(value: object) -> ValidationResult:
+    """Validate the one common claim/evidence return contract for all roles."""
+    issues: list[ValidationIssue] = []
+    if not isinstance(value, Mapping):
+        return ValidationResult.fail(
+            [ValidationIssue("return_contract.type", "claim/evidence result must be a mapping")]
+        )
+    status = value.get("status")
+    if status not in {"pass", "revise", "escalate", "blocked"}:
+        issues.append(
+            ValidationIssue(
+                "return_contract.status",
+                "status must be pass, revise, escalate, or blocked",
+                "status",
+            )
+        )
+    claim = value.get("claim")
+    if not isinstance(claim, str) or not claim.strip():
+        issues.append(ValidationIssue("return_contract.claim", "claim must be non-empty text", "claim"))
+    evidence = value.get("evidence")
+    if (
+        not isinstance(evidence, list)
+        or not evidence
+        or not all(isinstance(item, str) and item.strip() for item in evidence)
+    ):
+        issues.append(
+            ValidationIssue(
+                "return_contract.evidence",
+                "evidence must be a non-empty list of text references",
+                "evidence",
+            )
+        )
+    return ValidationResult.fail(issues) if issues else ValidationResult(
+        COMMON_RETURN_SCHEMA_ID, True, ()
+    )
+
+
+def validate_common_return_schema(registry: "ModelProfileRegistry") -> ValidationResult:
+    """Ensure every canonical profile advertises the common return contract."""
+    profile_ids = {profile.return_schema_id for profile in registry.model_profiles}
+    if profile_ids != {COMMON_RETURN_SCHEMA_ID}:
+        return ValidationResult.fail(
+            [
+                ValidationIssue(
+                    "return_contract.schema_ids",
+                    f"all profiles must use {COMMON_RETURN_SCHEMA_ID}",
+                    "model_profiles.return_schema_id",
+                )
+            ]
+        )
+    return ValidationResult(COMMON_RETURN_SCHEMA_ID, True, ())
+
+
+@dataclass(frozen=True)
+class ConsumerStaticClauseProjection:
+    """Typed source-neutral projection for one live instruction clause."""
+
+    clause_id: str
+    consumer_static_text: str
+    static_obligations: tuple[str, ...]
+    schema_id: ClassVar[str] = SCHEMA_IDS["consumer_static_clause_projection"]
+
+
 @dataclass(frozen=True)
 class RoleInstructionClause:
     clause_id: str
     text: str
     priority: int = 0
     schema_id: str = SCHEMA_IDS["role_instruction_clause"]
+    consumer_static_projection: ConsumerStaticClauseProjection | None = None
 
 
 @dataclass(frozen=True)
@@ -319,6 +514,7 @@ class ModelProfileRegistry:
     role_sandbox_bindings: Mapping[str, str]
     role_instruction_templates: Mapping[str, tuple[RoleInstructionClause, ...]]
     standalone_role_metadata: Mapping[str, tuple[str, str, str]]
+    writer_isolation_policy: Mapping[str, object]
 
     def by_profile(self, profile_id: str) -> ModelProfile:
         matches = [profile for profile in self.model_profiles if profile.id == profile_id]
@@ -352,19 +548,28 @@ class ModelProfileRegistry:
         return tuple(sorted(clauses, key=lambda value: (value.priority, value.clause_id)))
 
     def projection_digest_for_role(self, role_id: str, profile_id: str) -> str:
-        """Bind generated views and capsules to profile and role-specific clauses."""
+        """Bind both live and consumer-static views to one canonical clause digest."""
         profile = self.profile_for_role(role_id)
         clauses = self.instruction_clauses_for_role(role_id, profile_id)
         return _stable_digest(
             {
                 "profile_id": profile.id,
-                "profile_projection_digest": profile.projection_digest,
                 "role_id": role_id,
-                "role_instructions": [
+                "clauses": [
                     {
                         "id": clause.clause_id,
-                        "text": clause.text,
                         "priority": clause.priority,
+                        "live_text": clause.text,
+                        "consumer_static_text": (
+                            clause.consumer_static_projection.consumer_static_text
+                            if clause.consumer_static_projection is not None
+                            else clause.text
+                        ),
+                        "static_obligations": list(
+                            clause.consumer_static_projection.static_obligations
+                            if clause.consumer_static_projection is not None
+                            else ()
+                        ),
                     }
                     for clause in clauses
                 ],
@@ -390,11 +595,27 @@ def _profile_digest_payload(item: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def load_model_profile_registry(root: os.PathLike[str] | str = ".") -> ModelProfileRegistry:
-    root_path = Path(root)
+def load_model_profile_registry(
+    root: os.PathLike[str] | str = ".",
+    *,
+    source_root: os.PathLike[str] | str | None = None,
+) -> ModelProfileRegistry:
+    """Load the registry from an explicit AgentCanon source root.
+
+    ``root`` remains the standalone positional API.  Derived callers pass
+    ``source_root`` so a parent workspace can never silently become the source
+    registry root.
+    """
+    root_path = Path(source_root if source_root is not None else root).resolve()
+    registry_path = root_path / "agents" / "model_profiles.toml"
+    if not registry_path.is_file():
+        raise ModelProfileRegistryError(
+            f"model_profile_registry_source_missing:{registry_path.relative_to(root_path)}"
+        )
     data = _closed_mapping(
-        _read_toml_file(root_path / "agents" / "model_profiles.toml"),
+        _read_toml_file(registry_path),
         fields=_ROOT_FIELDS,
+        required=_ROOT_FIELDS - {"writer_isolation_policy"},
         label="registry",
     )
     if _text(data["schema_id"], "schema_id") != SCHEMA_IDS["registry"]:
@@ -402,6 +623,52 @@ def load_model_profile_registry(root: os.PathLike[str] | str = ".") -> ModelProf
     version = data["registry_version"]
     if not isinstance(version, int) or version <= 0:
         raise ModelProfileRegistryError("registry_version:must_be_positive_int")
+    raw_writer_policy = _closed_mapping(
+        data.get(
+            "writer_isolation_policy",
+            {
+                "current_checkout_mode": "legacy_unspecified",
+                "parallel_requirements": ["disjoint_paths"],
+                "collision_action": "serialize_current_checkout_waves",
+                "isolated_worktree_mode": "explicit_only",
+            },
+        ),
+        fields={
+            "current_checkout_mode",
+            "parallel_requirements",
+            "collision_action",
+            "isolated_worktree_mode",
+        },
+        required={
+            "current_checkout_mode",
+            "parallel_requirements",
+            "collision_action",
+            "isolated_worktree_mode",
+        },
+        label="writer_isolation_policy",
+    )
+    current_checkout_mode = _text(
+        raw_writer_policy["current_checkout_mode"],
+        "writer_isolation_policy.current_checkout_mode",
+    )
+    collision_action = _text(
+        raw_writer_policy["collision_action"],
+        "writer_isolation_policy.collision_action",
+    )
+    isolated_worktree_mode = _text(
+        raw_writer_policy["isolated_worktree_mode"],
+        "writer_isolation_policy.isolated_worktree_mode",
+    )
+    parallel_requirements = _string_tuple(
+        raw_writer_policy["parallel_requirements"],
+        "writer_isolation_policy.parallel_requirements",
+    )
+    writer_policy = {
+        "current_checkout_mode": current_checkout_mode,
+        "parallel_requirements": parallel_requirements,
+        "collision_action": collision_action,
+        "isolated_worktree_mode": isolated_worktree_mode,
+    }
     raw_bindings = data["role_profile_bindings"]
     if not isinstance(raw_bindings, Mapping) or not raw_bindings:
         raise ModelProfileRegistryError("role_profile_bindings:must_be_nonempty_mapping")
@@ -440,6 +707,7 @@ def load_model_profile_registry(root: os.PathLike[str] | str = ".") -> ModelProf
             clause = _closed_mapping(
                 raw_clause,
                 fields=_CLAUSE_FIELDS,
+                required={"id", "text", "priority"},
                 label=f"role_instruction_templates.{role}[{clause_index}]",
             )
             clause_id = _text(clause["id"], "role_instruction.id")
@@ -458,6 +726,11 @@ def load_model_profile_registry(root: os.PathLike[str] | str = ".") -> ModelProf
                     clause_id,
                     _text(clause["text"], "role_instruction.text"),
                     priority,
+                    consumer_static_projection=_static_projection(
+                        clause,
+                        clause_id=clause_id,
+                        field=f"role_instruction_templates.{role}[{clause_index}]",
+                    ),
                 )
             )
         role_templates[role] = tuple(
@@ -499,6 +772,7 @@ def load_model_profile_registry(root: os.PathLike[str] | str = ".") -> ModelProf
             clause = _closed_mapping(
                 raw_clause,
                 fields=_CLAUSE_FIELDS,
+                required={"id", "text", "priority"},
                 label=f"model_profile:{profile_id}.role_instructions[{clause_index}]",
             )
             clause_id = _text(clause["id"], "role_instruction.id")
@@ -508,7 +782,18 @@ def load_model_profile_registry(root: os.PathLike[str] | str = ".") -> ModelProf
             priority = clause["priority"]
             if not isinstance(priority, int):
                 raise ModelProfileRegistryError(f"role_instruction:{clause_id}:priority_must_be_int")
-            clauses.append(RoleInstructionClause(clause_id, _text(clause["text"], "role_instruction.text"), priority))
+            clauses.append(
+                RoleInstructionClause(
+                    clause_id,
+                    _text(clause["text"], "role_instruction.text"),
+                    priority,
+                    consumer_static_projection=_static_projection(
+                        clause,
+                        clause_id=clause_id,
+                        field=f"model_profile:{profile_id}.role_instructions[{clause_index}]",
+                    ),
+                )
+            )
         allowed = _string_tuple(item["allowed_context"], f"{profile_id}.allowed_context")
         forbidden = _string_tuple(item["forbidden_context"], f"{profile_id}.forbidden_context")
         if set(allowed) & set(forbidden):
@@ -575,6 +860,7 @@ def load_model_profile_registry(root: os.PathLike[str] | str = ".") -> ModelProf
         role_sandbox_bindings=sandboxes,
         role_instruction_templates=role_templates,
         standalone_role_metadata=standalone,
+        writer_isolation_policy=writer_policy,
     )
     for role_id in role_templates:
         registry.instruction_clauses_for_role(role_id)
@@ -765,11 +1051,49 @@ def _registered_role_descriptions(root: Path) -> dict[str, str]:
     return result
 
 
+def _validate_projection_mode(projection: str) -> str:
+    if projection not in {"live", "consumer-static"}:
+        raise ModelProfileRegistryError(
+            f"role_projection:unsupported_projection:{projection}"
+        )
+    return projection
+
+
+def compose_consumer_static_clause(
+    clause: RoleInstructionClause,
+) -> tuple[str, tuple[str, ...]]:
+    """Compose one source-neutral clause and return its selected obligation IDs."""
+    projection = clause.consumer_static_projection
+    if projection is None:
+        if _contains_static_forbidden_prefix(clause.text):
+            raise ModelProfileRegistryError(
+                f"role_instruction:{clause.clause_id}:consumer_static_projection_required"
+            )
+        return clause.text, ()
+    selected = tuple(
+        _STATIC_OBLIGATIONS_BY_ID[obligation_id].fragment
+        for obligation_id in projection.static_obligations
+    )
+    return " ".join((projection.consumer_static_text, *selected)), projection.static_obligations
+
+
+def _render_instruction_clauses(
+    clauses: Sequence[RoleInstructionClause],
+    projection: str,
+) -> str:
+    mode = _validate_projection_mode(projection)
+    if mode == "live":
+        return " ".join(clause.text for clause in clauses)
+    return " ".join(compose_consumer_static_clause(clause)[0] for clause in clauses)
+
+
 def generate_role_views(
     registry: ModelProfileRegistry,
     root: os.PathLike[str] | str = ".",
     target_state_contract: Mapping[str, Any] | TargetStateContract | None = None,
+    projection: str = "live",
 ) -> tuple[GeneratedRoleView, ...]:
+    projection = _validate_projection_mode(projection)
     root_path = Path(root)
     metadata = _team_role_metadata(root_path)
     if set(metadata) & set(registry.standalone_role_metadata):
@@ -794,7 +1118,7 @@ def generate_role_views(
         profile = registry.profile_for_role(role_id)
         logical_role, contract_ref, sandbox = metadata[role_id]
         role_clauses = registry.instruction_clauses_for_role(role_id, profile.id)
-        clauses = " ".join(clause.text for clause in role_clauses)
+        clauses = _render_instruction_clauses(role_clauses, projection)
         instructions = profile.role_template.format(
             role_id=role_id,
             model_alias=profile.model_alias,
@@ -837,10 +1161,16 @@ def _toml_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-def _render_role_view(view: GeneratedRoleView) -> str:
+def _render_role_view(view: GeneratedRoleView, projection: str = "live") -> str:
+    projection = _validate_projection_mode(projection)
     nicknames = ", ".join(_toml_string(value) for value in view.nickname_candidates)
-    return "\n".join(
-        (
+    if projection == "consumer-static":
+        comments = (
+            "# generated role view: generated_role_view_v1",
+            f"# source canonical digest: {view.source_canonical_digest}",
+        )
+    else:
+        comments = (
             "# @dependency-start",
             "# contract configuration",
             f"# responsibility Projects the canonical {view.role_id} model profile into executable Codex settings.",
@@ -852,6 +1182,10 @@ def _render_role_view(view: GeneratedRoleView) -> str:
             "# generated from agents/model_profiles.toml plus canonical team/runtime role metadata",
             "# materializer: tools/agent_tools/model_profile_registry.py",
             f"# source canonical digest: {view.source_canonical_digest}",
+        )
+    return "\n".join(
+        (
+            *comments,
             "",
             f"name = {_toml_string(view.name)}",
             f"description = {_toml_string(view.description)}",
@@ -909,13 +1243,17 @@ def _projection_records(views: Sequence[GeneratedRoleView]) -> tuple[dict[str, o
     return agent_views, roles
 
 
-def write_role_views(root: os.PathLike[str] | str = ".") -> tuple[GeneratedRoleView, ...]:
+def write_role_views(
+    root: os.PathLike[str] | str = ".",
+    projection: str = "live",
+) -> tuple[GeneratedRoleView, ...]:
     root_path = Path(root)
     registry = load_model_profile_registry(root_path)
-    views = generate_role_views(registry, root_path)
+    projection = _validate_projection_mode(projection)
+    views = generate_role_views(registry, root_path, projection=projection)
     for view in views:
         path = root_path / ".codex" / "agents" / f"{view.role_id}.toml"
-        path.write_text(_render_role_view(view), encoding="utf-8")
+        path.write_text(_render_role_view(view, projection), encoding="utf-8")
     config_path = root_path / "agents" / "agents_config.json"
     raw = json.loads(config_path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
@@ -958,6 +1296,7 @@ def validate_target_state_contract(
 def materialize_contract_projection(
     target_state_contract: Mapping[str, Any],
     root: os.PathLike[str] | str = ".",
+    projection: str = "live",
 ) -> ImplementationExecutionContract:
     registry = load_model_profile_registry(root)
     result = validate_target_state_contract(target_state_contract, registry)
@@ -966,17 +1305,23 @@ def materialize_contract_projection(
     contract_id = _text(target_state_contract.get("contract_id"), "target_state_contract.contract_id")
     return ImplementationExecutionContract(
         contract_id=contract_id,
-        generated_views=generate_role_views(registry, root, target_state_contract),
+        generated_views=generate_role_views(
+            registry,
+            root,
+            target_state_contract,
+            projection=projection,
+        ),
     )
 
 
-def _role_view_issues(root: Path) -> tuple[ValidationIssue, ...]:
+def _role_view_issues(root: Path, projection: str = "live") -> tuple[ValidationIssue, ...]:
+    projection = _validate_projection_mode(projection)
     registry = load_model_profile_registry(root)
-    views = generate_role_views(registry, root)
+    views = generate_role_views(registry, root, projection=projection)
     issues: list[ValidationIssue] = []
     for view in views:
         path = root / ".codex" / "agents" / f"{view.role_id}.toml"
-        expected = _render_role_view(view).encode("utf-8")
+        expected = _render_role_view(view, projection).encode("utf-8")
         try:
             actual = path.read_bytes()
         except OSError:
@@ -1014,16 +1359,22 @@ def _print_role_view_issue(issue: ValidationIssue) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="model_profile_registry.py")
     parser.add_argument("--root", required=True, type=Path)
+    parser.add_argument(
+        "--projection",
+        choices=("live", "consumer-static"),
+        default="live",
+        help="In-memory role projection mode; generated schema fields remain unchanged.",
+    )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--generate-role-views", action="store_true")
     mode.add_argument("--check-role-views", action="store_true")
     args = parser.parse_args(argv)
     try:
         if args.generate_role_views:
-            views = write_role_views(args.root)
+            views = write_role_views(args.root, args.projection)
             print(f"MODEL_PROFILE_ROLE_VIEWS=generated:{len(views)}")
             return 0
-        issues = _role_view_issues(args.root)
+        issues = _role_view_issues(args.root, args.projection)
     except (ModelProfileRegistryError, OSError, ValueError) as exc:
         issues = (ValidationIssue("role_view.schema_drift", str(exc), "agents/model_profiles.toml"),)
     if issues:

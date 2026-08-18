@@ -2,7 +2,7 @@
 name: agent-canon-update
 description: "Use when updating AgentCanon itself, refreshing a vendored vendor/agent-canon submodule pin, repairing AgentCanon root runtime views, applying AgentCanon update TODOs, or routing local AgentCanon source commits through a proper AgentCanon branch and PR before parent pin updates."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"7616cf12df75060362f0953cb898dc676a0153defe00e97c9cae71c903d5a128"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"fd8d8968ca24ff3d2935e0de5ad374fcba439d5203009487de4428698ae5986f"} -->
 
 <!--
 @dependency-start

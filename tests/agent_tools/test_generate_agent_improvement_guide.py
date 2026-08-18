@@ -83,14 +83,14 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn("human_feedback_action_counts:", guide)
         self.assertIn("prompt_repair", guide)
         self.assertIn("Top Failure Repair Targets", guide)
-        self.assertIn("tools/agent_tools/task_start.py", guide)
+        self.assertIn("tools/agent_tools/bootstrap_agent_run.py", guide)
         self.assertIn("hook_quality_counts:", guide)
         self.assertIn("unknown_event", guide)
         self.assertIn("Hook Quality Findings", guide)
         self.assertIn("Protocol Feedback Coverage", guide)
         self.assertIn("hook_tool_feedback=reviewed", guide)
         self.assertNotIn("failure-a", guide)
-        self.assertIn("memory/AGENT_PHILOSOPHY.md", guide)
+        self.assertIn("memory/records", guide)
         self.assertIn("Local Codex", guide)
 
     def test_resolves_vendored_agentcanon_root_from_parent_repo(self) -> None:
@@ -205,13 +205,9 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
             "issue_id: AC-20260513-closed\nstatus: resolved\n",
             encoding="utf-8",
         )
-        (root / "memory" / "AGENT_PHILOSOPHY.md").write_text(
-            "# Agent Philosophy\n\n- durable learning\n",
-            encoding="utf-8",
-        )
-        (root / "memory" / "USER_PREFERENCES.md").write_text(
-            "# User Preferences\n\n- durable preference\n",
-            encoding="utf-8",
+        (root / "memory" / "records").mkdir(parents=True)
+        (root / "memory" / "records" / "agent--durable-learning.md").write_text(
+            "# Durable learning\n", encoding="utf-8"
         )
         for skill in ("agent-orchestration", "codex-task-workflow", "result-artifact-writeout"):
             skill_path = root / ".agents" / "skills" / skill / "SKILL.md"
@@ -241,7 +237,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                                 "tools/oop/python/readability.py",
                                 "--root",
                                 str(root),
-                                "tools/agent_tools/task_start.py",
+                                "tools/agent_tools/bootstrap_agent_run.py",
                             ],
                             "returncode": 0,
                             "output_snippet": (

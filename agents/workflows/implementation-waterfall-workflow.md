@@ -249,7 +249,7 @@ decision が `approve` の場合に approval evidence になります。
 - active runtime が explicit user request なしの subagent spawn を禁止する場合は、actual spawn の代わりに `SUBAGENT_AUTHORIZATION=required`、role、input packet、expected output、review gate を structured handoff message/tool result に固定します。coordination/resumption が既に durable bundle を選択している場合だけ、その bundle を使います。許可が出るまでその specialist review を完了扱いにしません
 - selected review claims が同じ owner、responsibility、context、write authority、validation route を共有する場合は active instance を再利用します。独立 review、disjoint authority、incompatible context、または owning gate で判定できない distinct unresolved claim/risk の場合だけ別 instance にします
 - 包括的開発では、parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します
-- 包括的開発では、same directory / same public API surface の parallel write を許可しません。独立した source workstream は、substantial replaceable responsibility unit、computed workspace clone、disjoint write scope、dependency/merge order、validation route、reviewer ownership を持つ場合だけ `--placement workspace` で分離できます。fresh route は既存 local/remote branch を拒否し、継続は `--placement workspace-continuation` に分けます。vendor-first は非並列 single-stream の既定であり、ready な全 stream を launch した parent は descendants を monitor し、同一責任・同一 context を再利用します。
+- 包括的開発では、same directory / same public API surface の parallel write を許可しません。独立した source workstream は、substantial replaceable responsibility unit、`repository-topic-clone` が算出する workspace clone、disjoint write scope、dependency/merge order、validation route、reviewer ownership を持つ場合だけ分離します。generic prepare は exact local/remote branch を再利用し、不在 branch を最新 `origin/main` から作成します。repository kind は clone 後の decorator であり、parallel eligibility や file/diff size は clone と scope の authority ではありません。ready な全 stream を launch した parent は descendants を monitor し、同一責任・同一 context を再利用します。
 - 独立 workstream が複数ある場合は、同じ parent wave に全 role を詰めず、stage owner ごとの vertical dynamic wave として schedule / workflow monitoring に記録します
 
 ### Gate 1. 要件整理
@@ -290,7 +290,7 @@ source bucket:
 - `current_request`
   - 今回の user request に明示された requirement
 - `durable_user_preference`
-  - `memory/USER_PREFERENCES.md` や過去ログから抽出された user tendency
+  - `memory/records/*.md` や過去ログから抽出された user tendency
 - `repo_or_code_precedent`
   - 既存 code、test、docs、workflow から分かる制約
 - `domain_or_external_constraint`
@@ -459,7 +459,7 @@ exit 条件:
 - 新規・変更する human-authored text file では旧 `Dependency Files:` block を使わず、`documents/design/dependency-manifest-design.md` の `@dependency-start` / `@dependency-end` 形式に統一します
 - 新しい dependency edge を足す場合は reverse edge も同じ pass の file plan に入れます。移行中で reverse edge 追加を同じ pass に含められない場合は、design review に blocker か明示 escalation として出します
 - `Canonical Tree-Head Plan` では、task 完了後に tracked tree に残してよい canonical design path と canonical implementation path を固定し、parallel design doc、implementation copy、dated snapshot、backup file、duplicate directory を作らないことを明示します
-- `bootstrap_agent_run.py` と `task_start.py` は `DESIGN_DOCUMENT_PACKET` と `IMPLEMENTATION_DOCUMENT_PACKET` を出力します。parent は designer / implementer subagent 起動時にその path 群をそのまま渡します
+- `bootstrap_agent_run.py` は `DESIGN_DOCUMENT_PACKET` と `IMPLEMENTATION_DOCUMENT_PACKET` を出力します。parent は designer / implementer subagent 起動時にその path 群をそのまま渡します
 - `Design-To-Implementation Trace` には、各予定差分ごとに design section、request clause ID、source / reuse 文書または code path、validation evidence を対応付けます。test-design route が active な場合だけ test plan item も対応付けます
 - 新規 helper、new module、new dependency、new public API を足す差分では、既存実装や導入済みライブラリでは足りない理由を `Design-To-Implementation Trace` に対応付けます
 - 既存 module boundary、命名、API shape、test style、docs style から逸脱する場合は、理由を明示します
@@ -788,7 +788,7 @@ exit 条件:
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes`
 - `closeout_gate.md` の `completion_coverage_consumer=yes`、`coverage_check.ok=true`、および `completion_boundary.topology_errors=[]`
 - selected review gate の post-fix evidence (full review は touched contract が要求する final candidate の場合だけ)
-- `closeout_gate.md` の `mechanical_completion_loop_complete=yes` と構造化 loop evidence
+- `closeout_gate.md` の `review_convergence_complete=yes` と構造化 loop evidence
 - selected diff-check review がある場合だけ `closeout_gate.md` の `diff_check_agent_complete=yes` と run-local artifact evidence
 - `closeout_gate.md` の `canonical_tree_head_complete=yes`
 - `user_request_contract.md` の `all_clauses_resolved=yes` と `forbidden_drift_detected=no`
@@ -810,7 +810,7 @@ exit 条件:
   revert ではなく、intent-preserving repair / redesign / escalation として
   証跡化されていることが `Review Finding Integration Evidence` に記録されている
 - review-driven fix が入った場合、changed behavior / owner / correctness / validation / publication を変えた accepted finding に限り selected gate の latest diff rerun evidence を記録する。full review rerun は final candidate が要求した場合だけ行う
-- planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙した loop evidence が `Mechanical Completion Loop Evidence` に記録されている
+- planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙した loop evidence が `Review Convergence Evidence` に記録されている
 - selected owning review gate の decision、latest diff ref、findings disposition が記録される。read-only diff-check artifact はその gate が選択した場合だけ要求する
 - canonical design path と implementation path だけが tracked tree に残っていることが `Canonical Tree-Head Evidence` に記録されている
 - user request clause の未解決がない

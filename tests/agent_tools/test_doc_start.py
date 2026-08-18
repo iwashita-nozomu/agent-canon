@@ -12,12 +12,15 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import os
 from pathlib import Path
 
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DOC_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "doc_start.py"
+TEST_PARENT_ROOT = PROJECT_ROOT.parents[2]
+TEST_TEMP_ROOT = TEST_PARENT_ROOT / ".agent-canon" / "tmp"
 
 
 class DocStartTest(unittest.TestCase):
@@ -25,11 +28,15 @@ class DocStartTest(unittest.TestCase):
 
     def test_doc_start_long_form(self) -> None:
         """Long-form doc start should emit the long-form skill and base review roles."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             workspace_root = Path(tmp_dir) / "workspace"
             report_root.mkdir(parents=True, exist_ok=True)
             workspace_root.mkdir(parents=True, exist_ok=True)
+            (workspace_root / ".codex").mkdir(parents=True, exist_ok=True)
+            (workspace_root / ".codex" / "config.toml").write_bytes(
+                (PROJECT_ROOT / ".codex" / "config.toml").read_bytes()
+            )
             result = subprocess.run(
                 [
                     sys.executable,
@@ -48,6 +55,7 @@ class DocStartTest(unittest.TestCase):
                     str(workspace_root),
                 ],
                 cwd=PROJECT_ROOT,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -80,11 +88,15 @@ class DocStartTest(unittest.TestCase):
 
     def test_doc_start_paper(self) -> None:
         """Paper doc start should enable citation, notation, and logic reviewers."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             workspace_root = Path(tmp_dir) / "workspace"
             report_root.mkdir(parents=True, exist_ok=True)
             workspace_root.mkdir(parents=True, exist_ok=True)
+            (workspace_root / ".codex").mkdir(parents=True, exist_ok=True)
+            (workspace_root / ".codex" / "config.toml").write_bytes(
+                (PROJECT_ROOT / ".codex" / "config.toml").read_bytes()
+            )
             result = subprocess.run(
                 [
                     sys.executable,
@@ -103,6 +115,7 @@ class DocStartTest(unittest.TestCase):
                     str(workspace_root),
                 ],
                 cwd=PROJECT_ROOT,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,

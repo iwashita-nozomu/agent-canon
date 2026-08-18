@@ -83,19 +83,19 @@ tools/bin/agent-canon docs check <changed-file>.md
 bash tools/docker_dependency_validator.sh
 python3 tools/ci/container_config.py
 make docker-build-check
-python3 tools/ci/run_container_pack.py --pack docker/packs/default.toml --print-only
+python3 tools/ci/run_container_pack.py --print-only
 ```
 
 必要なら:
 
 ```bash
-make docker-build-check-host-docker
-python3 tools/ci/run_codex_in_repo_container.py --profile host-docker --print-only
+python3 tools/ci/run_codex_in_repo_container.py --print-only
 ```
 
 確認:
 
-- repo-local `docker/Dockerfile`、`docker/requirements.txt`、AgentCanon-owned `.devcontainer/` の責務境界が同期している
+- repo-local `docker/Dockerfile`、`pyproject.toml`、AgentCanon-owned `.devcontainer/` の責務境界が同期している
+- fixed OS/Python capability、digest-pinned official Node OCI provider image、typed dependency manifest、project extras の owner が混在していない
 - `docker/README.md`、`README.md`、`QUICK_START.md` が更新されている
 - `templates/agents/environment_change_proposal.md` に proposal が残っている
 

@@ -1,173 +1,168 @@
 # gpu-execution
+
 <!--
 @dependency-start
 contract skill
-responsibility Documents GPU execution routing, ExperimentRunner delegation, and GPU validation evidence.
-upstream design ../canonical/skills.md skill canon registry
-upstream design ../../documents/design/experiment_runner.md ExperimentRunner responsibility boundary
-upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md exact R5 admission owner and fallback boundary
-upstream design ../../documents/conventions/python/15_jax_rules.md JAX GPU preallocation and CPU fallback policy
-upstream design ../workflows/experiment-workflow.md managed experiment workflow
-upstream design experiment-lifecycle.md experiment protocol and result artifact boundary
-upstream design computational-optimization.md numerical correctness and benchmark validation boundary
+responsibility Routes GPU execution through provider-independent AgentCanon admission by default and the optional managed experiment adapter only when managed lifecycle contracts are required.
+upstream design ../../documents/experiments/gpu-direct-command.md direct admission state machine, exact environment, lifecycle, and route-selection contract
+upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md canonical discovery, occupancy, lock, and admission evidence ownership
+upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md NVIDIA topology and full UUID boundary
+upstream design experiment-lifecycle.md managed experiment artifact boundary
+downstream implementation ../../tools/experiments/run_gpu_command.py provider-independent direct-command CLI
+downstream implementation ../../tools/experiments/run_managed_experiment.py optional managed provider adapter
 downstream implementation ../../.agents/skills/gpu-execution/SKILL.md Codex discovery shim
+upstream environment ../../agent-canon-environment.toml audited managed ExperimentRunner provider identity and runtime item
 @dependency-end
 -->
 
-## Reader Map
+## 目的
 
-- Purpose: route GPU/CUDA/JAX/XLA/IREE execution through a managed runtime,
-  disable JAX/XLA preallocation where required, and preserve GPU validation
-  evidence without CPU fallback.
-- Section path: Purpose and Use When define scope; Boundary separates
-  experiment, numerical, and environment ownership; Runtime Request Packet,
-  Python Execution Contract, Environment Contract, Blocker Evidence, and
-  Closeout Evidence define the operational contract.
-- Use when: GPU execution, CUDA backend availability, `nvidia-smi`,
-  `CUDA_VISIBLE_DEVICES`, JAX/XLA allocator settings, ExperimentRunner Python
-  execution, GPU validation blockers, or GPU-backed benchmark/evaluation is in
-  scope.
-- Boundary: this skill owns the GPU runtime route and evidence. It does not own
-  experiment design, solver math, Docker/driver installation, or language-level
-  code review.
+この skill は GPU/CUDA/JAX/XLA/IREE 実行を AgentCanon の厳格な admission、full UUID
+lock、固定 environment、terminal evidence に接続します。通常の pytest、benchmark、診断、
+任意 argv は provider-independent direct route を使います。topic/cases/source snapshot/
+artifact/completion coverage が必要な実験だけ managed route を使います。
 
-## Purpose
+static test や CPU-only smoke を実機 GPU validation と取り違えず、GPU が使えない場合は
+blocker evidence を残します。
 
-GPU を使う実行を、場当たり的な shell / Python 直実行ではなく、runner の責務境界と
-artifact evidence に接続します。特に Python 実行は `experiment_runner` の
-`StandardWorker`、`StandardFullResourceScheduler`、`StandardRunner` へ委譲し、
-JAX / XLA の GPU 実行では import 前に preallocation を無効化します。
+## 適用範囲と owner 境界
 
-## Use When
+- GPU allocation、CUDA/NVIDIA visibility、MIG、`nvidia-smi`、JAX/XLA allocator、GPU
+  smoke/benchmark/diagnosis が対象です。
+- NVIDIA topology、process occupancy、BUSY/UNKNOWN/FREE、full UUID reservation、fresh
+  post-lock observation は `execution_resource_plan.py` が canonical owner です。
+- provider-independent plan/environment/child lifecycle は `gpu_command_admission.py`、CLI は
+  `run_gpu_command.py` が owner です。
+- topic の設計と registry、managed run artifact は `experiment-lifecycle` が所有します。
+- solver と数値 correctness は `computational-optimization`、Docker/driver/CI は
+  `environment-maintenance`、Python/C++ review は各 review skill が所有します。
+- hooks/resource projection の public schema は変更しません。
 
-- GPU / CUDA / JAX / XLA / IREE backend で実行、検証、benchmark、diagnosis を行う。
-- `CUDA_VISIBLE_DEVICES`、`NVIDIA_VISIBLE_DEVICES`、GPU slot、GPU memory、worker
-  slot、`nvidia-smi` evidence を扱う。
-- `XLA_PYTHON_CLIENT_PREALLOCATE=false`、allocator 設定、JAX import 順序、
-  CPU fallback 禁止を明示する。
-- Python 実験、GPU smoke、formal run、server-side run、rerun decision を
-  ExperimentRunner 経由にしたい。
-- GPU が使えず `gpu_validation_blocker=<reason>` を残す必要がある。
+## Route selection
 
-## Boundary
+次の条件では direct route が既定です。
 
-- 実験 topic、run / rerun protocol、registry、run artifact は
-  `$experiment-lifecycle` が所有します。
-- solver、optimizer、residual、convergence、tolerance、数値 benchmark の数学契約と
-  correctness evidence は `$computational-optimization` が所有します。
-- Docker、driver、dependency、CI runner、system package 更新は
-  `$environment-maintenance` が所有します。
-- Python / C++ の実装差分 review は `$python-review` / `$cpp-review` が所有します。
-- この skill は、GPU 実行 route、environment handoff、blocker evidence、artifact
-  closeout を所有します。
-
-## Runtime Request Packet
-
-GPU / CPU 数値実行、benchmark、formal experiment を予定する前に、タスクに結び付いた
-実行前記録を作るか引用します。
-
-- `request_clause`: 依頼のどの部分に対応する実行か。
-- `command_type`: GPU validation、GPU benchmark、formal experiment、smoke run、
-  backend diagnosis など。
-- `lightweight_evidence`: 先に確認した static check、config、registry、design doc。
-- `runtime_budget`: 見込み時間、timeout、stop condition。
-- `resource_target`: GPU 数、GPU memory、worker 数、dtype、backend、allocator。
-- `artifact_path`: run manifest、logs、stdout/stderr、environment、summary の保存先。
-- `owner`: 実行責務を持つ skill / workflow / agent。
-
-この packet がない GPU 実行は、結果を validation evidence として扱いません。
-
-## Python Execution Contract
-
-Python の GPU 実行は、正式な validation / smoke / formal / server-side run では
-`tools/experiments/run_managed_experiment.py` を通します。topic が実装する
-public entrypoint は canonical `experiments/<topic>/run.py::main()` だけです。
-managed adapter は exact registry closure と fd-bound source snapshot からその
-entrypoint と argv を 1 つの immutable case に束縛します。live source callable、
-topic-owned scheduler、injected task/cases/context builder、direct subprocess、または
-別 lifecycle wrapper は admission route ではありません。
-
-GPU admission は独立 owner の collaboration です。
-
-- `NvidiaInventoryProbe`: exact NVIDIA list/XML/driver と physical/MIG topology。
-- `GpuProcessOccupancyProbe`: physical/MIG parent-child occupancy exclusion。
-- `GpuReservationTransaction`: candidate-local flock、fd readback、busy continuation、
-  tamper/infrastructure fail-closed、total rollback。
-- `SourceFreezeOwner`: exact registry を含む source membership と fd-bound snapshot。
-- `RuntimeIdentityReader`: namespace、UID/GID/groups、umask、Compose/bootstrap/finalize
-  receipt join。
-- `build_admitted_environment`: frozen full UUID set から run 前 environment を作成。
-- `RunGpuAdmissionContext`: composition order と reverse release だけ。
-
-`experiment_runner` 側へ委譲するものは次です。
-
-- fresh child process lifecycle
-- timeout、terminate、kill、cleanup
-- parent / child diagnostics
-- scheduler-owned `ExecutionResult` completion
-- generic worker slot と host memory lifecycle
-- `TaskContext["environment_variables"]` の child 反映
-- worker start / finish / timeout / signal の観測
-
-fixed ff97 route は 1 つの `StandardFullResourceScheduler`、1 つの
-`StandardRunner`、1 回の `run(worker)` だけです。`run(worker)` は `None` を返し、
-completion は scheduler から読みます。実験 script、Context、Adapter、Store、Owner
-は launch lifecycle、completion、cleanup policy を吸収しません。
-
-## Environment Contract
-
-GPU device と allocator の環境変数は、admission 済み frozen plan から
-`build_admitted_environment` が runner construction 前に作り、
-`TaskContext["environment_variables"]` と child initializer で反映します。task body や
-case loop の中で `CUDA_VISIBLE_DEVICES`、`NVIDIA_VISIBLE_DEVICES`、`XLA_*` を直接組み立てません。
-GPU ID は full physical UUID または full MIG UUID だけです。CPU fallback、integer
-index、UUID prefix、direct launch、compatibility route はありません。
-
-managed container identity は次の exact artifact からだけ読みます。
+- pytest、benchmark、diagnostic、smoke、one-off script を一つの argv として実行する。
+- 成否が child exit、stdout、stderr、GPU admission/lifecycle evidence で定義できる。
+- topic registry、cases、source snapshot、provider artifact schema、completion coverage を
+  必要としない。
 
 ```text
-/var/lib/agent-canon/runtime/shared-runtime-provision.json
-/var/lib/agent-canon/runtime/shared-runtime-readback.json
+python3 tools/experiments/run_gpu_command.py \
+  --gpu-count 1 \
+  --min-free-memory <bytes> \
+  -- <argv...>
 ```
 
-JAX / XLA GPU 実行では、JAX import より前に次を反映します。
+次の contract が一つでも必要な場合だけ managed route を使います。
+
+- experiment topic/variant/run identity と registry command
+- case expansion と resource estimate/capacity wire schema
+- source/config snapshot と provider-owned artifact manifest
+- provider lifecycle result、worker coverage、completion coverage
 
 ```text
+python3 -m tools.experiments.run_managed_experiment \
+  --topic <topic> --variant <variant> -- <inner argv...>
+```
+
+managed route だけが `experiment-runner-admitted` の存在、contract identity、request/result
+schema を検証します。direct route は provider、registry、topic、cases、snapshot、artifact、
+completion coverage を参照しません。
+
+## Direct admission contract
+
+```text
+strict nvidia-smi -L
+  -> executable physical/MIG leaves
+  -> S0 BUSY/UNKNOWN/FREE + memory
+  -> full UUID lock
+  -> distinct S_lock
+  -> race/memory validation
+  -> immutable plan
+  -> exact environment
+  -> shell=False child
+  -> descendant quiescence
+  -> one-attempt lock release
+```
+
+XML topology/process hierarchy が UUID binding authority です。query-compute-apps は XML
+PID の一意 join 後の supplement だけです。`FREE` だけが eligible で、UNKNOWN、MIG parent
+closure、topology drift、visibility drift、memory shortage、lock contention は fail-closed です。
+integer index と UUID prefix は使用しません。
+
+plan は argv/cwd、candidate inventory、MIG joins、initial/post-lock event、unit states、selected
+memory、全 reservation ID、全 lock device/inode、admission fingerprint を environment 生成前に
+固定して書き出します。
+
+## Environment
+
+selected full physical/MIG UUID の visibility は plan freeze 後にだけ生成します。
+
+```text
+CUDA_VISIBLE_DEVICES=<selected full UUID list>
+NVIDIA_VISIBLE_DEVICES=<same list>
+JAX_PLATFORMS=cuda
 XLA_PYTHON_CLIENT_PREALLOCATE=false
-```
-
-project-local helper が allocator knob を持つ場合は、同じ env dict に次も載せます。
-
-```text
 XLA_PYTHON_CLIENT_ALLOCATOR=platform
 XLA_PYTHON_CLIENT_USE_CUDA_HOST_ALLOCATOR=false
 ```
 
-closeout では `preallocation_disabled=yes` を残します。CUDA backend 初期化失敗は
-preallocation 設定の成否と混同せず、backend blocker として分けます。
+JAX は admitted child 内で初めて import します。`JAX_PLATFORMS=cuda` により GPU backend が
+ない場合の CPU fallback を成功扱いしません。継承した secret 値は plaintext evidence に
+書かず、fingerprint では値を hash して exact environment に束縛します。
 
-## Blocker Evidence
+## Child lifecycle
 
-GPU が使えない場合は、CPU 計算へ切り替えず次を記録します。
+direct adapter は argv array、`shell=False`、新しい session で一度だけ child を起動します。
+Linux subreaper と PID/starttime/ancestry/session/process-group/adoption evidence で
+AgentCanon-started descendants の transitive closure を追跡します。既存 runner child は対象外
+です。signal/kill は送りません。
 
-- `gpu_validation_blocker=<reason>`
-- `nvidia-smi` または runner / scheduler が返した GPU allocation evidence
-- backend import / initialization の stderr、traceback、diagnostic record
-- どの claim、test、benchmark、experiment を未検証として残すか
+`Popen` 後の内部例外も descendant quiescence が成立するまで保持します。root と全 descendant
+が停止する前に lock を release しません。release は一回だけ試行し、ambiguous close を再試行
+で上書きしません。
 
-CPU-only smoke は GPU validation の代替 evidence ではありません。GPU backend claim、
-JAX / XLA / IREE lowering claim、solver / optimizer correctness on GPU、GPU benchmark
-claim は、GPU 実行 evidence か blocker evidence のどちらかで閉じます。
+## Managed route
 
-## Closeout Evidence
+managed route は従来どおり shell なしで次を一度だけ起動します。
 
-GPU execution closeout には次を含めます。
+```text
+experiment-runner-admitted --request <path> --result <path>
+request schema: agentcanon-managed-run/v1
+result schema:  agentcanon-managed-run-result/v1
+```
 
-- `gpu_execution_route=experiment_runner`
-- `preallocation_disabled=yes`
-- `gpu_validation_blocker=none` または `gpu_validation_blocker=<reason>`
-- command / Make target / managed wrapper path
-- run manifest、environment、source snapshot、artifact manifest、logs path
-- GPU id / GPU slot / worker slot / backend / dtype / allocator metadata
-- stdout、stderr、runner diagnostics、`ExecutionResult` summary
-- correctness evidence と performance evidence の分離
+request/result fingerprint、worker/process group、quiescence、completion coverage、cleanup、
+terminal evidence が成立するまで reservation を保持します。provider repository/contract
+identity は `agent-canon-environment.toml` と一致させます。direct route の導入は managed wire
+schema、provider identity、既存 completion coverage を変更しません。
+
+## Validation と blocker
+
+provider-independent owner tests:
+
+```text
+python3 -m pytest tests/tools/test_run_gpu_command.py -q
+```
+
+実機 JAX smoke:
+
+```text
+python3 tools/experiments/run_gpu_command.py \
+  --gpu-count 1 --min-free-memory 2147483648 -- \
+  python3 -c 'import jax; assert jax.default_backend() == "gpu"; print(jax.devices())'
+```
+
+GPU-heavy test/benchmark も同じ direct adapter の `--` 後へ argv として渡します。managed
+regression は既存 `tests/tools/test_run_managed_experiment.py` で確認します。
+
+GPU が利用不可なら `gpu_validation_blocker=<reason>`、未実行 claim、`nvidia-smi`/stderr/
+diagnostic を closeout に記録します。fake test、static pass、CPU-only smoke は実機 GPU pass
+ではありません。
+
+## Closeout
+
+closeout は選択した route、candidate/selected full UUID、plan/admission/environment fingerprint、
+start/end、raw exit、stdout/stderr hash、descendant quiescence、release evidence、targeted tests、
+managed regression、`gpu_validation_blocker` を参照します。

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -40,6 +41,13 @@ from generate_agent_improvement_guide import (  # noqa: E402
     counter_lines,
     known_skill_ids,
 )
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
 from report_artifact_checks import (  # noqa: E402
     actual_wave_event_fields,
     markdown_table_dict_rows,
@@ -47,6 +55,22 @@ from report_artifact_checks import (  # noqa: E402
 from runtime_log_paths import eval_result_search_dirs  # noqa: E402
 
 STATUS_RE = re.compile(r"\b[A-Z_]*STATUS=(pass|fail|skip)\b")
+
+
+def _parent_write(path: Path, data: bytes, purpose: str) -> None:
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            f"{purpose}: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
+    ParentRootSideEffectBoundary().write_parent_owned_file(
+        attestation, path, data, purpose
+    )
 TOKEN_COMPARISON_RE = re.compile(
     r"baseline_total=(?P<baseline>\d+)\s+"
     r"candidate_total=(?P<candidate>\d+)\s+"
@@ -75,6 +99,17 @@ TOKEN_SUMMARY_MARKDOWN_RE = re.compile(
     r"TOKEN_USAGE_MOVING_AVERAGE_WINDOW=(?P<window>\d+).*?"
     r"TOKEN_USAGE_LATEST_MOVING_AVERAGE_TOTAL=(?P<moving>[0-9.]+)",
     re.DOTALL,
+)
+CANONICAL_BEHAVIOR_EVENT_SCHEMA = "agent-canon.behavior-event.v1"
+WORKFLOW_ATTRIBUTION_KINDS = frozenset({"owner", "context", "missing"})
+TOKEN_OBJECTIVE_SELECTED_RE = re.compile(
+    r"(?:token_efficiency_protocol\s*=\s*active|"
+    r"token_reduction(?:_objective)?\s*=\s*(?:selected|active|true)|"
+    r"objective\s*=\s*token[-_]reduction)",
+    re.IGNORECASE,
+)
+TOKEN_OBJECTIVE_NOT_SELECTED_RE = re.compile(
+    r"token_efficiency_not_required\b", re.IGNORECASE
 )
 ISO_TIMESTAMP_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z")
 RUN_ID_TIMESTAMP_RE = re.compile(r"\d{8}T\d{6}(?:\d{6})?Z")
@@ -174,6 +209,17 @@ class HookWorkflowBreakdown:
     entries_without_workflow: int
     context_attributed_entries: int
 
+    @property
+    def workflow_attribution(self) -> Counter[str]:
+        """Return owner/context/missing counts without duplicating state."""
+        return Counter(
+            {
+                "owner": max(self.entries_with_workflow - self.context_attributed_entries, 0),
+                "context": self.context_attributed_entries,
+                "missing": self.entries_without_workflow,
+            }
+        )
+
 
 @dataclass(frozen=True)
 class TimedIntMetric:
@@ -211,6 +257,8 @@ class TokenUsageBreakdown:
     average_tokens_per_event: float
     timed_candidate_token_counts: tuple[TimedIntMetric, ...]
     timed_token_ratios: tuple[TimedFloatMetric, ...]
+    objective_selected: bool = False
+    objective_not_selected: bool = False
 
 
 @dataclass(frozen=True)
@@ -470,7 +518,11 @@ class SkillEvalBreakdownReader:
 class HookWorkflowBreakdownReader:
     """Reads workflow attribution from accumulated hook JSONL entries."""
 
-    WORKFLOW_FIELDS = ("candidate_workflows", *SELECTED_WORKFLOW_FIELDS)
+    WORKFLOW_FIELDS = (
+        *SELECTED_WORKFLOW_FIELDS,
+        "workflow_owner_workflows",
+        "workflow_context_workflows",
+    )
 
     @classmethod
     def read(
@@ -496,17 +548,16 @@ class HookWorkflowBreakdownReader:
             recent_cutoff_epoch,
         ):
             namespace = str(entry.get("hook_log_namespace") or "missing_namespace")
-            names = cls.workflow_names(entry)
-            if names:
-                latest_by_namespace[namespace] = names
-                attributed_names = names
-            else:
-                attributed_names = latest_by_namespace.get(namespace, ())
-                context_attributed_entries += int(bool(attributed_names))
+            attribution_kind, attributed_names, inherited_context = cls.attribute_entry(
+                entry, namespace, latest_by_namespace
+            )
+            context_attributed_entries += int(inherited_context)
             if not attributed_names:
                 entries_without_workflow += 1
                 missing_by_file[relative_path_label(hook_file, root)] += 1
-                missing_events[str(entry.get("event") or "missing_event")] += 1
+                missing_events[
+                    str(entry.get("hook_event_name") or entry.get("event") or "missing_event")
+                ] += 1
                 missing_namespaces[namespace] += 1
                 missing_statuses[str(entry.get("status") or "missing_status")] += 1
                 tool_name = str(
@@ -516,7 +567,7 @@ class HookWorkflowBreakdownReader:
                     missing_tools[tool_name] += 1
                 continue
             entries_with_workflow += 1
-            event = str(entry.get("event") or "missing_event")
+            event = str(entry.get("hook_event_name") or entry.get("event") or "missing_event")
             for name in attributed_names:
                 workflows[name] += 1
                 workflow_events[f"{name}@{event}"] += 1
@@ -587,6 +638,26 @@ class HookWorkflowBreakdownReader:
             names.extend(normalized_text_values(entry.get(workflow_field)))
         return tuple(dict.fromkeys(names))
 
+    @classmethod
+    def attribute_entry(
+        cls,
+        entry: dict[str, object],
+        namespace: str,
+        latest_by_namespace: dict[str, tuple[str, ...]],
+    ) -> tuple[str, tuple[str, ...], bool]:
+        """Return canonical or legacy attribution without promoting candidates."""
+        if entry.get("schema") == CANONICAL_BEHAVIOR_EVENT_SCHEMA:
+            kind = str(entry.get("workflow_attribution_kind") or "")
+            kind = kind if kind in WORKFLOW_ATTRIBUTION_KINDS else "missing"
+            field = "workflow_owner_workflows" if kind == "owner" else "workflow_context_workflows"
+            return kind, normalized_text_values(entry.get(field)), kind == "context"
+        names = cls.workflow_names(entry)
+        if names:
+            latest_by_namespace[namespace] = names
+            return "owner", names, False
+        inherited = latest_by_namespace.get(namespace, ())
+        return ("context", inherited, True) if inherited else ("missing", (), False)
+
 
 class TokenUsageBreakdownReader:
     """Reads token consumption evidence from accumulated run reports."""
@@ -613,29 +684,41 @@ class TokenUsageBreakdownReader:
         total_tokens = 0
         latest_moving_average_total = 0.0
         average_tokens_per_event = 0.0
+        objective_selected = False
+        objective_not_selected = False
         for path in cls.candidate_paths(root):
             text = path.read_text(encoding="utf-8")
             epoch = cls.evidence_epoch(path, text)
             if not evidence_inside_recent_window(path, epoch, recent_cutoff_epoch):
                 continue
-            for baseline, candidate, ratio in cls.comparisons(text):
+            comparisons = cls.comparisons(text)
+            summaries = cls.summaries(text)
+            selected, not_selected = cls.objective_flags(text)
+            objective_selected = objective_selected or selected
+            objective_not_selected = objective_not_selected or not_selected
+            if comparisons:
                 files.add(path)
-                baseline_total += baseline
+                base, candidate, base_counts, candidate_counts_for_file, ratios_for_file = cls.comparison_totals(comparisons)
+                baseline_total += base
                 candidate_total += candidate
-                baseline_counts.append(baseline)
-                candidate_counts.append(candidate)
-                if epoch > 0:
-                    timed_candidate_counts.append(TimedIntMetric(epoch, candidate))
-                    timed_ratios.append(TimedFloatMetric(epoch, ratio))
-                ratios.append(ratio)
-            for sessions, events, total, moving, average in cls.summaries(text):
+                baseline_counts.extend(base_counts)
+                candidate_counts.extend(candidate_counts_for_file)
+                ratios.extend(ratios_for_file)
+                timed_candidate_counts.extend(
+                    TimedIntMetric(epoch, item[1]) for item in comparisons if epoch > 0
+                )
+                timed_ratios.extend(
+                    TimedFloatMetric(epoch, item[2]) for item in comparisons if epoch > 0
+                )
+            if summaries:
                 summary_files.add(path)
-                summary_count += 1
-                session_count += sessions
-                token_event_count += events
-                total_tokens += total
-                latest_moving_average_total = moving
-                average_tokens_per_event = average
+                session_values, event_values, total_values = zip(*summaries)
+                summary_count += len(summaries)
+                session_count += sum(session_values)
+                token_event_count += sum(event_values)
+                total_tokens += sum(total_values)
+                latest_moving_average_total = summaries[-1][3]
+                average_tokens_per_event = summaries[-1][4]
         return TokenUsageBreakdown(
             comparison_files=tuple(sorted(files)),
             comparison_count=len(ratios),
@@ -657,6 +740,33 @@ class TokenUsageBreakdownReader:
             timed_token_ratios=tuple(
                 sorted(timed_ratios, key=lambda observation: observation.epoch)
             ),
+            objective_selected=objective_selected,
+            objective_not_selected=objective_not_selected or not objective_selected,
+        )
+
+    @staticmethod
+    def objective_flags(
+        text: str,
+    ) -> tuple[bool, bool]:
+        """Return selected and explicit opt-out token-objective flags."""
+        explicit_selected = TOKEN_OBJECTIVE_SELECTED_RE.search(text) is not None
+        explicit_not_selected = TOKEN_OBJECTIVE_NOT_SELECTED_RE.search(text) is not None
+        # Raw comparison rows are still parsed below, but they do not select a
+        # reduction objective by themselves.  Selection must be explicit.
+        selected = explicit_selected
+        return selected, explicit_not_selected and not explicit_selected
+
+    @staticmethod
+    def comparison_totals(
+        comparisons: Sequence[tuple[int, int, float]],
+    ) -> tuple[int, int, tuple[int, ...], tuple[int, ...], tuple[float, ...]]:
+        """Return stable aggregate totals for one comparison file."""
+        return (
+            sum(item[0] for item in comparisons),
+            sum(item[1] for item in comparisons),
+            tuple(item[0] for item in comparisons),
+            tuple(item[1] for item in comparisons),
+            tuple(item[2] for item in comparisons),
         )
 
     @staticmethod
@@ -1314,19 +1424,18 @@ class AgentRuntimeDashboard:
             reader.read_family("codex-agent-role"),
         )
         skill_eval_breakdown = SkillEvalBreakdownReader.read(result_families[0])
-        if self.recent_cutoff_epoch is not None:
-            evidence = EvidenceSummary(
-                open_issues=evidence.open_issues,
-                closed_issues=evidence.closed_issues,
-                memory_entries=evidence.memory_entries,
-                skill_eval_reports=result_families[0].reports,
-                failed_skill_eval_reports=result_families[0].failed_reports,
-                hook_counts=read_hook_evidence_counts(
-                    self.root,
-                    hook_files,
-                    self.recent_cutoff_epoch,
-                ),
-            )
+        evidence = EvidenceSummary(
+            open_issues=evidence.open_issues,
+            closed_issues=evidence.closed_issues,
+            memory_entries=evidence.memory_entries,
+            skill_eval_reports=result_families[0].reports,
+            failed_skill_eval_reports=result_families[0].failed_reports,
+            hook_counts=read_hook_evidence_counts(
+                self.root,
+                hook_files,
+                self.recent_cutoff_epoch,
+            ),
+        )
         return RuntimeDashboardSummary(
             root=self.root,
             recent_days=self.recent_days,
@@ -1628,7 +1737,7 @@ def compact_hook_failure_drilldown_lines(summary: RuntimeDashboardSummary) -> li
                 and str(entry.get("failure_fingerprint") or "") == fingerprint
             ):
                 namespaces[str(entry.get("hook_log_namespace") or "missing_namespace")] += 1
-                events[str(entry.get("event") or "missing_event")] += 1
+                events[str(entry.get("hook_event_name") or entry.get("event") or "missing_event")] += 1
                 tool = str(entry.get("tool_name") or entry.get("tool_command_verb") or "")
                 if tool:
                     tools[tool] += 1
@@ -1661,6 +1770,7 @@ def compact_workflow_attribution_drilldown_lines(summary: RuntimeDashboardSummar
         f"| `entries_with_workflow` | `{breakdown.entries_with_workflow}` |",
         f"| `entries_missing_workflow` | `{breakdown.entries_without_workflow}` |",
         f"| `entries_context_attributed` | `{breakdown.context_attributed_entries}` |",
+        f"| `workflow_attribution` | `{compact_counter_summary(breakdown.workflow_attribution)}` |",
         f"| `missing_events` | `{compact_counter_summary(breakdown.missing_workflow_events)}` |",
         f"| `missing_namespaces` | `{compact_counter_summary(breakdown.missing_workflow_namespaces)}` |",
         f"| `missing_statuses` | `{compact_counter_summary(breakdown.missing_workflow_statuses)}` |",
@@ -1958,7 +2068,7 @@ def hook_schema_breakdown(summary: RuntimeDashboardSummary) -> dict[str, object]
             summary.recent_cutoff_epoch,
         ):
             status = str(entry.get("status") or "unknown")
-            event = str(entry.get("event") or "missing_event")
+            event = str(entry.get("hook_event_name") or entry.get("event") or "missing_event")
             status_by_hook_family[family][status] += 1
             if event in ("UnknownHookEvent", "missing_event"):
                 unknown_events_by_file[file_label] += 1
@@ -2199,7 +2309,7 @@ class ReferenceCaptureAccumulator:
         self.registered_url_observations += integer_field(entry, "registered_count")
         self.missing_url_observations += integer_field(entry, "missing_count")
         self.blocked_entries += int(str(entry.get("decision") or "") == "block")
-        self.events[str(entry.get("event") or "missing_event")] += 1
+        self.events[str(entry.get("hook_event_name") or entry.get("event") or "missing_event")] += 1
         for field_name in normalized_text_values(entry.get("source_fields")):
             self.source_fields[field_name] += 1
         for url in normalized_text_values(entry.get("urls")):
@@ -2408,8 +2518,17 @@ def read_hook_evidence_counts(
     counter = HookEvidenceCounter(known_skill_ids(root), root=root)
     for path in hook_files:
         for entry in HookWorkflowBreakdownReader.iter_entries(path, recent_cutoff_epoch):
-            counter.add_entry(path, entry)
+            counter.add_entry(path, canonical_dashboard_entry(entry))
     return counter.counts()
+
+
+def canonical_dashboard_entry(entry: dict[str, object]) -> dict[str, object]:
+    """Project canonical behavior transport metadata into legacy counter input."""
+    if entry.get("schema") != CANONICAL_BEHAVIOR_EVENT_SCHEMA or "event" in entry:
+        return entry
+    projected = dict(entry)
+    projected["event"] = entry.get("hook_event_name", "missing_event")
+    return projected
 
 
 def evidence_location_lines(root: Path) -> list[str]:
@@ -2424,7 +2543,7 @@ def evidence_location_lines(root: Path) -> list[str]:
         "- workflow_selection_eval_reports: `.agent-canon/log-archive/eval-results/workflow-selection/<eval-run-id>-<status>.md`",
         "- report_quality_eval_reports: `.agent-canon/log-archive/eval-results/report-quality/<eval-run-id>-<status>.md`",
         "- durable_issues: `issues/open/AC-*.md` and `issues/closed/AC-*.md`",
-        "- shared_memory: `memory/USER_PREFERENCES.md` and `memory/AGENT_PHILOSOPHY.md`",
+        "- shared_memory: `memory/README.md` and `memory/records/*.md` (on-demand)",
         "- token_comparison_reports: `reports/agents/**/workflow_monitoring.md` or `reports/agents/**/*token*.md`",
         "- reference_capture_hook: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/reference_capture_guard.jsonl`",
         "- materialized_references: `references/external/*.md` in the parent repository that consulted the source",
@@ -2510,6 +2629,7 @@ def hook_workflow_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"- hook_entries_with_workflow_attribution: `{breakdown.entries_with_workflow}`",
         f"- hook_entries_missing_workflow_attribution: `{breakdown.entries_without_workflow}`",
         f"- hook_entries_context_attributed: `{breakdown.context_attributed_entries}`",
+        f"- workflow_attribution: `{compact_counter_summary(breakdown.workflow_attribution)}`",
         "",
         "| workflow | hook entries |",
         "| --- | ---: |",
@@ -2532,14 +2652,26 @@ def hook_workflow_lines(summary: RuntimeDashboardSummary) -> list[str]:
 def token_usage_lines(summary: RuntimeDashboardSummary) -> list[str]:
     """Return token consumption evidence lines."""
     breakdown = summary.token_usage_breakdown
-    if breakdown.comparison_count == 0 and breakdown.summary_count == 0:
+    evidence_count = breakdown.comparison_count + breakdown.summary_count
+    if not breakdown.objective_selected:
+        evidence_state = "present" if evidence_count else "missing"
+        return [
+            "- token_comparison_status: `not-selected`",
+            "- token_objective_status: `not-selected`",
+            f"- token_evidence_status: `{evidence_state}`",
+            "- token_comparison_reason: `token-reduction objective was not selected; no reduction claim is made`",
+            "- expected_sources: `reports/agents/**/workflow_monitoring.md`, `reports/agents/**/*token*.md`, or Codex session token_count comparisons",
+        ]
+    if evidence_count == 0:
         return [
             "- token_comparison_status: `missing`",
-            "- token_comparison_reason: `no token footprint comparison evidence found`",
+            "- token_objective_status: `selected`",
+            "- token_comparison_reason: `token-reduction objective selected but no token footprint comparison evidence found`",
             "- expected_sources: `reports/agents/**/workflow_monitoring.md`, `reports/agents/**/*token*.md`, or Codex session token_count comparisons",
         ]
     return [
         "- token_comparison_status: `present`",
+        "- token_objective_status: `selected`",
         f"- token_comparison_count: `{breakdown.comparison_count}`",
         f"- token_summary_count: `{breakdown.summary_count}`",
         f"- baseline_total_tokens: `{breakdown.baseline_total_tokens}`",
@@ -2785,7 +2917,8 @@ def dashboard_has_evidence_gaps(summary: RuntimeDashboardSummary) -> bool:
         or summary.wave_execution_breakdown.blocked_event_count > 0
         or summary.wave_execution_breakdown.actual_wave_event_count == 0
         or (
-            summary.token_usage_breakdown.comparison_count == 0
+            summary.token_usage_breakdown.objective_selected
+            and summary.token_usage_breakdown.comparison_count == 0
             and summary.token_usage_breakdown.summary_count == 0
         )
         or summary.prompt_tool_breakdown.prompt_entries == 0
@@ -2985,7 +3118,8 @@ def evidence_problem_components(summary: RuntimeDashboardSummary) -> tuple[Probl
         )
         )
     if (
-        summary.token_usage_breakdown.comparison_count == 0
+        summary.token_usage_breakdown.objective_selected
+        and summary.token_usage_breakdown.comparison_count == 0
         and summary.token_usage_breakdown.summary_count == 0
     ):
         components.append(
@@ -3291,6 +3425,8 @@ def prompt_tool_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboard
 
 def token_usage_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
     """Return the next action for missing token evidence."""
+    if not summary.token_usage_breakdown.objective_selected:
+        return ()
     if (
         summary.token_usage_breakdown.comparison_count > 0
         or summary.token_usage_breakdown.summary_count > 0
@@ -3406,6 +3542,7 @@ def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_CONTEXT_ATTRIBUTED={summary.hook_workflow_breakdown.context_attributed_entries}",
         f"AGENT_RUNTIME_DASHBOARD_TOKEN_COMPARISONS={summary.token_usage_breakdown.comparison_count}",
         f"AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARIES={summary.token_usage_breakdown.summary_count}",
+        f"AGENT_RUNTIME_DASHBOARD_TOKEN_OBJECTIVE_SELECTED={str(summary.token_usage_breakdown.objective_selected).lower()}",
         f"AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARY_SESSIONS={summary.token_usage_breakdown.session_count}",
         f"AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARY_EVENTS={summary.token_usage_breakdown.token_event_count}",
         f"AGENT_RUNTIME_DASHBOARD_WAVE_REPORTS={len(summary.wave_execution_breakdown.report_files)}",
@@ -3660,7 +3797,7 @@ def metric_candidate_skill_values(entry: dict[str, object]) -> tuple[str, ...]:
 
 def legacy_unattributed_candidate_entry(entry: dict[str, object]) -> bool:
     """Return whether legacy candidate fields lack enough context for miss accounting."""
-    event = str(entry.get("event") or "")
+    event = str(entry.get("hook_event_name") or entry.get("event") or "")
     if event not in ("", "UnknownHookEvent"):
         return False
     return not (
@@ -4107,14 +4244,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     dashboard = AgentRuntimeDashboard(args.root, recent_days=args.recent_days)
     summary = dashboard.collect()
     output = Path(args.out)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(render_dashboard(summary), encoding="utf-8")
+    _parent_write(output, render_dashboard(summary).encode("utf-8"), "runtime-dashboard")
     if args.compact_out is not None:
-        args.compact_out.parent.mkdir(parents=True, exist_ok=True)
-        args.compact_out.write_text(render_compact_dashboard(summary), encoding="utf-8")
+        _parent_write(
+            args.compact_out,
+            render_compact_dashboard(summary).encode("utf-8"),
+            "runtime-dashboard-compact",
+        )
     if args.api_out is not None:
-        args.api_out.parent.mkdir(parents=True, exist_ok=True)
-        args.api_out.write_text(render_dashboard_api(summary), encoding="utf-8")
+        _parent_write(
+            args.api_out,
+            render_dashboard_api(summary).encode("utf-8"),
+            "runtime-dashboard-api",
+        )
     print(f"AGENT_RUNTIME_DASHBOARD={output}")
     print("AGENT_RUNTIME_DASHBOARD_STATUS=pass")
     print(f"AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT={summary.root.as_posix()}")

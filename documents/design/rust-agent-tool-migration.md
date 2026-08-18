@@ -58,6 +58,15 @@ with `/usr/local/bin/agent-canon` as a compatibility symlink. Older containers
 may still have `/opt/agent-canon/bin/agent-canon`; new post-create runs use
 `~/.tools` for compiled agent-tool binaries.
 
+The `cargo-source-build` record selects `source_identity = "active-source"` and
+always invokes `cargo build --release --locked`. Cargo owns incremental/change
+detection for the mounted source tree, and the build input remains independent
+of repository metadata. The published `.build-state` records only
+`agent_canon_source_root`; active-source installation publishes no commit
+provenance or source-identity receipt.
+Records that select an explicit `commit` retain their existing Git commit
+verification and provenance checks.
+
 Repository search uses the deterministic Python `search.py` / `search_index.py`
 surfaces and the Rust `semantic-index` command. No model server, installer,
 model cache, or compatibility dispatch is part of the compiled-tool cache.
@@ -75,10 +84,10 @@ In a template or derived repository, the normal adoption path is:
 1. Update the `vendor/agent-canon` submodule pin to an AgentCanon commit that
    contains this policy and the Rust CLI.
 1. Repair shared root views with request-evidence-authorized
-   `bash tools/sync_agent_canon.sh link-root` if
+   the source-root resolver `exec tools/sync_agent_canon.sh link-root` if
    the root view drifts.
 1. Run request-evidence-authorized `make agent-canon-ensure-latest` or
-   request-evidence-authorized `bash tools/update_agent_canon.sh apply`; this calls
+   request-evidence-authorized source-root resolver `exec tools/update_agent_canon.sh apply`; this calls
    `tools/rebuild_agent_tools.sh` after the AgentCanon pin is updated. If the
    host has no Rust toolchain, rerun the same target inside the DevContainer or
    recreate the DevContainer so `.devcontainer/post-create.sh` runs again.
@@ -191,7 +200,6 @@ Recommended first migrations:
 Keep these Python-first until behavior stabilizes:
 
 - bootstrap_agent_run.py
-- task_start.py
 - task_close.py
 - evaluate_agent_run.py
 - agent_canon_update_todos.py

@@ -27,6 +27,23 @@ from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import cast
 
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+
 from artifact_identity import canonical_body_sha256, canonical_json_bytes, git_blob_oid
 from mid_task_user_input_policy import (
     MID_TASK_CLASSIFICATION_ACTIONS,
@@ -577,26 +594,30 @@ def _validation_stream(
 
 def _write_validation_leaf(path: Path, data: bytes) -> None:
     """Create one deterministic leaf once, or accept exact replay bytes."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        descriptor = os.open(
-            path,
-            os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
-            0o600,
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="validation-artifact")
         )
-    except FileExistsError:
-        if _validation_stable_bytes(path) != data:
-            raise ValidationMaterializerError("validation_artifact:byte_mismatch")
+        boundary = ParentRootSideEffectBoundary()
+        receipt = boundary.resolve_parent_owned_path(attestation, path, "validation-artifact", create=False)
+        try:
+            existing = boundary.read_parent_owned_file(receipt)
+        except ParentRootSideEffectError as exc:
+            if exc.reject is not ParentRootReject.ROOT_MISSING:
+                raise
+            existing = None
+        if existing is not None:
+            if existing != data:
+                raise ValidationMaterializerError("validation_artifact:byte_mismatch")
+            return
+        boundary.write_parent_owned_file(attestation, path, data, "validation-artifact")
         return
-    try:
-        offset = 0
-        while offset < len(data):
-            offset += os.write(descriptor, data[offset:])
-        os.fsync(descriptor)
-    except OSError as exc:
-        raise ValidationMaterializerError("validation_artifact:write_failed") from exc
-    finally:
-        os.close(descriptor)
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        "validation-artifact: explicit parent root is required",
+    )
 
 
 def _validation_event_hash(event: Mapping[str, object]) -> str:
@@ -2463,13 +2484,12 @@ def write_completion_coverage_artifact(
     }
     serialized = json.dumps(artifact, indent=2, sort_keys=True) + "\n"
     artifact_path = report_dir / "completion_coverage.json"
-    report_dir.mkdir(parents=True, exist_ok=True)
     if artifact_path.exists():
         existing = artifact_path.read_text(encoding="utf-8")
         if existing != serialized:
             raise ValueError(f"completion coverage artifact conflict: {artifact_path}")
         return artifact_path
-    artifact_path.write_text(serialized, encoding="utf-8")
+    _write_validation_leaf(artifact_path, serialized.encode("utf-8"))
     return artifact_path
 
 
@@ -2945,21 +2965,15 @@ def join_artifact_blockers(blockers: Sequence[str]) -> str:
 def report_artifact_placement_blockers(workspace: Path, report_dir: Path) -> list[str]:
     """Return generated report artifacts outside the active run bundle.
 
-    Tracked durable reports are allowed. Tracked generated report roots and tracked
-    agent run bundles outside the current run are blockers. Untracked generated
-    report files are allowed only under the current run directory because runtime
-    archive tooling collects one active run bundle at closeout. Ignored non-
-    generated report paths are local cache and do not block closeout.
+    Tracked report history is baseline repository state and is not a placement
+    error.  Untracked generated report files are allowed only under the current
+    run directory because runtime archive tooling collects one active run bundle
+    at closeout. Ignored non-generated report paths are local cache and do not
+    block closeout.
     """
     if not report_dir.resolve().is_relative_to(workspace.resolve()):
         return []
     report_paths = {}
-    for path in _git_report_paths(workspace, ()):
-        normalized = _normalized_git_path(path)
-        if normalized.startswith(
-            "reports/agents/"
-        ) or is_mechanically_regenerated_report_path(path):
-            report_paths[path] = "tracked"
     for path in _git_report_paths(
         workspace,
         ("--others", "--exclude-standard"),

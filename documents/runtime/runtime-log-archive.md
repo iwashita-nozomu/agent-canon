@@ -77,6 +77,15 @@ and porcelain-v1 status lines. `publication_intent` contains the deterministic
 attempt ID, exact target path, and only `prepared_state=prepared`; it never
 predicts an outcome.
 
+The native rollout source is selected only through the explicit
+`AGENT_CANON_CODEX_SESSION_ROOT` runtime-owner input. The value must resolve to
+one absolute, readable session directory owned by the active container or
+runtime profile; an absent, relative, or unavailable root fails closed as
+`context_source_absent`. The producer never derives a source from host `HOME`,
+`CODEX_HOME`, or `~/.codex/sessions`. The managed devcontainer and nested
+Codex runner provide the container-local value before collection, preserving
+normal log collection without making host files a required input.
+
 Publication is no-replace and source-bound. Post-target evidence is first
 appended as a canonical
 `agent_canon.runtime_event.publication_outcome_observation.v1` file beneath
@@ -124,21 +133,30 @@ python3 tools/agent_tools/runtime_log_archive_git.py materialize-runtime-event \
   --base-ref <base-ref>
 ```
 
-When an active runtime pointer exists, the Rust graph command consumes the
-prepared artifact plus the latest confirmed committed receipt during one
-`graph build`. Its v2 persisted runtime-evidence snapshot retains the exact
-artifact/receipt bytes, their hashes, the live source identity fingerprint,
-and the validated observation. Without an active runtime pointer, the same
-builder publishes the source facts and completeness diagnostics without a
-runtime producer snapshot. `graph status`, `graph query`, `graph context`, and
-dependency-review consumers reuse that one snapshot and perform only one
-bounded freshness probe per command. They never rerun the runtime producer.
+When an active runtime pointer exists and its run contains one prepared runtime
+event, the Rust graph command consumes the prepared artifact plus the latest
+confirmed committed receipt during one `graph build`. Its v2 persisted
+runtime-evidence snapshot retains the exact artifact/receipt bytes, their
+hashes, the live source identity fingerprint, and the validated observation.
+An active pointer whose run contains no prepared runtime event is an
+observability-incomplete closeout condition, not a prepared-certificate route;
+the deterministic graph still publishes source facts and completeness
+diagnostics without a runtime producer snapshot, and the selected workflow
+closeout owns reporting that condition. Once a prepared event-shaped entry is
+present, duplicate, malformed, uncertain, missing, or mismatched
+certificates/receipts remain fail-closed. Without an active runtime pointer,
+the same builder publishes the source facts and completeness diagnostics
+without a runtime producer snapshot. `graph status`, `graph query`, `graph
+context`, and dependency-review consumers reuse that one snapshot and perform
+only one bounded freshness probe per command. They never rerun the runtime
+producer.
 Nonempty source completeness diagnostics produce `incomplete` rather than
 `fresh`; status remains inspectable, while query and context refuse to
 authorize evidence until the diagnostic sets are empty.
-Once a runtime pointer is present, missing, uncertain, invalid, stale, or
-mismatched runtime evidence remains unavailable or stale instead of being
-regenerated.
+After a prepared-certificate route has been published or persisted, missing,
+uncertain, invalid, stale, or mismatched runtime evidence remains unavailable
+or stale instead of being regenerated. An empty active run remains the
+observability-incomplete source-only case described above.
 
 ## Layout
 

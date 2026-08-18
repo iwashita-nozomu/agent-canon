@@ -1,32 +1,35 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Validates Dockerfile, runtime pack, devcontainer, and shared VS Code surface configuration.
+# responsibility Validates Dockerfile, runtime pack, host-identity devcontainer, and retired VS Code projection paths.
 # upstream design ../../documents/conventions/coding-conventions-project.md environment configuration policy
-# upstream design ../../documents/runtime/shared-runtime-surfaces.toml machine-readable shared runtime surface ownership
 # upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell boundary
-# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md exact runtime identity validation contract
+# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md default startup profile boundary
+# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md explicit GPU-admission selector and scenario validation
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md opt-in GPU runtime identity contract
 # upstream design ../../documents/design/rust-agent-tool-migration.md Rust toolchain devcontainer boundary
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX tooling boundary
 # upstream design ../../documents/tools/lean_proof_env.md Lean proof environment toolchain boundary
 # upstream design ../../agents/skills/environment-maintenance.md environment change workflow
-# upstream implementation ../agent_tools/surface_manifest.py parses shared runtime surface manifests
-# upstream implementation ../agent_tools/requirements_lock.py canonical requirements lock parser and result/error model
+# upstream implementation ../agent_tools/devcontainer_dependencies.py typed project-extra validation and install owner
 # upstream implementation ../docker_dependency_validator.sh validates Docker dependency contents
 # upstream implementation ./container_runtime.py loads runtime pack contracts
 # upstream implementation ./run_container_pack.py builds and smokes runtime packs
 # downstream implementation ./run_all_checks.sh runs container configuration validation
 # downstream implementation ../../tests/tools/test_container_config.py tests validator
+# downstream implementation ../../.devcontainer/gpu-admission/devcontainer.json selects the opt-in Compose scenario
+# downstream implementation ../../.devcontainer/gpu-admission.sh owns the opt-in lifecycle scenario
 # @dependency-end
-"""Validate Dockerfile, runtime pack, devcontainer, and shared VS Code surfaces."""
+"""Validate Dockerfile, runtime pack, devcontainer, and retired VS Code projections."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
-import shlex
+import subprocess
 import sys
 
 try:
@@ -46,29 +49,75 @@ AGENT_TOOLS_DIR = Path(__file__).resolve().parents[1] / "agent_tools"
 if str(AGENT_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS_DIR))
 
-from requirements_lock import (  # noqa: E402,I001  # pyright: ignore[reportMissingTypeStubs]
-    parse_requirements,
-)
-from surface_manifest import (  # noqa: E402,I001
-    SurfaceEntry,
-    SurfaceManifest,
-    load_manifest,
-    target_for_entry,
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
 )
 
-REQUIRED_REQUIREMENTS = (
-    "jupyterlab",
-    "notebook",
-    "ipykernel",
-    "pydeps",
-    "snakeviz",
-    "pyyaml",
-)
-
-PARENT_ENVIRONMENT_SCRIPT = ".devcontainer/parent-environment.sh"
 PARENT_ENVIRONMENT_MANIFEST = ".devcontainer/parent-environment.toml"
 ENVIRONMENT_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 RUNTIME_SHELL_RE = re.compile(r"/[A-Za-z0-9._/-]+\Z")
+BUILD_TARGET_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
+OPTIONAL_MOUNT_PROFILES = frozenset(
+    {
+        "host-zshrc",
+        "host-git",
+        "host-secrets",
+        "host-credentials",
+        "ssh-agent",
+        "docker-host",
+        "linked-data-roots",
+    }
+)
+LINKED_DATA_TARGET_RE = re.compile(r"/mnt/[a-z]/[^/].*\Z")
+STANDALONE_DOCKER_CONTEXT_ALLOWLIST = (
+    ".devcontainer/",
+    ".devcontainer/Dockerfile",
+    ".devcontainer/dependencies.toml",
+    "tools/",
+    "tools/agent_tools/",
+    "tools/agent_tools/devcontainer_dependencies.py",
+    "tools/agent_tools/parent_root_side_effects.py",
+    "rust/",
+    "rust/agent-canon/",
+    "rust/agent-canon/src/",
+    "rust/agent-canon/src/semantic_index/",
+    "rust/agent-canon/tests/",
+    "rust/agent-canon/Cargo.lock",
+    "rust/agent-canon/Cargo.toml",
+    "rust/agent-canon/src/dependency_manifest.rs",
+    "rust/agent-canon/src/docs.rs",
+    "rust/agent-canon/src/graph.rs",
+    "rust/agent-canon/src/jit_ir_to_lean.rs",
+    "rust/agent-canon/src/main.rs",
+    "rust/agent-canon/src/memory.rs",
+    "rust/agent-canon/src/migration_audit.rs",
+    "rust/agent-canon/src/python_algorithm_contract.rs",
+    "rust/agent-canon/src/python_module_groups.rs",
+    "rust/agent-canon/src/python_structure_hash.rs",
+    "rust/agent-canon/src/python_structure_hash_impact.rs",
+    "rust/agent-canon/src/python_structure_hash_report.rs",
+    "rust/agent-canon/src/python_structure_hash_scope_plan.rs",
+    "rust/agent-canon/src/rust_migration_plan.rs",
+    "rust/agent-canon/src/semantic_index/args.rs",
+    "rust/agent-canon/src/semantic_index/cli.rs",
+    "rust/agent-canon/src/semantic_index/embedding.rs",
+    "rust/agent-canon/src/semantic_index/eval.rs",
+    "rust/agent-canon/src/semantic_index/mod.rs",
+    "rust/agent-canon/src/semantic_index/model.rs",
+    "rust/agent-canon/src/semantic_index/pipeline.rs",
+    "rust/agent-canon/src/semantic_index/query.rs",
+    "rust/agent-canon/src/semantic_index/relations.rs",
+    "rust/agent-canon/src/semantic_index/report.rs",
+    "rust/agent-canon/src/semantic_index/source.rs",
+    "rust/agent-canon/src/semantic_index/storage.rs",
+    "rust/agent-canon/src/semantic_index/tests.rs",
+    "rust/agent-canon/src/structured_analysis.rs",
+    "rust/agent-canon/src/test_design.rs",
+    "rust/agent-canon/tests/python_algorithm_contract_cli.rs",
+)
 
 
 @dataclass(frozen=True)
@@ -98,6 +147,17 @@ class PackConfig:
     workdir: str
     workspace_mount: str
     platform: str | None
+    optional_mount_profiles: tuple[str, ...]
+    linked_data_roots: tuple[LinkedDataRoot, ...]
+    linked_data_roots_declared: bool
+
+
+@dataclass(frozen=True)
+class LinkedDataRoot:
+    """One repository symlink projected to its declared host data directory."""
+
+    link: str
+    target: str
 
 
 @dataclass(frozen=True)
@@ -193,6 +253,33 @@ def validate_repo_path(
         findings.append(Finding("missing_file", source, f"{field}-missing:{value}"))
 
 
+def is_normalized_repo_relative_link(value: str) -> bool:
+    """Return whether a configured link is a normalized repository-relative path."""
+    path = Path(value)
+    return (
+        bool(value)
+        and not any(ord(char) < 32 for char in value)
+        and not path.is_absolute()
+        and value != "."
+        and value == path.as_posix()
+        and all(part not in {"", ".", ".."} for part in path.parts)
+    )
+
+
+def is_valid_linked_data_target(value: str) -> bool:
+    """Return whether a linked-data target is a narrow, non-root mount path."""
+    path = Path(value)
+    return bool(
+        LINKED_DATA_TARGET_RE.fullmatch(value)
+        and not any(ord(char) < 32 for char in value)
+        and ":" not in value
+        and "," not in value
+        and value == path.as_posix()
+        and all(part not in {"", ".", ".."} for part in path.parts)
+        and value not in {"/mnt", "/mnt/l"}
+    )
+
+
 def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]:
     """Load and validate one runtime pack TOML file."""
     source = path.relative_to(root).as_posix()
@@ -228,9 +315,11 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
     image_tag = required_pack_fields["image_tag"]
     target_value = pack.get("target")
     target = target_value if isinstance(target_value, str) else None
-    if target_value is not None and target is None:
+    if target_value is not None and (
+        target is None or BUILD_TARGET_RE.fullmatch(target) is None
+    ):
         findings.append(
-            Finding("invalid_manifest", source, "pack.target-must-be-string")
+            Finding("invalid_manifest", source, "pack.target-must-be-safe-build-stage")
         )
     platform_value = pack.get("platform")
     platform = platform_value if isinstance(platform_value, str) else None
@@ -239,23 +328,207 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             Finding("invalid_manifest", source, "pack.platform-must-be-string")
         )
 
+    optional_mount_profiles_value = runtime.get("optional_mount_profiles", ())
+    optional_mount_profiles: tuple[str, ...] = ()
+    if "optional_mount_profiles" in runtime:
+        profile_sequence = as_sequence(optional_mount_profiles_value)
+        if profile_sequence is None or not all(
+            isinstance(item, str) for item in profile_sequence
+        ):
+            findings.append(
+                Finding(
+                    "invalid_manifest",
+                    source,
+                    "runtime.optional_mount_profiles-must-be-string-list",
+                )
+            )
+        else:
+            profiles = tuple(cast(Sequence[str], profile_sequence))
+            seen_profiles: set[str] = set()
+            for profile in profiles:
+                if not profile or profile != profile.strip():
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            "runtime.optional_mount_profiles-empty-or-whitespace",
+                        )
+                    )
+                elif profile not in OPTIONAL_MOUNT_PROFILES:
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.optional_mount_profiles-unknown:{profile}",
+                        )
+                    )
+                if profile in seen_profiles:
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.optional_mount_profiles-duplicate:{profile}",
+                        )
+                    )
+                seen_profiles.add(profile)
+            optional_mount_profiles = profiles
+
+    linked_data_roots_value = runtime.get("linked_data_roots")
+    linked_data_roots: tuple[LinkedDataRoot, ...] = ()
+    linked_data_roots_present = "linked_data_roots" in runtime
+    if linked_data_roots_present:
+        root_sequence = as_sequence(linked_data_roots_value)
+        if root_sequence is None:
+            findings.append(
+                Finding(
+                    "invalid_manifest",
+                    source,
+                    "runtime.linked_data_roots-must-be-inline-table-array",
+                )
+            )
+        else:
+            parsed_roots: list[LinkedDataRoot] = []
+            seen_links: set[str] = set()
+            seen_targets: set[str] = set()
+            for index, raw_root in enumerate(root_sequence):
+                root_table = as_mapping(raw_root)
+                if root_table is None or set(root_table) != {"link", "target"}:
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-entry-{index}-must-have-link-target",
+                        )
+                    )
+                    continue
+                link = root_table.get("link")
+                linked_target = root_table.get("target")
+                if not isinstance(link, str) or not isinstance(linked_target, str):
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-entry-{index}-strings-required",
+                        )
+                    )
+                    continue
+                if not is_normalized_repo_relative_link(link):
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-link-invalid:{link}",
+                        )
+                    )
+                elif not (root / link).is_symlink():
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-link-must-be-symlink:{link}",
+                        )
+                    )
+                if not is_valid_linked_data_target(linked_target):
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-target-invalid:{linked_target}",
+                        )
+                    )
+                if link in seen_links:
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-link-duplicate:{link}",
+                        )
+                    )
+                if linked_target in seen_targets:
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-target-duplicate:{linked_target}",
+                        )
+                    )
+                seen_links.add(link)
+                seen_targets.add(linked_target)
+                parsed_roots.append(LinkedDataRoot(link=link, target=linked_target))
+            linked_data_roots = tuple(parsed_roots)
+    if ("linked-data-roots" in optional_mount_profiles) != linked_data_roots_present:
+        findings.append(
+            Finding(
+                "invalid_manifest",
+                source,
+                "runtime.linked-data-roots-profile-and-list-must-match",
+            )
+        )
+    if "linked-data-roots" in optional_mount_profiles and not linked_data_roots:
+        findings.append(
+            Finding(
+                "invalid_manifest",
+                source,
+                "runtime.linked_data_roots-must-be-non-empty-when-selected",
+            )
+        )
+
+    runtime_env: tuple[str, ...] = ()
     for table, key, section in (
         (smoke, "commands", "smoke"),
         (runtime, "env", "runtime"),
-        (runtime, "mounts", "runtime"),
     ):
-        _, finding = require_string_list(table, key, source, section)
+        values, finding = require_string_list(table, key, source, section)
         if finding is not None:
             findings.append(finding)
+        elif section == "runtime":
+            runtime_env = values
+    if any(item.partition("=")[0] == "AGENT_CANON_PYTHON_EXTRAS" for item in runtime_env):
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                source,
+                "runtime.env-cannot-override:AGENT_CANON_PYTHON_EXTRAS",
+            )
+        )
+    runtime_mounts, mounts_finding = require_string_list(
+        runtime, "mounts", source, "runtime"
+    )
+    if mounts_finding is not None:
+        findings.append(mounts_finding)
+    elif runtime_mounts:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                source,
+                "runtime.mounts-unsupported-use-optional-profile",
+            )
+        )
     workdir = runtime.get("workdir", "/workspace")
     workspace_mount = runtime.get("workspace_mount", "/workspace")
     shell = runtime.get("shell", "/bin/bash")
+    if "dependency_extras" in runtime:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                source,
+                "runtime.dependency_extras-forbidden-image-owned",
+            )
+        )
     if not isinstance(shell, str) or RUNTIME_SHELL_RE.fullmatch(shell) is None:
         findings.append(
             Finding(
                 "invalid_manifest",
                 source,
                 "runtime.shell-must-be-absolute-executable-path",
+            )
+        )
+    elif platform != "linux/amd64":
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                source,
+                "pack.platform-must-be-linux/amd64",
             )
         )
         shell = "/bin/bash"
@@ -271,6 +544,7 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             )
         )
         workspace_mount = ""
+    pack_shell = shell if isinstance(shell, str) else "/bin/bash"
 
     validate_repo_path(root, source, "dockerfile", dockerfile, findings)
     validate_repo_path(root, source, "context", context, findings)
@@ -284,45 +558,16 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             context=context,
             image_tag=image_tag,
             target=target,
-            shell=shell,
+            shell=pack_shell,
             workdir=workdir,
             workspace_mount=workspace_mount,
             platform=platform,
+            optional_mount_profiles=optional_mount_profiles,
+            linked_data_roots=linked_data_roots,
+            linked_data_roots_declared=linked_data_roots_present,
         ),
         [],
     )
-
-
-def validate_requirements(root: Path) -> list[Finding]:
-    """Validate docker/requirements.txt."""
-    path = root / "docker" / "requirements.txt"
-    relative = "docker/requirements.txt"
-    if not path.is_file():
-        return [Finding("missing_file", relative, "missing")]
-    findings: list[Finding] = []
-    parsed = parse_requirements(path)
-    for error in parsed.errors:
-        findings.append(
-            Finding(
-                "dependency_contract_violation",
-                relative,
-                f"invalid-line:{error.line_number}",
-            )
-        )
-    if parsed.valid:
-        requirements = {
-            record.normalized_name for record in parsed.records if record.is_active()
-        }
-        for requirement in REQUIRED_REQUIREMENTS:
-            if requirement not in requirements:
-                findings.append(
-                    Finding(
-                        "dependency_contract_violation",
-                        relative,
-                        f"missing:{requirement}",
-                    )
-                )
-    return findings
 
 
 def validate_dockerfile(root: Path) -> list[Finding]:
@@ -354,6 +599,85 @@ def validate_dockerignore(root: Path) -> list[Finding]:
     return findings
 
 
+def validate_standalone_docker_context(root: Path) -> list[Finding]:
+    """Keep the standalone image context limited to its build-time engine files."""
+    dockerfile = root / ".devcontainer" / "Dockerfile"
+    dockerignore = root / ".dockerignore"
+    findings: list[Finding] = []
+    if not dockerignore.is_file():
+        findings.append(Finding("missing_file", ".dockerignore", "missing"))
+    else:
+        patterns = tuple(
+            line.strip()
+            for line in dockerignore.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        )
+        if not patterns or patterns[0] != "**":
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    ".dockerignore",
+                    "standalone-context-deny-all-required",
+                )
+            )
+        expected_patterns = ("**",) + tuple(
+            f"!{path}" for path in STANDALONE_DOCKER_CONTEXT_ALLOWLIST
+        )
+        if patterns != expected_patterns:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    ".dockerignore",
+                    "standalone-context-allowlist-mismatch",
+                )
+            )
+    if dockerfile.is_file():
+        dockerfile_text = dockerfile.read_text(encoding="utf-8")
+        normalized_dockerfile = re.sub(r"\s+", " ", dockerfile_text)
+        if re.search(r"^\s*COPY\s+\.\s", dockerfile_text, flags=re.MULTILINE):
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    ".devcontainer/Dockerfile",
+                    "standalone-context-copy-dot-forbidden",
+                )
+            )
+        if "image_vendor_root" in dockerfile_text or "vendor/agent-canon" in dockerfile_text:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    ".devcontainer/Dockerfile",
+                    "standalone-context-conditional-vendor-root-forbidden",
+                )
+            )
+        required_copies = (
+            "COPY .devcontainer/dependencies.toml /opt/agent-canon/.devcontainer/dependencies.toml",
+            "COPY tools/agent_tools/devcontainer_dependencies.py /opt/agent-canon/tools/agent_tools/devcontainer_dependencies.py",
+            "COPY tools/agent_tools/parent_root_side_effects.py /opt/agent-canon/tools/agent_tools/parent_root_side_effects.py",
+        )
+        for required_copy in required_copies:
+            if required_copy not in dockerfile_text:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        ".devcontainer/Dockerfile",
+                        f"standalone-context-required-copy-missing:{required_copy}",
+                    )
+                )
+        if (
+            "image-install --workspace /opt/agent-canon --vendor-root /opt/agent-canon"
+            not in normalized_dockerfile
+        ):
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    ".devcontainer/Dockerfile",
+                    "standalone-context-fixed-vendor-root-required",
+                )
+            )
+    return findings
+
+
 def shared_devcontainer_dir(root: Path) -> Path:
     """Return the shared devcontainer source for a parent or source checkout."""
     vendored = root / "vendor" / "agent-canon" / ".devcontainer"
@@ -363,28 +687,44 @@ def shared_devcontainer_dir(root: Path) -> Path:
 
 
 def validate_post_create(root: Path) -> list[Finding]:
-    """Require the shared post-create source at its owning path."""
-    path = shared_devcontainer_dir(root) / "post-create.sh"
-    relative = f"{path.relative_to(root)}"
-    if not path.is_file():
-        return [Finding("missing_file", relative, "missing")]
-    return []
-
-
-def validate_python_dependency_installer(root: Path) -> list[Finding]:
-    """Require the optional dependency installer without fixing shell internals."""
-    path = root / "docker" / "install_python_dependencies.sh"
-    relative = "docker/install_python_dependencies.sh"
-    if not path.is_file():
-        return [Finding("missing_file", relative, "missing")]
-    return []
+    """Require executable shared-first post-create sources at their owner paths."""
+    shared_dir = shared_devcontainer_dir(root)
+    findings: list[Finding] = []
+    for name in ("post-create.sh", "post-create-entrypoint.sh"):
+        path = shared_dir / name
+        relative = f"{path.relative_to(root)}"
+        if not path.is_file():
+            findings.append(Finding("missing_file", relative, "missing"))
+        elif not (path.stat().st_mode & 0o111):
+            findings.append(
+                Finding("dependency_contract_violation", relative, "not-executable")
+            )
+    entrypoint = shared_dir / "post-create-entrypoint.sh"
+    if entrypoint.is_file():
+        text = entrypoint.read_text(encoding="utf-8")
+        required_markers = (
+            'bash "$entrypoint_dir/post-create.sh" "$workspace"',
+            'parent_hook="$workspace/.devcontainer/post-create-parent.sh"',
+            'bash "$parent_hook" "$workspace"',
+        )
+        for marker in required_markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        str(entrypoint.relative_to(root)),
+                        f"resolver-entrypoint-missing:{marker}",
+                    )
+                )
+    return findings
 
 
 def load_devcontainer_json(
     path: Path,
+    *,
+    relative: str = ".devcontainer/devcontainer.json",
 ) -> tuple[Mapping[str, object] | None, list[Finding]]:
     """Load .devcontainer/devcontainer.json."""
-    relative = ".devcontainer/devcontainer.json"
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
@@ -395,27 +735,81 @@ def load_devcontainer_json(
     return mapping, []
 
 
-def validate_devcontainer_json(config: Mapping[str, object]) -> list[Finding]:
+def expected_post_create_command(*, parent_layout: bool) -> str:
+    """Return the lifecycle command for standalone or parent-projected layouts."""
+    resolver = (
+        "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec"
+    )
+    entrypoint = (
+        f"{resolver} .devcontainer/post-create-entrypoint.sh "
+        "/workspace/${localWorkspaceFolderBasename}"
+    )
+    return entrypoint
+
+
+def validate_devcontainer_json(
+    config: Mapping[str, object],
+    *,
+    parent_layout: bool = False,
+    config_path: str = ".devcontainer/devcontainer.json",
+) -> list[Finding]:
     """Validate required devcontainer JSON fields."""
     findings: list[Finding] = []
-    expected_json = {
-        "name": "${localWorkspaceFolderBasename}-devcontainer",
-        "initializeCommand": "bash vendor/agent-canon/.devcontainer/bootstrap-shared-runtime.sh && AGENT_CANON_DEVCONTAINER_REPO_ROOT=. AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh",
+    if parent_layout:
+        return findings
+    compose_output = ".agent-canon/docker-compose.generated.yml"
+    expected_name = "${localWorkspaceFolderBasename}-devcontainer"
+    expected_json: dict[str, object] = {
+        "name": expected_name,
+        "initializeCommand": f"AGENT_CANON_DOCKER_COMPOSE_OUTPUT={compose_output} python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
         "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
         "service": "workspace",
         "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
-        "postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace/${localWorkspaceFolderBasename} && bash .devcontainer/post-create-parent.sh /workspace/${localWorkspaceFolderBasename}",
-        "postAttachCommand": "bash vendor/agent-canon/.devcontainer/post-attach.sh",
+        "postCreateCommand": expected_post_create_command(parent_layout=parent_layout),
+        "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
+        "updateRemoteUserUID": False,
     }
     for key, expected in expected_json.items():
         if config.get(key) != expected:
             findings.append(
                 Finding(
                     "inconsistency",
-                    ".devcontainer/devcontainer.json",
+                    config_path,
                     f"{key}-expected:{expected}",
                 )
             )
+    if "features" in config:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                config_path,
+                "node-feature-forbidden-image-owned",
+            )
+        )
+    if "containerUser" in config:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                config_path,
+                "default-containerUser-forbidden-compose-owned-project-identity",
+            )
+        )
+    if "remoteUser" in config:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                config_path,
+                "default-remoteUser-forbidden-compose-owned-project-identity",
+            )
+        )
+    if "containerEnv" in config:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                config_path,
+                "static-containerEnv-forbidden-generated-compose-owns-runtime-env",
+            )
+        )
     return findings
 
 
@@ -436,40 +830,96 @@ def validate_devcontainer_workspace(
 
 
 def validate_generate_runtime_compose_script(root: Path) -> list[Finding]:
-    """Require the generator at its AgentCanon source path."""
+    """Require the shared generator executable used by both runtime scenarios."""
     script_path = shared_devcontainer_dir(root) / "generate-runtime-compose.sh"
     if not script_path.is_file():
         return [Finding("missing_file", f"{script_path.relative_to(root)}", "missing")]
+    if script_path.stat().st_mode & 0o111 == 0:
+        return [
+            Finding(
+                "dependency_contract_violation",
+                f"{script_path.relative_to(root)}",
+                "not-executable",
+            )
+        ]
     return []
 
 
-def parse_parent_environment_exports(path: Path) -> tuple[tuple[str, ...], list[str]]:
-    """Parse allowed parent-environment export lines without executing shell."""
-    names: list[str] = []
-    findings: list[str] = []
-    for line_number, raw_line in enumerate(
-        path.read_text(encoding="utf-8").splitlines(), 1
-    ):
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-        try:
-            tokens = shlex.split(line, comments=True, posix=True)
-        except ValueError:
-            findings.append(f"invalid-export-line:{line_number}")
-            continue
-        if len(tokens) != 2 or tokens[0] != "export":
-            findings.append(f"invalid-export-line:{line_number}")
-            continue
-        name, separator, _value = tokens[1].partition("=")
-        if not separator or ENVIRONMENT_NAME_RE.fullmatch(name) is None:
-            findings.append(f"invalid-export-line:{line_number}")
-            continue
-        if name in names:
-            findings.append(f"duplicate-export:{name}")
-            continue
-        names.append(name)
-    return tuple(names), findings
+def validate_default_lifecycle_scripts(root: Path) -> list[Finding]:
+    """Require the default lifecycle entrypoints selected by devcontainer.json."""
+    shared_dir = shared_devcontainer_dir(root)
+    findings: list[Finding] = []
+    for name in ("post-create.sh", "post-attach.sh"):
+        path = shared_dir / name
+        relative = path.relative_to(root).as_posix()
+        if not path.is_file():
+            findings.append(Finding("missing_file", relative, "missing"))
+        elif path.stat().st_mode & 0o111 == 0:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "not-executable",
+                )
+            )
+    return findings
+
+
+def validate_gpu_admission_selector(root: Path) -> list[Finding]:
+    """Validate the explicit GPU-admission selector without inspecting script text."""
+    selector_path = root / ".devcontainer" / "gpu-admission" / "devcontainer.json"
+    if not selector_path.is_file():
+        return [
+            Finding(
+                "missing_file",
+                ".devcontainer/gpu-admission/devcontainer.json",
+                "explicit-profile-selector-required",
+            )
+        ]
+    config, findings = load_devcontainer_json(selector_path)
+    if config is None:
+        return findings
+    expected = {
+        "name": "${localWorkspaceFolderBasename}-gpu-admission-devcontainer",
+        "initializeCommand": "AGENT_CANON_GPU_ADMISSION_PROFILE=gpu-admission AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/gpu-admission-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
+        "dockerComposeFile": "../../.agent-canon/gpu-admission-compose.generated.yml",
+        "service": "workspace",
+        "containerUser": "project",
+        "remoteUser": "project",
+        "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
+        "postCreateCommand": expected_post_create_command(
+            parent_layout=(root / "vendor" / "agent-canon").is_dir()
+        ),
+        "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
+    }
+    for key, expected_value in expected.items():
+        if config.get(key) != expected_value:
+            findings.append(
+                Finding(
+                    "inconsistency",
+                    ".devcontainer/gpu-admission/devcontainer.json",
+                    f"{key}-expected:{expected_value}",
+                )
+            )
+    if config.get("shutdownAction") != "stopCompose" or config.get("overrideCommand") is not False:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                ".devcontainer/gpu-admission/devcontainer.json",
+                "profile-lifecycle-fields",
+            )
+        )
+    orchestrator = shared_devcontainer_dir(root) / "gpu-admission.sh"
+    orchestrator_relative = orchestrator.relative_to(root).as_posix()
+    if not orchestrator.is_file() or orchestrator.stat().st_mode & 0o111 == 0:
+        findings.append(
+            Finding(
+                "missing_file" if not orchestrator.is_file() else "dependency_contract_violation",
+                orchestrator_relative,
+                "executable-profile-orchestrator-required",
+            )
+        )
+    return findings
 
 
 def parse_parent_environment_manifest(path: Path) -> tuple[tuple[str, ...], list[str]]:
@@ -477,16 +927,17 @@ def parse_parent_environment_manifest(path: Path) -> tuple[tuple[str, ...], list
     try:
         with path.open("rb") as handle:
             data = tomllib.load(handle)
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        return (), [f"toml-decode:{exc}"]
+    except (OSError, tomllib.TOMLDecodeError):
+        return (), ["toml-decode:invalid-or-unreadable-file"]
     if set(data) != {"variables"}:
         return (), ["toml-keys-must-be-variables-only"]
     variables = data.get("variables")
-    if not isinstance(variables, list) or not all(
-        isinstance(item, str) for item in variables
-    ):
+    if not isinstance(variables, list):
         return (), ["variables-must-be-string-list"]
-    names = cast(list[str], variables)
+    variable_values = cast(list[object], variables)
+    if not all(isinstance(item, str) for item in variable_values):
+        return (), ["variables-must-be-string-list"]
+    names = cast(list[str], variable_values)
     findings: list[str] = []
     seen: set[str] = set()
     for name in names:
@@ -498,55 +949,61 @@ def parse_parent_environment_manifest(path: Path) -> tuple[tuple[str, ...], list
     return tuple(names), findings
 
 
-def validate_parent_environment(root: Path) -> list[Finding]:
-    """Validate parent environment sources and their ordered-name agreement."""
-    if not (root / "vendor" / "agent-canon").is_dir():
-        return []
-    findings: list[Finding] = []
-    script_path = root / PARENT_ENVIRONMENT_SCRIPT
-    manifest_path = root / PARENT_ENVIRONMENT_MANIFEST
-    for path, relative in (
-        (script_path, PARENT_ENVIRONMENT_SCRIPT),
-        (manifest_path, PARENT_ENVIRONMENT_MANIFEST),
-    ):
-        if not path.is_file():
-            findings.append(Finding("missing_file", relative, "missing"))
-        elif path.is_symlink():
-            findings.append(Finding("inconsistency", relative, "must-be-regular-file"))
-    if findings:
-        return findings
+def is_managed_topic_root(root: Path) -> bool:
+    """Return True when the repo is mounted as a managed topic layout."""
+    topic_root = root.parent
+    return topic_root.parent.name == "workspace"
 
-    export_names, export_findings = parse_parent_environment_exports(script_path)
-    findings.extend(
-        Finding("invalid_manifest", PARENT_ENVIRONMENT_SCRIPT, detail)
-        for detail in export_findings
+
+def is_removed_legacy_topic_root(root: Path) -> bool:
+    """Return True when the immediate parent directory is a removed legacy workspace root."""
+    return (
+        root.parent.name.startswith("workspace-") and root.parent.parent.name != "workspace"
     )
-    manifest_names, manifest_findings = parse_parent_environment_manifest(manifest_path)
-    findings.extend(
-        Finding("invalid_manifest", PARENT_ENVIRONMENT_MANIFEST, detail)
-        for detail in manifest_findings
+
+
+def git_index_mode(root: Path, path: Path) -> str | None:
+    """Return the git-index mode for one path if it is tracked."""
+    try:
+        relative = path.relative_to(root).as_posix()
+    except ValueError:
+        return None
+    result = subprocess.run(
+        ["git", "-C", str(root), "ls-files", "-s", "--", relative],
+        capture_output=True,
+        text=True,
+        check=False,
     )
-    if not export_findings and not manifest_findings and export_names != manifest_names:
-        findings.append(
-            Finding(
-                "inconsistency",
-                PARENT_ENVIRONMENT_MANIFEST,
-                f"ordered-variable-names-mismatch:manifest={list(manifest_names)}:exports={list(export_names)}",
-            )
-        )
-    return findings
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    return result.stdout.split(None, 1)[0] or None
 
 
-def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Finding]:
+def validate_generated_compose(
+    root: Path,
+    pack: PackConfig | None,
+    *,
+    profile: str = "default",
+    compose_path: Path | None = None,
+    runtime_source: Path | None = None,
+) -> list[Finding]:
     """Validate generated Compose meaning rather than generator implementation text."""
-    if (root / "vendor" / "agent-canon").is_dir():
-        compose_path = root / ".agent-canon" / "docker-compose.generated.yml"
-        relative = ".agent-canon/docker-compose.generated.yml"
+    runtime_source = runtime_source or (root / ".agent-canon/runtime")
+    if compose_path is None:
+        if (root / "vendor" / "agent-canon").is_dir():
+            compose_path = root / ".agent-canon" / "docker-compose.generated.yml"
+            relative = ".agent-canon/docker-compose.generated.yml"
+        else:
+            compose_path = root / ".devcontainer" / "docker-compose.generated.yml"
+            relative = ".devcontainer/docker-compose.generated.yml"
     else:
-        compose_path = root / ".devcontainer" / "docker-compose.generated.yml"
-        relative = ".devcontainer/docker-compose.generated.yml"
+        compose_path = compose_path.resolve()
+        try:
+            relative = compose_path.relative_to(root.resolve()).as_posix()
+        except ValueError:
+            relative = f"<generated-compose:{profile}>"
     if not compose_path.exists():
-        return []
+        return [Finding("missing_file", relative, f"{profile}-scenario-compose-required")]
     if yaml is None:
         return [Finding("invalid_manifest", relative, "yaml-parser-unavailable")]
     try:
@@ -561,19 +1018,42 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
     if service is None:
         return [Finding("invalid_manifest", relative, "workspace-service-required")]
     root = root.resolve()
-    topic_root = root.parent.resolve()
+    topic_root = root.parent
     repo_target = f"/workspace/{root.name}"
+    expected_workspace_layout = (
+        "managed-topic" if is_managed_topic_root(root) else "direct-repo"
+    )
+    if is_removed_legacy_topic_root(root) and expected_workspace_layout != "managed-topic":
+        return [
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "legacy-workspace-root-direct-repo-rejected",
+            )
+        ]
+    parent_layout = (root / "vendor" / "agent-canon").is_dir()
     findings: list[Finding] = []
-    if topic_root.parent.name != "workspace":
-        if topic_root.name.startswith("workspace-"):
+    home_target = "/home/project"
+    expected_runtime_user = "project"
+    if profile not in {"default", "gpu-admission"}:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                f"profile-unsupported:{profile}",
+            )
+        )
+    if profile == "gpu-admission":
+        compose_name = compose.get("name")
+        if not isinstance(compose_name, str) or not compose_name.endswith(
+            "-gpu-admission"
+        ):
             findings.append(
                 Finding(
-                    "dependency_contract_violation", relative, "legacy-topic-root-name"
+                    "dependency_contract_violation",
+                    relative,
+                    "gpu-admission-project-name-suffix-required",
                 )
-            )
-        else:
-            findings.append(
-                Finding("dependency_contract_violation", relative, "topic-root-parent")
             )
     if service.get("working_dir") != repo_target:
         findings.append(
@@ -581,11 +1061,78 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                 "inconsistency", relative, f"working-dir:{service.get('working_dir')}"
             )
         )
+    expected_platform = pack.platform if pack is not None and pack.platform else "linux/amd64"
+    if service.get("platform") != expected_platform:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                f"compose-platform-expected:{expected_platform}",
+            )
+        )
     build = as_mapping(service.get("build"))
+    build_target = build.get("target") if build is not None else None
+    if profile == "default" and build_target == "gpu-runtime":
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "default-gpu-build-target-forbidden:gpu-runtime",
+            )
+        )
+    if pack is not None and build_target != pack.target:
+        expected_target = pack.target if pack.target is not None else "absent"
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                f"compose-build-target-expected:{expected_target}",
+            )
+        )
     if build is not None and build.get("context") != "..":
         findings.append(
             Finding("inconsistency", relative, f"build-context:{build.get('context')}")
         )
+    standalone_dockerfile = root / ".devcontainer" / "Dockerfile"
+    if not parent_layout and standalone_dockerfile.is_file():
+        if build is None:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "standalone-build-required",
+                )
+            )
+        else:
+            if build.get("dockerfile") != ".devcontainer/Dockerfile":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "standalone-dockerfile-required:.devcontainer/Dockerfile",
+                    )
+                )
+            standalone_args = as_mapping(build.get("args"))
+            if standalone_args is None:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "standalone-build-args-required:PROJECT_UID,PROJECT_GID",
+                    )
+                )
+            else:
+                for name in ("PROJECT_UID", "PROJECT_GID"):
+                    value = standalone_args.get(name)
+                    pattern = r"[1-9][0-9]*" if name == "PROJECT_UID" else r"[0-9]+"
+                    if not isinstance(value, str) or re.fullmatch(pattern, value) is None:
+                        findings.append(
+                            Finding(
+                                "dependency_contract_violation",
+                                relative,
+                                f"standalone-build-arg-{name}-must-be-{'nonzero' if name == 'PROJECT_UID' else 'nonnegative'}-decimal",
+                            )
+                        )
     volumes = as_sequence(service.get("volumes"))
     if volumes is None:
         return [
@@ -612,7 +1159,8 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
         if volume is not None:
             return volume.get("read_only") is True
         if isinstance(raw_volume, str):
-            return raw_volume.rsplit(":", 1)[-1] == "ro"
+            options = raw_volume.rsplit(":", 1)[-1].split(",")
+            return "ro" in options
         return False
 
     def volume_type(raw_volume: object) -> str | None:
@@ -628,32 +1176,130 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
         candidate = Path(source)
         return (candidate if candidate.is_absolute() else root / candidate).resolve()
 
-    workspace_mounts: list[tuple[str | None, str | None]] = []
-    for raw_volume in volumes:
-        source, target = volume_fields(raw_volume)
-        if target == "/workspace":
-            workspace_mounts.append((source, target))
-    if len(workspace_mounts) != 1:
+    environment = as_mapping(service.get("environment"))
+    optional_mounts_value = (
+        environment.get("AGENT_CANON_OPTIONAL_MOUNTS", "")
+        if environment is not None
+        else ""
+    )
+    optional_mounts = optional_mounts_value if isinstance(optional_mounts_value, str) else ""
+    optional_tokens_list: list[str] = []
+    if not isinstance(optional_mounts_value, str):
         findings.append(
             Finding(
                 "dependency_contract_violation",
                 relative,
-                f"workspace-mount-count:{len(workspace_mounts)}",
+                "optional-mount-profile-source-must-be-string",
             )
         )
-    elif source_path(workspace_mounts[0][0]) != topic_root:
+    elif optional_mounts:
+        optional_tokens_list = optional_mounts.split(",")
+        if any(not token or token != token.strip() or re.search(r"\s", token) for token in optional_tokens_list):
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "optional-mount-profile-empty-or-whitespace",
+                )
+            )
+    optional_tokens = set(optional_tokens_list)
+    supported_optional_mounts = OPTIONAL_MOUNT_PROFILES
+    for token in sorted(optional_tokens - supported_optional_mounts):
         findings.append(
-            Finding("dependency_contract_violation", relative, "workspace-source")
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                f"optional-mount-profile-unsupported:{token}",
+            )
+        )
+    if len(optional_tokens_list) != len(optional_tokens):
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "optional-mount-profile-duplicate",
+            )
+        )
+    if pack is not None:
+        expected_profiles = list(pack.optional_mount_profiles)
+        expected_profiles.extend(
+            token for token in optional_tokens_list if token not in expected_profiles
+        )
+        if optional_tokens_list != expected_profiles:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "optional-mount-profile-canonical-union",
+                )
+            )
+    linked_profile_selected = "linked-data-roots" in optional_tokens
+    if pack is not None and linked_profile_selected != pack.linked_data_roots_declared:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "linked-data-roots-profile-and-list-must-match",
+            )
+        )
+    elif pack is None and linked_profile_selected:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "linked-data-roots-pack-required",
+            )
+        )
+    workspace_layout = (
+        environment.get("AGENT_CANON_WORKSPACE_LAYOUT")
+        if environment is not None
+        else None
+    )
+    if not isinstance(workspace_layout, str) or workspace_layout not in {
+        "managed-topic",
+        "direct-repo",
+    }:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "workspace-layout-environment-required",
+            )
+        )
+    elif workspace_layout != expected_workspace_layout:
+        findings.append(
+            Finding(
+                "inconsistency",
+                relative,
+                f"workspace-layout:{workspace_layout}",
+            )
+        )
+
+    repository_mounts = [
+        raw_volume for raw_volume in volumes if volume_fields(raw_volume)[1] == repo_target
+    ]
+    if len(repository_mounts) != 1:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                f"repository-mount-count:{len(repository_mounts)}",
+            )
+        )
+    elif source_path(volume_fields(repository_mounts[0])[0]) != root:
+        findings.append(
+            Finding("dependency_contract_violation", relative, "repository-mount-source")
         )
     for raw_volume in volumes:
         source, target = volume_fields(raw_volume)
-        if source_path(source) == root or target == repo_target:
+        if source_path(source) == topic_root or target == "/workspace":
             findings.append(
                 Finding(
-                    "dependency_contract_violation", relative, "repository-double-mount"
+                    "dependency_contract_violation",
+                    relative,
+                    "workspace-scope-leak",
                 )
             )
-    parent_layout = (root / "vendor" / "agent-canon").is_dir()
     expected_shell = pack.shell if pack is not None else "/bin/bash"
     if service.get("command") != f'{expected_shell} -lc "sleep infinity"':
         findings.append(
@@ -663,85 +1309,453 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                 f"runtime-shell-command:{expected_shell}",
             )
         )
-    if parent_layout:
-        required_mounts = (
-            "/etc/project-template/parent-environment.sh",
-            "/etc/project-template/zsh/.zshrc",
+    service_user = service.get("user")
+    service_user_valid = isinstance(service_user, str) and re.fullmatch(
+        r"[1-9][0-9]*:[0-9]+", service_user
+    ) is not None
+    if not service_user_valid:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "project-user-must-have-nonzero-uid-nonnegative-gid",
+            )
         )
-        for target in required_mounts:
+    build_args: Mapping[str, object] | None = None
+    if build is None:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "build-required-for-project-uid-gid",
+            )
+        )
+    else:
+        build_args = as_mapping(build.get("args"))
+        if build_args is None:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "build-args-required:PROJECT_UID,PROJECT_GID",
+                )
+            )
+        else:
+            for name in ("PROJECT_UID", "PROJECT_GID"):
+                value = build_args.get(name)
+                pattern = r"[1-9][0-9]*" if name == "PROJECT_UID" else r"[0-9]+"
+                if not isinstance(value, str) or re.fullmatch(pattern, value) is None:
+                    findings.append(
+                        Finding(
+                            "dependency_contract_violation",
+                            relative,
+                            f"build-arg-{name}-must-be-{'nonzero' if name == 'PROJECT_UID' else 'nonnegative'}-decimal",
+                        )
+                    )
+    if service_user_valid and build_args is not None:
+        project_uid = build_args.get("PROJECT_UID")
+        project_gid = build_args.get("PROJECT_GID")
+        if (
+            isinstance(project_uid, str)
+            and re.fullmatch(r"[1-9][0-9]*", project_uid) is not None
+            and isinstance(project_gid, str)
+            and re.fullmatch(r"[0-9]+", project_gid) is not None
+            and service_user != f"{project_uid}:{project_gid}"
+        ):
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "project-user-must-match-build-args",
+                )
+            )
+    if not parent_layout and "tmpfs" in service:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "default-home-tmpfs-forbidden",
+            )
+        )
+    if profile == "default":
+        if "group_add" in service:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "default-shared-runtime-field-forbidden:group_add",
+                )
+            )
+        if "gpus" in service:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "default-gpu-field-forbidden:gpus",
+                )
+            )
+    else:
+        if "group_add" in service:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "gpu-admission-group-add-forbidden",
+                )
+            )
+        if service.get("gpus") != "all":
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "gpu-admission-gpus-all-required",
+                )
+            )
+    for raw_volume in volumes:
+        _source, target = volume_fields(raw_volume)
+        if profile == "default" and target == "/var/lib/agent-canon/runtime":
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "default-shared-runtime-field-forbidden:runtime-bind",
+                )
+            )
+    runtime_mounts = [
+        raw_volume
+        for raw_volume in volumes
+        if volume_fields(raw_volume)[1] == "/var/lib/agent-canon/runtime"
+    ]
+    if profile == "gpu-admission":
+        if len(runtime_mounts) != 1:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    f"gpu-admission-runtime-mount-count:{len(runtime_mounts)}",
+                )
+            )
+        elif volume_type(runtime_mounts[0]) != "bind":
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "gpu-admission-runtime-mount-type-must-be-bind",
+                )
+            )
+        else:
+            actual_runtime_source, runtime_target = volume_fields(runtime_mounts[0])
+            if actual_runtime_source != str(runtime_source):
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "gpu-admission-runtime-mount-source-must-be-repository-local",
+                    )
+                )
+            if runtime_target != "/var/lib/agent-canon/runtime":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "gpu-admission-runtime-mount-target-must-be-canonical",
+                    )
+                )
+            runtime_volume = as_mapping(runtime_mounts[0])
+            if runtime_volume is not None:
+                if (
+                    "read_only" in runtime_volume
+                    and runtime_volume.get("read_only") is not False
+                ):
+                    findings.append(
+                        Finding(
+                            "dependency_contract_violation",
+                            relative,
+                            "gpu-admission-runtime-mount-must-be-read-write",
+                        )
+                    )
+            elif volume_is_read_only(runtime_mounts[0]):
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "gpu-admission-runtime-mount-must-be-read-write",
+                    )
+                )
+    if parent_layout or "host-zshrc" in optional_tokens:
+        zshrc_matches = [
+            raw_volume
+            for raw_volume in volumes
+            if volume_fields(raw_volume)[1] in {
+                f"{home_target}/.zshrc",
+                "/etc/project-template/zsh/.zshrc",
+            }
+        ]
+        for host_zshrc in zshrc_matches:
+            _, target = volume_fields(host_zshrc)
+            if target != f"{home_target}/.zshrc":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"host-zshrc-target-must-be-{home_target}/.zshrc",
+                    )
+                )
+            if volume_type(host_zshrc) != "bind":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zshrc-mount-type-must-be-bind",
+                    )
+                )
+            source, _ = volume_fields(host_zshrc)
+            if not isinstance(source, str) or not Path(source).is_absolute():
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zshrc-source-must-be-resolved-absolute-file",
+                    )
+                )
+            if not volume_is_read_only(host_zshrc):
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zshrc-mount-read-only",
+                    )
+                )
+        zsh_matches = [
+            raw_volume
+            for raw_volume in volumes
+            if volume_fields(raw_volume)[1] == f"{home_target}/.zsh"
+        ]
+        for host_zsh in zsh_matches:
+            source, target = volume_fields(host_zsh)
+            if target != f"{home_target}/.zsh":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"host-zsh-target-must-be-{home_target}/.zsh",
+                    )
+                )
+            if volume_type(host_zsh) != "bind":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zsh-mount-type-must-be-bind",
+                    )
+                )
+            if not isinstance(source, str) or not Path(source).is_absolute():
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zsh-source-must-be-resolved-absolute-directory",
+                    )
+                )
+            if not volume_is_read_only(host_zsh):
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zsh-mount-read-only",
+                    )
+                )
+        for raw_volume in volumes:
+            source, target = volume_fields(raw_volume)
+            if (source and "/root/" in source) or (target and target.startswith("/root/")):
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "root-home-mount-forbidden",
+                    )
+                )
+    linked_targets: set[str] = set()
+    if pack is not None:
+        linked_targets = {linked_root.target for linked_root in pack.linked_data_roots}
+    if linked_profile_selected and pack is not None:
+        linked_mounts = [
+            raw_volume
+            for raw_volume in volumes
+            if volume_fields(raw_volume)[1] in linked_targets
+        ]
+        seen_linked_sources: set[str] = set()
+        seen_linked_targets: set[str] = set()
+        for linked_root in pack.linked_data_roots:
             matches = [
                 raw_volume
-                for raw_volume in volumes
-                if volume_fields(raw_volume)[1] == target
+                for raw_volume in linked_mounts
+                if volume_fields(raw_volume)[1] == linked_root.target
             ]
             if len(matches) != 1:
                 findings.append(
                     Finding(
                         "dependency_contract_violation",
                         relative,
-                        f"parent-environment-mount-required:{target}",
+                        f"linked-data-root-mount-count:{linked_root.target}",
                     )
                 )
-            elif not volume_is_read_only(matches[0]):
+                continue
+            linked_mount = matches[0]
+            source, target = volume_fields(linked_mount)
+            if source != linked_root.target or target != linked_root.target:
                 findings.append(
                     Finding(
                         "dependency_contract_violation",
                         relative,
-                        f"parent-environment-mount-read-only:{target}",
+                        f"linked-data-root-source-target-mismatch:{linked_root.target}",
                     )
                 )
-            if target == "/etc/project-template/zsh/.zshrc" and len(matches) == 1:
-                host_zshrc = matches[0]
-                if volume_type(host_zshrc) != "bind":
-                    findings.append(
-                        Finding(
-                            "dependency_contract_violation",
-                            relative,
-                            "host-zshrc-mount-type-must-be-bind",
-                        )
+            if volume_type(linked_mount) != "bind":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"linked-data-root-mount-type-must-be-bind:{linked_root.target}",
                     )
-                source, _ = volume_fields(host_zshrc)
-                if source != "${HOME}/.zshrc":
-                    findings.append(
-                        Finding(
-                            "dependency_contract_violation",
-                            relative,
-                            "host-zshrc-source-must-be-${HOME}/.zshrc",
-                        )
-                    )
-        if service.get("user") != "${LOCAL_UID}:${LOCAL_GID}":
-            findings.append(
-                Finding(
-                    "inconsistency",
-                    relative,
-                    "user-mapping-must-be-${LOCAL_UID}:${LOCAL_GID}",
                 )
-            )
-        tmpfs = as_sequence(service.get("tmpfs"))
-        expected_tmpfs = (
-            "/tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700"
-        )
-        if tmpfs is None or expected_tmpfs not in tmpfs:
+            volume = as_mapping(linked_mount)
+            if volume is None or volume.get("read_only") is not False:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"linked-data-root-mount-must-be-read-write:{linked_root.target}",
+                    )
+                )
+            if isinstance(source, str) and source in seen_linked_sources:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"linked-data-root-source-duplicate:{source}",
+                    )
+                )
+            if isinstance(target, str) and target in seen_linked_targets:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"linked-data-root-target-duplicate:{target}",
+                    )
+                )
+            if isinstance(source, str):
+                seen_linked_sources.add(source)
+            if isinstance(target, str):
+                seen_linked_targets.add(target)
+    docker_host_mounts = [
+        raw_volume
+        for raw_volume in volumes
+        if volume_fields(raw_volume)[1] == "/var/run/docker.sock"
+    ]
+    if "docker-host" in optional_tokens:
+        if len(docker_host_mounts) != 1:
             findings.append(
                 Finding(
                     "dependency_contract_violation",
                     relative,
-                    "mapped-uid-home-tmpfs-must-be-exact",
+                    f"docker-host-mount-count:{len(docker_host_mounts)}",
+                )
+            )
+        else:
+            docker_host_mount = docker_host_mounts[0]
+            docker_source, docker_target = volume_fields(docker_host_mount)
+            if docker_source != "/var/run/docker.sock":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "docker-host-mount-source-must-be-canonical",
+                    )
+                )
+            if docker_target != "/var/run/docker.sock":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "docker-host-mount-target-must-be-canonical",
+                    )
+                )
+            docker_volume = as_mapping(docker_host_mount)
+            if docker_volume is not None and volume_type(docker_host_mount) != "bind":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "docker-host-mount-type-must-be-bind",
+                    )
+                )
+            malformed_read_only = (
+                docker_volume is not None
+                and "read_only" in docker_volume
+                and docker_volume.get("read_only") is not False
+            )
+            if malformed_read_only or (
+                docker_volume is None and volume_is_read_only(docker_host_mount)
+            ):
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "docker-host-mount-must-be-read-write",
+                    )
+                )
+    allowed_targets = {repo_target}
+    if "host-zshrc" in optional_tokens:
+        allowed_targets.add(f"{home_target}/.zshrc")
+        allowed_targets.add(f"{home_target}/.zsh")
+    if profile == "gpu-admission":
+        allowed_targets.add("/var/lib/agent-canon/runtime")
+    if "host-git" in optional_tokens:
+        allowed_targets.add("/mnt/git")
+    if "host-secrets" in optional_tokens:
+        allowed_targets.add("/mnt/agent-canon-secrets")
+    if "host-credentials" in optional_tokens:
+        allowed_targets.update({f"{home_target}/.config/gh", f"{home_target}/.ssh"})
+    if "ssh-agent" in optional_tokens:
+        allowed_targets.add("/ssh-agent")
+    if "docker-host" in optional_tokens:
+        allowed_targets.add("/var/run/docker.sock")
+    if linked_profile_selected:
+        allowed_targets.update(linked_targets)
+    for raw_volume in volumes:
+        source, target = volume_fields(raw_volume)
+        if target not in allowed_targets:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    f"host-mount-target-forbidden-by-default:{target}",
+                )
+            )
+        if (source and "/root/" in source) or (target and target.startswith("/root/")):
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "root-home-mount-forbidden",
                 )
             )
     required_environment = {
+        "AGENT_CANON_WORKSPACE_LAYOUT": expected_workspace_layout or "<invalid>",
         "AGENT_CANON_WORKSPACE_ROOT": "/workspace",
         "AGENT_CANON_REPOSITORY_ROOT": repo_target,
+        "DEPENDENCY_MODULE_CONTAINER_SOURCE": str(root),
+        "DEPENDENCY_MODULE_CONTAINER_TARGET": repo_target,
+        "AGENT_CANON_RUNTIME_ROUTE": (
+            "MANAGED_CONTAINER" if profile == "gpu-admission" else "CONTAINER_LOCAL"
+        ),
+        "AGENT_CANON_CODEX_SESSION_ROOT": f"{home_target}/.codex/sessions",
+        "AGENT_CANON_SECRET_MOUNT": "/mnt/agent-canon-secrets",
+        "HOME": home_target,
+        "SHELL": expected_shell,
+        "AGENT_CANON_CONTAINER_USER": expected_runtime_user,
     }
-    if parent_layout:
-        required_environment.update(
-            {
-                "HOME": "/tmp/project-template-home",
-                "ZDOTDIR": "/etc/project-template/zsh",
-                "SHELL": pack.shell if pack is not None else "/bin/bash",
-            }
-        )
-    environment = as_mapping(service.get("environment"))
     if environment is None:
         for name in required_environment:
             findings.append(
@@ -752,6 +1766,78 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                 )
             )
     else:
+        if "AGENT_CANON_RUNTIME_IDENTITY_MODE" in environment:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "daemon-runtime-identity-mode-env-forbidden",
+                )
+            )
+        expected_gpu_mode = "enabled" if profile == "gpu-admission" else "disabled"
+        if environment.get("DEVCONTAINER_GPU_MODE") != expected_gpu_mode:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    f"{profile}-gpu-mode-mismatch",
+                )
+            )
+        if profile == "default":
+            forbidden_environment = (
+                "DEVCONTAINER_GPU_REQUEST",
+                "NVIDIA_VISIBLE_DEVICES",
+                "NVIDIA_DRIVER_CAPABILITIES",
+                "AGENT_CANON_RUNTIME_GID",
+                "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS",
+                "ZDOTDIR",
+                "AGENT_CANON_SHARED_RUNTIME_SOURCE",
+                "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE",
+                "AGENT_CANON_SHARED_RUNTIME_TARGET",
+                "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
+                "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT",
+            )
+            for name in forbidden_environment:
+                if name in environment:
+                    category = (
+                        "default-gpu-field-forbidden"
+                        if name.startswith(("DEVCONTAINER_GPU", "NVIDIA_"))
+                        else "default-shared-runtime-field-forbidden"
+                    )
+                    findings.append(
+                        Finding(
+                            "dependency_contract_violation",
+                            relative,
+                            f"{category}:{name}",
+                        )
+                    )
+        else:
+            required_profile_environment = {
+                "DEVCONTAINER_GPU_REQUEST": "all",
+                "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
+                "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
+                "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(runtime_source),
+                "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+                "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
+                "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
+            }
+            for name, expected in required_profile_environment.items():
+                if name not in environment:
+                    findings.append(
+                        Finding(
+                            "dependency_contract_violation",
+                            relative,
+                            f"gpu-admission-environment-required:{name}",
+                        )
+                    )
+                elif environment.get(name) != expected:
+                    findings.append(
+                        Finding(
+                            "inconsistency",
+                            relative,
+                            f"gpu-admission-environment:{name}",
+                        )
+                    )
         for name, expected in required_environment.items():
             if name not in environment:
                 findings.append(
@@ -782,13 +1868,146 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
     return findings
 
 
+def validate_generated_compose_scenarios(
+    root: Path, pack: PackConfig | None
+) -> list[Finding]:
+    """Generate and validate the mandatory default and GPU-admission scenarios."""
+    script_path = shared_devcontainer_dir(root) / "generate-runtime-compose.sh"
+    if not script_path.is_file() or script_path.stat().st_mode & 0o111 == 0:
+        return []
+    findings: list[Finding] = []
+    boundary = ParentRootSideEffectBoundary()
+    runtime_source: Path | None = None
+    temporary_parent = root / ".agent-canon" / "tmp"
+    agent_canon_dir = root / ".agent-canon"
+    temporary_parent_existed = temporary_parent.is_dir()
+    agent_canon_dir_existed = agent_canon_dir.is_dir()
+    try:
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(
+                cwd=root, explicit_root=root, purpose="container-config-runtime"
+            )
+        )
+        temporary = boundary.create_parent_owned_temp_directory(
+            attestation,
+            temporary_parent,
+            "container-config-runtime",
+            "container-config",
+        )
+    except ParentRootSideEffectError as exc:
+        return [
+            Finding(
+                "dependency_contract_violation",
+                script_path.relative_to(root).as_posix(),
+                f"container-config-runtime-boundary:{exc}",
+            )
+        ]
+    temporary_root = temporary.physical_path
+    try:
+        base_environment = {
+            name: value
+            for name, value in os.environ.items()
+            if not name.startswith(
+                ("AGENT_CANON_", "DEVCONTAINER_", "NVIDIA_", "PROJECT_")
+            )
+        }
+        base_environment.update(
+            {
+                "HOME": str(temporary_root / "home-without-host-state"),
+                "AGENT_CANON_DEVCONTAINER_REPO_ROOT": str(root.resolve()),
+            }
+        )
+        scenarios: list[tuple[str, dict[str, str]]] = [("default", {})]
+        packs_dir = root / "docker" / "packs"
+        if packs_dir.is_dir():
+            runtime_source = boundary.ensure_parent_owned_directory(
+                attestation,
+                temporary_root / "runtime",
+                "container-config-runtime-source",
+            ).physical_path
+            scenarios.append(
+                (
+                    "gpu-admission",
+                    {
+                        "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
+                        "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(runtime_source),
+                        "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(runtime_source),
+                        "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+                        "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(runtime_source / "shared-runtime-provision.json"),
+                        "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(runtime_source / "shared-runtime-readback.json"),
+                    },
+                )
+            )
+        for profile, additions in scenarios:
+            compose_path = temporary_root / f"{profile}.yml"
+            scenario_pack = pack
+            if profile == "gpu-admission":
+                gpu_pack_path = packs_dir / "gpu-admission.toml"
+                if gpu_pack_path.is_file():
+                    scenario_pack, gpu_pack_findings = load_pack(
+                        root, gpu_pack_path
+                    )
+                    findings.extend(gpu_pack_findings)
+            environment = {
+                **base_environment,
+                **additions,
+                "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": str(compose_path),
+            }
+            result = subprocess.run(
+                ["bash", str(script_path)],
+                cwd=root,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                stderr_lines = result.stderr.strip().splitlines()
+                detail = stderr_lines[-1] if stderr_lines else "no-stderr"
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        script_path.relative_to(root).as_posix(),
+                        f"{profile}-scenario-generation-failed:rc={result.returncode}:{detail}",
+                    )
+                )
+                continue
+            findings.extend(
+                validate_generated_compose(
+                    root,
+                    scenario_pack,
+                    profile=profile,
+                    compose_path=compose_path,
+                    runtime_source=(runtime_source if profile == "gpu-admission" else None),
+                )
+            )
+    finally:
+        boundary.remove_parent_owned_tree(
+            attestation, temporary, "container-config-runtime-cleanup"
+        )
+        if not temporary_parent_existed and temporary_parent.is_dir():
+            parent_receipt = boundary.resolve_parent_owned_path(
+                attestation, temporary_parent, "container-config-runtime-base-cleanup", create=False
+            )
+            boundary.remove_empty_parent_owned_directory(
+                attestation, parent_receipt, "container-config-runtime-base-cleanup"
+            )
+        if not agent_canon_dir_existed and agent_canon_dir.is_dir():
+            root_receipt = boundary.resolve_parent_owned_path(
+                attestation, agent_canon_dir, "container-config-agent-base-cleanup", create=False
+            )
+            boundary.remove_empty_parent_owned_directory(
+                attestation, root_receipt, "container-config-agent-base-cleanup"
+            )
+    return findings
+
+
 def validate_devcontainer(root: Path) -> list[Finding]:
     """Validate shared devcontainer entrypoint configuration."""
     devcontainer_dir = root / ".devcontainer"
     if not devcontainer_dir.exists():
         return []
     findings: list[Finding] = []
-    findings.extend(validate_parent_environment(root))
     json_path = devcontainer_dir / "devcontainer.json"
     if not json_path.is_file():
         return [Finding("missing_file", ".devcontainer/devcontainer.json", "missing")]
@@ -797,25 +2016,38 @@ def validate_devcontainer(root: Path) -> list[Finding]:
     if config is None:
         return findings
 
-    findings.extend(validate_devcontainer_json(config))
-    findings.extend(validate_generate_runtime_compose_script(root))
-    findings.extend(validate_post_create(root))
-    dependency_module_change = (
-        shared_agent_tools_dir(root) / "dependency_module_change.py"
-    )
-    if (root / ".gitmodules").is_file() and not dependency_module_change.is_file():
-        findings.append(
-            Finding(
-                "missing_file",
-                dependency_module_change.relative_to(root).as_posix(),
-                "required-for-devcontainer-dependency-check",
-            )
+    findings.extend(
+        validate_devcontainer_json(
+            config,
+            parent_layout=(root / "vendor" / "agent-canon").is_dir(),
+            config_path=".devcontainer/devcontainer.json",
         )
+    )
+    parent_layout = (root / "vendor" / "agent-canon").is_dir()
+    if not parent_layout:
+        findings.extend(validate_generate_runtime_compose_script(root))
+        findings.extend(validate_post_create(root))
+        findings.extend(validate_default_lifecycle_scripts(root))
+        findings.extend(validate_gpu_admission_selector(root))
+    if not parent_layout:
+        dependency_module_change = (
+            shared_agent_tools_dir(root) / "dependency_module_change.py"
+        )
+        if (root / ".gitmodules").is_file() and not dependency_module_change.is_file():
+            findings.append(
+                Finding(
+                    "missing_file",
+                    dependency_module_change.relative_to(root).as_posix(),
+                    "required-for-devcontainer-dependency-check",
+                )
+            )
     return findings
 
 
 def shared_agent_tools_dir(root: Path) -> Path:
     """Locate shared agent tools in standalone or parent-projected layouts."""
+    if (root / "vendor" / "agent-canon").is_dir():
+        return root / "tools" / "agent-canon" / "agent_tools"
     direct = root / "tools" / "agent_tools"
     if direct.is_dir():
         return direct
@@ -833,69 +2065,52 @@ def validate_devcontainer_pack_alignment(
     config, json_findings = load_devcontainer_json(json_path)
     if config is None:
         return json_findings
-    return [
+    findings = [
         *json_findings,
         *validate_devcontainer_workspace(config, pack),
-        *validate_generated_compose(root, pack),
+        *validate_generated_compose_scenarios(root, pack),
     ]
+    persisted_compose = (
+        root / ".agent-canon" / "docker-compose.generated.yml"
+        if (root / "vendor" / "agent-canon").is_dir()
+        else root / ".devcontainer" / "docker-compose.generated.yml"
+    )
+    if persisted_compose.exists():
+        findings.extend(
+            validate_generated_compose(
+                root, pack, compose_path=persisted_compose
+            )
+        )
+    profile_compose = root / ".agent-canon" / "gpu-admission-compose.generated.yml"
+    if profile_compose.exists():
+        profile_pack = pack
+        gpu_pack_path = root / "docker" / "packs" / "gpu-admission.toml"
+        if gpu_pack_path.is_file():
+            profile_pack, gpu_pack_findings = load_pack(root, gpu_pack_path)
+            findings.extend(gpu_pack_findings)
+        findings.extend(
+            validate_generated_compose(
+                root,
+                profile_pack,
+                profile="gpu-admission",
+                compose_path=profile_compose,
+            )
+        )
+    return findings
+
+
+def is_standalone_source(root: Path) -> bool:
+    """Return whether root carries the standalone AgentCanon source markers."""
+    return all(
+        (root / marker).is_file() and not (root / marker).is_symlink()
+        for marker in ("ROOT_AGENTS.md", "agent-canon-environment.toml")
+    )
 
 
 def has_vscode_contract(root: Path) -> bool:
-    """Return whether this root declares an AgentCanon VS Code surface."""
+    """Return whether this root has a VS Code contract to inspect."""
     vscode_dir = root / ".vscode"
-    vendor_manifest = (
-        root / "vendor" / "agent-canon" / "documents" / "shared-runtime-surfaces.toml"
-    )
-    return (
-        (root / "documents" / "shared-runtime-surfaces.toml").is_file()
-        or vendor_manifest.is_file()
-        or vscode_dir.exists()
-        or vscode_dir.is_symlink()
-    )
-
-
-def load_shared_surface_manifest(
-    root: Path,
-) -> tuple[SurfaceManifest | None, list[Finding]]:
-    """Load the shared runtime surface manifest through its canonical parser."""
-    try:
-        return load_manifest(
-            root, "vendor/agent-canon", "documents/runtime/shared-runtime-surfaces.toml"
-        ), []
-    except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
-        return None, [
-            Finding(
-                "invalid_manifest",
-                "documents/runtime/shared-runtime-surfaces.toml",
-                f"load-failed:{exc}",
-            )
-        ]
-
-
-def load_vscode_surface(
-    root: Path,
-) -> tuple[SurfaceEntry | None, SurfaceManifest | None, list[Finding]]:
-    """Load the .vscode entry from the shared runtime surface manifest."""
-    manifest, findings = load_shared_surface_manifest(root)
-    if manifest is None:
-        return None, None, findings
-    entry = next(
-        (candidate for candidate in manifest.entries if candidate.path == ".vscode"),
-        None,
-    )
-    if entry is None:
-        return (
-            None,
-            manifest,
-            [
-                Finding(
-                    "dependency_contract_violation",
-                    "documents/runtime/shared-runtime-surfaces.toml",
-                    "missing-surface:.vscode",
-                )
-            ],
-        )
-    return entry, manifest, []
+    return is_standalone_source(root) or vscode_dir.exists() or vscode_dir.is_symlink()
 
 
 VSCODE_SHARED_FILES = (
@@ -906,134 +2121,54 @@ VSCODE_SHARED_FILES = (
 )
 
 
-def validate_vscode_manifest(
-    entry: SurfaceEntry, manifest: SurfaceManifest
-) -> list[Finding]:
-    """Validate the real .vscode container and exact shared-file coverage."""
-    findings: list[Finding] = []
-    expected = {
-        "mode": "regular",
-        "owner": "template-or-derived-repo",
-        "surface_class": "active_contract",
-    }
-    actual = {
-        "mode": entry.mode,
-        "owner": entry.owner,
-        "surface_class": entry.surface_class,
-    }
-    for field, expected_value in expected.items():
-        if actual[field] != expected_value:
-            findings.append(
-                Finding(
-                    "dependency_contract_violation",
-                    "documents/runtime/shared-runtime-surfaces.toml",
-                    f".vscode-{field}-expected:{expected_value}",
-                )
-            )
-    shared = {
-        candidate.path: candidate
-        for candidate in manifest.entries
-        if candidate.path.startswith(".vscode/")
-    }
-    expected_paths = {f".vscode/{name}" for name in VSCODE_SHARED_FILES}
-    if set(shared) != expected_paths:
-        findings.append(
-            Finding(
-                "dependency_contract_violation",
-                "documents/runtime/shared-runtime-surfaces.toml",
-                "vscode-source-coverage",
-            )
+def is_agent_canon_vscode_symlink(path: Path, root: Path) -> bool:
+    """Return whether a parent editor file still links into AgentCanon."""
+    if not path.is_symlink():
+        return False
+    source_dir = root / "vendor" / "agent-canon" / ".vscode"
+    try:
+        target = path.readlink()
+        target_path = target if target.is_absolute() else path.parent / target
+        return target_path.resolve(strict=False).is_relative_to(
+            source_dir.resolve(strict=False)
         )
-    for path in expected_paths:
-        candidate = shared.get(path)
-        if candidate is None:
-            continue
-        if (
-            candidate.mode != "symlink"
-            or candidate.owner != "agent-canon"
-            or candidate.surface_class != "runtime_surface"
-        ):
-            findings.append(
-                Finding(
-                    "dependency_contract_violation",
-                    "documents/runtime/shared-runtime-surfaces.toml",
-                    f"vscode-file-surface:{path}",
-                )
-            )
-    return findings
+    except (OSError, RuntimeError):
+        return False
 
 
 def validate_vscode(root: Path) -> list[Finding]:
-    """Validate shared VS Code surface ownership."""
-    entry, manifest, findings = load_vscode_surface(root)
-    if entry is None or manifest is None:
-        return findings
-    findings.extend(validate_vscode_manifest(entry, manifest))
+    """Validate standalone files and reject retired parent projections."""
+    findings: list[Finding] = []
     root_vscode = root / ".vscode"
+    source_checkout = is_standalone_source(root)
     if root_vscode.is_symlink():
         findings.append(Finding("inconsistency", ".vscode", "expected-real-directory"))
         return findings
-    source_checkout = not (
-        root
-        / "vendor"
-        / "agent-canon"
-        / "documents"
-        / "runtime"
-        / "shared-runtime-surfaces.toml"
-    ).is_file()
-    source_relative = ".vscode" if source_checkout else f"{manifest.prefix}/.vscode"
-    source_dir = root / source_relative
-    if source_dir.is_symlink() or not source_dir.is_dir():
+    if source_checkout:
+        for name in VSCODE_SHARED_FILES:
+            source_file = root_vscode / name
+            path = f".vscode/{name}"
+            if not source_file.is_file():
+                findings.append(Finding("missing_file", path, "missing"))
+            elif source_file.is_symlink():
+                findings.append(
+                    Finding(
+                        "inconsistency", path, "source-file-must-be-regular"
+                    )
+                )
+        return findings
+    if not root_vscode.is_dir():
         findings.append(Finding("inconsistency", ".vscode", "expected-real-directory"))
         return findings
-    shared = {
-        candidate.path: candidate
-        for candidate in manifest.entries
-        if candidate.path.startswith(".vscode/")
-    }
-    for name in VSCODE_SHARED_FILES:
-        path = f".vscode/{name}"
-        source_file = source_dir / name
-        if not source_file.is_file():
+    for child in root_vscode.iterdir():
+        if is_agent_canon_vscode_symlink(child, root):
             findings.append(
-                Finding("missing_file", f"{source_relative}/{name}", "missing")
+                Finding(
+                    "inconsistency",
+                    str(child.relative_to(root)),
+                    "legacy-agent-canon-symlink",
+                )
             )
-        root_file = root / path
-        if source_checkout:
-            if source_file.is_symlink():
-                findings.append(
-                    Finding("inconsistency", path, "source-file-must-be-regular")
-                )
-        elif path in shared:
-            if not root_file.is_symlink():
-                findings.append(
-                    Finding("inconsistency", path, "expected-individual-symlink")
-                )
-                continue
-            expected_target = target_for_entry(root, manifest.prefix, shared[path])
-            target = root_file.readlink()
-            target_path = target if target.is_absolute() else root_file.parent / target
-            try:
-                matches = target_path.resolve(strict=True) == source_file.resolve(
-                    strict=True
-                )
-            except FileNotFoundError:
-                matches = False
-            if target.as_posix() != expected_target and not matches:
-                findings.append(
-                    Finding(
-                        "inconsistency", path, "unexpected-individual-symlink-target"
-                    )
-                )
-    if not source_checkout:
-        allowed = set(VSCODE_SHARED_FILES)
-        for child in (root / ".vscode").iterdir():
-            if child.name not in allowed:
-                findings.append(
-                    Finding(
-                        "inconsistency", str(child.relative_to(root)), "unexpected-file"
-                    )
-                )
     return findings
 
 
@@ -1053,25 +2188,16 @@ def validate(root: Path) -> ValidationReport:
     findings: list[Finding] = []
     checked: list[str] = []
     packs: list[PackConfig] = []
+    parent_layout = (root / "vendor" / "agent-canon").is_dir()
     if docker_dir.exists():
-        checked.extend(
-            (
-                ".dockerignore",
-                "docker/Dockerfile",
-                "docker/requirements.txt",
-                "docker/packs",
-            )
-        )
+        checked.extend((".dockerignore", "docker/Dockerfile"))
         findings.extend(validate_dockerignore(root))
         findings.extend(validate_dockerfile(root))
-        findings.extend(validate_python_dependency_installer(root))
-        findings.extend(validate_requirements(root))
         packs_dir = docker_dir / "packs"
-        if not packs_dir.is_dir():
-            findings.append(Finding("missing_file", "docker/packs", "missing"))
-        else:
+        if packs_dir.is_dir():
+            checked.append("docker/packs")
             pack_paths = sorted(packs_dir.glob("*.toml"))
-            if not pack_paths:
+            if not pack_paths and not parent_layout:
                 findings.append(
                     Finding("missing_file", "docker/packs", "no-pack-files")
                 )
@@ -1080,6 +2206,9 @@ def validate(root: Path) -> ValidationReport:
                 findings.extend(pack_findings)
                 if pack is not None:
                     packs.append(pack)
+        elif not parent_layout:
+            checked.append("docker/packs")
+            findings.append(Finding("missing_file", "docker/packs", "missing"))
 
     default_pack = next(
         (pack for pack in packs if pack.path == "docker/packs/default.toml"), None
@@ -1087,7 +2216,14 @@ def validate(root: Path) -> ValidationReport:
     if devcontainer_dir.exists():
         checked.append(".devcontainer")
         findings.extend(validate_devcontainer(root))
-        findings.extend(validate_devcontainer_pack_alignment(root, default_pack))
+        if (
+            is_standalone_source(root)
+            and (devcontainer_dir / "Dockerfile").is_file()
+        ):
+            checked.append(".dockerignore")
+            findings.extend(validate_standalone_docker_context(root))
+        if not parent_layout:
+            findings.extend(validate_devcontainer_pack_alignment(root, default_pack))
     if vscode_configured:
         checked.append(".vscode")
         findings.extend(validate_vscode(root))

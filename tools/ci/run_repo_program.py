@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import argparse
-import shlex
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -21,20 +20,25 @@ from container_runtime import (
     build_build_command,
     build_run_command,
     build_shell_invocation,
+    emit_not_created_lifecycle_receipt,
     join_shell_lines,
+    lifecycle_context,
     load_or_default_pack,
     print_label_and_command,
     resolve_builder,
+    scope_pack_image_tag,
+    start_container_lifecycle,
     workspace_path,
+    write_lifecycle_receipt,
 )
-from run_python_in_dockerfile import load_rules, resolve_rule
+from run_python_in_dockerfile import PythonExecutionRule, load_rules, resolve_rule
 
 
 @dataclass(frozen=True)
 class ProgramResolution:
     """Describe how one program should run in the container."""
 
-    pack_path: str
+    pack_path: str | None
     command: list[str]
     workdir: str | None
 
@@ -54,8 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--rules",
-        default="docker/python-execution-rules.toml",
-        help="Python execution rule file. Default: docker/python-execution-rules.toml",
+        help="Optional project-owned Python execution rule file.",
     )
     parser.add_argument("--pack", help="Pack override. Skip rule resolution when set.")
     parser.add_argument(
@@ -64,16 +67,21 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("auto", "docker", "podman"),
         help="Container builder to use. Default: auto",
     )
-    parser.add_argument("--skip-build", action="store_true", help="Skip the build step.")
-    parser.add_argument("--keep-image", action="store_true", help="Keep the built image.")
-    parser.add_argument("--print-only", action="store_true", help="Print commands without executing.")
+    parser.add_argument(
+        "--skip-build", action="store_true", help="Skip the build step."
+    )
+    parser.add_argument(
+        "--print-only", action="store_true", help="Print commands without executing."
+    )
     parser.add_argument(
         "--skip-env-check",
         action="store_true",
         help="Skip the preflight environment check inside the container.",
     )
     parser.add_argument("--workdir", help="Container workdir override.")
-    parser.add_argument("--shell", help="Shell used for shell-script execution. Default: /bin/bash")
+    parser.add_argument(
+        "--shell", help="Shell used for shell-script execution. Default: /bin/bash"
+    )
     parser.add_argument(
         "--env",
         action="append",
@@ -88,18 +96,15 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="SRC:DST[:MODE]",
         help="Additional bind mount for docker run. Repeatable.",
     )
-    parser.add_argument("program", help="Python file, shell script, workspace binary, or command.")
+    parser.add_argument(
+        "program", help="Python file, shell script, workspace binary, or command."
+    )
     parser.add_argument(
         "program_args",
         nargs=argparse.REMAINDER,
         help="Arguments passed to the target program. Use -- to separate them.",
     )
     return parser
-
-
-def cleanup_image(builder: str, image_tag: str) -> None:
-    """Remove one image quietly."""
-    subprocess.run([builder, "image", "rm", "-f", image_tag], check=False, capture_output=True)
 
 
 def normalize_program_args(program_args: list[str]) -> list[str]:
@@ -115,10 +120,18 @@ def workspace_relative(program_path: Path) -> str:
     return program_path.relative_to(workspace_path(".")).as_posix()
 
 
+def workspace_container_path(workspace_mount: str, relative_program: str) -> str:
+    """Return a workspace-relative program path at the selected mount."""
+    normalized_mount = workspace_mount.rstrip("/") or "/"
+    if normalized_mount == "/":
+        return f"/{relative_program}"
+    return f"{normalized_mount}/{relative_program}"
+
+
 def resolve_program(
     *,
     dockerfile: str,
-    rules_path: str,
+    rules_path: str | None,
     pack_override: str | None,
     program: str,
     program_args: list[str],
@@ -129,23 +142,39 @@ def resolve_program(
     workspace_root = workspace_path(".")
     program_candidate = workspace_root / program
     normalized_args = normalize_program_args(program_args)
+    resolved_rule: PythonExecutionRule | None = None
 
     if program_candidate.exists() and program_candidate.is_file():
-        relative_program = workspace_relative(program_candidate)
-        container_program = f"/workspace/{relative_program}"
-
-        if program_candidate.suffix == ".py":
+        if program_candidate.suffix == ".py" and rules_path is not None:
             _, rules = load_rules(rules_path)
             resolved_rule = resolve_rule(
                 dockerfile=dockerfile,
                 python_file=program_candidate,
                 rules=rules,
             )
-            pack_path = pack_override or (
-                resolved_rule.pack if resolved_rule is not None else "docker/packs/default.toml"
+        pack_path = pack_override or (
+            resolved_rule.pack
+            if resolved_rule is not None
+            else None
+        )
+    else:
+        pack_path = pack_override
+
+    pack = load_or_default_pack(pack_path)
+    workspace_mount = pack.runtime.workspace_mount
+    default_workdir = workspace_mount.rstrip("/") or "/"
+    workdir = workdir_override or (
+        resolved_rule.workdir if resolved_rule is not None else default_workdir
+    )
+
+    if program_candidate.exists() and program_candidate.is_file():
+        relative_program = workspace_relative(program_candidate)
+        container_program = workspace_container_path(workspace_mount, relative_program)
+
+        if program_candidate.suffix == ".py":
+            python_bin = (
+                resolved_rule.python_bin if resolved_rule is not None else "python3"
             )
-            python_bin = resolved_rule.python_bin if resolved_rule is not None else "python3"
-            workdir = workdir_override or (resolved_rule.workdir if resolved_rule is not None else None)
             return ProgramResolution(
                 pack_path=pack_path,
                 command=[python_bin, container_program, *normalized_args],
@@ -154,21 +183,21 @@ def resolve_program(
 
         if program_candidate.suffix in {".sh", ".bash"}:
             return ProgramResolution(
-                pack_path=pack_override or "docker/packs/default.toml",
+                pack_path=pack_path,
                 command=[shell or "/bin/bash", container_program, *normalized_args],
-                workdir=workdir_override,
+                workdir=workdir,
             )
 
         return ProgramResolution(
-            pack_path=pack_override or "docker/packs/default.toml",
+            pack_path=pack_path,
             command=[container_program, *normalized_args],
-            workdir=workdir_override,
+            workdir=workdir,
         )
 
     return ProgramResolution(
-        pack_path=pack_override or "docker/packs/default.toml",
+        pack_path=pack_path,
         command=[program, *normalized_args],
-        workdir=workdir_override,
+        workdir=workdir,
     )
 
 
@@ -186,21 +215,6 @@ def build_env_check_command() -> list[str]:
         ]
     )
     return build_shell_invocation("/bin/bash", script)
-
-
-def workspace_setup_command(command: list[str], *, container_workspace: str) -> list[str]:
-    """Return a command that runs workspace setup before the requested command."""
-    installer = f"{container_workspace.rstrip('/')}/docker/install_python_dependencies.sh"
-    lines = [
-        "set -euo pipefail",
-        (
-            f"if [ -f {shlex.quote(installer)} ]; then "
-            f"bash {shlex.quote(installer)} {shlex.quote(container_workspace)}; "
-            "fi"
-        ),
-        f"exec {shlex.join(command)}",
-    ]
-    return build_shell_invocation("/bin/bash", join_shell_lines(lines))
 
 
 def main() -> int:
@@ -221,8 +235,12 @@ def main() -> int:
             dockerfile=args.dockerfile,
         )
         builder = resolve_builder(args.builder, print_only=args.print_only)
-        container_workspace = pack.runtime.workspace_mount
-        build_command = build_build_command(builder, pack)
+        workspace_root = workspace_path(".")
+        lifecycle = lifecycle_context(workspace_root, builder, "repo-program")
+        if not args.skip_build:
+            pack = scope_pack_image_tag(pack, lifecycle)
+        lifecycle = lifecycle.bind_image_tag(pack.image_tag)
+        build_command = build_build_command(builder, pack, labels=lifecycle.labels())
         print_label_and_command("build", build_command)
 
         env_check_command: list[str] | None = None
@@ -230,50 +248,59 @@ def main() -> int:
             env_check_command = build_run_command(
                 builder,
                 pack,
-                workspace_root=workspace_path("."),
-                command=workspace_setup_command(
-                    build_env_check_command(),
-                    container_workspace=container_workspace,
-                ),
+                workspace_root=workspace_root,
+                command=build_env_check_command(),
                 env=tuple(args.env),
                 mounts=tuple(args.mount),
+                labels=lifecycle.labels(),
             )
             print_label_and_command("env-check", env_check_command)
 
         run_command = build_run_command(
             builder,
             pack,
-            workspace_root=workspace_path("."),
-            command=workspace_setup_command(
-                resolution.command,
-                container_workspace=container_workspace,
-            ),
+            workspace_root=workspace_root,
+            command=resolution.command,
             env=tuple(args.env),
             mounts=tuple(args.mount),
             workdir=resolution.workdir,
+            labels=lifecycle.labels(),
         )
         print_label_and_command("run", run_command)
 
         if args.print_only:
+            emit_not_created_lifecycle_receipt(workspace_root, lifecycle)
             return 0
 
-        image_built_here = False
-        if not args.skip_build:
-            build_result = subprocess.run(build_command, check=False)
-            if build_result.returncode != 0:
-                return build_result.returncode
-            image_built_here = True
+        lifecycle_run = start_container_lifecycle(
+            workspace_root, builder, "repo-program", context=lifecycle
+        )
+        if lifecycle_run.receipt.state != "snapshot":
+            write_lifecycle_receipt(workspace_root, lifecycle_run.receipt)
+            print(
+                f"container lifecycle unavailable: {lifecycle_run.receipt.failure or lifecycle_run.receipt.before.query_status}",
+                file=sys.stderr,
+            )
+            return 2
 
+        command_exit = 0
         try:
-            if env_check_command is not None:
-                env_check_result = subprocess.run(env_check_command, check=False)
-                if env_check_result.returncode != 0:
-                    return env_check_result.returncode
-            run_result = subprocess.run(run_command, check=False)
-            return run_result.returncode
+            if not args.skip_build:
+                command_exit = subprocess.run(build_command, check=False).returncode
+            if command_exit == 0 and env_check_command is not None:
+                command_exit = subprocess.run(env_check_command, check=False).returncode
+            if command_exit == 0:
+                command_exit = subprocess.run(run_command, check=False).returncode
         finally:
-            if image_built_here and not args.keep_image:
-                cleanup_image(builder, pack.image_tag)
+            cleanup_result = lifecycle_run.finish(cleanup=True)
+        if cleanup_result.state not in {"cleaned", "not-created"}:
+            print(
+                f"container lifecycle cleanup state={cleanup_result.state}: {cleanup_result.failure}",
+                file=sys.stderr,
+            )
+            if command_exit == 0:
+                command_exit = 2
+        return command_exit
     except (RuntimeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 2

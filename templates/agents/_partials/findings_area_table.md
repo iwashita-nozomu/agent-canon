@@ -7,7 +7,8 @@ downstream implementation ../../../tools/agent_tools/agent_team.py expands templ
 @dependency-end
 -->
 
-## Findings
+## Findings（指摘）
 
-| Area | Finding | Severity | Status |
-| ---- | ------- | -------- | ------ |
+| Area | Finding | Severity | Status | Evidence |
+| ---- | ------- | -------- | ------ | -------- |
+<!-- status: blocking | non-blocking | question | not-applicable | accepted-risk; overall outcome is changes-required only for unresolved blocking rows. -->

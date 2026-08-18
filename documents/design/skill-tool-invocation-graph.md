@@ -172,25 +172,25 @@ equality/readback は四段で行う。(1) source→materialized IR は catalog 
 
 | # | catalog skill id | # | catalog skill id | # | catalog skill id |
 | ---: | --- | ---: | --- | ---: | --- |
-| 1 | agent-orchestration | 21 | dependency-module-change | 41 | worktree-start |
-| 2 | repo-onboarding | 22 | pr-processing | 42 | worktree-health |
-| 3 | task-routing | 23 | agent-update-branch | 43 | experiment-lifecycle |
-| 4 | start-repository | 24 | report-writing | 44 | save-experiment-results |
-| 5 | codex-task-workflow | 25 | prose-reasoning-graph | 45 | experiment-review |
-| 6 | owner-bounded-routing | 26 | structure-planning | 46 | gpu-execution |
-| 7 | subagent-bootstrap | 27 | code-visualization | 47 | computational-optimization |
-| 8 | change-review | 28 | html-output | 48 | adaptive-improvement-loop |
-| 9 | python-review | 29 | html-experiment-report | 49 | literature-survey |
-| 10 | cpp-review | 30 | test-design | 50 | formal-proof-workflow |
-| 11 | oop-readability-check | 31 | refactor-loop | 51 | lean-algorithm-design |
-| 12 | oop-type-design | 32 | structure-refactor | 52 | algorithm-proof-exploration |
-| 13 | result-artifact-writeout | 33 | user-guided-debugging | 53 | algorithm-flowchart |
-| 14 | result-visualize | 34 | long-form-writing | 54 | research-workflow |
-| 15 | tool-finding-report | 35 | academic-writing | 55 | comprehensive-development |
-| 16 | issue-finding-report | 36 | paper-writing | 56 | dependency-design |
-| 17 | agent-log-analysis | 37 | md-style-check | 57 | environment-maintenance |
-| 18 | runtime-log-repair | 38 | mvp-skeleton | 58 | user-preference-sync |
-| 19 | agent-eval-accumulation | 39 | document-canon-cleanup | 59 | agent-learning |
+| 1 | agent-orchestration | 20 | dependency-module-change | 39 | worktree-health |
+| 2 | repo-onboarding | 21 | pr-processing | 40 | experiment-lifecycle |
+| 3 | task-routing | 22 | agent-update-branch | 41 | experiment-review |
+| 4 | start-repository | 23 | report-writing | 42 | gpu-execution |
+| 5 | codex-task-workflow | 24 | prose-reasoning-graph | 43 | computational-optimization |
+| 6 | agent-orchestration (bounded owner route) | 25 | structure-planning | 44 | adaptive-improvement-loop |
+| 7 | subagent-bootstrap | 26 | code-visualization | 45 | literature-survey |
+| 8 | change-review | 27 | html-output | 46 | formal-proof-workflow |
+| 9 | python-review | 28 | test-design | 47 | lean-algorithm-design |
+| 10 | cpp-review | 29 | refactor-loop | 48 | algorithm-proof-exploration |
+| 11 | oop-readability-check | 30 | structure-refactor | 49 | algorithm-flowchart |
+| 12 | oop-type-design | 31 | user-guided-debugging | 50 | research-workflow |
+| 13 | result-artifact-writeout | 32 | long-form-writing | 51 | comprehensive-development |
+| 14 | result-visualize | 33 | academic-writing | 52 | dependency-design |
+| 15 | tool-finding-report | 34 | paper-writing | 53 | environment-maintenance |
+| 16 | issue-finding-report | 35 | md-style-check | 54 | agent-learning |
+| 17 | agent-log-analysis | 36 | mvp-skeleton |  |  |
+| 18 | runtime-log-repair | 37 | document-canon-cleanup |  |  |
+| 19 | agent-eval-accumulation | 38 | worktree-start |  |  |
 | source order | catalog が定める skill id の順序（`agents/skills/catalog.yaml`） | readback | `tools/agent_tools/check_skill_tool_invocation_graph.py` が同じ source order を検証 |
 
 ## Complete Mermaid Projection Contract

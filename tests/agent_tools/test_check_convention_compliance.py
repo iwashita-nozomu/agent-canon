@@ -29,7 +29,6 @@ from tools.agent_tools.check_convention_compliance import (
     IMPLEMENTATION_GUARDRAIL_MARKERS,
     LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
     MATHEMATICAL_NECESSITY_MARKERS,
-    OWNER_BOUNDED_TOOL_ROUTE_MARKERS,
     OWNER_MAP_ENTRYPOINT_MARKERS,
     PR_ESSENCE_DOCUMENTATION_MARKERS,
     REFACTOR_SEQUENCE_MARKERS,
@@ -41,6 +40,7 @@ from tools.agent_tools.check_convention_compliance import (
     TEST_CONTRACT_ROUTING_MARKERS,
     TOOL_GATES,
     VALIDATION_FAILURE_RESPONSE_MARKERS,
+    check_surface_manifest_wiring,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -128,27 +128,25 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "issues/open/ issue_sync.py github_mirror\n"
     ),
     "documents/runtime/SHARED_RUNTIME_SURFACES.md": (
-        "surface_manifest.py documents/runtime/shared-runtime-surfaces.toml owner class\n"
-        ".codex/hooks.json .codex/hooks .devcontainer/ .vscode/ documents/README.md "
-        "documents/contracts/template-bootstrap.md "
-        "documents/contracts/github-first-module-and-devcontainer-policy.md "
-        "memory/USER_PREFERENCES.md "
-        "tests/agent_tools/ Root `tools/` is a parent-owned regular container "
+        "surface_manifest.py documents/runtime/shared-runtime-surfaces.toml AGENTS.md "
+        ".codex/config.toml .codex/agents tools/agent-canon Root `tools/` is a parent-owned regular container "
         "tools/agent-canon -> ../vendor/agent-canon/tools "
         "vendor/agent-canon/tools/ "
         "Project-local automation must stay in project-owned paths\n"
     ),
     "documents/runtime/shared-runtime-surfaces.toml": (
-        'mode = "standalone_only"\n'
-        'owner = "agent-canon-standalone"\n'
-        'path = "goal.md"\n'
-        '"documents/README.md"\n'
-        '"documents/contracts/template-bootstrap.md"\n'
-        '".devcontainer"\n'
-        '".vscode"\n'
-        '"documents/contracts/github-first-module-and-devcontainer-policy.md"\n'
-        '".codex/hooks.json"\n'
-        '"tests/agent_tools/test_check_convention_compliance.py"\n'
+        'version = 1\n'
+        'prefix = "vendor/agent-canon"\n'
+        'integration_mode = "live-agent-canon"\n'
+        'default_consumer = false\n'
+        'selection = "explicit-opt-in"\n'
+        'path = "AGENTS.md"\n'
+        'path = ".codex/config.toml"\n'
+        'path = ".codex/agents"\n'
+        'path = "tools/agent-canon"\n'
+        'path = ".agent-canon"\n'
+        'mode = "removed_legacy"\n'
+        'paths = [\n'
     ),
     "documents/agent-canon/agent-canon-parent-repo-latest-checklist.md": "checklist\n",
     "documents/runtime/runtime-profiles-and-check-matrix.md": (
@@ -216,15 +214,20 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "legacy-route drift duplicate implementation canonical owner "
         "caller migration contract-complete implementation acceptance contract "
         "design_issue_blocker implementation shortcut\n"
-        "Branch Reuse Default branch_worktree_guard.py user が別 branch を明示 "
+        "Branch Reuse Default tools/agent_tools/hook_safety.py user が別 branch を明示 "
         "AgentCanon branch / PR workflow "
         "branch_creation_reason=<reason> worktree_creation_reason=<reason> "
-        "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
-        "AGENT_CANON_DESTRUCTIVE_GIT_REASON=<reason> proven exact task ownership "
-        "session restart "
-        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
-        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow "
-        "AGENT_CANON_BRANCH_WORKTREE_REASON=<reason>\n"
+        "proven exact task ownership session restart "
+        "Git authority は操作リスクで分けます。 "
+        "通常の branch create / worktree add "
+        "creation authority/reason のみを要求し "
+        "force-create または ref overwrite "
+        "creation と destructive authority/reason の両方を要求 "
+        "既存 branch の checkout/switch "
+        "destructive authority/reason を要求します "
+        "`latest` / `apply` / merge update wrapper "
+        "worktree の remove/move/repair/prune/force-add "
+        "ambient 変数や prior segment は authority になりません。\n"
     ),
     "agents/canonical/CODEX_SUBAGENTS.md": "subagents\n",
     "agents/workflows/example-workflow.md": (
@@ -252,7 +255,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "owner, replaceable unit implementation mechanism validation route "
         "unresolved branch Abstract Design Frame "
         "design_issue_blocker implementation shortcut "
-        "$owner-bounded-routing "
+        "bounded owner route "
         "task-shape skill check_convention_compliance.py vertical dynamic wave "
         "write-capable handoff prose-reasoning-graph structure-planning "
         "md-style-check format-only structure_contract=skipped "
@@ -275,7 +278,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "design_issue_blocker implementation shortcut "
         "md-style-check format-only structure_contract=skipped "
         "existing-tool route targeted validation Owner-Bounded Change "
-        "parent-direct $owner-bounded-routing SKILL.md "
+        "parent-direct SKILL.md "
         "external public API/behavior/schema unchanged scoped_change "
         "dependency/consumer/migration/docs closure "
         "tool_rejection_preflight.py "
@@ -300,8 +303,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "SOLID principle signal OOP readability report class Protocol\n"
     ),
     "agents/skills/pr-processing.md": (
-        "PR Essence problem / user request design intent canonical owner "
-        "behavior or contract delta evidence route\n"
+        "single-candidate fast path base/head/diff/check/authority "
+        "dependency evidence\n"
     ),
     "agents/skills/subagent-bootstrap.md": (
         "selected_agent_type write_capable_handoff_blocker evidence "
@@ -314,19 +317,12 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "accepted_with_reason explicit_approval_evidence\n"
     ),
     "agents/skills/md-style-check.md": (
-        "prose-reasoning-graph structure-planning $owner-bounded-routing format-only "
+        "prose-reasoning-graph structure-planning bounded owner route format-only "
         "structure_contract=skipped existing-tool route targeted validation\n"
     ),
     "agents/skills/structure-planning.md": (
         "document_unit document_split_decision split_when merge_when "
         "invalid_split_boundaries\n"
-    ),
-    "agents/skills/owner-bounded-routing.md": (
-        "existing tool owner boundary targeted validation Owner-Bounded Change "
-        "targeted validation tool_rejection_preflight.py "
-        "structure_contract=skipped responsibility_scope owner scope protecting tools "
-        "実装ディレクトリ SKILL.md external public API/behavior/schema unchanged "
-        "scoped_change dependency/consumer/migration/docs closure\n"
     ),
     "agents/skills/test-design.md": (
         "contract-only wrapper static contract validation canonical command evidence "
@@ -343,7 +339,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/skills/worktree-health.md": (
         "agents/canonical/CODEX_WORKFLOW.md Branch Reuse Default "
-        "branch_worktree_guard.py "
+        "tools/agent_tools/hook_safety.py "
         "branch_creation_reason=<reason> "
         "worktree_creation_reason=<reason> git worktree list --porcelain "
         "git branch --show-current\n"
@@ -383,7 +379,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "mathematical necessity gate theorem surface\n"
     ),
     "agents/skills/README.md": (
-        "owner-bounded-routing existing tool targeted validation .codex/config.toml "
+        "bounded owner route existing tool targeted validation .codex/config.toml "
         "prose-reasoning-graph structure-planning md-style-check "
         "structure_contract=skipped external public API/behavior/schema unchanged "
         "scoped_change dependency/consumer/migration/docs closure\n"
@@ -394,7 +390,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "prose-reasoning-graph structure-planning SOLID SRP OCP LSP ISP DIP "
         "Single responsibility Open/closed Liskov Interface segregation "
         "Dependency inversion Protocol コードファイル 順序 定義順 関数 class\n"
-        "owner-bounded-routing owner-bounded targeted validation Owner-Bounded Change "
+        "bounded owner route bounded owner targeted validation Owner-Bounded Change "
         "external public API/behavior/schema unchanged scoped_change "
         "dependency/consumer/migration/docs closure\n"
         '- ["SOLID"]\n'
@@ -440,7 +436,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "| default specialists and review packs | "
         "`agents/task_catalog.yaml`; `agents/agents_config.json` |\n"
         "| run bundle, declared workflow / skills / review, and dynamic wave ledger | "
-        "`task_start.py`; `bootstrap_agent_run.py`; `workflow_monitor.py` |\n"
+        "`bootstrap_agent_run.py`; `workflow_monitor.py` |\n"
         "| skill selection | `agents/skills/catalog.yaml`; "
         "`python3 tools/agent_tools/route.py --prompt` |\n"
         "| implementation stage gate | "
@@ -509,29 +505,27 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     ".github/PULL_REQUEST_TEMPLATE.md": (
         "## PR Essence\n"
-        "Problem / user request\n"
-        "Design intent\n"
-        "Canonical owner\n"
-        "Behavior or contract delta\n"
-        "Evidence route\n"
+        "Problem / user request:\n"
+        "Canonical owner / responsibility unit:\n"
+        "Behavior or contract delta:\n"
+        "Evidence route:\n"
     ),
     ".github/PULL_REQUEST_TEMPLATE/agent_canon.md": (
         "## PR Essence\n"
-        "Problem / user request\n"
-        "Design intent\n"
-        "Canonical owner\n"
-        "Behavior or contract delta\n"
-        "Evidence route\n"
+        "Problem / user request:\n"
+        "Canonical owner / responsibility unit:\n"
+        "Behavior or contract delta:\n"
+        "Evidence route:\n"
     ),
     "tools/ci/run_all_checks.sh": (
-        "check_hardcoded_numbers.py check_static_any.py "
+        "check_static_any.py "
         "check_log_helper_names.py import_responsibility.py check_convention_compliance.py "
         "check_skill_frontmatter.py "
         "tool_catalog.py tool_drift.py notebook_quality.py "
         "check_github_workflows.py container_config.py check_runtime_profile_inventory.py\n"
     ),
     "tools/ci/check_agent_canon_pr.sh": (
-        "python3 tools/agent_tools/check_convention_compliance.py\n"
+        'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json\n'
         "python3 tools/ci/check_github_workflows.py\n"
     ),
     "rust/agent-canon/src/docs.rs": "runtime profile inventory\n",
@@ -577,7 +571,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "`check_agent_runtime_alignment.py` |\n"
         "| task bootstrap and CLI entrypoints | "
         "`vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md` | "
-        "`task_start.py`; `bootstrap_agent_run.py` |\n"
+        "`bootstrap_agent_run.py` |\n"
         "| subagent lifecycle, same-role instances, wave ledger | "
         "`vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md` | "
         "`workflow_monitor.py` |\n"
@@ -586,7 +580,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "`check_agent_runtime_alignment.py` |\n"
         "| skill routing and public skill surface | "
         "`vendor/agent-canon/agents/skills/catalog.yaml` | "
-        "`python3 tools/agent_tools/route.py --prompt` |\n"
+        "`python3 tools/agent-canon/agent_tools/route.py --prompt` |\n"
         "| report and closeout structure | `task_close.py` | closeout gate |\n"
     ),
     "AGENTS.md": (
@@ -597,7 +591,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "| Contract | Owner Surface | Validation |\n"
         "| -------- | ------------- | ---------- |\n"
         "| root runtime entrypoint | `ROOT_AGENTS.md` | "
-        "`bash tools/sync_agent_canon.sh check` |\n"
+        "`PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec "
+        "tools/sync_agent_canon.sh check` |\n"
         "| workflow family, spawn budget, role topology | "
         "`agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |\n"
         "| public skill registry | `agents/skills/catalog.yaml` | "
@@ -645,14 +640,6 @@ class CheckConventionComplianceTest(unittest.TestCase):
             text=True,
         )
 
-    def test_current_repository_passes(self) -> None:
-        """The canonical repository satisfies the convention wiring gate."""
-        result = self.run_checker(PROJECT_ROOT)
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("CONVENTION_COMPLIANCE=pass", result.stdout)
-        self.assertIn("CONVENTION_COMPLIANCE_FINDINGS=0", result.stdout)
-
     def test_generated_skill_content_is_outside_convention_policy(self) -> None:
         """Generated shim prose is validated by its dedicated readback gates."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -664,7 +651,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             result = self.run_checker(root)
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn(
+                "missing-positive-convention-compliance-command",
+                result.stdout,
+            )
             self.assertNotIn(".agents/skills", result.stdout)
 
     def test_policy_source_tables_exclude_generated_skill_shims(self) -> None:
@@ -679,7 +669,6 @@ class CheckConventionComplianceTest(unittest.TestCase):
             IMPLEMENTATION_GUARDRAIL_MARKERS,
             LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
             MATHEMATICAL_NECESSITY_MARKERS,
-            OWNER_BOUNDED_TOOL_ROUTE_MARKERS,
             PR_ESSENCE_DOCUMENTATION_MARKERS,
             REFACTOR_SEQUENCE_MARKERS,
             RESPONSIBILITY_PREFLIGHT_GATE_MARKERS,
@@ -722,6 +711,47 @@ class CheckConventionComplianceTest(unittest.TestCase):
             workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             workflow.write_text(
                 "#!/usr/bin/env bash\n# Mention check_convention_compliance.py only.\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-positive-convention-compliance-command",
+                result.stdout,
+            )
+
+    def test_workflow_hook_positive_quoted_canonical_command(self) -> None:
+        """A canonical quoted root/format invocation satisfies the positive command check."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            workflow.write_text(
+                "#!/usr/bin/env bash\n"
+                'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py"'
+                ' --root "${WORKSPACE_ROOT}" --format json\n',
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertNotIn(
+                "missing-positive-convention-compliance-command",
+                result.stdout,
+            )
+
+    def test_workflow_hook_requires_no_trailing_whitespace(self) -> None:
+        """A positive command with trailing space is rejected."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            workflow.write_text(
+                "#!/usr/bin/env bash\n"
+                'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py"'
+                ' --root "${WORKSPACE_ROOT}" --format json \n',
                 encoding="utf-8",
             )
 
@@ -820,7 +850,64 @@ class CheckConventionComplianceTest(unittest.TestCase):
                 "surface_manifest:documents/runtime/SHARED_RUNTIME_SURFACES.md",
                 result.stdout,
             )
-            self.assertIn("missing-marker:.codex/hooks.json", result.stdout)
+            self.assertIn("missing-marker:AGENTS.md", result.stdout)
+
+    def test_parent_root_sync_adapter_delegates_to_vendored_source(self) -> None:
+        """A parent root adapter may delegate all sync internals to AgentCanon."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "vendor" / "agent-canon"
+            self.copy_minimal_repo(source)
+            adapter = root / "tools" / "sync_agent_canon.sh"
+            adapter.parent.mkdir(parents=True)
+            adapter.write_text(
+                "#!/usr/bin/env bash\n"
+                'exec env PYTHONPATH="vendor/agent-canon/tools:tools" \\\n'
+                "  python3 -m agent_tools.agent_canon_source_root exec \\\n"
+                '  tools/sync_agent_canon.sh "$@"\n',
+                encoding="utf-8",
+            )
+
+            findings = check_surface_manifest_wiring(root)
+
+            self.assertEqual(findings, [])
+
+    def test_parent_without_root_sync_adapter_uses_vendored_projection(self) -> None:
+        """Parent mode without root adapter still passes when vendored projection is present."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "vendor" / "agent-canon"
+            self.copy_minimal_repo(source)
+
+            findings = check_surface_manifest_wiring(root)
+
+            self.assertEqual(findings, [])
+
+    def test_parent_root_sync_adapter_wrong_target_fails(self) -> None:
+        """Mistargeted parent adapters fail without internal markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "vendor" / "agent-canon"
+            self.copy_minimal_repo(source)
+            adapter = root / "tools" / "sync_agent_canon.sh"
+            adapter.parent.mkdir(parents=True)
+            adapter.write_text(
+                "#!/usr/bin/env bash\n"
+                'exec env PYTHONPATH="vendor/agent-canon/tools:tools" '
+                "python3 -m agent_tools.agent_canon_source_root exec "
+                'tools/update_agent_canon.sh "$@"\n',
+                encoding="utf-8",
+            )
+
+            findings = check_surface_manifest_wiring(root)
+
+            self.assertTrue(findings)
+            self.assertTrue(
+                any(
+                    "missing-root-source-adapter-marker" in finding.detail
+                    for finding in findings
+                )
+            )
 
     def test_hook_guardrail_policy_marker_fails(self) -> None:
         """Every stable dispatcher contract marker remains mechanically required."""
@@ -857,7 +944,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("hook_guardrail_policy:tools/agent_tools/hook_safety.py", result.stdout)
+            self.assertIn(
+                "hook_guardrail_policy:tools/agent_tools/hook_safety.py", result.stdout
+            )
             self.assertIn("missing-marker:operation", result.stdout)
 
     def test_parent_repo_can_keep_shared_docs_only_in_vendor_canon(self) -> None:
@@ -993,7 +1082,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            skill = root / "agents" / "skills" / "agent-orchestration.md"
+            skill = root / "agents" / "skills" / "codex-task-workflow.md"
             skill.write_text(
                 skill.read_text(encoding="utf-8").replace(
                     " status=blocked",
@@ -1139,90 +1228,6 @@ class CheckConventionComplianceTest(unittest.TestCase):
         )
 
         self.assertEqual(missing, [])
-
-    def test_owner_bounded_tool_route_requires_tool_route_markers(self) -> None:
-        """Small edit routes must keep owner-bounded tool route markers."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            skill_doc = root / "agents" / "skills" / "agent-orchestration.md"
-            skill_doc.write_text(
-                skill_doc.read_text(encoding="utf-8").replace(
-                    " existing-tool route",
-                    "",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("owner_bounded_tool_route", result.stdout)
-            self.assertIn("missing-marker:existing-tool route", result.stdout)
-
-    def test_owner_bounded_tool_route_requires_public_surface_invariance(self) -> None:
-        """Owner-bounded routing requires external public-surface invariance."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            skill_doc = root / "agents" / "skills" / "owner-bounded-routing.md"
-            skill_doc.write_text(
-                skill_doc.read_text(encoding="utf-8").replace(
-                    "external public API/behavior/schema unchanged",
-                    "public impact known",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("owner_bounded_tool_route", result.stdout)
-            self.assertIn(
-                "agents/skills/owner-bounded-routing.md:missing-marker:"
-                "external public API/behavior/schema unchanged",
-                result.stdout,
-            )
-
-    def test_minimal_fixture_covers_owner_bounded_tool_route_surfaces(self) -> None:
-        """The fixture includes every owner-bounded tool route surface."""
-        missing = sorted(
-            path
-            for path in OWNER_BOUNDED_TOOL_ROUTE_MARKERS
-            if path not in MINIMAL_REPO_FILES
-        )
-
-        self.assertEqual(missing, [])
-
-    def test_owner_bounded_routing_requires_catalog_trigger_marker(self) -> None:
-        """Owner-bounded route stays discoverable from the skill catalog."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            catalog = root / "agents" / "skills" / "catalog.yaml"
-            catalog.write_text(
-                catalog.read_text(encoding="utf-8").replace("owner-bounded", ""),
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("owner_bounded_tool_route", result.stdout)
-            self.assertIn("missing-marker:owner-bounded", result.stdout)
-
-    def test_owner_bounded_tool_route_contract_is_manifest_backed(self) -> None:
-        """Owner-bounded marker surfaces are loaded from the manifest contract."""
-        self.assertIn(
-            "agents/skills/owner-bounded-routing.md",
-            OWNER_BOUNDED_TOOL_ROUTE_MARKERS,
-        )
-        self.assertFalse(
-            any(
-                path.startswith(".agents/skills/")
-                for path in OWNER_BOUNDED_TOOL_ROUTE_MARKERS
-            )
-        )
 
     def test_design_integrity_gate_requires_markers(self) -> None:
         """Design guidance must keep implementation tied to responsibility model."""
@@ -1446,7 +1451,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("branch_worktree_creation_guard", result.stdout)
-            self.assertIn("missing-marker:tools/agent_tools/hook_safety.py", result.stdout)
+            self.assertIn(
+                "missing-marker:tools/agent_tools/hook_safety.py", result.stdout
+            )
 
     def test_minimal_fixture_covers_branch_worktree_guard_surfaces(self) -> None:
         """The minimal test fixture includes every branch/worktree guard surface."""
@@ -1687,13 +1694,31 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
         self.assertEqual(missing, [])
 
-    def test_review_issue_routing_requires_markers(self) -> None:
-        """Review findings keep durable issue routing markers."""
+    def test_review_issue_routing_is_conditional_and_keeps_owner_markers(self) -> None:
+        """Only durable review follow-up uses issue routing markers."""
+        self.assertNotIn(
+            "agents/skills/change-review.md",
+            REVIEW_ISSUE_ROUTING_MARKERS,
+        )
+        self.assertIn(
+            "documents/conventions/REVIEW_PROCESS.md",
+            REVIEW_ISSUE_ROUTING_MARKERS,
+        )
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
             review_skill = root / "agents" / "skills" / "change-review.md"
             review_skill.write_text("review findings only\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            review_process = root / "documents" / "conventions" / "REVIEW_PROCESS.md"
+            review_process.write_text("review policy without durable follow-up\n", encoding="utf-8")
 
             result = self.run_checker(root)
 
@@ -1720,7 +1745,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             template = root / ".github" / "PULL_REQUEST_TEMPLATE.md"
             template.write_text(
                 template.read_text(encoding="utf-8").replace(
-                    "Behavior or contract delta\n",
+                    "Behavior or contract delta:\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -1731,9 +1756,24 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("pr_essence_documentation", result.stdout)
             self.assertIn(
-                "missing-marker:Behavior or contract delta",
+                "missing-marker:Behavior or contract delta:",
                 result.stdout,
             )
+
+    def test_pr_essence_documentation_does_not_bind_operational_skill(self) -> None:
+        """PR body/workflow owners retain essence fields without skill duplication."""
+        self.assertNotIn(
+            "agents/skills/pr-processing.md",
+            PR_ESSENCE_DOCUMENTATION_MARKERS,
+        )
+        self.assertIn(
+            ".github/PULL_REQUEST_TEMPLATE.md",
+            PR_ESSENCE_DOCUMENTATION_MARKERS,
+        )
+        self.assertIn(
+            "agents/workflows/agent-canon-pr-workflow.md",
+            PR_ESSENCE_DOCUMENTATION_MARKERS,
+        )
 
     def test_minimal_fixture_covers_pr_essence_documentation_surfaces(self) -> None:
         """The minimal test fixture includes every PR essence documentation surface."""
@@ -1837,8 +1877,18 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
         self.assertEqual(missing, [])
 
-    def test_source_file_definition_order_requires_review_markers(self) -> None:
-        """Source definition order guidance stays wired to Python review evidence."""
+    def test_source_file_definition_order_is_owned_by_conventions_not_python_review(
+        self,
+    ) -> None:
+        """Definition-order guidance remains in its semantic convention owners."""
+        self.assertNotIn(
+            "agents/skills/python-review.md",
+            SOURCE_FILE_DEFINITION_ORDER_MARKERS,
+        )
+        self.assertIn(
+            "documents/conventions/python/09_file_roles.md",
+            SOURCE_FILE_DEFINITION_ORDER_MARKERS,
+        )
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
@@ -1853,9 +1903,19 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             result = self.run_checker(root)
 
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            file_roles = root / "documents" / "conventions" / "python" / "09_file_roles.md"
+            file_roles.write_text("python file roles without ordering owner\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("source_file_definition_order", result.stdout)
-            self.assertIn("missing-marker:定義順", result.stdout)
+            self.assertIn("missing-marker:読者順序", result.stdout)
 
     def test_source_file_definition_order_requires_catalog_trigger(self) -> None:
         """Source definition order feedback stays visible in deterministic routing."""

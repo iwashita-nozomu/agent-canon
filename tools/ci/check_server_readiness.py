@@ -178,9 +178,11 @@ def collect_findings(layout: dict[str, object] | None) -> tuple[list[Finding], l
             findings.append(Finding("warning", f"docker version failed: {format_command_result(docker_version)}"))
 
     default_paths = {
-        "workspace_root": Path("/mnt/l/workspace"),
         "docker_state_root": Path("/var/lib/docker"),
     }
+    host_workspace_root = os.environ.get("AGENT_CANON_HOST_WORKSPACE_ROOT", "")
+    if host_workspace_root:
+        default_paths["workspace_root"] = Path(host_workspace_root)
     for label, path in default_paths.items():
         if path.exists():
             mount_info = mount_for_path(path, mounts)

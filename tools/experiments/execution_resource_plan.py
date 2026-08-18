@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Owns the immutable ExecutionResourcePlan transaction, canonical GPU allocation, ExperimentRunner handoff, and completion coverage.
+# responsibility Owns the immutable ExecutionResourcePlan transaction, canonical GPU allocation, reusable GPU admission primitives, managed ExperimentRunner handoff, and completion coverage.
 # upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 U-18 implementation frame and exact packet identity
 # upstream design ../../documents/design/experiment_runner.md ExperimentRunner lifecycle and scheduler boundary
 # upstream design ../../agents/skills/gpu-execution.md UUID GPU and readback contract
@@ -10,19 +10,21 @@
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md validation failure reader projection
 # upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md official nvidia-smi C/G/M/O/C+G/M+C process visibility, PID/start/container mapping, MIG UUID mapping
 # downstream implementation ./run_managed_experiment.py managed experiment adapter
+# downstream implementation ./gpu_command_admission.py provider-independent direct GPU admission adapter
 # downstream implementation ../agent_tools/execution_resource_projection.py validates exact coarse PostToolUse projection constants
 # downstream implementation ../agent_tools/jit_canonical_ir.py GPU requests must route here or fail typed preflight
 # downstream implementation ../../templates/experiments/_template/run.py direct GPU launch is statically prohibited
 # downstream environment ../../.devcontainer/devcontainer.json selects the shared runtime receipt stages
 # @dependency-end
 
-# Static consumer closure: run_managed_experiment.py is the only managed-run
-# consumer; generic lifecycle remains in the fixed ff97 ExperimentRunner source.
+# Static consumer closure: run_managed_experiment.py is the managed-run
+# consumer; gpu_command_admission.py reuses only admission primitives for the
+# provider-independent direct-command route.
 
-"""Canonical execution resource planning for managed ExperimentRunner runs.
+"""Canonical execution resource planning for admitted managed runs.
 
 This module deliberately owns the complete resource transaction.  Callers may
-provide observations and an ExperimentRunner transport, but they cannot add a
+provide observations and an admitted-run transport, but they cannot add a
 second GPU policy, mutate a frozen plan, or fall back to a different execution
 mode when the requested allocation is unavailable.
 """
@@ -42,20 +44,16 @@ import subprocess
 import threading
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
-from enum import StrEnum
+from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Callable, Literal, Mapping, Protocol, Sequence, TypeAlias, cast
-
-if TYPE_CHECKING:
-    from experiment_runner import RunnerLifecycleEvidence
+from typing import Callable, Literal, Mapping, Protocol, Sequence, TypeAlias, cast
 
 try:
     import fcntl
 except ImportError:  # pragma: no cover - this owner is Unix/container-only.
     fcntl = None  # type: ignore[assignment]
-
 
 PLAN_SCHEMA_VERSION = "execution-resource-plan/v1"
 ENVIRONMENT_CERTIFICATE_SCHEMA_VERSION = "environment-certificate/v1"
@@ -63,6 +61,15 @@ COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION = "completion-coverage/v2"
 HOST_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
 CONTAINER_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
 RUNTIME_ROOT = Path(HOST_RUNTIME_ROOT)
+
+
+class RunnerLifecycleEvidence(Protocol):
+    """Minimal lifecycle artifact boundary supplied by the admitted CLI."""
+
+    def to_dict(self) -> Mapping[str, object]:
+        """Return the schema-owned lifecycle evidence mapping."""
+
+
 LOCK_ROOT = RUNTIME_ROOT / "locks"
 SOURCE_PROJECTION_TEMPLATE = "/workspace/reports/agents/{run_id}/runtime"
 STRUCTURE_CONTRACT_REF = "documents/structure/repo-structure-contract.toml"
@@ -117,7 +124,10 @@ SENSITIVE_ENV_PARTS = (
 )
 
 
-class PlanState(StrEnum):
+# StrEnum is unavailable on supported Python <3.11 runtimes.
+class PlanState(str, Enum):  # noqa: UP042
+    __str__ = str.__str__
+
     RESOURCE_DISCOVERED = "resource_discovered"
     PLAN_FROZEN = "plan_frozen"
     ENV_MATERIALIZED = "env_materialized"
@@ -179,6 +189,7 @@ AbsolutePosixPath: TypeAlias = str
 RelativePosixPath: TypeAlias = str
 FullGpuUuid: TypeAlias = str
 FullMigUuid: TypeAlias = str
+GpuUnitDisposition: TypeAlias = Literal["BUSY", "UNKNOWN", "FREE"]
 EvidenceAbsenceField: TypeAlias = Literal[
     "source_freeze_evidence",
     "lock_readback",
@@ -339,14 +350,12 @@ def _read_runtime_receipt(
             not stat.S_ISREG(before.st_mode)
             or before.st_dev != parent_stat.st_dev
             or stat.S_IMODE(before.st_mode) != 0o660
-            or before.st_uid != parent_stat.st_uid
-            or before.st_gid != parent_stat.st_gid
             or before.st_size <= 0
             or before.st_size > 65536
         ):
             raise TypedPreflightFailure(
                 "runtime_receipt_invalid",
-                "runtime receipt fd identity, mode, owner, group, or size is invalid",
+                "runtime receipt fd identity, mode, or size is invalid",
                 path=path,
             )
         chunks: list[bytes] = []
@@ -466,8 +475,6 @@ def write_runtime_receipt_atomic(
             not stat.S_ISREG(lock_stat.st_mode)
             or lock_stat.st_dev != parent_stat.st_dev
             or stat.S_IMODE(lock_stat.st_mode) != 0o660
-            or lock_stat.st_uid != parent_stat.st_uid
-            or lock_stat.st_gid != parent_stat.st_gid
         ):
             raise TypedPreflightFailure(
                 "runtime_receipt_lock_tampered",
@@ -492,8 +499,6 @@ def write_runtime_receipt_atomic(
                 not stat.S_ISREG(existing.st_mode)
                 or existing.st_dev != parent_stat.st_dev
                 or stat.S_IMODE(existing.st_mode) != 0o660
-                or existing.st_uid != parent_stat.st_uid
-                or existing.st_gid != parent_stat.st_gid
             ):
                 raise TypedPreflightFailure(
                     "runtime_receipt_target_tampered",
@@ -728,7 +733,7 @@ def _require_receipt_shape(
 def read_shared_runtime_provision(
     path: AbsolutePosixPath,
 ) -> SharedRuntimeProvisionReceipt:
-    payload, receipt_stat = _read_runtime_receipt(path)
+    payload, _receipt_stat = _read_runtime_receipt(path)
     _require_receipt_shape(
         payload,
         frozenset(
@@ -791,10 +796,16 @@ def read_shared_runtime_provision(
             "runtime provision receipt fingerprint does not match its payload",
             path=path,
         )
-    if receipt_stat.st_uid != typed_payload["host_uid"]:
+    if typed_payload["host_uid"] <= 0 or typed_payload["host_gid"] < 0:
         raise TypedPreflightFailure(
-            "runtime_receipt_identity_mismatch",
-            "runtime provision receipt fd owner differs from its host identity",
+            "runtime_identity_invalid",
+            "runtime provision receipt UID/GID must be nonzero/nonnegative",
+            path=path,
+        )
+    if typed_payload["host_supplementary_gids"] != (typed_payload["host_gid"],):
+        raise TypedPreflightFailure(
+            "runtime_identity_invalid",
+            "runtime provision receipt supplementary groups must equal its primary GID",
             path=path,
         )
     return SharedRuntimeProvisionReceipt(
@@ -826,7 +837,7 @@ def read_shared_runtime_provision(
 def read_shared_runtime_readback(
     path: AbsolutePosixPath,
 ) -> SharedRuntimeReadbackReceipt:
-    payload, receipt_stat = _read_runtime_receipt(path)
+    payload, _receipt_stat = _read_runtime_receipt(path)
     _require_receipt_shape(
         payload,
         frozenset(
@@ -912,10 +923,18 @@ def read_shared_runtime_readback(
             "runtime readback receipt fingerprint does not match its payload",
             path=path,
         )
-    if receipt_stat.st_uid != typed_payload["container_uid"]:
+    if typed_payload["container_uid"] <= 0 or typed_payload["container_gid"] < 0:
         raise TypedPreflightFailure(
-            "runtime_receipt_identity_mismatch",
-            "runtime readback receipt fd owner differs from its container identity",
+            "runtime_identity_invalid",
+            "runtime readback receipt UID/GID must be nonzero/nonnegative",
+            path=path,
+        )
+    if typed_payload["container_supplementary_gids"] != (
+        typed_payload["container_gid"],
+    ):
+        raise TypedPreflightFailure(
+            "runtime_identity_invalid",
+            "runtime readback receipt supplementary groups must equal its primary GID",
             path=path,
         )
     return SharedRuntimeReadbackReceipt(
@@ -966,11 +985,20 @@ class RuntimeIdentityReader:
                 "provision and readback routes differ",
             )
         if (
-            provision.host_uid != readback.container_uid
-            or provision.host_gid != readback.container_gid
-            or provision.host_supplementary_gids
-            != readback.container_supplementary_gids
-            or provision.host_umask != readback.container_umask
+            provision.host_uid <= 0
+            or provision.host_gid < 0
+            or provision.host_supplementary_gids != (provision.host_gid,)
+            or readback.container_uid <= 0
+            or readback.container_gid < 0
+            or readback.container_supplementary_gids != (readback.container_gid,)
+        ):
+            raise TypedPreflightFailure(
+                "runtime_identity_invalid",
+                "runtime provision/readback numeric identity is invalid under the mapping-neutral identity contract",
+            )
+        if (
+            provision.host_umask != 0o0007
+            or readback.container_umask != 0o0007
             or provision.bind_source_dev != readback.bind_target_dev
             or provision.bind_source_ino != readback.bind_target_ino
             or readback.probe_fd_disposition != "closed"
@@ -980,21 +1008,16 @@ class RuntimeIdentityReader:
         ):
             raise TypedPreflightFailure(
                 "runtime_identity_mismatch",
-                "runtime provision/readback identity is not exact",
-            )
-        if provision.host_uid == 0:
-            raise TypedPreflightFailure(
-                "runtime_identity_invalid",
-                "UID 0 is not a valid managed runtime identity",
+                "runtime provision/readback evidence is invalid under the mapping-neutral identity contract",
             )
         receipt_payload = {
             "schema_version": RUNTIME_IDENTITY_SCHEMA_VERSION,
             "runtime_route": provision.runtime_route,
             "namespace_inode": readback.namespace_inode,
-            "uid": provision.host_uid,
-            "gid": provision.host_gid,
-            "supplementary_gids": provision.host_supplementary_gids,
-            "umask": provision.host_umask,
+            "uid": readback.container_uid,
+            "gid": readback.container_gid,
+            "supplementary_gids": readback.container_supplementary_gids,
+            "umask": readback.container_umask,
             "bind_source_dev": provision.bind_source_dev,
             "bind_source_ino": provision.bind_source_ino,
             "bind_target_dev": readback.bind_target_dev,
@@ -1854,7 +1877,7 @@ def _source_file_record_payload(
 
 
 def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _canonical_json(value: object) -> str:
@@ -1939,6 +1962,220 @@ def _write_json_once(
 
 
 @dataclass(frozen=True)
+class ProcessRoot:
+    """The immutable process-root identity used by GPU admission."""
+
+    pid: int
+    starttime: str
+    pid_namespace: str
+    cgroup: str
+
+    def __post_init__(self) -> None:
+        if (
+            self.pid <= 0
+            or not self.starttime
+            or not self.pid_namespace
+            or not self.cgroup
+        ):
+            raise ValueError("process root requires pid, starttime, namespace, and cgroup")
+
+
+@dataclass(frozen=True)
+class _ProcRecord:
+    pid: int
+    starttime: str
+    parent_pid: int
+    pid_namespace: str
+    cgroup: str
+
+
+@dataclass(frozen=True)
+class ProcAncestryEvidence:
+    """Authoritative proc ancestry; pstree is capability metadata only."""
+
+    holder: ProcessRoot
+    root: ProcessRoot
+    chain: tuple[ProcessRoot, ...]
+    pstree_available: bool
+    pstree_path: str
+
+
+class ProcAncestryProbe:
+    """Read and validate one process ancestry without sending signals."""
+
+    def __init__(
+        self,
+        *,
+        proc_root: Path = Path("/proc"),
+        max_depth: int = 64,
+    ) -> None:
+        if max_depth <= 0:
+            raise ValueError("process ancestry depth must be positive")
+        self.proc_root = proc_root
+        self.max_depth = max_depth
+        self.pstree_path = shutil.which("pstree") or ""
+
+    def observe(self, pid: int) -> ProcAncestryEvidence:
+        if pid <= 0:
+            raise TypedPreflightFailure(
+                "gpu_process_identity_unproven",
+                "GPU process PID must be positive",
+                pid=pid,
+            )
+        first = self._read_record(pid)
+        chain: list[ProcessRoot] = []
+        seen: set[int] = set()
+        current = first
+        holder_namespace = first.pid_namespace
+        holder_cgroup = first.cgroup
+        for depth in range(self.max_depth):
+            if current.pid in seen:
+                raise TypedPreflightFailure(
+                    "gpu_process_ancestry_cycle",
+                    "process ancestry contains a PID cycle",
+                    pid=current.pid,
+                    depth=depth,
+                )
+            seen.add(current.pid)
+            if current.pid_namespace != holder_namespace:
+                raise TypedPreflightFailure(
+                    "gpu_process_namespace_mismatch",
+                    "process ancestry crosses PID namespaces",
+                    pid=current.pid,
+                    holder_namespace=holder_namespace,
+                    observed_namespace=current.pid_namespace,
+                )
+            if current.cgroup != holder_cgroup:
+                raise TypedPreflightFailure(
+                    "gpu_process_cgroup_mismatch",
+                    "process ancestry crosses cgroups",
+                    pid=current.pid,
+                    holder_cgroup=holder_cgroup,
+                    observed_cgroup=current.cgroup,
+                )
+            chain.append(
+                ProcessRoot(
+                    pid=current.pid,
+                    starttime=current.starttime,
+                    pid_namespace=current.pid_namespace,
+                    cgroup=current.cgroup,
+                )
+            )
+            if current.parent_pid in {0, 1}:
+                break
+            current = self._read_record(current.parent_pid)
+        else:
+            raise TypedPreflightFailure(
+                "gpu_process_ancestry_depth_exceeded",
+                "process ancestry exceeded its bounded depth",
+                pid=pid,
+                max_depth=self.max_depth,
+            )
+        return ProcAncestryEvidence(
+            holder=chain[0],
+            root=chain[-1],
+            chain=tuple(chain),
+            pstree_available=bool(self.pstree_path),
+            pstree_path=self.pstree_path,
+        )
+
+    def _read_record(self, pid: int) -> _ProcRecord:
+        proc_dir = self.proc_root / str(pid)
+        stat_path = proc_dir / "stat"
+        status_path = proc_dir / "status"
+        try:
+            before = self._parse_stat(stat_path.read_text(encoding="utf-8"), pid)
+            status = self._parse_status(status_path.read_text(encoding="utf-8"), pid)
+            pid_namespace = str((proc_dir / "ns" / "pid").readlink())
+            cgroup = self._parse_cgroup((proc_dir / "cgroup").read_text(encoding="utf-8"), pid)
+            after = self._parse_stat(stat_path.read_text(encoding="utf-8"), pid)
+        except TypedPreflightFailure:
+            raise
+        except (FileNotFoundError, PermissionError, OSError, UnicodeError) as exc:
+            raise TypedPreflightFailure(
+                "gpu_process_identity_unproven",
+                "authoritative proc ancestry is unavailable",
+                pid=pid,
+            ) from exc
+        if before != after:
+            raise TypedPreflightFailure(
+                "gpu_process_identity_raced",
+                "proc stat starttime or PPid changed during ancestry read",
+                pid=pid,
+            )
+        if status != before.parent_pid:
+            raise TypedPreflightFailure(
+                "gpu_process_parent_mismatch",
+                "proc status PPid and stat PPid disagree",
+                pid=pid,
+                stat_ppid=before.parent_pid,
+                status_ppid=status,
+            )
+        if not pid_namespace or not cgroup:
+            raise TypedPreflightFailure(
+                "gpu_process_identity_unproven",
+                "proc namespace or cgroup identity is empty",
+                pid=pid,
+            )
+        return replace(before, pid_namespace=pid_namespace, cgroup=cgroup)
+
+    @staticmethod
+    def _parse_stat(raw: str, pid: int) -> _ProcRecord:
+        suffix = raw.rsplit(")", 1)[-1].split()
+        if len(suffix) <= 19:
+            raise TypedPreflightFailure(
+                "gpu_process_identity_unproven",
+                "proc stat omitted starttime or PPid",
+                pid=pid,
+            )
+        try:
+            parent_pid = int(suffix[1])
+        except ValueError as exc:
+            raise TypedPreflightFailure(
+                "gpu_process_identity_unproven",
+                "proc stat PPid is not numeric",
+                pid=pid,
+            ) from exc
+        starttime = suffix[19]
+        if not starttime or starttime in {"unknown", "dead"}:
+            raise TypedPreflightFailure(
+                "gpu_process_identity_unproven",
+                "proc stat starttime is not authoritative",
+                pid=pid,
+                starttime=starttime,
+            )
+        return _ProcRecord(pid, starttime, parent_pid, "", "")
+
+    @staticmethod
+    def _parse_status(raw: str, pid: int) -> int:
+        values = {
+            line.split(":", 1)[0]: line.split(":", 1)[1].strip()
+            for line in raw.splitlines()
+            if ":" in line
+        }
+        try:
+            return int(values["PPid"])
+        except (KeyError, ValueError) as exc:
+            raise TypedPreflightFailure(
+                "gpu_process_identity_unproven",
+                "proc status omitted numeric PPid",
+                pid=pid,
+            ) from exc
+
+    @staticmethod
+    def _parse_cgroup(raw: str, pid: int) -> str:
+        records = tuple(line.strip() for line in raw.splitlines() if line.strip())
+        if not records:
+            raise TypedPreflightFailure(
+                "gpu_process_identity_unproven",
+                "proc cgroup identity is unavailable",
+                pid=pid,
+            )
+        unified = tuple(record for record in records if "::" in record)
+        return "|".join(unified or records)
+
+
+@dataclass(frozen=True)
 class ProcessIdentity:
     """GPU process identity including PID and process-start identity."""
 
@@ -1951,6 +2188,10 @@ class ProcessIdentity:
     observation_timestamp: str = ""
     observation_fingerprint: str = ""
     container_namespace_identity: str = ""
+    pid_namespace: str = ""
+    cgroup: str = ""
+    process_root: ProcessRoot | None = None
+    ancestry: tuple[ProcessRoot, ...] = ()
 
     def __post_init__(self) -> None:
         if (
@@ -1991,6 +2232,8 @@ class ResourceObservation:
     tool_availability: Mapping[str, object] = field(default_factory=dict)
     container_id: str = ""
     nvidia_inventory: "NvidiaInventory | None" = None
+    unknown_gpu_ids: frozenset[str] = frozenset()
+    unit_states: Mapping[str, GpuUnitDisposition] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "caller_allocated_ids", frozenset(self.caller_allocated_ids))
@@ -1998,6 +2241,8 @@ class ResourceObservation:
         object.__setattr__(self, "gpu_devices", tuple(sorted(self.gpu_devices, key=lambda device: device.uuid)))
         object.__setattr__(self, "free_memory_bytes", _freeze_mapping(self.free_memory_bytes))
         object.__setattr__(self, "container_visible_ids", frozenset(self.container_visible_ids))
+        object.__setattr__(self, "unknown_gpu_ids", frozenset(self.unknown_gpu_ids))
+        object.__setattr__(self, "unit_states", _freeze_mapping(self.unit_states))
         object.__setattr__(self, "cpu_available_set", tuple(sorted(self.cpu_available_set)))
         object.__setattr__(self, "structure_tool", _freeze_mapping(self.structure_tool))
         object.__setattr__(self, "tool_availability", _freeze_mapping(self.tool_availability))
@@ -2030,8 +2275,8 @@ class ResourceObservation:
                             "free_memory_bytes": dict(self.free_memory_bytes),
                             "boot_id": self.boot_id,
                             "container_visible_ids": tuple(sorted(self.container_visible_ids)),
-                            "observed_at": self.observed_at,
-                            "observation_event_id": self.observation_event_id,
+                            "unknown_gpu_ids": tuple(sorted(self.unknown_gpu_ids)),
+                            "unit_states": dict(self.unit_states),
                         }
                     ).encode("utf-8")
                 ).hexdigest(),
@@ -2197,6 +2442,17 @@ def _structured_unit_uuid(
     explicit_uuid = element.find("uuid")
     if explicit_uuid is not None and explicit_uuid.text:
         return explicit_uuid.text.strip()
+    unit = _nearest_xml_ancestor(
+        element,
+        parent_map,
+        frozenset({"mig_device", "mig_instance", "compute_instance", "gpu_instance", "gpu"}),
+    )
+    if unit is None:
+        return ""
+    if _xml_local_name(unit) != "gpu":
+        unit_uuid = unit.find("uuid")
+        if unit_uuid is not None and unit_uuid.text:
+            return unit_uuid.text.strip()
     physical = _nearest_xml_ancestor(element, parent_map, frozenset({"gpu"}))
     if physical is None:
         return ""
@@ -2331,8 +2587,11 @@ def _parse_structured_gpu_processes(
     root: ET.Element,
     device_by_uuid: Mapping[str, GPUDevice],
     parent_map: Mapping[ET.Element, ET.Element],
-) -> tuple[ProcessIdentity, ...]:
+) -> _StructuredProcessParse:
     processes: list[ProcessIdentity] = []
+    unknown_gpu_ids: set[str] = set()
+    xml_binding_unknown = False
+    ancestry_probe = ProcAncestryProbe()
     for process_info in root.findall(".//process_info"):
         pid_text = _xml_text(process_info.find("pid"), "process_info.pid")
         try:
@@ -2358,12 +2617,7 @@ def _parse_structured_gpu_processes(
         if not process_kind_tokens or not process_kind_tokens.issubset(
             {"C", "G", "M", "O"}
         ):
-            raise TypedPreflightFailure(
-                "gpu_process_kind_visibility_unproven",
-                "GPU process context is not classified by the structured inventory",
-                pid=pid,
-                observed_type=raw_process_kind,
-            )
+            process_kind_tokens = frozenset({"O"})
         if {"G", "C"}.issubset(process_kind_tokens):
             process_kind = "compute_graphics"
         elif "G" in process_kind_tokens:
@@ -2390,50 +2644,50 @@ def _parse_structured_gpu_processes(
         if graphics_ancestor:
             process_kind = "graphics"
         if not bound_uuid or bound_uuid not in device_by_uuid:
-            raise TypedPreflightFailure(
-                "gpu_process_uuid_visibility_unproven",
-                "GPU process context cannot be bound to an observed GPU/MIG UUID",
-                pid=pid,
-                observed_uuid=bound_uuid,
-                process_kind=process_kind,
-            )
-        start_identity, parent_pid = _proc_start_and_parent(pid)
+            xml_binding_unknown = True
+            continue
         try:
-            container_namespace_identity = str(Path(f"/proc/{pid}/ns/pid").readlink())
-        except (FileNotFoundError, PermissionError, OSError) as exc:
-            raise TypedPreflightFailure(
-                "gpu_process_identity_unproven",
-                "GPU process PID/container namespace mapping is unavailable",
-                pid=pid,
-            ) from exc
-        if not container_namespace_identity:
-            raise TypedPreflightFailure(
-                "gpu_process_identity_unproven",
-                "GPU process container namespace identity is empty",
-                pid=pid,
-            )
-        relationship = _process_relationship(pid, parent_pid)
+            ancestry = ancestry_probe.observe(pid)
+        except TypedPreflightFailure:
+            unknown_gpu_ids.add(bound_uuid)
+            continue
+        parent_pid = ancestry.chain[1].pid if len(ancestry.chain) > 1 else None
+        relationship = (
+            "planner_process"
+            if pid == os.getpid()
+            else "child"
+            if parent_pid == os.getpid()
+            else "external"
+        )
         processes.append(
             ProcessIdentity(
                 pid=pid,
-                process_start_identity=start_identity,
+                process_start_identity=ancestry.holder.starttime,
                 gpu_uuid=bound_uuid,
                 kind=process_kind,
                 parent_pid=parent_pid,
                 relationship=relationship,
-                container_namespace_identity=container_namespace_identity,
+                container_namespace_identity=ancestry.holder.pid_namespace,
+                pid_namespace=ancestry.holder.pid_namespace,
+                cgroup=ancestry.holder.cgroup,
+                process_root=ancestry.root,
+                ancestry=ancestry.chain,
             )
         )
-    return tuple(
-        sorted(
-            processes,
-            key=lambda process: (
-                process.gpu_uuid,
-                process.kind,
-                process.pid,
-                process.process_start_identity,
-            ),
-        )
+    return _StructuredProcessParse(
+        processes=tuple(
+            sorted(
+                processes,
+                key=lambda process: (
+                    process.gpu_uuid,
+                    process.kind,
+                    process.pid,
+                    process.process_start_identity,
+                ),
+            )
+        ),
+        unknown_gpu_ids=frozenset(unknown_gpu_ids),
+        xml_binding_unknown=xml_binding_unknown,
     )
 
 
@@ -2555,22 +2809,7 @@ def build_source_path_set(
             "gpu_source_path_topic_invalid",
             "source path selection requires one simple topic name",
         )
-    fixed_core = (
-        "tools/experiments/execution_resource_plan.py",
-        "tools/experiments/run_managed_experiment.py",
-        "tools/experiments/registry_lib.py",
-        "tools/agent_tools/jit_canonical_ir.py",
-    )
     result: list[str] = []
-    for relative_path in fixed_core:
-        candidate = source_root / relative_path
-        if not candidate.is_file():
-            raise TypedPreflightFailure(
-                "gpu_source_path_missing",
-                "a fixed managed source path is missing",
-                relative_path=relative_path,
-            )
-        result.append(relative_path)
     registry_path = source_root / "experiments/registry.toml"
     if not registry_path.is_file():
         raise TypedPreflightFailure(
@@ -2735,6 +2974,16 @@ class NvidiaStructuredObservation:
     devices: tuple[GPUDevice, ...]
     processes: tuple[ProcessIdentity, ...]
     process_inventory_visibility: Mapping[str, object]
+    unknown_gpu_ids: frozenset[str] = frozenset()
+    xml_binding_unknown: bool = False
+    unit_states: Mapping[str, GpuUnitDisposition] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class _StructuredProcessParse:
+    processes: tuple[ProcessIdentity, ...]
+    unknown_gpu_ids: frozenset[str]
+    xml_binding_unknown: bool
 
 
 _NVIDIA_DRIVER_VERSION_RE = re.compile(
@@ -2747,7 +2996,7 @@ _NVIDIA_MIG_LINE_RE = re.compile(
     r"^[ ]{2,}MIG ([0-9]+c\.)?[0-9]+g\.[0-9]+gb[ ]{2,}Device[ ]{2}([0-9]+): \(UUID: (MIG-[A-Za-z0-9-]+)\)$"
 )
 _NVIDIA_UUID_RE = re.compile(r"^(GPU|MIG)-[A-Za-z0-9-]+$")
-_NVIDIA_UNSAFE_XML_RE = re.compile(r"<!\s*(?:DOCTYPE|ENTITY)\b", re.IGNORECASE)
+_NVIDIA_UNSAFE_XML_RE = re.compile(r"<!\s*ENTITY\b", re.IGNORECASE)
 _NVIDIA_PROCESS_CONTAINER_TAGS = frozenset(
     {"processes", "compute_processes", "graphics_processes"}
 )
@@ -3089,7 +3338,7 @@ def _parse_nvidia_smi_xml_document(evidence: EvidenceFd) -> _ParsedNvidiaXmlDocu
     if _NVIDIA_UNSAFE_XML_RE.search(data.decode("ascii", errors="ignore")):
         raise _nvidia_parser_failure(
             "gpu_structured_probe_unsafe_xml",
-            "NVIDIA XML must not contain DTD or entity declarations",
+            "NVIDIA XML must not contain entity declarations",
             evidence=evidence,
         )
     _decode_nvidia_utf8(data, evidence)
@@ -3353,6 +3602,81 @@ def _structured_gpu_devices(
     return parsed_devices
 
 
+def _close_unknown_gpu_units(
+    unknown_gpu_ids: Sequence[str],
+    devices: Sequence[GPUDevice],
+    caller_allocated_ids: frozenset[str],
+    *,
+    xml_binding_unknown: bool = False,
+) -> frozenset[str]:
+    """Close unknown units over their physical/MIG topology boundary."""
+    if xml_binding_unknown:
+        return frozenset(caller_allocated_ids)
+    parent_by_uuid = {
+        device.uuid: device.mig_parent_uuid
+        for device in devices
+        if device.mig_parent_uuid is not None
+    }
+    children_by_parent: dict[str, set[str]] = {}
+    for child, parent in parent_by_uuid.items():
+        children_by_parent.setdefault(parent, set()).add(child)
+    closed: set[str] = set()
+    for uuid in unknown_gpu_ids:
+        if uuid in parent_by_uuid:
+            closed.update({uuid, parent_by_uuid[uuid]})
+        else:
+            closed.add(uuid)
+            closed.update(children_by_parent.get(uuid, set()))
+    return frozenset(closed.intersection(caller_allocated_ids))
+
+
+def _classify_gpu_unit_states(
+    devices: Sequence[GPUDevice],
+    processes: Sequence[ProcessIdentity],
+    caller_allocated_ids: frozenset[str],
+    unknown_gpu_ids: Sequence[str] = (),
+    *,
+    xml_binding_unknown: bool = False,
+) -> Mapping[str, GpuUnitDisposition]:
+    """Materialize BUSY/UNKNOWN/FREE without letting partial evidence become FREE."""
+    parent_by_uuid = {
+        device.uuid: device.mig_parent_uuid
+        for device in devices
+        if device.mig_parent_uuid is not None
+    }
+    children_by_parent: dict[str, set[str]] = {}
+    for child, parent in parent_by_uuid.items():
+        children_by_parent.setdefault(parent, set()).add(child)
+    busy: set[str] = set()
+    for process in processes:
+        busy.add(process.gpu_uuid)
+        parent = parent_by_uuid.get(process.gpu_uuid)
+        if parent is not None:
+            busy.add(parent)
+        busy.update(children_by_parent.get(process.gpu_uuid, set()))
+    unknown = set(
+        _close_unknown_gpu_units(
+            unknown_gpu_ids,
+            devices,
+            caller_allocated_ids,
+            xml_binding_unknown=xml_binding_unknown,
+        )
+    )
+    return MappingProxyType(
+        {
+            device.uuid: (
+                "UNKNOWN"
+                if device.uuid in unknown
+                else "BUSY"
+                if device.uuid in busy
+                else "FREE"
+            )
+            for device in devices
+            if device.uuid in caller_allocated_ids
+        }
+    )
+
+
 class NvidiaInventoryProbe:
     """Own only fd-backed NVIDIA driver, list, and topology evidence."""
 
@@ -3460,16 +3784,33 @@ class NvidiaInventoryProbe:
             allocated,
             xml_document.parent_map,
         )
-        processes = _parse_structured_gpu_processes(
+        process_parse = _parse_structured_gpu_processes(
             xml_document.root,
             parsed_devices,
             xml_document.parent_map,
+        )
+        processes = process_parse.processes
+        unknown_gpu_ids = _close_unknown_gpu_units(
+            process_parse.unknown_gpu_ids,
+            tuple(parsed_devices.values()),
+            allocated,
+            xml_binding_unknown=process_parse.xml_binding_unknown,
+        )
+        unit_states = _classify_gpu_unit_states(
+            tuple(parsed_devices.values()),
+            processes,
+            allocated,
+            unknown_gpu_ids,
+            xml_binding_unknown=process_parse.xml_binding_unknown,
         )
         return NvidiaStructuredObservation(
             inventory=inventory,
             devices=tuple(sorted(parsed_devices.values(), key=lambda device: device.uuid)),
             processes=processes,
             process_inventory_visibility=process_visibility,
+            unknown_gpu_ids=unknown_gpu_ids,
+            xml_binding_unknown=process_parse.xml_binding_unknown,
+            unit_states=unit_states,
         )
 
 
@@ -3498,6 +3839,8 @@ class ProcessOccupancyEvidence:
     occupied_uuids: tuple[FullGpuUuid | FullMigUuid, ...]
     inventory_scope: Literal["local-namespace-complete"]
     evidence_fingerprint: Sha256Hex
+    unknown_uuids: tuple[FullGpuUuid | FullMigUuid, ...] = ()
+    unit_states: Mapping[str, GpuUnitDisposition] = field(default_factory=dict)
 
 
 class GpuProcessOccupancyProbe:
@@ -3510,11 +3853,15 @@ class GpuProcessOccupancyProbe:
         namespace_inode: int,
         processes: Sequence[ProcessIdentity],
         process_inventory_disposition: str,
+        unknown_gpu_ids: Sequence[str] = (),
+        xml_binding_unknown: bool = False,
     ) -> None:
         self._inventory = inventory
         self._namespace_inode = namespace_inode
         self._processes = tuple(processes)
         self._process_inventory_disposition = process_inventory_disposition
+        self._unknown_gpu_ids = tuple(unknown_gpu_ids)
+        self._xml_binding_unknown = xml_binding_unknown
         self._state: Literal["UNPROVEN", "OBSERVING", "PROVEN", "FAILED"] = "UNPROVEN"
 
     def observe(self) -> ProcessOccupancyEvidence:
@@ -3614,6 +3961,15 @@ class GpuProcessOccupancyProbe:
         seen_processes: set[tuple[int, str, str, str]] = set()
         seen_pid_starts: dict[int, str] = {}
         occupied: set[str] = set()
+        unknown = _close_unknown_gpu_units(
+            self._unknown_gpu_ids,
+            tuple(
+                GPUDevice(uuid, 0, mig_parent_uuid=parent_by_child.get(uuid))
+                for uuid in known_uuids
+            ),
+            frozenset(known_uuids),
+            xml_binding_unknown=self._xml_binding_unknown,
+        )
         expected_namespace = f"pid:[{self._namespace_inode}]"
         for process in ordered_processes:
             identity_key = (
@@ -3669,6 +4025,16 @@ class GpuProcessOccupancyProbe:
                 if parent_uuid is not None:
                     occupied.add(parent_uuid)
         occupied_uuids = tuple(sorted(occupied))
+        unit_states = _classify_gpu_unit_states(
+            tuple(
+                GPUDevice(uuid, 0, mig_parent_uuid=parent_by_child.get(uuid))
+                for uuid in known_uuids
+            ),
+            ordered_processes,
+            frozenset(known_uuids),
+            unknown,
+            xml_binding_unknown=self._xml_binding_unknown,
+        )
         fingerprint = hashlib.sha256(
             _canonical_json(
                 _json_safe(
@@ -3677,6 +4043,8 @@ class GpuProcessOccupancyProbe:
                         "namespace_inode": self._namespace_inode,
                         "processes": tuple(_process_record(process) for process in ordered_processes),
                         "occupied_uuids": occupied_uuids,
+                        "unknown_uuids": tuple(sorted(unknown)),
+                        "unit_states": dict(unit_states),
                         "inventory_scope": "local-namespace-complete",
                     }
                 )
@@ -3689,6 +4057,8 @@ class GpuProcessOccupancyProbe:
             occupied_uuids=occupied_uuids,
             inventory_scope="local-namespace-complete",
             evidence_fingerprint=fingerprint,
+            unknown_uuids=tuple(sorted(unknown)),
+            unit_states=unit_states,
         )
 
 
@@ -3828,9 +4198,10 @@ class RunGpuAdmissionReceipt:
                 tuple(self.actual_gpu_processes),
             )
         supplied_fingerprint = self.admission_fingerprint
-        computed_fingerprint = hashlib.sha256(
-            _canonical_json(_admission_receipt_payload(self)).encode("utf-8")
+        content_hash = hashlib.sha256(
+            _canonical_json(_admission_content_payload(self)).encode("utf-8")
         ).hexdigest()
+        computed_fingerprint = _admission_composite_fingerprint(self, content_hash)
         if supplied_fingerprint and not secrets.compare_digest(
             supplied_fingerprint,
             computed_fingerprint,
@@ -3841,6 +4212,57 @@ class RunGpuAdmissionReceipt:
                 supplied_fingerprint=supplied_fingerprint,
             )
         object.__setattr__(self, "admission_fingerprint", computed_fingerprint)
+
+
+def _admission_content_payload(value: RunGpuAdmissionReceipt) -> dict[str, object]:
+    """Return only the lock-independent admission snapshot content."""
+    return {
+        "schema_version": value.schema_version,
+        "candidate_uuids": value.candidate_uuids,
+        "occupied_uuids": value.occupied_uuids,
+        "selected_uuids": value.selected_uuids,
+        "inventory_fingerprint": value.inventory_fingerprint,
+        "occupancy_fingerprint": value.occupancy_fingerprint,
+    }
+
+
+def build_lock_bound_admission_receipt(
+    *,
+    candidate_uuids: Sequence[str],
+    occupied_uuids: Sequence[str],
+    reserved_uuids: Sequence[str],
+    selected_uuids: Sequence[str],
+    inventory_fingerprint: Sha256Hex,
+    occupancy_fingerprint: Sha256Hex,
+    reservation_fingerprint: Sha256Hex,
+    runtime_identity_fingerprint: Sha256Hex,
+    lock_readback: LockReadback,
+    actual_gpu_processes: tuple[ProcessOccupancyEvidence, ...] | None = None,
+    concurrent_run_evidence: ConcurrentRunEvidence | None = None,
+    mig_evidence: MigEvidence | None = None,
+    container_visible_uuid_mapping: UuidVisibilityEvidence | None = None,
+    os_safe_lock_placement: LockPlacementEvidence | None = None,
+) -> RunGpuAdmissionReceipt:
+    """Create the canonical lock-held composite admission receipt."""
+    return RunGpuAdmissionReceipt(
+        schema_version="gpu-admission/v1",
+        candidate_uuids=tuple(candidate_uuids),
+        occupied_uuids=tuple(occupied_uuids),
+        reserved_uuids=tuple(reserved_uuids),
+        selected_uuids=tuple(selected_uuids),
+        inventory_fingerprint=inventory_fingerprint,
+        occupancy_fingerprint=occupancy_fingerprint,
+        reservation_fingerprint=reservation_fingerprint,
+        runtime_identity_fingerprint=runtime_identity_fingerprint,
+        plan_fingerprint=None,
+        admission_fingerprint="",
+        lock_readback=lock_readback,
+        actual_gpu_processes=actual_gpu_processes,
+        concurrent_run_evidence=concurrent_run_evidence,
+        mig_evidence=mig_evidence,
+        container_visible_uuid_mapping=container_visible_uuid_mapping,
+        os_safe_lock_placement=os_safe_lock_placement,
+    )
 
 
 def _admission_receipt_payload(value: RunGpuAdmissionReceipt) -> dict[str, object]:
@@ -3889,6 +4311,8 @@ def _admission_receipt_payload(value: RunGpuAdmissionReceipt) -> dict[str, objec
                     ),
                     "occupied_uuids": item.occupied_uuids,
                     "inventory_scope": item.inventory_scope,
+                    "unknown_uuids": item.unknown_uuids,
+                    "unit_states": item.unit_states,
                     "evidence_fingerprint": item.evidence_fingerprint,
                 }
                 for item in value.actual_gpu_processes
@@ -3960,6 +4384,31 @@ def _admission_receipt_payload(value: RunGpuAdmissionReceipt) -> dict[str, objec
             else None
         ),
     }
+
+
+def _admission_composite_fingerprint(
+    value: RunGpuAdmissionReceipt,
+    content_hash: Sha256Hex,
+) -> Sha256Hex:
+    """Bind content, reservation receipt, lock identity, and selected UUIDs."""
+    lock_identity: list[Mapping[str, object]] = []
+    if value.lock_readback is not None:
+        lock_identity.append(
+            {
+                "device": value.lock_readback.device,
+                "inode": value.lock_readback.inode,
+            }
+        )
+    return hashlib.sha256(
+        _canonical_json(
+            {
+                "content_hash": content_hash,
+                "reservation_receipt": value.reservation_fingerprint,
+                "lock_identity": tuple(lock_identity),
+                "selected_uuids": value.selected_uuids,
+            }
+        ).encode("utf-8")
+    ).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -4504,6 +4953,9 @@ class _NvidiaSMIObservation:
     tool_capability: Mapping[str, object]
     container_identity: str
     inventory: NvidiaInventory | None = None
+    unknown_gpu_ids: frozenset[str] = frozenset()
+    xml_binding_unknown: bool = False
+    unit_states: Mapping[str, GpuUnitDisposition] = field(default_factory=dict)
 
     @classmethod
     def discover(
@@ -4537,6 +4989,9 @@ class _NvidiaSMIObservation:
         processes: tuple[ProcessIdentity, ...] = ()
         inventory: NvidiaInventory | None = None
         process_inventory_visibility: Mapping[str, object] | None = None
+        unknown_gpu_ids: frozenset[str] = frozenset()
+        xml_binding_unknown = False
+        unit_states: Mapping[str, GpuUnitDisposition] = {}
         tool_capability: dict[str, object] = {
             "tree": {
                 "available": shutil.which("tree") is not None,
@@ -4578,6 +5033,9 @@ class _NvidiaSMIObservation:
                 devices = structured.devices
                 processes = structured.processes
                 process_inventory_visibility = structured.process_inventory_visibility
+                unknown_gpu_ids = structured.unknown_gpu_ids
+                xml_binding_unknown = structured.xml_binding_unknown
+                unit_states = structured.unit_states
             finally:
                 for evidence in (driver_evidence, xml_evidence, list_evidence):
                     _close_evidence_fd(evidence)
@@ -4589,7 +5047,8 @@ class _NvidiaSMIObservation:
                 "process_type_taxonomy": ("C", "G", "M", "O", "C+G", "M+C"),
                 "pid_identity": "authoritative_proc_pid_stat_and_pid_namespace",
                 "uuid_identity": "full_gpu_or_mig_uuid",
-                "narrower_sources_rejected": ("pmon", "query-compute-apps"),
+                "narrower_sources_rejected": ("pmon",),
+                "query_compute_apps": "auxiliary_unique_xml_pid_join_only",
                 "process_inventory_visibility": process_inventory_visibility,
             }
         else:
@@ -4638,10 +5097,11 @@ class _NvidiaSMIObservation:
                         for device in devices
                     ),
                     "processes": tuple(_process_record(process) for process in processes),
+                    "unknown_gpu_ids": tuple(sorted(unknown_gpu_ids)),
+                    "xml_binding_unknown": xml_binding_unknown,
+                    "unit_states": dict(unit_states),
                     "boot_id": boot_id,
                     "visible": tuple(sorted(allocated)),
-                    "observed_at": observed_at,
-                    "observation_event_id": observation_event_id,
                 }
             ).encode("utf-8")
         ).hexdigest()
@@ -4669,6 +5129,9 @@ class _NvidiaSMIObservation:
             tool_capability=tool_capability,
             container_identity=container_identity,
             inventory=inventory if gpu_requested_count else None,
+            unknown_gpu_ids=unknown_gpu_ids,
+            xml_binding_unknown=xml_binding_unknown,
+            unit_states=unit_states,
         )
 
 @dataclass(frozen=True)
@@ -4718,6 +5181,8 @@ class NvidiaSMIResourceProbe:
             tool_availability=snapshot.tool_capability,
             container_id=snapshot.container_identity,
             nvidia_inventory=snapshot.inventory,
+            unknown_gpu_ids=snapshot.unknown_gpu_ids,
+            unit_states=snapshot.unit_states,
         )
 
 
@@ -5065,8 +5530,6 @@ class UUIDReservationStore:
                 != under_lock_observation.observation_event_id
                 and bool(prelock_observation.fingerprint)
                 and bool(under_lock_observation.fingerprint)
-                and prelock_observation.fingerprint
-                != under_lock_observation.fingerprint
             )
             under_lock_owner_start = (
                 process_start_identity(current_owner_pid)
@@ -5454,6 +5917,7 @@ class GPUAllocation:
     lock_readback: Mapping[str, object]
     allocation_provenance: str
     leases: tuple[ReservationLease, ...] = field(repr=False, compare=False)
+    admission_fingerprint: Sha256Hex | None = None
     _planner_provenance: object = field(
         default=None,
         init=False,
@@ -5604,6 +6068,7 @@ class MaterializedEnvironment:
     run_root: Path
     log_root: Path
     source_projection_root: Path
+    admission_fingerprint: Sha256Hex | None = None
     state: PlanState = PlanState.ENV_MATERIALIZED
 
     def __post_init__(self) -> None:
@@ -5991,13 +6456,14 @@ class ManagedGpuOutcome:
 
 @dataclass(frozen=True)
 class AdmittedEnvironment:
-    """Immutable exact UUID environment produced before generic runner creation."""
+    """Immutable exact UUID environment produced after plan freeze."""
 
     schema_version: Literal["admitted-environment/v1"]
     exact_env_map: tuple[tuple[str, str], ...]
     cuda_visible_devices: str
     nvidia_visible_devices: str
     environment_fingerprint: Sha256Hex
+    admission_fingerprint: Sha256Hex | None = None
 
 
 def _failure_record_payload(value: FailureRecord) -> dict[str, object]:
@@ -6728,15 +7194,7 @@ def _json_safe(value: object) -> object:
     if isinstance(value, Path):
         return str(value)
     if isinstance(value, ProcessIdentity):
-        return {
-            "pid": value.pid,
-            "process_start_identity": value.process_start_identity,
-            "gpu_uuid": value.gpu_uuid,
-            "kind": value.kind,
-            "parent_pid": value.parent_pid,
-            "relationship": value.relationship,
-            "container_namespace_identity": value.container_namespace_identity,
-        }
+        return dict(_process_record(value))
     if isinstance(value, GPUDevice):
         return {
             "uuid": value.uuid,
@@ -6759,6 +7217,27 @@ def _process_record(process: ProcessIdentity) -> Mapping[str, object]:
             "observation_timestamp": process.observation_timestamp,
             "observation_fingerprint": process.observation_fingerprint,
             "container_namespace_identity": process.container_namespace_identity,
+            "pid_namespace": process.pid_namespace,
+            "cgroup": process.cgroup,
+            "process_root": (
+                {
+                    "pid": process.process_root.pid,
+                    "starttime": process.process_root.starttime,
+                    "pid_namespace": process.process_root.pid_namespace,
+                    "cgroup": process.process_root.cgroup,
+                }
+                if process.process_root is not None
+                else None
+            ),
+            "ancestry": tuple(
+                {
+                    "pid": item.pid,
+                    "starttime": item.starttime,
+                    "pid_namespace": item.pid_namespace,
+                    "cgroup": item.cgroup,
+                }
+                for item in process.ancestry
+            ),
         }
     )
 
@@ -7609,7 +8088,6 @@ def _plan_gpu_allocation_impl(
     provenance = discovered.allocation_provenance
     observation_s0 = discovered.observation
     observation_events = {observation_s0.observation_event_id}
-    observation_fingerprints = {observation_s0.fingerprint}
 
     def fresh_observation(event: str) -> ResourceObservation:
         observation = discovered.probe.observe()
@@ -7620,16 +8098,15 @@ def _plan_gpu_allocation_impl(
                 event=event,
                 observation_event_id=observation.observation_event_id,
             )
-        if not observation.fingerprint or observation.fingerprint in observation_fingerprints:
+        if not observation.fingerprint:
             raise _gpu_preflight(
-                "gpu_observation_fingerprint_reused",
-                "resource probe returned a repeated or empty observation fingerprint",
+                "gpu_observation_content_missing",
+                "resource probe returned an empty content fingerprint",
                 event=event,
                 observation_event_id=observation.observation_event_id,
                 observation_fingerprint=observation.fingerprint,
             )
         observation_events.add(observation.observation_event_id)
-        observation_fingerprints.add(observation.fingerprint)
         return observation
     if requested == 0:
         lock_readback = {
@@ -7700,6 +8177,7 @@ def _plan_gpu_allocation_impl(
         observation_s0.gpu_devices,
         candidate_ids,
     )
+    unknown_ids = frozenset(observation_s0.unknown_gpu_ids)
     reserved_ids_seen = set(discovered.reserved_ids)
     reserved_ids = tuple(sorted(reserved_ids_seen))
     free_memory = dict(observation_s0.free_memory_bytes)
@@ -7707,6 +8185,7 @@ def _plan_gpu_allocation_impl(
         uuid
         for uuid in candidate_ids
         if uuid not in occupied_ids
+        and uuid not in unknown_ids
         and uuid not in reserved_ids
         and free_memory.get(uuid, device_by_id[uuid].free_memory_bytes)
         >= request.gpu_requested_memory_bytes
@@ -7777,6 +8256,7 @@ def _plan_gpu_allocation_impl(
             reread_allocated = observation_s_lock.caller_allocated_ids
             reread_processes = observation_s_lock.process_identities
             reread_memory = observation_s_lock.free_memory_bytes
+            reread_unknown_ids = frozenset(observation_s_lock.unknown_gpu_ids)
             selected_under_lock = (*selected, uuid)
             occupied_under_lock = _occupied_gpu_units(
                 reread_processes,
@@ -7788,6 +8268,7 @@ def _plan_gpu_allocation_impl(
                 for selected_uuid in selected_under_lock
                 if selected_uuid not in reread_allocated
                 or selected_uuid in occupied_under_lock
+                or selected_uuid in reread_unknown_ids
                 or reread_memory.get(selected_uuid, 0)
                 < request.gpu_requested_memory_bytes
             )
@@ -7857,6 +8338,7 @@ def _plan_gpu_allocation_impl(
         raise _PlannerAttemptFailure(exc, tuple(leases)) from exc
     final_allocated = observation_s_final.caller_allocated_ids
     final_processes = observation_s_final.process_identities
+    final_unknown_ids = frozenset(observation_s_final.unknown_gpu_ids)
     final_memory = observation_s_final.free_memory_bytes
     final_device_by_id = {device.uuid: device for device in observation_s_final.gpu_devices}
     final_occupied_ids = _occupied_gpu_units(
@@ -7868,6 +8350,7 @@ def _plan_gpu_allocation_impl(
         len(selected) == requested
         and all(uuid in final_allocated for uuid in selected)
         and not set(selected).intersection(final_occupied_ids)
+        and not set(selected).intersection(final_unknown_ids)
         and all(
             final_memory.get(uuid, 0) >= request.gpu_requested_memory_bytes
             for uuid in selected
@@ -7888,6 +8371,7 @@ def _plan_gpu_allocation_impl(
         uuid
         for uuid in candidate_ids
         if uuid not in final_occupied_ids
+        and uuid not in final_unknown_ids
         and uuid not in reserved_ids_seen
         and final_memory.get(uuid, 0) >= request.gpu_requested_memory_bytes
     )
@@ -7911,6 +8395,8 @@ def _plan_gpu_allocation_impl(
             _process_record(process) for process in final_processes
         ),
         "final_occupied_ids": final_occupied_ids,
+        "initial_unknown_ids": tuple(sorted(unknown_ids)),
+        "final_unknown_ids": tuple(sorted(final_unknown_ids)),
         "final_free_memory_bytes": {
             uuid: final_memory.get(uuid, 0) for uuid in candidate_ids
         },
@@ -7989,6 +8475,7 @@ def _allocation_with_fingerprint(allocation: GPUAllocation, fingerprint: str) ->
         lock_readback=allocation.lock_readback,
         allocation_provenance=allocation.allocation_provenance,
         leases=allocation.leases,
+        admission_fingerprint=allocation.admission_fingerprint,
     )
     if allocation._planner_provenance is _PLANNER_PROVENANCE:
         return _mark_canonical_planner_provenance(fingerprinted)
@@ -8115,9 +8602,14 @@ def _freeze_resource_plan_impl(
     plan_id = request.plan_id or request.run_id or f"plan-{secrets.token_hex(12)}"
     selected_ids = tuple(gpu_allocation.selected_ids)
     exact_environment = dict(request.environment)
-    if request.gpu_requested_count:
-        exact_environment["CUDA_VISIBLE_DEVICES"] = ",".join(selected_ids)
-        exact_environment["NVIDIA_VISIBLE_DEVICES"] = ",".join(selected_ids)
+    if request.gpu_requested_count and any(
+        key in exact_environment
+        for key in ("CUDA_VISIBLE_DEVICES", "NVIDIA_VISIBLE_DEVICES")
+    ):
+        raise _gpu_preflight(
+            "gpu_visibility_before_plan_freeze",
+            "selected GPU visibility must be materialized only after plan freeze",
+        )
     elif any(key in exact_environment for key in GPU_ENVIRONMENT_KEYS) or request.xla_jax_preallocation_values:
         raise _gpu_preflight(
             "gpu_environment_without_request",
@@ -8161,6 +8653,7 @@ def _freeze_resource_plan_impl(
             "visible_ids": gpu_allocation.selected_ids,
             "allocation_id": gpu_allocation.allocation_id,
             "reservation_ids": gpu_allocation.reservation_ids,
+            "admission_fingerprint": gpu_allocation.admission_fingerprint,
             "free_memory_bytes": gpu_allocation.free_memory_bytes,
             "occupied_process_identities": gpu_allocation.occupied_process_identities,
             "process_identities": gpu_allocation.process_identities,
@@ -8211,6 +8704,7 @@ def _freeze_resource_plan_impl(
         "cwd": str(request.cwd.absolute()),
         "argv": request.argv,
         "env": exact_environment,
+        "admission_fingerprint": gpu_allocation.admission_fingerprint,
         "owner_maximum_timeout_seconds": request.maximum_timeout_seconds,
         "idle_policy": "observe_and_wait",
         "force_stop_policy": "no_idle_force_stop; runner_deadline_owner_only",
@@ -8380,6 +8874,10 @@ def _materialize_environment_impl(plan: ExecutionResourcePlan) -> MaterializedEn
         run_root=run_root,
         log_root=log_root,
         source_projection_root=source_projection,
+        admission_fingerprint=cast(
+            Sha256Hex | None,
+            materialized_plan.execution.get("admission_fingerprint"),
+        ),
     )
 
 
@@ -9690,6 +10188,9 @@ __all__ = [
     "PartialEvidence",
     "PreExecutionFailureCleanupEvidence",
     "PreExecutionFailureTerminalEvidence",
+    "ProcessRoot",
+    "ProcAncestryEvidence",
+    "ProcAncestryProbe",
     "ProcessOccupancyEvidence",
     "ProcessIdentity",
     "PostToolUseProjectionReducer",
@@ -9699,6 +10200,7 @@ __all__ = [
     "ResourceRequest",
     "ReservationEvidence",
     "RunGpuAdmissionReceipt",
+    "build_lock_bound_admission_receipt",
     "RuntimeIdentityReader",
     "RuntimeIdentityReceipt",
     "RuntimeRoute",

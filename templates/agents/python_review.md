@@ -1,4 +1,4 @@
-# Python Review
+# Python Review（Python レビュー）
 <!--
 @dependency-start
 contract template
@@ -12,11 +12,15 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
-## Python Findings
+{{>reader_map}}
+{{>review_contract}}
 
-| File | Finding | Severity | Status |
-| ---- | ------- | -------- | ------ |
+## Python Findings（Python の指摘）
 
-## Expected Evidence
+| File | Finding | Severity | Status | Evidence |
+| ---- | ------- | -------- | ------ | -------- |
+<!-- Status is finding-level: blocking, non-blocking, question, not-applicable, or accepted-risk. -->
 
-<!-- Record pyright, pytest, and ruff status or missing evidence. -->
+## Expected Evidence（必要な証跡）
+
+<!-- pyright、pytest、ruff の status または不足している証跡を記録します。 -->

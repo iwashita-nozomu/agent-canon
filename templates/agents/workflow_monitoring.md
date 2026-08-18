@@ -1,4 +1,4 @@
-# Workflow Monitoring
+# Workflow Monitoring（workflow 監視）
 <!--
 @dependency-start
 contract workflow
@@ -17,33 +17,40 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
 - Owner: {{OWNER}}
 - Created At (UTC): {{CREATED_AT}}
 
-## Signals
+{{>reader_map}}
 
-<!-- Record workflow signals observed during execution. Prefer `python3 tools/agent_tools/workflow_monitor.py --report-dir <run> --signal "..."` and tool-level `--report-dir` hooks over hand edits. Required signals include selected skills, stage owners, subagent or parent-direct routing, wave_id, repo dependency intake, web-research decision, review status, validation status, and any drift risk. The run-bundle producer emits one canonical `runtime_measurement_input=<JSON>` signal through `workflow_monitor.py`; preserve null versus explicit zero and do not hand-author or duplicate that measurement record. -->
+## Signals（signal）
 
-## Behavior Events
+<!-- 実行中に観測した workflow signal を記録します。手編集より `python3 tools/agent_tools/workflow_monitor.py --report-dir <run> --signal "..."` と tool-level `--report-dir` hook を優先します。selected skill、stage owner、subagent/parent-direct routing、wave_id、repo dependency intake、web-research decision、review status、validation status、drift risk を含めます。run-bundle producer は `workflow_monitor.py` を通じて canonical な `runtime_measurement_input=<JSON>` signal を出力するため、null と明示的 zero を区別し、その record を手書き・重複しません。 -->
 
-<!-- Record observable agent behavior as structured events, not retrospective prose. Prefer `workflow_monitor.py --behavior-event "..."`. Required event families include skill invocation, stage/subagent routing with wave_id, mid-task expansion trigger, budget before/after, spawned/skipped roles and rationale, tool calls that gate implementation, accumulated prompt eval run status with EVAL_RUN_ID, EVAL_USED_SKILLS, and EVAL_ACCUMULATED_REPORT whenever a skill is used, dependency/static-analysis runs, code checker results such as `tool_call=pyright code_checker=pass`, `tool_call=ruff code_checker=pass`, `tool_call=oop-readability-check code_checker=pass`, or explicit `code_checker_not_required`, pre-edit tool rejection prediction with `pre_edit_rejection_prediction=reviewed` and `predicted_tool_rejection_gates=<recorded|none>`, hook/tool feedback routing with `hook_tool_feedback=reviewed`, `parent_protocol_update=<applied|recorded|not_required>`, `subagent_protocol_update=<applied|recorded|not_required>`, and `protocol_feedback_reason=...`, token-efficiency protocol activation or explicit opt-out, token footprint comparison, runtime_feedback=observed or runtime_feedback_not_observed, subagent_no_return_investigation with agent_id, wave_id, cause evidence, and resolution decision, static_analysis_feedback=applied|recorded|not_applicable, execution_path=..., route_efficiency=..., selected_inefficient_route=..., review decisions, feedback actions, subagent lifecycle closeout, and diff-check approval. Use `workflow_monitor.py --runtime-feedback "source=user target=<skill-or-workflow> action=prompt_repair"` when feedback from actual use should update skill prompts, workflow prompts, evals, or memory. If runtime_feedback=observed and action is not no_op, at least one Improvement Decisions line below must be applied or recorded before closeout. -->
+- failure-cause classification:
+- conflict intent / preserved user or design clause:
+- unexpected action report and parent handoff:
+- cleanup/materialization readback:
 
-## Actual Wave Events
+## Behavior Events（behavior event）
 
-<!-- Mirror selected schedule.md Agent Wave Ledger events as concise `wave_event=...` token rows so dynamic expansion is searchable and checkable. Required tokens for each row: wave_id, event_kind, spawn_authority, trigger, budget_before, budget_after, runtime_max_threads, runtime_max_depth, spawned_roles, role_instances, skipped_roles, allowed_paths, do_not_read, write_scope, validation_route, review_gate, handoff_artifacts, status. `spawned_roles` is the legacy aggregate; `role_instances` is the deterministic identity ledger using `role_id:instance_id:agent_type:input_packet` entries so same-role subagents remain distinguishable. For `event_kind=mid_task_user_input`, also include input_classification, updated_packet, redispatch_action, target_agents, scope_status, and lifecycle_policy_ref. For `event_kind=subagent_no_return_investigation`, include agent_id, wait_status, last_known_status, evidence_pointer, and resolution_decision. A no-return resolution decision is `await_new_state`, `continue_disjoint_parent_work`, `terminal_status_observed`, or `explicit_user_cancel`; timeout maps to `termination_action=preserve_running_instance`. `scope_or_contract_change` includes fresh-wave evidence only when the compatibility test selects a fresh wave; `new_task` includes a fresh bundle only when durable coordination/resumption requires it. Prefer `workflow_monitor.py --mid-task-user-input` instead of hand editing when durable evidence is needed. -->
+<!-- 観測可能な agent behavior を retrospective prose ではなく structured event として記録します。`workflow_monitor.py --behavior-event "..."` を優先します。skill invocation、subagent lifecycle（サブエージェントのライフサイクル）、wave_id 付き stage/subagent routing、mid-task expansion、budget before/after、spawned/skipped role と理由、実装を gate する tool call、skill 使用時の EVAL_RUN_ID/EVAL_USED_SKILLS/EVAL_ACCUMULATED_REPORT、dependency/static-analysis、code checker、pre-edit rejection prediction、hook/tool feedback、protocol update、token efficiency、runtime feedback、subagent no-return investigation、static-analysis feedback、execution path、route efficiency、review decision、feedback action、subagent closeout、diff-check approval を必要 event family とします。実利用 feedback で skill/workflow/eval/memory を更新する場合は `workflow_monitor.py --runtime-feedback "source=user target=<skill-or-workflow> action=prompt_repair"` を使います。runtime_feedback=observed かつ action が no_op でなければ、closeout 前に下の Improvement Decisions を少なくとも 1 つ applied または recorded にします。 -->
 
-## Tool Warnings
+## Actual Wave Events（実際の wave event）
+
+<!-- selected schedule.md Agent Wave Ledger event を簡潔な `wave_event=...` token row として mirror し、dynamic expansion を検索・確認可能にします。各 row に wave_id、event_kind、spawn_authority、trigger、budget_before/after、runtime_max_threads/depth、spawned_roles、role_instances、skipped_roles、allowed_paths、do_not_read、write_scope、validation_route、review_gate、handoff_artifacts、status を記録します。同一 role を区別する deterministic ledger は `role_id:instance_id:agent_type:input_packet` を使います。mid-task user input では input_classification、updated_packet、redispatch_action、target_agents、scope_status、lifecycle_policy_ref を追加し、subagent no-return investigation では agent_id、wait_status、last_known_status、evidence_pointer、resolution_decision を追加します。durable evidence が必要なら手編集より `workflow_monitor.py --mid-task-user-input` を優先します。 -->
+
+## Tool Warnings（tool warning）
 
 - tool_warnings_status: pending
 
-<!-- If any non-blocking tool, hook, checker, wrapper, or guardrail emits a warning, record it immediately with `workflow_monitor.py --tool-warning "warning_id=<stable-id> source_tool=<tool> severity=<warning|fix-now|s0|s1> status=open message=<short-no-spaces> repair_command=<command-or-doc>"`. Record the same warning_id again with `status=resolved evidence=<path-or-command>` after repair. Normal warnings reach tool_warning_exit_status through resolved, deferred_with_issue issue=<issue-path-or-pr> with durable owner, or accepted_with_reason with explicit_approval_evidence and a durable rationale artifact; fix-now / S0 / S1 warnings must be `resolved`. If no warnings were observed, run `workflow_monitor.py --tool-warning-status none`. Do not leave this section pending at closeout. -->
+<!-- non-blocking tool、hook、checker、wrapper、guardrail が warning を出したら、直ちに `workflow_monitor.py --tool-warning "warning_id=<stable-id> source_tool=<tool> severity=<warning|fix-now|s0|s1> status=open message=<short-no-spaces> repair_command=<command-or-doc>"` で記録します。修正後は同じ warning_id を `status=resolved evidence=<path-or-command>` で記録し、最終状態を `tool_warning_exit_status` として read back します。normal warning は resolved、durable owner 付き deferred_with_issue、または `explicit_approval_evidence` と durable rationale artifact 付き accepted_with_reason で終了し、fix-now/S0/S1 は resolved にします。warning がなければ `workflow_monitor.py --tool-warning-status none` を実行し、closeout で pending を残しません。 -->
 
-## Interventions
+## Interventions（介入）
 
-<!-- Record monitoring-driven interventions. Prefer `workflow_monitor.py --intervention "..."` so Eval evidence is accumulated during the run, not only at closeout. Include spawned or skipped roles, added review gates, dependency-tool reruns, prompt/tool/config corrections, schedule changes, or explicit no-op decisions. -->
+<!-- monitoring が促した intervention を記録します。closeout だけでなく run 中に Eval evidence を蓄積するため `workflow_monitor.py --intervention "..."` を優先します。spawned/skipped role、追加 review gate、dependency-tool rerun、prompt/tool/config correction、schedule change、明示的 no-op decision を含めます。 -->
 
-## Improvement Decisions
+## Improvement Decisions（改善判断）
 
 - skill_improvement_decision: pending
 - config_improvement_decision: pending
 - workflow_improvement_decision: pending
 - memory_learning_decision: pending
 
-<!-- Use applied, recorded, or not_applicable. Prefer `workflow_monitor.py --decision key=value`. Do not leave pending at closeout. If applied or recorded, cite the concrete file, commit, or memory entry. If runtime_feedback=observed and action is not no_op, all decisions cannot remain not_applicable. -->
+<!-- applied、recorded、not_applicable のいずれかを使います。`workflow_monitor.py --decision key=value` を優先し、closeout に pending を残しません。applied/recorded なら具体的な file、commit、memory entry を引用します。runtime_feedback=observed かつ action が no_op でなければ、全 decision を not_applicable のままにしません。 -->

@@ -2,39 +2,39 @@
 <!--
 @dependency-start
 contract skill
-responsibility Documents start-repository for this repository.
+responsibility Starts a template-derived repository through the default source-free static-seed bootstrap.
 upstream design ../canonical/skills.md skill canon registry
+upstream design ../../documents/contracts/template-bootstrap.md default bootstrap contract
+upstream design ../../documents/contracts/static-seed-export.md static seed ownership and provenance
 @dependency-end
 -->
 
-
 ## Purpose
 
-`git clone <template>` 直後に、新しい repo として使い始めるための初期化手順を固定します。
-project slug、display name、project remote の登録を同じ入口で扱います。
-AgentCanon の source of truth は GitHub remote です。
+`git clone <template>` 直後に、新しい repository として使い始めるための初期化手順を固定します。
+project slug、display name、destination remote の登録を同じ入口で扱います。default path は
+static seed を通常 file として所有し、AgentCanon source や runtime lifecycle を必要としません。
 
 ## Use When
 
-- template clone を新 repo として初期化する
-- GitHub-backed project remote に向ける
-- clone 直後の `vendor/agent-canon` submodule pin と GitHub AgentCanon main の関係を揃えたい
-- `make agent-canon-ensure-latest` が別 repo 向け remote で安全判定に止まるのを bootstrap 時点で避けたい
+- template clone を新 repository として初期化する
+- project slug、display name、destination remote を設定する
+- clone 済みの static seed を保持したまま local/offline bootstrap を行う
+- 初期化後の tree が外部 AgentCanon source なしで検証できることを確認する
 
 ## Core References
 
 - `documents/contracts/template-bootstrap.md`
+- `documents/contracts/template-github-remote.md`
+- `documents/contracts/static-seed-export.md`
 - `scripts/README.md`
 - `scripts/start_repository.sh`
 - `scripts/init_from_template.sh`
-- AgentCanon document `documents/runtime/runtime-profiles-and-check-matrix.md`; from a template or derived repo root, resolve it as `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md`
-- AgentCanon document `documents/agent-canon/agent-canon-github-remote.md`; from a template or derived repo root, resolve it as `vendor/agent-canon/documents/agent-canon/agent-canon-github-remote.md`
-- `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh`
 
 ## Default Sequence
 
 1. `git status --short --branch` で clone 直後の状態を確認します。
-1. 初期化します。wrapper は AgentCanon update surface が repairable なら実 init の前に `make agent-canon-ensure-latest` を実行します。unsafe な update surface があれば preflight の route を出して init を続行します。
+1. repository identity と project config を初期化します。
 
 ```bash
 bash scripts/start_repository.sh \
@@ -42,7 +42,7 @@ bash scripts/start_repository.sh \
   --display-name "Your Project"
 ```
 
-1. 初期化変更を commit したあとに確認します。
+1. 初期化変更を commit したあとに project-owned validation を実行します。
 
 ```bash
 bash scripts/start_repository.sh --validate-only
@@ -50,4 +50,8 @@ bash scripts/start_repository.sh --validate-only
 
 ## Safety Rules
 
+- bootstrap は既に tracked されている static seed を再取得・再生成しません。
+- AgentCanon checkout、runtime projection、latest 判定、update state、checkout secret を追加しません。
+- network access は destination repository の作成・push を明示的に行う場合だけです。
+- live AgentCanon integration は default bootstrap へ混ぜず、独立した opt-in architecture change として扱います。
 - template 固有の clone bootstrap は `scripts/` に置き、shared automation の `tools/` へ移しません。

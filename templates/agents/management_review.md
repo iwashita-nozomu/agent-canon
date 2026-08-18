@@ -1,4 +1,4 @@
-# Management Review
+# Management Review（管理レビュー）
 <!--
 @dependency-start
 contract template
@@ -12,36 +12,49 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
-## Scope Review
+{{>reader_map}}
+{{>review_contract}}
 
-<!-- Check whether user intent, acceptance criteria, and scope are concrete enough. -->
+## Scope Review（scope レビュー）
 
-## User Request Coverage Review
+<!-- user intent、acceptance criteria、scope が十分に具体的か確認します。 -->
 
-<!-- Check whether user_request_contract.md captures every must-do, must-not-do, and completion-evidence clause without silent drops. -->
+## User Request Coverage Review（user request coverage レビュー）
 
-## Source Bucket Review
+<!-- user_request_contract.md が must-do、must-not-do、completion-evidence の全 clause を silent drop なく収録するか確認します。 -->
 
-<!-- Check whether each clause is labeled as current_request, durable_user_preference, repo_or_code_precedent, domain_or_external_constraint, or unknown_or_open_question, and whether durable preferences are not silently converted into task requirements. -->
+## Source Bucket Review（source bucket レビュー）
 
-## Accumulated Context Resolution Review
+<!-- 各 clause が current_request、durable_user_preference、repo_or_code_precedent、domain_or_external_constraint、unknown_or_open_question のいずれかで label され、durable preference が silent に task requirement へ変換されないか確認します。 -->
 
-<!-- Check whether open questions were first resolved against memory, notes/themes, notes/guardrails, notes/knowledge, notes/failures, documents, prior logs, local code, tests, and external constraints if needed. Return revise if the agent asked the user or left unknowns without this sweep. -->
+## Accumulated Context Resolution Review（蓄積 context の解決レビュー）
 
-## Unknown Handling Review
+<!-- scope または判定を変える具体的な evidence がある場合だけ memory、notes/themes、notes/guardrails、notes/knowledge、notes/failures、documents、prior log、local code、test、必要な external constraint と照合します。decision に影響しない sweep は実行せず、未実行だけで revise にしません。 -->
 
-<!-- Check whether unknown_or_open_question appears only in deferred or escalation entries, not in active must-do, must-not-do, or completion-evidence clauses. Return escalate only when accumulated context cannot resolve a scope-changing unknown. -->
+## Unknown Handling Review（unknown 処理レビュー）
 
-## Routing Review
+<!-- unknown_or_open_question が deferred または escalation entry にだけ現れ、active must-do、must-not-do、completion-evidence clause に現れないか確認します。蓄積 context で scope-changing unknown を解決できない場合だけ escalate とします。 -->
 
-<!-- Check whether workflow=<family>, skills=<...>, review=<...> are declared and whether the right specialist roles and explicit stage subagents were enabled. Return revise if the fanout ledger does not prove that Intake Responsibility Wave is treated as an intake slice rather than a total cap, or if a dynamic expansion wave lacks budget and scope evidence. -->
+## Routing Review（routing レビュー）
 
-## Context And Library Sweep Review
+<!-- workflow=<family>、skills=<...>、review=<...> が宣言され、適切な specialist role と明示的な stage subagent が有効か確認します。fanout ledger が Intake Responsibility Wave を total cap ではなく intake slice と証明しない場合、または dynamic expansion wave に budget/scope evidence がなければ revise とします。 -->
 
-<!-- Check whether the required document sweep, dependency/library sweep, and existing-implementation sweep were actually performed before planning, and whether the artifacts record what was inspected. -->
+## Finding Status And Outcome（finding status と判定）
 
-## Reuse-First Review
+| Finding Status | Outcome impact |
+| --- | --- |
+| `blocking` | `changes-required` while unresolved |
+| `non-blocking`, `question`, `not-applicable`, `accepted-risk` | visible evidence only; does not force changes |
 
-<!-- Check whether the intake package identifies existing code, docs, and installed libraries that implementation must follow, and whether it records why reuse or extension is insufficient before any new path is proposed. -->
+<!-- management review is one owner gate; specialist checks remain bounded
+validators and do not create duplicate full-review artifacts. -->
+
+## Context And Library Sweep Review（context と library sweep レビュー）
+
+<!-- planning 前に required document sweep、dependency/library sweep、existing-implementation sweep を実施し、artifact が inspected surface を記録するか確認します。 -->
+
+## Reuse-First Review（reuse-first レビュー）
+
+<!-- intake package が implementation の従う既存 code、docs、installed library を特定し、新規 path を提案する前に reuse/extension で足りない理由を記録するか確認します。 -->
 
 {{>decision_approve_revise_escalate}}

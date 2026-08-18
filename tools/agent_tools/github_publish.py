@@ -21,10 +21,27 @@ import re
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 from urllib.parse import urlparse
+
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
 
 from artifact_identity import canonical_json_bytes
 from update_lifecycle_contract import (
@@ -33,7 +50,6 @@ from update_lifecycle_contract import (
     materialize_publication_readback_receipt,
     pull_request_branch_table,
     validate_candidate_cas_pr_transition,
-    validate_candidate_cas_receipt,
     validate_candidate_cas_rebind_transition,
     validate_gate_chain,
     validate_gate_verdict,
@@ -49,6 +65,24 @@ GITHUB_PUBLICATION_PACKET_SCHEMA = "agent-canon.github-publication-packet.v1"
 ACTIVE_PACKET_MATERIALIZATION_SCHEMA = (
     "waterfall.active_design_packet_materialization.v1"
 )
+
+
+def _write_publication_summary(path: Path, payload: bytes) -> None:
+    """Write local publication evidence beneath the parent root."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="github-publication-staging")
+        )
+        ParentRootSideEffectBoundary().write_parent_owned_file(
+            attestation, path, payload, "github-publication-staging"
+        )
+        return
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        "github-publication-staging: explicit parent root is required",
+    )
 
 
 @dataclass(frozen=True)
@@ -935,6 +969,21 @@ def _remote_head_readback(
     return remote_sha
 
 
+def _git_push_command(
+    verification: RemoteVerification,
+    *,
+    candidate_sha: str,
+    ref: str,
+) -> list[str]:
+    """Build a normal non-forced push, using gh credentials for HTTPS remotes."""
+    command = ["git"]
+    parsed = urlparse(verification.remote_url)
+    if parsed.scheme == "https":
+        command.extend(["-c", "credential.helper=!gh auth git-credential"])
+    command.extend(["push", "-u", verification.remote, f"{candidate_sha}:{ref}"])
+    return command
+
+
 def _permission_identity(verification: RemoteVerification) -> dict[str, object]:
     """Return verified or explicitly unknown push authority evidence."""
     evidence_id = verification.permission_evidence_id
@@ -1098,7 +1147,7 @@ def build_pull_request_lifecycle(
         if external_binding is None
         else cast(str, external_binding["snapshot_id"])
     )
-    observed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    observed_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     evidence_seed = {
         "transaction_id": transaction_id,
         "snapshot_id": snapshot_id,
@@ -1232,37 +1281,75 @@ def materialize_pr_identity_gate(
     upstream_gate_verdicts: Sequence[Mapping[str, object]],
 ) -> dict[str, object]:
     """Materialize G3 from G1/G2, exact CAS, topology, and permission."""
-    checked = validate_pull_request_lifecycle(lifecycle)
-    cas = validate_candidate_cas_receipt(candidate_cas_receipt)
-    rebind = validate_source_main_rebind_receipt(source_main_rebind_receipt)
-    validate_candidate_cas_rebind_transition(rebind, cas)
-    validate_candidate_cas_pr_transition(cas, checked)
+    return _materialize_pr_identity_gate_bundle(
+        lifecycle,
+        candidate_cas_receipt,
+        source_main_rebind_receipt,
+        upstream_gate_verdicts,
+    )[4]
+
+
+def _validate_pr_identity_inputs(
+    lifecycle: Mapping[str, object],
+    candidate_cas_receipt: Mapping[str, object],
+    source_main_rebind_receipt: Mapping[str, object],
+) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
+    """Validate and deep-clone the immutable G3 input records once."""
+    checked_rebind = validate_source_main_rebind_receipt(
+        source_main_rebind_receipt
+    )
+    checked_cas = validate_candidate_cas_rebind_transition(
+        checked_rebind, candidate_cas_receipt
+    )
+    checked_lifecycle = validate_candidate_cas_pr_transition(
+        checked_cas, lifecycle
+    )
+    return checked_lifecycle, checked_cas, checked_rebind
+
+
+def _materialize_pr_identity_gate_bundle(
+    lifecycle: Mapping[str, object],
+    candidate_cas_receipt: Mapping[str, object],
+    source_main_rebind_receipt: Mapping[str, object],
+    upstream_gate_verdicts: Sequence[Mapping[str, object]],
+) -> tuple[
+    dict[str, object],
+    dict[str, object],
+    dict[str, object],
+    tuple[dict[str, object], ...],
+    dict[str, object],
+]:
+    """Return checked G3 inputs and its gate without repeated validation."""
+    checked_lifecycle, checked_cas, checked_rebind = _validate_pr_identity_inputs(
+        lifecycle, candidate_cas_receipt, source_main_rebind_receipt
+    )
     upstream = validate_gate_chain(
         list(upstream_gate_verdicts),
         expected_gate_ids=("G1", "G2"),
         require_pass=True,
     )
     if any(
-        binding_identity(item["binding"]) != binding_identity(checked["binding"])
-        for item in (*upstream, cas)
+        binding_identity(item["binding"])
+        != binding_identity(checked_lifecycle["binding"])
+        for item in upstream
     ):
         raise UserVisibleFailure(
             message="G1/G2/CAS evidence does not bind the selected PR topology",
             next_action="materialize_a_successor_for_the_changed_candidate_or_base",
         )
-    permission = cast(Mapping[str, object], checked["permission_identity"])
+    permission = cast(Mapping[str, object], checked_lifecycle["permission_identity"])
     if permission["permission_state"] != "verified_true":
         raise UserVisibleFailure(
             message="push permission is not verified true for this immutable PR topology",
             next_action="read_verified_remote_permission_and_create_a_successor_lifecycle",
         )
-    binding = cast(Mapping[str, object], checked["binding"])
+    binding = cast(Mapping[str, object], checked_lifecycle["binding"])
     upstream_refs = [
         cast(str, cast(Mapping[str, object], item["binding"])["evidence_ref"])
         for item in upstream
     ]
-    cas_binding = cast(Mapping[str, object], cas["binding"])
-    return materialize_gate_verdict(
+    cas_binding = cast(Mapping[str, object], checked_cas["binding"])
+    gate = materialize_gate_verdict(
         binding=binding,
         gate_id="G3",
         ordered_input_evidence_refs=[
@@ -1272,13 +1359,18 @@ def materialize_pr_identity_gate(
         ],
         invariant="pr_identity_cas",
         output_digest=_sha256(
-            {"lifecycle": checked, "cas": cas, "source_main_rebind": rebind}
+            {
+                "lifecycle": checked_lifecycle,
+                "cas": checked_cas,
+                "source_main_rebind": checked_rebind,
+            }
         ),
         owner=f"{Path(__file__).resolve()}#materialize_pr_identity_gate",
         verdict="pass",
         retry_reason=None,
         next_checkpoint=None,
     )
+    return checked_lifecycle, checked_cas, checked_rebind, upstream, gate
 
 
 def require_pr_identity_gate(
@@ -1289,20 +1381,42 @@ def require_pr_identity_gate(
     gate_verdict: Mapping[str, object],
 ) -> tuple[dict[str, object], dict[str, object]]:
     """Consume, without recomputing, one exact G3 publication authority."""
-    checked = validate_pull_request_lifecycle(lifecycle)
-    cas = validate_candidate_cas_receipt(candidate_cas_receipt)
-    rebind = validate_source_main_rebind_receipt(source_main_rebind_receipt)
-    validate_candidate_cas_rebind_transition(rebind, cas)
-    validate_candidate_cas_pr_transition(cas, checked)
-    gate = validate_gate_verdict(gate_verdict)
-    if gate["gate_id"] != "G3" or gate["verdict"] != "pass":
+    checked, _cas, _rebind, _upstream, gate = _require_pr_identity_gate_bundle(
+        lifecycle,
+        candidate_cas_receipt,
+        source_main_rebind_receipt,
+        upstream_gate_verdicts,
+        gate_verdict,
+    )
+    return checked, gate
+
+
+def _require_pr_identity_gate_bundle(
+    lifecycle: Mapping[str, object],
+    candidate_cas_receipt: Mapping[str, object],
+    source_main_rebind_receipt: Mapping[str, object],
+    upstream_gate_verdicts: Sequence[Mapping[str, object]],
+    gate_verdict: Mapping[str, object],
+) -> tuple[
+    dict[str, object],
+    dict[str, object],
+    dict[str, object],
+    tuple[dict[str, object], ...],
+    dict[str, object],
+]:
+    """Return checked publication inputs and G3 without duplicate validation."""
+    checked, cas, _rebind = _validate_pr_identity_inputs(
+        lifecycle, candidate_cas_receipt, source_main_rebind_receipt
+    )
+    checked_gate = validate_gate_verdict(gate_verdict)
+    if checked_gate["gate_id"] != "G3" or checked_gate["verdict"] != "pass":
         raise UserVisibleFailure(
             message="GitHub mutation requires a passing G3 PR identity/CAS verdict",
             next_action="materialize_the_exact_candidate_permission_and_cas_evidence",
         )
     try:
-        validate_gate_chain(
-            [*upstream_gate_verdicts, gate],
+        checked_chain = validate_gate_chain(
+            [*upstream_gate_verdicts, checked_gate],
             expected_gate_ids=("G1", "G2", "G3"),
             require_pass=True,
         )
@@ -1311,18 +1425,21 @@ def require_pr_identity_gate(
             message=f"G3 predecessor chain is invalid: {exc}",
             next_action="materialize_G1_G2_and_CAS_for_the_exact_candidate",
         ) from exc
+    checked_gate = checked_chain[2]
+    checked_upstream = checked_chain[:2]
     cas_binding = cast(Mapping[str, object], cas["binding"])
-    gate_inputs = cast(Sequence[object], gate["ordered_input_evidence_refs"])
+    checked_binding = cast(Mapping[str, object], checked["binding"])
+    gate_binding = cast(Mapping[str, object], checked_gate["binding"])
+    gate_inputs = cast(Sequence[object], checked_gate["ordered_input_evidence_refs"])
     if (
-        binding_identity(checked["binding"]) != binding_identity(gate["binding"])
-        or binding_identity(cas_binding) != binding_identity(gate["binding"])
+        binding_identity(checked_binding) != binding_identity(gate_binding)
         or cast(str, cas_binding["evidence_ref"]) not in gate_inputs
     ):
         raise UserVisibleFailure(
             message="G3 evidence does not bind the selected PR lifecycle",
             next_action="create_a_successor_lifecycle_for_the_changed_identity",
         )
-    return checked, gate
+    return checked, cas, _rebind, checked_upstream, checked_gate
 
 
 def materialize_github_publication_packet(
@@ -1334,19 +1451,13 @@ def materialize_github_publication_packet(
     predecessor_graph_materialization: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Materialize the sole machine packet consumed by GitHub mutations."""
-    checked_lifecycle = validate_pull_request_lifecycle(lifecycle)
-    checked_cas = validate_candidate_cas_receipt(candidate_cas_receipt)
-    checked_rebind = validate_source_main_rebind_receipt(
-        source_main_rebind_receipt
-    )
-    validate_candidate_cas_rebind_transition(checked_rebind, checked_cas)
-    upstream = validate_gate_chain(
-        list(upstream_gate_verdicts),
-        expected_gate_ids=("G1", "G2"),
-        require_pass=True,
-    )
-    gate = materialize_pr_identity_gate(
-        checked_lifecycle, checked_cas, checked_rebind, upstream
+    checked_lifecycle, checked_cas, checked_rebind, upstream, gate = (
+        _materialize_pr_identity_gate_bundle(
+            lifecycle,
+            candidate_cas_receipt,
+            source_main_rebind_receipt,
+            upstream_gate_verdicts,
+        )
     )
     packet = {
         "schema": GITHUB_PUBLICATION_PACKET_SCHEMA,
@@ -1360,7 +1471,11 @@ def materialize_github_publication_packet(
         packet["predecessor_graph_materialization"] = (
             validate_predecessor_graph_materialization(
                 predecessor_graph_materialization,
-                expected_source_oid=str(checked_rebind["new_base_identity"]["commit_sha"]),
+                expected_source_oid=str(
+                    cast(Mapping[str, object], checked_rebind["new_base_identity"])[
+                        "commit_sha"
+                    ]
+                ),
             )
         )
     return packet
@@ -1460,31 +1575,26 @@ def validate_github_publication_packet(value: object) -> dict[str, object]:
             message="GitHub publication predecessor gates are invalid",
             next_action="materialize_G1_and_G2_for_the_exact_candidate",
         )
-    lifecycle, gate = require_pr_identity_gate(
+    (
+        checked_lifecycle,
+        checked_cas,
+        checked_rebind,
+        checked_upstream,
+        checked_gate,
+    ) = _require_pr_identity_gate_bundle(
         cast(Mapping[str, object], value["pull_request_lifecycle"]),
         cast(Mapping[str, object], value["candidate_cas_receipt"]),
         cast(Mapping[str, object], value["source_main_rebind_receipt"]),
         cast(Sequence[Mapping[str, object]], upstream_value),
         cast(Mapping[str, object], value["g3_gate"]),
     )
-    checked_rebind = validate_source_main_rebind_receipt(
-        value["source_main_rebind_receipt"]
-    )
     result = {
         "schema": GITHUB_PUBLICATION_PACKET_SCHEMA,
-        "pull_request_lifecycle": lifecycle,
-        "candidate_cas_receipt": validate_candidate_cas_receipt(
-            value["candidate_cas_receipt"]
-        ),
+        "pull_request_lifecycle": checked_lifecycle,
+        "candidate_cas_receipt": checked_cas,
         "source_main_rebind_receipt": checked_rebind,
-        "upstream_gate_verdicts": list(
-            validate_gate_chain(
-                list(upstream_value),
-                expected_gate_ids=("G1", "G2"),
-                require_pass=True,
-            )
-        ),
-        "g3_gate": gate,
+        "upstream_gate_verdicts": list(checked_upstream),
+        "g3_gate": checked_gate,
     }
     if "predecessor_graph_materialization" in value:
         result["predecessor_graph_materialization"] = (
@@ -1541,21 +1651,24 @@ def perform_push(
     verification: RemoteVerification,
     branch: str,
     *,
-    authority: GithubPublicationAuthority | None,
+    authority: GithubPublicationAuthority | None = None,
+    lifecycle: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
-    """Transport one local branch, optionally bound to a sealed packet."""
+    """Transport one local branch with optional packet or direct lifecycle evidence."""
     if branch == "main" and not getattr(args, "allow_main", False):
         raise UserVisibleFailure(
             message="refusing to push main without --allow-main",
             next_action="publish_a_topic_branch_or_pass_--allow-main_with_explicit_authority",
         )
-    lifecycle: dict[str, object] | None = None
     gate: dict[str, object] | None = None
     expected_ref = f"refs/heads/{branch}"
     sealed_candidate_sha: str | None = None
     sealed_candidate_tree_sha: str | None = None
     if authority is not None:
         lifecycle, gate = consume_publication_authority(authority)
+    elif lifecycle is not None:
+        lifecycle = validate_pull_request_lifecycle(lifecycle)
+    if lifecycle is not None:
         if lifecycle["state"] not in {
             "draft",
             "ready",
@@ -1571,35 +1684,30 @@ def perform_push(
         )
     dirty = worktree_dirty(runner)
     local_before = _local_git_identity(runner)
-    if (
-        local_before["branch"] != branch
-        or local_before["ref"] != expected_ref
-    ):
+    if local_before["branch"] != branch:
         raise UserVisibleFailure(
             message="current local branch/ref differs from the selected branch",
             next_action="checkout_the_selected_named_branch_before_publication",
         )
-    if authority is not None and (
+    if lifecycle is not None and (
         local_before["commit_sha"] != sealed_candidate_sha
         or local_before["tree_sha"] != sealed_candidate_tree_sha
     ):
+        lifecycle_label = "sealed" if authority is not None else "verified"
         raise UserVisibleFailure(
             message=(
-                "local branch/ref/commit/tree differs from the sealed lifecycle "
-                "head identity"
+                "local branch/ref/commit/tree differs from the "
+                f"{lifecycle_label} lifecycle head identity"
             ),
             next_action="materialize_a_successor_lifecycle_for_the_current_local_commit",
         )
     candidate_sha = local_before["commit_sha"]
     candidate_tree_sha = local_before["tree_sha"]
-    command = [
-        "git",
-        "push",
-        "-u",
-        "--force-with-lease",
-        verification.remote,
-        f"{candidate_sha}:{expected_ref}",
-    ]
+    command = _git_push_command(
+        verification,
+        candidate_sha=candidate_sha,
+        ref=expected_ref,
+    )
     result = run_command(
         runner,
         command,
@@ -1622,7 +1730,11 @@ def perform_push(
         {
             "action": "push",
             "publication_boundary": (
-                "sealed_publication" if authority is not None else "branch_transport_only"
+                "sealed_publication"
+                if authority is not None
+                else "verified_lifecycle"
+                if lifecycle is not None
+                else "branch_transport_only"
             ),
             "worktree_dirty": dirty,
             "command": command,
@@ -1637,8 +1749,9 @@ def perform_push(
             "status": "ok",
         }
     )
-    if lifecycle is not None and gate is not None:
+    if lifecycle is not None:
         summary["pull_request_lifecycle"] = lifecycle
+    if gate is not None:
         summary["g3_gate"] = gate
     return summary
 
@@ -1649,11 +1762,21 @@ def perform_pr(
     verification: RemoteVerification,
     branch: str,
     *,
-    authority: GithubPublicationAuthority,
+    authority: GithubPublicationAuthority | None = None,
+    lifecycle: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Create or update a pull request for the verified branch."""
     body_file = require_body_file(args.body_file)
-    lifecycle, gate = consume_publication_authority(authority)
+    gate: dict[str, object] | None = None
+    if authority is not None:
+        lifecycle, gate = consume_publication_authority(authority)
+    elif lifecycle is not None:
+        lifecycle = validate_pull_request_lifecycle(lifecycle)
+    else:
+        raise UserVisibleFailure(
+            message="PR mutation requires a verified direct lifecycle or sealed packet",
+            next_action="derive_the_local_candidate_and_verified_base_lifecycle",
+        )
     if lifecycle["state"] not in {
         "draft",
         "ready",
@@ -1699,9 +1822,10 @@ def perform_pr(
                     "command": command,
                     "gh_stdout": result.stdout.strip(),
                     "pull_request_lifecycle": lifecycle,
-                    "g3_gate": gate,
                 }
             )
+            if gate is not None:
+                summary["g3_gate"] = gate
             return summary
         readback = pull_request_readback(
             runner,
@@ -1717,9 +1841,10 @@ def perform_pr(
                 "pr_url": string_field(existing, "url"),
                 "next_action": "use_existing_pr_or_pass_--update-existing",
                 "pull_request_lifecycle": lifecycle,
-                "g3_gate": gate,
             }
         )
+        if gate is not None:
+            summary["g3_gate"] = gate
         return summary
 
     command = [
@@ -1758,9 +1883,10 @@ def perform_pr(
             "command": command,
             "pr_number": int_field(readback, "number"),
             "pull_request_lifecycle": lifecycle,
-            "g3_gate": gate,
         }
     )
+    if gate is not None:
+        summary["g3_gate"] = gate
     return summary
 
 
@@ -1770,19 +1896,20 @@ def perform_checks(
     verification: RemoteVerification,
     branch: str,
     *,
-    authority: GithubPublicationAuthority | GithubPostPublicationChecksAuthority,
+    authority: GithubPublicationAuthority | GithubPostPublicationChecksAuthority | None = None,
 ) -> dict[str, object]:
     """Show pull-request checks through gh."""
-    checked_g5: dict[str, object] | None
+    checked_g5: dict[str, object] | None = None
+    lifecycle: dict[str, object] | None = None
+    gate: dict[str, object] | None = None
     if type(authority) is GithubPostPublicationChecksAuthority:
         packet, checked_g5 = authority.consume()
         lifecycle = cast(dict[str, object], packet["pull_request_lifecycle"])
         gate = cast(dict[str, object], packet["g3_gate"])
-    else:
+    elif authority is not None:
         lifecycle, gate = consume_publication_authority(
             cast(GithubPublicationAuthority, authority)
         )
-        checked_g5 = None
     pr_selector = args.pr or branch
     command = ["gh", "pr", "checks", pr_selector, "--repo", verification.repo]
     if args.watch:
@@ -1803,11 +1930,14 @@ def perform_checks(
             "pr_selector": pr_selector,
             "command": command,
             "checks_stdout": result.stdout.strip(),
-            "pull_request_lifecycle": lifecycle,
-            "g3_gate": gate,
-            "g5_gate": checked_g5,
         }
     )
+    if lifecycle is not None:
+        summary["pull_request_lifecycle"] = lifecycle
+    if gate is not None:
+        summary["g3_gate"] = gate
+    if checked_g5 is not None:
+        summary["g5_gate"] = checked_g5
     if result.returncode == 8:
         summary["next_action"] = "wait_for_github_checks_or_rerun_with_--watch"
     return summary
@@ -1854,8 +1984,10 @@ def emit_summary(args: argparse.Namespace, summary: Mapping[str, object]) -> Non
     summary_out = getattr(args, "summary_out", None)
     if summary_out:
         path = Path(summary_out)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        _write_publication_summary(
+            path,
+            (json.dumps(summary, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+        )
     for line in summary_lines(summary):
         print(line)
 
@@ -1902,19 +2034,8 @@ def run(
     os.chdir(args.root)
     branch = selected_branch(runner, args.branch)
     verification = verify_remote(runner, repo=args.repo, remote=args.remote)
-    if publication_packet is None:
-        packet_path = Path(
-            ".agent-canon/update-lifecycle/state/github-publication.json"
-        )
-        if packet_path.is_file():
-            loaded = json.loads(packet_path.read_text(encoding="utf-8"))
-            publication_packet = cast(Mapping[str, object], loaded)
-        elif args.action != "push":
-            raise UserVisibleFailure(
-                message="canonical GitHub publication packet is missing",
-                next_action="materialize_reviewed_CAS_and_G1_G2_G3_before_mutation",
-            )
     authority: GithubPublicationAuthority | None = None
+    lifecycle: dict[str, object] | None = None
     if publication_packet is not None:
         authority = GithubPublicationAuthority.from_packet(publication_packet)
         packet = authority.consume()
@@ -1938,6 +2059,13 @@ def run(
                 message="publication packet differs from verified immutable GitHub topology",
                 next_action="materialize_a_successor_publication_packet",
             )
+    elif args.action in {"pr", "publish-pr"}:
+        lifecycle = build_pull_request_lifecycle(
+            args,
+            runner,
+            verification,
+            branch,
+        )
     if args.action == "push":
         return perform_push(
             args,
@@ -1945,11 +2073,7 @@ def run(
             verification,
             branch,
             authority=authority,
-        )
-    if authority is None:
-        raise UserVisibleFailure(
-            message="PR and checks actions require a sealed publication packet",
-            next_action="materialize_reviewed_CAS_and_G1_G2_G3_before_mutation",
+            lifecycle=lifecycle,
         )
     if args.action == "pr":
         return perform_pr(
@@ -1958,6 +2082,7 @@ def run(
             verification,
             branch,
             authority=authority,
+            lifecycle=lifecycle,
         )
     if args.action == "publish-pr":
         push_summary = perform_push(
@@ -1966,6 +2091,7 @@ def run(
             verification,
             branch,
             authority=authority,
+            lifecycle=lifecycle,
         )
         pr_summary = perform_pr(
             args,
@@ -1973,6 +2099,7 @@ def run(
             verification,
             branch,
             authority=authority,
+            lifecycle=lifecycle,
         )
         summary = dict(pr_summary)
         summary["action"] = "publish-pr"

@@ -1,21 +1,12 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical detailed_designer model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 04b88bc705194b571d8b10ae90998c81b0bdbcab4659f8296744e488f95b1d2d
+# source canonical digest: 7bda9f797204511bf61540839b7b33cafff3dffcc6dbbfe946601283f1e8e12a
 
 name = "detailed_designer"
 description = "Detailed-design authoring agent for writing implementation-ready design docs with reuse-first, side-effect mapping, and style-continuity guidance."
 nickname_candidates = ["detailed_designer"]
-sandbox_mode = "workspace-write"
+sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = "You are acting as detailed_designer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."
+developer_instructions = "You are acting as detailed_designer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass."

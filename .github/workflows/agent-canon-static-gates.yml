@@ -1,25 +1,13 @@
 # @dependency-start
 # contract configuration
-# responsibility Runs the canonical AgentCanon source gate once for a PR candidate tree.
+# responsibility Selects and runs standalone AgentCanon validation in semantic execution units while preserving one aggregate required check.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
-# upstream implementation ../../tools/agent_tools/tool_catalog.py validates tool catalog shape
-# upstream implementation ../../tools/agent_tools/tool_drift.py rejects retired legacy tool surfaces
-# upstream implementation ../../tools/agent_tools/responsibility_scope.py validates scope/tool ownership
-# upstream implementation ../../tools/agent_tools/import_responsibility.py validates import ownership boundaries
-# upstream implementation ../../tools/agent_tools/issue_sync.py validates local issue files
-# upstream implementation ../../tools/agent_tools/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
-# upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
-# upstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates Codex runtime role config
-# upstream implementation ../../tools/agent_tools/evaluate_codex_agent_roles.py validates Codex agent role prompts
-# upstream implementation ../../tools/agent_tools/check_skill_frontmatter.py validates runtime skill YAML frontmatter
-# upstream implementation ../../tools/agent_tools/smoke_test_research_perspective_pack.py validates research review pack routing
-# upstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py validates skill/workflow prompt surfaces
-# upstream implementation ../../tools/agent_tools/check_convention_compliance.py validates convention gate wiring
-# upstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py validates workflow routing eval prompts
-# upstream implementation ../../tools/agent_tools/evaluate_report_quality.py validates report quality checklist prompts
-# upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh checks dependency headers and graph
-# upstream implementation ../../tools/ci/check_github_workflows.py validates workflow and PR template conventions
-# upstream implementation ../../tools/ci/check_agent_canon_pr.sh owns the one source-PR static gate invocation.
+# upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
+# upstream implementation ../../tools/agent_tools/classify_path_risk.py canonical changed-path selector and unit mapping
+# upstream implementation ../../tools/ci/run_standalone_static_gate_unit.sh executes one selected static-gate unit
+# upstream implementation ../../tools/ci/check_agent_canon_pr.sh preserves the manual full-confidence route
+# downstream implementation ../../tools/ci/check_github_workflows.py validates workflow and PR template conventions
+# downstream implementation ../../tests/tools/test_standalone_static_gate_units.py validates execution-unit boundaries and selection
 # @dependency-end
 
 name: AgentCanon Static Gates
@@ -36,7 +24,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  static-gates:
+  select-static-units:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      units: ${{ steps.select.outputs.units }}
+      rust: ${{ steps.select.outputs.rust }}
+      contracts: ${{ steps.select.outputs.contracts }}
+      eval: ${{ steps.select.outputs.eval }}
+      workflow_container: ${{ steps.select.outputs.workflow_container }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          persist-credentials: false
+      - name: Select validation units from trusted PR diff
+        id: select
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" > "${RUNNER_TEMP}/agent-canon-changed-paths.txt"
+          python3 tools/agent_tools/classify_path_risk.py \
+            --paths-file "${RUNNER_TEMP}/agent-canon-changed-paths.txt" \
+            --format github-output | tee -a "${GITHUB_OUTPUT}"
+
+  rust-static:
+    needs: select-static-units
+    if: needs.select-static-units.outputs.rust == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -45,26 +62,139 @@ jobs:
           fetch-depth: 0
           submodules: false
           persist-credentials: false
+      - name: Install Rust gate components
+        run: rustup component add rustfmt clippy
+      - name: Run Rust static unit
+        run: bash tools/ci/run_standalone_static_gate_unit.sh rust
 
-      - name: Checkout AgentCanon submodule
-        env:
-          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
-
+  contracts-static:
+    needs: select-static-units
+    if: needs.select-static-units.outputs.contracts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          persist-credentials: false
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-      - name: Install static gate dependencies
+      - name: Install contract gate dependencies
         run: python3 -m pip install --upgrade pyyaml tomli packaging
+      - name: Run contract static unit
+        run: bash tools/ci/run_standalone_static_gate_unit.sh contracts
 
-      - name: Prepare runtime log archive
-        run: mkdir -p .agent-canon/log-archive
+  eval-static:
+    needs: select-static-units
+    if: needs.select-static-units.outputs.eval == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          persist-credentials: false
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install eval gate dependencies
+        run: python3 -m pip install --upgrade pyyaml tomli packaging
+      - name: Run eval static unit
+        run: bash tools/ci/run_standalone_static_gate_unit.sh eval
 
-      - name: Install Rust gate components
+  workflow-container-static:
+    needs: select-static-units
+    if: needs.select-static-units.outputs.workflow_container == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          persist-credentials: false
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install workflow gate dependencies
+        run: python3 -m pip install --upgrade pyyaml tomli packaging pytest
+      - name: Run workflow and container static unit
+        run: bash tools/ci/run_standalone_static_gate_unit.sh workflow-container
+
+  static-gates:
+    if: always()
+    needs:
+      - select-static-units
+      - rust-static
+      - contracts-static
+      - eval-static
+      - workflow-container-static
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read back selected PR execution units
+        if: github.event_name == 'pull_request'
+        env:
+          SELECTOR_RESULT: ${{ needs.select-static-units.result }}
+          SELECTED_UNITS: ${{ needs.select-static-units.outputs.units }}
+          RUST_SELECTED: ${{ needs.select-static-units.outputs.rust }}
+          CONTRACTS_SELECTED: ${{ needs.select-static-units.outputs.contracts }}
+          EVAL_SELECTED: ${{ needs.select-static-units.outputs.eval }}
+          WORKFLOW_CONTAINER_SELECTED: ${{ needs.select-static-units.outputs.workflow_container }}
+          RUST_RESULT: ${{ needs.rust-static.result }}
+          CONTRACTS_RESULT: ${{ needs.contracts-static.result }}
+          EVAL_RESULT: ${{ needs.eval-static.result }}
+          WORKFLOW_CONTAINER_RESULT: ${{ needs.workflow-container-static.result }}
+        run: |
+          test "${SELECTOR_RESULT}" = success
+          printf 'selected_units=%s\n' "${SELECTED_UNITS}"
+          check_unit() {
+            selected="$1"
+            result="$2"
+            name="$3"
+            printf '%s selected=%s result=%s\n' "${name}" "${selected}" "${result}"
+            if [ "${selected}" = true ]; then
+              test "${result}" = success
+            else
+              test "${result}" = skipped
+            fi
+          }
+          check_unit "${RUST_SELECTED}" "${RUST_RESULT}" rust
+          check_unit "${CONTRACTS_SELECTED}" "${CONTRACTS_RESULT}" contracts
+          check_unit "${EVAL_SELECTED}" "${EVAL_RESULT}" eval
+          check_unit "${WORKFLOW_CONTAINER_SELECTED}" "${WORKFLOW_CONTAINER_RESULT}" workflow-container
+
+      - name: Checkout repository for manual full gate
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          persist-credentials: false
+      - name: Checkout AgentCanon submodule for manual full gate
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
+          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
+        run: bash tools/ci/checkout_agent_canon_submodule.sh
+      - name: Setup Python for manual full gate
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install manual full-gate dependencies
+        if: github.event_name == 'workflow_dispatch'
+        run: python3 -m pip install --upgrade pyyaml tomli packaging pytest
+      - name: Install Rust components for manual full gate
+        if: github.event_name == 'workflow_dispatch'
         run: rustup component add rustfmt clippy
-
-      - name: Run static gates
+      - name: Run manual full gate
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}
         run: bash tools/ci/check_agent_canon_pr.sh

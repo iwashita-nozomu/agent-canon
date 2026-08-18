@@ -4,11 +4,15 @@
   "summary": [
     "AgentCanon ships broad shared surfaces, but not every surface is mandatory for",
     "every repository task. Treat root views and tools as installed capability, then",
-    "activate only the profile required by the current change."
+    "activate only the profile required by the current change.",
+    "Each profile ID and strict_dependency_graph_required value is canonical input",
+    "for parent AgentCanon PR graph selection; unknown IDs fail selection."
   ],
   "profile_classes": [
     {
+      "id": "base-project",
       "profile": "Base project",
+      "strict_dependency_graph_required": false,
       "activates": [
         "`README.md`",
         "`QUICK_START.md`",
@@ -18,18 +22,21 @@
       "required_when": "Every template or derived repo"
     },
     {
+      "id": "agent-runtime",
       "profile": "Agent runtime",
+      "strict_dependency_graph_required": false,
       "activates": [
         "`AGENTS.md`",
-        "`agents/`",
-        "`.agents/`",
-        "`.codex/`",
-        "shared `tools/`"
+        "`.codex/config.toml`",
+        "`tools/agent-canon`",
+        "project-owned `agents/`, `.agents/`, `.codex/`, and `tools/` remain separate"
       ],
       "required_when": "An agent performs or reviews repo work"
     },
     {
+      "id": "devcontainer",
       "profile": "Devcontainer",
+      "strict_dependency_graph_required": false,
       "activates": [
         "`.devcontainer/`",
         "shared post-create helpers"
@@ -37,7 +44,9 @@
       "required_when": "VS Code devcontainer or agent ergonomics are used"
     },
     {
+      "id": "docker-runtime",
       "profile": "Docker runtime",
+      "strict_dependency_graph_required": false,
       "activates": [
         "root `docker/`",
         "runtime packs"
@@ -45,7 +54,9 @@
       "required_when": "Dockerfile, image, pack, Jupyter, or container setup changes"
     },
     {
+      "id": "github-automation",
       "profile": "GitHub automation",
+      "strict_dependency_graph_required": false,
       "activates": [
         "`.github/`",
         "PR templates",
@@ -54,7 +65,9 @@
       "required_when": "GitHub Actions, PR automation, or GitHub path-constrained copies change"
     },
     {
+      "id": "experiment",
       "profile": "Experiment",
+      "strict_dependency_graph_required": false,
       "activates": [
         "`experiments/`",
         "experiment registry",
@@ -63,7 +76,9 @@
       "required_when": "Experiment topics, formal runs, result summaries, or research workflows change"
     },
     {
+      "id": "cpp",
       "profile": "C++",
+      "strict_dependency_graph_required": false,
       "activates": [
         "parent root remains language-neutral",
         "`cpp/CMakeLists.txt` as the single native project entry",
@@ -78,7 +93,9 @@
       "required_when": "C or C++ code, build layout, or native artifacts change"
     },
     {
+      "id": "memory-and-learning",
       "profile": "Memory and learning",
+      "strict_dependency_graph_required": false,
       "activates": [
         "`memory/`",
         "notes promotion",
@@ -87,7 +104,9 @@
       "required_when": "User asks to persist memory, feedback/retrospective is observed, or agent-learning is in scope"
     },
     {
+      "id": "maintenance",
       "profile": "Maintenance",
+      "strict_dependency_graph_required": true,
       "activates": [
         "inventories",
         "review backlog scan",
@@ -140,7 +159,13 @@
     "PR or run bundle must state why that set is sufficient.",
     "Prompt-only or prose-only edits use the surface-specific docs, prompt, eval,",
     "and dependency checks selected by the active profile; they do not automatically",
-    "escalate to full `make ci`."
+    "escalate to full `make ci`.",
+    "Pydocstyle is an explicit Docstring review route, not a shared correctness",
+    "requirement. The shared gate does not invoke or block on pydocstyle; active",
+    "profile validation owners remain authoritative for their selected checks.",
+    "An unavailable pydocstyle tool or its diagnostics fail only the explicit",
+    "review command.",
+    "AgentCanon development prompt and accumulated eval producers belong to the standalone static-gates owner; derived shared gates do not invoke them or apply their diagnostics to parent-owned documents."
   ],
   "validation_failure_response": {
     "rule": [
@@ -201,14 +226,17 @@
         "standalone-source tool_drift coverage once",
         "docs check",
         "generated-artifact guard",
-        "broad quick CI with docs/workflow gates skipped",
-        "validated PR-gate receipt suppresses repeated graph/dependency-header producers; ordinary run_all runs them"
+        "standalone-source prompt/accumulated evals remain in the existing static-gates owner",
+        "derived shared gates exclude AgentCanon development prompt/accumulated eval producers and parent-owned diagnostics",
+        "standalone shared gates remain the existing static-gates owner and add no repository-wide project-quality job",
+        "derived parent workflows expose the canonical project-quality owner marker and `make ci` command; job names are not an authority",
+        "no repository-wide project-quality runner is added to the shared gate"
       ]
     },
     {
       "changed_surface": "Root shared views or submodule pin",
       "required_check": [
-        "`bash tools/sync_agent_canon.sh check`",
+        "source-root resolver `exec tools/sync_agent_canon.sh check`",
         "`git submodule status vendor/agent-canon` evidence"
       ]
     },

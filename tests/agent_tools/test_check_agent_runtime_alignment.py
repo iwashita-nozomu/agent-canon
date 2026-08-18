@@ -9,6 +9,9 @@
 
 from __future__ import annotations
 
+import ast
+import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -31,12 +34,15 @@ from implementation_dispatch import (  # noqa: E402
     workflow_topology_policy_violations,
 )
 from packets import (  # noqa: E402
+    markdown_document_headings,
+    markdown_heading_anchor,
     resolve_active_design_packet_config,
     resolve_cross_cutting_document_packet,
     resolve_document_section_locators,
     resolve_role_document_packet,
 )
 from team_config import TaskCatalog, load_team_config, resolve_role  # noqa: E402
+from workspace_scope import resolve_report_bundle_artifact_path  # noqa: E402
 
 
 def task_catalog_from_raw(raw: dict[str, object]) -> TaskCatalog:
@@ -54,6 +60,60 @@ def loaded_task_catalog_raw() -> dict[str, object]:
     return yaml.safe_load(
         (PROJECT_ROOT / "agents" / "task_catalog.yaml").read_text(encoding="utf-8")
     )
+
+
+def top_level_function_names(source: str) -> set[str]:
+    """Return only function definitions owned directly by a Python module."""
+    tree = ast.parse(source)
+    return {
+        node.name
+        for node in tree.body
+        if isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef))
+    }
+
+
+def module_string_constant(source: str, name: str) -> str:
+    """Resolve one top-level string constant from a Python module."""
+    tree = ast.parse(source)
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(
+            isinstance(target, ast.Name) and target.id == name
+            for target in node.targets
+        ):
+            continue
+        value = ast.literal_eval(node.value)
+        if isinstance(value, str):
+            return value
+    raise AssertionError(f"missing string constant: {name}")
+
+
+def imported_names(source: str) -> set[str]:
+    """Return names imported by a Python module, independent of import style."""
+    tree = ast.parse(source)
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.update(alias.asname or alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            names.update(alias.asname or alias.name for alias in node.names)
+    return names
+
+
+def test_missing_report_bundle_path_uses_existing_git_parent(tmp_path: Path) -> None:
+    """A future report bundle is checked without being created."""
+    parent = tmp_path / "parent"
+    subprocess.run(["git", "init", "-q", "-b", "main", str(parent)], check=True)
+    report_dir = parent / "reports" / "agents" / "future-run"
+
+    resolved = resolve_report_bundle_artifact_path(
+        report_dir,
+        "intent_brief.md",
+    )
+
+    assert resolved == report_dir / "intent_brief.md"
+    assert not report_dir.exists()
 
 
 class AgentRuntimeAlignmentTest(unittest.TestCase):
@@ -81,9 +141,13 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
     def test_alignment_script_passes(self) -> None:
         """The runtime alignment checker should succeed without findings."""
+        environment = os.environ.copy()
+        environment["AGENT_CANON_PARENT_ROOT"] = str(PROJECT_ROOT.parents[2])
+        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(PROJECT_ROOT.parents[2])
         result = subprocess.run(
             [sys.executable, str(SCRIPT_PATH)],
             cwd=PROJECT_ROOT,
+            env=environment,
             check=False,
             capture_output=True,
             text=True,
@@ -91,6 +155,29 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("AGENT_RUNTIME_ALIGNMENT=pass", result.stdout)
+
+    def test_consumer_static_role_projection_readback_passes(self) -> None:
+        """Runtime alignment compares the committed 35-role static snapshot."""
+        runtime_alignment.validate_generated_role_views()
+
+    def test_alignment_script_standalone_parent_uses_external_fixture_parent(self) -> None:
+        """Standalone parent-bound checks keep derived reports outside source."""
+        environment = os.environ.copy()
+        environment["AGENT_CANON_PARENT_ROOT"] = str(PROJECT_ROOT)
+        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(PROJECT_ROOT)
+        before = set(PROJECT_ROOT.parent.glob(".agent-canon-runtime-parent-*"))
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT_PATH)],
+            cwd=PROJECT_ROOT,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        after = set(PROJECT_ROOT.parent.glob(".agent-canon-runtime-parent-*"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("AGENT_RUNTIME_ALIGNMENT=pass", result.stdout)
+        self.assertEqual(after, before)
 
     def test_retired_command_accepts_catalog_backed_validation_owner(self) -> None:
         """A tombstone may route to a canonical validation tool in the catalog."""
@@ -365,41 +452,94 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
     def test_decision_sufficiency_has_one_owner_and_pointer_only_consumers(self) -> None:
         """DSV semantics stay canonical while packets, Spark, closeout, and evals consume it."""
-        owner = (
+        owner_document_path = (
             PROJECT_ROOT / "agents" / "skills" / "agent-orchestration.md"
-        ).read_text(encoding="utf-8")
+        )
+        owner_document = owner_document_path.read_text(encoding="utf-8")
         manifest_rendering = (
             PROJECT_ROOT / "tools" / "agent_tools" / "manifest_rendering.py"
         ).read_text(encoding="utf-8")
         lifecycle_contract = (
             PROJECT_ROOT / "tools" / "agent_tools" / "update_lifecycle_contract.py"
         ).read_text(encoding="utf-8")
-        subagents = (
-            PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md"
+        implementation_route = (
+            PROJECT_ROOT / "tools" / "agent_tools" / "implementation_route.py"
         ).read_text(encoding="utf-8")
-        consumer_docs = [
-            PROJECT_ROOT / ".agents" / "skills" / "agent-orchestration" / "SKILL.md",
-            PROJECT_ROOT / "agents" / "skills" / "task-routing.md",
+        pointer_docs = [
             PROJECT_ROOT / "agents" / "skills" / "agent-canon-update.md",
             PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md",
         ]
 
-        self.assertEqual(owner.count("## Decision Sufficiency Packet"), 1)
-        self.assertIn("唯一の意味論 owner", owner)
-        self.assertNotIn("def validate_decision_sufficiency_packet", manifest_rendering)
-        self.assertNotIn("def validate_decision_sufficiency_packet", lifecycle_contract)
-        self.assertIn(
-            'DECISION_SUFFICIENCY_OWNER = "agents/skills/agent-orchestration.md#Decision Sufficiency Packet"',
+        owner_reference = module_string_constant(
             manifest_rendering,
+            "DECISION_SUFFICIENCY_OWNER",
         )
-        self.assertIn("import_decision_sufficiency_verdict", manifest_rendering)
-        self.assertIn("selected owner gate", subagents)
+        owner_path_text, separator, owner_anchor = owner_reference.partition("#")
+        self.assertTrue(separator)
+        owner_relative_path = Path(owner_path_text)
+        self.assertFalse(owner_relative_path.is_absolute())
+        owner_path = (PROJECT_ROOT / owner_relative_path).resolve()
+        self.assertEqual(owner_path.relative_to(PROJECT_ROOT), owner_relative_path)
+        self.assertEqual(owner_path, owner_document_path.resolve())
+        self.assertTrue(owner_path.is_file())
+
+        json_start = owner_document.index("```json") + len("```json")
+        json_end = owner_document.index("```", json_start)
+        owner_record = cast(
+            dict[str, object],
+            json.loads(owner_document[json_start:json_end]),
+        )
+        irrelevant_unknowns = cast(
+            list[object],
+            owner_record["irrelevant_unknowns"],
+        )
+        self.assertEqual(len(irrelevant_unknowns), 1)
+        unknown = cast(dict[str, object], irrelevant_unknowns[0])
+        self.assertEqual(unknown["validator_owner"], owner_reference)
+
+        owner_headings = markdown_document_headings(owner_path)
+        owner_anchor_candidates = {
+            owner_anchor,
+            markdown_heading_anchor(owner_anchor),
+        }
+        resolved_owner_headings = [
+            heading
+            for heading in owner_headings
+            if heading in owner_anchor_candidates
+            or markdown_heading_anchor(heading) in owner_anchor_candidates
+        ]
+        self.assertEqual(
+            resolved_owner_headings,
+            ["Decision Sufficiency Packet"],
+        )
+
+        semantic_consumers = {
+            "manifest_rendering": manifest_rendering,
+            "implementation_route": implementation_route,
+            "update_lifecycle_contract": lifecycle_contract,
+        }
+        for name, source in semantic_consumers.items():
+            with self.subTest(consumer=name):
+                self.assertNotIn(
+                    "validate_decision_sufficiency_packet",
+                    top_level_function_names(source),
+                )
+        self.assertIn(
+            "import_decision_sufficiency_verdict",
+            imported_names(manifest_rendering),
+        )
+        self.assertIn(
+            "update_lifecycle_contract",
+            imported_names(implementation_route),
+        )
+        for path in pointer_docs:
+            with self.subTest(pointer_doc=path):
+                self.assertIn(owner_reference, path.read_text(encoding="utf-8"))
+
+        self.assertIn("selected owner gate", (
+            PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md"
+        ).read_text(encoding="utf-8"))
         self.assertIn("decision_sufficiency_packet_ref", manifest_rendering)
-        for path in consumer_docs:
-            with self.subTest(path=path):
-                text = path.read_text(encoding="utf-8")
-                self.assertNotIn("## Decision Sufficiency Packet", text)
-                self.assertNotIn('"schema": "agent-canon.decision-sufficiency.v1"', text)
 
     def test_generated_role_views_cannot_claim_model_authority(self) -> None:
         """Both runtime docs reject generated-view authority and manual model edits."""
@@ -488,12 +628,22 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         }
 
         with (
-            patch.object(runtime_alignment, "load_project_config_toml", return_value=config),
-            patch.object(runtime_alignment, "validate_skill_config", return_value=None),
+            patch.object(
+                runtime_alignment, "load_project_config_toml", return_value=config
+            ),
             patch.object(runtime_alignment, "parse_codex_agents", return_value={}),
             self.assertRaisesRegex(RuntimeError, "unsupported scalar keys under"),
         ):
             runtime_alignment.validate_project_config()
+
+    def test_project_config_uses_standard_permissions_and_discovery(self) -> None:
+        """Project config uses safe permissions and Codex's automatic skill discovery."""
+        config = runtime_alignment.load_project_config_toml()
+
+        self.assertEqual(config["approval_policy"], "on-request")
+        self.assertEqual(config["sandbox_mode"], "workspace-write")
+        self.assertNotIn("features", config)
+        self.assertNotIn("skills", config)
 
     def test_task_catalog_rejects_legacy_same_role_identity_key(self) -> None:
         """The alignment checker should reject the old role_type identity key."""
@@ -579,124 +729,6 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         with patch.object(runtime_alignment, "load_task_catalog", return_value=catalog):
             with self.assertRaisesRegex(RuntimeError, "T12 candidate specialists"):
                 runtime_alignment.validate_task_catalog_references()
-
-    def test_skill_config_accepts_project_owned_skill_overlay(self) -> None:
-        """Parent repos may add skills through .codex/project-config.toml."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            agent_skill = root / ".agents" / "skills" / "agent-skill" / "SKILL.md"
-            project_skill = root / ".codex" / "project-skills" / "project-skill" / "SKILL.md"
-            agent_skill.parent.mkdir(parents=True)
-            project_skill.parent.mkdir(parents=True)
-            agent_skill.write_text("---\nname: agent-skill\n---\n", encoding="utf-8")
-            project_skill.write_text("---\nname: project-skill\n---\n", encoding="utf-8")
-            config_path = root / ".codex" / "config.toml"
-            project_config_path = root / ".codex" / "project-config.toml"
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-            config_path.write_text("", encoding="utf-8")
-            config: dict[str, object] = {
-                "skills": {
-                    "config": [
-                        {
-                            "path": "../.agents/skills/agent-skill/SKILL.md",
-                            "enabled": True,
-                        },
-                    ]
-                }
-            }
-            project_config: dict[str, object] = {
-                "skills": {
-                    "config": [
-                        {
-                            "path": "project-skills/project-skill/SKILL.md",
-                            "enabled": True,
-                        },
-                    ]
-                }
-            }
-
-            with (
-                patch.object(runtime_alignment, "PROJECT_CONFIG_PATH", config_path),
-                patch.object(runtime_alignment, "PROJECT_SKILL_CONFIG_PATH", project_config_path),
-                patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".agents" / "skills"),
-                patch.object(
-                    runtime_alignment,
-                    "expected_skill_config_paths",
-                    return_value=("../.agents/skills/agent-skill/SKILL.md",),
-                ),
-            ):
-                self.assertTrue(runtime_alignment.is_project_skill_lane_path(project_skill))
-                runtime_alignment.validate_skill_config(config, project_config)
-
-    def test_shared_skill_config_rejects_project_owned_skill_entries(self) -> None:
-        """Parent-owned skills must not be enabled from AgentCanon config.toml."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            project_skill = root / ".codex" / "project-skills" / "project-skill" / "SKILL.md"
-            project_skill.parent.mkdir(parents=True)
-            project_skill.write_text("---\nname: project-skill\n---\n", encoding="utf-8")
-            config_path = root / ".codex" / "config.toml"
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-            config_path.write_text("", encoding="utf-8")
-            config: dict[str, object] = {
-                "skills": {
-                    "config": [
-                        {
-                            "path": "project-skills/project-skill/SKILL.md",
-                            "enabled": True,
-                        },
-                    ]
-                }
-            }
-
-            with (
-                patch.object(runtime_alignment, "PROJECT_CONFIG_PATH", config_path),
-                patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".agents" / "skills"),
-                patch.object(
-                    runtime_alignment,
-                    "expected_skill_config_paths",
-                    return_value=(),
-                ),
-                self.assertRaisesRegex(RuntimeError, "project-config.toml"),
-            ):
-                runtime_alignment.validate_skill_config(config)
-
-    def test_skill_config_rejects_paths_outside_agentcanon_and_project_lanes(
-        self,
-    ) -> None:
-        """skills.config paths outside approved lanes must fail closed."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            outside_skill = root / "skills" / "project-skill" / "SKILL.md"
-            outside_skill.parent.mkdir(parents=True)
-            outside_skill.write_text("---\nname: project-skill\n---\n", encoding="utf-8")
-            config_path = root / ".codex" / "config.toml"
-            project_config_path = root / ".codex" / "project-config.toml"
-            config_path.parent.mkdir(parents=True)
-            config_path.write_text("", encoding="utf-8")
-            project_config: dict[str, object] = {
-                "skills": {
-                    "config": [
-                        {
-                            "path": "../skills/project-skill/SKILL.md",
-                            "enabled": True,
-                        },
-                    ]
-                }
-            }
-
-            with (
-                patch.object(runtime_alignment, "PROJECT_CONFIG_PATH", config_path),
-                patch.object(runtime_alignment, "PROJECT_SKILL_CONFIG_PATH", project_config_path),
-                patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".agents" / "skills"),
-                patch.object(
-                    runtime_alignment,
-                    "expected_skill_config_paths",
-                    return_value=(),
-                ),
-                self.assertRaisesRegex(RuntimeError, "outside allowed skill lanes"),
-            ):
-                runtime_alignment.validate_skill_config({"skills": {"config": []}}, project_config)
 
     def test_public_skill_document_contract_rejects_extra_public_doc(self) -> None:
         """Public skill docs must be catalog-backed instead of internal routines."""
@@ -995,7 +1027,10 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         """Derived workspaces need not expose shared AgentCanon docs at root."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir)
-            entries = resolve_cross_cutting_document_packet(workspace_root)
+            entries = resolve_cross_cutting_document_packet(
+                workspace_root,
+                PROJECT_ROOT,
+            )
             review_process = (
                 PROJECT_ROOT / "documents" / "conventions" / "REVIEW_PROCESS.md"
             ).resolve()
@@ -1017,9 +1052,10 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             packet = resolve_role_document_packet(
                 config=config,
                 role=role,
-                report_dir=workspace_root / "reports" / "agents" / "_packet_probe",
+                report_dir=PROJECT_ROOT / "reports" / "agents" / "_packet_probe",
                 workspace_root=workspace_root,
                 active_design_packet=active_design_packet,
+                agentcanon_source_root=PROJECT_ROOT,
             )
             non_artifact_paths = {
                 entry.path for entry in packet.read_before_work if not entry.rationale.startswith("run artifact:")
@@ -1039,6 +1075,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             report_dir=PROJECT_ROOT / "reports" / "agents" / "_packet_probe",
             workspace_root=PROJECT_ROOT,
             active_design_packet=active_design_packet,
+            agentcanon_source_root=PROJECT_ROOT,
         )
         sectioned_entries = [
             entry for entry in packet.read_before_work if entry.sections

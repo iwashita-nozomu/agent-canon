@@ -11,6 +11,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -19,6 +20,7 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 from typing import cast
+from unittest import mock
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -30,6 +32,11 @@ SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_skill_workflow_promp
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 import evaluate_skill_workflow_prompts as evaluator  # noqa: E402
 from eval_manifest_paths import resolve_eval_manifest  # noqa: E402
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+    attest_parent_root,
+)
 from runtime_log_paths import mounted_log_archive_root  # noqa: E402
 
 
@@ -165,6 +172,36 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             ".codex/agents/*.toml",
         ):
             self.assertIn(required_glob, target_globs)
+
+    def test_codex_agent_generic_provenance_is_consumer_static_and_path_free(self) -> None:
+        """The generic Codex prompt check owns only static marker/digest provenance."""
+        manifest = PROJECT_ROOT / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+        data = load_toml_document(manifest)
+        evals = cast(list[dict[str, object]], data["evals"])
+        role_eval = next(entry for entry in evals if entry.get("id") == "all-codex-subagent-prompts")
+        checklist = next(
+            item
+            for item in cast(list[dict[str, object]], role_eval["checklist"])
+            if item.get("id") == "CODEX-AGENT-GENERIC-1"
+        )
+
+        self.assertEqual(
+            set(cast(list[str], checklist["required_regex"])),
+            {
+                "generated role view: generated_role_view_v1",
+                "(?m)^# source canonical digest: [0-9a-f]{64}$",
+            },
+        )
+        self.assertEqual(
+            set(cast(list[str], checklist["forbidden_regex"])),
+            {
+                "agents/skills/",
+                "agents/model_profiles\\.toml",
+                "tools/agent_tools/",
+                "\\.\\./\\.\\./agents/",
+                "\\.\\./\\.\\./tools/",
+            },
+        )
 
     def test_default_manifest_routes_convention_and_toolcall_eval_coverage(
         self,
@@ -692,6 +729,44 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             self.assertIn("glob-sample:prompts/a.md", result.stdout)
             self.assertIn("glob-sample:prompts/b.md", result.stdout)
 
+    def test_target_glob_reads_one_canonical_owner_for_each_shim(self) -> None:
+        """Globbed thin shims can share one canonical owner in checklist text."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            prompt_dir = root / "prompts"
+            prompt_dir.mkdir()
+            (prompt_dir / "a.md").write_text("shim\n", encoding="utf-8")
+            (root / "canonical.md").write_text("canonical-marker\n", encoding="utf-8")
+            manifest = root / "eval.toml"
+            manifest.write_text(
+                textwrap.dedent(
+                    """
+                    version = 1
+
+                    [[evals]]
+                    id = "glob-canonical"
+                    target_glob = "prompts/*.md"
+                    expected_count = 1
+                    canonical_target = "canonical.md"
+                    kind = "skill"
+                    description = "sample"
+
+                    [[evals.checklist]]
+                    id = "GC1"
+                    critical = true
+                    description = "requires canonical owner"
+                    required_regex = ["canonical-marker"]
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = run_eval("--root", str(root), "--manifest", "eval.toml")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("EVAL_CHECKS_TOTAL=1", result.stdout)
+
     def test_target_glob_expected_count_mismatch_fails_closed(self) -> None:
         """A glob count mismatch forces the eval manifest to be updated."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1017,15 +1092,48 @@ class T14EvaluatorContractTest(unittest.TestCase):
             self.assertEqual(evaluator.compute_t14_packet_digest(packet), expected)
 
     def record_fixture(self, *, run_id: str = "test-run", attempt: int = 0, packet_digest: str | None = None):
-        tmp = tempfile.TemporaryDirectory()
+        configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+        if not configured_parent:
+            configured_parent = str(PROJECT_ROOT)
+            os.environ["AGENT_CANON_PARENT_ROOT"] = configured_parent
+            self.addCleanup(os.environ.pop, "AGENT_CANON_PARENT_ROOT", None)
+        parent_root = Path(configured_parent)
+        fixture_parent = Path(
+            os.environ.get(
+                "TMPDIR",
+                str(parent_root / ".agent-canon" / "validation"),
+            )
+        ) / "t14-fixtures"
+        fixture_parent.mkdir(parents=True, exist_ok=True)
+        tmp = tempfile.TemporaryDirectory(dir=fixture_parent)
         root = Path(tmp.name)
         packet = root / "packet.md"
         packet.write_text("packet\n", encoding="utf-8")
         report_bytes = t14_report_text().encode("utf-8")
         raw = root / "reports" / "agents" / run_id / "evaluator_artifacts" / "iteration-1" / f"attempt-{attempt}" / "OOP-TYPE-SCENARIO-01.md"
-        return_artifact = Path("/tmp/agentcanon-type-design-workspaces") / run_id / "iteration-1" / f"attempt-{attempt}" / "OOP-TYPE-SCENARIO-01" / "evaluator_return.bin"
+        return_artifact = parent_root / ".agent-canon" / "tmp" / "agentcanon-type-design-workspaces" / run_id / "iteration-1" / f"attempt-{attempt}" / "OOP-TYPE-SCENARIO-01" / "evaluator_return.bin"
         return_artifact.parent.mkdir(parents=True, exist_ok=True)
         return_artifact.write_bytes(report_bytes)
+        boundary = ParentRootSideEffectBoundary()
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(
+                cwd=parent_root,
+                explicit_root=parent_root,
+                purpose="t14-test-cleanup",
+            )
+        )
+        return_root = parent_root / ".agent-canon" / "tmp" / "agentcanon-type-design-workspaces" / run_id
+
+        def cleanup_return_artifact() -> None:
+            if return_root.exists():
+                receipt = boundary.resolve_parent_owned_path(
+                    attestation, return_root, "t14-test-cleanup", create=False
+                )
+                boundary.remove_parent_owned_tree(
+                    attestation, receipt, "t14-test-cleanup"
+                )
+
+        self.addCleanup(cleanup_return_artifact)
         parent = root / "reports" / "agents" / run_id / "agent_evaluation.md"
         digest = packet_digest or evaluator.compute_t14_packet_digest(packet)
         return tmp, report_bytes, raw, parent, packet, digest, return_artifact
@@ -1038,6 +1146,47 @@ class T14EvaluatorContractTest(unittest.TestCase):
                 lambda: evaluator.record_t14_evaluation("digest-mismatch", fixture[1], fixture[2], fixture[2], self.requirement_ids, "OOP-TYPE-SCENARIO-01", 1, 0, fixture[4], "sha256:" + "0" * 64, fixture[3]),
                 "t14-packet-digest-mismatch",
             )
+
+    def test_record_t14_evaluation_requires_parent_receipt_before_read(self) -> None:
+        """T14 establishes one parent capability before any receipt-bound read."""
+        fixture = self.record_fixture(run_id="receipt-order")
+        with fixture[0]:
+            capability_established = False
+            original_capability = evaluator._parent_capability
+
+            def observe_capability(purpose: str):
+                nonlocal capability_established
+                result = original_capability(purpose)
+                capability_established = True
+                return result
+
+            original_read = ParentRootSideEffectBoundary.read_parent_owned_file
+
+            def observe_read(boundary, receipt):
+                self.assertTrue(capability_established)
+                return original_read(boundary, receipt)
+
+            with mock.patch.object(
+                evaluator, "_parent_capability", side_effect=observe_capability
+            ), mock.patch.object(
+                ParentRootSideEffectBoundary,
+                "read_parent_owned_file",
+                observe_read,
+            ):
+                report = evaluator.record_t14_evaluation(
+                    "receipt-order",
+                    fixture[1],
+                    fixture[2],
+                    fixture[2],
+                    self.requirement_ids,
+                    "OOP-TYPE-SCENARIO-01",
+                    1,
+                    0,
+                    fixture[4],
+                    fixture[5],
+                    fixture[3],
+                )
+            self.assertEqual(report.scenario_id, "OOP-TYPE-SCENARIO-01")
 
     def test_record_t14_evaluation_preserves_verbatim_raw_bytes(self) -> None:
         fixture = self.record_fixture(run_id="verbatim")
@@ -1213,6 +1362,25 @@ class T14EvaluatorContractTest(unittest.TestCase):
         with tmp:
             assert_t14_error(self, lambda: evaluator.append_t14_iteration_summary(parent, 0, (), {}, Decimal("0"), True, Decimal("0")), "t14-iteration-order")
 
+    def test_append_t14_iteration_summary_uses_locked_parent_handle(self) -> None:
+        """Summary append reads and writes through one parent-owned handle."""
+        fixture = self.record_fixture(run_id="append-parent-handle")
+        with fixture[0]:
+            fixture[3].parent.mkdir(parents=True, exist_ok=True)
+            fixture[3].write_bytes(
+                evaluator._T14_PARENT_HEADER.format(run_id="append-parent-handle").encode()
+                + b"\n"
+            )
+            with mock.patch.object(
+                Path, "read_text", side_effect=AssertionError("pathname read")
+            ):
+                evaluator.append_t14_iteration_summary(
+                    fixture[3], 1, (), {}, Decimal("50"), True, Decimal("0")
+                )
+            self.assertIn(
+                b"convergence=blocked", fixture[3].read_bytes()
+            )
+
     def finalize_with_summaries(
         self,
         run_id: str,
@@ -1275,6 +1443,31 @@ class T14EvaluatorContractTest(unittest.TestCase):
             evaluator.append_t14_iteration_summary(parent, 2, (), {}, Decimal("101"), True, Decimal("0"))
             evaluator.finalize_t14_evaluation(parent)
             self.assertIn("failure_code=t14-score-out-of-range", parent.read_text(encoding="utf-8"))
+
+    def test_finalize_t14_evaluation_uses_locked_parent_handle(self) -> None:
+        """Finalization reads and writes through one parent-owned handle."""
+        fixture = self.record_fixture(run_id="finalize-parent-handle")
+        with fixture[0]:
+            fixture[3].parent.mkdir(parents=True, exist_ok=True)
+            fixture[3].write_bytes(
+                evaluator._T14_PARENT_HEADER.format(run_id="finalize-parent-handle").encode()
+                + b"\n"
+            )
+            for iteration in (1, 2):
+                evaluator.append_t14_iteration_summary(
+                    fixture[3],
+                    iteration,
+                    self.report_set(iteration),
+                    {scenario: True for scenario in evaluator._T14_SCENARIOS},
+                    Decimal("90"),
+                    True,
+                    Decimal("1"),
+                )
+            with mock.patch.object(
+                Path, "read_text", side_effect=AssertionError("pathname read")
+            ):
+                evaluator.finalize_t14_evaluation(fixture[3])
+            self.assertIn(b"## Parent Summary", fixture[3].read_bytes())
 
 
 if __name__ == "__main__":

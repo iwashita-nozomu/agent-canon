@@ -4,42 +4,59 @@
 contract reference
 responsibility Documents Coding Decision Methods for this repository.
 upstream design README.md notes lifecycle index
+upstream design ../../documents/conventions/software-engineering-principles.md canonical AgentCanon engineering policy and decision precedence
 @dependency-end
 -->
 
 ## Reader Map
 
-- This note owns reusable coding-decision heuristics for implementation,
+- This note owns reusable external methods and source-informed heuristics for implementation,
   planning, review follow-up, and closeout judgment.
-- Read scope and known construction principles first, then use the coding task
-  decision ladder, architecture/design decisions, code review decision rules,
-  repo use, and practical commands as needed.
-- Use it when a coding or technical-doc task needs explicit requirements,
-  reuse, quality-attribute, verification, review, or closeout reasoning.
-- It is durable guidance for decisions, not a substitute for task-specific
+- AgentCanon の安定した原則、競合時の優先順位、誤用防止は
+  `documents/conventions/software-engineering-principles.md` が正本です。
+- Read the canonical policy first when deciding a repository change; use this note when
+  SWEBOK、ATAM、ADR、Google Engineering Practices などの method/source context が必要です。
+- This note is durable reference guidance, not a substitute for task-specific
   `user_request_contract.md`, approved design packets, or validation evidence.
 
+## Canonical Policy Boundary
+
+この note は外部 source と method を再利用できる形で保持しますが、shared policy の
+第二正本にはしません。次の判断は canonical policy に委譲します。
+
+- contract / correctness と simplicity / style の優先順位
+- separation of concerns、single responsibility、cohesion / coupling、information hiding
+- KISS、YAGNI、DRY と abstraction admission
+- evidence-bounded complete owning unit、migration closure
+- testability、determinism、idempotency、reproducibility
+- failure classification、observability、traceability
+
+外部 source が異なる語彙や process を示しても、AgentCanon の mandatory ceremony、checker、
+receipt、workflow をこの note から直接追加しません。current requirement と canonical owner に
+適用できる method だけを task-specific design / review evidence として使います。
 
 ## Scope
 
 - Reuse surface: coding tasks, implementation plans, code review follow-up, and closeout checks.
-- Applies when: changing code, scripts, tests, agent workflow files, or technical docs that describe executable behavior.
+- Applies when: changing code, scripts, tests, agent workflow files, or technical docs that describe executable behavior and external method context improves a material decision.
 - Does not apply when: the task is pure translation, casual chat, or a one-off command with no durable decision.
+- Policy boundary: this note explains supporting methods and references; normative repository decisions use the canonical software engineering principles and the owning contract.
 
 ## Known
 
 - Source: IEEE Computer Society, [SWEBOK Guide v4.0a](https://ieeecs-media.computer.org/media/education/swebok/swebok-v4.pdf), Software Construction KA.
 - Coding skill is not only writing statements. Treat construction as coding plus detailed design, debugging, unit/integration testing, construction planning, dependency management, quality work, and feedback loops.
-- Prioritize readable, simple code over clever code. SWEBOK frames complexity reduction as a central construction goal, supported by standards, modular design, and quality techniques.
+- Prioritize readable, simple code over clever code after correctness, invariant ownership, and complete requested behavior are fixed. SWEBOK frames complexity reduction as a central construction goal, supported by standards, modular design, and quality techniques.
 - Build for verification while coding: organize code for automated tests, follow coding standards that make review feasible, avoid hard-to-understand constructs, and add useful logs when behavior needs later diagnosis.
 - Reuse existing assets before creating new ones. SWEBOK lists frameworks, libraries, modules, components, source code, and COTS assets as construction reuse candidates; in this repo, that maps to searching `python/`, `tests/`, `src/`, `include/`, `lib/`, `tools/`, and `scripts/` before adding new paths.
 - Keep dependency decisions explicit. New dependencies can improve productivity, but they also add supply-chain, license, defect, vulnerability, and build-efficiency risk.
 - Use test-first thinking when behavior is unclear. Even when not practicing strict TDD, writing or sketching the failing case first forces requirements and design gaps to surface before implementation.
-- Use early feedback loops. Prefer small validated increments with automated checks over large unvalidated rewrites.
+- Use early feedback loops. Prefer coherent validated increments with automated checks over large unvalidated rewrites; do not split one required migration into incomplete states merely to make each diff smaller.
 
 ## Coding Task Decision Ladder
 
 - Requirements: map every user-visible requirement to a clause in `user_request_contract.md`; do not implement from conversation memory alone when repo context can resolve details.
+- Canonical policy: identify the material `SEP-*` clauses, owning contract, invariant/state owner, and forbidden interpretation before choosing structure or diff size.
 - Reuse: search local docs and code for existing patterns, helpers, scripts, tests, and known failures before introducing a new file, helper, or workflow branch.
 - Options: list viable options only when the choice changes behavior, maintainability, risk, cost, or future reversibility.
 - Quality attributes: choose based on correctness, maintainability, readability, testability, security, performance, reliability, and operational risk; do not argue from personal preference when technical evidence or local style applies.
@@ -81,7 +98,7 @@ upstream design README.md notes lifecycle index
 
 ## Repo Use
 
-- Before coding: run the required startup checks, fill `user_request_contract.md`, and search local docs/code for reuse candidates.
+- Before coding: run the required startup checks, fill `user_request_contract.md`, read the material canonical engineering clauses, and search local docs/code for reuse candidates.
 - During coding: keep implementation tied to clause IDs and avoid mixing unrelated refactors, protocol changes, runtime flags, or performance experiments into the same change unless the contract requires it.
 - During review: require review artifacts to state spec-to-product gaps and unapplied findings; the implementation is not complete while such gaps remain.
 - During closeout: `closeout_gate.md` must have `completion_coverage_consumer: yes`, `coverage_check.ok: true`, and an empty `completion_boundary.topology_errors`; `task_close.py` should be the mechanical final gate.
@@ -90,6 +107,7 @@ upstream design README.md notes lifecycle index
 
 - `python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --task-id T1 --owner codex --workspace-root "$PWD"`
 - `python3 tools/agent_tools/task_close.py --report-dir <reports/agents/run-id>`
+- `documents/conventions/software-engineering-principles.md`
 - `notes/knowledge/`
 - `reports/agents/<run-id>/user_request_contract.md`
 - `reports/agents/<run-id>/closeout_gate.md`

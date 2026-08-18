@@ -1,4 +1,4 @@
-# Project Review
+# Project Review（project レビュー）
 <!--
 @dependency-start
 contract template
@@ -12,19 +12,22 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
-## Repo Inventory Findings
+{{>reader_map}}
+{{>review_contract}}
 
-<!-- Record stale surfaces, duplicated canon, settings-vs-docs drift, or integration gaps. -->
+## Repo Inventory Findings（repo inventory の指摘）
 
-## Canonical Tree-Head Findings
+<!-- 古い surface、重複した canon、settings と docs の drift、integration gap を記録します。 -->
 
-<!-- Record any non-canonical design doc, copied implementation, snapshot tree, backup path, or mirrored directory that would leave the repo with more than one durable truth surface. -->
+## Canonical Tree-Head Findings（canonical tree head の指摘）
 
-## Fix-Now Integration Risks
+<!-- canonical でない design doc、copied implementation、snapshot tree、backup path、mirrored directory により durable truth surface が複数になる場合を記録します。 -->
+
+## Fix-Now Integration Risks（今直す integration risk）
 
 | Finding | Severity | Status |
 | ------- | -------- | ------ |
 
-## Follow-Up
+## Follow-Up（後続対応）
 
-<!-- Record non-blocking cleanup work. -->
+<!-- blocking ではない cleanup 作業を記録します。 -->

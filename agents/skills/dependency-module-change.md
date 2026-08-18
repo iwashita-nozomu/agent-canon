@@ -15,19 +15,17 @@ downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.
 
 ## 目的
 
-依存 module の source 変更、topic branch clone、remote 再構成可能性に基づく
-cleanup を同じ責務境界で扱います。
-
-### Compact integration cleanup projection
-
-`../../documents/design/request-intent-and-update-relation.md` の `LIFE-01` は merge/readback
-evidence を受けて、この owner の既存 `dependency_module_change.py cleanup --apply` を
-dispatch-ready state へ進めます。completion evidence は same-command authority、
-reconstructibility readback、および `CLEANUP` receipt です。
+依存 module の `.gitmodules` identity、gitlink、pin、projection を generic
+repository topic clone lifecycle へ接続します。clone path、branch selection、
+`origin/main` merge、publication receipt、cleanup authority は
+`repository-topic-clone` が所有し、この skill は再定義しません。
 
 ## 使う route
 
-詳細な source-clone 判断と AgentCanon parent state decision table は
+generic lifecycle は
+[`agents/skills/repository-topic-clone.md`](repository-topic-clone.md) と
+[`documents/rule/repository-topic-clone.md`](../../documents/rule/repository-topic-clone.md)
+を読みます。依存 module 固有の identity と AgentCanon parent state decision table は
 [`documents/rule/dependency-module-changes.md`](../../documents/rule/dependency-module-changes.md) を唯一の正本として読みます。
 topic workspace の filesystem / lifecycle、devcontainer mount、VS Code workspace 運用の禁止、
 `.vscode/` 共有面の境界は [`documents/contracts/github-first-module-and-devcontainer-policy.md`](../../documents/contracts/github-first-module-and-devcontainer-policy.md)
@@ -35,66 +33,48 @@ topic workspace の filesystem / lifecycle、devcontainer mount、VS Code worksp
 pin/runtime projection、`workspace/<topic-slug>/<module-basename>` source clone、
 results owner surface はそれぞれの owner に分けます。
 
-`prepare --topic <topic> --module <path> --branch <task-branch>
---owner-evidence <file> [--parent-branch <pin-branch>]` は owner evidence がある source-edit のときだけ使い、pin-only・
-update-only・read-only では clone を作りません。返された `PARENT_ROOT`、
-`SOURCE_CLONE`、`CONTINUE_PATH` は正本契約の filesystem / lifecycle 作業領域で
-使います。cleanup は dry-run を経て remote に全 state がある場合
-だけ apply します。
+source edit では `.gitmodules` の module URL/name を generic request に写像し、exact
+local/remote branch を再利用するか、不在 branch を最新 `origin/main` から作成します。
+specialized precondition が成立しない場合は dependency decorator だけを外し、user が
+要求した clone/edit/update operation を generic owner へ戻します。manual clone や
+operation refusal は代替 route ではありません。
 
-PR merge/readback 後に topic branch が削除され、clone に local-only commit が
-残る場合は、cleanup に `--integrated-commit <full-oid>` として統合 commit の
-evidence を渡します。省略時の canonical `origin/main` discovery を含む
-equivalence gate と hold 条件は、詳細 policy owner の cleanup gate に従います。
-computed clone path、manifest / `origin` URL、clean / untracked-zero state、tree の
-inclusion / deletion が証明されていれば、module cleanup と parent cleanup は parent と
-target clone の `agent-canon.topic.role` / `topic` marker を readback し、stale または
-missing membership marker を旧 evidence として `marker-readback=membership-mismatch` に
-明示するだけで cleanup を阻害しません。target clone の owner evidence、placement、module、
-URL、branch の不一致は従来どおり hold し、parent identity は proof 後に判断します。
-workspace clone を削除した後、managed child 以外の成果物が無い
-topic root は同じ `CLEANUP` receipt で除去されます。再 clone / `prepare` はこの route に
-追加しません。
-
-### Exact integrated cleanup command
-
-PR merge/readback 後の workspace clone cleanup は、computed path、owner evidence、
-integrated commit、same-command authority を一つの既存 CLI call に束ねます。
-
-```bash
-python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup \
-  --placement workspace --topic <topic> --module <path> \
-  --expected-clone <absolute-clone> \
-  --owner-evidence-sha256 <sha256> \
-  --integrated-commit <full-oid> --apply
-```
-
-この literal の CLI / ToolCall / receipt shape は変更せず、`CLEANUP` readback と
-typed hold reason を後続の PR processing が消費します。
-
-独立した replaceable responsibility を parallel に実行する場合は、vendor の clean
-状態を理由に停止せず、親の DAG packet が disjoint write scope、依存/merge order、
-validation、reviewer ownership を固定した後で、次の typed route を使います。
+`--owner-evidence` が非空で、`.gitmodules` identity と computed
+`workspace/<topic-slug>/<module-basename>` が一致する場合、canonical `prepare` と
+`merge-main` は operation-level の追加承認を要求しません。reuse は `prepare` に含まれます。
+`status` は dependency adapter の read-only command で、owner-evidence を要求せず、
+generic lifecycle または operation-level approval carve-out には含めません。ここで許可される
+のは canonical lifecycle tool が管理する repo-local workspace の作成・再利用・使用だけ
+です。共有 checkout の raw `git checkout`、branch/worktree、reset/restore/clean/stash
+などは従来どおり protected Git route として明示 authority を必要とします。
 
 ```bash
 python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare \
-  --placement workspace --topic <topic> --module <path> --branch <branch> \
+  --topic <topic> --module <path> --branch <branch> \
   --owner-evidence <file>
 ```
 
-この route は `workspace/<topic-slug>/<module-basename>` の computed clone だけを
-fresh create し、親 cloneや代替 pathを作りません。local/remote に requested branch が
-存在する場合は拒否します。既存 remote branch の継続は
-`--placement workspace-continuation` という別の non-fresh route で明示します。新規 branch は最新
-`origin/main` から作られ、`SOURCE_REMOTE`、`SOURCE_BASE_REF`、`SOURCE_BASE_SHA`、
-`SOURCE_OWNER_EVIDENCE_SHA256`、`SOURCE_BRANCH`、`SOURCE_HEAD_SHA` を source identity
-として返します。相対 `.gitmodules` URL は親 origin identity に対して解決されます。
-細粒度の fresh agent や責務単位の過剰分割には使わず、親は ready な独立 stream を
-全て launch し、descendant を monitor し、互換な worker context を再利用します。
+通常の closeout cleanup は canonical lifecycle artifact を materialize せず、manifest から
+計算した clone path と Git remote-head の reconstructibility proof だけを使います。publication
+後または merge/readback 後に追加 evidence を渡す場合だけ、coherent lifecycle artifact を
+同じ call に渡します。dry-run も同じ選択された proof を検証し、pass 後だけ `--apply` します。
 
-AgentCanon update はこの一般 route の具体例です。
+```bash
+python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup \
+  --topic <topic> --module <path> --branch <branch> \
+  --owner-evidence <file> \
+  [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
+  [--publication-readback <publication-readback.json>]] [--apply]
+```
 
-parent pin/root projection、clean named topic の source owner、requested topic
-identity、dirty fallback の typed next action は、同規約の判定表に従います。
-`main` は topic 作成の起点であり source owner ではありません。runtime shim や
-workflow は `cmd_latest` の更新対象 branch を topic slug に使いません。
+completion evidence は generic prepare/merge receipt、dependency identity readback、
+pin/projection validation、および必要に応じた canonical publication evidence と `CleanupProof`
+です。
+
+completion ではこの skill が canonical `cleanup` を dispatch し、computed clone path、owner
+evidence/marker、clean branch、および fetch した `origin/<branch>` の head/tree 一致を検証
+します。proof preflight が通るときだけ `CleanupProof` / cleanup receipt を closeout に保存
+して clone/topic root を削除し、衝突・unknown dirty state・remote mismatch では typed hold
+を保存して状態を保持します。candidate CAS、PR lifecycle、publication readback は任意の
+追加 evidence ですが、いずれかを指定する場合は candidate CAS と PR lifecycle を一組で
+指定します。proof 不足時に blind deletion や手動 `rm` へ迂回しません。

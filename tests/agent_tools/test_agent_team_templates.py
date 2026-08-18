@@ -3,6 +3,7 @@
 # responsibility Tests agent team template rendering behavior.
 # upstream design ../../templates/agents/README.md template partial contract
 # downstream implementation ../../tools/agent_tools/manifest_rendering.py renders templates and partials
+# downstream implementation ../../templates/code/python/docstring_template.py is the materializable code source
 # downstream implementation ../../tools/agent_tools/agent_team.py owns facade orchestration
 # @dependency-end
 
@@ -11,27 +12,271 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import subprocess
 import sys
+import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
+from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 import capacity_handshake  # noqa: E402
+import bootstrap_agent_run  # noqa: E402
 import task_close  # noqa: E402
 import update_lifecycle_contract  # noqa: E402
+from agent_team import (  # noqa: E402
+    RunBundleSpec,
+    create_run_bundle,
+)
 from implementation_dispatch import dispatch_fixed_implementation  # noqa: E402
-from manifest_rendering import render_template, suggested_public_skills  # noqa: E402
-from packets import resolve_active_design_packet_config  # noqa: E402
-from team_config import load_team_config  # noqa: E402
+from manifest_rendering import (  # noqa: E402
+    render_code_template,
+    render_template,
+    suggested_public_skills,
+)
+from packets import (  # noqa: E402
+    iter_artifacts,
+    resolve_active_design_packet_config,
+    resolve_cross_cutting_document_packet,
+    resolve_role_document_packet,
+    _spec_source_root,
+)
+from team_config import load_task_catalog, load_team_config, resolve_role  # noqa: E402
+from task_authority import hash_baseline_bytes  # noqa: E402
+
+TEST_PARENT_ROOT = PROJECT_ROOT.parents[2]
+TEST_TEMP_ROOT = TEST_PARENT_ROOT / ".agent-canon" / "tmp"
 
 
 class AgentTeamTemplateTest(unittest.TestCase):
     """Verify reusable template partial expansion."""
+
+    def test_packet_helpers_require_explicit_source_and_derived_source(self) -> None:
+        """Packet helpers fail closed and resolve derived reads from the source root."""
+        config = load_team_config()
+        role = resolve_role(config, "change_reviewer")
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"^runtime_roots_invalid:agentcanon_source_root_missing$",
+        ):
+            resolve_cross_cutting_document_packet(PROJECT_ROOT)
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"^runtime_roots_invalid:agentcanon_source_root_missing$",
+        ):
+            resolve_role_document_packet(
+                config=config,
+                role=role,
+                report_dir=PROJECT_ROOT / "reports" / "packet-test",
+                workspace_root=PROJECT_ROOT,
+            )
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"^runtime_roots_invalid:agentcanon_source_root_missing$",
+        ):
+            _spec_source_root(
+                RunBundleSpec(
+                    config=config,
+                    report_dir=PROJECT_ROOT / "reports" / "packet-test",
+                    run_id="packet-test",
+                    task="packet test",
+                    owner="test",
+                    created_at_iso="2026-08-14T00:00:00Z",
+                    roles=(),
+                    workspace_root=PROJECT_ROOT,
+                )
+            )
+
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            report_dir = Path(tmp_dir) / "reports" / "packet-test"
+            workspace_root.mkdir(parents=True)
+            cross_cutting = resolve_cross_cutting_document_packet(
+                workspace_root,
+                PROJECT_ROOT,
+            )
+            role_packet = resolve_role_document_packet(
+                config=config,
+                role=role,
+                report_dir=report_dir,
+                workspace_root=workspace_root,
+                agentcanon_source_root=PROJECT_ROOT,
+            )
+            source_paths = tuple(entry.path for entry in cross_cutting) + tuple(
+                entry.path
+                for entry in role_packet.read_before_work
+                if "workspace doc:" in entry.rationale
+                or "cross_cutting_doc:" in entry.rationale
+            )
+            self.assertTrue(source_paths)
+            self.assertTrue(
+                all(path.is_relative_to(PROJECT_ROOT) for path in source_paths)
+            )
+            self.assertTrue(
+                all(not path.is_relative_to(workspace_root) for path in source_paths)
+            )
+
+    def test_create_run_bundle_uses_atomic_publication_and_rolls_back_injected_write(
+        self,
+    ) -> None:
+        """The public facade leaves no partial run when stage writing fails."""
+        config = load_team_config()
+        task_catalog = load_task_catalog(config)
+        active_packet = resolve_active_design_packet_config(config)
+
+        def build_spec(report_root: Path, run_id: str) -> RunBundleSpec:
+            return RunBundleSpec(
+                config=config,
+                report_dir=report_root / run_id,
+                report_root=report_root,
+                run_id=run_id,
+                task="atomic bundle test",
+                owner="test",
+                created_at_iso="2026-08-14T00:00:00Z",
+                roles=(),
+                workspace_root=PROJECT_ROOT,
+                agentcanon_source_root=PROJECT_ROOT,
+                active_design_packet=active_packet,
+                task_catalog=task_catalog,
+            )
+
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            report_root.mkdir(parents=True)
+            prior_run = report_root / "prior-run"
+            prior_run.mkdir()
+            prior_artifact = prior_run / "prior.txt"
+            prior_artifact.write_bytes(b"prior\n")
+            pointer = report_root / ".active_run"
+            pointer_bytes = (str(prior_run.resolve()) + "\n").encode("utf-8")
+            pointer.write_bytes(pointer_bytes)
+            pointer_baseline = report_root / ".active_run.sha256"
+            pointer_baseline_bytes = hash_baseline_bytes(pointer_bytes)
+            pointer_baseline.write_bytes(pointer_baseline_bytes)
+
+            mismatch_spec = replace(
+                build_spec(report_root, "destination-mismatch"),
+                report_dir=report_root / "wrong-destination",
+            )
+            with patch.dict(
+                os.environ,
+                {"AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
+                clear=False,
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    r"^runtime_roots_invalid:report_dir_mismatch$",
+                ):
+                    create_run_bundle(mismatch_spec)
+            self.assertFalse(mismatch_spec.report_dir.exists())
+            self.assertEqual(pointer.read_bytes(), pointer_bytes)
+            self.assertEqual(pointer_baseline.read_bytes(), pointer_baseline_bytes)
+            self.assertEqual(prior_artifact.read_bytes(), b"prior\n")
+            self.assertEqual(tuple(report_root.glob(".stage-run.*")), ())
+
+            spec = build_spec(report_root, "injected-failure")
+            original_write = (
+                bootstrap_agent_run.ParentRootSideEffectBoundary.write_parent_owned_file
+            )
+            stage_writes = 0
+
+            def fail_second_stage_write(
+                boundary: object,
+                attestation: object,
+                path: Path,
+                payload: bytes,
+                purpose: str,
+            ) -> object:
+                nonlocal stage_writes
+                if purpose == "bootstrap-stage-artifact":
+                    stage_writes += 1
+                    if stage_writes == 2:
+                        raise RuntimeError("injected-stage-write-failure")
+                return original_write(boundary, attestation, path, payload, purpose)
+
+            with patch.object(
+                bootstrap_agent_run.ParentRootSideEffectBoundary,
+                "write_parent_owned_file",
+                new=fail_second_stage_write,
+            ):
+                with patch.dict(
+                    os.environ,
+                    {"AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
+                    clear=False,
+                ):
+                    with self.assertRaisesRegex(
+                        RuntimeError,
+                        r"^injected-stage-write-failure$",
+                    ):
+                        create_run_bundle(spec)
+
+            self.assertEqual(stage_writes, 2)
+            self.assertFalse(spec.report_dir.exists())
+            self.assertEqual(pointer.read_bytes(), pointer_bytes)
+            self.assertEqual(pointer_baseline.read_bytes(), pointer_baseline_bytes)
+            self.assertEqual(prior_artifact.read_bytes(), b"prior\n")
+            self.assertEqual(tuple(report_root.glob(".stage-run.*")), ())
+
+            success_spec = build_spec(report_root, "successful-run")
+            with patch.dict(
+                os.environ,
+                {"AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
+                clear=False,
+            ):
+                created_files = create_run_bundle(success_spec)
+            self.assertEqual(
+                tuple(path for path in created_files if path),
+                created_files,
+            )
+            self.assertTrue(success_spec.report_dir.is_dir())
+            self.assertTrue(
+                all((success_spec.report_dir / path).is_file() for path in created_files)
+            )
+            self.assertEqual(tuple(report_root.glob(".stage-run.*")), ())
+            self.assertEqual(
+                pointer.read_text(encoding="utf-8"),
+                str(success_spec.report_dir.resolve()) + "\n",
+            )
+            self.assertEqual(prior_artifact.read_bytes(), b"prior\n")
+
+    def test_code_template_renderer_returns_materializable_python_source(self) -> None:
+        """The code owner exposes a parseable module/class/function source."""
+        rendered = render_code_template("python/docstring_template.py")
+
+        self.assertIn("class ExampleState", rendered)
+        self.assertIn("def build_example_state", rendered)
+        self.assertIn("Args:", rendered)
+        self.assertIn("Ownership:", rendered)
+        self.assertNotIn("return None", rendered)
+
+    def test_code_template_renderer_works_from_repo_root_package_route(self) -> None:
+        """リポジトリ root の canonical package invocation が source を読み戻せます."""
+        environment = dict(os.environ)
+        environment["PYTHONPATH"] = str(PROJECT_ROOT / "tools")
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "from agent_tools.code_template_rendering import "
+                    "render_code_template; "
+                    "source = render_code_template('python/docstring_template.py'); "
+                    "assert 'class ExampleState' in source"
+                ),
+            ],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_active_design_packet_normalizer_rejects_unknown_mapping_fields(
         self,
@@ -87,6 +332,28 @@ class AgentTeamTemplateTest(unittest.TestCase):
         )
         self.assertEqual(rendered.count("@dependency-start"), 1)
 
+    def test_template_renderer_uses_explicit_source_root(self) -> None:
+        """Derived preparation reads templates from the selected source root only."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source_root = Path(tmp_dir)
+            template_root = source_root / "templates" / "agents"
+            partial_root = template_root / "_partials"
+            partial_root.mkdir(parents=True)
+            (partial_root / "source_marker.md").write_text(
+                "source-marker={{VALUE}}\n", encoding="utf-8"
+            )
+            (template_root / "source_template.md").write_text(
+                "before\n{{> source_marker}}after\n", encoding="utf-8"
+            )
+
+            rendered = render_template(
+                "source_template.md",
+                {"VALUE": "selected-source"},
+                source_root=source_root,
+            )
+
+        self.assertEqual(rendered, "before\nsource-marker=selected-source\nafter\n")
+
     def test_decision_partial_expands_without_manifest_leak(self) -> None:
         """Decision partials should render as normal sections inside top-level templates."""
         rendered = render_template(
@@ -100,8 +367,8 @@ class AgentTeamTemplateTest(unittest.TestCase):
         )
 
         self.assertNotIn("{{>", rendered)
-        self.assertIn("## Decision", rendered)
-        self.assertIn("<!-- Record approve, revise, or escalate. -->", rendered)
+        self.assertIn("## 判定（Decision）", rendered)
+        self.assertIn("<!-- approve、revise、escalate のいずれかを記録します。 -->", rendered)
         self.assertEqual(rendered.count("@dependency-start"), 1)
 
     def test_research_driven_skill_calls_literature_survey_first(self) -> None:
@@ -114,6 +381,22 @@ class AgentTeamTemplateTest(unittest.TestCase):
             skills.index("$literature-survey"),
             skills.index("$research-workflow"),
         )
+
+    def test_optional_review_templates_are_materialized_only_when_selected(self) -> None:
+        """Core bundle artifacts stay available without empty review templates."""
+        config = load_team_config()
+        packet = resolve_active_design_packet_config(config)
+        core_only = iter_artifacts(config, ())
+        self.assertIn("team_manifest.yaml", core_only)
+        self.assertNotIn(packet.design_artifact, core_only)
+        self.assertNotIn(packet.design_review_artifact, core_only)
+        selected = iter_artifacts(
+            config,
+            (resolve_role(config, "change_reviewer"),),
+            packet,
+        )
+        self.assertIn("change_review.md", selected)
+        self.assertNotIn("python_review.md", selected)
 
     def test_fixed_implementation_dispatch_uses_typed_route_and_registry_prompt(
         self,

@@ -114,16 +114,17 @@ license の `LICENSE` と、Rust crate については `rust/agent-canon/Cargo.t
 ## AgentCanon Runtime And Environment Tools
 
 この表は shared devcontainer や AgentCanon local tooling が利用する外部 tool を
-まとめます。`agent-canon-environment.toml`、固定 bootstrap、
+まとめます。`agent-canon-environment.toml`、image-owned fixed capabilities、
 `.devcontainer/dependencies.toml` に現れる tool を中心にしています。
 
 | Tool | Purpose | AgentCanon Surface | License Status |
 | --- | --- | --- | --- |
 | `agent-canon` Rust CLI | docs check、semantic index、structured analysis などの統一 CLI。 | `rust/agent-canon/Cargo.toml`, `tools/bin/agent-canon` | local: Apache-2.0 |
 | Rust toolchain: `rustup`, `cargo`, `rustc`, `rustfmt`, `clippy`, `rust-analyzer` | AgentCanon Rust CLI の build、format、lint、editor support。 | `agent-canon-environment.toml`, `.devcontainer/dependencies.toml` | upstream: Apache-2.0 OR MIT for official Rust projects; verify component repository |
-| `clang-format` (Ubuntu 24.04 package `1:18.0-59~exp2`, executable `18.1.3`) | Shared C/C++ source formatting。 | `.devcontainer/dependencies.toml` (`clang-format`) | distro: `/usr/share/doc/clang-format/copyright` in the pinned Ubuntu image; upstream: Apache-2.0 WITH LLVM-exception; package metadata: <https://packages.ubuntu.com/noble/clang-format> |
+| `clang-format` (Ubuntu 22.04 package `1:14.0-55~exp2`, executable `14.0.0-1ubuntu1.1`) | Shared C/C++ source formatting。 | `.devcontainer/dependencies.toml` (`clang-format`) | distro: `/usr/share/doc/clang-format/copyright` in the pinned Ubuntu image; upstream: Apache-2.0 WITH LLVM-exception; package metadata: <https://packages.ubuntu.com/jammy/clang-format> |
 | `jq` | JSON / JSONL の compact extraction と CI evidence 整形。 | `agent-canon-environment.toml`, `.devcontainer/dependencies.toml` | upstream: MIT for `jq`; docs are CC BY 3.0 |
-| Node.js | `npm` と Codex CLI install の runtime。 | `.devcontainer/bootstrap-dependencies.sh` | upstream: MIT for Node.js core, with bundled third-party notices |
+| `experiment-runner-admitted` | ExperimentRunnerのmerged provider。admitted request/result、UUID visibility、child lifecycleを提供します。 | `agent-canon-environment.toml`, `documents/experiments/gpu-admission-r5-ordered-integration-interface.json` | consumer-provided runtime; AgentCanon does not install or import it |
+| Node.js | `npm` と Codex CLI install の runtime。 | `.devcontainer/devcontainer.json`, `.devcontainer/gpu-admission/devcontainer.json` の digest-pinned official Feature | upstream: MIT for Node.js core, with bundled third-party notices |
 | `npm` CLI | `@openai/codex` の install に使う JavaScript package manager。 | `.devcontainer/dependencies.toml` | upstream: Artistic-2.0 |
 | Codex CLI: `@openai/codex` | local Codex runtime entrypoint。 | `.devcontainer/dependencies.toml` | upstream: Apache-2.0 |
 | GitHub CLI: `gh` | GitHub repo 確認、branch publish、PR evidence 作成。 | `.devcontainer/dependencies.toml`, `tools/agent_tools/github_publish.py` | upstream: MIT |
@@ -133,8 +134,8 @@ license の `LICENSE` と、Rust crate については `rust/agent-canon/Cargo.t
 | `git` | source checkout、submodule、branch / PR workflow。 | `.devcontainer/post-create.sh`, update tools | upstream: GPL-2.0 |
 | `cmake` | native tool build。 | `.devcontainer/post-create.sh` | upstream: BSD-3-Clause |
 | `curl` | installer、release asset、license source fetch。 | `.devcontainer/post-create.sh` | upstream: curl license |
-| `python3`, `python3-pip`, `python3-packaging` | Python helper execution、structured PEP 508 parsing、`detect-secrets` install。 | `.devcontainer/bootstrap-dependencies.sh`, `.devcontainer/dependencies.toml` | Python: Python Software Foundation License; Packaging: Apache-2.0 OR BSD-2-Clause; distro package licenses vary |
-| `tar`, `xz-utils`, `ca-certificates`, `build-essential`, `pkg-config` | archive extraction, package bootstrap, native build support。 | `.devcontainer/bootstrap-dependencies.sh`, `.devcontainer/dependencies.toml` | distro: verify package copyright files |
+| `python3`, `python3-pip`, `pipx`, `python3-packaging` | Python helper execution、typed project-extra validation、manifest-defined Python CLI の隔離 install、`detect-secrets` install。 | `.devcontainer/Dockerfile`, `.devcontainer/dependencies.toml` | Python: Python Software Foundation License; pipx: MIT; Packaging: Apache-2.0 OR BSD-2-Clause; distro package licenses vary |
+| `tar`, `xz-utils`, `ca-certificates`, `build-essential`, `pkg-config` | archive extraction, fixed image capability, native build support。 | `.devcontainer/Dockerfile`, `.devcontainer/dependencies.toml` | distro: verify package copyright files |
 | `texlive-latex-base` (pdfLaTeX) | pdfLaTeX document rendering。 | `.devcontainer/dependencies.toml` (`pdflatex`) | TeX Live: mixed free software; verify distro copyright files |
 | `latexmk` | Academic-writing PDF build orchestration。 | `.devcontainer/dependencies.toml` | upstream: GPL-2.0 |
 | `texlive-latex-recommended`, `texlive-latex-extra` | LaTeX packages used by academic-writing documents。 | `.devcontainer/dependencies.toml` | TeX Live: mixed free software; verify distro copyright files |
@@ -184,7 +185,7 @@ a binary distribution or container image.
 - Rust license policy: <https://www.rust-lang.org/policies/licenses/>
 - rustfmt license: <https://github.com/rust-lang/rustfmt>
 - rust-analyzer license: <https://github.com/rust-lang/rust-analyzer>
-- Ubuntu package metadata for the current image contract: <https://packages.ubuntu.com/noble/clang-format>
+- Ubuntu package metadata for the current image contract: <https://packages.ubuntu.com/jammy/clang-format>
 - LLVM license: <https://llvm.org/LICENSE.txt>
 - jq license: <https://github.com/jqlang/jq>
 - Node.js license: <https://github.com/nodejs/node/blob/main/LICENSE>

@@ -1,4 +1,4 @@
-# Artifact Review
+# Artifact Review（artifact レビュー）
 <!--
 @dependency-start
 contract template
@@ -12,11 +12,14 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
+{{>reader_map}}
+{{>review_contract}}
+
 {{>findings_required_change_table}}
 
-## Focus
+## Focus（確認点）
 
-- Code and script completeness
-- Raw result capture
-- Environment bundle quality
-- Rerun package readiness
+- code と script の完全性
+- raw result の保存
+- environment bundle の品質
+- rerun package の準備状況

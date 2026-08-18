@@ -4,6 +4,7 @@
 @dependency-start
 contract design
 responsibility Defines the repository-wide dependency manifest DSL and validation model.
+upstream design source-owned-dependency-validation.md source authority, PR receipt, and source/runtime boundary
 downstream design dependency-contract-kinds.toml registered dependency header contract kinds
 downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates changed-file manifests
 downstream implementation ../../tools/agent_tools/scan_dependency_headers.sh scans manifest marker coverage
@@ -12,10 +13,22 @@ downstream implementation ../../tools/agent_tools/check_dependency_graph.sh vali
 downstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh wraps repo-wide dependency review
 downstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extracts code dependency evidence separately
 downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design claims against manifest evidence
+downstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py renders dependency graph review artifacts
+downstream implementation ../../tools/ci/agent_canon_pr_graph_selector.py selects parent strict graph gating from this canonical dependency surface manifest
+downstream implementation ../../tools/ci/check_agent_canon_pr.sh executes selected source review and writes the source/skipped receipt
+downstream implementation ../../tools/ci/pr_gate_receipt.py owns the owner/root/PID/status-bound receipt schema
+downstream implementation ../../tools/ci/run_all_checks.sh consumes the validated source/skipped receipt
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
+downstream implementation ../../tests/tools/test_agent_canon_pr_graph_selector.py verifies parent gate selection from canonical profiles, surfaces, and diff evidence
+downstream implementation ../../tests/tools/test_agent_canon_pr_graph_gate_integration.py verifies the source/runtime boundary and receipt owner
+downstream implementation ../../tests/tools/test_pr_gate_receipt.py verifies receipt schema and binding rejection
+downstream implementation ../../tests/tools/test_pr_gate_receipt_round_trip.py verifies writer/parser/consumer execution
 downstream implementation ../../rust/agent-canon/src/dependency_manifest.rs owns the sole complete-file manifest parser and source snapshot
 downstream implementation ../../rust/agent-canon/src/graph.rs owns canonical graph materialization and queries
+downstream implementation ../../rust/agent-canon/src/structured_analysis.rs owns the shared graph storage schema
+downstream implementation ../../rust/agent-canon/src/main.rs dispatches public graph commands
+downstream implementation ../../tools/bin/agent-canon provides the stable bootstrap CLI for public graph commands
 downstream implementation ../../tools/agent_tools/graph_client.py provides the sole Python graph adapter
 downstream design ../structured-analysis/graph-dsl.md maps dependency manifest evidence into Graph DSL Core
 downstream design ../structured-analysis/dependency-header-analysis.md maps manifest graph evidence into structured analysis
@@ -57,6 +70,47 @@ questions.
 - すべての generated / binary artifact を同じ manifest で管理しない
 - write-capable subagent の並列数を増やすための設計ではない
 
+## Mounted Language-Server Dependency Contract
+
+共有 code analysis の LSP サーバーは product image の依存ではなく、
+`.devcontainer/dependencies.toml` の mounted developer/agent tool record
+として管理します。各 record は registry/repository の exact version、
+source、provider、typed executable verification、`failure_policy = "fail"`
+を持ち、検証済みの executable 以外を PATH から選択しません。Canonical
+mapping は `python → pyright-langserver --stdio`、`c`/`cpp → clangd-18`、
+`shellscript → bash-language-server start`、`rust → rust-analyzer` です。
+
+`apt-repository` には `repository_suite` と
+`repository_components` を明示します。`repository_packages_sha256` がある
+record は source、suite、単一 component、`platform` から uncompressed
+Packages index URL を決定し、取得 bytes の SHA-256 を source-line/apt
+package の受入れ前に照合します。URL の欠落、取得失敗、digest 不一致、
+署名付き source line の drift、または executable/version の drift は
+warning に降格せず typed failure とします。Rust の `rust-src` は component
+verification の対象ですが、独立 executable probe は持ちません。
+Immutable な apt artifact を固定する record は
+`repository_package_url` と `repository_package_sha256` を必ず対で持ちます。
+URL は HTTPS の `.deb`、SHA-256 は 64 桁 hex とし、installer は signed
+source/key の update 後に exact URL を safe temporary path へ取得し、artifact
+SHA を照合してから local-file `apt-get install` を実行します。receipt は
+rolling Packages index identity と immutable artifact identity を別フィールド
+として保存し、両者を混同した変更を stale receipt として拒否します。
+
+依存 receipt の executable identity は manifest の install method が所有します。
+`VerifiedExecutable(record_id, manifest_version, executable, absolute_path,
+record_fingerprint, plan_fingerprint, verification_output)` と
+`resolve_verified_executable(workspace, vendor_root, receipts, record_id,
+executable)` が公開境界です。解決は exact record、receipt schema/fingerprint/
+requested-provided binding、Installer の live verify、method-specific absolute
+path、receipt の absolute path/output readback の順で行い、どれか一つでも
+不一致なら fail closed とします。npm は `pyright` と
+`pyright-langserver` を同一 package の bindings として保存し、apt は
+`executable_owner_packages` で宣言された所有者群の lexical path と
+resolved path を `/usr/bin/dpkg-query --listfiles` ownership で照合します。いずれかの
+所有者が所有境界に失敗した場合は fail-closed です。Rust は pinned
+toolchain の `rust-analyzer` path を保存します。ambient `PATH` や `shutil.which`
+はこの境界に入りません。
+
 ## Design Claim Evidence Contract
 
 Design documents state implementation-facing claims within the evidence exposed
@@ -75,11 +129,39 @@ The ledger carries four fields:
 - `Refactor handoff`: structure, ownership, or route changes passed to
   `dependency-analysis` and `structure-refactor`.
 
-`check_design_doc_claims.py` implements the deterministic gate. It requests a
-bounded dependency closure and token context from the canonical graph, checks
-the returned typed evidence, and reports unsupported tokens or parent
-contradictions. It does not parse dependency headers or open evidence files as
-a second fact authority.
+`check_design_doc_claims.py` implements the deterministic design-evidence gate.
+It requests a bounded dependency closure and tokenless context through the
+source-derived `GraphClient` projections, checks the returned typed evidence,
+and reports unsupported tokens or parent contradictions. Explicit token graph
+context remains a separate persisted analysis capability. The claim checker
+does not parse dependency headers or open evidence files as a second fact
+authority.
+
+## Parent PR Gate Selection Contract
+
+Dependency-manifest correctness is source-owned and does not require a
+persisted graph runtime. The authority, receipt meaning, and source/graph
+boundary are defined by
+[`source-owned-dependency-validation.md`](source-owned-dependency-validation.md).
+This document owns only the manifest DSL, relation semantics, contract kinds,
+changed-scope selection, and source-derived projections.
+
+The PR selector still selects trusted base/head evidence and the changed-path
+packet. `run_pr_dependency_source_gate.sh` then runs source scan, format,
+relation/cycle, and source-derived TSV/DOT projections. It records a receipt
+with exactly `source` or `skipped`; it never creates or reads persisted graph
+state. `tools/ci/pr_gate_receipt.py` is the sole receipt schema/parser owner,
+and `run_all_checks.sh` consumes its single validated status output. The
+retired `prepared` and `scoped` graph states are not compatibility values.
+
+The normal repository review route remains independent of graph executables and
+databases. `--ensure-graph` and `tools/bin/agent-canon graph
+build|status|query|context` are explicit analysis capabilities with their own
+runtime contract. They are mutually exclusive with source review where the
+wrapper promises an ensure-only route; no normal scan, format, review, or PR
+receipt path invokes them. Trusted base/head selection remains a selector
+responsibility and is not reimplemented by the source parser or receipt
+consumer.
 
 ## Manifest Block
 
@@ -93,7 +175,7 @@ contract design
 responsibility Documents this file's role so agents can identify why it exists.
 upstream design ../../agents/canonical/CODEX_WORKFLOW.md workflow contract
 upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py consumes workflow metadata
-downstream implementation ../tests/agent_tools/test_task_start_and_close.py verifies emitted output
+downstream implementation ../tests/agent_tools/test_bootstrap_and_close.py verifies emitted output
 @dependency-end
 ```
 
@@ -130,8 +212,7 @@ responsibility <role statement...>
 ```
 
 - `direction` は `upstream` または `downstream`
-- `kind` は `design`、`implementation`、`environment`、`requirements`、
-  `review`、`evidence`
+- `kind` は `design`、`implementation`、`environment`
 - `relative-path` は manifest を持つ file から見た相対 path
 - `relative-path` は `./` の有無や bare sibling を問わず、宣言元 file の
   repo-relative parent から正規化します。absolute path は受理せず、root の
@@ -155,15 +236,17 @@ shared canon は派生 repo に配布されるため、environment edge はそ�
 
 `implementation` は code、script、test、runtime consumer、生成元、生成先を表します。
 
+`test` は contract kind registry の file-level contract 分類であり、
+dependency relation kind ではありません。依存 manifest の relation は
+`design`、`implementation`、`environment` の3種に限定し、テストへの
+依存も `downstream implementation` として宣言します。
+
 `environment` は Docker、CI、requirements、lock、tool config、runtime assumption を表します。
 
-`requirements` は同じ責任単位を拘束する要求成果物、`review` は承認・
-差し戻し判断、`evidence` は再利用される観測証拠を表します。これらは
-run bundle の会話や schedule を authority に昇格させず、明示された immutable
-artifact 間の edge にだけ使用します。
-
-登録済みの 6 種に限定します。
-新しい kind を増やす場合は、tool、docs、review gate、migration plan を同じ変更で更新します。
+Dependency relation はこの3種に限定します。`test`、`review`、`report`
+などの file-level contract 分類は、`dependency-contract-kinds.toml` の
+contract kind として別に管理します。新しい relation kind を増やす場合は、
+parser、tool、docs、review gate、migration plan を同じ変更で更新します。
 
 ## Contract Kinds
 
@@ -203,7 +286,7 @@ Python / shell / TOML:
 # contract tool
 # responsibility Implements one repository tool or runtime helper.
 # upstream implementation ../../tools/agent_tools/agent_team.py imports helper contract
-# downstream implementation ../tests/agent_tools/test_task_start_and_close.py verifies CLI behavior
+# downstream implementation ../tests/agent_tools/test_bootstrap_and_close.py verifies CLI behavior
 # @dependency-end
 ```
 
@@ -236,19 +319,53 @@ The downstream graph answers: after editing this file, what affected files must 
 This separation exists for human and agent context management.
 An agent can load upstream closure before editing, then load downstream closure after the diff exists.
 
-## Machine-Readable Graph Artifact
+## Explicit Graph Analysis Artifact
 
 `rust/agent-canon/src/dependency_manifest.rs::ManifestParser` is the sole
 complete-file parser. `agent-canon graph build` captures its parent-profile
 source snapshot and atomically publishes the parent-owned SQLite database at
 `.agent-canon/knowledge-graph/graph.sqlite`. Source facts and their typed
-completeness diagnostics are always required. A prepared runtime-event plus
-latest committed receipt is an optional producer snapshot: when
-`reports/agents/.active_run` is absent, the same Rust builder publishes a
-source-only graph with explicit `runtime_evidence=null`; when the pointer is
-present, malformed, missing, uncertain, or source-mismatched runtime evidence
-remains a fail-closed runtime boundary. `status`, `query`, and `context` are
-read-only; they never rebuild or fall back to a header scan.
+completeness diagnostics are required for this explicit graph artifact. A
+captured runtime event plus latest committed receipt is an optional producer
+snapshot: when
+`reports/agents/.active_run` is absent, or the pointed active run has no
+captured runtime-event certificate, the same Rust builder publishes a
+source-only graph with explicit `runtime_evidence=null`. The empty-run case is
+an observability closeout condition, not a semantic graph prerequisite. Once a
+captured certificate is present, duplicate, malformed, missing, uncertain, or
+source-mismatched runtime evidence remains a fail-closed runtime boundary.
+`status`, `query`, and `context` are read-only; they never rebuild or fall back
+to a header scan.
+Canonical current-tree consumers let `status` derive the current producer and
+manifest identity. The PR selector's trusted-base readback instead repeats the
+exact current producer identity and exact base-tree manifest used by its
+preceding build. `status` validates those explicit typed inputs, re-probes the
+base snapshot, and compares the resulting HEAD/source/input fingerprints with
+the persisted integration record; a missing, changed, or substituted input
+fails before diagnostic classification.
+
+Explicit graph freshness recovery belongs only to the `--ensure-graph` route.
+That route may admit one canonical build followed by status read-back under its
+own typed status contract; every other stale reason, typed-unavailable status,
+persisted read-back corruption, producer mismatch, incomplete or invalid
+status, build failure, and non-fresh read-back fails closed. The normal source
+review wrapper does not perform this recovery or treat its result as a receipt
+prerequisite. The graph producer continues to own its existing lock, staging,
+atomic rename, and durability read-back.
+
+The standalone runtime dashboard workflow is the periodic producer authority,
+not an ordinary graph consumer. Only its scheduled event invokes the
+source-root-resolved canonical Graph CLI to run one direct `graph build`; pull
+request, push, and manual-dispatch events skip that step. A fresh checkout with
+no ignored graph database therefore starts from the producer rather than from
+consumer status. The Graph CLI emits build exit `0` only with `status=fresh`;
+that result is required before the workflow runs `graph status` readback.
+Build failure and published incomplete status fail before readback. The
+read-only status command must then return exit `0` and fresh while revalidating
+the persisted publication, snapshot HEAD,
+source/content/input fingerprints, and producer identity. The scheduled build
+uses the producer's existing lock, staging, atomic rename, and durability
+contract. Its cron value remains owned only by that workflow.
 
 source snapshot の候補 path は、解決先の内容ではなく候補 path 自体の
 filesystem object を読む。`dependency_manifest.rs` の単一 source-path
@@ -314,6 +431,11 @@ incomplete graph is inspectable through status but cannot authorize query or
 context evidence. Freshness binds parent HEAD, dirty fingerprint, source
 snapshot, producer hashes, profile pair `default`/`parent`, schema, and tool
 versions; stale state is reported and never silently rebuilt.
+
+`issues/closed/` records are historical evidence, not active dependency
+owners. They remain source identities so active canon may cite a closed issue,
+but their dependency headers do not emit declarations or unresolved-target
+diagnostics. `issues/open/` records retain the ordinary active manifest route.
 
 ### Executable finite-set contract
 
@@ -483,11 +605,15 @@ Example: A `upstream` B plus B `upstream` A is an upstream cycle and should fail
 
 ## Tool Split
 
-Tools are Bash-first.
-Python is not required for the first implementation because the DSL is line-oriented.
-
 Code dependency extraction is deliberately separate from dependency manifest validation.
-`scan_code_dependencies.sh` reads language syntax such as Python imports, local C/C++ includes, and shell source statements.
+`scan_code_dependencies.sh` is the compatibility command surface, while
+`lsp_code_analysis.py scan-legacy` owns the canonical code-relation projection.
+The shell wrapper delegates normal scans to that LSP command and uses its
+lexical extractor only when `--lexical-only` is explicit.
+The LSP adapter reads language syntax through server capabilities such as
+document symbols, definitions, references, and call hierarchy; the explicit
+lexical route still reads Python imports, local C/C++ includes, and shell source
+statements.
 The manifest tools read only `@dependency-start` / `@dependency-end` blocks.
 Do not combine these outputs into one graph: code dependency evidence answers "what does this code reference", while header dependency evidence answers "which design, implementation, environment, and test context must be read".
 
@@ -495,42 +621,51 @@ Do not combine these outputs into one graph: code dependency evidence answers "w
 
 Responsibilities:
 
-- extract best-effort code edges from import / include / source statements
+- delegate the normal scan to the canonical LSP `scan-legacy` report
 - keep output independent from manifest upstream/downstream edges
 - support explicit path lists and `--changed`
 - provide pre-edit evidence for `agents/workflows/hypothesis-validation-workflow.md`
-- remain Bash-first and lightweight; deeper language-specific precision can be added later without changing the header manifest DSL
+- require `--lexical-only` for the compatibility extractor and fail closed when
+  the canonical LSP server is unavailable
 
 ### `scan_dependency_headers.sh`
 
 Responsibilities:
 
-- invoke graph status, then one all-dependency query
+- parse tracked `@dependency-start` / `@dependency-end` source blocks
 - select caller-requested, changed, or tracked paths without deriving facts
-- report source nodes whose parser-owned `manifest_present` value is false
-- with `--explain-missing`, print typed graph owner and producer evidence
+- report missing manifests and source-owned owner classification
 - run in report-only mode during migration
 - later become a CI fail gate
+- accept a selector-owned `--changed-path-packet` containing the trusted PR
+  base/head, tree, merge-base, exact changed-path set, and path-set digest
+- fail closed when that packet is missing, malformed, stale, or differs from
+  the repository's verified base/head diff; the PR gate passes its separately
+  trusted base SHA and the scanner requires an exact packet binding to it
+- under a trusted PR packet, report unchanged missing headers as baseline
+  evidence and block only missing headers on changed or newly added paths;
+  deleted paths and existing root-view, symlink, and submodule skip rules stay
+  owned by this scanner
+- remain independent of graph-selection activation: a valid trusted PR packet
+  is sufficient to run this header gate without a graph executable or database
 
 ### `check_dependency_header_format.sh`
 
 Responsibilities:
 
-- invoke graph status once and graph context once per sorted selected path
-- require one parser-owned `manifest.present` item
-- when present, require exactly one `manifest.contract` and one
-  `manifest.responsibility` item from `source-snapshot`/`ManifestParser`
-- map missing or malformed graph evidence to the existing pass/fail output
+- parse each selected source block and validate one registered contract and one
+  responsibility line
+- map missing or malformed source evidence to the existing pass/fail output
 - accept `--allow-frontmatter` as a compatibility flag without interpreting text
 
-The Rust parser and graph build own syntax, registry, target, and completeness
-validation. This shell owns no tokenizer or target normalizer.
+The source parser and contract registry own syntax, target, and completeness
+validation. This shell owns no persisted graph state or runtime status.
 
 ### `check_dependency_graph.sh`
 
 Responsibilities:
 
-- invoke graph status and one all-relation query with direction `both`
+- consume source-derived dependency projections from `source_dependency_graph.py`
 - filter explicit dependency facts and project their typed detail
 - fail manifest files that are isolated from the edge graph
 - validate self reference
@@ -551,8 +686,8 @@ cannot read source headers, rebuild graph facts, or open SQLite.
 
 Responsibilities:
 
-- invoke graph status followed by all-dependency and all-owner queries
-- run the graph-backed scan, format, and graph projections over selected files
+- run source scan, format, relation/cycle, TSV/DOT, and edit-scope projections
+- keep the normal route independent of graph executable and persisted database
 - keep missing manifests report-only by default while repository-wide migration is incomplete
 - offer `--fail-missing` for strict checkpoint runs after a subtree or repo has been migrated
 - offer `--explain-missing` for owner-classified missing-header repair output
@@ -561,22 +696,38 @@ Responsibilities:
 - offer `--list-changed-dependencies` so checkpoint review can hand reviewers every surface that changed files declare or are referenced by
 - automatically write `dependency_graph.tsv` when `--report-dir` is set
 - accept `--search-hits-file` and write `dependency_edit_scope.txt` when `--report-dir` is set
+- accept `--changed-path-packet` from the trusted PR graph selector and pass it
+  to the canonical header scan; the wrapper does not derive a second local
+  branch diff or duplicate changed-path authority
+- support a header-scan-only route that does not require a fresh graph status;
+  the PR gate uses it when derived-parent graph selection is skipped while
+  still requiring the trusted changed-path packet and strict missing-header
+  gate
 
-Template repos expose `make dependency-review-surfaces` to run strict review against both the parent root view and `vendor/agent-canon` source tree.
+Template repos expose `make dependency-review-surfaces` to run an explicit
+strict review against both the parent root view and `vendor/agent-canon` source
+tree. Persisted graph preparation is available only through the explicit
+`--ensure-graph` route; it exits before source review and is never a normal
+receipt prerequisite.
 
 ## Migration Plan
 
 Phase 1: add this design and make changed-file validation require `@dependency-start` / `@dependency-end`.
 
-Phase 2: provide the shell entrypoints as graph consumers:
+Phase 2: provide the shell entrypoints as source-derived consumers:
 
 - `scan_dependency_headers.sh`
 - `check_dependency_header_format.sh`
 - `check_dependency_graph.sh`
 
 `scan_dependency_headers.sh` starts as full-repo report-only so it can list
-missing manifests without blocking unrelated work. Both changed-file checkers
-consume parser-owned graph context; neither parses source text or the registry.
+missing manifests without blocking unrelated work. The scan and format tools
+consume the tracked source projection and contract registry directly; neither
+requires persisted graph state.
+The parent PR gate supplies a selector-owned changed-path packet rather than a
+local branch diff. The scanner verifies the packet against the trusted
+base/head snapshot, blocks missing manifests only for changed/new paths, and
+reports unchanged missing paths with stable count/path baseline evidence.
 `check_dependency_graph.sh` default mode rejects self references and cycles.
 `check_dependency_graph.sh --cycle-report-only` reports cycles without failing
 and is valid only when paired with a durable graph report artifact.
@@ -585,10 +736,12 @@ and is valid only when paired with a durable graph report artifact.
 Phase 3: migrate files one by one from checker findings.
 Each touched file must be converted from `Dependency Files:` to `@dependency-start` in the same change that touches it.
 
-Phase 4: enable CI fail gate for changed files.
+Phase 4: enable the source-owned CI fail gate for changed files.
 Full-repo missing-header scan remains report-only until the repository is migrated.
-この repository では full-repo migration 後の strict baseline を `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` で固定します。
-goal-driven cleanup や shared surface migration の closeout では、この strict baseline を繰り返し実行して `DEPENDENCY_HEADER_SCAN_MISSING=0` と `REPO_DEPENDENCY_REVIEW=pass` が安定することを evidence にします。
+The PR gate records `source` when the full source review is selected and
+`skipped` when only the trusted header scan is selected. Neither status claims
+persisted graph completeness. `--ensure-graph` remains explicit analysis and
+is validated by its own status/build read-back contract.
 
 Phase 5: remove legacy `Dependency Files:` wording from remaining docs after all checkable files use dependency manifest blocks.
 

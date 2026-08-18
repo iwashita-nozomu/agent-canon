@@ -13,6 +13,7 @@
 # upstream implementation ./capacity_handshake.py owns typed capacity readback
 # upstream implementation ./packets.py owns active design packet normalization and materialization
 # upstream implementation ./team_config.py owns team and role configuration resolution
+# upstream implementation ./workspace_scope.py owns typed workspace/source/report roots
 # @dependency-end
 
 """Validate that agent runtime surfaces, task catalog, and bundle outputs align."""
@@ -20,10 +21,11 @@
 from __future__ import annotations
 
 import json
+import os
 import re
-import shutil
 import subprocess
 import tempfile
+from contextlib import contextmanager
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -34,6 +36,23 @@ from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
@@ -97,6 +116,24 @@ else:
     from agent_team import create_run_bundle
 
 if __package__:
+    from .agent_canon_source_root import (
+        RepositoryRoots,
+        RootResolution,
+        resolve_agent_canon_source_root,
+    )
+else:
+    from agent_canon_source_root import (  # type: ignore[no-redef]
+        RepositoryRoots,
+        RootResolution,
+        resolve_agent_canon_source_root,
+    )
+
+if __package__:
+    from .workspace_scope import resolve_repository_roots
+else:
+    from workspace_scope import resolve_repository_roots
+
+if __package__:
     from .manifest_rendering import required_output_templates_missing
 else:
     from manifest_rendering import required_output_templates_missing
@@ -119,11 +156,9 @@ from vendor_skill_adapters import VendorSkillValidator
 UTC = timezone.utc
 
 PROJECT_CONFIG_PATH = ROOT / ".codex" / "config.toml"
-PROJECT_SKILL_CONFIG_PATH = ROOT / ".codex" / "project-config.toml"
 HOOKS_JSON_PATH = ROOT / ".codex" / "hooks.json"
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
-PROJECT_SKILL_LANE = ".codex/project-skills"
 PUBLIC_SKILL_DOC_ROOT = ROOT / "agents" / "skills"
 INTERNAL_ROUTINE_ROOT = ROOT / "agents" / "internal-routines"
 MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
@@ -209,6 +244,86 @@ class AlignmentWorkspace:
 
     workspace_root: Path
     report_root: Path
+    repository_roots: RepositoryRoots
+
+
+@contextmanager
+def runtime_alignment_parent(source_resolution: RootResolution):
+    """Yield an authenticated parent that can host derived alignment state.
+
+    The standalone static-gate wrapper authenticates the source checkout itself
+    as the parent.  A derived workspace cannot place reports below that source
+    without violating the typed root boundary, so the self-check creates a
+    short-lived Git parent beside the source checkout for this fixture only.
+    Managed parent/derived executions retain their caller-provided parent.
+    """
+    configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured_parent:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "runtime-alignment-temp: explicit parent root is required",
+        )
+    parent = Path(configured_parent).resolve(strict=True)
+    source_root = source_resolution.source_root.resolve()
+    if parent != source_root:
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(
+                cwd=parent,
+                explicit_root=parent,
+                purpose="runtime-alignment",
+            )
+        )
+        base = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
+            attestation,
+            parent / ".agent-canon" / "tmp" / "runtime-alignment",
+            "runtime-alignment-temp",
+        )
+        yield base.physical_path
+        return
+
+    source_origin = subprocess.run(
+        ["git", "-C", str(source_root), "remote", "get-url", "origin"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    with tempfile.TemporaryDirectory(
+        prefix=".agent-canon-runtime-parent-",
+        dir=source_root.parent,
+    ) as fixture_parent_text:
+        fixture_parent = Path(fixture_parent_text)
+        subprocess.run(["git", "init", "-q", str(fixture_parent)], check=True)
+        subprocess.run(
+            ["git", "-C", str(fixture_parent), "remote", "add", "origin", source_origin],
+            check=True,
+        )
+        previous_parent = os.environ.get("AGENT_CANON_PARENT_ROOT")
+        previous_active = os.environ.get("AGENT_CANON_ACTIVE_REPOSITORY_ROOT")
+        os.environ["AGENT_CANON_PARENT_ROOT"] = str(fixture_parent)
+        os.environ["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(fixture_parent)
+        try:
+            attestation = attest_parent_root(
+                ParentRootAttestationRequest(
+                    cwd=fixture_parent,
+                    explicit_root=fixture_parent,
+                    purpose="runtime-alignment",
+                )
+            )
+            base = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
+                attestation,
+                fixture_parent / ".agent-canon" / "tmp" / "runtime-alignment",
+                "runtime-alignment-temp",
+            )
+            yield base.physical_path
+        finally:
+            if previous_parent is None:
+                os.environ.pop("AGENT_CANON_PARENT_ROOT", None)
+            else:
+                os.environ["AGENT_CANON_PARENT_ROOT"] = previous_parent
+            if previous_active is None:
+                os.environ.pop("AGENT_CANON_ACTIVE_REPOSITORY_ROOT", None)
+            else:
+                os.environ["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = previous_active
 
 
 def resolve_packet_probe_workspace() -> Path:
@@ -304,21 +419,43 @@ def load_project_config_toml() -> dict[str, object]:
     return require_mapping(raw_config, ".codex/config.toml must parse as a mapping")
 
 
-def load_project_skill_config_toml() -> dict[str, object]:
-    """Load the optional parent-owned Codex skill overlay."""
-    if not PROJECT_SKILL_CONFIG_PATH.is_file():
-        return {}
-    raw_config: object = tomllib.loads(PROJECT_SKILL_CONFIG_PATH.read_text(encoding="utf-8"))
-    return require_mapping(
-        raw_config,
-        ".codex/project-config.toml must parse as a mapping",
-    )
-
-
 def validate_project_config() -> None:
     """Check that the shared project config exposes the review route."""
     config = load_project_config_toml()
     registry = model_profile_registry.load_model_profile_registry(ROOT)
+    common_return = model_profile_registry.validate_common_return_schema(registry)
+    ensure(common_return.valid, "all canonical profiles must use the common claim/evidence return schema")
+    writer_policy = registry.writer_isolation_policy
+    ensure(
+        writer_policy.get("current_checkout_mode")
+        == "parallel_only_for_disjoint_paths_without_shared_state",
+        "writer isolation policy must protect shared current-checkout state",
+    )
+    ensure(
+        tuple(writer_policy.get("parallel_requirements", ()))
+        == (
+            "disjoint_paths",
+            "no_shared_git_index_or_head",
+            "no_generated_or_formatter_effects",
+        ),
+        "writer isolation policy requirements must be explicit",
+    )
+    ensure(
+        writer_policy.get("collision_action") == "serialize_current_checkout_waves",
+        "writer collisions must serialize in the current checkout",
+    )
+    ensure(
+        writer_policy.get("isolated_worktree_mode")
+        == "explicit_alternative_implementation_experiment_only",
+        "isolated worktrees are reserved for explicit alternative implementation experiments",
+    )
+    repository_writers = {"worker", "spark_worker"}
+    for role_id, sandbox in registry.role_sandbox_bindings.items():
+        expected_sandbox = "workspace-write" if role_id in repository_writers else "read-only"
+        ensure(
+            sandbox == expected_sandbox,
+            f"{role_id} sandbox/write policy contradiction: expected {expected_sandbox}",
+        )
     parent_profile = registry.by_profile("sol_parent_high")
     review_profile = registry.by_profile("luna_reasoning_high")
     ensure(config.get("model") == parent_profile.model, "parent model must project sol_parent_high")
@@ -346,17 +483,30 @@ def validate_project_config() -> None:
         config.get("tool_output_token_limit") == EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT,
         f"tool_output_token_limit must remain {EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT}",
     )
-    features = require_mapping(config.get("features", {}), "features must be a mapping")
-    ensure(features.get("hooks") is True, "features.hooks must be true")
-    ensure(features.get("goals") is True, "features.goals must be true")
-    ensure(features.get("multi_agent") is True, "features.multi_agent must be true")
-    ensure("codex_hooks" not in features, "deprecated features.codex_hooks must be absent")
-    ensure("profiles" not in config, "project-local profiles must stay out of shared config")
+    ensure(
+        config.get("approval_policy") == "on-request",
+        "approval_policy must use the recommended on-request project default",
+    )
+    ensure(
+        config.get("sandbox_mode") == "workspace-write",
+        "sandbox_mode must use the recommended workspace-write project default",
+    )
+    ensure(
+        "features" not in config,
+        "stable Codex features must use runtime defaults instead of project overrides",
+    )
+    ensure(
+        "skills" not in config,
+        "repository skills must use automatic .agents/skills discovery",
+    )
+    ensure(
+        "profiles" not in config,
+        "project-local profiles must stay out of shared config",
+    )
     ensure(
         "agent_model_policy" not in config,
         "agent_model_policy must stay out of .codex/config.toml; use .codex/agents/*.toml",
     )
-    validate_skill_config(config, load_project_skill_config_toml())
     agents = require_mapping(config.get("agents", {}), "agents must be a mapping")
     ensure(
         agents.get("max_threads") == EXPECTED_MAX_THREADS,
@@ -411,17 +561,6 @@ def validate_project_config() -> None:
         )
 
 
-def expected_skill_config_paths() -> tuple[str, ...]:
-    """Return public project-local skill paths that must be enabled in Codex config."""
-    return tuple(
-        sorted(
-            f"../{path.relative_to(ROOT).as_posix()}"
-            for path in SKILL_SHIM_ROOT.glob("*/SKILL.md")
-            if is_public_skill_id(path.parent.name)
-        )
-    )
-
-
 def is_private_skill_id(skill_id: str) -> bool:
     """Return whether one skill id is private and runtime-internal."""
     return skill_id.startswith(PRIVATE_SKILL_PREFIX)
@@ -430,83 +569,6 @@ def is_private_skill_id(skill_id: str) -> bool:
 def is_public_skill_id(skill_id: str) -> bool:
     """Return whether one skill id belongs to the user-facing public catalog."""
     return bool(skill_id) and not is_private_skill_id(skill_id)
-
-
-def validate_skill_config(
-    config: dict[str, object],
-    project_config: dict[str, object] | None = None,
-) -> None:
-    """Check shared and parent-owned skill config lanes."""
-    skills = require_mapping(config.get("skills", {}), "skills must be a mapping")
-    entries = require_list(skills.get("config", []), "skills.config must be a list")
-    observed_agentcanon: list[str] = []
-    for entry in entries:
-        entry = require_mapping(entry, "skills.config entries must be mappings")
-        path_value = validate_skill_config_entry(entry, PROJECT_CONFIG_PATH)
-        resolved = (PROJECT_CONFIG_PATH.parent / path_value).resolve()
-        ensure(
-            resolved.is_relative_to(SKILL_SHIM_ROOT.resolve()),
-            "project-owned skills.config entries must live in .codex/project-config.toml: "
-            f"{path_value}",
-        )
-        ensure(
-            is_public_skill_id(resolved.parent.name),
-            f"private skill shims must stay out of skills.config: {path_value}",
-        )
-        observed_agentcanon.append(path_value)
-    expected = expected_skill_config_paths()
-    ensure(
-        sorted(observed_agentcanon) == list(expected),
-        "skills.config must enable every .agents/skills/*/SKILL.md path",
-    )
-    validate_project_skill_config(project_config or {})
-
-
-def validate_project_skill_config(project_config: dict[str, object]) -> None:
-    """Check optional parent-owned project skill config entries."""
-    skills = require_mapping(project_config.get("skills", {}), "project skills must be a mapping")
-    entries = require_list(
-        skills.get("config", []),
-        "project skills.config must be a list",
-    )
-    observed_project: list[str] = []
-    for entry in entries:
-        entry = require_mapping(entry, "project skills.config entries must be mappings")
-        path_value = validate_skill_config_entry(entry, PROJECT_SKILL_CONFIG_PATH)
-        resolved = (PROJECT_SKILL_CONFIG_PATH.parent / path_value).resolve()
-        ensure(
-            is_project_skill_lane_path(resolved),
-            f"skills.config path is outside allowed skill lanes: {path_value}",
-        )
-        ensure(
-            is_public_skill_id(resolved.parent.name),
-            f"private project skill shims must stay out of skills.config: {path_value}",
-        )
-        observed_project.append(path_value)
-    ensure(
-        len(observed_project) == len(set(observed_project)),
-        "project-owned skills.config entries must not be duplicated",
-    )
-
-
-def validate_skill_config_entry(entry: dict[str, object], config_path: Path) -> str:
-    """Validate one skills.config entry and return its path."""
-    path_value = str(entry.get("path", "")).strip()
-    ensure(bool(path_value), "skills.config entry path must be non-empty")
-    ensure(entry.get("enabled") is True, f"skills.config {path_value} must be enabled")
-    resolved = (config_path.parent / path_value).resolve()
-    ensure(resolved.is_file(), f"skills.config path missing: {path_value}")
-    ensure(resolved.name == "SKILL.md", f"skills.config path must point at SKILL.md: {path_value}")
-    return path_value
-
-
-def is_project_skill_lane_path(path: Path) -> bool:
-    """Return whether one SKILL.md path belongs to the project-owned skill lane."""
-    lane_root = (PROJECT_CONFIG_PATH.parent / "project-skills").resolve()
-    try:
-        return path.is_relative_to(lane_root)
-    except ValueError:
-        return False
 
 
 def validate_retired_command_or_skill(value: str, child: str) -> None:
@@ -629,8 +691,21 @@ def validate_generated_role_views() -> None:
     registry_ids = {profile.id for profile in registry.model_profiles}
     generated = {
         view.role_id: view
-        for view in model_profile_registry.generate_role_views(registry, root=ROOT)
+        for view in model_profile_registry.generate_role_views(
+            registry,
+            root=ROOT,
+            projection="consumer-static",
+        )
     }
+    role_view_issues = model_profile_registry._role_view_issues(
+        ROOT,
+        projection="consumer-static",
+    )
+    ensure(
+        not role_view_issues,
+        "committed consumer-static role bytes must match the canonical materializer: "
+        + "; ".join(issue.message for issue in role_view_issues),
+    )
     ensure(set(configs) == set(agent_views) == set(bindings), "generated role-view sets must be identical")
     ensure(
         len(configs) == len(registry.role_profile_bindings),
@@ -674,7 +749,14 @@ def validate_codex_agent_settings() -> None:
     """Check executable settings and the canonical generated role projection."""
     configs = parse_codex_agents()
     registry = model_profile_registry.load_model_profile_registry(ROOT)
-    generated = {view.role_id: view for view in model_profile_registry.generate_role_views(registry, ROOT)}
+    generated = {
+        view.role_id: view
+        for view in model_profile_registry.generate_role_views(
+            registry,
+            ROOT,
+            projection="consumer-static",
+        )
+    }
     valid_efforts = {"low", "medium", "high", "xhigh"}
     for role_id, config in sorted(configs.items()):
         forbidden_keys = sorted(FORBIDDEN_AGENT_PROFILE_KEYS & set(config))
@@ -769,6 +851,7 @@ def validate_team_config_references() -> None:
             config.artifacts["team_manifest"],
             config.artifacts["verification"],
         ),
+        source_root=ROOT,
     )
     ensure(
         not missing_templates,
@@ -807,7 +890,10 @@ def validate_team_config_references() -> None:
 
     packet_probe_workspace = resolve_packet_probe_workspace()
     packet_probe_report_dir = ROOT / "reports" / "agents" / "_packet_probe"
-    for entry in resolve_cross_cutting_document_packet(packet_probe_workspace):
+    for entry in resolve_cross_cutting_document_packet(
+        packet_probe_workspace,
+        ROOT,
+    ):
         ensure(entry.path.exists(), f"cross-cutting document packet path missing: {entry.path}")
     for role in config.always_on_roles + config.specialist_roles:
         packet = resolve_role_document_packet(
@@ -816,6 +902,7 @@ def validate_team_config_references() -> None:
             report_dir=packet_probe_report_dir,
             workspace_root=packet_probe_workspace,
             active_design_packet=active_design_packet,
+            agentcanon_source_root=ROOT,
         )
         for entry in packet.read_before_work:
             ensure(
@@ -862,7 +949,6 @@ def validate_task_catalog_references() -> None:
         == "distinct_unresolved_claim_or_risk_only",
         "review_activation_policy specialist activation must be conditional",
     )
-    runtime_max_threads = codex_runtime_max_threads()
     role_ids = {role.id for role in config.always_on_roles + config.specialist_roles}
     topology = require_mapping(
         catalog.raw.get("role_topology_defaults"),
@@ -1480,7 +1566,6 @@ def validate_subagent_protocol_docs() -> None:
                 "agents/task_catalog.yaml",
                 "agents/agents_config.json",
                 ".codex/agents/*.toml",
-                "task_start.py",
                 "bootstrap_agent_run.py",
                 "workflow_monitor.py",
                 "python3 tools/agent_tools/route.py --prompt",
@@ -1568,11 +1653,23 @@ def validate_vendor_skill_adapters() -> None:
     )
 
 
-def alignment_workspace(tmp_root: Path) -> AlignmentWorkspace:
+def alignment_workspace(
+    tmp_root: Path,
+    source_resolution: RootResolution,
+) -> AlignmentWorkspace:
     """Return the temporary workspace layout for bundle smoke checks."""
+    workspace_root = tmp_root / "workspace"
+    report_root = tmp_root / "reports"
+    repository_roots = resolve_repository_roots(
+        workspace_root,
+        report_root,
+        source_root=source_resolution.source_root,
+        canon_root=source_resolution.canon_root,
+    )
     return AlignmentWorkspace(
-        workspace_root=tmp_root / "workspace",
-        report_root=tmp_root / "reports",
+        workspace_root=workspace_root,
+        report_root=report_root,
+        repository_roots=repository_roots,
     )
 
 
@@ -1584,21 +1681,9 @@ def initialize_alignment_workspace(workspace: AlignmentWorkspace) -> None:
     (workspace.workspace_root / "documents").mkdir()
     (workspace.workspace_root / "reports" / "runtime").mkdir(parents=True)
     (workspace.workspace_root / ".codex").mkdir()
-    (workspace.workspace_root / "agents").mkdir()
-    for relative_path in (
-        ".codex/config.toml",
-        "agents/agents_config.json",
-        "agents/task_catalog.yaml",
-        "agents/model_profiles.toml",
-        "agents/capacity_policy.toml",
-        "agents/canonical/CODEX_WORKFLOW.md",
-        "templates/agents/design_brief.md",
-        "agents/workflows/implementation-waterfall-workflow.md",
-        "documents/design/dependency-manifest-design.md",
-    ):
-        destination = workspace.workspace_root / relative_path
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(ROOT / relative_path, destination)
+    (workspace.workspace_root / ".codex" / "config.toml").write_bytes(
+        (workspace.repository_roots.agentcanon_source_root / ".codex" / "config.toml").read_bytes()
+    )
     (workspace.workspace_root / "WORKTREE_SCOPE.md").write_text(
         "\n".join(
             [
@@ -2146,6 +2231,7 @@ def validate_task_bundle_output(
     task = task_by_id(catalog, task_id)
     roles = roles_for_task(config, catalog, task_id)
     report_dir = workspace.report_root / task_id
+    repository_roots = workspace.repository_roots
     create_run_bundle(
         RunBundleSpec(
             config=config,
@@ -2156,6 +2242,9 @@ def validate_task_bundle_output(
             created_at_iso=created_at_iso,
             roles=roles,
             workspace_root=workspace.workspace_root,
+            agentcanon_source_root=repository_roots.agentcanon_source_root,
+            report_root=repository_roots.report_root,
+            repository_roots=repository_roots,
             workflow_family_id=str(task["family"]),
             task_catalog=catalog,
         )
@@ -2202,6 +2291,7 @@ def validate_full_team_bundle_output(
         workflow_family_id="comprehensive_development",
     )
     full_team_dir = workspace.report_root / "full-team"
+    repository_roots = workspace.repository_roots
     create_run_bundle(
         RunBundleSpec(
             config=config,
@@ -2212,6 +2302,9 @@ def validate_full_team_bundle_output(
             created_at_iso=created_at_iso,
             roles=full_team_roles,
             workspace_root=workspace.workspace_root,
+            agentcanon_source_root=repository_roots.agentcanon_source_root,
+            report_root=repository_roots.report_root,
+            repository_roots=repository_roots,
             workflow_family_id="comprehensive_development",
             task_catalog=catalog,
         )
@@ -2221,29 +2314,34 @@ def validate_full_team_bundle_output(
 
 def validate_bundle_outputs() -> None:
     """Create temporary bundles for every catalog task and full-team run."""
-    config = load_team_config()
-    catalog = load_task_catalog(config)
+    source_resolution = resolve_agent_canon_source_root(ROOT)
+    source_root = source_resolution.source_root
+    config = load_team_config(source_root / "agents" / "agents_config.json")
+    catalog = load_task_catalog(config, root=source_root)
     created_at_iso = current_utc_iso()
 
-    with tempfile.TemporaryDirectory(prefix="agent-runtime-alignment-") as tmp_dir:
-        workspace = alignment_workspace(Path(tmp_dir))
-        initialize_alignment_workspace(workspace)
+    with runtime_alignment_parent(source_resolution) as temp_parent:
+        with tempfile.TemporaryDirectory(
+            prefix="agent-runtime-alignment-", dir=str(temp_parent)
+        ) as tmp_dir:
+            workspace = alignment_workspace(Path(tmp_dir), source_resolution)
+            initialize_alignment_workspace(workspace)
 
-        for task_id in task_ids(catalog):
-            validate_task_bundle_output(
+            for task_id in task_ids(catalog):
+                validate_task_bundle_output(
+                    config=config,
+                    catalog=catalog,
+                    workspace=workspace,
+                    task_id=task_id,
+                    created_at_iso=created_at_iso,
+                )
+
+            validate_full_team_bundle_output(
                 config=config,
                 catalog=catalog,
                 workspace=workspace,
-                task_id=task_id,
                 created_at_iso=created_at_iso,
             )
-
-        validate_full_team_bundle_output(
-            config=config,
-            catalog=catalog,
-            workspace=workspace,
-            created_at_iso=created_at_iso,
-        )
 
 
 def main() -> int:

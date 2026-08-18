@@ -10,7 +10,7 @@
 # upstream design ../../templates/agents/closeout_gate.md defines closeout status contract
 # upstream design ../../templates/agents/agent_evaluation.md defines evaluation contract
 # upstream design ../../documents/design/request-intent-and-update-relation.md cleanup/readback receipt closeout projection
-# downstream implementation ../../tests/agent_tools/test_task_start_and_close.py tests closeout
+# downstream implementation ../../tests/agent_tools/test_bootstrap_and_close.py tests closeout
 # @dependency-end
 """Evaluate whether one run bundle is ready for a user-facing completion report."""
 
@@ -19,15 +19,32 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import capacity_handshake
+from parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
+
+
+def _parent_validate(path: Path, purpose: str) -> None:
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
+    ParentRootSideEffectBoundary().resolve_parent_owned_path(attestation, path, purpose, create=False)
 
 if __package__:
     from .tool_calls import (
@@ -44,6 +61,10 @@ if __package__:
     from .workspace_scope import resolve_report_root
 else:
     from workspace_scope import resolve_report_root
+if __package__:
+    from . import surface_manifest
+else:
+    import surface_manifest
 from report_artifact_checks import (
     COMPLETION_COVERAGE_SCHEMA,
     COMPLETION_COVERAGE_TAXONOMY_REFS,
@@ -63,9 +84,9 @@ from update_lifecycle_contract import (
     validate_durable_handback,
     validate_gate_chain,
 )
+from autonomous_convergence import validate_closeout_projection
 
 STATIC_ANALYSIS_COMPLETE_STATUSES = {"yes", "profile_selected"}
-MECHANICAL_STATIC_ANALYSIS_READY_STATUSES = {"pass", "targeted", "not_applicable"}
 DOCUMENT_STRUCTURE_MISSING_VALUES = {"", "missing", "none", "not_applicable"}
 DOCUMENT_SPLIT_DECISION_PREFIXES = (
     "keep:",
@@ -75,11 +96,17 @@ DOCUMENT_SPLIT_DECISION_PREFIXES = (
     "rename:",
 )
 DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX = "not_applicable:format-only:"
+DOCUMENT_STRUCTURE_ACTIVATIONS = {"required", "not_required", "format_only"}
+DOCUMENT_STRUCTURE_VALUE_MISSING = {"", "missing", "none", "not_applicable"}
 COMPLETION_COVERAGE_ARTIFACT_NAME = "completion_coverage.json"
+AGENT_CANON_PREFIX = "vendor/agent-canon"
 
 
 def _resolve_report_root(report_root: str | None, workspace_root: Path) -> Path:
     """Load the team CLI helper only for the CLI/report path."""
+    # Keep report-root resolution tied to the requested workspace.  The
+    # parent capability below validates the resulting path and must not
+    # silently relocate lifecycle artifacts to the configured parent root.
     return resolve_report_root(report_root, workspace_root)
 
 
@@ -269,10 +296,10 @@ def validate_capacity_lifecycle_closeout(
 
 
 def capacity_lifecycle_closeout_from_report(report_dir: Path) -> tuple[bool, tuple[str, ...]]:
-    """Read the generated closeout projection and validate its shared ledger."""
+    """Validate a generated capacity projection when the run contains one."""
     packet_path = report_dir / "closeout_packet.json"
     if not packet_path.is_file():
-        return False, ("closeout_packet_missing",)
+        return True, ()
     try:
         payload = json.loads(packet_path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
@@ -513,6 +540,263 @@ def changed_markdown_paths(workspace: Path) -> tuple[str, ...]:
     return tuple(sorted(paths))
 
 
+def changed_file_paths(workspace: Path) -> tuple[str, ...]:
+    """Return tracked and untracked non-report file paths changed in the checkout."""
+    commands = (
+        ("git", "diff", "--name-only"),
+        ("git", "diff", "--cached", "--name-only"),
+        ("git", "ls-files", "--others", "--exclude-standard"),
+    )
+    paths: set[str] = set()
+    for command in commands:
+        result = subprocess.run(
+            list(command),
+            cwd=workspace,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            continue
+        for line in result.stdout.splitlines():
+            path = line.strip()
+            if not path:
+                continue
+            if path.startswith("reports/") or path.startswith(".agent-canon/log-archive/"):
+                continue
+            paths.add(path)
+    return tuple(sorted(paths))
+
+
+def _normalize_path(raw_path: str) -> str:
+    """Normalize one path for manifest/closeout comparison."""
+    return Path(raw_path).as_posix()
+
+
+def _path_in_prefix(path: str, prefixes: Iterable[str]) -> bool:
+    for prefix in prefixes:
+        if path == prefix or path.startswith(f"{prefix}/"):
+            return True
+    return False
+
+
+def agent_canon_parent_sync_manifest_prefixes(
+    workspace: Path,
+    prefix: str = AGENT_CANON_PREFIX,
+) -> tuple[str, ...]:
+    """Read current AgentCanon surface manifest and return prefix-triggered sync paths."""
+    entries = ()
+    try:
+        manifest = surface_manifest.load_manifest(
+            workspace,
+            prefix,
+            surface_manifest.DEFAULT_MANIFEST,
+        )
+        entries = manifest.entries
+    except (FileNotFoundError, OSError, ValueError, TypeError):
+        return tuple()
+    trigger_paths: set[str] = set()
+    for entry in entries:
+        if entry.mode in {"copy", "regular"}:
+            trigger_paths.add(_normalize_path(entry.path))
+            source = entry.source_or_default()
+            if source:
+                trigger_paths.add(_normalize_path(source))
+    return tuple(sorted(trigger_paths))
+
+
+def agent_canon_parent_sync_manifest_exact_paths(
+    workspace: Path,
+    prefix: str = AGENT_CANON_PREFIX,
+) -> tuple[str, ...]:
+    """Read current manifest and return symlink-link parent paths that must be changed exactly."""
+    entries = ()
+    try:
+        manifest = surface_manifest.load_manifest(
+            workspace,
+            prefix,
+            surface_manifest.DEFAULT_MANIFEST,
+        )
+        entries = manifest.entries
+    except (FileNotFoundError, OSError, ValueError, TypeError):
+        return tuple()
+    exact_paths: set[str] = set()
+    for entry in entries:
+        if entry.mode == "symlink":
+            exact_paths.add(_normalize_path(entry.path))
+    return tuple(sorted(exact_paths))
+
+
+def agent_canon_parent_sync_symlink_source_paths(
+    workspace: Path,
+    prefix: str = AGENT_CANON_PREFIX,
+) -> tuple[str, ...]:
+    """Return symlink source roots from manifest; changes under these do not require link-root."""
+    try:
+        manifest = surface_manifest.load_manifest(
+            workspace,
+            prefix,
+            surface_manifest.DEFAULT_MANIFEST,
+        )
+    except (FileNotFoundError, OSError, ValueError, TypeError):
+        return tuple()
+    sources: set[str] = set()
+    for entry in manifest.entries:
+        if entry.mode != "symlink":
+            continue
+        source = entry.source_or_default()
+        if source:
+            normalized = _normalize_path(source)
+            sources.add(normalized)
+            source_parent = Path(normalized).as_posix()
+            if source_parent and source_parent != ".":
+                parent = Path(source_parent).parent
+                while parent.as_posix() != ".":
+                    sources.add(parent.as_posix())
+                    parent = parent.parent
+    return tuple(sorted(sources))
+
+
+def _gitlink_commit_resolvable(workspace: Path) -> str | None:
+    """Return commit object for the committed vendor/agent-canon gitlink."""
+    if not (workspace / AGENT_CANON_PREFIX).is_dir():
+        return None
+    result = subprocess.run(
+        ["git", "ls-tree", "HEAD", AGENT_CANON_PREFIX],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    fields = result.stdout.strip().split()
+    if len(fields) < 3 or fields[0] != "160000" or fields[1] != "commit":
+        return None
+    commit = fields[2]
+    if not commit:
+        return None
+    exists = subprocess.run(
+        ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return commit if exists.returncode == 0 else None
+
+
+def _parse_gitlink_ref_updates(lines: tuple[str, ...]) -> tuple[str | None, str | None]:
+    """Parse `git diff --raw` lines for AgentCanon gitlink target path updates."""
+
+    def _as_hash(raw_hash: str) -> str | None:
+        return None if raw_hash in {"0" * 40, ""} else raw_hash
+
+    for raw in lines:
+        metadata, separator, paths = raw.partition("\t")
+        if not separator:
+            continue
+        fields = metadata.split()
+        if len(fields) < 4:
+            continue
+        if not fields[0].startswith(":"):
+            continue
+        mode_old = fields[0].lstrip(":")
+        mode_new = fields[1]
+        if mode_old != "160000" or mode_new != "160000":
+            continue
+        old_hash = _as_hash(fields[2])
+        new_hash = _as_hash(fields[3])
+        status = fields[4] if len(fields) > 4 else "M"
+
+        path_fields = paths.split("\t")
+        if not path_fields or not path_fields[0]:
+            continue
+        old_path = _normalize_path(path_fields[0])
+        new_path = _normalize_path(path_fields[-1])
+
+        if status.startswith(("R", "C")) and len(path_fields) >= 2:
+            old_path = _normalize_path(path_fields[0])
+            new_path = _normalize_path(path_fields[1])
+        else:
+            new_path = old_path
+
+        if status.startswith("R"):
+            if old_path == AGENT_CANON_PREFIX and new_path != AGENT_CANON_PREFIX:
+                continue
+            if new_path == AGENT_CANON_PREFIX and old_path != AGENT_CANON_PREFIX:
+                return old_hash, new_hash
+            continue
+
+        if new_path == AGENT_CANON_PREFIX:
+            return old_hash, new_hash
+    return None, None
+
+
+def _gitlink_update_candidates(workspace: Path) -> tuple[str | None, str | None]:
+    """Read staged and unstaged gitlink hash transitions for vendor/agent-canon."""
+    outputs: list[str] = []
+    for args in (
+        ("git", "diff", "--raw", "--cached", "HEAD", "--", AGENT_CANON_PREFIX),
+        ("git", "diff", "--raw", "HEAD", "--", AGENT_CANON_PREFIX),
+    ):
+        result = subprocess.run(
+            list(args),
+            cwd=workspace,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            continue
+        outputs.extend(result.stdout.splitlines())
+    return _parse_gitlink_ref_updates(tuple(outputs))
+
+
+def _gitlink_target_commit_resolvable(workspace: Path) -> str | None:
+    """Return the targeted gitlink commit object only when vendor/agent-canon is changed."""
+    old_hash, new_hash = _gitlink_update_candidates(workspace)
+    if new_hash is None:
+        return None
+    result = subprocess.run(
+        ["git", "cat-file", "-e", f"{new_hash}^{{commit}}"],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return new_hash if result.returncode == 0 else None
+
+
+def _sync_gate_manifest_prefixes(workspace: Path) -> tuple[str, ...]:
+    """Return copy/regular materialization prefixes."""
+    return agent_canon_parent_sync_manifest_prefixes(workspace)
+
+
+def agent_canon_parent_sync_gate_required(
+    changed_paths: Sequence[str],
+    *,
+    workspace: Path | None = None,
+) -> bool:
+    """Return whether this run requires a parent shared-canon root sync gate."""
+    resolved_workspace = workspace or Path.cwd()
+    normalized = {_normalize_path(item) for item in changed_paths}
+    sync_targets = set(_sync_gate_manifest_prefixes(resolved_workspace))
+    exact_root_symlink_paths = set(agent_canon_parent_sync_manifest_exact_paths(resolved_workspace))
+    symlink_sources = set(
+        agent_canon_parent_sync_symlink_source_paths(resolved_workspace)
+    )
+
+    for path in normalized:
+        if path in exact_root_symlink_paths:
+            return True
+        if _path_in_prefix(path, symlink_sources):
+            continue
+        if _path_in_prefix(path, sync_targets):
+            return True
+    return False
+
+
 def parse_document_structure_paths(value: str) -> set[str]:
     """Parse a closeout document-structure path list."""
     if value in {"", "missing", "none"}:
@@ -548,23 +832,58 @@ def document_structure_evidence_ready(
     normalized_changed = {Path(path).as_posix() for path in changed_markdown}
     paths_recorded = normalized_changed.issubset(recorded_paths)
     status = evidence.get("document_structure_status", "")
+    activation = evidence.get("structure_activation", "")
     structure_contract = evidence.get("structure_contract", "")
     split_decision_ready = document_split_decision_ready(
         status, evidence.get("document_split_decision", "")
     )
-    complete_route = (
-        status == "complete"
+    identity_ready = all(
+        evidence.get(field, "") not in DOCUMENT_STRUCTURE_VALUE_MISSING
+        for field in (
+            "structure_owner",
+            "structure_source",
+            "structure_reader",
+            "structure_layout",
+            "structure_validation_topology",
+        )
+    )
+    required_route = (
+        activation == "required"
         and evidence.get("structure_planning") == "complete"
-        and evidence.get("prose_graph") == "complete"
-        and structure_contract
-        not in {"", "missing", "none", "not_applicable"}
-        and "skipped" not in structure_contract
+        and evidence.get("prose_graph_activation") in {"selected", "not_selected"}
+        and (
+            (
+                evidence.get("prose_graph_activation") == "selected"
+                and evidence.get("prose_graph") == "complete"
+            )
+            or (
+                evidence.get("prose_graph_activation") == "not_selected"
+                and evidence.get("prose_graph") == "not_selected"
+            )
+        )
+        and structure_contract.startswith("required:")
+        and identity_ready
+    )
+    existing_topology_route = (
+        activation == "not_required"
+        and evidence.get("structure_planning") == "not_required"
+        and evidence.get("prose_graph_activation") == "not_selected"
+        and evidence.get("prose_graph") == "not_selected"
+        and structure_contract.startswith("not_required:existing-topology:")
+        and identity_ready
+    )
+    complete_route = status == "complete" and activation in {"required", "not_required"} and (
+        required_route or existing_topology_route
     )
     skipped_route = (
         status == "skipped"
+        and activation == "format_only"
         and evidence.get("md_style_check") == "pass"
-        and "skipped" in evidence.get("structure_contract", "")
-        and evidence.get("format_only_reason", "") not in {"", "missing", "none"}
+        and evidence.get("document_split_decision", "").startswith(
+            DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX
+        )
+        and structure_contract.startswith("skipped:")
+        and evidence.get("format_only_reason", "") not in DOCUMENT_STRUCTURE_VALUE_MISSING
     )
     return paths_recorded, split_decision_ready, split_decision_ready and (
         complete_route or skipped_route
@@ -1024,6 +1343,7 @@ def main() -> int:
         report_dir = (
             _resolve_report_root(args.report_root, Path.cwd()) / str(args.run_id)
         ).resolve()
+    _parent_validate(report_dir, "task-close")
     workspace = Path.cwd().resolve()
     active_run = active_run_name(report_dir)
 
@@ -1050,8 +1370,8 @@ def main() -> int:
 
     verification = parse_kv_lines(verification_path)
     closeout = parse_markdown_status_section(closeout_path, "Gate Status")
-    mechanical_loop = parse_markdown_status_section(
-        closeout_path, "Mechanical Completion Loop Evidence"
+    review_convergence = parse_markdown_status_section(
+        closeout_path, "Review Convergence Evidence"
     )
     tool_warning_evidence = parse_markdown_status_section(
         closeout_path, "Tool Warning Evidence"
@@ -1088,6 +1408,14 @@ def main() -> int:
     )
     active_diff_ref = current_diff_ref(workspace)
     changed_markdown = changed_markdown_paths(workspace)
+    changed_all = changed_file_paths(workspace)
+    requires_canon_parent_sync = agent_canon_parent_sync_gate_required(
+        changed_all,
+        workspace=workspace,
+    )
+    parent_gitlink_commit = _gitlink_target_commit_resolvable(workspace)
+    _, changed_gitlink_target = _gitlink_update_candidates(workspace)
+    requires_parent_gitlink_integrity = changed_gitlink_target is not None
     (
         document_structure_paths_ready,
         document_split_decision_route_ready,
@@ -1115,6 +1443,7 @@ def main() -> int:
     )
     report_artifact_blockers = report_artifact_placement_blockers(workspace, report_dir)
     completion_decision = completion_coverage_consumer(report_dir)
+    convergence_decision = validate_closeout_projection(review_convergence)
     update_lifecycle_decision = update_lifecycle_closeout_consumer(report_dir)
     wave_reconciliation = wave_reconciliation_blockers(
         schedule_text,
@@ -1156,21 +1485,37 @@ def main() -> int:
             "repo_wide_static_analysis_complete"
         )
         in STATIC_ANALYSIS_COMPLETE_STATUSES,
-        "agent_canon_latest_complete": closeout.get("agent_canon_latest_complete") == "yes",
-        "agent_canon_latest_command": agent_canon_latest.get(
-            "agent_canon_latest_command", ""
-        )
-        not in {"", "missing", "none"},
-        "agent_canon_latest_status": agent_canon_latest.get("agent_canon_latest_status", "")
-        == "pass",
+        "agent_canon_latest_complete": closeout.get("agent_canon_latest_complete") == "yes"
+        if requires_canon_parent_sync
+        else closeout.get("agent_canon_latest_complete") in {"yes", "not_applicable"},
+        "agent_canon_latest_command": (
+            agent_canon_latest.get("agent_canon_latest_command", "")
+            not in {"", "missing", "none"}
+            if requires_canon_parent_sync
+            else True
+        ),
+        "agent_canon_latest_status": (
+            agent_canon_latest.get("agent_canon_latest_status", "") == "pass"
+            if requires_canon_parent_sync
+            else True
+        ),
         "agent_canon_submodule_status": agent_canon_latest.get(
             "agent_canon_submodule_status", ""
         )
-        not in {"", "missing", "none"},
+        not in {"", "missing", "none"}
+        if requires_canon_parent_sync
+        else True,
         "agent_canon_source_head": agent_canon_latest.get("agent_canon_source_head", "")
-        not in {"", "missing", "none"},
+        not in {"", "missing", "none"}
+        if requires_canon_parent_sync
+        else True,
         "agent_canon_parent_pin": agent_canon_latest.get("agent_canon_parent_pin", "")
-        not in {"", "missing", "none"},
+        not in {"", "missing", "none"}
+        if requires_canon_parent_sync
+        else True,
+        "agent_canon_parent_gitlink_commit": (
+            parent_gitlink_commit is not None if requires_parent_gitlink_integrity else True
+        ),
         "mapping_error_sets_empty": (
             closeout.get(
                 "mapping_error_sets_empty",
@@ -1202,7 +1547,7 @@ def main() -> int:
         )
         == "pass",
         "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",
-        "post_fix_full_review_complete": closeout.get("post_fix_full_review_complete")
+        "focused_recheck_complete": closeout.get("focused_recheck_complete")
         in {"yes", "not_applicable"},
         "tool_warnings_resolved": closeout.get("tool_warnings_resolved") == "yes",
         "tool_warning_monitoring_status": tool_warning_evidence.get(
@@ -1219,49 +1564,12 @@ def main() -> int:
         "document_structure_paths_recorded": document_structure_paths_ready,
         "document_split_decision_evidence": document_split_decision_route_ready,
         "document_structure_evidence": document_structure_route_ready,
-        "mechanical_completion_loop_complete": closeout.get(
-            "mechanical_completion_loop_complete"
+        "review_convergence_complete": closeout.get(
+            "review_convergence_complete"
         )
         == "yes",
+        "review_convergence_evidence": convergence_decision.ready,
         "subagents_closed": closeout.get("subagents_closed") == "yes",
-        "mechanical_loop_iterations": mechanical_loop.get("mechanical_loop_iterations", "")
-        not in {"", "0", "none"},
-        "mechanical_loop_open_items": mechanical_loop.get("mechanical_loop_open_items")
-        == "none",
-        "mechanical_loop_stop_reason": mechanical_loop.get("mechanical_loop_stop_reason", "")
-        != "",
-        "mechanical_loop_planned_work_status": mechanical_loop.get(
-            "mechanical_loop_planned_work_status"
-        )
-        == "complete",
-        "mechanical_loop_review_findings_status": mechanical_loop.get(
-            "mechanical_loop_review_findings_status"
-        )
-        in {"none", "resolved"},
-        "mechanical_loop_validation_status": mechanical_loop.get(
-            "mechanical_loop_validation_status"
-        )
-        == "pass",
-        "mechanical_loop_dependency_review_status": mechanical_loop.get(
-            "mechanical_loop_dependency_review_status"
-        )
-        == "pass",
-        "mechanical_loop_static_analysis_status": mechanical_loop.get(
-            "mechanical_loop_static_analysis_status"
-        )
-        in MECHANICAL_STATIC_ANALYSIS_READY_STATUSES,
-        "mechanical_loop_commit_push_status": mechanical_loop.get(
-            "mechanical_loop_commit_push_status"
-        )
-        == "complete",
-        "mechanical_loop_canon_sync_status": mechanical_loop.get(
-            "mechanical_loop_canon_sync_status"
-        )
-        in {"complete", "not_applicable"},
-        "mechanical_loop_follow_up_status": mechanical_loop.get(
-            "mechanical_loop_follow_up_status"
-        )
-        in {"none", "resolved"},
         "fresh_subagents_required": subagent_lifecycle.get("fresh_subagents_required")
         in {"conditional", "yes", "no", "not_applicable"},
         "reuse_for_new_task": subagent_lifecycle.get("reuse_for_new_task")
@@ -1429,7 +1737,7 @@ def main() -> int:
     )
     print(
         "MAKE_CI_STATUS="
-        f"{mechanical_loop.get('mechanical_loop_static_analysis_status', '')}"
+        f"{review_convergence.get('review_convergence_static_analysis_status', '')}"
     )
     print(
         "AGENT_CANON_LATEST_COMPLETE="
@@ -1457,8 +1765,8 @@ def main() -> int:
     )
     print(f"REVIEW_FINDINGS_INTEGRATED={closeout.get('review_findings_integrated', '')}")
     print(
-        "POST_FIX_FULL_REVIEW_COMPLETE="
-        f"{closeout.get('post_fix_full_review_complete', '')}"
+        "FOCUSED_RECHECK_COMPLETE="
+        f"{closeout.get('focused_recheck_complete', '')}"
     )
     print(f"TOOL_WARNINGS_RESOLVED={closeout.get('tool_warnings_resolved', '')}")
     print(
@@ -1506,23 +1814,16 @@ def main() -> int:
         f"{'yes' if document_structure_route_ready else 'no'}"
     )
     print(
-        "MECHANICAL_COMPLETION_LOOP_COMPLETE="
-        f"{closeout.get('mechanical_completion_loop_complete', '')}"
-    )
-    print(f"SUBAGENTS_CLOSED={closeout.get('subagents_closed', '')}")
-    print(f"MECHANICAL_LOOP_ITERATIONS={mechanical_loop.get('mechanical_loop_iterations', '')}")
-    print(f"MECHANICAL_LOOP_OPEN_ITEMS={mechanical_loop.get('mechanical_loop_open_items', '')}")
-    print(
-        "MECHANICAL_LOOP_VALIDATION_STATUS="
-        f"{mechanical_loop.get('mechanical_loop_validation_status', '')}"
+        "REVIEW_CONVERGENCE_COMPLETE="
+        f"{closeout.get('review_convergence_complete', '')}"
     )
     print(
-        "MECHANICAL_LOOP_DEPENDENCY_REVIEW_STATUS="
-        f"{mechanical_loop.get('mechanical_loop_dependency_review_status', '')}"
+        "REVIEW_CONVERGENCE_READY="
+        f"{'yes' if convergence_decision.ready else 'no'}"
     )
     print(
-        "MECHANICAL_LOOP_STATIC_ANALYSIS_STATUS="
-        f"{mechanical_loop.get('mechanical_loop_static_analysis_status', '')}"
+        "REVIEW_CONVERGENCE_BLOCKERS="
+        f"{join_blockers(list(convergence_decision.reasons))}"
     )
     print(
         "SUBAGENT_FRESH_REQUIRED="

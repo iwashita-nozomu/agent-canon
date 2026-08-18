@@ -6,15 +6,17 @@
 # upstream implementation ./packets.py provides rendering packet inputs.
 # upstream implementation ./workspace_scope.py provides rendering paths.
 # downstream implementation ./agent_team.py facade consumes rendering APIs.
-# downstream implementation ./task_start.py consumes rendering APIs.
+# downstream implementation ./code_template_rendering.py owns package-safe code source rendering.
+# downstream implementation ./bootstrap_agent_run.py consumes rendering APIs.
 # @dependency-end
 """Own AgentTeam manifest, template, and output rendering."""
 
 from __future__ import annotations
 
 import json
+import os
 import re
-import subprocess
+import shlex
 from collections.abc import Mapping
 from pathlib import Path
 from typing import cast
@@ -22,12 +24,33 @@ from typing import cast
 import yaml
 
 if __package__:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+else:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+
+if __package__:
     from .agent_canon_source_root import resolve_agent_canon_source_root
 else:
     from agent_canon_source_root import resolve_agent_canon_source_root
 
 from route import decide_skills, implementation_handoff_required, load_skill_route_rules
-from skill_tool_commands import SkillCommandPacket, packet_for_skill
+from skill_tool_commands import (
+    SkillCommandPacket,
+    packet_for_skill,
+    project_public_command_for_layout,
+)
 from update_lifecycle_contract import (
     import_decision_sufficiency_verdict,
 )
@@ -61,15 +84,11 @@ else:
 
 if __package__:
     from .workspace_scope import (
-        GIT_STATUS_SHORT_MIN_LINE_LENGTH,
-        GIT_STATUS_SHORT_PATH_START,
         resolve_role_write_scope,
         schedule_wave_row,
     )
 else:
     from workspace_scope import (
-        GIT_STATUS_SHORT_MIN_LINE_LENGTH,
-        GIT_STATUS_SHORT_PATH_START,
         resolve_role_write_scope,
         schedule_wave_row,
     )
@@ -77,7 +96,6 @@ else:
 if __package__:
     from .team_config import (
         ROOT,
-        TEAM_CONFIG_PATH,
         Role,
         RunBundleSpec,
         SubagentWaveSlot,
@@ -93,7 +111,6 @@ if __package__:
 else:
     from team_config import (
         ROOT,
-        TEAM_CONFIG_PATH,
         Role,
         RunBundleSpec,
         SubagentWaveSlot,
@@ -181,9 +198,21 @@ def _render_prompt_entry(value: object, field_name: str) -> str:
 
 TEMPLATE_ROOT = ROOT / "templates" / "agents"
 
+CODE_TEMPLATE_ROOT = ROOT / "templates" / "code"
+
 TEMPLATE_PARTIAL_ROOT = TEMPLATE_ROOT / "_partials"
 
 TEMPLATE_PARTIAL_RE = re.compile(r"\{\{>\s*([A-Za-z0-9_-]+)\s*\}\}")
+
+
+def _required_spec_source_root(spec: RunBundleSpec) -> Path:
+    """Return the source root carried by a run spec, without guessing."""
+    source_root = spec.agentcanon_source_root
+    if source_root is None and spec.repository_roots is not None:
+        source_root = spec.repository_roots.agentcanon_source_root
+    if source_root is None:
+        raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
+    return source_root.resolve()
 
 DEPENDENCY_MANIFEST_CLOSE_MARKER = "-->"
 
@@ -436,13 +465,19 @@ OOP_EVIDENCE_DIMENSIONS = (
 )
 
 
-def validation_failure_response_policy() -> dict[str, object]:
+def validation_failure_response_policy(
+    source_root: Path | None = None,
+) -> dict[str, object]:
     """Return validation-failure response taxonomy from the JSON owner."""
     global _validation_failure_response_policy_cache
-    if _validation_failure_response_policy_cache is None:
+    if _validation_failure_response_policy_cache is None or source_root is not None:
         raw_data = cast(
             "dict[str, object]",
-            json.loads(RUNTIME_PROFILE_INVENTORY_PATH.read_text(encoding="utf-8")),
+            json.loads(
+                ((source_root or ROOT) / VALIDATION_FAILURE_TAXONOMY_SOURCE).read_text(
+                    encoding="utf-8"
+                )
+            ),
         )
         raw_policy = raw_data.get("validation_failure_response")
         if not isinstance(raw_policy, dict):
@@ -463,17 +498,19 @@ def validation_failure_response_policy() -> dict[str, object]:
             raise ValueError(
                 "validation_failure_response.intent_preservation must be strings"
             )
-        _validation_failure_response_policy_cache = {
+        policy_cache = {
             "taxonomy_source": VALIDATION_FAILURE_TAXONOMY_SOURCE,
             "required_fields": tuple(cast("list[str]", required_fields)),
             "intent_preservation": tuple(cast("list[str]", intent_preservation)),
         }
+        if source_root is None:
+            _validation_failure_response_policy_cache = policy_cache
+    else:
+        policy_cache = _validation_failure_response_policy_cache
     return {
-        "taxonomy_source": _validation_failure_response_policy_cache["taxonomy_source"],
-        "required_fields": _validation_failure_response_policy_cache["required_fields"],
-        "intent_preservation": _validation_failure_response_policy_cache[
-            "intent_preservation"
-        ],
+        "taxonomy_source": policy_cache["taxonomy_source"],
+        "required_fields": policy_cache["required_fields"],
+        "intent_preservation": policy_cache["intent_preservation"],
     }
 
 
@@ -635,9 +672,10 @@ def selected_skill_names(selected_skills: tuple[str, ...]) -> tuple[str, ...]:
 
 def selected_skill_command_packets(
     selected_skills: tuple[str, ...],
+    source_root: Path | None = None,
 ) -> tuple[SkillCommandPacket, ...]:
     """Build repo tool command packets for selected public skills."""
-    root_resolution = resolve_agent_canon_source_root(ROOT)
+    root_resolution = resolve_agent_canon_source_root(source_root or ROOT)
     return tuple(
         packet_for_skill(root_resolution, skill)
         for skill in selected_skill_names(selected_skills)
@@ -646,11 +684,12 @@ def selected_skill_command_packets(
 
 def dynamic_skill_candidate_names(
     selected_skills: tuple[str, ...],
+    source_root: Path | None = None,
 ) -> tuple[str, ...]:
     """Return related public skills that can activate in later waves."""
     selected = set(selected_skill_names(selected_skills))
     candidates: list[str] = []
-    for packet in selected_skill_command_packets(selected_skills):
+    for packet in selected_skill_command_packets(selected_skills, source_root):
         for candidate in packet.related_skills:
             if candidate in selected or candidate in candidates:
                 continue
@@ -665,11 +704,15 @@ def format_public_skill_list(skills: tuple[str, ...]) -> str:
 
 def repo_tool_routing_policy_output_lines(
     selected_skills: tuple[str, ...],
+    *,
+    source_root: Path | None = None,
 ) -> tuple[str, ...]:
     """Return stdout lines for selected-skill repo tool routing."""
+    if source_root is None:
+        raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
     skill_names = selected_skill_names(selected_skills)
     skill_list = format_public_skill_list(skill_names)
-    dynamic_candidates = dynamic_skill_candidate_names(selected_skills)
+    dynamic_candidates = dynamic_skill_candidate_names(selected_skills, source_root)
     return (
         "REPO_TOOL_ROUTING_POLICY=run.repo_tool_routing_policy",
         "REPO_TOOL_CALL_TOKEN_SCHEMA=agent-canon.tool-call.v1",
@@ -703,6 +746,7 @@ def default_quality_check_policy_output_lines(
     language_review_candidates: tuple[str, ...] = (),
     default_review_packs_enabled: bool = False,
     default_review_pack_ids: tuple[str, ...] = (),
+    layout: str = "standalone",
 ) -> tuple[str, ...]:
     """Return machine-readable stdout lines for default quality-check routing."""
     review_pack_state = "active" if default_review_packs_enabled else "candidate_only"
@@ -715,7 +759,8 @@ def default_quality_check_policy_output_lines(
         f"{','.join(default_quality_check_agent_types(roles)) or '-'}",
         f"DEFAULT_QUALITY_CHECK_STAGES={','.join(DEFAULT_QUALITY_CHECK_STAGES)}",
         f"DEFAULT_QUALITY_CHECK_EVIDENCE={','.join(OOP_EVIDENCE_DIMENSIONS)}",
-        f"DEFAULT_FORMAT_CHECK_ROUTE={CANONICAL_FORMAT_CHECK_ROUTE}",
+        "DEFAULT_FORMAT_CHECK_ROUTE="
+        + public_command_for_layout(CANONICAL_FORMAT_CHECK_ROUTE, layout),
         f"OFFICIAL_HOOK_DISPATCHER={OFFICIAL_HOOK_DISPATCHER}",
         f"OFFICIAL_HOOK_SCHEMA={OFFICIAL_HOOK_SCHEMA}",
         "DEFAULT_QUALITY_CHECK_TASK_DEFAULT_SPECIALISTS="
@@ -734,6 +779,8 @@ def suggested_public_skills(
     task_id: str | None,
     workflow_family_id: str | None,
     task_text: str = "",
+    *,
+    source_root: Path | None = None,
 ) -> tuple[str, ...]:
     """Return the public skill set required by the selected route."""
     selected = ["$agent-orchestration", "$codex-task-workflow", "$subagent-bootstrap"]
@@ -754,40 +801,38 @@ def suggested_public_skills(
         decision = decide_skills(
             task_text,
             "repo-changing",
-            load_skill_route_rules(ROOT),
+            load_skill_route_rules(source_root or ROOT),
         )
         selected.extend(f"${skill}" for skill in decision.skills)
     return tuple(dict.fromkeys(selected))
 
 
-def subagent_wave_record_command(report_dir: Path | str = "<run-report-dir>") -> str:
+def subagent_wave_record_command(
+    report_dir: Path | str = "<run-report-dir>",
+    *,
+    layout: str = "standalone",
+) -> str:
     """Return the canonical command for recording a spawned subagent wave."""
-    return SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE.format(report_dir=str(report_dir))
-
-
-def discover_changed_paths(workspace_root: Path) -> tuple[str, ...]:
-    """Return changed paths from git status when available."""
-    result = subprocess.run(
-        ["git", "-C", str(workspace_root), "status", "--short"],
-        check=False,
-        capture_output=True,
-        text=True,
+    logical = SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE.format(report_dir=str(report_dir))
+    projection = project_public_command_for_layout(logical, layout=layout)
+    return shlex.join(
+        [*(f"{key}={value}" for key, value in projection.public_env), *projection.public_argv]
     )
-    if result.returncode != 0:
-        return ()
 
-    changed: list[str] = []
-    for raw_line in result.stdout.splitlines():
-        line = raw_line.rstrip()
-        if len(line) < GIT_STATUS_SHORT_MIN_LINE_LENGTH:
-            continue
-        path_part = line[GIT_STATUS_SHORT_PATH_START:]
-        if " -> " in path_part:
-            _, path_part = path_part.split(" -> ", 1)
-        normalized = path_part.strip()
-        if normalized and normalized not in changed:
-            changed.append(normalized)
-    return tuple(changed)
+
+def public_command_for_layout(logical_command: str, layout: str) -> str:
+    """Render one logical command through the selected public layout."""
+    projection = project_public_command_for_layout(logical_command, layout=layout)
+    return shlex.join(
+        [*(f"{key}={value}" for key, value in projection.public_env), *projection.public_argv]
+    )
+
+
+def public_command_for_spec(spec: RunBundleSpec, logical_command: str) -> str:
+    """Render one command through the selected source/public layout owner."""
+    roots = spec.repository_roots
+    layout = getattr(roots, "layout", "standalone") if roots is not None else "standalone"
+    return public_command_for_layout(logical_command, layout)
 
 
 def language_review_candidates(
@@ -795,7 +840,7 @@ def language_review_candidates(
     changed_paths: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
     """Return explicit language-review candidates from changed paths."""
-    candidate_paths = changed_paths or discover_changed_paths(workspace_root)
+    candidate_paths = changed_paths
     normalized_paths = tuple(
         raw_path.replace("\\", "/").lstrip("./") for raw_path in candidate_paths
     )
@@ -869,24 +914,37 @@ def strip_dependency_manifest(text: str) -> str:
     )
 
 
-def render_template_partial(partial_name: str, seen: tuple[str, ...] = ()) -> str:
+def render_template_partial(
+    partial_name: str,
+    seen: tuple[str, ...] = (),
+    *,
+    source_root: Path | None = None,
+) -> str:
     """Load one reusable template partial without leaking its manifest into output."""
     if not re.fullmatch(r"[A-Za-z0-9_-]+", partial_name):
         raise RuntimeError(f"invalid template partial name: {partial_name}")
     if partial_name in seen:
         chain = " -> ".join((*seen, partial_name))
         raise RuntimeError(f"recursive template partial include: {chain}")
-    path = TEMPLATE_PARTIAL_ROOT / f"{partial_name}.md"
+    template_root = (source_root or ROOT) / "templates" / "agents"
+    path = template_root / "_partials" / f"{partial_name}.md"
     if not path.is_file():
         raise RuntimeError(f"template partial not found: {partial_name}")
     content = strip_dependency_manifest(path.read_text(encoding="utf-8"))
-    return expand_template_partials(content, (*seen, partial_name))
+    return expand_template_partials(content, (*seen, partial_name), source_root=source_root)
 
 
-def expand_template_partials(content: str, seen: tuple[str, ...] = ()) -> str:
+def expand_template_partials(
+    content: str,
+    seen: tuple[str, ...] = (),
+    *,
+    source_root: Path | None = None,
+) -> str:
     """Expand reusable partial markers in one template body."""
     return TEMPLATE_PARTIAL_RE.sub(
-        lambda match: render_template_partial(match.group(1), seen),
+        lambda match: render_template_partial(
+            match.group(1), seen, source_root=source_root
+        ),
         content,
     )
 
@@ -899,23 +957,41 @@ def apply_template_replacements(content: str, replacements: dict[str, str]) -> s
     return content
 
 
-def render_template(template_name: str, replacements: dict[str, str]) -> str:
+def render_template(
+    template_name: str,
+    replacements: dict[str, str],
+    *,
+    source_root: Path | None = None,
+) -> str:
     """Load and fill a text template from templates/agents."""
-    content = (TEMPLATE_ROOT / template_name).read_text(encoding="utf-8")
-    content = expand_template_partials(content)
+    template_root = (source_root or ROOT) / "templates" / "agents"
+    content = (template_root / template_name).read_text(encoding="utf-8")
+    content = expand_template_partials(content, source_root=source_root)
     content = apply_template_replacements(content, replacements)
     return content
 
 
-def has_template(artifact_name: str) -> bool:
+def render_code_template(template_name: str) -> str:
+    """互換 facade から package-safe code-template renderer を呼び出します."""
+    if __package__:
+        from .code_template_rendering import render_code_template as render_source
+    else:
+        from code_template_rendering import render_code_template as render_source
+    return render_source(template_name)
+
+
+def has_template(artifact_name: str, *, source_root: Path | None = None) -> bool:
     """Return whether a template exists for one artifact filename."""
-    return (TEMPLATE_ROOT / artifact_name).is_file()
+    template_root = (source_root or ROOT) / "templates" / "agents"
+    return (template_root / artifact_name).is_file()
 
 
 def required_output_templates_missing(
     config: TeamConfig,
     roles: tuple[Role, ...],
     allowed_missing: tuple[str, ...] = (),
+    *,
+    source_root: Path | None = None,
 ) -> tuple[str, ...]:
     """Return required output templates that are missing from templates/agents."""
     return tuple(
@@ -923,7 +999,8 @@ def required_output_templates_missing(
             output
             for role in roles
             for output in role.required_outputs
-            if output not in allowed_missing and not has_template(output)
+            if output not in allowed_missing
+            and not has_template(output, source_root=source_root)
         )
     )
 
@@ -943,12 +1020,14 @@ def write_initial_wave_execution_gate(spec: RunBundleSpec) -> None:
         active_subagents,
         spec.task_catalog,
         spec.agent_type_selections,
+        _required_spec_source_root(spec) / ".codex" / "agents",
     )
     if not initial_wave:
         return
     row = initial_wave_gate_fields(
         initial_wave=initial_wave,
         active_subagents=active_subagents,
+        runtime_root=spec.workspace_root,
     )
     append_markdown_section_line(
         spec.report_dir / "schedule.md",
@@ -962,10 +1041,43 @@ def write_initial_wave_execution_gate(spec: RunBundleSpec) -> None:
     )
 
 
+def initial_wave_execution_gate_lines(
+    spec: RunBundleSpec,
+) -> tuple[tuple[str, str, str], ...]:
+    """Return the initial-wave lines without writing a report artifact."""
+    if not spec.workflow_family_id:
+        return ()
+    if spec.task_catalog is None:
+        raise RuntimeError("task catalog is required for initial wave materialization")
+    active_subagents, _max_write_subagents = workflow_spawn_budget(
+        spec.task_catalog,
+        spec.workflow_family_id,
+    )
+    initial_wave = recommended_initial_subagent_wave(
+        spec.roles,
+        active_subagents,
+        spec.task_catalog,
+        spec.agent_type_selections,
+        _required_spec_source_root(spec) / ".codex" / "agents",
+    )
+    if not initial_wave:
+        return ()
+    row = initial_wave_gate_fields(
+        initial_wave=initial_wave,
+        active_subagents=active_subagents,
+        runtime_root=spec.workspace_root,
+    )
+    return (
+        ("schedule.md", "## Agent Wave Ledger", schedule_wave_row(row)),
+        ("workflow_monitoring.md", "## Actual Wave Events", workflow_wave_event_line(row)),
+    )
+
+
 def initial_wave_gate_fields(
     *,
     initial_wave: tuple[str, ...],
     active_subagents: int,
+    runtime_root: Path = ROOT,
 ) -> dict[str, str]:
     """Return one schedule/monitor row for a parent-executed WAVE-1 gate."""
     skipped_roles = ",".join(initial_wave) + ":pending_explicit_runtime_spawn_authority"
@@ -977,8 +1089,8 @@ def initial_wave_gate_fields(
         "trigger": "bootstrap_initial_intake_wave",
         "budget_before": active_budget,
         "budget_after": active_budget,
-        "runtime_max_threads": str(codex_runtime_max_threads()),
-        "runtime_max_depth": str(codex_runtime_max_depth()),
+        "runtime_max_threads": str(codex_runtime_max_threads(runtime_root)),
+        "runtime_max_depth": str(codex_runtime_max_depth(runtime_root)),
         "spawned_roles": "none",
         "role_instances": "none",
         "skipped_roles": skipped_roles,
@@ -1046,7 +1158,21 @@ def append_markdown_section_line(path: Path, heading: str, line: str) -> None:
         while insert_at > 0 and not lines[insert_at - 1].strip():
             insert_at -= 1
         lines.insert(insert_at, line)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    rendered = ("\n".join(lines) + "\n").encode("utf-8")
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="manifest-rendering")
+        )
+        ParentRootSideEffectBoundary().write_parent_owned_file(
+            attestation, path, rendered, "manifest-rendering"
+        )
+        return
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        "manifest-rendering: explicit parent root is required",
+    )
 
 
 def build_manifest(
@@ -1094,6 +1220,7 @@ def manifest_run_lines(
             workflow_family=workflow_family,
         )
     )
+    source_root = _required_spec_source_root(spec)
     lines = [
         "run:",
         f"  id: {spec.run_id}",
@@ -1102,9 +1229,9 @@ def manifest_run_lines(
         f"  created_at_utc: {spec.created_at_iso}",
         f"  report_dir: {str(spec.report_dir)!r}",
         f"  workspace_root: {str(spec.workspace_root)!r}",
-        f"  team_config: {str(TEAM_CONFIG_PATH)!r}",
-        f"  team_runtime: {str(ROOT / 'tools' / 'agent_tools' / 'agent_team.py')!r}",
-        f"  task_catalog: {str(ROOT / str(spec.config.team['task_catalog']))!r}",
+        f"  team_config: {str(source_root / 'agents' / 'agents_config.json')!r}",
+        f"  team_runtime: {str(source_root / 'tools' / 'agent_tools' / 'agent_team.py')!r}",
+        f"  task_catalog: {str(source_root / str(spec.config.team['task_catalog']))!r}",
         "  active_design_packet:",
     ]
     packet_yaml = yaml.safe_dump(
@@ -1135,7 +1262,7 @@ def manifest_run_lines(
             "    profile_registry_import: 'tools.agent_tools.model_profile_registry'",
             "    dispatch: 'immediate_one_pass'",
             "    same_spark_gap_continuation: 'resume_same_spark_after_gap'",
-            "    deterministic_search_route: 'python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json'",
+            f"    deterministic_search_route: {public_command_for_spec(spec, 'python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json')!r}",
             "  capacity_request:",
         ]
     )
@@ -1181,10 +1308,10 @@ def manifest_run_lines(
             "    broad_cross_cutting_packet: available_not_default_read",
             "  implementation_gate_defaults:",
             "    implementation_surface_route_status: pending",
-            "    implementation_surface_route_command: 'python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json'",
+            f"    implementation_surface_route_command: {public_command_for_spec(spec, 'python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json')!r}",
             "    tool_reuse_ledger_status: required_before_custom_implementation",
             "    pre_edit_rejection_prediction_status: pending",
-            "    pre_edit_rejection_command: 'python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>'",
+            f"    pre_edit_rejection_command: {public_command_for_spec(spec, 'python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>')!r}",
             "  standard_wave_sequence:",
             "    activation: candidate_sequence_selected_per_wave",
             f"    source: {STANDARD_AGENT_WAVE_SEQUENCE_SOURCE!r}",
@@ -1195,14 +1322,17 @@ def manifest_run_lines(
             *manifest_user_facing_language_policy_lines(),
             *manifest_contract_complete_implementation_policy_lines(spec.task),
             *manifest_pre_handoff_scope_policy_lines(),
-            *manifest_pre_handoff_gate_status_lines(active_design_packet),
+            *manifest_pre_handoff_gate_status_lines(
+                active_design_packet,
+                layout=getattr(spec.repository_roots, "layout", "standalone"),
+            ),
             *manifest_decision_sufficiency_lines(spec),
             *manifest_repo_tool_routing_policy_lines(spec),
             *manifest_default_quality_check_policy_lines(spec),
             "  agent_report_collection:",
-            "    status_command: 'python3 tools/agent_tools/runtime_log_archive_git.py status'",
-            f"    archive_current_run_command: 'python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir {spec.report_dir}'",
-            "    sync_command: 'python3 tools/agent_tools/runtime_log_archive_git.py sync'",
+            f"    status_command: {public_command_for_spec(spec, 'python3 tools/agent_tools/runtime_log_archive_git.py status')!r}",
+            f"    archive_current_run_command: {public_command_for_spec(spec, f'python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir {spec.report_dir}')!r}",
+            f"    sync_command: {public_command_for_spec(spec, 'python3 tools/agent_tools/runtime_log_archive_git.py sync')!r}",
             "    archive_index: '.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl'",
         ]
     )
@@ -1222,7 +1352,7 @@ def manifest_run_lines(
     communication_protocol = spec.config.team.get("communication_protocol")
     if communication_protocol is not None:
         lines.append(
-            f"  communication_protocol: {str(ROOT / str(communication_protocol))!r}"
+            f"  communication_protocol: {str(source_root / str(communication_protocol))!r}"
         )
     if workflow_family is not None:
         if spec.task_catalog is None:
@@ -1237,8 +1367,12 @@ def manifest_run_lines(
         )
         lines.append(f"    active_subagents: {active_subagents}")
         lines.append(f"    max_write_subagents: {max_write_subagents}")
-        lines.append(f"    runtime_max_threads: {codex_runtime_max_threads()}")
-        lines.append(f"    runtime_max_depth: {codex_runtime_max_depth()}")
+        lines.append(
+            f"    runtime_max_threads: {codex_runtime_max_threads(spec.workspace_root)}"
+        )
+        lines.append(
+            f"    runtime_max_depth: {codex_runtime_max_depth(spec.workspace_root)}"
+        )
         lines.append("    initial_three_agent_intake_is_total_cap: false")
         lines.append("    max_write_subagents_scope: 'write-capable subagents only'")
         initial_wave = recommended_initial_subagent_wave(
@@ -1246,6 +1380,7 @@ def manifest_run_lines(
             active_subagents,
             spec.task_catalog,
             spec.agent_type_selections,
+            _required_spec_source_root(spec) / ".codex" / "agents",
         )
         expansion_wave_slots = recommended_dynamic_expansion_wave_slots(
             spec.roles,
@@ -1253,6 +1388,7 @@ def manifest_run_lines(
             initial_wave,
             spec.task_catalog,
             spec.agent_type_selections,
+            _required_spec_source_root(spec) / ".codex" / "agents",
         )
         lines.append("  spawn_wave_recommendation:")
         lines.append(
@@ -1308,7 +1444,7 @@ def manifest_run_lines(
             "    runtime_depth_ceiling_source: 'run.spawn_budget.runtime_max_depth'"
         )
         lines.append(
-            f"    wave_record_command: {subagent_wave_record_command(spec.report_dir)!r}"
+            f"    wave_record_command: {subagent_wave_record_command(spec.report_dir, layout=getattr(spec.repository_roots, 'layout', 'standalone'))!r}"
         )
         lines.append("    expansion_triggers:")
         lines.append("      - new_independent_stage")
@@ -1319,7 +1455,9 @@ def manifest_run_lines(
         lines.append("    validation_failure_triage_policy:")
         lines.append(f"      trigger: {VALIDATION_FAILURE_TRIAGE_TRIGGER}")
         lines.append("      triage_write_scope: read_only_until_cause_identified")
-        validation_policy = validation_failure_response_policy()
+        validation_policy = validation_failure_response_policy(
+            spec.agentcanon_source_root
+        )
         lines.append(f"      taxonomy_source: {validation_policy['taxonomy_source']}")
         lines.append("      repair_required_fields:")
         for field in cast("tuple[str, ...]", validation_policy["required_fields"]):
@@ -1434,7 +1572,10 @@ def manifest_run_lines(
         lines.append(f"    name: {str(workflow_family['name'])!r}")
         lines.extend(render_subagent_prompt_packet(workflow_family, indent="  "))
     lines.append("  cross_cutting_document_packet:")
-    cross_cutting_packet = resolve_cross_cutting_document_packet(spec.workspace_root)
+    cross_cutting_packet = resolve_cross_cutting_document_packet(
+        spec.workspace_root,
+        _required_spec_source_root(spec),
+    )
     for entry in cross_cutting_packet:
         lines.append(f"    - path: {str(entry.path)!r}")
         lines.append(f"      rationale: {entry.rationale!r}")
@@ -1522,8 +1663,15 @@ def manifest_pre_handoff_scope_policy_lines() -> list[str]:
 
 def manifest_pre_handoff_gate_status_lines(
     active_design_packet: ActiveDesignPacketConfig,
+    *,
+    layout: str = "standalone",
 ) -> list[str]:
     """Render the pre-handoff gate status contract."""
+    design_projection = project_public_command_for_layout(
+        "python3 tools/agent_tools/waterfall_gate_check.py --report-dir <report-dir> --gate design",
+        layout=layout,
+    )
+    design_command = shlex.join(design_projection.public_argv)
     lines = [
         "  pre_handoff_gate_status:",
         "    enabled: true",
@@ -1535,7 +1683,7 @@ def manifest_pre_handoff_gate_status_lines(
         lines.append(f"      - {field}")
     lines.extend(
         [
-            "    design_gate_command: 'python3 tools/agent_tools/waterfall_gate_check.py --report-dir <report-dir> --gate design'",
+            f"    design_gate_command: {design_command!r}",
             "    applies_when: "
             f"run.active_design_packet.design_artifact={active_design_packet.design_artifact};"
             "condition=exists_before_implementation_or_handoff",
@@ -1550,9 +1698,11 @@ def manifest_repo_tool_routing_policy_lines(spec: RunBundleSpec) -> list[str]:
     selected_skills = spec.selected_skills or suggested_public_skills(
         None,
         spec.workflow_family_id or None,
+        source_root=_required_spec_source_root(spec),
     )
     skill_names = selected_skill_names(selected_skills)
-    dynamic_candidates = dynamic_skill_candidate_names(selected_skills)
+    source_root = _required_spec_source_root(spec)
+    dynamic_candidates = dynamic_skill_candidate_names(selected_skills, source_root)
     lines = [
         "  repo_tool_routing_policy:",
         "    enabled: true",
@@ -1585,7 +1735,7 @@ def manifest_repo_tool_routing_policy_lines(spec: RunBundleSpec) -> list[str]:
     else:
         lines.append("        - none")
     lines.append("    sequential_tool_routes:")
-    for packet in selected_skill_command_packets(selected_skills):
+    for packet in selected_skill_command_packets(selected_skills, source_root):
         lines.extend(manifest_one_skill_tool_route_lines(packet))
     return lines
 
@@ -1730,7 +1880,7 @@ def manifest_default_quality_check_policy_lines(spec: RunBundleSpec) -> list[str
         lines.append("      default_review_pack_ids: []")
     lines.append("    static_check_commands:")
     for command in DEFAULT_QUALITY_CHECK_STATIC_COMMANDS:
-        lines.append(f"      - {command!r}")
+        lines.append(f"      - {public_command_for_spec(spec, command)!r}")
     return lines
 
 
@@ -1866,6 +2016,7 @@ def manifest_document_packet_lines(
         spec.report_dir,
         spec.workspace_root,
         active_design_packet,
+        _required_spec_source_root(spec),
     )
     lines = ["    document_packet:"]
     lines.append(

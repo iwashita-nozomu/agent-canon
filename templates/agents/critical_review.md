@@ -1,4 +1,4 @@
-# Critical Review
+# Critical Review（批判的レビュー）
 <!--
 @dependency-start
 contract template
@@ -12,15 +12,18 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
-## Ship Blockers
+{{>reader_map}}
+{{>review_contract}}
+
+## Ship Blockers（出荷を止める指摘）
 
 | Area | Finding | Severity | Status |
 | ---- | ------- | -------- | ------ |
 
-## Testing And Dependency Gaps
+## Testing And Dependency Gaps（検証と依存関係の不足）
 
-<!-- Record missing validation, unsafe rollout assumptions, or dependency conflicts. -->
+<!-- 不足している validation、安全でない rollout 仮定、dependency conflict を記録します。 -->
 
-## Follow-Up
+## Follow-Up（後続対応）
 
-<!-- Record non-blocking architecture, security, or implementation gap follow-up work. -->
+<!-- blocking ではない architecture、security、implementation gap の後続作業を記録します。 -->

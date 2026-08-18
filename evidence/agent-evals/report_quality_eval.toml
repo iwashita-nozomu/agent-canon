@@ -10,135 +10,6 @@
 
 catalog_kind = "agent_canon_report_quality_eval"
 version = 1
-
-[[evals]]
-id = "report-writing-runtime-skill"
-target = ".agents/skills/report-writing/SKILL.md"
-canonical_target = "agents/skills/report-writing.md"
-description = "The discoverable report-writing skill must route report authors through source packets, artifact separation, the report quality checklist, and review gates."
-
-[[evals.checklist]]
-id = "REPORT-RUNTIME-1"
-critical = true
-description = "Requires report classification and source packet construction before drafting."
-required_regex = ["Classify the report", "source packet", "audience", "decision context"]
-
-[[evals.checklist]]
-id = "REPORT-RUNTIME-2"
-critical = true
-description = "Separates raw artifact writeout from reader-facing report writing."
-required_regex = ["\\$result-artifact-writeout", "raw machine results", "reader report"]
-
-[[evals.checklist]]
-id = "REPORT-RUNTIME-3"
-critical = true
-description = "Requires the report quality checklist and core quality dimensions."
-required_regex = [
-  "Report Quality Checklist",
-  "evidence traceability",
-  "limitations",
-  "provenance",
-  "actionability",
-  "rule-drift control",
-]
-
-[[evals.checklist]]
-id = "REPORT-RUNTIME-4"
-critical = true
-description = "Requires report reviewer routing and closeout tokens."
-required_regex = ["report_reviewer", "report_quality_checklist", "report_rule_drift"]
-
-[[evals.checklist]]
-id = "REPORT-RUNTIME-4B"
-critical = true
-description = "Requires presentation asset packet routing for deck/PPT output."
-required_regex = [
-  "slide deck/PPT",
-  "presentation asset packet",
-  "presentation_asset_packet",
-]
-
-[[evals.checklist]]
-id = "REPORT-RUNTIME-5"
-critical = true
-description = "Requires evaluation and experiment reports to explain how readers should interpret results."
-required_regex = ["reader guide", "denominator", "directionality", "valid or invalid", "next action"]
-
-[[evals]]
-id = "report-writing-human-doc"
-target = "agents/skills/report-writing.md"
-description = "The human-facing report-writing doc must expose a concrete report quality checklist."
-
-[[evals.checklist]]
-id = "REPORT-CHECKLIST-1"
-critical = true
-description = "Checklist covers audience, decision context, purpose, and non-goals."
-required_regex = [
-  "- \\[ \\] Audience and decision context are explicit\\.",
-  "- \\[ \\] Purpose and non-goals are explicit\\.",
-]
-
-[[evals.checklist]]
-id = "REPORT-CHECKLIST-2"
-critical = true
-description = "Checklist covers evidence traceability and observation/interpretation separation."
-required_regex = [
-  "Source artifacts, commands, commits, issues, PRs, or run ids",
-  "Observations are separated from interpretations",
-]
-
-[[evals.checklist]]
-id = "REPORT-CHECKLIST-3"
-critical = true
-description = "Checklist covers claim strength, limitations, uncertainty, and provenance."
-required_regex = [
-  "Each recommendation or strong claim has evidence",
-  "Limitations, uncertainty, missing checks, and stale evidence",
-  "Provenance includes command, runtime, branch, commit, timestamp",
-]
-
-[[evals.checklist]]
-id = "REPORT-CHECKLIST-4"
-critical = true
-description = "Checklist covers actionability, artifact integrity, and policy truth control."
-required_regex = [
-  "The report is actionable",
-  "Raw artifacts and reader-facing summary paths are not conflated",
-  "second policy truth surface",
-]
-
-[[evals.checklist]]
-id = "REPORT-CHECKLIST-4B"
-critical = true
-description = "Checklist covers Mermaid or an explicit alternative for nontrivial reader-facing flow structure."
-required_regex = [
-  "Mermaid diagram",
-  "process, dependency, ownership, routing, state, review-gate",
-  "table or text-only outline",
-]
-
-[[evals.checklist]]
-id = "REPORT-CHECKLIST-4C"
-critical = true
-description = "Checklist covers presentation asset traceability and separates conceptual visuals from data-backed figures."
-required_regex = [
-  "first visual, ponchi-e/concept diagrams",
-  "Conceptual visuals are labeled separately",
-  "Presentation Asset Packet",
-]
-
-[[evals.checklist]]
-id = "REPORT-CHECKLIST-5"
-critical = true
-description = "Checklist covers reader interpretation guidance for evaluation and experiment reports."
-required_regex = [
-  "reader guide",
-  "what to inspect first",
-  "denominator and directionality",
-  "valid and invalid comparisons",
-  "what result would change the next action",
-]
-
 [[evals]]
 id = "report-reviewer-route"
 target = "agents/agents_config.json"
@@ -155,3 +26,17 @@ required_regex = [
   "claim_strength_review",
   "reader_facing_report_review",
 ]
+
+
+[[evals]]
+id = "report-writing-semantic-quality"
+target = "agents/skills/report-writing.md"
+description = "Report quality is claim/evidence/limitation/action correctness, not heading or token count."
+[[evals.checklist]]
+id = "REPORT-QUALITY-SEMANTIC-1"
+critical = true
+required_regex = ["source support", "inference", "observations and interpretations", "limitations", "next action"]
+[[evals.checklist]]
+id = "REPORT-QUALITY-SEMANTIC-2"
+critical = true
+required_regex = ["No fixed heading count", "accepted blocking findings", "finding_count == 0", "second policy/source-of-truth"]

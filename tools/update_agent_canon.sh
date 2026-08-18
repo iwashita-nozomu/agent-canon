@@ -2,11 +2,15 @@
 # @dependency-start
 # contract tool
 # responsibility Provides GitHub-first AgentCanon submodule update automation.
+# upstream design ../documents/agent-canon/agent-canon-update-route.md owns update materialization acceptance and publication order.
 # upstream design ../documents/contracts/github-first-module-and-devcontainer-policy.md defines GitHub-first module policy.
-# upstream design ../documents/rule/dependency-module-changes.md defines independent source-clone and clean projection policy.
+# upstream design ../documents/rule/repository-topic-clone.md owns the generic topic-clone lifecycle.
+# upstream design ../documents/rule/dependency-module-changes.md decorates that lifecycle with pin/projection policy.
 # upstream design ../documents/agent-canon/agent-canon-github-remote.md defines the canonical AgentCanon GitHub remote.
 # upstream implementation ./sync_agent_canon.sh performs low-level submodule freshness and root-view synchronization.
+# upstream implementation ./agent_tools/attach_clean_detached_submodule.py safely attaches a reconstructible detached parent submodule before planning/apply.
 # upstream implementation ./agent_tools/update_lifecycle_contract.py owns queue/frontier receipt mechanics and guards.
+# upstream implementation ./agent_tools/source_projection_handoff.py materializes the sole source-publication packet in the parent owner namespace.
 # upstream implementation ./rebuild_agent_tools.sh rebuilds compiled AgentCanon tools after safe updates.
 # downstream implementation ./agent_tools/agent_canon_update_todos.py advances parent-repo AgentCanon update TODO state after safe updates.
 # downstream implementation ../tests/tools/test_update_agent_canon.py validates update wrapper behavior.
@@ -17,9 +21,89 @@ export GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_DIR}/lib/repo_paths.sh"
+source "${SCRIPT_DIR}/lib/update_materialization.sh"
 source "${SCRIPT_DIR}/lib/git_authority.sh"
 ROOT_DIR="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
-CANON_TOOLS_ROOT="$(agent_canon_tools_root "$ROOT_DIR")"
+CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$ROOT_DIR")"
+AGENT_CANON_SOURCE_ROOT="$(git -C "${CANON_TOOLS_ROOT}" rev-parse --show-toplevel)"
+PARENT_ROOT_DIR="${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}"
+PARENT_ROOT_DIR="$(cd "${PARENT_ROOT_DIR}" && pwd -P)"
+AGENT_CANON_BOUNDARY_SCRIPT="${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py"
+
+if [[ "${PARENT_ROOT_DIR}" != "${ROOT_DIR}" \
+  && "${AGENT_CANON_CHILD_PURPOSE:-}" != "agent-canon-update-script" ]]; then
+  echo "AGENT_CANON_UPDATE_PARENT_HANDOFF=missing" >&2
+  echo "AGENT_CANON_UPDATE_PARENT_ROOT=${PARENT_ROOT_DIR}" >&2
+  echo "AGENT_CANON_UPDATE_SOURCE_ROOT=${AGENT_CANON_SOURCE_ROOT}" >&2
+  exit 2
+fi
+if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "agent-canon-update-script" ]]; then
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" verify-child \
+    --root "${PARENT_ROOT_DIR}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose agent-canon-update-script \
+    --consume >/dev/null
+else
+  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${PARENT_ROOT_DIR}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose agent-canon-update-script \
+    --issue-handoff \
+    -- bash "${BASH_SOURCE[0]}" "$@"
+fi
+unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
+
+CANON_PARENT_TMP_CANDIDATE="${AGENT_CANON_PARENT_TMPDIR:-$PARENT_ROOT_DIR/.agent-canon/tmp/update}"
+CANON_PARENT_TMPDIR="$(python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+  ensure-dir --root "$PARENT_ROOT_DIR" --candidate "$CANON_PARENT_TMP_CANDIDATE" --purpose agent-canon-update)"
+export TMPDIR="$CANON_PARENT_TMPDIR"
+parent_ensure_dir() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    ensure-dir --root "$PARENT_ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-update}"
+}
+parent_temp_dir() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    temp-dir --root "$PARENT_ROOT_DIR" --candidate "$1" --prefix "$2" --purpose "${3:-agent-canon-update}"
+}
+parent_write_file() {
+  local candidate="$1" content="${2-}"
+  printf '%s' "$content" | python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    write --root "$PARENT_ROOT_DIR" --candidate "$candidate" --purpose "${3:-agent-canon-update}" >/dev/null
+}
+parent_remove_file() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    remove-file --root "$PARENT_ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-update}" >/dev/null
+}
+parent_remove_tree() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    remove-tree --root "$PARENT_ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-update}" >/dev/null
+}
+parent_copy_file() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    copy --root "$PARENT_ROOT_DIR" --source "$1" --candidate "$2" --purpose "${3:-agent-canon-update}" >/dev/null
+}
+parent_move_path() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    move --root "$PARENT_ROOT_DIR" --source "$1" --candidate "$2" --purpose "${3:-agent-canon-update}" >/dev/null
+}
+parent_symlink() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    symlink --root "$PARENT_ROOT_DIR" --target "$1" --candidate "$2" --purpose "${3:-agent-canon-update}" >/dev/null
+}
+parent_read_presence() {
+  local candidate="$1" purpose="${2:-agent-canon-update}"
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    read-presence --root "$PARENT_ROOT_DIR" --candidate "$candidate" --purpose "$purpose"
+}
+run_parent_bound_sync() {
+  AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${PARENT_ROOT_DIR}" \
+    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${PARENT_ROOT_DIR}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose agent-canon-sync-script \
+    --issue-handoff \
+    -- bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" "$@"
+}
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 SUPERPROJECT_DIR=""
 if [ "$(git -C "$ROOT_DIR" config -f .gitmodules --get "submodule.${PREFIX}.path" 2>/dev/null || true)" = "$PREFIX" ] \
@@ -28,6 +112,7 @@ if [ "$(git -C "$ROOT_DIR" config -f .gitmodules --get "submodule.${PREFIX}.path
 fi
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
 PROTECTED_GIT_NEXT_ACTION="request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason"
+BRANCH_WORKTREE_NEXT_ACTION="request_branch_or_worktree_creation_authority_then_rerun_same_command_with_inline_git_authority_and_reason"
 COMMIT_AUTOMATION_AUTHOR_NAME="AgentCanon Sync Automation"
 COMMIT_AUTOMATION_AUTHOR_EMAIL="agent-canon-sync@automation.invalid"
 COMMIT_PROVENANCE_NEXT_ACTION="set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex> and rerun the same command"
@@ -38,11 +123,12 @@ else
   AGENT_CANON_SOURCE_MODE="standalone_source"
   AGENT_CANON_DIR="$ROOT_DIR"
 fi
-UPDATE_OWNER_NAMESPACE="$ROOT_DIR/.agent-canon/update-lifecycle"
+UPDATE_OWNER_NAMESPACE="$PARENT_ROOT_DIR/.agent-canon/update-lifecycle"
 UPDATE_STATE_DIR="$UPDATE_OWNER_NAMESPACE/state"
 UPDATE_EVIDENCE_DIR="$UPDATE_OWNER_NAMESPACE/evidence"
 UPDATE_PROJECTION_DIR="$UPDATE_OWNER_NAMESPACE/projection-queue"
 SOURCE_PROJECTION_PACKET="$UPDATE_STATE_DIR/source-publication-ready.json"
+SOURCE_PROJECTION_HANDOFF="${AGENT_CANON_SOURCE_PROJECTION_HANDOFF:-}"
 
 usage() {
   cat <<EOF
@@ -52,7 +138,6 @@ Usage:
   AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh apply [branch]
   bash tools/update_agent_canon.sh rebuild-tools
   AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh merge-main-into-current [branch]
-  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty [branch]
   bash tools/update_agent_canon.sh status
 
 Commands:
@@ -68,11 +153,8 @@ Commands:
   rebuild-tools
       Rebuild compiled AgentCanon tools from the currently checked-out source.
   merge-main-into-current
-      Fetch AgentCanon main and merge it into the current source branch.
-      Parent projection mode uses the parent vendor source owner.
-  merge-main-into-current-preserve-dirty
-      Standalone source mode only. Parent projection mode uses the current
-      parent source owner with dirty-worktree preservation when safe.
+      Fetch AgentCanon main and merge it into the current source branch while
+      preserving non-colliding local uncommitted paths in place.
   status
       Print low-level AgentCanon submodule/root-view status.
 
@@ -88,132 +170,12 @@ die() {
   exit 1
 }
 
-classify_parent_vendor_source() {
-  local requested_topic="${1:-${AGENT_CANON_TOPIC_SLUG:-}}"
-  local current_branch=""
-  local source_head=""
-  local parent_prefix_head=""
-  local source_status=""
-  local fallback_topic=""
-  local workspace_root=""
-
-  if [ "$AGENT_CANON_SOURCE_MODE" != "parent_projection" ]; then
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=standalone_source"
-    return 0
-  fi
-
-  current_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
-  source_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD 2>/dev/null || true)"
-  source_status="$(git -C "$ROOT_DIR/$PREFIX" status --short --untracked-files=all 2>/dev/null || true)"
-  parent_prefix_head="$(git -C "$ROOT_DIR" rev-parse ":$PREFIX" 2>/dev/null || true)"
-
-  if [ -n "$source_status" ]; then
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=dirty_worktree"
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_BRANCH=${current_branch:-<detached>}"
-    echo "AGENT_CANON_PARENT_PREFIX_HEAD=$parent_prefix_head"
-    if [ -z "$requested_topic" ]; then
-      echo "AGENT_CANON_PARENT_TOPIC_IDENTITY=required"
-      echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-      echo "NEXT_ACTION=topic_identity_required"
-      return 2
-    fi
-
-    if [ "$requested_topic" = "$DEFAULT_BRANCH" ] || [ "$requested_topic" = "main" ]; then
-      echo "AGENT_CANON_PARENT_TOPIC_IDENTITY=invalid_default_branch"
-      echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-      echo "NEXT_ACTION=topic_identity_required"
-      return 2
-    fi
-
-    if [ -n "$current_branch" ] && [ "$requested_topic" = "$current_branch" ]; then
-      echo "AGENT_CANON_PARENT_TOPIC_IDENTITY=$requested_topic"
-      echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-      echo "NEXT_ACTION=materialize_current_vendor_topic_commit_push_pr_then_resume"
-      return 2
-    fi
-
-    fallback_topic="$(sanitize_ref_component "$requested_topic")"
-    if [ "$fallback_topic" = "$DEFAULT_BRANCH" ] || [ "$fallback_topic" = "main" ]; then
-      echo "AGENT_CANON_PARENT_TOPIC_IDENTITY=invalid_default_branch"
-      echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-      echo "NEXT_ACTION=topic_identity_required"
-      return 2
-    fi
-    workspace_root="$(dirname "$ROOT_DIR")/workspace/$fallback_topic/agent-canon"
-    echo "AGENT_CANON_PARENT_TOPIC_IDENTITY=$requested_topic"
-    echo "AGENT_CANON_PARENT_BRANCH_SOURCE_CLONE_PATH=$workspace_root"
-    echo "AGENT_CANON_DEPENDENCY_MODULE_ROUTE=documents/rule/dependency-module-changes.md"
-    echo "AGENT_CANON_DEPENDENCY_MODULE_TOOL=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic $fallback_topic --module $PREFIX --branch <source-branch> --owner-evidence <owner-evidence>"
-    echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-    echo "NEXT_ACTION=materialize_vendor_topic_commit_push_pr_or_use_workspace_fallback"
-    return 2
-  fi
-
-  if [ -z "$source_head" ] || [ -z "$current_branch" ]; then
-    if [ -n "$source_head" ]; then
-      echo "AGENT_CANON_PARENT_VENDOR_SOURCE_HEAD=$source_head"
-    else
-      echo "AGENT_CANON_PARENT_VENDOR_SOURCE_HEAD=<unknown>"
-    fi
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=detached_head"
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_BRANCH=<detached>"
-    echo "AGENT_CANON_PARENT_PIN_STATUS=unusable_state"
-    echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-    echo "NEXT_ACTION=request_user_direction_preserve_current_checkout_then_rerun_with_inline_git_authority_and_reason"
-    return 3
-  fi
-
-  if [ "$current_branch" = "$DEFAULT_BRANCH" ]; then
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=default_branch"
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_BRANCH=$current_branch"
-    echo "AGENT_CANON_PARENT_PIN_STATUS=needs_topic_branch"
-    echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-    echo "NEXT_ACTION=checkout_or_create_topic_branch_from_$DEFAULT_BRANCH"
-    return 1
-  fi
-
-  if [ -z "$parent_prefix_head" ] || [ "$source_head" != "$parent_prefix_head" ]; then
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=pin_mismatch"
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_BRANCH=$current_branch"
-    echo "AGENT_CANON_PARENT_VENDOR_PIN=$parent_prefix_head"
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_HEAD=$source_head"
-    echo "AGENT_CANON_DEPENDENCY_MODULE_ROUTE=documents/rule/dependency-module-changes.md"
-    echo "AGENT_CANON_DEPENDENCY_MODULE_TOOL=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic ${current_branch} --module $PREFIX --branch <source-branch> --owner-evidence <owner-evidence>"
-    echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-    echo "NEXT_ACTION=materialize_vendor_topic_commit_push_pr_or_use_workspace_fallback"
-    return 2
-  fi
-
-  echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=clean_topic_branch"
-  echo "AGENT_CANON_PARENT_VENDOR_SOURCE_BRANCH=$current_branch"
-  echo "AGENT_CANON_PARENT_PREFIX_HEAD=$parent_prefix_head"
-  echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=allowed"
-  return 0
-}
-
-require_protected_git_authority() {
+protected_git_authority_failure() {
   local mode="$1"
-  if git_authority_check_protected_git_authority "$mode"; then
-    return 0
-  fi
-
-  echo "DESTRUCTIVE_GIT_GUARD=block"
-  echo "BRANCH_WORKTREE_CREATION_GUARD=block"
-  echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
-  echo "NEXT_ACTION=$PROTECTED_GIT_NEXT_ACTION"
-  die "protected AgentCanon update requires same-command branch/worktree and explicit destructive approval authority"
-}
-
-require_commit_request_evidence() {
-  local mode="$1"
-  if git_authority_check_commit_request_evidence; then
-    return 0
-  fi
-
-  echo "COMMIT_PROVENANCE_GUARD=block"
-  echo "AGENT_CANON_COMMIT_PROVENANCE_SUBCOMMAND=$mode"
-  echo "NEXT_ACTION=$COMMIT_PROVENANCE_NEXT_ACTION"
-  die "auto-commit requires AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>"
+  git_authority_emit_failure \
+    "$mode" "$PROTECTED_GIT_NEXT_ACTION" "$BRANCH_WORKTREE_NEXT_ACTION" \
+    "protected AgentCanon update requires same-command"
+  die "$GIT_AUTHORITY_FAILURE_DETAIL"
 }
 
 require_commit_provenance() {
@@ -223,11 +185,7 @@ require_commit_provenance() {
   fi
 
   if ! git_authority_check_protected_git_authority "$mode"; then
-    echo "DESTRUCTIVE_GIT_GUARD=block"
-    echo "BRANCH_WORKTREE_CREATION_GUARD=block"
-    echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
-    echo "NEXT_ACTION=$PROTECTED_GIT_NEXT_ACTION"
-    die "protected AgentCanon update requires same-command branch/worktree and explicit destructive approval authority"
+    protected_git_authority_failure "$mode"
   fi
 
   echo "COMMIT_PROVENANCE_GUARD=block"
@@ -296,199 +254,6 @@ submodule_remote_url() {
   git -C "$ROOT_DIR" config -f .gitmodules --get "submodule.${PREFIX}.url" 2>/dev/null || true
 }
 
-sanitize_ref_component() {
-  local raw="${1:-}"
-  raw="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
-  raw="$(printf '%s' "$raw" | sed -E 's#[^a-z0-9._/-]+#-#g; s#^[./-]+##; s#[./-]+$##; s#/{2,}#/#g; s#-+#-#g')"
-  if [[ -z "$raw" ]]; then
-    raw="detached"
-  fi
-  printf '%s\n' "$raw"
-}
-
-parent_repo_log_slug() {
-  local raw="${AGENT_CANON_LOG_REPO_SLUG:-}"
-  if [ -z "$raw" ]; then
-    raw="$(basename "$ROOT_DIR")"
-  fi
-  sanitize_ref_component "$raw"
-}
-
-status_porcelain_path() {
-  local line="$1"
-  local path="${line:3}"
-  case "$path" in
-    *" -> "*)
-      path="${path##* -> }"
-      ;;
-  esac
-  printf '%s\n' "$path"
-}
-
-is_accumulated_eval_result_path() {
-  case "$1" in
-    agents/evals/results/*)
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
-
-is_jsonl_eval_result_path() {
-  case "$1" in
-    agents/evals/results/*.jsonl|agents/evals/results/*/*.jsonl|agents/evals/results/*/*/*.jsonl|agents/evals/results/*/*/*/*.jsonl)
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
-
-stash_ref_for_sha() {
-  local stash_sha="$1"
-  git -C "$AGENT_CANON_DIR" stash list --format='%gd %H' \
-    | awk -v sha="$stash_sha" '$2 == sha {print $1; exit}'
-}
-
-drop_stash_sha_if_present() {
-  local stash_sha="$1"
-  local stash_ref=""
-  stash_ref="$(stash_ref_for_sha "$stash_sha")"
-  [ -n "$stash_ref" ] || return 0
-  git -C "$AGENT_CANON_DIR" stash drop "$stash_ref" >/dev/null
-}
-
-remove_eval_log_worktree() {
-  local worktree_path="$1"
-  local branch="$2"
-  if [ -n "$worktree_path" ] && [ -d "$worktree_path" ]; then
-    git -C "$AGENT_CANON_DIR" worktree remove --force "$worktree_path" >/dev/null 2>&1 || true
-  fi
-  if [ -n "$branch" ]; then
-    git -C "$AGENT_CANON_DIR" branch -D "$branch" >/dev/null 2>&1 || true
-  fi
-}
-
-resolve_eval_jsonl_conflicts() {
-  local worktree_root="$1"
-  local conflict_path=""
-  local tmp_dir=""
-  local unresolved=""
-
-  while IFS= read -r conflict_path; do
-    [ -n "$conflict_path" ] || continue
-    if ! is_jsonl_eval_result_path "$conflict_path"; then
-      echo "AGENT_CANON_EVAL_LOG_PARK_CONFLICT_UNSAFE=$conflict_path"
-      return 1
-    fi
-    tmp_dir="$(mktemp -d)"
-    git -C "$worktree_root" show ":2:$conflict_path" >"$tmp_dir/ours.jsonl" 2>/dev/null || true
-    git -C "$worktree_root" show ":3:$conflict_path" >"$tmp_dir/theirs.jsonl" 2>/dev/null || true
-    mkdir -p "$(dirname "$worktree_root/$conflict_path")"
-    awk 'NF && !seen[$0]++ { print }' "$tmp_dir/ours.jsonl" "$tmp_dir/theirs.jsonl" >"$worktree_root/$conflict_path"
-    rm -rf "$tmp_dir"
-    git -C "$worktree_root" add "$conflict_path"
-  done < <(git -C "$worktree_root" diff --name-only --diff-filter=U)
-
-  unresolved="$(git -C "$worktree_root" diff --name-only --diff-filter=U)"
-  [ -z "$unresolved" ]
-}
-
-park_eval_log_dirty_state_if_safe() {
-  local status_output=""
-  local line=""
-  local path=""
-  local current_branch=""
-  local current_head=""
-  local log_branch=""
-  local log_start_ref=""
-  local stash_sha=""
-  local apply_log=""
-  local apply_rc=0
-  local commit_sha=""
-  local tmp_worktree=""
-  local tmp_branch=""
-  local -a paths=()
-
-  ensure_agent_canon_submodule
-  status_output="$(git -C "$AGENT_CANON_DIR" status --porcelain=v1 --untracked-files=all)"
-  if [ -z "$status_output" ]; then
-    echo "AGENT_CANON_EVAL_LOG_PARK=clean"
-    return 0
-  fi
-
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    path="$(status_porcelain_path "$line")"
-    if ! is_accumulated_eval_result_path "$path"; then
-      echo "AGENT_CANON_EVAL_LOG_PARK=skipped_non_log_dirty"
-      echo "AGENT_CANON_EVAL_LOG_PARK_BLOCKING_PATH=$path"
-      return 1
-    fi
-    paths+=("$path")
-  done <<< "$status_output"
-
-  current_branch="$(git -C "$AGENT_CANON_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
-  current_head="$(git -C "$AGENT_CANON_DIR" rev-parse HEAD)"
-  log_branch="${AGENT_CANON_EVAL_LOG_BRANCH:-agent-logs/$(parent_repo_log_slug)}"
-  tmp_branch="agent-log-park/$(parent_repo_log_slug)/$(date -u +%Y%m%dT%H%M%SZ)-$$"
-
-  echo "AGENT_CANON_EVAL_LOG_PARK=started"
-  echo "AGENT_CANON_EVAL_LOG_PARK_BRANCH=$log_branch"
-  git -C "$AGENT_CANON_DIR" stash push -u -m "park eval logs before AgentCanon latest" -- "${paths[@]}" >/dev/null
-  stash_sha="$(git -C "$AGENT_CANON_DIR" rev-parse --verify refs/stash)"
-
-  git -C "$AGENT_CANON_DIR" fetch --no-write-fetch-head origin "$log_branch" >/dev/null 2>&1 || true
-  if git -C "$AGENT_CANON_DIR" show-ref --verify --quiet "refs/remotes/origin/$log_branch"; then
-    log_start_ref="origin/$log_branch"
-  elif git -C "$AGENT_CANON_DIR" show-ref --verify --quiet "refs/heads/$log_branch"; then
-    log_start_ref="$log_branch"
-  else
-    log_start_ref="$current_head"
-  fi
-  tmp_worktree="$(mktemp -d)"
-  git -C "$AGENT_CANON_DIR" worktree add -b "$tmp_branch" "$tmp_worktree" "$log_start_ref" >/dev/null
-
-  apply_log="$(mktemp)"
-  git -C "$tmp_worktree" stash apply "$stash_sha" >"$apply_log" 2>&1 || apply_rc=$?
-  if [ "$apply_rc" -ne 0 ]; then
-    if ! resolve_eval_jsonl_conflicts "$tmp_worktree"; then
-      cat "$apply_log" >&2
-      rm -f "$apply_log"
-      remove_eval_log_worktree "$tmp_worktree" "$tmp_branch"
-      return "$apply_rc"
-    fi
-  fi
-  rm -f "$apply_log"
-
-  git -C "$tmp_worktree" add -- "${paths[@]}"
-  if git -C "$tmp_worktree" diff --cached --quiet; then
-    echo "AGENT_CANON_EVAL_LOG_PARK=noop"
-    drop_stash_sha_if_present "$stash_sha"
-    remove_eval_log_worktree "$tmp_worktree" "$tmp_branch"
-    return 0
-  fi
-  GIT_AUTHOR_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
-  GIT_AUTHOR_EMAIL="$COMMIT_AUTOMATION_AUTHOR_EMAIL" \
-  GIT_COMMITTER_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
-  GIT_COMMITTER_EMAIL="$COMMIT_AUTOMATION_AUTHOR_EMAIL" \
-    git -C "$tmp_worktree" commit \
-    -m "Append $(parent_repo_log_slug) AgentCanon eval logs" \
-    --trailer "AgentCanon-Automation-Actor=agent-canon-sync" \
-    --trailer "AgentCanon-Authority-Source=${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY}" \
-    --trailer "AgentCanon-Destructive-Authority=${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY}" \
-    --trailer "AgentCanon-Request-Evidence=${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" >/dev/null
-  commit_sha="$(git -C "$tmp_worktree" rev-parse HEAD)"
-  git -C "$tmp_worktree" push -u origin "HEAD:refs/heads/$log_branch" >/dev/null
-  drop_stash_sha_if_present "$stash_sha"
-  remove_eval_log_worktree "$tmp_worktree" "$tmp_branch"
-  echo "AGENT_CANON_EVAL_LOG_PARK=committed"
-  echo "AGENT_CANON_EVAL_LOG_PARK_COMMIT=$commit_sha"
-}
-
 parent_pin() {
   if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
     git -C "$AGENT_CANON_DIR" rev-parse HEAD
@@ -523,19 +288,37 @@ emit_remote_main_ancestor_evidence() {
 plan_value() {
   local key="$1"
   local text="$2"
-  awk -F= -v key="$key" '$1 == key {print substr($0, index($0, "=") + 1); exit}' <<< "$text"
+  awk -F= -v key="$key" '$1 == key {print substr($0, index($0, "=") + 1)}' <<< "$text" | tail -n1
 }
 
 emit_agentcanon_conflict_workflow_route() {
   local reason="$1"
+  local current_checkout_block="no"
+
+  case "$reason" in
+    *route=submodule_materialization_collision*|*route=submodule_merge_conflict*|*route=unresolved_submodule_merge_conflict*|*materialization_collision*|*merge_conflict*)
+      current_checkout_block="yes"
+      ;;
+  esac
+
+  if [ "$current_checkout_block" = "yes" ]; then
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=blocked_current_checkout"
+    echo "AGENT_CANON_LATEST_BLOCK_SCOPE=current_checkout"
+    echo "AGENT_CANON_LATEST_BLOCK_REASON=$reason"
+    echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
+    echo "NEXT_ACTION=resolve_agentcanon_materialization_collision_or_merge_conflict_in_current_checkout_then_rerun_latest"
+    return
+  fi
+
   echo "AGENT_CANON_LATEST_TOOL_RESULT=agent_workflow_required"
   echo "AGENT_CANON_LATEST_BLOCK_REASON=$reason"
   echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
   if [ "$AGENT_CANON_SOURCE_MODE" = "parent_projection" ]; then
+    echo "AGENT_CANON_LATEST_CLONE_OWNER=tools/agent_tools/repository_topic_clone.py"
     echo "AGENT_CANON_LATEST_DEPENDENCY_ROUTE=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic <topic> --module $PREFIX --branch <source-branch> --owner-evidence <owner-evidence>"
-    echo "NEXT_ACTION=prepare_topic_workspace_source_clone"
+    echo "NEXT_ACTION=prepare_generic_repository_topic_clone_via_dependency_decorator"
   else
-    echo "AGENT_CANON_LATEST_CONFLICT_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty"
+    echo "AGENT_CANON_LATEST_CONFLICT_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh merge-main-into-current"
     echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest"
     echo "NEXT_ACTION=run_agentcanon_conflict_workflow"
   fi
@@ -544,81 +327,34 @@ emit_agentcanon_conflict_workflow_route() {
 route_requires_agent_workflow() {
   local route="$1"
   local prefix_mode="$2"
-  local dirty_update_surface="$3"
-  local submodule_worktree_status="$4"
 
   case "$route" in
-    submodule_detached|submodule_non_default_branch|local_contains_remote|diverged_submodule_history|diverged_local_history|snapshot_import_unsafe_tree_not_in_remote)
+    submodule_detached|submodule_detached_dirty|submodule_detached_nonpin|submodule_detached_requires_main|submodule_detached_invalid_stage0_gitlink|submodule_detached_main_descendant|submodule_detached_main_divergent|submodule_detached_main_worktree_collision|submodule_remote_resolution_failed|submodule_remote_object_unavailable|submodule_origin_main_fetch_failed|submodule_origin_main_mismatch|submodule_merge_conflict|submodule_materialization_collision|unresolved_submodule_merge_conflict)
       return 0
       ;;
     deferred_branch_pr)
       return 1
       ;;
-  esac
-  if [ "$prefix_mode" = "submodule" ] && [ "$submodule_worktree_status" = "dirty" ]; then
-    return 0
-  fi
-  if [ "$dirty_update_surface" = "yes" ]; then
-    case "$route" in
-      already_current_submodule|submodule_update)
+    local_contains_remote|diverged_submodule_history)
+      if [ "$prefix_mode" = "submodule" ]; then
         return 1
-        ;;
-      *)
-        return 0
-        ;;
-    esac
-  fi
-  return 1
-}
-
-can_preserve_dirty_agentcanon_latest() {
-  local route="$1"
-  local prefix_mode="$2"
-  local submodule_worktree_status="$3"
-
-  [ "$prefix_mode" = "submodule" ] || return 1
-  [ "$submodule_worktree_status" = "dirty" ] || return 1
-  case "$route" in
-    already_current_submodule|submodule_update|local_contains_remote|diverged_submodule_history|diverged_local_history|deferred_branch_pr)
+      fi
+      return 0
+      ;;
+    diverged_local_history|snapshot_import_unsafe_tree_not_in_remote)
       return 0
       ;;
   esac
   return 1
 }
 
-preserve_dirty_agentcanon_latest() {
+attach_reconstructible_detached_parent_submodule() {
   local branch="$1"
-  local route="$2"
-  local preserve_rc=0
-
-  echo "AGENT_CANON_LATEST_DIRTY_PRESERVE=started"
-  echo "AGENT_CANON_LATEST_DIRTY_PRESERVE_ROUTE=${route:-unknown}"
-  cmd_merge_main_into_current_preserve_dirty "$branch" || preserve_rc=$?
-  if [ "$preserve_rc" -ne 0 ]; then
-    echo "AGENT_CANON_LATEST_DIRTY_PRESERVE=failed"
-    echo "AGENT_CANON_LATEST_TOOL_RESULT=dirty_preserve_failed"
-    return "$preserve_rc"
+  if [ "$AGENT_CANON_SOURCE_MODE" != "parent_projection" ]; then
+    return 0
   fi
-  echo "AGENT_CANON_LATEST_DIRTY_PRESERVE=pass"
-  if ! bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" link-root; then
-    echo "AGENT_CANON_LATEST_ROOT_VIEW_REPAIR=failed"
-    echo "AGENT_CANON_LATEST_TOOL_RESULT=dirty_preserve_root_view_repair_failed"
-    echo "NEXT_ACTION=commit_or_stash_agentcanon_root_view_changes_then_rerun_make_agent-canon-ensure-latest AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>"
-    return 1
-  fi
-  echo "AGENT_CANON_LATEST_ROOT_VIEW_REPAIR=pass"
-  if ! bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" check; then
-    echo "AGENT_CANON_LATEST_SHARED_SURFACE_CHECK=failed"
-    echo "AGENT_CANON_LATEST_TOOL_RESULT=dirty_preserve_shared_surface_check_failed"
-    echo "NEXT_ACTION=repair_shared_surface_with_link-root_then_rerun_make_agent-canon-ensure-latest AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>"
-    return 1
-  fi
-  echo "AGENT_CANON_LATEST_SHARED_SURFACE_CHECK=pass"
-  echo "AGENT_CANON_LATEST_TOOL_RESULT=agent_workflow_preserved_dirty"
-  echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
-  echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest"
-  echo "NEXT_ACTION=continue_agentcanon_branch_PR_flow_with_restored_dirty_state"
-  return 0
+  python3 "$CANON_TOOLS_ROOT/agent_tools/attach_clean_detached_submodule.py" \
+    --root "$ROOT_DIR" --prefix "$PREFIX" --branch "$branch"
 }
 
 acknowledge_update_todos_if_available() {
@@ -632,17 +368,21 @@ acknowledge_update_todos_if_available() {
     return 0
   fi
 
-  todo_log="$(mktemp)"
-  if ! python3 "$todo_tool" plan --write >"$todo_log" 2>&1; then
+  todo_log_dir="$(parent_temp_dir "$CANON_PARENT_TMPDIR" todo-log)"
+  todo_log="$todo_log_dir/output"
+  local todo_output=""
+  if ! todo_output="$(python3 "$todo_tool" plan --write 2>&1)"; then
+    parent_write_file "$todo_log" "$todo_output"
     cat "$todo_log"
-    rm -f "$todo_log"
+    parent_remove_file "$todo_log"
     echo "AGENT_CANON_LATEST_TODOS=failed"
     echo "NEXT_ACTION=repair_agent_canon_update_todo_state_then_rerun_latest"
     return 1
   fi
+  parent_write_file "$todo_log" "$todo_output"
   cat "$todo_log"
   pending_count="$(awk -F= '/^AGENT_CANON_UPDATE_TODO_PENDING_COUNT=/{print $2}' "$todo_log")"
-  rm -f "$todo_log"
+  parent_remove_file "$todo_log"
 
   if [ "${pending_count:-0}" != "0" ]; then
     echo "AGENT_CANON_LATEST_TODOS=pending"
@@ -652,7 +392,7 @@ acknowledge_update_todos_if_available() {
   fi
 
   python3 "$todo_tool" acknowledge
-  if [ -f "$state_path" ]; then
+  if parent_read_presence "$state_path" agent-canon-update-state >/dev/null; then
     git -C "$ROOT_DIR" add "$state_path"
     if ! git -C "$ROOT_DIR" diff --cached --quiet -- "$state_path"; then
       GIT_AUTHOR_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
@@ -679,7 +419,51 @@ rebuild_agent_tools_if_available() {
     echo "AGENT_CANON_TOOL_REBUILD=skipped_missing_tool"
     return
   fi
-  bash "$rebuild_tool"
+  AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${PARENT_ROOT_DIR}" \
+    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+      --root "${PARENT_ROOT_DIR}" \
+      --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+      --purpose agent-canon-rebuild-script \
+      --issue-handoff \
+      -- bash "$rebuild_tool"
+}
+
+source_projection_lifecycle_complete() {
+  parent_read_presence "$UPDATE_STATE_DIR/current-transaction" update-lifecycle >/dev/null \
+    && parent_read_presence "$UPDATE_PROJECTION_DIR/queue.accepted.json" update-lifecycle >/dev/null \
+    && parent_read_presence "$UPDATE_PROJECTION_DIR/frontier.accepted.json" update-lifecycle >/dev/null \
+    && parent_read_presence "$UPDATE_EVIDENCE_DIR/g4.parent-projection-integrity.json" update-lifecycle >/dev/null
+}
+
+materialize_source_projection_handoff() {
+  local handoff="${SOURCE_PROJECTION_HANDOFF:-}"
+  if [ -z "$handoff" ]; then
+    return 0
+  fi
+  [ -f "$handoff" ] \
+    || die "source projection handoff input is missing: $handoff"
+  PYTHONPATH="$CANON_TOOLS_ROOT/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
+    python3 "$CANON_TOOLS_ROOT/agent_tools/source_projection_handoff.py" publish \
+      --root "$PARENT_ROOT_DIR" \
+      --input "$handoff" \
+      --output "$SOURCE_PROJECTION_PACKET"
+}
+
+ensure_source_projection_lifecycle() {
+  if source_projection_lifecycle_complete; then
+    return 0
+  fi
+  materialize_source_projection_handoff
+  if parent_read_presence "$SOURCE_PROJECTION_PACKET" source-projection >/dev/null; then
+    advance_source_projection
+  fi
+  if source_projection_lifecycle_complete; then
+    return 0
+  fi
+  echo "AGENT_CANON_PARENT_PROJECTION_BLOCKER=source_publication_handoff_missing" >&2
+  echo "AGENT_CANON_SOURCE_PROJECTION_PACKET=$SOURCE_PROJECTION_PACKET" >&2
+  echo "NEXT_ACTION=publish_source_projection_packet_via_canonical_source_front_door;manual_gitlink_or_receipt_copy_forbidden" >&2
+  die "parent projection blocked: source publication handoff is missing"
 }
 
 emit_queue_receipt() {
@@ -693,18 +477,25 @@ emit_queue_receipt() {
   local frontier_output="${8:-$UPDATE_PROJECTION_DIR/frontier.pending.json}"
   local current_marker="$UPDATE_STATE_DIR/current-transaction"
 
-  mkdir -p "$UPDATE_STATE_DIR" "$UPDATE_EVIDENCE_DIR" "$UPDATE_PROJECTION_DIR"
+  parent_ensure_dir "$UPDATE_STATE_DIR"
+  parent_ensure_dir "$UPDATE_EVIDENCE_DIR"
+  parent_ensure_dir "$UPDATE_PROJECTION_DIR"
   PYTHONPATH="$CANON_TOOLS_ROOT/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
     python3 - "$binding_file" "$rebind_receipt_file" \
       "$source_main_readback_evidence_ref" "$predecessor_388_evidence_ref" \
       "$predecessor_389_evidence_ref" "$source_projection_packet" \
       "$queue_output" "$frontier_output" \
-      "$AGENT_CANON_DIR" "$current_marker" <<'PY'
+      "$AGENT_CANON_DIR" "$current_marker" "$PARENT_ROOT_DIR" <<'PY'
 import json
-import os
 import sys
-import tempfile
 from pathlib import Path
+
+from parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectError,
+    ParentRootSideEffectBoundary,
+)
 
 from update_lifecycle_contract import (
     materialize_dependency_frontier,
@@ -725,10 +516,33 @@ from update_lifecycle_contract import (
     frontier_path,
     source_namespace,
     current_marker_path,
+    root_dir,
 ) = sys.argv[1:]
-binding = json.loads(Path(binding_path).read_text(encoding="utf-8"))
-rebind = json.loads(Path(rebind_path).read_text(encoding="utf-8"))
-packet = json.loads(Path(packet_path).read_text(encoding="utf-8"))
+root = Path(root_dir)
+boundary = ParentRootSideEffectBoundary()
+attestation = boundary.attest(
+    ParentRootAttestationRequest(cwd=root, explicit_root=root, purpose="update-lifecycle")
+)
+
+def reject_duplicate_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+def read_json(path_text, *, optional=False):
+    raw = boundary.read_parent_owned_bytes(
+        attestation, Path(path_text), "update-lifecycle", allow_missing=optional
+    )
+    if raw is None:
+        return None
+    return json.loads(raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs)
+
+binding = read_json(binding_path)
+rebind = read_json(rebind_path)
+packet = read_json(packet_path)
 queue = materialize_queue_receipt(
     binding=binding,
     source_namespace=str(Path(source_namespace).resolve()),
@@ -760,25 +574,47 @@ frontier = materialize_dependency_frontier(
 
 def persist_once(path_text, record, validator, identity_field):
     path = Path(path_text)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.is_file():
-        existing = validator(json.loads(path.read_text(encoding="utf-8")))
-        validate_immutable_replay(existing, record, field=str(path))
+    existing_raw = boundary.read_parent_owned_bytes(
+        attestation, path, "update-lifecycle", allow_missing=True
+    )
+    if existing_raw is not None:
+        existing = validator(json.loads(
+            existing_raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs
+        ))
+        try:
+            validate_immutable_replay(existing, record, field=str(path))
+        except Exception as exc:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH,
+                f"parent-owned replay conflict: {path}",
+            ) from exc
         replay = json.loads(json.dumps(existing))
         replay["binding"]["timing"]["replayed"] = True
         return replay
-    handle = tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=path.parent, delete=False
+    rendered = (json.dumps(record, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    status, detail = boundary.publish_parent_owned_file_noreplace(
+        attestation, path, rendered, "update-lifecycle"
     )
+    winner_raw = boundary.read_parent_owned_bytes(
+        attestation, path, "update-lifecycle", allow_missing=False
+    )
+    assert winner_raw is not None
+    winner = validator(json.loads(
+        winner_raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs
+    ))
     try:
-        json.dump(record, handle, indent=2, sort_keys=True)
-        handle.write("\n")
-        handle.close()
-        os.replace(handle.name, path)
-    finally:
-        if os.path.exists(handle.name):
-            os.unlink(handle.name)
-    return record
+        validate_immutable_replay(winner, record, field=str(path))
+    except Exception as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned no-replace conflict: {path}:{detail}",
+        ) from exc
+    if status == "failed":
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned no-replace conflict: {path}:{detail}",
+        )
+    return winner
 
 queue_result = persist_once(
     queue_path, queue, validate_queue_receipt, "queue_receipt_id"
@@ -793,23 +629,27 @@ marker = {
     "frontier_id": frontier_result["frontier_id"],
 }
 marker_path = Path(current_marker_path)
-if marker_path.is_file():
-    existing_marker = json.loads(marker_path.read_text(encoding="utf-8"))
+existing_marker = read_json(marker_path, optional=True)
+if existing_marker is not None:
     if existing_marker != marker:
-        raise SystemExit(f"input_identity_mismatch:{marker_path}")
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned replay conflict: {marker_path}",
+        )
 else:
-    marker_path.parent.mkdir(parents=True, exist_ok=True)
-    handle = tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=marker_path.parent, delete=False
+    rendered_marker = (json.dumps(marker, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    status, detail = boundary.publish_parent_owned_file_noreplace(
+        attestation,
+        marker_path,
+        rendered_marker,
+        "update-lifecycle",
     )
-    try:
-        json.dump(marker, handle, indent=2, sort_keys=True)
-        handle.write("\n")
-        handle.close()
-        os.replace(handle.name, marker_path)
-    finally:
-        if os.path.exists(handle.name):
-            os.unlink(handle.name)
+    winner_marker = read_json(marker_path)
+    if winner_marker != marker or status == "failed":
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned no-replace conflict: {marker_path}:{detail}",
+        )
 print(f"AGENT_CANON_QUEUE_RECEIPT_ID={queue_result['queue_receipt_id']}")
 print(f"AGENT_CANON_QUEUE_REPLAYED={str(queue_result['binding']['timing']['replayed']).lower()}")
 print(f"AGENT_CANON_FRONTIER_ID={frontier_result['frontier_id']}")
@@ -831,19 +671,26 @@ accept_dependency_frontier() {
     || die "accepted frontier requires exact origin/main readback identity"
   [[ "$source_main_tree" =~ ^[0-9a-f]{40}$ ]] \
     || die "accepted frontier requires exact origin/main tree readback identity"
-  mkdir -p "$UPDATE_STATE_DIR" "$UPDATE_EVIDENCE_DIR" "$UPDATE_PROJECTION_DIR"
+  parent_ensure_dir "$UPDATE_STATE_DIR"
+  parent_ensure_dir "$UPDATE_EVIDENCE_DIR"
+  parent_ensure_dir "$UPDATE_PROJECTION_DIR"
   PYTHONPATH="$CANON_TOOLS_ROOT/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
     python3 - "$pending_frontier_file" "$queue_receipt_file" \
       "$rebind_receipt_file" "$source_main_sha" "$source_main_tree" \
       "$acceptance_evidence_ref" \
       "$accepted_output" "$SOURCE_PROJECTION_PACKET" "$g4_output" \
-      "$ROOT_DIR" <<'PY'
+      "$PARENT_ROOT_DIR" "$ROOT_DIR" <<'PY'
 import hashlib
 import json
-import os
 import sys
-import tempfile
 from pathlib import Path
+
+from parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectError,
+    ParentRootSideEffectBoundary,
+)
 
 from artifact_identity import canonical_json_bytes
 from update_lifecycle_contract import (
@@ -866,11 +713,34 @@ from update_lifecycle_contract import (
     output_path,
     packet_path,
     g4_path,
-    root_dir,
+    parent_root_dir,
+    logical_root_dir,
 ) = sys.argv[1:]
-pending = json.loads(Path(pending_path).read_text(encoding="utf-8"))
-queue = json.loads(Path(queue_path).read_text(encoding="utf-8"))
-rebind = json.loads(Path(rebind_path).read_text(encoding="utf-8"))
+root = Path(parent_root_dir)
+boundary = ParentRootSideEffectBoundary()
+attestation = boundary.attest(
+    ParentRootAttestationRequest(cwd=root, explicit_root=root, purpose="update-frontier")
+)
+
+def reject_duplicate_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+def read_json(path_text, *, optional=False):
+    raw = boundary.read_parent_owned_bytes(
+        attestation, Path(path_text), "update-frontier", allow_missing=optional
+    )
+    if raw is None:
+        return None
+    return json.loads(raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs)
+
+pending = read_json(pending_path)
+queue = read_json(queue_path)
+rebind = read_json(rebind_path)
 accepted = json.loads(json.dumps(pending))
 accepted["frontier_state"] = "accepted"
 accepted["preceding_frontier_evidence_id"] = pending["binding"]["evidence_ref"]
@@ -892,29 +762,50 @@ accepted = validate_dependency_frontier_transition(
     ],
 )
 path = Path(output_path)
-path.parent.mkdir(parents=True, exist_ok=True)
-if path.is_file():
+existing_raw = boundary.read_parent_owned_bytes(
+    attestation, path, "update-frontier", allow_missing=True
+)
+if existing_raw is not None:
     existing = validate_dependency_frontier(
-        json.loads(path.read_text(encoding="utf-8"))
+        json.loads(existing_raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs)
     )
-    validate_immutable_replay(existing, accepted, field=str(path))
+    try:
+        validate_immutable_replay(existing, accepted, field=str(path))
+    except Exception as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned replay conflict: {path}",
+        ) from exc
     result = json.loads(json.dumps(existing))
     result["binding"]["timing"]["replayed"] = True
 else:
-    handle = tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=path.parent, delete=False
+    rendered = (json.dumps(accepted, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    status, detail = boundary.publish_parent_owned_file_noreplace(
+        attestation,
+        path,
+        rendered,
+        "update-frontier",
+    )
+    winner_raw = boundary.read_parent_owned_bytes(attestation, path, "update-frontier")
+    assert winner_raw is not None
+    winner = validate_dependency_frontier(
+        json.loads(winner_raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs)
     )
     try:
-        json.dump(accepted, handle, indent=2, sort_keys=True)
-        handle.write("\n")
-        handle.close()
-        os.replace(handle.name, path)
-    finally:
-        if os.path.exists(handle.name):
-            os.unlink(handle.name)
-    result = accepted
+        validate_immutable_replay(winner, accepted, field=str(path))
+    except Exception as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned no-replace conflict: {path}:{detail}",
+        ) from exc
+    if status == "failed":
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned no-replace conflict: {path}:{detail}",
+        )
+    result = winner
 packet = validate_source_projection_packet(
-    json.loads(Path(packet_path).read_text(encoding="utf-8"))
+    read_json(packet_path)
 )
 g3 = packet["source_gate_verdicts"][2]
 
@@ -941,32 +832,53 @@ g4 = materialize_gate_verdict(
             }
         )
     ).hexdigest(),
-    owner=str(Path(root_dir).resolve())
+    owner=str(Path(logical_root_dir).resolve())
     + "/tools/update_agent_canon.sh#accept_dependency_frontier",
     verdict="pass",
 )
 g4_output = Path(g4_path)
-g4_output.parent.mkdir(parents=True, exist_ok=True)
-if g4_output.is_file():
+existing_g4_raw = boundary.read_parent_owned_bytes(
+    attestation, g4_output, "update-frontier", allow_missing=True
+)
+if existing_g4_raw is not None:
     existing_g4 = validate_gate_verdict(
-        json.loads(g4_output.read_text(encoding="utf-8"))
+        json.loads(existing_g4_raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs)
     )
-    validate_immutable_replay(existing_g4, g4, field=str(g4_output))
+    try:
+        validate_immutable_replay(existing_g4, g4, field=str(g4_output))
+    except Exception as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned replay conflict: {g4_output}",
+        ) from exc
     g4_result = json.loads(json.dumps(existing_g4))
     g4_result["binding"]["timing"]["replayed"] = True
 else:
-    handle = tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=g4_output.parent, delete=False
+    rendered_g4 = (json.dumps(g4, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    status, detail = boundary.publish_parent_owned_file_noreplace(
+        attestation,
+        g4_output,
+        rendered_g4,
+        "update-frontier",
+    )
+    winner_g4_raw = boundary.read_parent_owned_bytes(attestation, g4_output, "update-frontier")
+    assert winner_g4_raw is not None
+    winner_g4 = validate_gate_verdict(
+        json.loads(winner_g4_raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs)
     )
     try:
-        json.dump(g4, handle, indent=2, sort_keys=True)
-        handle.write("\n")
-        handle.close()
-        os.replace(handle.name, g4_output)
-    finally:
-        if os.path.exists(handle.name):
-            os.unlink(handle.name)
-    g4_result = g4
+        validate_immutable_replay(winner_g4, g4, field=str(g4_output))
+    except Exception as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned no-replace conflict: {g4_output}:{detail}",
+        ) from exc
+    if status == "failed":
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned no-replace conflict: {g4_output}:{detail}",
+        )
+    g4_result = winner_g4
 print(f"AGENT_CANON_FRONTIER_ID={result['frontier_id']}")
 print(f"AGENT_CANON_FRONTIER_STATE={result['frontier_state']}")
 print(f"AGENT_CANON_FRONTIER_REPLAYED={str(result['binding']['timing']['replayed']).lower()}")
@@ -981,22 +893,36 @@ advance_source_projection() {
   local rebind_file="$UPDATE_STATE_DIR/source-projection.rebind.json"
   local source_main_sha=""
   local source_main_tree=""
+  local source_remote="origin"
   local projection_values=()
 
-  [ -f "$packet" ] || die "source projection packet is missing"
-  source_main_sha="$(resolve_remote_branch_sha origin main)"
+  parent_read_presence "$packet" source-projection >/dev/null \
+    || die "source projection packet is missing"
+  if [ "$AGENT_CANON_SOURCE_MODE" = "parent_projection" ]; then
+    source_remote="$(submodule_remote_url)"
+    [ -n "$source_remote" ] \
+      || die "parent projection source remote is missing"
+  fi
+  source_main_sha="$(resolve_remote_branch_sha "$source_remote" main)"
   ensure_remote_commit_object "$AGENT_CANON_DIR" origin "$source_main_sha"
   source_main_tree="$(git -C "$AGENT_CANON_DIR" rev-parse "$source_main_sha^{tree}")"
-  mkdir -p "$UPDATE_STATE_DIR" "$UPDATE_EVIDENCE_DIR" "$UPDATE_PROJECTION_DIR"
+  parent_ensure_dir "$UPDATE_STATE_DIR"
+  parent_ensure_dir "$UPDATE_EVIDENCE_DIR"
+  parent_ensure_dir "$UPDATE_PROJECTION_DIR"
   mapfile -t projection_values < <(
     PYTHONPATH="$CANON_TOOLS_ROOT/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
       python3 - "$packet" "$binding_file" "$rebind_file" \
-        "$source_main_sha" "$source_main_tree" <<'PY'
+        "$source_main_sha" "$source_main_tree" "$PARENT_ROOT_DIR" <<'PY'
 import json
-import os
 import sys
-import tempfile
 from pathlib import Path
+
+from parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectError,
+    ParentRootSideEffectBoundary,
+)
 
 from update_lifecycle_contract import validate_source_projection_packet
 
@@ -1006,10 +932,31 @@ from update_lifecycle_contract import validate_source_projection_packet
     rebind_path,
     observed_source_main,
     observed_source_tree,
+    root_dir,
 ) = sys.argv[1:]
-packet = validate_source_projection_packet(
-    json.loads(Path(packet_path).read_text(encoding="utf-8"))
+root = Path(root_dir)
+boundary = ParentRootSideEffectBoundary()
+attestation = boundary.attest(
+    ParentRootAttestationRequest(cwd=root, explicit_root=root, purpose="source-projection")
 )
+
+def reject_duplicate_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+def read_json(path_text, *, optional=False):
+    raw = boundary.read_parent_owned_bytes(
+        attestation, Path(path_text), "source-projection", allow_missing=optional
+    )
+    if raw is None:
+        return None
+    return json.loads(raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs)
+
+packet = validate_source_projection_packet(read_json(packet_path))
 binding = packet["binding"]
 publication = packet["publication_readback_receipt"]["pr_identity"]
 if (
@@ -1020,22 +967,26 @@ if (
 
 def persist_projection(path_text, value):
     path = Path(path_text)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    rendered = json.dumps(value, indent=2, sort_keys=True) + "\n"
-    if path.is_file():
-        if path.read_text(encoding="utf-8") != rendered:
-            raise SystemExit(f"input_identity_mismatch:{path}")
-        return
-    handle = tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=path.parent, delete=False
+    rendered = (json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    existing = boundary.read_parent_owned_bytes(
+        attestation, path, "source-projection", allow_missing=True
     )
-    try:
-        handle.write(rendered)
-        handle.close()
-        os.replace(handle.name, path)
-    finally:
-        if os.path.exists(handle.name):
-            os.unlink(handle.name)
+    if existing is not None:
+        if existing != rendered:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH,
+                f"parent-owned replay conflict: {path}",
+            )
+        return
+    status, detail = boundary.publish_parent_owned_file_noreplace(
+        attestation, path, rendered, "source-projection"
+    )
+    winner = boundary.read_parent_owned_bytes(attestation, path, "source-projection")
+    if winner != rendered or status == "failed":
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned no-replace conflict: {path}:{detail}",
+        )
 
 persist_projection(binding_path, binding)
 persist_projection(rebind_path, packet["source_main_rebind_receipt"])
@@ -1066,24 +1017,23 @@ PY
 }
 
 require_accepted_dependency_frontier() {
+  if [ "$AGENT_CANON_SOURCE_MODE" = "parent_projection" ]; then
+    ensure_source_projection_lifecycle
+  fi
   local current_marker="$UPDATE_STATE_DIR/current-transaction"
   local accepted_queue="$UPDATE_PROJECTION_DIR/queue.accepted.json"
   local accepted_frontier="$UPDATE_PROJECTION_DIR/frontier.accepted.json"
   local g4_receipt="$UPDATE_EVIDENCE_DIR/g4.parent-projection-integrity.json"
-  [ -f "$current_marker" ] \
-    || die "parent projection blocked: current transaction marker is missing"
-  [ -f "$accepted_queue" ] \
-    || die "parent projection blocked until queue acceptance"
-  [ -f "$accepted_frontier" ] \
-    || die "parent projection blocked until dependency frontier acceptance"
-  [ -f "$g4_receipt" ] \
-    || die "parent projection blocked until G4 integrity evidence"
   PYTHONPATH="$CANON_TOOLS_ROOT/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
     python3 - "$accepted_frontier" "$accepted_queue" "$current_marker" \
-      "$g4_receipt" <<'PY'
+      "$g4_receipt" "$PARENT_ROOT_DIR" <<'PY'
 import json
 import sys
 from pathlib import Path
+from parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+)
 from update_lifecycle_contract import (
     binding_identity,
     validate_dependency_frontier,
@@ -1091,16 +1041,30 @@ from update_lifecycle_contract import (
     validate_queue_receipt,
 )
 
-frontier = validate_dependency_frontier(
-    json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+root = Path(sys.argv[5])
+boundary = ParentRootSideEffectBoundary()
+attestation = boundary.attest(
+    ParentRootAttestationRequest(cwd=root, explicit_root=root, purpose="update-lifecycle")
 )
-queue = validate_queue_receipt(
-    json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
-)
-marker = json.loads(Path(sys.argv[3]).read_text(encoding="utf-8"))
-g4 = validate_gate_verdict(
-    json.loads(Path(sys.argv[4]).read_text(encoding="utf-8"))
-)
+
+def reject_duplicate_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+def read_json(path_text):
+    raw = boundary.read_parent_owned_bytes(
+        attestation, Path(path_text), "update-lifecycle", allow_missing=False
+    )
+    return json.loads(raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs)
+
+frontier = validate_dependency_frontier(read_json(sys.argv[1]))
+queue = validate_queue_receipt(read_json(sys.argv[2]))
+marker = read_json(sys.argv[3])
+g4 = validate_gate_verdict(read_json(sys.argv[4]))
 if set(marker) != {"schema", "transaction_id", "queue_receipt_id", "frontier_id"}:
     raise SystemExit("frontier:current_transaction_marker_invalid")
 if marker["schema"] != "agent-canon.update-lifecycle-current-transaction.v1":
@@ -1136,78 +1100,88 @@ cmd_plan() {
     echo "agent_canon_plan_branch=$branch"
     return
   fi
-  bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" plan "$branch"
+  run_parent_bound_sync plan "$branch"
 }
 
 cmd_latest() {
   local branch="${1:-$DEFAULT_BRANCH}"
   local plan_output=""
+  local plan_rc=0
+  local attach_rc=0
   local route=""
   local prefix_mode=""
   local dirty_update_surface=""
   local submodule_worktree_status=""
   local latest_log=""
   local latest_rc=0
-  local park_rc=0
   local todo_rc=0
 
   if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
-    if [ -f "$SOURCE_PROJECTION_PACKET" ]; then
+    materialize_source_projection_handoff
+    if parent_read_presence "$SOURCE_PROJECTION_PACKET" source-projection >/dev/null; then
       advance_source_projection
       return
     fi
-    cmd_merge_main_into_current_preserve_dirty "$branch"
+    cmd_merge_main_into_current "$branch"
     return
   fi
-  require_accepted_dependency_frontier
 
-  park_eval_log_dirty_state_if_safe || park_rc=$?
-  if [ "$park_rc" -gt 1 ]; then
-    echo "AGENT_CANON_LATEST_TOOL_RESULT=eval_log_park_failed"
-    echo "NEXT_ACTION=repair_eval_log_branch_then_rerun_latest"
-    return "$park_rc"
+  attach_reconstructible_detached_parent_submodule "$branch" || attach_rc=$?
+  if [ "$attach_rc" -ne 0 ]; then
+    return "$attach_rc"
   fi
 
-  plan_output="$(cmd_plan "$branch")"
+  plan_output="$(cmd_plan "$branch" 2>&1)" || plan_rc=$?
   printf '%s\n' "$plan_output"
+  if [ "$plan_rc" -ne 0 ]; then
+    return "$plan_rc"
+  fi
   route="$(plan_value agent_canon_plan_route "$plan_output")"
   prefix_mode="$(plan_value agent_canon_plan_prefix_mode "$plan_output")"
   dirty_update_surface="$(plan_value agent_canon_plan_dirty_update_surface "$plan_output")"
   submodule_worktree_status="$(plan_value agent_canon_plan_submodule_worktree_status "$plan_output")"
 
-  if route_requires_agent_workflow "$route" "$prefix_mode" "$dirty_update_surface" "$submodule_worktree_status"; then
-    if can_preserve_dirty_agentcanon_latest "$route" "$prefix_mode" "$submodule_worktree_status"; then
-      preserve_dirty_agentcanon_latest "$branch" "$route"
-      return $?
-    fi
+  if [ "${route:-}" != "deferred_branch_pr" ]; then
+    require_accepted_dependency_frontier
+  fi
+
+  if route_requires_agent_workflow "$route" "$prefix_mode"; then
     emit_agentcanon_conflict_workflow_route "route=${route:-unknown};dirty_update_surface=${dirty_update_surface:-unknown};submodule_worktree_status=${submodule_worktree_status:-unknown}"
     return 2
   fi
 
-  latest_log="$(mktemp)"
-  bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?
+  latest_log_dir="$(parent_temp_dir "$CANON_PARENT_TMPDIR" latest-log)"
+  latest_log="$latest_log_dir/output"
+  local latest_output=""
+  latest_output="$(run_parent_bound_sync ensure-latest "$branch" 2>&1)" || latest_rc=$?
+  parent_write_file "$latest_log" "$latest_output"
   if [ "$latest_rc" -ne 0 ]; then
     cat "$latest_log"
-    rm -f "$latest_log"
-    emit_agentcanon_conflict_workflow_route "ensure_latest_failed=$latest_rc;route=${route:-unknown}"
+    if grep -q '^agent_canon_materialization_collision=yes$' "$latest_log"; then
+      emit_agentcanon_conflict_workflow_route "route=submodule_materialization_collision;ensure_latest_failed=$latest_rc"
+    elif grep -q '^agent_canon_materialization_merge_conflict=yes$' "$latest_log"; then
+      emit_agentcanon_conflict_workflow_route "route=submodule_merge_conflict;ensure_latest_failed=$latest_rc"
+    else
+      emit_agentcanon_conflict_workflow_route "ensure_latest_failed=$latest_rc;route=${route:-unknown}"
+    fi
+    parent_remove_file "$latest_log"
     return "$latest_rc"
   fi
   cat "$latest_log"
   if [ "$prefix_mode" = "submodule" ] && ! grep -q '^agent_canon_latest_submodule_local_state_checked=yes$' "$latest_log"; then
-    rm -f "$latest_log"
+    parent_remove_file "$latest_log"
     emit_agentcanon_conflict_workflow_route "ensure_latest_missing_submodule_local_state_evidence=yes;route=${route:-unknown}"
     return 2
   fi
   if grep -q '^agent_canon_latest=deferred_branch_pr$' "$latest_log"; then
-    rm -f "$latest_log"
-    bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" check
+    parent_remove_file "$latest_log"
     echo "AGENT_CANON_LATEST_TOOL_RESULT=deferred_branch_pr"
     echo "NEXT_ACTION=after_agentcanon_PR_merge_rerun_make_agent-canon-ensure-latest"
     return 0
   fi
-  rm -f "$latest_log"
+  parent_remove_file "$latest_log"
 
-  bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" check
+  run_parent_bound_sync check
   rebuild_agent_tools_if_available
   acknowledge_update_todos_if_available || todo_rc=$?
   if [ "$todo_rc" -eq 2 ]; then
@@ -1224,34 +1198,35 @@ cmd_apply() {
   local branch="${1:-$DEFAULT_BRANCH}"
   local latest_log=""
   local latest_rc=0
-  local park_rc=0
+  local attach_rc=0
 
   if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
     cmd_merge_main_into_current "$branch"
     return
   fi
+
+  attach_reconstructible_detached_parent_submodule "$branch" || attach_rc=$?
+  if [ "$attach_rc" -ne 0 ]; then
+    return "$attach_rc"
+  fi
   require_accepted_dependency_frontier
 
-  park_eval_log_dirty_state_if_safe || park_rc=$?
-  if [ "$park_rc" -gt 1 ]; then
-    echo "AGENT_CANON_LATEST_TOOL_RESULT=eval_log_park_failed"
-    echo "NEXT_ACTION=repair_eval_log_branch_then_rerun_latest"
-    return "$park_rc"
-  fi
-
-  latest_log="$(mktemp)"
-  bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?
+  latest_log_dir="$(parent_temp_dir "$CANON_PARENT_TMPDIR" latest-log)"
+  latest_log="$latest_log_dir/output"
+  local latest_output=""
+  latest_output="$(run_parent_bound_sync ensure-latest "$branch" 2>&1)" || latest_rc=$?
+  parent_write_file "$latest_log" "$latest_output"
   cat "$latest_log"
   if [ "$latest_rc" -ne 0 ]; then
-    rm -f "$latest_log"
+    parent_remove_file "$latest_log"
     return "$latest_rc"
   fi
   if grep -q '^agent_canon_latest=deferred_branch_pr$' "$latest_log"; then
-    rm -f "$latest_log"
+    parent_remove_file "$latest_log"
     echo "AGENT_CANON_TOOL_REBUILD=skipped_deferred_branch_pr"
     return 0
   fi
-  rm -f "$latest_log"
+  parent_remove_file "$latest_log"
   rebuild_agent_tools_if_available
 }
 
@@ -1268,7 +1243,7 @@ cmd_status() {
     echo "agent_canon_source_worktree_status=$(git -C "$AGENT_CANON_DIR" status --porcelain=v1 --untracked-files=all | wc -l | tr -d ' ')"
     return
   fi
-  bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" status
+  run_parent_bound_sync status
 }
 
 cmd_merge_main_into_current() {
@@ -1279,14 +1254,14 @@ cmd_merge_main_into_current() {
   local post_head=""
   local current_branch=""
   local submodule_status=""
-  local backup_branch=""
-  local backup_ref=""
-  local timestamp=""
+  local collision_path=""
+  local collision_rc=0
+  local materialization_result_tree=""
+  local materialization_result_tree_rc=0
   local merge_log=""
   local result=""
   local conflict_files=""
 
-  classify_parent_vendor_source || return "$?"
   ensure_agent_canon_submodule
   remote_url="$(submodule_remote_url)"
   [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
@@ -1303,14 +1278,8 @@ cmd_merge_main_into_current() {
   echo "agent_canon_merge_target_branch=${current_branch:-<detached>}"
   echo "agent_canon_merge_pre_head=$pre_head"
 
-  if [ -n "$submodule_status" ]; then
-    echo "agent_canon_merge_worktree_status=dirty"
-    echo "agent_canon_merge_result=blocked_dirty"
-    echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
-    echo "NEXT_ACTION=commit_agentcanon_artifacts_or_rerun_merge-main-into-current-preserve-dirty"
-    die "submodule '$PREFIX' has uncommitted changes; commit AgentCanon-owned artifacts or use merge-main-into-current-preserve-dirty before merging main"
-  fi
-  echo "agent_canon_merge_worktree_status=clean"
+  echo "agent_canon_merge_worktree_status=$([ -n "$submodule_status" ] && echo dirty || echo clean)"
+  echo "agent_canon_merge_acceptance_predicate=materialization_merge_conflict_or_unpreservable_materialization_collision"
 
   if [ -z "$current_branch" ]; then
     echo "agent_canon_merge_result=blocked_detached_head"
@@ -1318,6 +1287,44 @@ cmd_merge_main_into_current() {
     echo "NEXT_ACTION=request_user_direction_preserve_current_checkout_then_rerun_with_inline_git_authority_and_reason"
     die "submodule '$PREFIX' is detached; create or switch to a branch before merging main"
   fi
+  if update_materialization_unresolved_conflict "$AGENT_CANON_DIR"; then
+    echo "agent_canon_merge_unresolved_merge_conflict=yes"
+    echo "agent_canon_merge_merge_conflict=yes"
+    echo "agent_canon_merge_conflict_type=existing_unresolved_index"
+    echo "agent_canon_merge_result=blocked_unresolved_merge_conflict"
+    echo "NEXT_ACTION=resolve_agentcanon_merge_conflicts_then_rerun_merge-main-into-current"
+    die "current AgentCanon branch has unresolved merge conflicts"
+  fi
+  materialization_result_tree="$(
+    update_materialization_result_tree "$AGENT_CANON_DIR" "$pre_head" "$remote_sha"
+  )" || materialization_result_tree_rc=$?
+  if [ "$materialization_result_tree_rc" -eq 2 ]; then
+    echo "agent_canon_merge_unresolved_merge_conflict=no"
+    echo "agent_canon_merge_merge_conflict=yes"
+    echo "agent_canon_merge_conflict_type=virtual_merge_result"
+    echo "agent_canon_merge_result=blocked_merge_conflict"
+    echo "NEXT_ACTION=resolve_committed_branch_merge_conflict_then_rerun_merge-main-into-current"
+    die "current AgentCanon branch conflicts with the virtual merge result"
+  fi
+  [ "$materialization_result_tree_rc" -eq 0 ] \
+    || die "failed to compute the AgentCanon virtual merge result tree"
+  echo "agent_canon_merge_unresolved_merge_conflict=no"
+  echo "agent_canon_merge_merge_conflict=no"
+  echo "agent_canon_merge_conflict_type=none"
+  collision_path="$(
+    update_materialization_collision_path \
+      "$AGENT_CANON_DIR" "$pre_head" "$materialization_result_tree"
+  )" || collision_rc=$?
+  if [ "$collision_rc" -eq 0 ]; then
+    echo "agent_canon_merge_materialization_collision=yes"
+    printf 'agent_canon_merge_materialization_collision_path=%q\n' "$collision_path"
+    echo "agent_canon_merge_result=blocked_unpreservable_collision"
+    echo "NEXT_ACTION=materialize_or_move_the_colliding_local_path_then_rerun_merge-main-into-current"
+    die "current AgentCanon branch has a local materialized path in the exact update write set"
+  fi
+  [ "$collision_rc" -eq 1 ] \
+    || die "failed to compute the AgentCanon materialization collision set"
+  echo "agent_canon_merge_materialization_collision=no"
 
   if [ "$pre_head" = "$remote_sha" ]; then
     echo "agent_canon_merge_post_head=$pre_head"
@@ -1328,12 +1335,6 @@ cmd_merge_main_into_current() {
     return
   fi
 
-  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-  backup_branch="agent-canon-merge-backup/$(sanitize_ref_component "$current_branch")/$timestamp"
-  backup_ref="refs/heads/$backup_branch"
-  git -C "$AGENT_CANON_DIR" branch "$backup_branch" "$pre_head" >/dev/null
-  echo "agent_canon_merge_backup_ref=$backup_ref"
-
   if git -C "$AGENT_CANON_DIR" merge-base --is-ancestor "$remote_sha" "$pre_head"; then
     echo "agent_canon_merge_post_head=$pre_head"
     emit_remote_main_ancestor_evidence "$remote_sha" "$pre_head"
@@ -1343,103 +1344,43 @@ cmd_merge_main_into_current() {
     return
   fi
 
-  merge_log="$(mktemp)"
-  if git -C "$AGENT_CANON_DIR" merge --no-edit "$remote_sha" >"$merge_log" 2>&1; then
+  merge_log_dir="$(parent_temp_dir "$CANON_PARENT_TMPDIR" merge-log)"
+  merge_log="$merge_log_dir/output"
+  local merge_output=""
+  if merge_output="$(git -C "$AGENT_CANON_DIR" merge --no-autostash --no-edit "$remote_sha" 2>&1)"; then
+    parent_write_file "$merge_log" "$merge_output"
     post_head="$(git -C "$AGENT_CANON_DIR" rev-parse HEAD)"
     if git -C "$AGENT_CANON_DIR" merge-base --is-ancestor "$pre_head" "$remote_sha"; then
       result="fast_forwarded"
     else
       result="merged"
     fi
-    rm -f "$merge_log"
+    parent_remove_file "$merge_log"
     echo "agent_canon_merge_post_head=$post_head"
     emit_remote_main_ancestor_evidence "$remote_sha" "$post_head"
     echo "agent_canon_merge_result=$result"
+    echo "agent_canon_merge_local_changes=$([ -n "$submodule_status" ] && echo preserved || echo none)"
     echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$post_head")"
     echo "NEXT_ACTION=run_validation_then_push_current_agentcanon_branch_and_open_or_update_PR"
     return
   fi
 
+  parent_write_file "$merge_log" "$merge_output"
   cat "$merge_log" >&2
-  rm -f "$merge_log"
+  parent_remove_file "$merge_log"
   conflict_files="$(git -C "$AGENT_CANON_DIR" diff --name-only --diff-filter=U | paste -sd, -)"
-  echo "agent_canon_merge_result=conflict"
+  echo "agent_canon_merge_unresolved_merge_conflict=$([ -n "$conflict_files" ] && echo yes || echo no)"
+  echo "agent_canon_merge_result=$([ -n "$conflict_files" ] && echo blocked_unresolved_merge_conflict || echo failed_without_conflict)"
   echo "agent_canon_merge_conflict_files=${conflict_files:-<unset>}"
   echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
   echo "NEXT_ACTION=resolve_agentcanon_merge_conflicts_then_commit_and_push_current_branch"
-  exit 1
-}
-
-cmd_merge_main_into_current_preserve_dirty() {
-  local branch="${1:-$DEFAULT_BRANCH}"
-  local current_branch=""
-  local submodule_status=""
-  local stash_sha=""
-  local stash_ref=""
-  local merge_rc=0
-  local restore_log=""
-  local restore_rc=0
-
-  classify_parent_vendor_source || return "$?"
-  ensure_agent_canon_submodule
-  current_branch="$(git -C "$AGENT_CANON_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
-  submodule_status="$(git -C "$AGENT_CANON_DIR" status --short --untracked-files=all)"
-
-  echo "agent_canon_merge_dirty_preserve_prefix=$PREFIX"
-  echo "agent_canon_merge_dirty_preserve_target_branch=${current_branch:-<detached>}"
-
-  if [ -z "$current_branch" ]; then
-    echo "agent_canon_merge_dirty_preserve_result=blocked_detached_head"
-    echo "agent_canon_merge_dirty_preserve_worktree_status=$([ -n "$submodule_status" ] && echo dirty || echo clean)"
-    echo "NEXT_ACTION=request_user_direction_preserve_current_checkout_then_rerun_with_inline_git_authority_and_reason"
-    die "submodule '$PREFIX' is detached; create or switch to a branch before preserving dirty state and merging main"
-  fi
-
-  if [ -z "$submodule_status" ]; then
-    echo "agent_canon_merge_dirty_preserve_result=clean_passthrough"
-    cmd_merge_main_into_current "$branch"
-    return
-  fi
-
-  echo "agent_canon_merge_dirty_preserve_result=started"
-  echo "agent_canon_merge_dirty_preserve_worktree_status=dirty"
-  git -C "$AGENT_CANON_DIR" stash push -u -m "preserve dirty AgentCanon work before merge-main-into-current" >/dev/null
-  stash_sha="$(git -C "$AGENT_CANON_DIR" rev-parse --verify refs/stash)"
-  stash_ref="$(stash_ref_for_sha "$stash_sha")"
-  echo "agent_canon_merge_dirty_stash_ref=${stash_ref:-<unknown>}"
-  echo "agent_canon_merge_dirty_stash_sha=$stash_sha"
-
-  ( cmd_merge_main_into_current "$branch" ) || merge_rc=$?
-  if [ "$merge_rc" -ne 0 ]; then
-    echo "agent_canon_merge_dirty_restore=skipped_merge_failed"
-    echo "agent_canon_merge_dirty_stash_kept=${stash_ref:-$stash_sha}"
-    echo "NEXT_ACTION=resolve_agentcanon_merge_then_apply_stash_ref_${stash_ref:-$stash_sha}"
-    return "$merge_rc"
-  fi
-
-  restore_log="$(mktemp)"
-  git -C "$AGENT_CANON_DIR" stash apply "$stash_sha" >"$restore_log" 2>&1 || restore_rc=$?
-  if [ "$restore_rc" -eq 0 ]; then
-    rm -f "$restore_log"
-    drop_stash_sha_if_present "$stash_sha"
-    echo "agent_canon_merge_dirty_restore=applied"
-    echo "agent_canon_merge_dirty_stash_dropped=yes"
-    echo "NEXT_ACTION=review_restored_dirty_state_then_continue_agentcanon_PR_flow"
-    return
-  fi
-
-  cat "$restore_log" >&2
-  rm -f "$restore_log"
-  echo "agent_canon_merge_dirty_restore=conflict"
-  echo "agent_canon_merge_dirty_stash_kept=${stash_ref:-$stash_sha}"
-  echo "NEXT_ACTION=resolve_restored_dirty_conflicts_then_drop_stash_ref_${stash_ref:-$stash_sha}"
-  return "$restore_rc"
+  return 1
 }
 
 main() {
   local subcommand="${1:-}"
   case "$subcommand" in
-    latest|apply|merge-main-into-current|merge-main-into-current-preserve-dirty)
+    latest|apply|merge-main-into-current)
       require_commit_provenance "$subcommand"
       ;;
   esac
@@ -1463,10 +1404,6 @@ main() {
     merge-main-into-current)
       shift
       cmd_merge_main_into_current "${1:-$DEFAULT_BRANCH}"
-      ;;
-    merge-main-into-current-preserve-dirty)
-      shift
-      cmd_merge_main_into_current_preserve_dirty "${1:-$DEFAULT_BRANCH}"
       ;;
     status)
       shift

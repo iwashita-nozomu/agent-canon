@@ -33,6 +33,12 @@ TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools" / "agent_tools"
 if TOOLS_DIR.is_dir():
     sys.path.insert(0, str(TOOLS_DIR))
 
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
 from runtime_log_paths import (  # noqa: E402
     codex_trace_key,
     hook_event_spool_root,
@@ -142,53 +148,37 @@ def _write_all(descriptor: int, payload: bytes) -> None:
         offset += written
 
 
+def _publish_parent_owned(path: Path, bytes_: bytes) -> tuple[str, str]:
+    """Publish a hook event through the authenticated parent capability."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        return "failed", "parent_unattested"
+    try:
+        parent = Path(configured)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(
+                cwd=parent, explicit_root=parent, purpose="hook-event-spool"
+            )
+        )
+        boundary = ParentRootSideEffectBoundary()
+        receipt = boundary.resolve_parent_owned_path(
+            attestation, path, "hook-event-spool", create=False
+        )
+        if receipt.target_dev is not None:
+            identical = boundary.read_parent_owned_file(receipt) == bytes_
+            return ("duplicate", "") if identical else ("failed", "spool_conflict")
+        return boundary.publish_parent_owned_file_noreplace(
+            attestation, path, bytes_, "hook-event-spool"
+        )
+    except ParentRootSideEffectError:
+        return "failed", "parent_unattested"
+    except OSError:
+        return "failed", "spool_io_failure"
+
+
 def publish_hook_event_noreplace(path: Path, bytes_: bytes) -> tuple[str, str]:
     """Publish one event without replacing an existing event identity."""
-    path = path.resolve()
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-    except OSError:
-        return "failed", "spool_unavailable"
-    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
-    descriptor = -1
-    linked = False
-    try:
-        descriptor = os.open(
-            temporary,
-            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
-            0o600,
-        )
-        _write_all(descriptor, bytes_)
-        os.fsync(descriptor)
-        os.close(descriptor)
-        descriptor = -1
-        try:
-            os.link(temporary, path)
-            linked = True
-            status, error_code = "spooled", ""
-        except FileExistsError:
-            try:
-                identical = path.read_bytes() == bytes_
-            except OSError:
-                return "failed", "spool_io_failure"
-            status = "duplicate" if identical else "failed"
-            error_code = "" if identical else "spool_conflict"
-        try:
-            temporary.unlink()
-        except FileNotFoundError:
-            pass
-        _fsync_directory(path.parent)
-        return status, error_code
-    except (OSError, ValueError):
-        return "failed", "spool_io_failure"
-    finally:
-        if descriptor >= 0:
-            os.close(descriptor)
-        if not linked:
-            try:
-                temporary.unlink()
-            except FileNotFoundError:
-                pass
+    return _publish_parent_owned(path, bytes_)
 
 
 @dataclass(frozen=True)

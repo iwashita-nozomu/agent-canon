@@ -1,4 +1,4 @@
-# Retrospective
+# Retrospective（振り返り）
 <!--
 @dependency-start
 contract template
@@ -13,14 +13,16 @@ upstream design workflow_monitoring.md records monitoring observations and impro
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
-## What Worked
+{{>reader_map}}
 
-<!-- Capture techniques, tools, sequencing, monitoring signals, or workflow interventions that helped. -->
+## What Worked（うまくいったこと）
 
-## What Hurt
+<!-- 有効だった technique、tool、sequencing、monitoring signal、workflow intervention を記録します。 -->
 
-<!-- Capture friction, surprises, process gaps, missing skill/config/workflow guidance, or monitoring gaps. -->
+## What Hurt（困ったこと）
 
-## Follow-ups
+<!-- friction、surprise、process gap、不足した skill/config/workflow guidance、monitoring gap を記録します。 -->
 
-<!-- Capture concrete follow-up tasks or policy changes. If workflow_monitoring.md marked all improvement decisions not_applicable, state None. -->
+## Follow-ups（後続対応）
+
+<!-- 具体的な follow-up task または policy change を記録します。workflow_monitoring.md が全 improvement decision を not_applicable とした場合は None と記録します。 -->

@@ -6,7 +6,7 @@
 # upstream implementation ./implementation_route.py owns implementation eligibility.
 # upstream implementation ./model_profile_registry.py owns prompt/profile materialization.
 # downstream implementation ./agent_team.py facade consumes capacity APIs.
-# downstream implementation ./task_start.py consumes capacity APIs.
+# downstream implementation ./bootstrap_agent_run.py consumes capacity APIs.
 # @dependency-end
 """Own AgentTeam capacity derivation and implementation dispatch."""
 
@@ -456,7 +456,15 @@ def _closeout_projection(
 ) -> dict[str, object]:
     """Materialize the provider closeout state with canonical close-agent tokens."""
     tokens: dict[str, dict[str, object]] = {}
-    registry = model_profile_registry.load_model_profile_registry(spec.workspace_root)
+    source_root = spec.agentcanon_source_root
+    if source_root is None and spec.repository_roots is not None:
+        source_root = spec.repository_roots.agentcanon_source_root
+    if source_root is None:
+        raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
+    registry = model_profile_registry.load_model_profile_registry(
+        spec.workspace_root,
+        source_root=source_root,
+    )
     for record in runtime.ledger.topology.descendants:
         if record.status not in {
             capacity_handshake.LifecycleStatus.READBACK_VERIFIED,
@@ -515,6 +523,7 @@ def dispatch_fixed_implementation(
     spawn: Callable[[str, str], str | None],
     *,
     workspace_root: Path = ROOT,
+    source_root: Path | None = None,
     capacity_runtime: _CapacityRuntime | None = None,
 ) -> ImplementationDispatch:
     """Route, materialize, and launch exactly one fixed Spark implementation worker."""
@@ -543,7 +552,10 @@ def dispatch_fixed_implementation(
         packet_context = dict(packet_payload)
     else:
         raise RuntimeError("implementation_dispatch:fixed_packet_missing")
-    registry = model_profile_registry.load_model_profile_registry(workspace_root)
+    registry = model_profile_registry.load_model_profile_registry(
+        workspace_root,
+        source_root=source_root,
+    )
     prompt = model_profile_registry.materialize_prompt_capsule(
         model_profile_registry.PromptMaterializationRequest(
             profile_id=route_result.selected_profile_id,
@@ -798,19 +810,19 @@ def workflow_topology_policy_violations(
     return tuple(violations)
 
 
-def codex_runtime_max_threads() -> int:
+def codex_runtime_max_threads(root: Path = ROOT) -> int:
     """Return the configured runtime max_threads from .codex/config.toml."""
-    return codex_runtime_agent_int("max_threads")
+    return codex_runtime_agent_int("max_threads", root=root)
 
 
-def codex_runtime_max_depth() -> int:
+def codex_runtime_max_depth(root: Path = ROOT) -> int:
     """Return the configured runtime max_depth from .codex/config.toml."""
-    return codex_runtime_agent_int("max_depth")
+    return codex_runtime_agent_int("max_depth", root=root)
 
 
-def codex_runtime_agent_int(key: str) -> int:
+def codex_runtime_agent_int(key: str, *, root: Path = ROOT) -> int:
     """Return one configured integer from the Codex [agents] runtime section."""
-    config_path = ROOT / ".codex" / "config.toml"
+    config_path = root.resolve() / ".codex" / "config.toml"
     parsed: object = tomllib.loads(config_path.read_text(encoding="utf-8"))
     data = _as_object_mapping(parsed, ".codex/config.toml")
     agents = data.get("agents")

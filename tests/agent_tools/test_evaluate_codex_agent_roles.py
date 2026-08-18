@@ -13,9 +13,13 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import tomllib
 import unittest
 from pathlib import Path
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 import yaml
 
@@ -28,12 +32,366 @@ from implementation_dispatch import (  # noqa: E402
     recommended_initial_subagent_wave,
 )
 from team_config import load_task_catalog, load_team_config, select_roles  # noqa: E402
+from model_profile_registry import generate_role_views, load_model_profile_registry  # noqa: E402
 
 FIRST_RUNTIME_TOKENS = 100
 FIRST_RUNTIME_LATENCY_MS = 25
 SECOND_RUNTIME_TOKENS = 50
 SECOND_RUNTIME_LATENCY_MS = 15
 EXPECTED_RUNTIME_TOKENS = FIRST_RUNTIME_TOKENS + SECOND_RUNTIME_TOKENS
+PRE_CHANGE_LIVE_GOLDEN = {
+    'artifact_reviewer': {
+        'name': 'artifact_reviewer',
+        'description': 'Read-only reviewer for code, scripts, raw results, environment capture, and artifact-readiness.',
+        'nickname_candidates': ['artifact_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as artifact_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'benchmark_reviewer': {
+        'name': 'benchmark_reviewer',
+        'description': 'Read-only reviewer for fairness, confounders, and benchmark anti-patterns.',
+        'nickname_candidates': ['benchmark_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as benchmark_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'citation_evidence_reviewer': {
+        'name': 'citation_evidence_reviewer',
+        'description': 'Read-only reviewer for paper claims, citations, figures, tables, and evidence traceability.',
+        'nickname_candidates': ['citation_evidence_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as citation_evidence_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'cpp_reviewer': {
+        'name': 'cpp_reviewer',
+        'description': 'Read-only reviewer for C and C++ diffs, build/test evidence, ABI-boundary changes, and native-code regressions.',
+        'nickname_candidates': ['cpp_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as cpp_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'detailed_design_reviewer': {
+        'name': 'detailed_design_reviewer',
+        'description': 'Read-only reviewer for detailed design docs, implementation readiness, side-effect mapping, reuse-first discipline, and style continuity.',
+        'nickname_candidates': ['detailed_design_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as detailed_design_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'detailed_designer': {
+        'name': 'detailed_designer',
+        'description': 'Detailed-design authoring agent for writing implementation-ready design docs with reuse-first, side-effect mapping, and style-continuity guidance.',
+        'nickname_candidates': ['detailed_designer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as detailed_designer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'diff_triage_reviewer': {
+        'name': 'diff_triage_reviewer',
+        'description': 'Read-only reviewer for bounded diffs before escalation to broad review.',
+        'nickname_candidates': ['diff_triage_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as diff_triage_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review bounded diffs findings-first; route SOLID-sensitive Python boundaries to python_reviewer and require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence. Return approve, revise, or escalate, and escalate public API, workflow, runtime, security, dependency, or cross-owner scope.',
+    },
+    'docs_workflow_steward': {
+        'name': 'docs_workflow_steward',
+        'description': 'Docs and workflow steward for canonical instructions, notes, and agent workflows.',
+        'nickname_candidates': ['docs_workflow_steward'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as docs_workflow_steward with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'document_flow_reviewer': {
+        'name': 'document_flow_reviewer',
+        'description': 'Read-only reviewer for top-down document coherence, section order, term introduction order, and first-reader comprehension.',
+        'nickname_candidates': ['document_flow_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as document_flow_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'execution_planner': {
+        'name': 'execution_planner',
+        'description': 'Execution-planning agent for stage order, subagent assignment, validation sequence, and rollback-aware task plans.',
+        'nickname_candidates': ['execution_planner'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as execution_planner with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'experiment_runner': {
+        'name': 'experiment_runner',
+        'description': 'Execution-only agent for running bounded experiments and summarizing logs.',
+        'nickname_candidates': ['experiment_runner'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as experiment_runner with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'explorer': {
+        'name': 'explorer',
+        'description': 'Read-only agent for tracing code paths, docs, and workflow state.',
+        'nickname_candidates': ['explorer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as explorer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'fair_data_reviewer': {
+        'name': 'fair_data_reviewer',
+        'description': 'Read-only reviewer for metadata quality, naming, reuse, and FAIR-style data organization.',
+        'nickname_candidates': ['fair_data_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as fair_data_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'literature_researcher': {
+        'name': 'literature_researcher',
+        'description': 'Read-only agent for paper search, prior-art mapping, and contradictory-source hunting.',
+        'nickname_candidates': ['literature_researcher'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as literature_researcher with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'logic_gap_reviewer': {
+        'name': 'logic_gap_reviewer',
+        'description': 'Read-only reviewer for academic-argument continuity, claim-to-evidence links, hidden assumptions, and unsupported inferential jumps.',
+        'nickname_candidates': ['logic_gap_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as logic_gap_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'long_form_writer': {
+        'name': 'long_form_writer',
+        'description': 'Long-form document author for README, workflow, guide, migration, and other reader-facing documents that need roadmap-first drafting.',
+        'nickname_candidates': ['long_form_writer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as long_form_writer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'manager_reviewer': {
+        'name': 'manager_reviewer',
+        'description': 'Read-only requirements reviewer for scope, source buckets, accumulated-context resolution, and escalation discipline.',
+        'nickname_candidates': ['manager_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as manager_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'ml_science_reviewer': {
+        'name': 'ml_science_reviewer',
+        'description': 'Read-only reviewer for assumptions, limitations, uncertainty, and reader-facing scientific reporting.',
+        'nickname_candidates': ['ml_science_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as ml_science_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'notation_definition_reviewer': {
+        'name': 'notation_definition_reviewer',
+        'description': 'Read-only reviewer for symbol, abbreviation, terminology, unit, and definition-before-use discipline in academic documents.',
+        'nickname_candidates': ['notation_definition_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as notation_definition_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'oop_readability_reviewer': {
+        'name': 'oop_readability_reviewer',
+        'description': 'Read-only reviewer that documents mechanical OOP readability reports without changing their verdicts.',
+        'nickname_candidates': ['oop_readability_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as oop_readability_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'plan_reviewer': {
+        'name': 'plan_reviewer',
+        'description': 'Read-only reviewer for execution plans, stage order, reviewer separation, validation sequencing, and rollback readiness.',
+        'nickname_candidates': ['plan_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as plan_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'project_reviewer': {
+        'name': 'project_reviewer',
+        'description': 'Read-only reviewer for repo-wide inventory, workflow health, and tooling health.',
+        'nickname_candidates': ['project_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as project_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'prompt_config_reviewer': {
+        'name': 'prompt_config_reviewer',
+        'description': 'Read-only reviewer for prompt, routing, and subagent-config drift.',
+        'nickname_candidates': ['prompt_config_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as prompt_config_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'python_reviewer': {
+        'name': 'python_reviewer',
+        'description': 'Read-only reviewer for Python diffs, type boundaries, and parent-selected validation evidence.',
+        'nickname_candidates': ['python_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as python_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review Python diffs findings-first for behavior, types, tests, and public boundaries. Follow agents/skills/python-review.md#Validation route and agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for validation scope; review the parent packet route and do not add validation outside that route. When the canonical route selects SOLID evidence, require a path-covered OOP readability report, SOLID principle signal, Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion, and check_solid_evidence.py path-coverage evidence; otherwise do not add those checks. Return revise only for evidence required by the canonical route.',
+    },
+    'report_reviewer': {
+        'name': 'report_reviewer',
+        'description': 'Read-only reviewer for experiment reports and evidence traceability.',
+        'nickname_candidates': ['report_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as report_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'reproducibility_reviewer': {
+        'name': 'reproducibility_reviewer',
+        'description': 'Read-only reviewer for provenance, seeds, commands, environments, and rerunability.',
+        'nickname_candidates': ['reproducibility_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as reproducibility_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'requirements_organizer': {
+        'name': 'requirements_organizer',
+        'description': 'Requirements-organizing agent for turning user intent and local precedent into concrete scope, acceptance criteria, and reuse targets.',
+        'nickname_candidates': ['requirements_organizer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as requirements_organizer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'reviewer': {
+        'name': 'reviewer',
+        'description': 'Read-only review agent for diffs, regressions, and documentation alignment.',
+        'nickname_candidates': ['reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review exact diffs findings-first against request clauses and owning evidence. For SOLID-sensitive Python changes require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence; return revise when that evidence or changed-path coverage is incomplete.',
+    },
+    'scientific_computing_reviewer': {
+        'name': 'scientific_computing_reviewer',
+        'description': 'Read-only reviewer for incremental change, testing, automation, and prototype discipline in research code.',
+        'nickname_candidates': ['scientific_computing_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as scientific_computing_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'ship_reviewer': {
+        'name': 'ship_reviewer',
+        'description': 'High-assurance read-only reviewer for final clause coverage and release readiness.',
+        'nickname_candidates': ['ship_reviewer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'xhigh',
+        'developer_instructions': 'You are acting as ship_reviewer for ship readiness under luna_ship. Constrain edits to one responsibility unit and one-pass materialization only when selected.',
+    },
+    'skill_evaluator': {
+        'name': 'skill_evaluator',
+        'description': 'Fresh read-only evaluator for explicit empirical skill scenarios.',
+        'nickname_candidates': ['skill_evaluator'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.4-mini',
+        'model_reasoning_effort': 'medium',
+        'developer_instructions': 'You are acting as skill_evaluator with skill_evaluator policy. Evaluate policy conformance with explicit evidence and typed outputs.',
+    },
+    'spark_worker': {
+        'name': 'spark_worker',
+        'description': 'Low-latency implementation agent for bounded code, docs, tests, or mechanical cleanup slices derived from the Abstract Design Frame and design trace.',
+        'nickname_candidates': ['spark_worker'],
+        'sandbox_mode': 'workspace-write',
+        'approval_policy': 'never',
+        'model': 'gpt-5.3-codex-spark',
+        'model_reasoning_effort': 'low',
+        'developer_instructions': 'You are acting as spark_worker for implementation execution with spark_implementation. Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop.',
+    },
+    'terra': {
+        'name': 'terra',
+        'description': 'Conditional read-only cross-cutting specialist for owner closure, context reconstruction, and adversarial contradiction validation.',
+        'nickname_candidates': ['terra'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-terra',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as terra with terra_cross_cutting cross-cutting review capacity. Operate only as a conditional read-only cross-cutting specialist. Activate on multi-owner dependency closure, compaction/long-run/incomplete-handoff context reconstruction, or adversarial contradiction validation. Treat user-provided alternatives and alternatives already present in findings as admissible adversarial-comparison input. Return owner closure, context capsule, and accepted/rejected/escalated handback; send unresolved findings to Sol. Do not invent unrequested alternatives, adopt an architecture, coordinate, implement as a general worker, mutate repository state, create PRs, or make final integration decisions.',
+    },
+    'test_designer': {
+        'name': 'test_designer',
+        'description': 'Read-only agent for post-implementation static analysis when an explicit unresolved oracle, specification, regression, or failure-mode risk remains beyond existing validation.',
+        'nickname_candidates': ['test_designer'],
+        'sandbox_mode': 'read-only',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'high',
+        'developer_instructions': 'You are acting as test_designer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+    },
+    'worker': {
+        'name': 'worker',
+        'description': 'Implementation agent for bounded code, docs, or test changes.',
+        'nickname_candidates': ['worker'],
+        'sandbox_mode': 'workspace-write',
+        'approval_policy': 'never',
+        'model': 'gpt-5.6-luna',
+        'model_reasoning_effort': 'xhigh',
+        'developer_instructions': 'You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. For this role, execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop.',
+    },
+}
+
 
 
 def run_eval(*args: str) -> subprocess.CompletedProcess[str]:
@@ -206,12 +564,56 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
 
         self.assertEqual(set(evaluator), expected_fields)
         self.assertIn("generated role view: generated_role_view_v1", evaluator_text)
-        self.assertIn("agents/model_profiles.toml", evaluator_text)
+        for producer_prefix in (
+            "agents/skills/",
+            "agents/model_profiles.toml",
+            "tools/agent_tools/",
+            "../../agents/",
+            "../../tools/",
+        ):
+            self.assertNotIn(producer_prefix, evaluator_text)
         self.assertEqual(evaluator["model"], "gpt-5.4-mini")
         self.assertEqual(evaluator["model_reasoning_effort"], "medium")
         self.assertIn("explicit evidence and typed outputs", evaluator["developer_instructions"])
         self.assertNotIn("R<integer>", evaluator_text)
         self.assertNotIn("score_percent=", evaluator_text)
+
+    def test_pre_change_live_golden_is_invariant_for_all_35_roles(self) -> None:
+        """The post-change live materializer remains byte-identical to the HEAD golden."""
+        registry = load_model_profile_registry(PROJECT_ROOT)
+        views = {
+            view.role_id: view
+            for view in generate_role_views(registry, PROJECT_ROOT, projection="live")
+        }
+        self.assertEqual(set(views), set(PRE_CHANGE_LIVE_GOLDEN))
+        self.assertEqual(len(views), 35)
+        fields = (
+            "name",
+            "description",
+            "nickname_candidates",
+            "sandbox_mode",
+            "approval_policy",
+            "model",
+            "model_reasoning_effort",
+        )
+        for role_id, golden in PRE_CHANGE_LIVE_GOLDEN.items():
+            view = views[role_id]
+            actual = {
+                "name": view.name,
+                "description": view.description,
+                "nickname_candidates": list(view.nickname_candidates),
+                "sandbox_mode": view.sandbox_mode,
+                "approval_policy": view.approval_policy,
+                "model": view.model,
+                "model_reasoning_effort": view.reasoning_effort,
+                "developer_instructions": view.rendered_instructions,
+            }
+            self.assertEqual(
+                {field: actual[field] for field in fields},
+                {field: golden[field] for field in fields},
+                role_id,
+            )
+            self.assertEqual(actual["developer_instructions"], golden["developer_instructions"], role_id)
 
     def test_role_eval_rejects_tier_and_service_tier_profile_keys(self) -> None:
         """Repository agent TOMLs must not introduce tier selectors."""

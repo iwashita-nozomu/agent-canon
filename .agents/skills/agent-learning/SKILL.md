@@ -1,8 +1,8 @@
 ---
 name: agent-learning
-description: "Use when agent-side working philosophy, interaction lessons, task retrospectives, repeated routing misses, missed skill invocation, or recurrence-prevention feedback should be logged without mixing them into user preferences."
+description: "Use when problem-solving memory curation or runtime agent behavior learning should capture recurrence evidence without mixing it into user preferences."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"31aee0356d04c2b55849d59f1b8400086f2c9bbe79c82893a52331d0899e8fed"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"e9297df167ced78535b4d178dd998c478094d27b6480e8c367603bfb32e709a2"} -->
 
 <!--
 @dependency-start

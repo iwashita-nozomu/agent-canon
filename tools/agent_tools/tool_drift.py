@@ -2,7 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Detects drift between tool contracts, convention docs, and dependency manifests.
-# upstream design ../../documents/design/dependency-manifest-design.md dependency manifest graph semantics
+# upstream design ../../documents/design/source-owned-dependency-validation.md source-owned dependency receipt and review authority
+# upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL and graph semantics
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR validation contract
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing contract
 # upstream design ../../agents/TASK_WORKFLOWS.md workflow routing contract
@@ -24,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
@@ -67,6 +69,16 @@ class TextCheck:
 
 
 @dataclass(frozen=True)
+class CommandCheck:
+    """One required shell command pattern for a tool contract."""
+
+    path: str
+    pattern: str
+    detail: str
+    required_count: int = 1
+
+
+@dataclass(frozen=True)
 class ToolContract:
     """One tool/convention consistency contract."""
 
@@ -74,6 +86,7 @@ class ToolContract:
     tool: str
     links: tuple[LinkCheck, ...]
     text_checks: tuple[TextCheck, ...] = ()
+    command_checks: tuple[CommandCheck, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -102,16 +115,8 @@ CONTRACTS = (
             LinkCheck(".github/AGENTS.md"),
             LinkCheck(".github/PULL_REQUEST_TEMPLATE.md"),
             LinkCheck("templates/documents/github/pull-request/agent_canon.md"),
-            LinkCheck(".github/workflows/agent-coordination.yml"),
             LinkCheck("tools/ci/checkout_agent_canon_submodule.sh"),
             LinkCheck("README.md"),
-        ),
-        text_checks=(
-            TextCheck(
-                ".github/workflows/agent-coordination.yml",
-                "tools/ci/checkout_agent_canon_submodule.sh",
-                "missing-standalone-checkout-helper-route",
-            ),
         ),
     ),
     ToolContract(
@@ -183,7 +188,6 @@ CONTRACTS = (
         links=(
             LinkCheck("agents/COMMUNICATION_PROTOCOL.md"),
             LinkCheck("agents/skills/codex-task-workflow.md"),
-            LinkCheck("agents/skills/owner-bounded-routing.md"),
             LinkCheck("tools/agent_tools/responsibility_scope.py"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
@@ -199,11 +203,6 @@ CONTRACTS = (
                 "agents/skills/codex-task-workflow.md",
                 "responsibility_scope",
                 "missing-runtime-workflow-responsibility-preflight",
-            ),
-            TextCheck(
-                "agents/skills/owner-bounded-routing.md",
-                "responsibility_scope",
-                "missing-runtime-small-change-responsibility-preflight",
             ),
         ),
     ),
@@ -260,10 +259,11 @@ CONTRACTS = (
             LinkCheck("templates/agents/closeout_gate.md"),
             LinkCheck("tests/agent_tools/test_generated_artifact_guard.py"),
         ),
-        text_checks=(
-            TextCheck(
+        text_checks=(),
+        command_checks=(
+            CommandCheck(
                 "tools/ci/check_agent_canon_pr.sh",
-                "python3 tools/agent_tools/generated_artifact_guard.py",
+                r'^python3\s+"\$\{CANON_TOOLS_ROOT\}/agent_tools/generated_artifact_guard\.py"\s+--root\s+"\$\{WORKSPACE_ROOT\}"\s*$',
                 "missing-generated-artifact-pr-guard",
             ),
         ),
@@ -276,29 +276,20 @@ CONTRACTS = (
             LinkCheck(".github/PULL_REQUEST_TEMPLATE.md"),
             LinkCheck("templates/documents/github/pull-request/agent_canon.md"),
             LinkCheck("tools/agent_tools/run_repo_dependency_review.sh"),
+            LinkCheck("tools/ci/pr_gate_receipt.py"),
             LinkCheck("tools/agent_tools/run_accumulated_agent_evals.py"),
             LinkCheck("tools/agent_tools/generated_artifact_guard.py"),
             LinkCheck("tools/agent_tools/evaluate_skill_workflow_prompts.py"),
             LinkCheck("tools/agent_tools/check_agent_runtime_alignment.py"),
             LinkCheck("tools/agent_tools/check_convention_compliance.py"),
+            LinkCheck("tools/ci/agent_canon_pr_graph_selector.py"),
             LinkCheck("tools/ci/check_github_workflows.py"),
-            LinkCheck("tools/ci/run_all_checks.sh"),
         ),
         text_checks=(
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
-                "run_repo_dependency_review.sh --fail-missing",
-                "missing-strict-dependency-review",
-            ),
-            TextCheck(
-                "tools/ci/check_agent_canon_pr.sh",
-                "check_agent_runtime_alignment.py",
+                'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"',
                 "missing-agent-runtime-alignment-check",
-            ),
-            TextCheck(
-                "tools/ci/check_agent_canon_pr.sh",
-                "run_accumulated_agent_evals.py --run-id agent-canon-pr-gate",
-                "missing-accumulated-agent-eval-producer",
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
@@ -307,13 +298,38 @@ CONTRACTS = (
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
-                "python3 tools/agent_tools/generated_artifact_guard.py",
-                "missing-generated-artifact-pr-guard",
+                "not_applicable_standalone_source",
+                "missing-standalone-shared-surface-skip",
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
-                "not_applicable_standalone_source",
-                "missing-standalone-shared-surface-skip",
+                "agentcanon_pr_dependency_graph_required()",
+                "missing-dependency-graph-requirement-selector",
+            ),
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                "if agentcanon_pr_dependency_graph_required; then",
+                "missing-conditional-dependency-graph-gate",
+            ),
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                "PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped",
+                "missing-optional-dependency-source-receipt-status",
+            ),
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                'python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py"',
+                "missing-canonical-dependency-graph-selector",
+            ),
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                "--selector-reason",
+                "missing-dependency-graph-selector-reason-receipt",
+            ),
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                "--selector-evidence",
+                "missing-dependency-graph-selector-evidence-receipt",
             ),
         ),
     ),
@@ -446,7 +462,9 @@ def resolve_repo_path(root: Path, relative_path: str) -> Path:
     if root_path.exists():
         return root_path
     if relative_path.startswith("tools/"):
-        projected_path = root / "tools" / "agent-canon" / relative_path.removeprefix("tools/")
+        projected_path = (
+            root / "tools" / "agent-canon" / relative_path.removeprefix("tools/")
+        )
         if projected_path.exists():
             return projected_path
     vendor_path = root / "vendor" / "agent-canon" / relative_path
@@ -604,15 +622,102 @@ def check_text(
     ]
 
 
+def collect_shell_executable_commands(path: Path) -> tuple[str, ...]:
+    """Collect executable command lines from a shell script."""
+    raw_lines = path.read_text(encoding="utf-8").splitlines()
+    continuation_lines: list[str] = []
+    current = ""
+    for raw_line in raw_lines:
+        if raw_line.endswith("\\"):
+            current += (" " if current else "") + raw_line[:-1]
+            continue
+        full_line = current + (" " if current else "") + raw_line
+        current = ""
+        continuation_lines.append(full_line)
+    if current:
+        continuation_lines.append(current)
+
+    commands: list[str] = []
+    disabled_depth = 0
+    for raw_line in continuation_lines:
+        line = raw_line.strip()
+        if not line:
+            continue
+        if re.match(r"^\s*#", line):
+            continue
+        if re.match(r"^\s*:", line):
+            continue
+        if re.match(r"^\s*(echo|printf)\b", line):
+            continue
+        if re.search(r"\|\|\s*true\b", line):
+            continue
+        if re.match(r"^\s*if\b.*\bfalse\b.*\bthen\b\s*$", line):
+            disabled_depth += 1
+            continue
+        if re.match(r"^\s*fi\b", line):
+            disabled_depth = max(0, disabled_depth - 1)
+            continue
+        if disabled_depth > 0:
+            continue
+        line = line.split(" #", 1)[0].rstrip()
+        if not line:
+            continue
+        commands.append(re.sub(r"\s+", " ", line))
+    return tuple(commands)
+
+
+def check_command(
+    root: Path, contract: ToolContract, command_check: CommandCheck
+) -> list[Finding]:
+    """Check one required shell command pattern."""
+    path = resolve_repo_path(root, command_check.path)
+    if not path.is_file():
+        return [
+            Finding(
+                "missing-file", contract.name, command_check.path, command_check.detail
+            )
+        ]
+    commands = collect_shell_executable_commands(path)
+    pattern = re.compile(command_check.pattern)
+    hits = [command for command in commands if pattern.search(command)]
+    if not hits:
+        return [
+            Finding(
+                "missing-required-command",
+                contract.name,
+                command_check.path,
+                command_check.detail,
+            )
+        ]
+    if len(hits) != command_check.required_count:
+        return [
+            Finding(
+                "duplicate-required-command",
+                contract.name,
+                command_check.path,
+                (
+                    f"{command_check.detail}:actual={len(hits)}:"
+                    f"expected={command_check.required_count}"
+                ),
+            )
+        ]
+    return []
+
+
 def projected_runtime_snippet(root: Path, snippet: str) -> str:
     """Map standalone AgentCanon tool paths to a parent runtime projection."""
-    if not (root / "tools" / "agent-canon").exists() or (root / "tools" / "ci").exists():
+    if (
+        not (root / "tools" / "agent-canon").exists()
+        or (root / "tools" / "ci").exists()
+    ):
         return snippet
     return (
         snippet.replace("tools/agent_tools/", "tools/agent-canon/agent_tools/")
         .replace("tools/ci/", "tools/agent-canon/ci/")
         .replace("tools/sync_agent_canon.sh", "tools/agent-canon/sync_agent_canon.sh")
-        .replace("tools/update_agent_canon.sh", "tools/agent-canon/update_agent_canon.sh")
+        .replace(
+            "tools/update_agent_canon.sh", "tools/agent-canon/update_agent_canon.sh"
+        )
     )
 
 
@@ -736,6 +841,8 @@ def run_checks(root: Path, names: Sequence[str]) -> list[Finding]:
             findings.extend(check_link(contract, link, all_edges))
         for text_check in contract.text_checks:
             findings.extend(check_text(root, contract, text_check))
+        for command_check in contract.command_checks:
+            findings.extend(check_command(root, contract, command_check))
         if contract.name == "tool_catalog":
             findings.extend(check_catalog_entries(root))
     return sorted(

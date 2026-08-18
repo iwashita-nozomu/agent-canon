@@ -14,7 +14,7 @@
 # downstream implementation ./task_close.py consumes closeout coverage without revalidating upstream gates.
 # downstream implementation ../../tools/update_agent_canon.sh consumes queue and dependency-frontier receipts.
 # downstream implementation ../../tests/agent_tools/test_publication_integrator.py validates lifecycle mechanics.
-# downstream implementation ../../tests/agent_tools/test_task_start_and_close.py validates terminal cleanup guards.
+# downstream implementation ../../tests/agent_tools/test_bootstrap_and_close.py validates terminal cleanup guards.
 # @dependency-end
 """Canonical mechanics for resumable AgentCanon update transactions.
 
@@ -2574,7 +2574,7 @@ def validate_close_agent_tool_call(value: object) -> dict[str, object]:
         field="close_agent_tool_call",
     )
     _schema(token, CLOSE_AGENT_TOOL_CALL_SCHEMA)
-    binding = validate_record_binding(token["binding"])
+    validate_record_binding(token["binding"])
     if token["tool_id"] != "close_agent":
         _fail("close_agent:tool_id_invalid")
     if token["state"] != "terminal":

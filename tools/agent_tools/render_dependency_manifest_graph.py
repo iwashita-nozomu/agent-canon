@@ -311,7 +311,7 @@ class OptionalManifestFields(TypedDict, total=False):
     manifest_path: str
     manifest_sha256: str
     visualization_source_universe: viz_contract.VisualizationSourceUniverse
-    visualization_coverage: dict[str, "VisualizationArtifactCoverage"]
+    visualization_coverage: dict[str, VisualizationArtifactCoverage]
     visualization_tool_calls: list[viz_contract.ToolCall]
 
 
@@ -871,6 +871,11 @@ def dependency_edge_records(edges: tuple[Edge, ...]) -> list[GraphEdgeRecord]:
         }
         for index, edge in enumerate(edges)
     ]
+
+
+def dependency_source_item_id(index: int, edge: Edge) -> str:
+    """Return the canonical source-universe identity for one input-order edge."""
+    return f"edge:{index}:{edge.direction}:{edge.kind}:{edge.source}:{edge.target}"
 
 
 def containment_edge_records(edges: tuple[ContainmentEdge, ...]) -> list[GraphEdgeRecord]:
@@ -1465,7 +1470,7 @@ def static_graph_svg(
     parts.append("</g>")
 
     parts.append('<g class="static-edges">')
-    for edge in report.edges:
+    for edge_index, edge in enumerate(report.edges):
         source = positions.get(edge.source)
         target = positions.get(edge.target)
         if not source or not target:
@@ -1476,8 +1481,10 @@ def static_graph_svg(
         end_y = target[1] + STATIC_NODE_H / 2
         curve = max(54, abs(end_x - start_x) / 2)
         title = html.escape(f"{edge.direction}/{edge.kind}: {edge.source} -> {edge.target}")
+        source_id = html.escape(dependency_source_item_id(edge_index, edge), quote=True)
         parts.append(
             f'<path class="static-edge {html.escape(edge.kind, quote=True)}" '
+            f'data-agent-canon-source-id="{source_id}" '
             f'd="M {start_x:.1f} {start_y:.1f} C {start_x + curve:.1f} {start_y:.1f}, '
             f'{end_x - curve:.1f} {end_y:.1f}, {end_x:.1f} {end_y:.1f}">'
             f"<title>{title}</title></path>"
@@ -1493,8 +1500,9 @@ def static_graph_svg(
         parent_label = str(node.get("parentLabel", path_group(node_id)))
         subtitle = html.escape(f"{short_html_label(parent_label, limit=30)} / d {degree[node_id]}")
         title = html.escape(node_id)
+        source_id = html.escape(f"node:{node_id}", quote=True)
         parts.append(
-            f'<g class="{node_class}" transform="translate({x} {y})">'
+            f'<g class="{node_class}" data-agent-canon-source-id="{source_id}" transform="translate({x} {y})">'
             f'<rect width="{STATIC_NODE_W}" height="{STATIC_NODE_H}"></rect>'
             f'<text class="label" x="10" y="14">{label}</text>'
             f'<text class="sub" x="10" y="28">{subtitle}</text>'
@@ -1507,13 +1515,13 @@ def static_graph_svg(
 def edge_table_html(report: GraphReport) -> str:
     """Render the complete edge list as an HTML table."""
     rows = [
-        "<table>",
+        '<table id="edge-table">',
         "<thead><tr><th>Direction</th><th>Kind</th><th>Source</th><th>Target</th></tr></thead>",
         "<tbody>",
     ]
-    for edge in report.edges:
+    for edge_index, edge in enumerate(report.edges):
         rows.append(
-            "<tr>"
+            f'<tr data-agent-canon-source-id="{html.escape(dependency_source_item_id(edge_index, edge), quote=True)}">'
             f"<td>{html.escape(edge.direction)}</td>"
             f"<td>{html.escape(edge.kind)}</td>"
             f"<td><code>{html.escape(edge.source)}</code></td>"
@@ -1528,13 +1536,14 @@ def node_table_html(report: GraphReport) -> str:
     """Render the complete node list as an HTML table."""
     nodes = list(graph_payload(report)["nodes"])
     rows = [
-        "<table>",
+        '<table id="node-table">',
         "<thead><tr><th>Group</th><th>Name</th><th>Parent</th><th>Path</th><th>In</th><th>Out</th><th>Degree</th></tr></thead>",
         "<tbody>",
     ]
     for node in sorted(nodes, key=lambda item: (str(item["group"]), str(item["id"]))):
+        source_id = html.escape(f"node:{node['id']}", quote=True)
         rows.append(
-            "<tr>"
+            f'<tr data-agent-canon-source-id="{source_id}">'
             f"<td>{html.escape(str(node['group']))}</td>"
             f"<td><code>{html.escape(str(node['label']))}</code></td>"
             f"<td><code>{html.escape(str(node['parentLabel']))}</code></td>"
@@ -1549,17 +1558,35 @@ def node_table_html(report: GraphReport) -> str:
 
 
 def directory_table_html(report: GraphReport) -> str:
-    """Render inferred directory containment edges as an HTML table."""
+    """Render inferred directory nodes and containment edges as HTML tables."""
     directory_tree = graph_payload(report)["directoryTree"]
+    nodes = list(directory_tree["nodes"])
     edges = list(directory_tree["edges"])
     rows = [
-        "<table>",
-        "<thead><tr><th>Parent</th><th>Child</th><th>Child kind</th></tr></thead>",
+        '<table id="directory-node-table">',
+        "<thead><tr><th>Directory</th><th>Path</th></tr></thead>",
         "<tbody>",
     ]
-    for edge in sorted(edges, key=lambda item: (str(item["parentPath"]), str(item["childPath"]))):
+    for node in sorted(nodes, key=lambda item: str(item["path"])):
+        source_id = html.escape(str(node["id"]), quote=True)
+        path = html.escape(str(node["path"]))
         rows.append(
-            "<tr>"
+            f'<tr data-agent-canon-source-id="{source_id}">'
+            f"<td>module</td><td><code>{path}</code></td></tr>"
+        )
+    rows.extend(
+        [
+            "</tbody>",
+            "</table>",
+            '<table id="directory-edge-table">',
+        "<thead><tr><th>Parent</th><th>Child</th><th>Child kind</th></tr></thead>",
+        "<tbody>",
+        ]
+    )
+    for index, edge in enumerate(edges):
+        source_id = html.escape(f"contains:{index:06d}", quote=True)
+        rows.append(
+            f'<tr data-agent-canon-source-id="{source_id}">'
             f"<td><code>{html.escape(str(edge['parentPath']))}</code></td>"
             f"<td><code>{html.escape(str(edge['childPath']))}</code></td>"
             f"<td>{html.escape(str(edge['childKind']))}</td>"
@@ -2235,6 +2262,7 @@ HTML_SCRIPT = """
       });
     }
 
+    /* AGENT_CANON_MODEL_BEGIN */
     function buildAdjacency(edges) {
       const adjacency = new Map();
       edges.forEach((edge) => {
@@ -2258,12 +2286,6 @@ HTML_SCRIPT = """
         frontier = next;
       }
       return seen;
-    }
-
-    function trimVisibleModel(nodes, edges) {
-      const fullNodeCount = nodes.length;
-      const fullEdgeCount = edges.length;
-      return { nodes, edges, fullNodeCount, fullEdgeCount, truncated: false };
     }
 
     function visibleModel() {
@@ -2300,8 +2322,9 @@ HTML_SCRIPT = """
       const nodes = nodeRecords
         .filter((node) => nodeIds.has(node.id))
         .sort((left, right) => left.group.localeCompare(right.group) || left.id.localeCompare(right.id));
-      return trimVisibleModel(nodes, edges);
+      return { nodes, edges };
     }
+    /* AGENT_CANON_MODEL_END */
 
     function layout(nodes) {
       const groups = [...new Set(nodes.map((node) => node.group))].sort();
@@ -2434,10 +2457,7 @@ HTML_SCRIPT = """
       });
       svg.append(nodeLayer);
 
-      const truncated = model.truncated
-        ? ` (showing ${model.nodes.length}/${model.fullNodeCount} nodes, ${model.edges.length}/${model.fullEdgeCount} edges)`
-        : "";
-      resultCount.textContent = `${model.nodes.length} nodes / ${model.edges.length} edges visible${truncated}`;
+      resultCount.textContent = `${model.nodes.length} nodes / ${model.edges.length} edges visible`;
       if (!state.selected || !model.nodes.some((node) => node.id === state.selected)) {
         renderInspector(model.nodes[0] ? model.nodes[0].id : "");
         state.selected = model.nodes[0] ? model.nodes[0].id : null;
@@ -2689,15 +2709,10 @@ def _build_source_universe(
             }
         )
     dependency_items: list[viz_contract.VisualizationSourceItem] = []
-    ordered_edges = sorted(
-        report.edges,
-        key=lambda edge: (
-            edge.source,
-            edge.target,
-            edge.direction,
-            edge.kind,
-        ),
-    )
+    # The producer's TSV input order is the canonical edge ordinal.  The
+    # universe may serialize items deterministically later, but it must never
+    # renumber the GraphIR/source relation by sorting a second time.
+    ordered_edges = report.edges
     for index, edge in enumerate(ordered_edges):
         row = "\t".join((edge.direction, edge.kind, edge.source, edge.target))
         dependency_items.append(
@@ -2737,14 +2752,8 @@ def _build_source_universe(
             if node_id == path or node_id.startswith(prefix)
         ]
 
-    directory_nodes = sorted(
-        (node for node in graph["nodes"] if node["kind"] == "directory"),
-        key=lambda node: node["id"],
-    )
-    containment_edges = sorted(
-        (edge for edge in graph["edges"] if edge["relation"] == "contains"),
-        key=lambda edge: edge["id"],
-    )
+    directory_nodes = [node for node in graph["nodes"] if node["kind"] == "directory"]
+    containment_edges = [edge for edge in graph["edges"] if edge["relation"] == "contains"]
     next_ordinal = len(dependency_items)
     for offset, node in enumerate(directory_nodes):
         directory_path = str(node["payload_json"]["path"])
@@ -2890,7 +2899,10 @@ def _projection_entries(
                 "artifact_locator": [str(locator)],
                 "renderer_id": VISUALIZATION_RENDERER_ID,
                 "readback_identity": item["item_id"],
-                "payload_json": _canonical_payload({"projection": "one_to_one"}),
+                # The source payload is the canonical identity join used by
+                # HTML readback; a generic projection marker cannot validate
+                # endpoints, ordinals, or nested directory provenance.
+                "payload_json": item["payload_json"],
                 "view_state": "visible",
             }
         )
@@ -2904,7 +2916,9 @@ def _expected_readback(
     artifact_format: viz_contract.ArtifactFormat,
 ) -> viz_contract.ReadbackProjection:
     """Return expected pre-marker identities used to construct the manifest."""
-    counts = {kind: 0 for kind in viz_contract.SOURCE_ITEM_KINDS}
+    counts: dict[viz_contract.SourceItemKind, int] = {
+        kind: 0 for kind in viz_contract.SOURCE_ITEM_KINDS
+    }
     for entry in entries:
         counts[entry["source_kind"]] += 1
     return {
@@ -2975,12 +2989,7 @@ def _embed_coverage_marker(
             f"{json.dumps(marker)}"
             "</script>"
         )
-        token_payload = html.escape(_canonical_payload(tokens))
-        token_element = (
-            '<div id="agent-canon-visualization-identities" hidden>'
-            f"{token_payload}</div>"
-        )
-        insertion = coverage_script + token_element
+        insertion = coverage_script
         if "</body>" not in body:
             raise ValueError("dependency HTML projection has no body boundary")
         return body.replace("</body>", insertion + "\n</body>", 1)

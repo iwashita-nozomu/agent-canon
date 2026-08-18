@@ -59,6 +59,12 @@ PARITY_FIELDS = (
     "workflow_monitor_report_dir",
 )
 
+# These values are consumed by the accumulation checker and dashboard.  Keep
+# the attribution decision in this assembler so downstream readers do not
+# have to reconstruct it from legacy candidate/selection fields.
+WORKFLOW_ATTRIBUTION_KINDS = frozenset({"owner", "context", "missing"})
+PROMPT_CAPTURE_STATUSES = frozenset({"present", "missing"})
+
 
 @dataclass(frozen=True)
 class HookInvocationParts:
@@ -157,10 +163,40 @@ def eligible_hook_invocation(parts: HookInvocationParts) -> bool:
     return bool(prompt.should_log() or classifier.should_log() or tool.should_log() or subagent.should_log() or context.has_workflow())
 
 
+def _workflow_context_fields(
+    attribution_kind: str,
+    context: WorkflowContext,
+) -> dict[str, object]:
+    """Return context carriers only when context owns attribution."""
+    if attribution_kind == "owner":
+        return {
+            "workflow_context_kind": "",
+            "workflow_context_source": "",
+            "workflow_context_workflows": [],
+            "workflow_context_timestamp": "",
+            "workflow_context_source_event": "",
+        }
+    return {
+        "workflow_context_kind": "context_workflow" if context.workflows else "",
+        "workflow_context_source": "recent_log" if context.workflows else "",
+        "workflow_context_workflows": list(context.workflows),
+        "workflow_context_timestamp": context.timestamp,
+        "workflow_context_source_event": context.source_event,
+    }
+
+
 def _assemble_fields(parts: HookInvocationParts) -> dict[str, object]:
     prompt, classifier, tool, subagent, context = _signal_bundle(parts)
     payload = _parts_payload(parts)
     fields = _default_fields()
+    workflow_attribution_kind = (
+        "owner"
+        if classifier.selected_workflows
+        else "context"
+        if context.workflows
+        else "missing"
+    )
+    prompt_capture_status = prompt.status if prompt.status in PROMPT_CAPTURE_STATUSES else "missing"
     fields.update({
         "hook_log_namespace": parts.hook_log_namespace,
         "root": str(parts.root),
@@ -169,14 +205,12 @@ def _assemble_fields(parts: HookInvocationParts) -> dict[str, object]:
         "selected_workflow": classifier.selected_workflows[0] if classifier.selected_workflows else "",
         "selected_workflows": list(classifier.selected_workflows), "workflow": list(classifier.selected_workflows), "workflow_family": classifier.selected_workflows[0] if classifier.selected_workflows else "",
         "workflow_selection_kind": "declared_workflow" if classifier.selected_workflows else "context_workflow" if context.workflows else "",
-        "workflow_attribution_kind": "owner" if classifier.selected_workflows else "context" if context.workflows else "missing",
+        "workflow_attribution_kind": workflow_attribution_kind,
         "workflow_owner": classifier.selected_workflows[0] if classifier.selected_workflows else "",
-        "workflow_owner_workflows": list(classifier.selected_workflows), "workflow_context_kind": "context_workflow" if context.workflows else "",
-        "workflow_context_source": "recent_log" if context.workflows else "", "workflow_context_workflows": list(context.workflows),
-        "workflow_context_timestamp": context.timestamp, "workflow_context_source_event": context.source_event, "selected_workflow_count": len(classifier.selected_workflows),
+        "workflow_owner_workflows": list(classifier.selected_workflows), **_workflow_context_fields(workflow_attribution_kind, context), "selected_workflow_count": len(classifier.selected_workflows),
         "candidate_skills": list(classifier.candidate_skills), "candidate_skill_reasons": list(classifier.candidate_skill_reasons), "candidate_skill_count": len(classifier.candidate_skills),
         "candidate_workflows": list(classifier.candidate_workflows), "candidate_workflow_count": len(classifier.candidate_workflows), "candidate_tools": list(classifier.candidate_tools), "candidate_tool_count": len(classifier.candidate_tools),
-        "prompt_capture_status": prompt.status, "prompt_excerpt_redacted": prompt.excerpt_redacted, "prompt_fingerprint": prompt.fingerprint, "prompt_char_count": prompt.char_count, "prompt_excerpt_truncated": prompt.truncated,
+        "prompt_capture_status": prompt_capture_status, "prompt_excerpt_redacted": prompt.excerpt_redacted if prompt_capture_status == "present" else "", "prompt_fingerprint": prompt.fingerprint if prompt_capture_status == "present" else "", "prompt_char_count": prompt.char_count if prompt_capture_status == "present" else 0, "prompt_excerpt_truncated": prompt.truncated if prompt_capture_status == "present" else False,
         "tool_name": tool.tool_name, "tool_selection_kind": tool.selection_kind, "tool_input_fingerprint": tool.tool_input_fingerprint, "tool_input_key_count": tool.tool_input_key_count, "tool_input_keys": list(tool.tool_input_keys), "tool_command_verb": tool.command_verb, "selected_tools": list(tool.selected_tools), "selected_tool_count": len(tool.selected_tools),
         "subagent_invoked": subagent.invoked, "subagent_event_kind": subagent.action, "subagent_tool_name": subagent.tool_name, "subagent_agent_type": subagent.agent_type, "subagent_target": subagent.target, "subagent_targets": list(subagent.targets), "subagent_target_count": len(subagent.targets) + int(bool(subagent.target)), "subagent_model": subagent.model, "subagent_reasoning_effort": subagent.reasoning_effort, "subagent_fork_context": subagent.fork_context, "subagent_prompt_fingerprint": subagent.prompt_fingerprint, "subagent_prompt_char_count": subagent.prompt_char_count, "subagent_item_count": subagent.item_count,
         "prompt_feedback_detected": bool(classifier.feedback_labels), "feedback_labels": list(classifier.feedback_labels), "feedback_targets": list(classifier.feedback_targets()), "feedback_action": classifier.feedback_action,
