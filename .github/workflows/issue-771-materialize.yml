@@ -358,10 +358,27 @@ jobs:
           python3 tests/agent_tools/test_surface_manifest_root_absence.py
           python3 tests/agent_tools/test_surface_manifest_sync_protocol.py
           python3 tests/tools/test_update_agent_canon_removed_legacy.py
-          python3 -m unittest \
-            tests.tools.test_update_agent_canon.SubmoduleUpdateAgentCanonTest.test_ensure_latest_reports_already_current_submodule
-          python3 -m pytest -q \
-            tests/tools/test_update_agent_canon_latest_todos.py::test_latest_reports_pending_update_todos_without_failing
+          python3 - <<'PY'
+          from pathlib import Path
+          import tempfile
+
+          from tests.tools.test_update_agent_canon import SubmoduleUpdateAgentCanonTest
+          from tests.tools.test_update_agent_canon_latest_todos import (
+              test_latest_reports_pending_update_todos_without_failing,
+          )
+
+          case = SubmoduleUpdateAgentCanonTest(
+              methodName="test_ensure_latest_reports_already_current_submodule"
+          )
+          case.setUp()
+          try:
+              case.test_ensure_latest_reports_already_current_submodule()
+          finally:
+              case.doCleanups()
+
+          with tempfile.TemporaryDirectory() as tmp_dir:
+              test_latest_reports_pending_update_todos_without_failing(Path(tmp_dir))
+          PY
 
       - name: Run /workspace bind-mount regression
         shell: bash
