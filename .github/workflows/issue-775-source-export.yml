@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - refactor/775-direct-luna-skill-dispatch
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
