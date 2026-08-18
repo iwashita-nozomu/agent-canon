@@ -1,5 +1,5 @@
 # generated role view: generated_role_view_v1
-# source canonical digest: 04208a0f63875c6428ed4e70f11998530ef5de53e516745d92eb837ec0064cc7
+# source canonical digest: e1796fc6a4f4da412e2090f03f0d83221ddf2e63900d260f1d907227e1a847dc
 
 name = "test_designer"
 description = "Read-only agent for post-implementation static analysis when an explicit unresolved oracle, specification, regression, or failure-mode risk remains beyond existing validation."
@@ -9,4 +9,4 @@ approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = "You are acting as test_designer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."
+developer_instructions = "You are acting as test_designer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass."

@@ -185,7 +185,7 @@ repo 全体の runtime 影響がある場合、または template pin を更新�
 - AgentCanon branch push 先と shared canon main の commit が evidence に記録済み
 - template repo では `origin/main` と shared canon main の更新が evidence に記録済み
 - non-canonical draft、backup copy、dated snapshot、旧 root surface 参照が tracked tree に残っていない
-- `closeout_gate.md` が `unfinished_tasks_absent=yes`、`dependency_headers_complete=yes`、`mechanical_completion_loop_complete=yes`、`diff_check_agent_complete=yes`、`user_completion_report=unlocked`
+- `closeout_gate.md` が `unfinished_tasks_absent=yes`、`dependency_headers_complete=yes`、`review_convergence_complete=yes`、`diff_check_agent_complete=yes`、`user_completion_report=unlocked`
 - run-local diff-check artifact が現在 tracked diff ref の read-only independent approval と findings disposition を示している
 
 ## Convention Compliance Gate

@@ -788,7 +788,7 @@ exit 条件:
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes`
 - `closeout_gate.md` の `completion_coverage_consumer=yes`、`coverage_check.ok=true`、および `completion_boundary.topology_errors=[]`
 - selected review gate の post-fix evidence (full review は touched contract が要求する final candidate の場合だけ)
-- `closeout_gate.md` の `mechanical_completion_loop_complete=yes` と構造化 loop evidence
+- `closeout_gate.md` の `review_convergence_complete=yes` と構造化 loop evidence
 - selected diff-check review がある場合だけ `closeout_gate.md` の `diff_check_agent_complete=yes` と run-local artifact evidence
 - `closeout_gate.md` の `canonical_tree_head_complete=yes`
 - `user_request_contract.md` の `all_clauses_resolved=yes` と `forbidden_drift_detected=no`
@@ -810,7 +810,7 @@ exit 条件:
   revert ではなく、intent-preserving repair / redesign / escalation として
   証跡化されていることが `Review Finding Integration Evidence` に記録されている
 - review-driven fix が入った場合、changed behavior / owner / correctness / validation / publication を変えた accepted finding に限り selected gate の latest diff rerun evidence を記録する。full review rerun は final candidate が要求した場合だけ行う
-- planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙した loop evidence が `Mechanical Completion Loop Evidence` に記録されている
+- planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙した loop evidence が `Review Convergence Evidence` に記録されている
 - selected owning review gate の decision、latest diff ref、findings disposition が記録される。read-only diff-check artifact はその gate が選択した場合だけ要求する
 - canonical design path と implementation path だけが tracked tree に残っていることが `Canonical Tree-Head Evidence` に記録されている
 - user request clause の未解決がない

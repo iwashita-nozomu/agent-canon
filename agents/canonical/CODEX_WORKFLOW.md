@@ -465,7 +465,7 @@ canonical formatter/dispatcher、validation-response、review integration が
    duplicate that semantic rule.
 1. diff-check agent が `approve` し、未完了 work unit、未解決 finding、未実行 validation、未同期 canon、未 commit / push、未判断 follow-up が無い場合だけ loop を止めます。
 
-`closeout_gate.md` の `mechanical_completion_loop_complete=yes` と `diff_check_agent_complete=yes` が揃った時点で、`user_completion_report=unlocked` にできます。
+`closeout_gate.md` の `review_convergence_complete=yes` と `diff_check_agent_complete=yes` が揃った時点で、`user_completion_report=unlocked` にできます。
 
 ## Contract-Required Skill Set
 
@@ -862,7 +862,7 @@ environment, produce resources, or duplicate tests/gates.
   requested-change への応答として、user request と design intent が保持された
   evidence を要求します。revert / discard が含まれる場合は、撤回、置換、owner
   外、unsafe replacement、または escalation の authority を示します
-- `closeout_gate.md` の `mechanical_completion_loop_complete=yes` で、planned work、review findings、validation、dependency review、static analysis、reading evidence、commit / push、shared canon sync、follow-up 判断を構造化 loop evidence として残す
+- `closeout_gate.md` の `review_convergence_complete=yes` で、planned work、review findings、validation、dependency review、static analysis、reading evidence、commit / push、shared canon sync、follow-up 判断を構造化 loop evidence として残す
 - `closeout_gate.md` の `subagents_closed=yes` で、run-local subagent の close と fresh lifecycle evidence を示す
 - `closeout_gate.md` の `diff_check_agent_complete=yes` で、run-local diff-check artifact、read-only independent agent、latest diff ref、`approve` decision、findings disposition を示す
 - `closeout_gate.md` の `canonical_tree_head_complete=yes` で、設計文書、implementation surface、snapshot tree、backup path の正本状態を示す

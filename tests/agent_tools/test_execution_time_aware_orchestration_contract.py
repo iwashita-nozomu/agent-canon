@@ -22,9 +22,24 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover
+    import tomli as tomllib  # type: ignore[no-redef]
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "check_execution_time_aware_orchestration.py"
+CHECKER = (
+    PROJECT_ROOT
+    / "tools"
+    / "agent_tools"
+    / "check_execution_time_aware_orchestration.py"
+)
+CONTRACT_PATH = (
+    PROJECT_ROOT / "agents" / "skills" / "agent-orchestration.execution-contract.toml"
+)
 OWNER_REF = (
     "agents/skills/agent-orchestration.md#"
     "Execution-Time-Aware Work-Conservation Contract"
@@ -45,11 +60,12 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
     """Keep the owner contract and its projections connected."""
 
     def read(self, relative_path: str) -> str:
-        """Read one repository surface for a static contract assertion."""
         return (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
 
+    def contract(self) -> dict[str, object]:
+        return tomllib.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+
     def fixture_root(self, temporary_directory: str) -> Path:
-        """Copy only the owner closure needed by the production checker."""
         root = Path(temporary_directory)
         for relative_path in CONTRACT_FIXTURE_PATHS:
             source = PROJECT_ROOT / relative_path
@@ -59,7 +75,6 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
         return root
 
     def run_checker(self, root: Path) -> subprocess.CompletedProcess[str]:
-        """Run the production checker against one isolated fixture."""
         return subprocess.run(
             [sys.executable, str(CHECKER), "--root", str(root)],
             cwd=PROJECT_ROOT,
@@ -69,56 +84,63 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
         )
 
     def assert_rejected(self, root: Path, category: str) -> None:
-        """Require a strict checker failure for one rejected mutation class."""
         result = self.run_checker(root)
-        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotEqual(
+            result.returncode,
+            0,
+            result.stdout + result.stderr,
+        )
         self.assertIn(
             f"EXECUTION_TIME_AWARE_ORCHESTRATION_FINDING={category}:",
             result.stdout,
         )
 
     def append(self, root: Path, relative_path: str, text: str) -> None:
-        """Append one controlled negative-fixture mutation."""
         path = root / relative_path
-        path.write_text(path.read_text(encoding="utf-8") + text, encoding="utf-8")
+        path.write_text(
+            path.read_text(encoding="utf-8") + text,
+            encoding="utf-8",
+        )
+
+    def consumer(self, consumer_id: str) -> dict[str, object]:
+        consumers = self.contract().get("consumers")
+        self.assertIsInstance(consumers, list)
+        matches = [
+            item
+            for item in consumers
+            if isinstance(item, dict) and item.get("id") == consumer_id
+        ]
+        self.assertEqual(len(matches), 1)
+        return matches[0]
 
     def test_owner_keeps_the_complete_work_conservation_contract(self) -> None:
-        """The canonical owner must retain every execution-time decision."""
         text = " ".join(
             self.read("agents/skills/agent-orchestration.md").lower().split()
         )
-
-        for marker in (
+        contract = self.contract()
+        markers = contract.get("owner_markers")
+        self.assertIsInstance(markers, list)
+        self.assertIn(
             "execution-time-aware work-conservation contract",
-            "dependency dag",
-            "critical path",
-            "ready set",
-            "minimize makespan",
-            "responsibility completeness",
-            "correctness",
-            "every ready node",
-            "non-conflicting",
-            "batch remote reads",
-            "warm worker and reviewer contexts",
-            "complete remaining closure",
-            "before opening the owning review",
-            "affected by the repaired node",
-            "wait only when the useful ready set is empty",
-            "elapsed-time scope gate",
-            "prompt-keyword routing",
-            "fixed duration",
-        ):
-            self.assertIn(marker, text, marker)
+            text,
+        )
+        for marker in markers:
+            self.assertIsInstance(marker, str)
+            self.assertIn(" ".join(marker.lower().split()), text, marker)
 
     def test_production_checker_accepts_the_complete_owner_closure(self) -> None:
-        """The production checker accepts the unmutated owner closure."""
         result = self.run_checker(PROJECT_ROOT)
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("EXECUTION_TIME_AWARE_ORCHESTRATION=pass", result.stdout)
+        self.assertEqual(
+            result.returncode,
+            0,
+            result.stdout + result.stderr,
+        )
+        self.assertIn(
+            "EXECUTION_TIME_AWARE_ORCHESTRATION=pass",
+            result.stdout,
+        )
 
     def test_rejects_duplicate_local_scheduling_definition(self) -> None:
-        """A consumer cannot introduce a second scheduling owner."""
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = self.fixture_root(temporary_directory)
             self.append(
@@ -126,80 +148,126 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
                 "agents/skills/pr-processing.md",
                 "\n## Execution-Time-Aware Work-Conservation Contract\n",
             )
-            self.assert_rejected(root, "duplicate_local_scheduling_definition")
+            self.assert_rejected(
+                root,
+                "duplicate_local_scheduling_definition",
+            )
 
     def test_rejects_duration_or_timeout_scope_cutoff(self) -> None:
-        """A schedule cannot use a budget or timeout to cut responsibility."""
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = self.fixture_root(temporary_directory)
-            self.append(root, "templates/agents/schedule.md", "\n- Duration budget: cut scope after timeout.\n")
-            self.assert_rejected(root, "duration_or_timeout_scope_cutoff")
+            self.append(
+                root,
+                "templates/agents/schedule.md",
+                "\n- Duration budget: cut scope after timeout.\n",
+            )
+            self.assert_rejected(
+                root,
+                "duration_or_timeout_scope_cutoff",
+            )
 
     def test_rejects_keyword_based_routing(self) -> None:
-        """A runtime shim cannot turn prompt keywords into scheduling policy."""
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = self.fixture_root(temporary_directory)
-            self.append(root, ".agents/skills/agent-orchestration/SKILL.md", "\n- Prompt keywords route ready nodes.\n")
+            self.append(
+                root,
+                ".agents/skills/agent-orchestration/SKILL.md",
+                "\n- Prompt keywords route ready nodes.\n",
+            )
             self.assert_rejected(root, "keyword_based_routing")
 
     def test_rejects_responsibility_scope_reduction(self) -> None:
-        """A queue specialization cannot reduce the requested responsibility."""
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = self.fixture_root(temporary_directory)
-            self.append(root, "agents/skills/pr-processing.md", "\n- Reduce requested responsibility to the first ready node.\n")
-            self.assert_rejected(root, "responsibility_scope_reduction")
+            self.append(
+                root,
+                "agents/skills/pr-processing.md",
+                "\n- Reduce requested responsibility to the first ready node.\n",
+            )
+            self.assert_rejected(
+                root,
+                "responsibility_scope_reduction",
+            )
 
-    def test_rejects_consumer_reference_without_executable_fields(self) -> None:
-        """A structured consumer reference must carry every executable field."""
+    def test_rejects_consumer_reference_without_executable_fields(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = self.fixture_root(temporary_directory)
             path = root / "agents/task_catalog.yaml"
-            text = path.read_text(encoding="utf-8")
-            path.write_text(text.replace("    - context_reuse\n", "", 1), encoding="utf-8")
-            self.assert_rejected(root, "consumer_reference_without_executable_fields")
+            task_catalog = yaml.safe_load(path.read_text(encoding="utf-8"))
+            task_catalog["execution_time_policy"]["executable_fields"].remove(
+                "context_reuse"
+            )
+            path.write_text(
+                yaml.safe_dump(task_catalog, sort_keys=False),
+                encoding="utf-8",
+            )
+            self.assert_rejected(
+                root,
+                "consumer_reference_without_executable_fields",
+            )
 
     def test_rejects_consumer_reference_mismatch(self) -> None:
-        """A consumer cannot point at an alternate scheduling owner."""
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = self.fixture_root(temporary_directory)
             path = root / "agents/task_catalog.yaml"
-            text = path.read_text(encoding="utf-8")
-            path.write_text(text.replace(OWNER_REF, "agents/skills/other-owner.md#Contract", 1), encoding="utf-8")
-            self.assert_rejected(root, "consumer_reference_mismatch")
+            task_catalog = yaml.safe_load(path.read_text(encoding="utf-8"))
+            task_catalog["execution_time_policy"]["owner_ref"] = (
+                "agents/skills/other-owner.md#Contract"
+            )
+            path.write_text(
+                yaml.safe_dump(task_catalog, sort_keys=False),
+                encoding="utf-8",
+            )
+            self.assert_rejected(
+                root,
+                "consumer_reference_mismatch",
+            )
 
     def test_pr_processing_consumes_and_specializes_the_owner(self) -> None:
-        """PR processing keeps queue-specific rules under the owner contract."""
-        text = " ".join(self.read("agents/skills/pr-processing.md").lower().split())
-
+        spec = self.consumer("pr-processing")
+        path = spec["path"]
+        self.assertIsInstance(path, str)
+        text = " ".join(self.read(path).lower().split())
         self.assertIn(OWNER_REF.lower(), text)
-        for marker in (
-            "batched queue snapshot",
-            "independent candidates",
-            "one closure review for each exact candidate",
-            "only the affected candidate evidence",
-            "same warm worker and reviewer context",
-            "merge candidates in dependency order",
-            "never use elapsed time",
-        ):
-            self.assertIn(marker, text, marker)
+        markers = spec.get("required_markers")
+        self.assertIsInstance(markers, list)
+        for marker in markers:
+            self.assertIsInstance(marker, str)
+            self.assertIn(" ".join(marker.lower().split()), text, marker)
 
     def test_runtime_catalog_and_schedule_project_the_owner(self) -> None:
-        """Projections point to the owner without becoming policy copies."""
-        self.assertIn(OWNER_REF, self.read("agents/task_catalog.yaml"))
+        task_catalog = yaml.safe_load(self.read("agents/task_catalog.yaml"))
+        self.assertEqual(
+            task_catalog["execution_time_policy"]["owner_ref"],
+            OWNER_REF,
+        )
         self.assertIn(OWNER_REF, self.read("templates/agents/schedule.md"))
-        self.assertIn(OWNER_REF, self.read(".agents/skills/agent-orchestration/SKILL.md"))
 
-        schedule = " ".join(self.read("templates/agents/schedule.md").lower().split())
-        for marker in (
-            "execution-time-aware plan",
-            "dependency dag / closure",
-            "critical path",
-            "ready set",
-            "useful ready set",
-            "dispatch batch",
-            "affected evidence invalidation",
-        ):
-            self.assertIn(marker, schedule, marker)
+        runtime_spec = self.consumer("runtime-shim")
+        runtime_path = runtime_spec["path"]
+        self.assertIsInstance(runtime_path, str)
+        runtime = " ".join(self.read(runtime_path).lower().split())
+        runtime_markers = runtime_spec.get("required_markers")
+        self.assertIsInstance(runtime_markers, list)
+        for marker in runtime_markers:
+            self.assertIsInstance(marker, str)
+            self.assertIn(" ".join(marker.lower().split()), runtime, marker)
+
+        schedule_spec = self.consumer("schedule")
+        path = schedule_spec["path"]
+        self.assertIsInstance(path, str)
+        schedule = " ".join(self.read(path).lower().split())
+        markers = schedule_spec.get("required_markers")
+        self.assertIsInstance(markers, list)
+        for marker in markers:
+            self.assertIsInstance(marker, str)
+            self.assertIn(
+                " ".join(marker.lower().split()),
+                schedule,
+                marker,
+            )
 
 
 if __name__ == "__main__":
