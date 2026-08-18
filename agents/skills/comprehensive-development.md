@@ -11,8 +11,6 @@ upstream design ../internal-routines/design-implementation-correspondence.md cro
 upstream design ../../documents/conventions/software-engineering-principles.md contract-first decision precedence and responsibility-boundary policy
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic action and verification-owner allocation
 upstream design ../../documents/design/entrypoint-owner-map.md root entrypoint responsibility migration boundary
-downstream implementation ../../evidence/agent-evals/issue_eval_manifest.toml issue-derived regression mapping eval
-downstream implementation ../../tests/agent_tools/test_issue_eval_manifest.py verifies regression mapping and projection boundaries
 @dependency-end
 -->
 
@@ -89,29 +87,6 @@ root-cause closure とみなしません。追加前に、現在の task packet 
 - parser、classifier、state construction、lifecycle、environment setup を production owner と別に test 側で再実装しないか
 - 同じ invariant を固定する historical regression を削除・統合できるか
 - focused test が診断する property と、正式 entrypoint / consumer boundary から判定する completion oracle
-
-次の表は新しい regression taxonomy や全 repository 向けの必須 schema ではありません。
-過去の failure 群を bug 名ごとの test owner にせず、既存の canonical invariant と
-boundary oracle へ統合できることを示す代表 witness mapping です。実際の変更では各 domain の
-production owner と public / canonical entrypoint を使います。
-
-| Historical failure family | Canonical invariant / owner class | Minimal boundary / counterexample set | Canonical oracle |
-| --- | --- | --- | --- |
-| cleanup / rollback / audit preservation | lifecycle / recovery / audit owner | terminal / nonterminal、interruption、repeated attempt、partial-effect rollback | production lifecycle entrypoint を通る finite-state transition table と audit readback |
-| concurrency / reservation / idempotent retry | reservation protocol / state-transition / idempotency owner | zero / one / many contenders、duplicate request、capacity boundary、interleaving | production reservation owner を通る table / property oracle と atomic state readback |
-| wait / backoff / timeout / cancel | temporal / liveness / cancellation owner | pre-timeout / at-timeout / post-timeout、cancel before / after effect、retry exhaustion | public wait / cancel entrypoint と virtual-clock boundary acceptance |
-| payment / refund / discount / tax normalization / rounding | monetary normalization / ordering / precision owner | zero / negative、discount-tax-refund ordering、precision limit、rounding tie | production money value / normalization owner の property oracle と known vectors |
-| empty / malformed / legacy input shape | parser / compatibility owner | omitted、empty、scalar、malformed、legacy shape | production parser の public boundary acceptance table |
-| multi-binding / submodule / generated-file ownership / projection drift | single-owner source identity / projection owner | zero / one / many bindings、stale pin / source digest、generated drift | canonical materializer / projection entrypoint の source readback |
-| PASS / FAIL / NOT_RUN、missing artifacts、stale evidence | completion-state / evidence identity owner | status-artifact cross-product、missing artifact、stale evidence、clean-replay contradiction | canonical status evaluator、artifact identity readback、clean replay acceptance |
-
-この代表 mapping の issue-derived evidence owner は
-[`issue_eval_manifest.toml`](../../evidence/agent-evals/issue_eval_manifest.toml) です。
-既存 checker
-[`test_issue_eval_manifest.py`](../../tests/agent_tools/test_issue_eval_manifest.py) は、
-表の family / invariant / boundary が欠ける場合、eval artifact の接続が欠ける場合、
-generated consumer に policy が複製される場合、focused pass が canonical acceptance へ
-昇格される場合、または completion state が矛盾する場合に fail closed します。
 
 同じ invariant に属する複数の historical failure は、個別 bug 名ごとの test を増やすより、
 可能な限り一つの canonical oracle と最小 counterexample 集合へ収束させます。有限 relation / state

@@ -372,18 +372,23 @@ def ready_closeout_evidence_lines(
         "- agent_canon_source_head: fixture-source-head",
         "- agent_canon_parent_pin: fixture-parent-pin",
         "",
-        "## Mechanical Completion Loop Evidence",
-        "- mechanical_loop_iterations: 1",
-        "- mechanical_loop_open_items: none",
-        "- mechanical_loop_stop_reason: all structured loop fields complete",
-        "- mechanical_loop_planned_work_status: complete",
-        "- mechanical_loop_review_findings_status: none",
-        "- mechanical_loop_validation_status: pass",
-        "- mechanical_loop_dependency_review_status: pass",
-        "- mechanical_loop_static_analysis_status: pass",
-        "- mechanical_loop_commit_push_status: complete",
-        "- mechanical_loop_canon_sync_status: complete",
-        "- mechanical_loop_follow_up_status: none",
+        "## Review Convergence Evidence",
+        "- convergence_schema: agent-canon.review-convergence.v1",
+        "- candidate_epoch: 1",
+        "- candidate_digest: sha256:" + "a" * 64,
+        "- initial_review_status: complete",
+        "- initial_blocking_finding_ids: none",
+        "- focused_recheck_finding_ids: none",
+        "- open_blocking_finding_ids: none",
+        "- advisory_finding_ids: none",
+        "- unresolved_request_clause_ids: none",
+        "- unresolved_validation_ids: none",
+        "- unresolved_measure_initial: 0",
+        "- unresolved_measure_final: 0",
+        "- selected_validation_status: pass",
+        "- same_state_action_repeated: no",
+        "- terminal_state: ship",
+        "- new_epoch_reason: none",
         "",
         "## Tool Warning Evidence",
         "- tool_warning_monitoring_status: none",
@@ -895,9 +900,9 @@ def write_ready_closeout_bundle(
                 "- repo_wide_static_analysis_complete: yes",
                 "- agent_canon_latest_complete: yes",
                 "- review_findings_integrated: yes",
-                "- post_fix_full_review_complete: yes",
+                "- focused_recheck_complete: yes",
                 "- tool_warnings_resolved: yes",
-                "- mechanical_completion_loop_complete: yes",
+                "- review_convergence_complete: yes",
                 "- subagents_closed: yes",
                 "- diff_check_agent_complete: yes",
                 "- canonical_tree_head_complete: yes",
@@ -3007,9 +3012,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- repo_wide_static_analysis_complete: yes",
                         "- agent_canon_latest_complete: yes",
                         "- review_findings_integrated: yes",
-                        "- post_fix_full_review_complete: yes",
+                        "- focused_recheck_complete: yes",
                         "- tool_warnings_resolved: yes",
-                        "- mechanical_completion_loop_complete: yes",
+                        "- review_convergence_complete: yes",
                         "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
@@ -3066,8 +3071,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "- repo_wide_static_analysis_complete: profile_selected",
             )
             closeout_text = closeout_text.replace(
-                "- mechanical_loop_static_analysis_status: pass",
-                "- mechanical_loop_static_analysis_status: targeted",
+                "- selected_validation_status: pass",
+                "- selected_validation_status: pass",
             )
             closeout_path.write_text(closeout_text, encoding="utf-8")
             write_ready_diff_check_artifact(report_dir)
@@ -3107,8 +3112,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "- repo_wide_static_analysis_complete: profile_selected",
             )
             closeout_text = closeout_text.replace(
-                "- mechanical_loop_static_analysis_status: pass",
-                "- mechanical_loop_static_analysis_status: pending",
+                "- selected_validation_status: pass",
+                "- selected_validation_status: pending",
             )
             closeout_path.write_text(closeout_text, encoding="utf-8")
             write_ready_diff_check_artifact(report_dir)
@@ -3128,7 +3133,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
-            self.assertIn("mechanical_loop_static_analysis_status", result.stdout)
+            self.assertIn("selected_validation_status", result.stdout)
 
     def test_task_close_rejects_open_tool_warning(self) -> None:
         """task_close should fail while workflow monitoring has open tool warnings."""
@@ -3288,9 +3293,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- repo_wide_static_analysis_complete: yes",
                         "- agent_canon_latest_complete: yes",
                         "- review_findings_integrated: yes",
-                        "- post_fix_full_review_complete: yes",
+                        "- focused_recheck_complete: yes",
                         "- tool_warnings_resolved: yes",
-                        "- mechanical_completion_loop_complete: yes",
+                        "- review_convergence_complete: yes",
                         "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
@@ -3474,7 +3479,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("REPORT_ACTIVE_RUN_MATCH=no", result.stdout)
             self.assertIn("report_active_run_match", result.stdout)
 
-    def test_task_close_rejects_missing_mechanical_loop_or_diff_check(self) -> None:
+    def test_task_close_rejects_missing_review_convergence_or_diff_check(self) -> None:
         """task_close should fail when parent-only closeout skips the final diff loop."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
@@ -3486,10 +3491,10 @@ class BootstrapAndCloseTest(unittest.TestCase):
             closeout_text = closeout_path.read_text(encoding="utf-8")
             closeout_path.write_text(
                 closeout_text.replace(
-                    "- mechanical_completion_loop_complete: yes\n"
+                    "- review_convergence_complete: yes\n"
                     "- subagents_closed: yes\n"
                     "- diff_check_agent_complete: yes",
-                    "- mechanical_completion_loop_complete: no\n"
+                    "- review_convergence_complete: no\n"
                     "- subagents_closed: no\n"
                     "- diff_check_agent_complete: no",
                 ),
@@ -3512,7 +3517,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
-            self.assertIn("mechanical_completion_loop_complete", result.stdout)
+            self.assertIn("review_convergence_complete", result.stdout)
             self.assertIn("diff_check_agent_complete", result.stdout)
 
     def test_task_close_rejects_missing_subagent_lifecycle_evidence(self) -> None:
@@ -3671,8 +3676,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     self.assertIn("CLOSEOUT_READY=no", result.stdout)
                     self.assertIn(expected_blocker, result.stdout)
 
-    def test_task_close_rejects_incomplete_mechanical_loop_evidence(self) -> None:
-        """task_close should fail when mechanical loop structured evidence is incomplete."""
+    def test_task_close_rejects_incomplete_review_convergence_evidence(self) -> None:
+        """task_close should fail when review convergence structured evidence is incomplete."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-incomplete-mechanical-loop"
@@ -3682,8 +3687,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
             closeout_path = report_dir / "closeout_gate.md"
             closeout_path.write_text(
                 closeout_path.read_text(encoding="utf-8").replace(
-                    "- mechanical_loop_validation_status: pass",
-                    "- mechanical_loop_validation_status: missing",
+                    "- selected_validation_status: pass",
+                    "- selected_validation_status: missing",
                 ),
                 encoding="utf-8",
             )
@@ -3704,7 +3709,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
-            self.assertIn("mechanical_loop_validation_status", result.stdout)
+            self.assertIn("selected_validation_status", result.stdout)
 
     def test_task_close_rejects_markdown_change_without_structure_evidence(
         self,
@@ -5053,9 +5058,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- repo_wide_static_analysis_complete: yes",
                         "- agent_canon_latest_complete: yes",
                         "- review_findings_integrated: yes",
-                        "- post_fix_full_review_complete: yes",
+                        "- focused_recheck_complete: yes",
                         "- tool_warnings_resolved: yes",
-                        "- mechanical_completion_loop_complete: no",
+                        "- review_convergence_complete: no",
                         "- diff_check_agent_complete: no",
                         "- canonical_tree_head_complete: yes",
                         "- agent_evaluation_complete: yes",
@@ -5149,8 +5154,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- repo_wide_static_analysis_complete: yes",
                         "- agent_canon_latest_complete: yes",
                         "- review_findings_integrated: no",
-                        "- post_fix_full_review_complete: no",
-                        "- mechanical_completion_loop_complete: yes",
+                        "- focused_recheck_complete: no",
+                        "- review_convergence_complete: yes",
                         "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
@@ -5188,7 +5193,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("completion_coverage_consumer", result.stdout)
             self.assertIn("review_findings_integrated", result.stdout)
 
-    def test_task_close_rejects_missing_post_fix_full_review_completion(self) -> None:
+    def test_task_close_rejects_missing_focused_recheck_completion(self) -> None:
         """task_close should fail when review-driven fixes skipped the final full rerun."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
@@ -5199,7 +5204,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     sys.executable,
                     str(BOOTSTRAP_SCRIPT),
                     "--task",
-                    "closeout missing post-fix full review",
+                    "closeout missing focused recheck",
                     "--owner",
                     "codex",
                     "--run-id",
@@ -5219,7 +5224,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "\n".join(
                     [
                         f"run_id={run_id}",
-                        "task=closeout missing post-fix full review",
+                        "task=closeout missing focused recheck",
                         "owner=codex",
                         "created_at_utc=2026-04-08T00:00:00Z",
                         "status=pass",
@@ -5264,8 +5269,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- repo_wide_static_analysis_complete: yes",
                         "- agent_canon_latest_complete: yes",
                         "- review_findings_integrated: yes",
-                        "- post_fix_full_review_complete: no",
-                        "- mechanical_completion_loop_complete: yes",
+                        "- focused_recheck_complete: no",
+                        "- review_convergence_complete: yes",
                         "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
@@ -5300,7 +5305,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
-            self.assertIn("post_fix_full_review_complete", result.stdout)
+            self.assertIn("focused_recheck_complete", result.stdout)
 
     def test_task_close_rejects_missing_canonical_tree_head_completion(self) -> None:
         """task_close should fail when canonical tree-head cleanup is incomplete."""
@@ -5358,9 +5363,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- repo_wide_static_analysis_complete: yes",
                         "- agent_canon_latest_complete: yes",
                         "- review_findings_integrated: yes",
-                        "- post_fix_full_review_complete: yes",
+                        "- focused_recheck_complete: yes",
                         "- tool_warnings_resolved: yes",
-                        "- mechanical_completion_loop_complete: yes",
+                        "- review_convergence_complete: yes",
                         "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: no",
@@ -5473,9 +5478,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- repo_wide_static_analysis_complete: yes",
                         "- agent_canon_latest_complete: yes",
                         "- review_findings_integrated: yes",
-                        "- post_fix_full_review_complete: yes",
+                        "- focused_recheck_complete: yes",
                         "- tool_warnings_resolved: yes",
-                        "- mechanical_completion_loop_complete: yes",
+                        "- review_convergence_complete: yes",
                         "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",

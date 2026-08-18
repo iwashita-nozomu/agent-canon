@@ -27,8 +27,11 @@ review_activation_policy:
     checker_owned_properties: route_to_static_or_deterministic_checker
     private_helpers_and_incidental_apis: do_not_freeze
   review_finding_rework:
-    rework_when: behavior_owner_boundary_correctness_validation_or_publication_changes
-    record_without_new_wave: duplicate_stylistic_already_covered_or_evidence_free
+    initial_review: one_per_candidate_epoch_with_stable_blocking_finding_ids
+    focused_recheck: addressed_blockers_and_invalidated_evidence_only
+    rework_when: stable_blocker_closure_or_typed_new_epoch_evidence
+    record_without_new_wave: advisory_duplicate_stylistic_already_covered_or_evidence_free
+    same_state_action: non_convergent_cycle
   validation:
     owner_ref: "agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary"
     route_source: parent_packet.validation_route
@@ -48,8 +51,16 @@ execution_time_policy:
     - dependency_dag
     - responsibility_completeness
     - correctness
+    - decision_relevant_total_work
+    - makespan_objective
+    - critical_path
+    - ready_set
     - context_reuse
     - affected_evidence_invalidation
+    - candidate_epoch
+    - blocking_finding_ids
+    - focused_recheck
+    - terminal_state
 
 role_topology_defaults: &standard_role_topology
   capacity_derivation: declared_team_peak_plus_nested_reservations_v1

@@ -46,9 +46,9 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - repo_wide_static_analysis_complete: no
 - agent_canon_latest_complete: no
 - review_findings_integrated: no
-- post_fix_full_review_complete: not_applicable
+- focused_recheck_complete: not_applicable
 - tool_warnings_resolved: no
-- mechanical_completion_loop_complete: no
+- review_convergence_complete: no
 - subagents_closed: no
 - diff_check_agent_complete: not_applicable
 - canonical_tree_head_complete: no
@@ -88,9 +88,9 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - canonical_dispatcher_schema_status: pass
 - validation_failure_response_status: pass
 - review_findings_integrated: yes
-<!-- selected final-contract rerun が完了したら post_fix_full_review_complete を yes にし、未選択なら not_applicable にします。 -->
+<!-- repair 後の focused recheck が完了したら focused_recheck_complete を yes にし、initial review で blocker が無ければ not_applicable にします。 -->
 - tool_warnings_resolved: yes
-- mechanical_completion_loop_complete: yes
+- review_convergence_complete: yes
 - subagents_closed: yes
 <!-- diff-check gate が有効で完了したら diff_check_agent_complete を yes にし、それ以外は not_applicable にします。 -->
 - canonical_tree_head_complete: yes
@@ -169,9 +169,15 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 
 <!-- required review artifact と、finding を fixed、escalated、follow-up として明示的に accepted したかを記録します。fix-now finding が未適用または未 review の間は completion を unlock しません。 -->
 
-## Post-Fix Full Review Evidence（修正後 full review evidence）
+## Focused Recheck Evidence（focused recheck evidence）
 
-<!-- earlier review pass 後に review-driven fix が入った場合は latest diff の refreshed full review artifact path を記録します。last full review pass 後に post-review fix がなければ明記します。 -->
+<!-- initial owning review が stable blocking finding ID を返し、その repair が入った場合だけ記録します。candidate epoch/digest、repaired finding IDs、repair が invalidated した evidence IDs、focused recheck verdict を固定し、full review を再開しません。 -->
+
+- focused_recheck_candidate_epoch:
+- focused_recheck_candidate_digest:
+- focused_recheck_finding_ids:
+- focused_recheck_invalidated_evidence_ids:
+- focused_recheck_status:
 
 ## Document Structure Evidence（文書 structure evidence）
 
@@ -212,21 +218,26 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - cleanup failure cause and typed hold:
 - parent handoff for any unexpected action:
 
-## Mechanical Completion Loop Evidence（mechanical completion loop evidence）
+## Review Convergence Evidence（review convergence evidence）
 
-<!-- finalization loop ごとに planned work unit/active clause の確認、latest diff、validation/dependency/static-analysis evidence、diff-check agent decision、fix-now finding の適用、停止理由を記録します。planned work、review finding、validation/dependency/static-analysis failure、commit/push、canon-sync、follow-up decision が scope に残る間は complete にしません。 -->
+<!-- `agent-canon.review-convergence.v1` の terminal projection を記録します。one initial owning review、stable blocker IDs、focused recheck、unresolved measure、selected validation、same-state/action cycle の不在を一度だけ判定します。zero blocker + zero unresolved request clause + selected validation pass/not_applicable で ship/handoff し、advisory improvement は現 task を再開しません。 -->
 
-- mechanical_loop_iterations:
-- mechanical_loop_open_items:
-- mechanical_loop_stop_reason:
-- mechanical_loop_planned_work_status:
-- mechanical_loop_review_findings_status:
-- mechanical_loop_validation_status:
-- mechanical_loop_dependency_review_status:
-- mechanical_loop_static_analysis_status:
-- mechanical_loop_commit_push_status:
-- mechanical_loop_canon_sync_status:
-- mechanical_loop_follow_up_status:
+- convergence_schema: agent-canon.review-convergence.v1
+- candidate_epoch:
+- candidate_digest:
+- initial_review_status:
+- initial_blocking_finding_ids:
+- focused_recheck_finding_ids:
+- open_blocking_finding_ids:
+- advisory_finding_ids:
+- unresolved_request_clause_ids:
+- unresolved_validation_ids:
+- unresolved_measure_initial:
+- unresolved_measure_final:
+- selected_validation_status:
+- same_state_action_repeated:
+- terminal_state:
+- new_epoch_reason:
 
 ## Subagent Lifecycle Evidence（subagent lifecycle evidence）
 

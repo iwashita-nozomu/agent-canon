@@ -122,6 +122,21 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
   loader/readback した configured value です。現在は direct frontier `21` と
   nested reservation `6` から生成された `27` で、universal hard ceiling では
   ありません。
+- `max_threads` は同時実行 capacity であり、総作業量を増やす許可では
+  ありません。自律実行の目的関数は request completeness/correctness、minimum
+  decision-relevant total work、minimum makespan の lexicographic order です。
+- exact candidate digest ごとに candidate epoch を一つ持ち、initial owning review
+  は一度だけ実行します。review は stable blocking finding IDs と advisory notes を
+  分離し、repair 後は addressed blocker IDs と invalidated evidence だけを focused
+  recheck します。
+- follow-up action は decision tuple を変える typed evidence を生成するか、
+  `|blocking findings| + |unresolved validation| + |unresolved request clauses|` を
+  厳密に減らす場合だけ admissible です。同じ state/action fingerprint は
+  `non_convergent_cycle` として停止し、新しい broad review や implementation pass を
+  起動しません。
+- zero blocker、zero unresolved request clause、selected validation pass または
+  not_applicable は terminal ship/handoff です。その後の improvement は advisory
+  または別 Issue とし、現 candidate epoch を再開しません。
 - `.codex/config.toml` の `[agents].max_depth` は `2` を正本にし、one bounded child-subagent layer を許可します
 - cap は同時実行数の上限として扱います
 - `.codex/config.toml` の `[agents]` は budget と runtime timeout の設定であり、subagent spawn 許可は上位 runtime / developer instruction に従います

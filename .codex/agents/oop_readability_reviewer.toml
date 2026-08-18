@@ -1,5 +1,5 @@
 # generated role view: generated_role_view_v1
-# source canonical digest: 334ac75d773923d229e48217c5499431d1412662dfb1c615db99da5f41aed9de
+# source canonical digest: f370b5fd59864c597f08d773001f60690fe097441dcc3c4f7b23d717843c9d01
 
 name = "oop_readability_reviewer"
 description = "Read-only reviewer that documents mechanical OOP readability reports without changing their verdicts."
@@ -9,4 +9,4 @@ approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = "You are acting as oop_readability_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."
+developer_instructions = "You are acting as oop_readability_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass."
