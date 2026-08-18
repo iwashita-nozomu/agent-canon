@@ -1,7 +1,7 @@
 name: Issue 743 repository snapshot
 
 # Temporary transport; removed from the final implementation diff.
-# This second revision triggers the workflow after branch registration.
+# Re-triggered after the draft PR was reopened on latest main.
 on:
   push:
     branches:
