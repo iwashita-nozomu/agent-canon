@@ -1,0 +1,27 @@
+name: Issue 768 Workspace Export
+
+on:
+  push:
+    branches:
+      - fix/768-sealed-candidate-publication
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Build workspace archive
+        run: git archive --format=tar.gz --output=agent-canon-issue-768.tar.gz HEAD
+      - name: Upload workspace archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-768-workspace
+          path: agent-canon-issue-768.tar.gz
+          if-no-files-found: error
