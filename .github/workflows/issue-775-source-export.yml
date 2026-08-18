@@ -1,0 +1,23 @@
+name: Issue 775 source export
+
+on:
+  push:
+    branches:
+      - refactor/775-direct-luna-skill-dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: issue-775-agent-canon-source
+          path: |
+            .
+            !.git
+          include-hidden-files: true
+          retention-days: 1
