@@ -11,6 +11,9 @@ on:
   push:
     branches:
       - feat/766-split-raw-annex-results
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
