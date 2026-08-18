@@ -23,8 +23,8 @@ try:
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
-from pathlib import Path
+from dataclasses import dataclass, replace
+from pathlib import Path, PurePosixPath
 from typing import cast
 
 DEFAULT_MANIFEST = Path("documents/runtime/shared-runtime-surfaces.toml")
@@ -54,6 +54,9 @@ ALLOWED_MODES = frozenset(
         "removed_legacy",
     }
 )
+DELETION_MODES = frozenset({"removed_legacy", "standalone_only"})
+ROOT_ABSENCE_TASK = "root-absence"
+UPDATE_TRANSITION_TASK = "update-transition"
 ALLOWED_PROJECTION_PRODUCERS = frozenset(
     {
         "agent-canon",
@@ -147,6 +150,7 @@ class SurfaceManifest:
     surface_selection: SurfaceSelection
     entries: tuple[SurfaceEntry, ...]
     update_transitions: tuple[UpdateTransition, ...]
+    deletion_targets: tuple[DeletionTarget, ...]
 
     @property
     def integration_mode(self) -> str:
@@ -198,6 +202,124 @@ class UpdateTransition:
     transition_id: str
     from_agent_canon_pins: tuple[str, ...]
     candidates: tuple[UpdateTransitionCandidate, ...]
+
+
+@dataclass(frozen=True)
+class DeletionTarget:
+    """One task-owned deletion target admitted below a canonical root."""
+
+    task: str
+    owner: str
+    path: str
+    canonical_path: Path
+
+
+def admit_deletion_targets(
+    root: Path,
+    entries: Sequence[SurfaceEntry],
+    transitions: Sequence[UpdateTransition],
+) -> tuple[
+    tuple[SurfaceEntry, ...],
+    tuple[UpdateTransition, ...],
+    tuple[DeletionTarget, ...],
+]:
+    """Generate, normalize, and admit every manifest deletion target."""
+    try:
+        canonical_root = root.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise ValueError(f"deletion root cannot be resolved: {root}") from exc
+    if not canonical_root.is_dir():
+        raise ValueError(
+            f"deletion root is not a directory: {canonical_root}"
+        )
+
+    def admit(raw_path: str, *, task: str, owner: str) -> DeletionTarget:
+        if not task or not owner:
+            raise ValueError(
+                "deletion target requires an explicit task owner"
+            )
+        pure_path = PurePosixPath(raw_path)
+        normalized = pure_path.as_posix()
+        invalid = (
+            not raw_path
+            or raw_path != raw_path.strip()
+            or pure_path.is_absolute()
+            or not pure_path.parts
+            or ".." in pure_path.parts
+            or normalized != raw_path
+            or any(
+                character in raw_path
+                for character in ("\0", "\n", "\r", "\t")
+            )
+        )
+        if invalid:
+            raise ValueError(
+                f"{owner}: deletion target {raw_path!r} must be a "
+                "normalized non-root repository-relative POSIX path"
+            )
+        candidate_path = canonical_root / normalized
+        try:
+            canonical_parent = (
+                candidate_path.parent.resolve(strict=False)
+            )
+        except (OSError, RuntimeError) as exc:
+            raise ValueError(
+                f"{owner}: deletion target {raw_path!r} cannot be resolved"
+            ) from exc
+        canonical_path = canonical_parent / candidate_path.name
+        if canonical_path == canonical_root:
+            raise ValueError(
+                f"{owner}: deletion target {raw_path!r} resolves to the "
+                "canonical repository root"
+            )
+        try:
+            canonical_path.relative_to(canonical_root)
+        except ValueError as exc:
+            raise ValueError(
+                f"{owner}: deletion target {raw_path!r} resolves outside "
+                "the canonical repository root"
+            ) from exc
+        return DeletionTarget(
+            task=task,
+            owner=owner,
+            path=normalized,
+            canonical_path=canonical_path,
+        )
+
+    normalized_entries: list[SurfaceEntry] = []
+    normalized_transitions: list[UpdateTransition] = []
+    admitted: list[DeletionTarget] = []
+    for entry in entries:
+        if entry.mode in DELETION_MODES:
+            target = admit(
+                entry.path,
+                task=ROOT_ABSENCE_TASK,
+                owner=(
+                    f"surface:{entry.mode}:{entry.projection_producer}:"
+                    f"{entry.projection_kind}"
+                ),
+            )
+            entry = replace(entry, path=target.path)
+            admitted.append(target)
+        normalized_entries.append(entry)
+    for transition in transitions:
+        candidates: list[UpdateTransitionCandidate] = []
+        for candidate in transition.candidates:
+            target = admit(
+                candidate.path,
+                task=UPDATE_TRANSITION_TASK,
+                owner=f"update-transition:{transition.transition_id}",
+            )
+            candidates.append(replace(candidate, path=target.path))
+            admitted.append(target)
+        normalized_transitions.append(
+            replace(transition, candidates=tuple(candidates))
+        )
+    return (
+        tuple(normalized_entries),
+        tuple(normalized_transitions),
+        tuple(admitted),
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -430,8 +552,6 @@ def update_transition_from_mapping(mapping: Mapping[str, object]) -> UpdateTrans
     candidates: list[UpdateTransitionCandidate] = []
     for candidate in manifest_tables(mapping, "candidate"):
         path = string_value(candidate, "path")
-        if not path or path.startswith("/") or "\t" in path or "\n" in path:
-            raise ValueError(f"{transition_id}: invalid transition candidate path")
         identities = tuple(
             legacy_identity_from_mapping(identity)
             for identity in manifest_tables(candidate, "identity")
@@ -495,11 +615,15 @@ def load_manifest(root: Path, prefix: str, raw_manifest: str) -> SurfaceManifest
     transition_ids = [transition.transition_id for transition in update_transitions]
     if len(transition_ids) != len(set(transition_ids)):
         raise ValueError("duplicate update_transition ids")
+    normalized_entries, normalized_transitions, deletion_targets = (
+        admit_deletion_targets(root, entries, update_transitions)
+    )
     return SurfaceManifest(
         prefix=manifest_prefix,
         surface_selection=surface_selection,
-        entries=tuple(entries),
-        update_transitions=update_transitions,
+        entries=normalized_entries,
+        update_transitions=normalized_transitions,
+        deletion_targets=deletion_targets,
     )
 
 
@@ -575,12 +699,12 @@ def render_removed_legacy(entries: Iterable[SurfaceEntry]) -> str:
     return "\n".join(lines)
 
 
-def render_root_absent_paths(entries: Iterable[SurfaceEntry]) -> str:
-    """Render paths that must not be materialized in a parent repo root."""
+def render_root_absent_paths(targets: Iterable[DeletionTarget]) -> str:
+    """Render admitted paths that must be absent from a parent repo root."""
     lines = [
-        entry.path
-        for entry in entries
-        if entry.mode in {"removed_legacy", "standalone_only"}
+        target.path
+        for target in targets
+        if target.task == ROOT_ABSENCE_TASK
     ]
     return "\n".join(lines)
 
@@ -611,20 +735,18 @@ def path_has_index_entry(path: str, index_paths: frozenset[str]) -> bool:
 
 
 def render_actionable_root_absent_paths(
-    entries: Iterable[SurfaceEntry], root: Path
+    targets: Iterable[DeletionTarget], root: Path
 ) -> str:
-    """Render R ∩ (E ∪ I), excluding root-absence fixed points.
+    """Render admitted R ∩ (E ∪ I), excluding fixed points.
 
-    R is the manifest-declared root-absence set, E is the set of paths that
-    currently exist in the worktree, and I is the set represented in the Git
-    index. A path absent from both E and I is already at the desired fixed point
-    and must not be reintroduced into a Git pathspec. If index inspection is not
-    available, the full declarative set is retained as a conservative fallback.
+    R contains only task-owned strict descendants admitted by
+    ``admit_deletion_targets``. E is worktree existence and I is Git index
+    representation. A target absent from both is already at the fixed point.
     """
     candidates = [
-        entry.path
-        for entry in entries
-        if entry.mode in {"removed_legacy", "standalone_only"}
+        target.path
+        for target in targets
+        if target.task == ROOT_ABSENCE_TASK
     ]
     index_paths = git_index_paths(root)
     if index_paths is None:
@@ -632,7 +754,8 @@ def render_actionable_root_absent_paths(
     actionable = [
         path
         for path in candidates
-        if os.path.lexists(root / path) or path_has_index_entry(path, index_paths)
+        if os.path.lexists(root / path)
+        or path_has_index_entry(path, index_paths)
     ]
     return "\n".join(actionable)
 
@@ -697,7 +820,9 @@ def render_command_outputs(manifest: SurfaceManifest, root: Path) -> Mapping[str
         ),
         "regular-specs": render_regular_specs(manifest.entries, manifest.prefix),
         "removed-legacy-paths": render_removed_legacy(manifest.entries),
-        "root-absent-paths": render_root_absent_paths(manifest.entries),
+        "root-absent-paths": render_root_absent_paths(
+            manifest.deletion_targets
+        ),
         "normalized-snapshot": json.dumps(
             normalized_snapshot(manifest),
             ensure_ascii=False,
@@ -705,6 +830,14 @@ def render_command_outputs(manifest: SurfaceManifest, root: Path) -> Mapping[str
             separators=(",", ":"),
         ),
     }
+
+
+def write_command_output(output: str) -> None:
+    """Write a newline protocol without inventing an empty record."""
+    if not output:
+        return
+    sys.stdout.write(output)
+    sys.stdout.write("\n")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -719,11 +852,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"SURFACE_MANIFEST_ERROR={exc}", file=sys.stderr)
         return 1
     if args.command == "root-absent-paths":
-        print(render_actionable_root_absent_paths(manifest.entries, root))
+        write_command_output(
+            render_actionable_root_absent_paths(
+                manifest.deletion_targets, root
+            )
+        )
         return 0
     outputs = render_command_outputs(manifest, root)
     if args.command in outputs:
-        print(outputs[args.command])
+        write_command_output(outputs[args.command])
         return 0
     if args.command == "check-doc":
         findings = check_doc(root, manifest.prefix, manifest)

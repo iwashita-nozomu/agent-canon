@@ -22,7 +22,9 @@ TEST_TEMP_ROOT = PROJECT_ROOT / ".agent-canon" / "test-root-absence-filter"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 from surface_manifest import (  # noqa: E402
+    DeletionTarget,
     SurfaceEntry,
+    admit_deletion_targets,
     render_actionable_root_absent_paths,
 )
 
@@ -57,6 +59,13 @@ class RootAbsenceFilterTest(unittest.TestCase):
             optional=False,
         )
 
+    def targets(
+        self, root: Path, *entries: SurfaceEntry
+    ) -> tuple[DeletionTarget, ...]:
+        """Admit fixture targets through the production deletion owner."""
+        _, _, targets = admit_deletion_targets(root, entries, ())
+        return targets
+
     def initialize_repository(self, root: Path) -> None:
         """Initialize isolated Git identity for one fixture."""
         self.git(root, "init")
@@ -71,7 +80,9 @@ class RootAbsenceFilterTest(unittest.TestCase):
             os.symlink("missing-target", root / "retired")
 
             self.assertEqual(
-                render_actionable_root_absent_paths((self.entry(),), root),
+                render_actionable_root_absent_paths(
+                    self.targets(root, self.entry()), root
+                ),
                 "retired",
             )
 
@@ -87,13 +98,17 @@ class RootAbsenceFilterTest(unittest.TestCase):
 
             retired.unlink()
             self.assertEqual(
-                render_actionable_root_absent_paths((self.entry(),), root),
+                render_actionable_root_absent_paths(
+                    self.targets(root, self.entry()), root
+                ),
                 "retired",
             )
 
             self.git(root, "add", "-A", "--", "retired")
             self.assertEqual(
-                render_actionable_root_absent_paths((self.entry(),), root),
+                render_actionable_root_absent_paths(
+                    self.targets(root, self.entry()), root
+                ),
                 "",
             )
 
@@ -104,7 +119,9 @@ class RootAbsenceFilterTest(unittest.TestCase):
             self.initialize_repository(root)
 
             self.assertEqual(
-                render_actionable_root_absent_paths((self.entry(),), root),
+                render_actionable_root_absent_paths(
+                    self.targets(root, self.entry()), root
+                ),
                 "",
             )
 
@@ -117,7 +134,9 @@ class RootAbsenceFilterTest(unittest.TestCase):
             root = Path(tmp_dir)
 
             self.assertEqual(
-                render_actionable_root_absent_paths((self.entry(),), root),
+                render_actionable_root_absent_paths(
+                    self.targets(root, self.entry()), root
+                ),
                 "retired",
             )
 
