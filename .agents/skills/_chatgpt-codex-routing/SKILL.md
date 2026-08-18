@@ -25,6 +25,12 @@ Canonical routing and policy:
 `python3 tools/agent_tools/skill_tool_commands.py show --skill _chatgpt-codex-routing --format text`
 <!-- skill-tool-commands:end -->
 
+## Direct Invocation
+
+```bash
+python3 tools/agent_tools/chatgpt_codex_routing.py --input <packet.json>
+```
+
 ## Invocation Boundary
 
 1. Invoke before public Codex workflow or skill selection.
