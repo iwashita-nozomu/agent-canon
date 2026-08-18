@@ -1,0 +1,802 @@
+name: Issue 771 canonical contract materialization
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - synchronize
+    paths:
+      - .github/workflows/issue-771-contract.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize-contract:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: fix/771-root-delete-guard
+
+      - name: Install the sole task-owned deletion target owner
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/apply_issue_771_contract.py <<'PY'
+          from pathlib import Path
+
+          source_path = Path("tools/agent_tools/surface_manifest.py")
+          root_test_path = Path("tests/agent_tools/test_surface_manifest_root_absence.py")
+          text = source_path.read_text(encoding="utf-8")
+
+
+          def replace_once(source: str, old: str, new: str) -> str:
+              count = source.count(old)
+              if count != 1:
+                  raise RuntimeError(
+                      f"expected one replacement target, found {count}: {old[:100]!r}"
+                  )
+              return source.replace(old, new, 1)
+
+
+          text = replace_once(
+              text,
+              "from dataclasses import dataclass\nfrom pathlib import Path\n",
+              "from dataclasses import dataclass, replace\nfrom pathlib import Path, PurePosixPath\n",
+          )
+          text = replace_once(
+              text,
+              '''ALLOWED_MODES = frozenset(
+              {
+                  "symlink",
+                  "copy",
+                  "regular",
+                  "repo_state",
+                  "standalone_only",
+                  "removed_legacy",
+              }
+          )
+          ''',
+              '''ALLOWED_MODES = frozenset(
+              {
+                  "symlink",
+                  "copy",
+                  "regular",
+                  "repo_state",
+                  "standalone_only",
+                  "removed_legacy",
+              }
+          )
+          DELETION_MODES = frozenset({"removed_legacy", "standalone_only"})
+          ROOT_ABSENCE_TASK = "root-absence"
+          UPDATE_TRANSITION_TASK = "update-transition"
+          ''',
+          )
+          text = replace_once(
+              text,
+              '''    entries: tuple[SurfaceEntry, ...]
+              update_transitions: tuple[UpdateTransition, ...]
+          ''',
+              '''    entries: tuple[SurfaceEntry, ...]
+              update_transitions: tuple[UpdateTransition, ...]
+              deletion_targets: tuple[TaskOwnedDeletionTarget, ...]
+          ''',
+          )
+          text = replace_once(
+              text,
+              '''@dataclass(frozen=True)
+          class UpdateTransition:
+              """A migration activated only by a known previous AgentCanon pin."""
+
+              transition_id: str
+              from_agent_canon_pins: tuple[str, ...]
+              candidates: tuple[UpdateTransitionCandidate, ...]
+
+
+          def build_parser() -> argparse.ArgumentParser:
+          ''',
+              '''@dataclass(frozen=True)
+          class UpdateTransition:
+              """A migration activated only by a known previous AgentCanon pin."""
+
+              transition_id: str
+              from_agent_canon_pins: tuple[str, ...]
+              candidates: tuple[UpdateTransitionCandidate, ...]
+
+
+          @dataclass(frozen=True)
+          class TaskOwnedDeletionTarget:
+              """One canonical strict-descendant target admitted for an explicit task."""
+
+              task_kind: str
+              task_owner: str
+              path: str
+              canonical_path: Path
+
+
+          @dataclass(frozen=True)
+          class TaskOwnedDeletionTargetOwner:
+              """Sole generator, normalizer, and admission owner for deletion targets."""
+
+              root: Path
+
+              @classmethod
+              def from_root(cls, root: Path) -> "TaskOwnedDeletionTargetOwner":
+                  """Bind admission to one existing canonical repository root."""
+                  try:
+                      canonical_root = root.resolve(strict=True)
+                  except (OSError, RuntimeError) as exc:
+                      raise ValueError(
+                          f"deletion root cannot be resolved: {root}"
+                      ) from exc
+                  if not canonical_root.is_dir():
+                      raise ValueError(f"deletion root is not a directory: {canonical_root}")
+                  return cls(canonical_root)
+
+              def admit(
+                  self,
+                  raw_path: str,
+                  *,
+                  task_kind: str,
+                  task_owner: str,
+              ) -> TaskOwnedDeletionTarget:
+                  """Admit exactly one normalized, task-owned strict descendant."""
+                  if not task_kind or not task_owner:
+                      raise ValueError("deletion target requires an explicit task owner")
+                  pure_path = PurePosixPath(raw_path)
+                  normalized = pure_path.as_posix()
+                  invalid_lexical_path = (
+                      not raw_path
+                      or raw_path != raw_path.strip()
+                      or pure_path.is_absolute()
+                      or not pure_path.parts
+                      or ".." in pure_path.parts
+                      or normalized != raw_path
+                      or any(
+                          character in raw_path
+                          for character in ("\\0", "\\n", "\\r", "\\t")
+                      )
+                  )
+                  if invalid_lexical_path:
+                      raise ValueError(
+                          f"{task_owner}: deletion target {raw_path!r} must be a normalized "
+                          "non-root repository-relative POSIX path"
+                      )
+                  checkout_path = self.root / normalized
+                  try:
+                      canonical_path = checkout_path.resolve(strict=False)
+                  except (OSError, RuntimeError) as exc:
+                      raise ValueError(
+                          f"{task_owner}: deletion target {raw_path!r} cannot be resolved"
+                      ) from exc
+                  if canonical_path == self.root:
+                      raise ValueError(
+                          f"{task_owner}: deletion target {raw_path!r} resolves to the "
+                          "canonical repository root"
+                      )
+                  try:
+                      canonical_path.relative_to(self.root)
+                  except ValueError as exc:
+                      raise ValueError(
+                          f"{task_owner}: deletion target {raw_path!r} resolves outside "
+                          "the canonical repository root"
+                      ) from exc
+                  return TaskOwnedDeletionTarget(
+                      task_kind=task_kind,
+                      task_owner=task_owner,
+                      path=normalized,
+                      canonical_path=canonical_path,
+                  )
+
+              def normalize_manifest(
+                  self,
+                  entries: Sequence[SurfaceEntry],
+                  transitions: Sequence[UpdateTransition],
+              ) -> tuple[
+                  tuple[SurfaceEntry, ...],
+                  tuple[UpdateTransition, ...],
+                  tuple[TaskOwnedDeletionTarget, ...],
+              ]:
+                  """Generate and admit every deletion claim exactly once."""
+                  normalized_entries: list[SurfaceEntry] = []
+                  normalized_transitions: list[UpdateTransition] = []
+                  admitted: list[TaskOwnedDeletionTarget] = []
+                  for entry in entries:
+                      if entry.mode in DELETION_MODES:
+                          target = self.admit(
+                              entry.path,
+                              task_kind=ROOT_ABSENCE_TASK,
+                              task_owner=(
+                                  f"surface:{entry.mode}:{entry.projection_producer}:"
+                                  f"{entry.projection_kind}"
+                              ),
+                          )
+                          entry = replace(entry, path=target.path)
+                          admitted.append(target)
+                      normalized_entries.append(entry)
+                  for transition in transitions:
+                      candidates: list[UpdateTransitionCandidate] = []
+                      for candidate in transition.candidates:
+                          target = self.admit(
+                              candidate.path,
+                              task_kind=UPDATE_TRANSITION_TASK,
+                              task_owner=f"update-transition:{transition.transition_id}",
+                          )
+                          candidates.append(replace(candidate, path=target.path))
+                          admitted.append(target)
+                      normalized_transitions.append(
+                          replace(transition, candidates=tuple(candidates))
+                      )
+                  return (
+                      tuple(normalized_entries),
+                      tuple(normalized_transitions),
+                      tuple(admitted),
+                  )
+
+
+          def build_parser() -> argparse.ArgumentParser:
+          ''',
+          )
+          text = replace_once(
+              text,
+              '''    transition_ids = [transition.transition_id for transition in update_transitions]
+              if len(transition_ids) != len(set(transition_ids)):
+                  raise ValueError("duplicate update_transition ids")
+              return SurfaceManifest(
+                  prefix=manifest_prefix,
+                  surface_selection=surface_selection,
+                  entries=tuple(entries),
+                  update_transitions=update_transitions,
+              )
+          ''',
+              '''    transition_ids = [transition.transition_id for transition in update_transitions]
+              if len(transition_ids) != len(set(transition_ids)):
+                  raise ValueError("duplicate update_transition ids")
+              deletion_owner = TaskOwnedDeletionTargetOwner.from_root(root)
+              normalized_entries, normalized_transitions, deletion_targets = (
+                  deletion_owner.normalize_manifest(entries, update_transitions)
+              )
+              return SurfaceManifest(
+                  prefix=manifest_prefix,
+                  surface_selection=surface_selection,
+                  entries=normalized_entries,
+                  update_transitions=normalized_transitions,
+                  deletion_targets=deletion_targets,
+              )
+          ''',
+          )
+          text = replace_once(
+              text,
+              '''def render_root_absent_paths(entries: Iterable[SurfaceEntry]) -> str:
+              """Render paths that must not be materialized in a parent repo root."""
+              lines = [
+                  entry.path
+                  for entry in entries
+                  if entry.mode in {"removed_legacy", "standalone_only"}
+              ]
+              return "\\n".join(lines)
+          ''',
+              '''def render_root_absent_paths(
+              targets: Iterable[TaskOwnedDeletionTarget],
+          ) -> str:
+              """Render admitted paths that must be absent from a parent repo root."""
+              lines = [
+                  target.path
+                  for target in targets
+                  if target.task_kind == ROOT_ABSENCE_TASK
+              ]
+              return "\\n".join(lines)
+          ''',
+          )
+          text = replace_once(
+              text,
+              '''def render_actionable_root_absent_paths(
+              entries: Iterable[SurfaceEntry], root: Path
+          ) -> str:
+              """Render R ∩ (E ∪ I), excluding root-absence fixed points.
+
+              R is the manifest-declared root-absence set, E is the set of paths that
+              currently exist in the worktree, and I is the set represented in the Git
+              index. A path absent from both E and I is already at the desired fixed point
+              and must not be reintroduced into a Git pathspec. If index inspection is not
+              available, the full declarative set is retained as a conservative fallback.
+              """
+              candidates = [
+                  entry.path
+                  for entry in entries
+                  if entry.mode in {"removed_legacy", "standalone_only"}
+              ]
+              index_paths = git_index_paths(root)
+              if index_paths is None:
+                  return "\\n".join(candidates)
+              actionable = [
+                  path
+                  for path in candidates
+                  if os.path.lexists(root / path) or path_has_index_entry(path, index_paths)
+              ]
+              return "\\n".join(actionable)
+          ''',
+              '''def render_actionable_root_absent_paths(
+              targets: Iterable[TaskOwnedDeletionTarget], root: Path
+          ) -> str:
+              """Render admitted R ∩ (E ∪ I), excluding fixed points.
+
+              R contains only targets already generated, normalized, and admitted by
+              ``TaskOwnedDeletionTargetOwner``. E is worktree existence and I is Git
+              index representation. An absent target is already at the fixed point.
+              """
+              candidates = [
+                  target.path
+                  for target in targets
+                  if target.task_kind == ROOT_ABSENCE_TASK
+              ]
+              index_paths = git_index_paths(root)
+              if index_paths is None:
+                  return "\\n".join(candidates)
+              actionable = [
+                  path
+                  for path in candidates
+                  if os.path.lexists(root / path) or path_has_index_entry(path, index_paths)
+              ]
+              return "\\n".join(actionable)
+          ''',
+          )
+          text = replace_once(
+              text,
+              '''        "root-absent-paths": render_root_absent_paths(manifest.entries),
+          ''',
+              '''        "root-absent-paths": render_root_absent_paths(
+                      manifest.deletion_targets
+                  ),
+          ''',
+          )
+          text = replace_once(
+              text,
+              '''
+
+          def main(argv: Sequence[str] | None = None) -> int:
+          ''',
+              '''
+
+          def write_command_output(output: str) -> None:
+              """Write a newline protocol without inventing an empty record."""
+              if not output:
+                  return
+              sys.stdout.write(output)
+              sys.stdout.write("\\n")
+
+
+          def main(argv: Sequence[str] | None = None) -> int:
+          ''',
+          )
+          text = replace_once(
+              text,
+              '''    if args.command == "root-absent-paths":
+                  print(render_actionable_root_absent_paths(manifest.entries, root))
+                  return 0
+          ''',
+              '''    if args.command == "root-absent-paths":
+                  write_command_output(
+                      render_actionable_root_absent_paths(
+                          manifest.deletion_targets, root
+                      )
+                  )
+                  return 0
+          ''',
+          )
+          text = replace_once(
+              text,
+              '''    if args.command in outputs:
+                  print(outputs[args.command])
+                  return 0
+          ''',
+              '''    if args.command in outputs:
+                  write_command_output(outputs[args.command])
+                  return 0
+          ''',
+          )
+          source_path.write_text(text, encoding="utf-8")
+
+          root_test = root_test_path.read_text(encoding="utf-8")
+          root_test = replace_once(
+              root_test,
+              '''from surface_manifest import (  # noqa: E402
+              SurfaceEntry,
+              render_actionable_root_absent_paths,
+          )
+          ''',
+              '''from surface_manifest import (  # noqa: E402
+              SurfaceEntry,
+              TaskOwnedDeletionTargetOwner,
+              render_actionable_root_absent_paths,
+          )
+          ''',
+          )
+          root_test = replace_once(
+              root_test,
+              '''    def initialize_repository(self, root: Path) -> None:
+          ''',
+              '''    def admitted_targets(
+                  self, root: Path, *entries: SurfaceEntry
+              ) -> tuple[object, ...]:
+                  """Admit fixture deletion targets through the production owner."""
+                  owner = TaskOwnedDeletionTargetOwner.from_root(root)
+                  _, _, targets = owner.normalize_manifest(entries, ())
+                  return targets
+
+              def initialize_repository(self, root: Path) -> None:
+          ''',
+          )
+          root_test = root_test.replace(
+              "render_actionable_root_absent_paths((self.entry(),), root)",
+              "render_actionable_root_absent_paths(\n                    self.admitted_targets(root, self.entry()), root\n                )",
+          )
+          root_test_path.write_text(root_test, encoding="utf-8")
+          PY
+          python3 /tmp/apply_issue_771_contract.py
+
+          cat > tests/agent_tools/test_surface_manifest_deletion_admission.py <<'PY'
+          """Regression tests for canonical task-owned deletion target admission."""
+
+          # @dependency-start
+          # contract test
+          # responsibility Verifies parent projection deletion targets are strict canonical descendants and empty sets serialize as EOF.
+          # upstream implementation ../../tools/agent_tools/surface_manifest.py owns deletion target generation, normalization, and admission
+          # upstream implementation ../../tools/sync_agent_canon.sh consumes admitted root-absence records
+          # upstream implementation ../../tools/update_agent_canon.sh routes latest through sync ensure-latest
+          # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md owns parent root projection safety
+          # @dependency-end
+
+          from __future__ import annotations
+
+          import json
+          import os
+          import subprocess
+          import sys
+          import tempfile
+          import unittest
+          from pathlib import Path
+
+          PROJECT_ROOT = Path(__file__).resolve().parents[2]
+          TEST_TEMP_ROOT = PROJECT_ROOT / ".agent-canon" / "test-deletion-admission"
+          SURFACE_MANIFEST = PROJECT_ROOT / "tools" / "agent_tools" / "surface_manifest.py"
+          sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+
+          from surface_manifest import ROOT_ABSENCE_TASK, load_manifest  # noqa: E402
+
+
+          class DeletionTargetAdmissionTest(unittest.TestCase):
+              """Exercise the sole deletion-target owner and its line protocol."""
+
+              def temporary_directory(self) -> tempfile.TemporaryDirectory[str]:
+                  """Keep fixtures under AgentCanon's repository-owned temp boundary."""
+                  TEST_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
+                  return tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT)
+
+              def write_manifest(
+                  self,
+                  root: Path,
+                  *,
+                  root_absent_path: str | None = None,
+                  transition_path: str | None = None,
+              ) -> Path:
+                  """Write one minimal live-integration surface manifest."""
+                  lines = [
+                      "version = 1",
+                      'prefix = "."',
+                      'integration_mode = "live-agent-canon"',
+                      "default_consumer = false",
+                      'selection = "explicit-opt-in"',
+                  ]
+                  if root_absent_path is not None:
+                      lines.extend(
+                          [
+                              "",
+                              "[[surface]]",
+                              f"path = {json.dumps(root_absent_path)}",
+                              'mode = "removed_legacy"',
+                              'projection_producer = "legacy"',
+                              'projection_kind = "removed_legacy"',
+                              "local_override_allowed = false",
+                          ]
+                      )
+                  if transition_path is not None:
+                      lines.extend(
+                          [
+                              "",
+                              "[[update_transition]]",
+                              'id = "fixture-transition"',
+                              f'from_agent_canon_pins = ["{"a" * 40}"]',
+                              "",
+                              "[[update_transition.candidate]]",
+                              f"path = {json.dumps(transition_path)}",
+                              "",
+                              "[[update_transition.candidate.identity]]",
+                              'kind = "regular"',
+                              f'git_blob = "{"b" * 40}"',
+                              f'content_sha256 = "{"c" * 64}"',
+                              'git_mode = "100644"',
+                              'symlink_target = ""',
+                          ]
+                      )
+                  manifest = root / "manifest.toml"
+                  manifest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                  return manifest
+
+              def run_manifest(
+                  self, root: Path, manifest: Path, command: str
+              ) -> subprocess.CompletedProcess[str]:
+                  """Run one surface-manifest producer command."""
+                  return subprocess.run(
+                      [
+                          sys.executable,
+                          str(SURFACE_MANIFEST),
+                          "--root",
+                          str(root),
+                          "--prefix",
+                          ".",
+                          "--manifest",
+                          manifest.name,
+                          command,
+                      ],
+                      cwd=root,
+                      check=False,
+                      capture_output=True,
+                      text=True,
+                  )
+
+              def test_empty_deletion_sets_emit_zero_records(self) -> None:
+                  """The empty set is EOF, not one empty path record."""
+                  with self.temporary_directory() as tmp_dir:
+                      root = Path(tmp_dir)
+                      manifest = self.write_manifest(root)
+                      for command in ("root-absent-paths", "update-transition-specs"):
+                          with self.subTest(command=command):
+                              result = self.run_manifest(root, manifest, command)
+                              self.assertEqual(result.returncode, 0, result.stderr)
+                              self.assertEqual(result.stdout, "")
+
+              def test_unsafe_root_absence_claims_fail_closed(self) -> None:
+                  """Lexical roots, absolute roots, and repository escapes are rejected."""
+                  with self.temporary_directory() as tmp_dir:
+                      root = Path(tmp_dir)
+                      sentinel = root / "parent-owned.txt"
+                      sentinel.write_text("preserve\n", encoding="utf-8")
+                      unsafe_paths = (
+                          "",
+                          ".",
+                          "/",
+                          str(root.resolve()),
+                          "../outside",
+                          "nested/../../outside",
+                          "nested//retired",
+                          "nested/",
+                          "./retired",
+                          "line\nbreak",
+                          "tab\tbreak",
+                      )
+                      for unsafe_path in unsafe_paths:
+                          with self.subTest(path=unsafe_path):
+                              manifest = self.write_manifest(
+                                  root, root_absent_path=unsafe_path
+                              )
+                              result = self.run_manifest(
+                                  root, manifest, "root-absent-paths"
+                              )
+                              self.assertEqual(result.returncode, 1)
+                              self.assertEqual(result.stdout, "")
+                              self.assertIn("SURFACE_MANIFEST_ERROR=", result.stderr)
+                              self.assertEqual(
+                                  sentinel.read_text(encoding="utf-8"), "preserve\n"
+                              )
+
+              def test_canonical_root_alias_and_outside_symlink_are_rejected(self) -> None:
+                  """Physical resolution rejects aliases of root and symlink escapes."""
+                  with self.temporary_directory() as tmp_dir:
+                      sandbox = Path(tmp_dir)
+                      root = sandbox / "checkout"
+                      outside = sandbox / "outside"
+                      root.mkdir()
+                      outside.mkdir()
+                      os.symlink(".", root / "root-alias")
+                      os.symlink(outside, root / "outside-alias")
+                      for unsafe_path in ("root-alias", "outside-alias/retired"):
+                          with self.subTest(path=unsafe_path):
+                              manifest = self.write_manifest(
+                                  root, root_absent_path=unsafe_path
+                              )
+                              result = self.run_manifest(
+                                  root, manifest, "root-absent-paths"
+                              )
+                              self.assertEqual(result.returncode, 1)
+                              self.assertEqual(result.stdout, "")
+                              self.assertIn("SURFACE_MANIFEST_ERROR=", result.stderr)
+
+              def test_safe_target_has_explicit_owner_and_canonical_descendant(self) -> None:
+                  """An admitted target carries task ownership and strict containment."""
+                  with self.temporary_directory() as tmp_dir:
+                      root = Path(tmp_dir)
+                      retired = root / "retired" / "path"
+                      retired.parent.mkdir()
+                      retired.write_text("legacy\n", encoding="utf-8")
+                      manifest_path = self.write_manifest(
+                          root, root_absent_path="retired/path"
+                      )
+                      manifest = load_manifest(root, ".", manifest_path.name)
+                      target = manifest.deletion_targets[0]
+                      self.assertEqual(target.task_kind, ROOT_ABSENCE_TASK)
+                      self.assertTrue(target.task_owner.startswith("surface:"))
+                      self.assertEqual(target.path, "retired/path")
+                      self.assertNotEqual(target.canonical_path, root.resolve())
+                      self.assertEqual(
+                          target.canonical_path.relative_to(root.resolve()),
+                          Path("retired/path"),
+                      )
+                      result = self.run_manifest(
+                          root, manifest_path, "root-absent-paths"
+                      )
+                      self.assertEqual(result.returncode, 0, result.stderr)
+                      self.assertEqual(result.stdout, "retired/path\n")
+
+              def test_update_transition_uses_the_same_admission_owner(self) -> None:
+                  """Inactive migration candidates cannot bypass deletion admission."""
+                  with self.temporary_directory() as tmp_dir:
+                      root = Path(tmp_dir)
+                      unsafe = self.write_manifest(root, transition_path=".")
+                      rejected = self.run_manifest(
+                          root, unsafe, "update-transition-specs"
+                      )
+                      self.assertEqual(rejected.returncode, 1)
+                      self.assertEqual(rejected.stdout, "")
+                      self.assertIn("SURFACE_MANIFEST_ERROR=", rejected.stderr)
+                      safe = self.write_manifest(
+                          root, transition_path="legacy/retired"
+                      )
+                      accepted = self.run_manifest(
+                          root, safe, "update-transition-specs"
+                      )
+                      self.assertEqual(accepted.returncode, 0, accepted.stderr)
+                      self.assertIn("\tlegacy/retired\tregular\t", accepted.stdout)
+
+              def test_workspace_named_checkout_survives_legacy_consumer(self) -> None:
+                  """A /workspace-style mount root receives no empty deletion record."""
+                  with self.temporary_directory() as tmp_dir:
+                      workspace = Path(tmp_dir) / "workspace"
+                      git_dir = workspace / ".git"
+                      git_dir.mkdir(parents=True)
+                      sentinel = git_dir / "HEAD"
+                      sentinel.write_text("ref: refs/heads/main\n", encoding="utf-8")
+                      manifest = self.write_manifest(workspace)
+                      produced = self.run_manifest(
+                          workspace, manifest, "root-absent-paths"
+                      )
+                      self.assertEqual(produced.returncode, 0, produced.stderr)
+                      self.assertEqual(produced.stdout, "")
+                      consumed = subprocess.run(
+                          [
+                              "bash",
+                              "-c",
+                              """
+                              set -euo pipefail
+                              ROOT_DIR="$1"
+                              while IFS= read -r path; do
+                                rm -rf -- "$ROOT_DIR/$path"
+                              done
+                              """,
+                              "legacy-root-absence-consumer",
+                              str(workspace),
+                          ],
+                          input=produced.stdout,
+                          check=False,
+                          capture_output=True,
+                          text=True,
+                      )
+                      self.assertEqual(consumed.returncode, 0, consumed.stderr)
+                      self.assertEqual(
+                          sentinel.read_text(encoding="utf-8"),
+                          "ref: refs/heads/main\n",
+                      )
+
+              def test_same_absolute_checkout_path_fails_before_consumer(self) -> None:
+                  """The checkout's exact absolute spelling is never a deletion target."""
+                  with self.temporary_directory() as tmp_dir:
+                      workspace = Path(tmp_dir) / "workspace"
+                      workspace.mkdir()
+                      sentinel = workspace / "sentinel"
+                      sentinel.write_text("preserve\n", encoding="utf-8")
+                      manifest = self.write_manifest(
+                          workspace, root_absent_path=str(workspace.resolve())
+                      )
+                      result = self.run_manifest(
+                          workspace, manifest, "root-absent-paths"
+                      )
+                      self.assertEqual(result.returncode, 1)
+                      self.assertEqual(result.stdout, "")
+                      self.assertEqual(
+                          sentinel.read_text(encoding="utf-8"), "preserve\n"
+                      )
+
+              def test_ensure_latest_and_update_latest_share_the_owner_route(self) -> None:
+                  """Both parent projection front doors consume the admitted producer."""
+                  sync_text = (
+                      PROJECT_ROOT / "tools" / "sync_agent_canon.sh"
+                  ).read_text(encoding="utf-8")
+                  update_text = (
+                      PROJECT_ROOT / "tools" / "update_agent_canon.sh"
+                  ).read_text(encoding="utf-8")
+                  self.assertIn(
+                      "root-absent-paths",
+                      sync_text[sync_text.index("build_root_absent_paths() {"):],
+                  )
+                  self.assertIn("done < <(build_root_absent_paths)", sync_text)
+                  self.assertIn(
+                      'run_parent_bound_sync ensure-latest "$branch"', update_text
+                  )
+
+
+          if __name__ == "__main__":
+              unittest.main()
+          PY
+
+      - name: Run focused parent-projection regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/agent_tools/surface_manifest.py
+          python3 tests/agent_tools/test_surface_manifest_root_absence.py
+          python3 tests/agent_tools/test_surface_manifest_deletion_admission.py
+          python3 tests/tools/test_update_agent_canon_removed_legacy.py
+
+      - name: Run exact /workspace bind-mount regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture="$GITHUB_WORKSPACE/.agent-canon/issue-771-bind-source"
+          rm -rf "$fixture"
+          mkdir -p "$fixture/.git"
+          printf 'ref: refs/heads/main\n' > "$fixture/.git/HEAD"
+          cat > "$fixture/manifest.toml" <<'EOF'
+          version = 1
+          prefix = "."
+          integration_mode = "live-agent-canon"
+          default_consumer = false
+          selection = "explicit-opt-in"
+          EOF
+          sudo env REPO="$GITHUB_WORKSPACE" FIXTURE="$fixture" \
+            unshare --mount --propagation private sh -eu -c '
+              mkdir -p /workspace
+              mount --bind "$FIXTURE" /workspace
+              trap "umount /workspace; rmdir /workspace 2>/dev/null || true" EXIT
+              python3 "$REPO/tools/agent_tools/surface_manifest.py" \
+                --root /workspace --prefix . --manifest manifest.toml \
+                root-absent-paths > /tmp/issue-771-specs
+              test ! -s /tmp/issue-771-specs
+              ROOT_DIR=/workspace
+              while IFS= read -r path; do
+                rm -rf -- "$ROOT_DIR/$path"
+              done < /tmp/issue-771-specs
+              test -f /workspace/.git/HEAD
+            '
+
+      - name: Commit the reviewable implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "AgentCanon Issue Automation"
+          git config user.email "agent-canon-issue@automation.invalid"
+          git rm -f \
+            .github/workflows/issue-771-contract.yml \
+            .github/workflows/issue-771-finalize.yml \
+            .github/workflows/issue-771-materialize.yml
+          git add \
+            tools/agent_tools/surface_manifest.py \
+            tests/agent_tools/test_surface_manifest_root_absence.py \
+            tests/agent_tools/test_surface_manifest_deletion_admission.py
+          git diff --cached --check
+          git commit -m "fix: admit only task-owned deletion targets (#771)"
+          git push origin HEAD:fix/771-root-delete-guard
