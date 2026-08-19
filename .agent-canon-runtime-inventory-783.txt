@@ -1,0 +1,1371 @@
+AgentCanonRuntime dependency inventory for #783
+base=0ea5bb6d5d0bfc2e027698612aeb6fc5a3c8b0c2
+
+## literal: /var/lib/agent-canon/runtime
+.devcontainer/Dockerfile:98:      /var/lib/agent-canon/runtime \
+.devcontainer/Dockerfile:99:      /var/lib/agent-canon/runtime/runs \
+.devcontainer/Dockerfile:100:      /var/lib/agent-canon/runtime/logs \
+.devcontainer/Dockerfile:103:      'export AGENT_CANON_RUNTIME_ROOT="/var/lib/agent-canon/runtime"' \
+.devcontainer/finalize-shared-runtime.sh:17:runtime_root="${AGENT_CANON_SHARED_RUNTIME_SOURCE:-/var/lib/agent-canon/runtime}"
+.devcontainer/finalize-shared-runtime.sh:35:[ "$runtime_root" = "/var/lib/agent-canon/runtime" ] || fail "shared runtime target is not canonical"
+.devcontainer/generate-runtime-compose.sh:622:runtime_target="/var/lib/agent-canon/runtime"
+.devcontainer/generate-runtime-compose.sh:630:  runtime_target="${AGENT_CANON_SHARED_RUNTIME_TARGET:-/var/lib/agent-canon/runtime}"
+.devcontainer/generate-runtime-compose.sh:639:  [ "$runtime_target" = "/var/lib/agent-canon/runtime" ] || {
+.devcontainer/generate-runtime-compose.sh:640:    printf 'devcontainer GPU admission runtime target must be /var/lib/agent-canon/runtime\n' >&2
+.devcontainer/gpu-admission.sh:35:runtime_target="/var/lib/agent-canon/runtime"
+.devcontainer/post-attach.sh:11:runtime_root="${AGENT_CANON_RUNTIME_ROOT:-/var/lib/agent-canon/runtime}"
+.devcontainer/post-create.sh:65:runtime_root="${AGENT_CANON_RUNTIME_ROOT:-/var/lib/agent-canon/runtime}"
+.github/workflows/issue-783-runtime-inventory.yml:34:              "/var/lib/agent-canon/runtime",
+CONTAINER_OPERATIONS.md:305:  `/var/lib/agent-canon/runtime`; only the controlled source-bound projection
+CONTAINER_OPERATIONS.md:375:  `/var/lib/agent-canon/runtime` へ bind し、primary `PROJECT_UID:PROJECT_GID`、
+CONTAINER_OPERATIONS.md:396:- GPU-admission profile を選択しない限り、`/var/lib/agent-canon/runtime` の
+agent-canon-environment.toml:77:runtime_root = "/var/lib/agent-canon/runtime"
+agent-canon-environment.toml:88:shared_runtime_source = "/var/lib/agent-canon/runtime"
+agent-canon-environment.toml:94:provision_receipt = "/var/lib/agent-canon/runtime/shared-runtime-provision.json"
+agent-canon-environment.toml:95:readback_receipt = "/var/lib/agent-canon/runtime/shared-runtime-readback.json"
+agent-canon-environment.toml:99:compose_bind_target = "/var/lib/agent-canon/runtime"
+documents/contracts/linux-wsl-host-requirements.md:72:  UID/GID で作成し、container の `/var/lib/agent-canon/runtime` へ bind します。
+documents/experiments/gpu-admission-r5-source-packet.md:29:group、shared lock、`/var/lib/agent-canon/runtime` の bind、provision/readback
+documents/experiments/gpu-admission-r5-source-packet.md:43:`/var/lib/agent-canon/runtime` target に bind し、primary `PROJECT_UID:PROJECT_GID` を
+documents/experiments/gpu-direct-command.md:107:  `/var/lib/agent-canon/runtime` and its canonical lock root.
+documents/parent-repository/CONTAINER_OPERATIONS.md:64:receipt に記録し、`/var/lib/agent-canon/runtime` への bind を
+tests/tools/test_container_config.py:645:            "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+tests/tools/test_container_config.py:912:    assert "/var/lib/agent-canon/runtime" not in compose
+tests/tools/test_container_config.py:994:            "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+tests/tools/test_container_config.py:1011:    assert '        target: "/var/lib/agent-canon/runtime"' in compose
+tests/tools/test_container_config.py:1053:            "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+tests/tools/test_container_config.py:1087:            "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+tests/tools/test_container_config.py:1149:            '        target: "/var/lib/agent-canon/runtime"\n',
+tests/tools/test_container_config.py:1150:            '        target: "/var/lib/agent-canon/runtime"\n        read_only: true\n',
+tests/tools/test_container_config.py:2353:                "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+tests/tools/test_execution_resource_plan.py:429:            runtime_root="/var/lib/agent-canon/runtime",
+tests/tools/test_execution_resource_plan.py:486:            runtime_root="/var/lib/agent-canon/runtime",
+tests/tools/test_gpu_admission_devcontainer.py:291:    assert "target=/var/lib/agent-canon/runtime" in result.stdout
+tests/tools/test_run_codex_in_repo_container.py:707:    assert 'runtime_target="/var/lib/agent-canon/runtime"' in gpu_admission
+tests/tools/test_run_codex_in_repo_container.py:732:    assert "/var/lib/agent-canon/runtime" in compose
+tests/tools/test_run_codex_in_repo_container.py:735:        "/var/lib/agent-canon/runtime/shared-runtime-provision.json"
+tests/tools/test_run_codex_in_repo_container.py:739:        "/var/lib/agent-canon/runtime/shared-runtime-readback.json"
+tests/tools/test_run_gpu_command.py:155:                runtime_root="/var/lib/agent-canon/runtime",
+tests/tools/test_run_managed_experiment.py:663:        runtime_root="/var/lib/agent-canon/runtime",
+tools/ci/container_config.py:1416:        if profile == "default" and target == "/var/lib/agent-canon/runtime":
+tools/ci/container_config.py:1427:        if volume_fields(raw_volume)[1] == "/var/lib/agent-canon/runtime"
+tools/ci/container_config.py:1456:            if runtime_target != "/var/lib/agent-canon/runtime":
+tools/ci/container_config.py:1713:        allowed_targets.add("/var/lib/agent-canon/runtime")
+tools/ci/container_config.py:1818:                "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
+tools/ci/container_config.py:1820:                "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+tools/ci/container_config.py:1821:                "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
+tools/ci/container_config.py:1822:                "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
+tools/ci/container_config.py:1935:                        "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+tools/ci/container_runtime.py:52:HOST_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+tools/ci/container_runtime.py:53:CONTAINER_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+tools/experiments/execution_resource_plan.py:61:HOST_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+tools/experiments/execution_resource_plan.py:62:CONTAINER_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+tools/experiments/execution_resource_plan.py:4079:    runtime_root: Literal["/var/lib/agent-canon/runtime"]
+tools/experiments/execution_resource_plan.py:4135:    runtime_root: Literal["/var/lib/agent-canon/runtime"]
+tools/experiments/execution_resource_plan.py:4476:        self._runtime_root: Literal["/var/lib/agent-canon/runtime"] = HOST_RUNTIME_ROOT
+tools/experiments/run_managed_experiment.py:2663:    lock_root_value = "/var/lib/agent-canon/runtime/locks"
+tools/experiments/run_managed_experiment.py:2687:        runtime_root=Path("/var/lib/agent-canon/runtime"),
+tools/experiments/run_managed_experiment.py:2968:                    runtime_root="/var/lib/agent-canon/runtime",
+tools/experiments/run_managed_experiment.py:2978:                            "runtime_root": "/var/lib/agent-canon/runtime",
+
+## literal: .agent-canon/runtime
+.devcontainer/finalize-shared-runtime.sh:113:    raise OSError("provision source is not repository-local .agent-canon/runtime")
+.devcontainer/generate-runtime-compose.sh:628:  runtime_bind_source="${AGENT_CANON_SHARED_RUNTIME_SOURCE:-${repo_root}/.agent-canon/runtime}"
+.devcontainer/generate-runtime-compose.sh:631:  [ "$runtime_bind_source" = "$repo_root/.agent-canon/runtime" ] || {
+.devcontainer/generate-runtime-compose.sh:632:    printf 'devcontainer GPU admission runtime source must be repository-local .agent-canon/runtime\n' >&2
+.devcontainer/gpu-admission.sh:34:runtime_source="$repository_root/.agent-canon/runtime"
+.github/workflows/issue-783-runtime-inventory.yml:35:              ".agent-canon/runtime",
+CONTAINER_OPERATIONS.md:368:  `${repository_root}/.agent-canon/runtime` を primary UID/GID の provenance として記録し、
+CONTAINER_OPERATIONS.md:374:  `${repository_root}/.agent-canon/runtime` を container の
+agent-canon-environment.toml:89:host_shared_runtime_source = "${repository_root}/.agent-canon/runtime (user-owned)"
+agent-canon-environment.toml:98:compose_bind_source = "${repository_root}/.agent-canon/runtime (user-owned)"
+documents/contracts/linux-wsl-host-requirements.md:71:  repository-local `${repository_root}/.agent-canon/runtime` を user-owned primary
+documents/experiments/gpu-admission-r5-source-packet.md:40:`nvidia-smi -L` を先に確認し、`${repository_root}/.agent-canon/runtime` を primary
+documents/parent-repository/CONTAINER_OPERATIONS.md:63:user-owned `${repository_root}/.agent-canon/runtime` を primary UID/GID の provenance として
+documents/runtime/runtime-log-archive.md:92:`.agent-canon/runtime-event-spool/publication-outcome/<attempt-id>/`, then
+documents/runtime/runtime-log-archive.md:170:| Hook chronology | `<source-repo>/.agent-canon/runtime-event-spool/hook-events/<stable-source-repository-id>/` | `.agent-canon/log-archive/hook-runs/<stable-source-repository-id>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl` on the stable branch | hooks publish per-event files; explicit `sync` checkpoints them |
+documents/runtime/runtime-log-archive.md:196:<source-repo>/.agent-canon/runtime-event-spool/hook-events/<stable-source-repository-id>/<runtime-namespace>/<hook-name>/<hook-run-id>.json
+documents/runtime/runtime-log-archive.md:382:`<source-repo>/.agent-canon/runtime-event-spool/.archive-transaction.lock`.
+documents/tools/README.md:379:  - hook event は PostToolUse で source repo の `.agent-canon/runtime-event-spool/` へ atomic no-replace publish し、archive Git や `ensure` を呼びません。明示 `runtime_log_archive_git.py sync` が nonblocking lock、1 回の ensure、snapshot/ingest/dedup/projection、commit/push/readback、verified finalize を所有します。hot path は `check-hook-hot-path` で archive context 構築前に検査します。eval report、Codex runtime summary、`reports/agents/` の agent run report と checkpoint 済み hook JSONL は `git@github.com:iwashita-nozomu/agent-canon-log.git` を `.agent-canon/log-archive/` に mount して蓄積します。branch / push 手順は `documents/runtime/runtime-log-archive.md` を正本にします。
+rust/agent-canon/src/dependency_manifest.rs:883:        || relative_path == ".agent-canon/runtime-event-spool"
+rust/agent-canon/src/dependency_manifest.rs:884:        || relative_path.starts_with(".agent-canon/runtime-event-spool/")
+tests/tools/test_container_config.py:643:            "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:644:            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:646:            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+tests/tools/test_container_config.py:647:            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
+tests/tools/test_container_config.py:992:            "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:993:            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:995:            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+tests/tools/test_container_config.py:996:            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
+tests/tools/test_container_config.py:1013:    assert f'        source: "{repo / ".agent-canon/runtime"}"' in compose
+tests/tools/test_container_config.py:1051:            "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:1052:            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:1054:            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+tests/tools/test_container_config.py:1055:            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
+tests/tools/test_container_config.py:1085:            "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:1086:            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:1088:            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+tests/tools/test_container_config.py:1089:            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
+tests/tools/test_container_config.py:1143:            f'        source: "{repo / ".agent-canon/runtime"}"\n',
+tests/tools/test_container_config.py:1193:        f'      - type: bind\n        source: "{repo / ".agent-canon/runtime"}"',
+tests/tools/test_container_config.py:1195:        f'      - type: bind\n        source: "{repo / ".agent-canon/runtime"}"',
+tests/tools/test_container_config.py:1720:    (repo / ".agent-canon/runtime").mkdir(parents=True, exist_ok=True)
+tests/tools/test_container_config.py:2351:                "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:2352:                "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:2355:                    repo / ".agent-canon/runtime/shared-runtime-provision.json"
+tests/tools/test_container_config.py:2358:                    repo / ".agent-canon/runtime/shared-runtime-readback.json"
+tests/tools/test_gpu_admission_devcontainer.py:290:    assert f"source={repository / '.agent-canon/runtime'}" in result.stdout
+tests/tools/test_run_codex_in_repo_container.py:706:    assert 'runtime_source="$repository_root/.agent-canon/runtime"' in gpu_admission
+tools/ci/container_config.py:991:    runtime_source = runtime_source or (root / ".agent-canon/runtime")
+
+## literal: AGENT_CANON_RUNTIME_ROOT
+.devcontainer/Dockerfile:103:      'export AGENT_CANON_RUNTIME_ROOT="/var/lib/agent-canon/runtime"' \
+.devcontainer/post-attach.sh:11:runtime_root="${AGENT_CANON_RUNTIME_ROOT:-/var/lib/agent-canon/runtime}"
+.devcontainer/post-create.sh:65:runtime_root="${AGENT_CANON_RUNTIME_ROOT:-/var/lib/agent-canon/runtime}"
+.devcontainer/post-create.sh:86:echo "AGENT_CANON_RUNTIME_ROOT=$runtime_root"
+.github/workflows/issue-783-runtime-inventory.yml:36:              "AGENT_CANON_RUNTIME_ROOT",
+
+## literal: AGENT_CANON_RUNTIME_ROUTE
+.devcontainer/finalize-shared-runtime.sh:19:runtime_route="${AGENT_CANON_RUNTIME_ROUTE:-MANAGED_CONTAINER}"
+.devcontainer/generate-runtime-compose.sh:258:    "AGENT_CANON_RUNTIME_ROUTE",
+.devcontainer/generate-runtime-compose.sh:688:  "      AGENT_CANON_RUNTIME_ROUTE: \"${runtime_route}\""
+.devcontainer/gpu-admission.sh:284:export AGENT_CANON_RUNTIME_ROUTE=MANAGED_CONTAINER
+.github/workflows/issue-783-runtime-inventory.yml:37:              "AGENT_CANON_RUNTIME_ROUTE",
+documents/design/devcontainer/parent-devcontainer-policy.md:70:Compose-owned `HOME`、`SHELL`、`AGENT_CANON_CONTAINER_USER`、`AGENT_CANON_RUNTIME_ROUTE`、
+documents/experiments/gpu-admission-r5-source-packet.md:45:`DEVCONTAINER_GPU_REQUEST=all`、`AGENT_CANON_RUNTIME_ROUTE=MANAGED_CONTAINER` を出力
+tests/tools/test_container_config.py:205:            "      AGENT_CANON_RUNTIME_ROUTE: CONTAINER_LOCAL",
+tests/tools/test_container_config.py:1016:    assert 'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"' in compose
+tests/tools/test_container_config.py:2638:        + '\nenv = ["AGENT_CANON_RUNTIME_ROUTE=MANAGED_CONTAINER"]\n',
+tests/tools/test_container_config.py:2651:        "runtime.env cannot override reserved key: AGENT_CANON_RUNTIME_ROUTE"
+tests/tools/test_container_config.py:2784:    assert 'AGENT_CANON_RUNTIME_ROUTE: "CONTAINER_LOCAL"' in compose
+tools/ci/container_config.py:1750:        "AGENT_CANON_RUNTIME_ROUTE": (
+
+## literal: AGENT_CANON_SHARED_RUNTIME
+.devcontainer/finalize-shared-runtime.sh:17:runtime_root="${AGENT_CANON_SHARED_RUNTIME_SOURCE:-/var/lib/agent-canon/runtime}"
+.devcontainer/finalize-shared-runtime.sh:18:host_runtime_source="${AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE:-}"
+.devcontainer/finalize-shared-runtime.sh:21:provision_receipt="${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-${runtime_root}/shared-runtime-provision.json}"
+.devcontainer/finalize-shared-runtime.sh:22:readback_receipt="${AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT:-${runtime_root}/shared-runtime-readback.json}"
+.devcontainer/finalize-shared-runtime.sh:243:printf 'AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT=%s\n' "$readback_receipt"
+.devcontainer/generate-runtime-compose.sh:261:    "AGENT_CANON_SHARED_RUNTIME_SOURCE",
+.devcontainer/generate-runtime-compose.sh:262:    "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE",
+.devcontainer/generate-runtime-compose.sh:263:    "AGENT_CANON_SHARED_RUNTIME_TARGET",
+.devcontainer/generate-runtime-compose.sh:264:    "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
+.devcontainer/generate-runtime-compose.sh:265:    "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT",
+.devcontainer/generate-runtime-compose.sh:628:  runtime_bind_source="${AGENT_CANON_SHARED_RUNTIME_SOURCE:-${repo_root}/.agent-canon/runtime}"
+.devcontainer/generate-runtime-compose.sh:629:  runtime_host_source="${AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE:-$runtime_bind_source}"
+.devcontainer/generate-runtime-compose.sh:630:  runtime_target="${AGENT_CANON_SHARED_RUNTIME_TARGET:-/var/lib/agent-canon/runtime}"
+.devcontainer/generate-runtime-compose.sh:643:  [ "${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-$runtime_bind_source/shared-runtime-provision.json}" = "$runtime_bind_source/shared-runtime-provision.json" ] || {
+.devcontainer/generate-runtime-compose.sh:647:  [ "${AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT:-$runtime_bind_source/shared-runtime-readback.json}" = "$runtime_bind_source/shared-runtime-readback.json" ] || {
+.devcontainer/generate-runtime-compose.sh:660:    "${AGENT_CANON_SHARED_RUNTIME_SOURCE:-}" \
+.devcontainer/generate-runtime-compose.sh:661:    "${AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE:-}" \
+.devcontainer/generate-runtime-compose.sh:662:    "${AGENT_CANON_SHARED_RUNTIME_TARGET:-}" \
+.devcontainer/generate-runtime-compose.sh:663:    "${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-}" \
+.devcontainer/generate-runtime-compose.sh:664:    "${AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT:-}"; do
+.devcontainer/generate-runtime-compose.sh:706:    "      AGENT_CANON_SHARED_RUNTIME_SOURCE: \"${runtime_target}\""
+.devcontainer/generate-runtime-compose.sh:707:    "      AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE: \"${runtime_host_source}\""
+.devcontainer/generate-runtime-compose.sh:708:    "      AGENT_CANON_SHARED_RUNTIME_TARGET: \"${runtime_target}\""
+.devcontainer/generate-runtime-compose.sh:709:    "      AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: \"${runtime_target}/shared-runtime-provision.json\""
+.devcontainer/generate-runtime-compose.sh:710:    "      AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT: \"${runtime_target}/shared-runtime-readback.json\""
+.devcontainer/gpu-admission.sh:285:export AGENT_CANON_SHARED_RUNTIME_SOURCE="$runtime_source"
+.devcontainer/gpu-admission.sh:286:export AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE="$runtime_source"
+.devcontainer/gpu-admission.sh:287:export AGENT_CANON_SHARED_RUNTIME_TARGET="$runtime_target"
+.devcontainer/gpu-admission.sh:288:export AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT="$provision_receipt"
+.devcontainer/gpu-admission.sh:289:export AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT="${runtime_source}/shared-runtime-readback.json"
+.github/workflows/issue-783-runtime-inventory.yml:38:              "AGENT_CANON_SHARED_RUNTIME",
+tests/tools/test_container_config.py:643:            "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:644:            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:645:            "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+tests/tools/test_container_config.py:646:            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+tests/tools/test_container_config.py:647:            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
+tests/tools/test_container_config.py:992:            "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:993:            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:994:            "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+tests/tools/test_container_config.py:995:            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+tests/tools/test_container_config.py:996:            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
+tests/tools/test_container_config.py:1051:            "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:1052:            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:1053:            "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+tests/tools/test_container_config.py:1054:            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+tests/tools/test_container_config.py:1055:            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
+tests/tools/test_container_config.py:1085:            "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:1086:            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:1087:            "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+tests/tools/test_container_config.py:1088:            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+tests/tools/test_container_config.py:1089:            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
+tests/tools/test_container_config.py:2351:                "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:2352:                "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
+tests/tools/test_container_config.py:2353:                "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+tests/tools/test_container_config.py:2354:                "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(
+tests/tools/test_container_config.py:2357:                "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(
+tests/tools/test_run_codex_in_repo_container.py:702:        'readback_receipt="${AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT:-${runtime_root}/shared-runtime-readback.json}"'
+tests/tools/test_run_codex_in_repo_container.py:733:    assert "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT" in compose
+tools/ci/container_config.py:1794:                "AGENT_CANON_SHARED_RUNTIME_SOURCE",
+tools/ci/container_config.py:1795:                "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE",
+tools/ci/container_config.py:1796:                "AGENT_CANON_SHARED_RUNTIME_TARGET",
+tools/ci/container_config.py:1797:                "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
+tools/ci/container_config.py:1798:                "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT",
+tools/ci/container_config.py:1818:                "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
+tools/ci/container_config.py:1819:                "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(runtime_source),
+tools/ci/container_config.py:1820:                "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+tools/ci/container_config.py:1821:                "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
+tools/ci/container_config.py:1822:                "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
+tools/ci/container_config.py:1933:                        "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(runtime_source),
+tools/ci/container_config.py:1934:                        "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(runtime_source),
+tools/ci/container_config.py:1935:                        "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+tools/ci/container_config.py:1936:                        "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(runtime_source / "shared-runtime-provision.json"),
+tools/ci/container_config.py:1937:                        "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(runtime_source / "shared-runtime-readback.json"),
+tools/experiments/run_managed_experiment.py:2795:                "AGENT_CANON_SHARED_RUNTIME_SOURCE",
+tools/experiments/run_managed_experiment.py:2808:                "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
+
+## literal: HOST_RUNTIME_ROOT
+.github/workflows/issue-783-runtime-inventory.yml:39:              "HOST_RUNTIME_ROOT",
+tests/tools/test_run_gpu_command.py:271:    monkeypatch.setattr(direct, "HOST_RUNTIME_ROOT", str(runtime_root))
+tools/ci/container_runtime.py:52:HOST_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+tools/experiments/execution_resource_plan.py:61:HOST_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+tools/experiments/execution_resource_plan.py:63:RUNTIME_ROOT = Path(HOST_RUNTIME_ROOT)
+tools/experiments/execution_resource_plan.py:4462:        runtime_root: AbsolutePosixPath = HOST_RUNTIME_ROOT,
+tools/experiments/execution_resource_plan.py:4469:        if runtime_root != HOST_RUNTIME_ROOT:
+tools/experiments/execution_resource_plan.py:4476:        self._runtime_root: Literal["/var/lib/agent-canon/runtime"] = HOST_RUNTIME_ROOT
+tools/experiments/execution_resource_plan.py:10172:    "HOST_RUNTIME_ROOT",
+tools/experiments/gpu_command_admission.py:45:    HOST_RUNTIME_ROOT,
+tools/experiments/gpu_command_admission.py:473:    runtime_root: Path = Path(HOST_RUNTIME_ROOT)
+tools/experiments/gpu_command_admission.py:512:        if self.runtime_root != Path(HOST_RUNTIME_ROOT) or self.lock_root != LOCK_ROOT:
+tools/experiments/run_gpu_command.py:27:    HOST_RUNTIME_ROOT,
+tools/experiments/run_gpu_command.py:124:            runtime_root=Path(HOST_RUNTIME_ROOT),
+tools/experiments/run_managed_experiment.py:54:        HOST_RUNTIME_ROOT,
+tools/experiments/run_managed_experiment.py:108:        HOST_RUNTIME_ROOT,
+tools/experiments/run_managed_experiment.py:2796:                HOST_RUNTIME_ROOT,
+tools/experiments/run_managed_experiment.py:2798:            if runtime_root != HOST_RUNTIME_ROOT:
+tools/experiments/run_managed_experiment.py:2805:                f"{HOST_RUNTIME_ROOT}/shared-runtime-provision.json"
+tools/experiments/run_managed_experiment.py:2819:                f"{HOST_RUNTIME_ROOT}/shared-runtime-readback.json"
+
+## literal: CONTAINER_RUNTIME_ROOT
+.github/workflows/issue-783-runtime-inventory.yml:40:              "CONTAINER_RUNTIME_ROOT",
+tools/ci/container_runtime.py:53:CONTAINER_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+tools/experiments/execution_resource_plan.py:62:CONTAINER_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+tools/experiments/execution_resource_plan.py:10146:    "CONTAINER_RUNTIME_ROOT",
+
+## literal: shared-runtime
+.devcontainer/finalize-shared-runtime.sh:5:# upstream design ../CONTAINER_OPERATIONS.md exact shared-runtime identity and namespace contract
+.devcontainer/finalize-shared-runtime.sh:21:provision_receipt="${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-${runtime_root}/shared-runtime-provision.json}"
+.devcontainer/finalize-shared-runtime.sh:22:readback_receipt="${AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT:-${runtime_root}/shared-runtime-readback.json}"
+.devcontainer/finalize-shared-runtime.sh:37:[ "$provision_receipt" = "${runtime_root}/shared-runtime-provision.json" ] || fail "provision receipt path is not canonical"
+.devcontainer/finalize-shared-runtime.sh:38:[ "$readback_receipt" = "${runtime_root}/shared-runtime-readback.json" ] || fail "readback receipt path is not canonical"
+.devcontainer/finalize-shared-runtime.sh:142:    usability_payload = b"agent-canon-shared-runtime-usability/v1\n"
+.devcontainer/finalize-shared-runtime.sh:214:    "schema_version": "shared-runtime-readback/v1",
+.devcontainer/generate-runtime-compose.sh:624:provision_receipt="${runtime_target}/shared-runtime-provision.json"
+.devcontainer/generate-runtime-compose.sh:625:readback_receipt="${runtime_target}/shared-runtime-readback.json"
+.devcontainer/generate-runtime-compose.sh:643:  [ "${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-$runtime_bind_source/shared-runtime-provision.json}" = "$runtime_bind_source/shared-runtime-provision.json" ] || {
+.devcontainer/generate-runtime-compose.sh:647:  [ "${AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT:-$runtime_bind_source/shared-runtime-readback.json}" = "$runtime_bind_source/shared-runtime-readback.json" ] || {
+.devcontainer/generate-runtime-compose.sh:709:    "      AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: \"${runtime_target}/shared-runtime-provision.json\""
+.devcontainer/generate-runtime-compose.sh:710:    "      AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT: \"${runtime_target}/shared-runtime-readback.json\""
+.devcontainer/gpu-admission.sh:9:# downstream implementation finalize-shared-runtime.sh validates the container bind and publishes readback
+.devcontainer/gpu-admission.sh:39:provision_receipt="$runtime_source/shared-runtime-provision.json"
+.devcontainer/gpu-admission.sh:40:readback_receipt="$runtime_source/shared-runtime-readback.json"
+.devcontainer/gpu-admission.sh:98:    probe_data = b"agent-canon-shared-runtime-probe/v5\\n"
+.devcontainer/gpu-admission.sh:131:    "schema_version": "shared-runtime-provision/v1",
+.devcontainer/gpu-admission.sh:289:export AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT="${runtime_source}/shared-runtime-readback.json"
+.devcontainer/gpu-admission.sh:310:  exec .devcontainer/finalize-shared-runtime.sh
+.github/workflows/issue-783-runtime-inventory.yml:41:              "shared-runtime",
+.github/workflows/issue-783-runtime-inventory.yml:43:              "finalize-shared-runtime",
+CONTAINER_OPERATIONS.md:308:  shared-runtime path.
+CONTAINER_OPERATIONS.md:358:  `finalize-shared-runtime.sh`、shared lock、provision/readback receipt は GPU
+CONTAINER_OPERATIONS.md:382:  `devcontainer exec` と source-root resolver で `finalize-shared-runtime.sh` を一度だけ
+CONTAINER_OPERATIONS.md:386:  `shared-runtime-readback.json` を `tools/experiments/execution_resource_plan.py` の
+CONTAINER_OPERATIONS.md:397:  `shared-runtime-provision.json` / `shared-runtime-readback.json` を default の
+README.md:52:[shared-runtime-surfaces.toml](documents/runtime/shared-runtime-surfaces.toml) です。Runtime
+ROOT_AGENTS.md:8:upstream design documents/runtime/shared-runtime-surfaces.toml live integration manifest
+ROOT_AGENTS.md:74:| explicit live integration surface | `vendor/agent-canon/documents/runtime/shared-runtime-surfaces.toml` | `surface_manifest.py` |
+agent-canon-environment.toml:94:provision_receipt = "/var/lib/agent-canon/runtime/shared-runtime-provision.json"
+agent-canon-environment.toml:95:readback_receipt = "/var/lib/agent-canon/runtime/shared-runtime-readback.json"
+agents/canonical/CODEX_WORKFLOW.md:192:1. canon-owned surface なら `documents/runtime/shared-runtime-surfaces.toml`、`documents/runtime/SHARED_RUNTIME_SURFACES.md`、`vendor/agent-canon/tools/sync_agent_canon.sh` の manifest-backed ownership に従い、`link-root`、vendor update、standalone canon update、または意図的削除のどれかに分類する
+documents/README.md:8:upstream design ./runtime/shared-runtime-surfaces.toml machine-readable ownership manifest。
+documents/agent-canon/agent-canon-licensing-policy.md:9:downstream design ../runtime/shared-runtime-surfaces.toml classifies parent-repository license surfaces
+documents/agent-canon/agent-canon-parent-repo-latest-checklist.md:42:| `documents/runtime/SHARED_RUNTIME_SURFACES.md`, `documents/runtime/shared-runtime-surfaces.toml` | shared surface policy and machine manifest | AgentCanon | source-root resolver `check-convention` |
+documents/agent-canon/agent-canon-subtree-migration.md:41:  - `documents/runtime/shared-runtime-surfaces.toml` に載っている active view、optional transaction state、retired path policy
+documents/agent-canon/agent-canon-subtree-migration.md:73:- shared surface を増減したら、同じ pass で `documents/runtime/shared-runtime-surfaces.toml` と ownership 文書を更新します。
+documents/agent-canon/agent-canon-subtree-migration.md:181:- authoritative path inventory は Markdown の長大リストではなく `documents/runtime/shared-runtime-surfaces.toml` です
+documents/contracts/static-seed-export.md:120:- `documents/runtime/shared-runtime-surfaces.toml` とその他の source manifest
+documents/design/devcontainer/parent-devcontainer-policy.md:6:upstream design ../../runtime/shared-runtime-surfaces.toml machine-readable shared runtime surface manifest
+documents/design/devcontainer/parent-devcontainer-policy.md:19:downstream implementation ../../../.devcontainer/finalize-shared-runtime.sh owns container-side shared-runtime readback
+documents/design/devcontainer/parent-devcontainer-policy.md:20:downstream implementation ../../../tools/experiments/execution_resource_plan.py owns typed shared-runtime receipt parsing and publication
+documents/design/devcontainer/parent-devcontainer-policy.md:89:`.devcontainer/post-create.sh` と `.devcontainer/finalize-shared-runtime.sh` が usability を read back します。
+documents/design/devcontainer/parent-devcontainer-policy.md:119:## Mapping-neutral shared-runtime receipt
+documents/design/devcontainer/parent-devcontainer-policy.md:121:RDC-003 の provision は `.devcontainer/gpu-admission.sh`、container readback は `.devcontainer/finalize-shared-runtime.sh`、
+documents/design/devcontainer/parent-devcontainer-policy.md:125:route/path、source/target device/inode、symlink/type/mode、mount namespace、fingerprint、lock、atomic publication、closed probe は `.devcontainer/finalize-shared-runtime.sh` と `tools/experiments/execution_resource_plan.py` が fail-closed で維持します。
+documents/design/devcontainer/parent-devcontainer-policy.md:139:| DEV-GPU-004 | `.devcontainer/gpu-admission.sh` は up 後に `.devcontainer/finalize-shared-runtime.sh` を同じ profile container で実行する | finalize tests が mount/route/path/fingerprint/atomic publication/usability と exact cleanup/original rc を検証する |
+documents/design/devcontainer/parent-devcontainer-policy.md:168:- Evidence sources: `.devcontainer/generate-runtime-compose.sh`, `tools/ci/container_config.py`, `tools/ci/container_runtime.py`, `.devcontainer/gpu-admission.sh`, `.devcontainer/finalize-shared-runtime.sh`, and `tools/experiments/execution_resource_plan.py` own the runtime/readback clauses above.
+documents/design/devcontainer/parent-devcontainer-policy.md:169:- Assumption boundary: daemon mode and host-visible numeric ownership are observations, not acceptance predicates; container-side usability remains the oracle owned by `.devcontainer/post-create.sh` and `.devcontainer/finalize-shared-runtime.sh`.
+documents/design/jax_util/algorithm_module_contract.md:396:| runtime mirror | `documents/runtime/shared-runtime-surfaces.toml` の retired test paths | 二つの test path を削除し、Rust test/fixture surface を登録 |
+documents/design/parent-repository-audit.md:60:| `documents/runtime/shared-runtime-surfaces.toml` | source/view projection mechanics | parent path ownership、general structure |
+documents/design/responsibility-scope-management.md:8:upstream design ../runtime/shared-runtime-surfaces.toml shared surface projection mechanics
+documents/design/responsibility-scope-management.md:35:  `shared-runtime-surfaces.toml`.
+documents/design/source-owned-dependency-validation.md:108:`documents/runtime/shared-runtime-surfaces.toml` using deterministic longest-prefix
+documents/design/source-owned-dependency-validation.md:109:selection before source bytes are read from `documents/runtime/shared-runtime-surfaces.toml`.
+documents/design/source-owned-dependency-validation.md:207:  `documents/runtime/shared-runtime-surfaces.toml`.
+documents/experiments/gpu-admission-r5-source-packet.md:30:receipt、GPU auto-request を選択しない。`finalize-shared-runtime.sh`、scheduler、
+documents/experiments/gpu-admission-r5-source-packet.md:52:`finalize-shared-runtime.sh` を実行します。provision、Compose generation、up、finalize
+documents/experiments/gpu-admission-r5-source-packet.md:57:acceptance は `finalize-shared-runtime.sh` が container-side target で
+documents/parent-repository-audit/README.md:32:- `shared-runtime-surfaces.toml`: source から parent view への projection mechanics。
+documents/parent-repository/CONTAINER_OPERATIONS.md:65:`.devcontainer/finalize-shared-runtime.sh` が container-side create/write/read/remove で
+documents/parent-repository/README.md:131:`documents/runtime/shared-runtime-surfaces.toml` の `removed_legacy` は、過去の
+documents/runtime/README.md:18:- `SHARED_RUNTIME_SURFACES.md` と `shared-runtime-surfaces.toml`: shared surface の
+documents/runtime/SHARED_RUNTIME_SURFACES.md:7:downstream design ./shared-runtime-surfaces.toml machine-readable opt-in projection manifest
+documents/runtime/SHARED_RUNTIME_SURFACES.md:34:`documents/runtime/shared-runtime-surfaces.toml`. It records
+documents/runtime/SHARED_RUNTIME_SURFACES.md:79:Each `[[surface]]` in `shared-runtime-surfaces.toml` declares projection metadata:
+documents/structure/repo-structure-contract.toml:6:# upstream design ../runtime/shared-runtime-surfaces.toml machine-readable projection mechanics
+documents/structure/repo-structure-contract.toml:49:  "documents/runtime/shared-runtime-surfaces.toml",
+documents/structure/repo-structure-contract.toml:122:path = "documents/runtime/shared-runtime-surfaces.toml"
+issues/closed/AC-20260516-template-agent-canon-audit-500.md:20:affected_surfaces: README.md, QUICK_START.md, Makefile, ROOT_AGENTS.md, agents/canonical/CODEX_WORKFLOW.md, agents/skills/start-repository.md, agents/skills/catalog.yaml, documents/runtime-profiles-and-check-matrix.md, documents/template-agent-canon-audit-resolution.md, documents/SHARED_RUNTIME_SURFACES.md, documents/shared-runtime-surfaces.toml, documents/tools/README.md, tools/sync_agent_canon.sh
+issues/closed/AC-20260516-template-agent-canon-audit-500.md:21:edit_scope: documents/runtime-profiles-and-check-matrix.md, documents/template-agent-canon-audit-resolution.md, README.md, ROOT_AGENTS.md, agents/canonical/CODEX_WORKFLOW.md, agents/skills/start-repository.md, agents/skills/catalog.yaml, documents/SHARED_RUNTIME_SURFACES.md, documents/shared-runtime-surfaces.toml, documents/tools/README.md, tools/catalog.yaml, tools/sync_agent_canon.sh, parent README.md, parent QUICK_START.md, parent Makefile, parent documents/README.md
+issues/closed/AC-20260517-github-folder-issue-sync.md:22:edit_scope: issues/README.md, .github/workflows/issue-mirror.yml, tools/agent_tools/issue_sync.py, tests/agent_tools/test_issue_sync.py, tools/catalog.yaml, tools/README.md, documents/tools/README.md, .github/PULL_REQUEST_TEMPLATE.md, .github/PULL_REQUEST_TEMPLATE/agent_canon.md, tools/ci/check_github_workflows.py, tests/tools/test_check_github_workflows.py, documents/shared-runtime-surfaces.toml
+issues/closed/AC-20260517-responsibility-scope-management.md:8:upstream design ../../documents/runtime/shared-runtime-surfaces.toml defines shared surface classes.
+issues/closed/AC-20260517-responsibility-scope-management.md:22:affected_surfaces: documents/SHARED_RUNTIME_SURFACES.md, documents/shared-runtime-surfaces.toml, responsibility-scope.toml, tools/catalog.yaml, tools/README.md, documents/tools/README.md, .codex/hooks.json, .codex/hooks/library_implementation_guard.py, .codex/hooks/helper_first_guard.py, ROOT_AGENTS.md, agents/workflows/agent-canon-pr-workflow.md
+issues/closed/AC-20260517-responsibility-scope-management.md:29:AgentCanon has a shared-runtime surface manifest and a tool catalog, but there
+memory/README.md:7:upstream design ../documents/runtime/shared-runtime-surfaces.toml shared runtime surface ownership
+reports/agents/20260712-090608-context-packettool-skill-routing/graph_design_brief.md:1719:| `SP-2` mathematical/current basis | `graph_architecture_audit.md`; `structured-analysis/graph-dsl.md`; `structured-analysis/database-design.md`; `dependency-manifest-design.md`; `dependency-header-analysis.md`; `semantic_index.md`; `search-coordination.md`; `responsibility-scope-management.md`; `SHARED_RUNTIME_SURFACES.md`; `shared-runtime-surfaces.toml`; `repo-structure-contract.toml`; `documents/README.md`, `tools/README.md`, `documents/tools/README.md`; `Cargo.toml`/`Cargo.lock`; `.codex/config.toml`. |
+reports/agents/20260712-090608-context-packettool-skill-routing/graph_design_brief.md:2368:- `documents/SHARED_RUNTIME_SURFACES.md`, `documents/shared-runtime-surfaces.toml`, `documents/repo-structure-contract.toml`.
+reports/agents/20260712-090608-context-packettool-skill-routing/graph_design_brief.md:2499:| `SEM-09` Root/docs/generated surfaces | `README.md`, `agents/README.md`, `documents/README.md`, `tools/README.md`, `documents/tools/README.md`, CLI/workflow docs, `tools/catalog.yaml`, `agents/skills/catalog.yaml`, generated/root views | public CLI and shared-runtime docs | only `agent-canon graph ...`; no MCP or private route | docs/convention/public-surface/dependency-header checks | one public graph route and parent DB ownership | `KG-CONSUME` | API/document-flow | `KG-1`, `KG-2`, `KG-3`, `KG-9` | existing reader maps, catalogs, root-view contract |
+rust/agent-canon/src/dependency_manifest.rs:21:const DEFAULT_SURFACE_MANIFEST: &str = "documents/runtime/shared-runtime-surfaces.toml";
+rust/agent-canon/src/dependency_manifest.rs:409:        fs::canonicalize(source_root.join("documents/runtime/shared-runtime-surfaces.toml"))
+rust/agent-canon/src/graph.rs:3477:                "documents/runtime/shared-runtime-surfaces.toml",
+rust/agent-canon/src/graph.rs:3478:                include_bytes!("../../../documents/runtime/shared-runtime-surfaces.toml"),
+rust/agent-canon/src/graph.rs:4180:            "documents/runtime/shared-runtime-surfaces.toml",
+rust/agent-canon/src/memory.rs:5:// upstream design ../../../documents/runtime/shared-runtime-surfaces.toml shared memory surface ownership
+tests/agent_tools/test_check_convention_compliance.py:131:        "surface_manifest.py documents/runtime/shared-runtime-surfaces.toml AGENTS.md "
+tests/agent_tools/test_check_convention_compliance.py:137:    "documents/runtime/shared-runtime-surfaces.toml": (
+tests/agent_tools/test_check_convention_compliance.py:842:                "surface_manifest.py documents/runtime/shared-runtime-surfaces.toml\n",
+tests/agent_tools/test_file_surface_inventory.py:144:            manifest = root / "vendor" / "agent-canon" / "documents" / "runtime" / "shared-runtime-surfaces.toml"
+tests/agent_tools/test_file_surface_inventory.py:179:                "vendor/agent-canon/documents/runtime/shared-runtime-surfaces.toml",
+tests/agent_tools/test_parent_repo_readiness.py:8:# upstream design ../../documents/runtime/shared-runtime-surfaces.toml shared runtime surface manifest
+tests/agent_tools/test_parent_repo_readiness.py:152:            "documents/runtime/shared-runtime-surfaces.toml",
+tests/agent_tools/test_parent_repo_readiness.py:329:            "documents/runtime/shared-runtime-surfaces.toml",
+tests/agent_tools/test_parent_repo_readiness.py:481:                "vendor/agent-canon/documents/runtime/shared-runtime-surfaces.toml:missing-manifest",
+tests/agent_tools/test_parent_repo_readiness.py:614:            root, "vendor/agent-canon", "documents/runtime/shared-runtime-surfaces.toml"
+tests/agent_tools/test_repo_structure_contract.py:203:            "documents/runtime/shared-runtime-surfaces.toml",
+tests/agent_tools/test_repo_structure_contract.py:298:                                {"type": "file", "name": "shared-runtime-surfaces.toml"}
+tests/agent_tools/test_surface_manifest.py:1:"""Focused tests for shared-runtime manifest metadata validation."""
+tests/agent_tools/test_surface_manifest.py:6:# upstream implementation ../../tools/agent_tools/surface_manifest.py parses shared-runtime metadata
+tests/agent_tools/test_surface_manifest.py:44:            "documents/runtime/shared-runtime-surfaces.toml",
+tests/agent_tools/test_task_close.py:69:        ("documents/runtime/shared-runtime-surfaces.toml",),
+tests/tools/test_agent_canon_pr_graph_selector.py:142:    manifest = parent / "documents" / "runtime" / "shared-runtime-surfaces.toml"
+tests/tools/test_agent_canon_pr_graph_selector.py:145:        PROJECT_ROOT / "documents" / "runtime" / "shared-runtime-surfaces.toml",
+tests/tools/test_agent_canon_pr_graph_selector.py:167:    manifest = parent / "documents" / "runtime" / "shared-runtime-surfaces.toml"
+tests/tools/test_agent_canon_pr_graph_selector.py:193:    manifest = source_root / "documents" / "runtime" / "shared-runtime-surfaces.toml"
+tests/tools/test_agent_canon_pr_graph_selector.py:196:        PROJECT_ROOT / "documents" / "runtime" / "shared-runtime-surfaces.toml",
+tests/tools/test_check_bootstrap_docs.py:7:# upstream design ../../documents/runtime/shared-runtime-surfaces.toml explicit live-integration manifest metadata
+tests/tools/test_check_bootstrap_docs.py:253:                root / "documents" / "runtime" / "shared-runtime-surfaces.toml",
+tests/tools/test_check_bootstrap_docs.py:261:                "documents/runtime/shared-runtime-surfaces.toml: live AgentCanon consumer surface is forbidden",
+tests/tools/test_check_bootstrap_docs.py:300:            (PROJECT_ROOT / "documents" / "runtime" / "shared-runtime-surfaces.toml").read_text(
+tests/tools/test_container_config.py:646:            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+tests/tools/test_container_config.py:647:            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
+tests/tools/test_container_config.py:995:            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+tests/tools/test_container_config.py:996:            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
+tests/tools/test_container_config.py:1054:            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+tests/tools/test_container_config.py:1055:            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
+tests/tools/test_container_config.py:1088:            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+tests/tools/test_container_config.py:1089:            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
+tests/tools/test_container_config.py:1333:            "AGENT_CANON_OPTIONAL_MOUNTS": "shared-runtime",
+tests/tools/test_container_config.py:1341:    assert "optional mount profile is unsupported: shared-runtime" in result.stderr
+tests/tools/test_container_config.py:2355:                    repo / ".agent-canon/runtime/shared-runtime-provision.json"
+tests/tools/test_container_config.py:2358:                    repo / ".agent-canon/runtime/shared-runtime-readback.json"
+tests/tools/test_container_config.py:2911:    assert "documents/runtime/shared-runtime-surfaces.toml" not in result.stdout
+tests/tools/test_execution_resource_plan.py:118:                "schema_version": "shared-runtime-provision/v1",
+tests/tools/test_execution_resource_plan.py:133:                "schema_version": "shared-runtime-readback/v1",
+tests/tools/test_execution_resource_plan.py:224:                "schema_version": "shared-runtime-provision/v1",
+tests/tools/test_execution_resource_plan.py:239:                "schema_version": "shared-runtime-readback/v1",
+tests/tools/test_gpu_admission_devcontainer.py:27:    finalizer = (PROJECT_ROOT / ".devcontainer/finalize-shared-runtime.sh").read_text(
+tests/tools/test_gpu_admission_devcontainer.py:286:            "<exec> <.devcontainer/finalize-shared-runtime.sh>",
+tests/tools/test_run_codex_in_repo_container.py:633:        PROJECT_ROOT / ".devcontainer" / "finalize-shared-runtime.sh"
+tests/tools/test_run_codex_in_repo_container.py:666:    assert '"$devcontainer_dir/finalize-shared-runtime.sh"' not in post_create
+tests/tools/test_run_codex_in_repo_container.py:700:    assert '"schema_version": "shared-runtime-readback/v1"' in finalize
+tests/tools/test_run_codex_in_repo_container.py:702:        'readback_receipt="${AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT:-${runtime_root}/shared-runtime-readback.json}"'
+tests/tools/test_run_codex_in_repo_container.py:721:    assert (PROJECT_ROOT / ".devcontainer" / "finalize-shared-runtime.sh").is_file()
+tests/tools/test_run_codex_in_repo_container.py:723:    assert not (PROJECT_ROOT / ".devcontainer" / "bootstrap-shared-runtime.sh").exists()
+tests/tools/test_run_codex_in_repo_container.py:724:    assert "bootstrap-shared-runtime.sh" not in devcontainer
+tests/tools/test_run_codex_in_repo_container.py:725:    assert "finalize-shared-runtime.sh" not in devcontainer
+tests/tools/test_run_codex_in_repo_container.py:735:        "/var/lib/agent-canon/runtime/shared-runtime-provision.json"
+tests/tools/test_run_codex_in_repo_container.py:739:        "/var/lib/agent-canon/runtime/shared-runtime-readback.json"
+tests/tools/test_run_codex_in_repo_container.py:743:    assert "/receipts/shared-runtime-provision" not in "\n".join(
+tests/tools/test_run_codex_in_repo_container.py:746:    assert "/receipts/shared-runtime-readback" not in "\n".join(
+tests/tools/test_update_agent_canon.py:892:                        / "shared-runtime-surfaces.toml"
+tests/tools/test_update_agent_canon.py:919:                                / "shared-runtime-surfaces.toml"
+tests/tools/test_update_agent_canon.py:2279:        (work_dir / "documents" / "runtime" / "shared-runtime-surfaces.toml").write_text(
+tests/tools/test_update_agent_canon.py:2392:                    "documents/runtime/shared-runtime-surfaces.toml",
+tests/tools/test_update_agent_canon.py:3920:            manifest = repo / "vendor" / "agent-canon" / "documents" / "runtime" / "shared-runtime-surfaces.toml"
+tests/tools/test_update_agent_canon_surface_migration.py:264:            "finalize-shared-runtime.sh",
+tools/agent_tools/check_convention_compliance.py:22:# upstream design ../../documents/runtime/shared-runtime-surfaces.toml shared surface manifest
+tools/agent_tools/check_convention_compliance.py:663:    "documents/runtime/shared-runtime-surfaces.toml",
+tools/agent_tools/check_convention_compliance.py:669:    "documents/runtime/shared-runtime-surfaces.toml",
+tools/agent_tools/check_convention_compliance.py:1445:        "documents/runtime/shared-runtime-surfaces.toml", ""
+tools/agent_tools/check_convention_compliance.py:1452:                    "documents/runtime/shared-runtime-surfaces.toml",
+tools/agent_tools/check_dependency_headers.py:320:        / "shared-runtime-surfaces.toml"
+tools/agent_tools/check_dependency_headers.py:331:                "documents/runtime/shared-runtime-surfaces.toml",
+tools/agent_tools/file_surface_inventory.py:130:        manifest = load_manifest(root, "vendor/agent-canon", "documents/runtime/shared-runtime-surfaces.toml")
+tools/agent_tools/parent_repo_readiness.py:5:# upstream design ../../documents/runtime/shared-runtime-surfaces.toml root surface ownership manifest
+tools/agent_tools/parent_repo_readiness.py:35:DEFAULT_MANIFEST = "documents/runtime/shared-runtime-surfaces.toml"
+tools/agent_tools/source_dependency_graph.py:71:SURFACE_MANIFEST = Path("documents/runtime/shared-runtime-surfaces.toml")
+tools/agent_tools/surface_manifest.py:6:# upstream design ../../documents/runtime/shared-runtime-surfaces.toml machine-readable surface manifest
+tools/agent_tools/surface_manifest.py:30:DEFAULT_MANIFEST = Path("documents/runtime/shared-runtime-surfaces.toml")
+tools/agent_tools/surface_manifest.py:88:    "documents/runtime/shared-runtime-surfaces.toml",
+tools/agent_tools/surface_manifest.py:686:        findings.append("SURFACE_MANIFEST_FINDING=documents/runtime/shared-runtime-surfaces.toml:empty-manifest")
+tools/catalog.yaml:199:      - documents/runtime/shared-runtime-surfaces.toml
+tools/catalog.yaml:206:    summary: Produces canonical shared-runtime surface snapshots consumed by AgentCanon graph builds and root synchronization.
+tools/catalog.yaml:211:    command: python3 tools/agent_tools/surface_manifest.py --root . --prefix vendor/agent-canon --manifest documents/runtime/shared-runtime-surfaces.toml normalized-snapshot
+tools/catalog.yaml:219:      - documents/runtime/shared-runtime-surfaces.toml
+tools/ci/agent_canon_pr_graph_selector.py:2235:        root / PROFILE_INVENTORY.parent / "shared-runtime-surfaces.toml"
+tools/ci/agent_canon_pr_graph_selector.py:2523:        name for name in names if Path(name).name == "shared-runtime-surfaces.toml"
+tools/ci/container_config.py:1386:                    "default-shared-runtime-field-forbidden:group_add",
+tools/ci/container_config.py:1421:                    "default-shared-runtime-field-forbidden:runtime-bind",
+tools/ci/container_config.py:1805:                        else "default-shared-runtime-field-forbidden"
+tools/ci/container_config.py:1821:                "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
+tools/ci/container_config.py:1822:                "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
+tools/ci/container_config.py:1936:                        "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(runtime_source / "shared-runtime-provision.json"),
+tools/ci/container_config.py:1937:                        "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(runtime_source / "shared-runtime-readback.json"),
+tools/ci/container_runtime.py:59:PROVISION_RECEIPT_NAME = "shared-runtime-provision.json"
+tools/ci/container_runtime.py:60:READBACK_RECEIPT_NAME = "shared-runtime-readback.json"
+tools/docs/check_bootstrap_docs.py:72:    Path("documents/runtime/shared-runtime-surfaces.toml"),
+tools/experiments/execution_resource_plan.py:219:SHARED_RUNTIME_PROVISION_SCHEMA_VERSION = "shared-runtime-provision/v1"
+tools/experiments/execution_resource_plan.py:220:SHARED_RUNTIME_READBACK_SCHEMA_VERSION = "shared-runtime-readback/v1"
+tools/experiments/execution_resource_plan.py:450:    lock_path = os.path.join(parent, "locks", "shared-runtime-receipt.lock")
+tools/experiments/execution_resource_plan.py:552:    schema_version: Literal["shared-runtime-provision/v1"]
+tools/experiments/execution_resource_plan.py:622:    schema_version: Literal["shared-runtime-readback/v1"]
+tools/experiments/execution_resource_plan.py:813:            Literal["shared-runtime-provision/v1"],
+tools/experiments/execution_resource_plan.py:942:            Literal["shared-runtime-readback/v1"],
+tools/experiments/run_managed_experiment.py:2695:        lock_namespace_visibility_witness="shared-runtime-receipt",
+tools/experiments/run_managed_experiment.py:2805:                f"{HOST_RUNTIME_ROOT}/shared-runtime-provision.json"
+tools/experiments/run_managed_experiment.py:2819:                f"{HOST_RUNTIME_ROOT}/shared-runtime-readback.json"
+tools/sync_agent_canon.sh:9:# upstream design ../documents/runtime/shared-runtime-surfaces.toml machine-readable surface manifest
+tools/sync_agent_canon.sh:121:SURFACE_MANIFEST="${AGENT_CANON_SURFACE_MANIFEST:-documents/runtime/shared-runtime-surfaces.toml}"
+
+## literal: shared_runtime
+.devcontainer/finalize-shared-runtime.sh:80:    read_shared_runtime_provision,
+.devcontainer/finalize-shared-runtime.sh:99:provision = read_shared_runtime_provision(provision_path)
+.github/workflows/issue-783-runtime-inventory.yml:42:              "shared_runtime",
+CONTAINER_OPERATIONS.md:387:  `read_shared_runtime_provision` / `write_runtime_receipt_atomic` owner 経由で発行する。
+agent-canon-environment.toml:88:shared_runtime_source = "/var/lib/agent-canon/runtime"
+agent-canon-environment.toml:89:host_shared_runtime_source = "${repository_root}/.agent-canon/runtime (user-owned)"
+documents/experiments/gpu-admission-r5-source-packet.md:68:`tools/experiments/execution_resource_plan.py` の `read_shared_runtime_provision`、
+documents/experiments/gpu-admission-r5-source-packet.md:69:`read_shared_runtime_readback`、`RuntimeIdentityReader.read` は receipt-file-owner と
+responsibility-scope.toml:24:  "shared_runtime",
+responsibility-scope.toml:128:class = "shared_runtime"
+templates/documents/responsibility-scope.template.toml:22:  "shared_runtime",
+templates/documents/responsibility-scope.template.toml:77:class = "shared_runtime"
+tests/tools/test_container_config.py:1315:def test_optional_mount_rejects_removed_shared_runtime_selector(
+tests/tools/test_execution_resource_plan.py:70:    read_shared_runtime_provision,
+tests/tools/test_execution_resource_plan.py:71:    read_shared_runtime_readback,
+tests/tools/test_execution_resource_plan.py:155:            provision = read_shared_runtime_provision(str(provision_path))
+tests/tools/test_execution_resource_plan.py:156:            readback = read_shared_runtime_readback(str(readback_path))
+tests/tools/test_execution_resource_plan.py:196:                    read_shared_runtime_provision(str(provision_path))
+tests/tools/test_execution_resource_plan.py:209:                    read_shared_runtime_readback(str(readback_path))
+tests/tools/test_execution_resource_plan.py:269:                    provision = read_shared_runtime_provision(str(provision_path))
+tests/tools/test_execution_resource_plan.py:270:                    readback = read_shared_runtime_readback(str(readback_path))
+tests/tools/test_execution_resource_plan.py:279:                read_shared_runtime_readback(str(readback_path))
+tests/tools/test_run_codex_in_repo_container.py:709:    assert "read_shared_runtime_provision" in finalize
+tools/experiments/execution_resource_plan.py:733:def read_shared_runtime_provision(
+tools/experiments/execution_resource_plan.py:837:def read_shared_runtime_readback(
+tools/experiments/execution_resource_plan.py:10240:    "read_shared_runtime_provision",
+tools/experiments/execution_resource_plan.py:10241:    "read_shared_runtime_readback",
+tools/experiments/run_managed_experiment.py:91:        read_shared_runtime_provision,
+tools/experiments/run_managed_experiment.py:92:        read_shared_runtime_readback,
+tools/experiments/run_managed_experiment.py:145:        read_shared_runtime_provision,
+tools/experiments/run_managed_experiment.py:146:        read_shared_runtime_readback,
+tools/experiments/run_managed_experiment.py:2817:            provision = read_shared_runtime_provision(provision_path)
+tools/experiments/run_managed_experiment.py:2818:            readback = read_shared_runtime_readback(
+
+## literal: finalize-shared-runtime
+.devcontainer/gpu-admission.sh:9:# downstream implementation finalize-shared-runtime.sh validates the container bind and publishes readback
+.devcontainer/gpu-admission.sh:310:  exec .devcontainer/finalize-shared-runtime.sh
+.github/workflows/issue-783-runtime-inventory.yml:43:              "finalize-shared-runtime",
+CONTAINER_OPERATIONS.md:358:  `finalize-shared-runtime.sh`、shared lock、provision/readback receipt は GPU
+CONTAINER_OPERATIONS.md:382:  `devcontainer exec` と source-root resolver で `finalize-shared-runtime.sh` を一度だけ
+documents/design/devcontainer/parent-devcontainer-policy.md:19:downstream implementation ../../../.devcontainer/finalize-shared-runtime.sh owns container-side shared-runtime readback
+documents/design/devcontainer/parent-devcontainer-policy.md:89:`.devcontainer/post-create.sh` と `.devcontainer/finalize-shared-runtime.sh` が usability を read back します。
+documents/design/devcontainer/parent-devcontainer-policy.md:121:RDC-003 の provision は `.devcontainer/gpu-admission.sh`、container readback は `.devcontainer/finalize-shared-runtime.sh`、
+documents/design/devcontainer/parent-devcontainer-policy.md:125:route/path、source/target device/inode、symlink/type/mode、mount namespace、fingerprint、lock、atomic publication、closed probe は `.devcontainer/finalize-shared-runtime.sh` と `tools/experiments/execution_resource_plan.py` が fail-closed で維持します。
+documents/design/devcontainer/parent-devcontainer-policy.md:139:| DEV-GPU-004 | `.devcontainer/gpu-admission.sh` は up 後に `.devcontainer/finalize-shared-runtime.sh` を同じ profile container で実行する | finalize tests が mount/route/path/fingerprint/atomic publication/usability と exact cleanup/original rc を検証する |
+documents/design/devcontainer/parent-devcontainer-policy.md:168:- Evidence sources: `.devcontainer/generate-runtime-compose.sh`, `tools/ci/container_config.py`, `tools/ci/container_runtime.py`, `.devcontainer/gpu-admission.sh`, `.devcontainer/finalize-shared-runtime.sh`, and `tools/experiments/execution_resource_plan.py` own the runtime/readback clauses above.
+documents/design/devcontainer/parent-devcontainer-policy.md:169:- Assumption boundary: daemon mode and host-visible numeric ownership are observations, not acceptance predicates; container-side usability remains the oracle owned by `.devcontainer/post-create.sh` and `.devcontainer/finalize-shared-runtime.sh`.
+documents/experiments/gpu-admission-r5-source-packet.md:30:receipt、GPU auto-request を選択しない。`finalize-shared-runtime.sh`、scheduler、
+documents/experiments/gpu-admission-r5-source-packet.md:52:`finalize-shared-runtime.sh` を実行します。provision、Compose generation、up、finalize
+documents/experiments/gpu-admission-r5-source-packet.md:57:acceptance は `finalize-shared-runtime.sh` が container-side target で
+documents/parent-repository/CONTAINER_OPERATIONS.md:65:`.devcontainer/finalize-shared-runtime.sh` が container-side create/write/read/remove で
+tests/tools/test_gpu_admission_devcontainer.py:27:    finalizer = (PROJECT_ROOT / ".devcontainer/finalize-shared-runtime.sh").read_text(
+tests/tools/test_gpu_admission_devcontainer.py:286:            "<exec> <.devcontainer/finalize-shared-runtime.sh>",
+tests/tools/test_run_codex_in_repo_container.py:633:        PROJECT_ROOT / ".devcontainer" / "finalize-shared-runtime.sh"
+tests/tools/test_run_codex_in_repo_container.py:666:    assert '"$devcontainer_dir/finalize-shared-runtime.sh"' not in post_create
+tests/tools/test_run_codex_in_repo_container.py:721:    assert (PROJECT_ROOT / ".devcontainer" / "finalize-shared-runtime.sh").is_file()
+tests/tools/test_run_codex_in_repo_container.py:725:    assert "finalize-shared-runtime.sh" not in devcontainer
+tests/tools/test_update_agent_canon_surface_migration.py:264:            "finalize-shared-runtime.sh",
+
+## literal: MANAGED_CONTAINER
+.devcontainer/finalize-shared-runtime.sh:19:runtime_route="${AGENT_CANON_RUNTIME_ROUTE:-MANAGED_CONTAINER}"
+.devcontainer/finalize-shared-runtime.sh:33:[ "$runtime_route" = "MANAGED_CONTAINER" ] || fail "runtime route is not MANAGED_CONTAINER"
+.devcontainer/generate-runtime-compose.sh:627:  runtime_route="MANAGED_CONTAINER"
+.devcontainer/gpu-admission.sh:132:    "runtime_route": "MANAGED_CONTAINER",
+.devcontainer/gpu-admission.sh:284:export AGENT_CANON_RUNTIME_ROUTE=MANAGED_CONTAINER
+.github/workflows/issue-783-runtime-inventory.yml:44:              "MANAGED_CONTAINER",
+CONTAINER_OPERATIONS.md:377:  `DEVCONTAINER_GPU_REQUEST=all`、`MANAGED_CONTAINER` route を出力する。default
+agent-canon-environment.toml:87:runtime_route = "MANAGED_CONTAINER"
+documents/experiments/gpu-admission-r5-source-packet.md:45:`DEVCONTAINER_GPU_REQUEST=all`、`AGENT_CANON_RUNTIME_ROUTE=MANAGED_CONTAINER` を出力
+tests/tools/test_container_config.py:1016:    assert 'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"' in compose
+tests/tools/test_container_config.py:2638:        + '\nenv = ["AGENT_CANON_RUNTIME_ROUTE=MANAGED_CONTAINER"]\n',
+tests/tools/test_execution_resource_plan.py:119:                "runtime_route": "MANAGED_CONTAINER",
+tests/tools/test_execution_resource_plan.py:134:                "runtime_route": "MANAGED_CONTAINER",
+tests/tools/test_execution_resource_plan.py:225:                "runtime_route": "MANAGED_CONTAINER",
+tests/tools/test_execution_resource_plan.py:240:                "runtime_route": "MANAGED_CONTAINER",
+tests/tools/test_run_managed_experiment.py:645:        runtime_route="MANAGED_CONTAINER",
+tools/ci/container_config.py:1751:            "MANAGED_CONTAINER" if profile == "gpu-admission" else "CONTAINER_LOCAL"
+tools/ci/container_runtime.py:61:RUNTIME_ROUTE = "MANAGED_CONTAINER"
+tools/experiments/execution_resource_plan.py:183:RuntimeRoute: TypeAlias = Literal["MANAGED_CONTAINER", "HOST_DIRECT"]
+tools/experiments/execution_resource_plan.py:764:    if route not in {"MANAGED_CONTAINER", "HOST_DIRECT"}:
+tools/experiments/execution_resource_plan.py:880:    if route not in {"MANAGED_CONTAINER", "HOST_DIRECT"}:
+tools/experiments/execution_resource_plan.py:1202:        if request.runtime_route not in {"MANAGED_CONTAINER", "HOST_DIRECT"}:
+tools/experiments/run_managed_experiment.py:430:    if runtime_identity.runtime_route != "MANAGED_CONTAINER":
+tools/experiments/run_managed_experiment.py:2758:        runtime_route="MANAGED_CONTAINER",
+
+## execution_resource_plan symbol map
+_read_runtime_receipt:324-395
+write_runtime_receipt_atomic:436-533
+SharedRuntimeProvisionReceipt:551-561
+SourceFreezeReceipt:604-617
+SharedRuntimeReadbackReceipt:621-636
+RuntimeIdentityReceipt:640-654
+CudaRuntimeCapabilityReceipt:658-667
+_receipt_field:670-689
+_receipt_gids:692-714
+_require_receipt_shape:717-730
+read_shared_runtime_provision:733-834
+read_shared_runtime_readback:837-971
+RuntimeIdentityReader:974-1059
+capture_cuda_runtime_capability:1062-1170
+LockReadback:4076-4084
+ReservationEvidence:4088-4095
+LockPlacementEvidence:4134-4143
+RunGpuAdmissionReceipt:4157-4214
+build_lock_bound_admission_receipt:4229-4265
+_admission_receipt_payload:4268-4386
+_reservation_evidence_payload:4426-4432
+_lock_readback_payload:4435-4442
+GpuReservationTransaction:4455-4934
+ReservationLease:5190-5286
+UUIDReservationStore:5308-5653
+_persist_runtime_and_projection_once:7370-7394
+full_lock_readback:4269-4275
+full_reservation_evidence:4277-4285
+reservation_ids:4659-4665
+_try_lock:4718-4730
+
+## definitions/references: .devcontainer/generate-runtime-compose.sh
+.devcontainer/generate-runtime-compose.sh:9:# upstream design ../documents/experiments/gpu-admission-r5-source-packet.md opt-in GPU runtime identity wiring
+.devcontainer/generate-runtime-compose.sh:83:gpu_profile="${AGENT_CANON_GPU_ADMISSION_PROFILE:-default}"
+.devcontainer/generate-runtime-compose.sh:85:  default|gpu-admission) ;;
+.devcontainer/generate-runtime-compose.sh:87:    printf 'devcontainer GPU admission profile is unsupported: %s\n' "$gpu_profile" >&2
+.devcontainer/generate-runtime-compose.sh:92:if [ "$gpu_profile" = "gpu-admission" ]; then
+.devcontainer/generate-runtime-compose.sh:93:  pack_name="gpu-admission"
+.devcontainer/generate-runtime-compose.sh:249:    "DEVCONTAINER_RUNTIME_MODE",
+.devcontainer/generate-runtime-compose.sh:253:    "AGENT_CANON_GPU_ADMISSION_PROFILE",
+.devcontainer/generate-runtime-compose.sh:258:    "AGENT_CANON_RUNTIME_ROUTE",
+.devcontainer/generate-runtime-compose.sh:261:    "AGENT_CANON_SHARED_RUNTIME_SOURCE",
+.devcontainer/generate-runtime-compose.sh:262:    "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE",
+.devcontainer/generate-runtime-compose.sh:263:    "AGENT_CANON_SHARED_RUNTIME_TARGET",
+.devcontainer/generate-runtime-compose.sh:264:    "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
+.devcontainer/generate-runtime-compose.sh:265:    "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT",
+.devcontainer/generate-runtime-compose.sh:354:if [ "$gpu_profile" = "gpu-admission" ]; then
+.devcontainer/generate-runtime-compose.sh:356:    printf 'devcontainer GPU admission profile requires pack: %s\n' "$pack" >&2
+.devcontainer/generate-runtime-compose.sh:368:if [ "$gpu_profile" = "gpu-admission" ]; then
+.devcontainer/generate-runtime-compose.sh:369:  compose_project_name="${compose_project_name}-gpu-admission"
+.devcontainer/generate-runtime-compose.sh:370:  [[ "$compose_project_name" =~ ^[a-z0-9][a-z0-9_-]*-gpu-admission$ ]] || {
+.devcontainer/generate-runtime-compose.sh:371:    printf 'devcontainer GPU admission project name is invalid: %s\n' "$compose_project_name" >&2
+.devcontainer/generate-runtime-compose.sh:620:runtime_route="CONTAINER_LOCAL"
+.devcontainer/generate-runtime-compose.sh:624:provision_receipt="${runtime_target}/shared-runtime-provision.json"
+.devcontainer/generate-runtime-compose.sh:625:readback_receipt="${runtime_target}/shared-runtime-readback.json"
+.devcontainer/generate-runtime-compose.sh:626:if [ "$gpu_profile" = "gpu-admission" ]; then
+.devcontainer/generate-runtime-compose.sh:627:  runtime_route="MANAGED_CONTAINER"
+.devcontainer/generate-runtime-compose.sh:628:  runtime_bind_source="${AGENT_CANON_SHARED_RUNTIME_SOURCE:-${repo_root}/.agent-canon/runtime}"
+.devcontainer/generate-runtime-compose.sh:629:  runtime_host_source="${AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE:-$runtime_bind_source}"
+.devcontainer/generate-runtime-compose.sh:630:  runtime_target="${AGENT_CANON_SHARED_RUNTIME_TARGET:-/var/lib/agent-canon/runtime}"
+.devcontainer/generate-runtime-compose.sh:632:    printf 'devcontainer GPU admission runtime source must be repository-local .agent-canon/runtime\n' >&2
+.devcontainer/generate-runtime-compose.sh:636:    printf 'devcontainer GPU admission host runtime source must match the bind source\n' >&2
+.devcontainer/generate-runtime-compose.sh:640:    printf 'devcontainer GPU admission runtime target must be /var/lib/agent-canon/runtime\n' >&2
+.devcontainer/generate-runtime-compose.sh:643:  [ "${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-$runtime_bind_source/shared-runtime-provision.json}" = "$runtime_bind_source/shared-runtime-provision.json" ] || {
+.devcontainer/generate-runtime-compose.sh:644:    printf 'devcontainer GPU admission provision receipt path is not canonical\n' >&2
+.devcontainer/generate-runtime-compose.sh:647:  [ "${AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT:-$runtime_bind_source/shared-runtime-readback.json}" = "$runtime_bind_source/shared-runtime-readback.json" ] || {
+.devcontainer/generate-runtime-compose.sh:648:    printf 'devcontainer GPU admission host readback receipt path is not canonical\n' >&2
+.devcontainer/generate-runtime-compose.sh:652:    printf 'devcontainer GPU admission runtime source is not provisioned: %s\n' "$runtime_bind_source" >&2
+.devcontainer/generate-runtime-compose.sh:656:  gpu_notice="explicit-gpu-admission-profile"
+.devcontainer/generate-runtime-compose.sh:660:    "${AGENT_CANON_SHARED_RUNTIME_SOURCE:-}" \
+.devcontainer/generate-runtime-compose.sh:661:    "${AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE:-}" \
+.devcontainer/generate-runtime-compose.sh:662:    "${AGENT_CANON_SHARED_RUNTIME_TARGET:-}" \
+.devcontainer/generate-runtime-compose.sh:663:    "${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-}" \
+.devcontainer/generate-runtime-compose.sh:664:    "${AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT:-}"; do
+.devcontainer/generate-runtime-compose.sh:666:      printf 'devcontainer GPU admission fields require the gpu-admission profile\n' >&2
+.devcontainer/generate-runtime-compose.sh:672:if [ "$gpu_profile" = "gpu-admission" ]; then
+.devcontainer/generate-runtime-compose.sh:682:  "      DEVCONTAINER_RUNTIME_MODE: \"${compose_mode}\""
+.devcontainer/generate-runtime-compose.sh:688:  "      AGENT_CANON_RUNTIME_ROUTE: \"${runtime_route}\""
+.devcontainer/generate-runtime-compose.sh:702:if [ "$gpu_profile" = "gpu-admission" ]; then
+.devcontainer/generate-runtime-compose.sh:705:    '      AGENT_CANON_GPU_ADMISSION_PROFILE: "gpu-admission"'
+.devcontainer/generate-runtime-compose.sh:706:    "      AGENT_CANON_SHARED_RUNTIME_SOURCE: \"${runtime_target}\""
+.devcontainer/generate-runtime-compose.sh:707:    "      AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE: \"${runtime_host_source}\""
+.devcontainer/generate-runtime-compose.sh:708:    "      AGENT_CANON_SHARED_RUNTIME_TARGET: \"${runtime_target}\""
+.devcontainer/generate-runtime-compose.sh:709:    "      AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: \"${runtime_target}/shared-runtime-provision.json\""
+.devcontainer/generate-runtime-compose.sh:710:    "      AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT: \"${runtime_target}/shared-runtime-readback.json\""
+.devcontainer/generate-runtime-compose.sh:733:    if [ "$gpu_profile" = "gpu-admission" ]; then
+
+## definitions/references: .devcontainer/gpu-admission.sh
+.devcontainer/gpu-admission.sh:4:# responsibility Owns the explicit GPU-admission devcontainer lifecycle.
+.devcontainer/gpu-admission.sh:5:# upstream design ../CONTAINER_OPERATIONS.md GPU-admission host operation and failure semantics
+.devcontainer/gpu-admission.sh:6:# upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md GPU-admission profile clauses
+.devcontainer/gpu-admission.sh:7:# upstream design ../documents/experiments/gpu-admission-r5-source-packet.md shared runtime receipt owner
+.devcontainer/gpu-admission.sh:9:# downstream implementation finalize-shared-runtime.sh validates the container bind and publishes readback
+.devcontainer/gpu-admission.sh:10:# downstream implementation ../tools/experiments/execution_resource_plan.py owns receipt parsing and atomic publication
+.devcontainer/gpu-admission.sh:16:  printf 'GPU admission opt-in failed: %s\n' "$1" >&2
+.devcontainer/gpu-admission.sh:30:profile_config="$repository_root/.devcontainer/gpu-admission/devcontainer.json"
+.devcontainer/gpu-admission.sh:31:profile_compose="$repository_root/.agent-canon/gpu-admission-compose.generated.yml"
+.devcontainer/gpu-admission.sh:32:[ -f "$profile_config" ] || fail "GPU-admission selector is unavailable: $profile_config"
+.devcontainer/gpu-admission.sh:37:receipts_root="$runtime_source/receipts"
+.devcontainer/gpu-admission.sh:39:provision_receipt="$runtime_source/shared-runtime-provision.json"
+.devcontainer/gpu-admission.sh:40:readback_receipt="$runtime_source/shared-runtime-readback.json"
+.devcontainer/gpu-admission.sh:64:ensure_directory "$receipts_root"
+.devcontainer/gpu-admission.sh:80:probe_path, runtime_root = sys.argv[1:]
+.devcontainer/gpu-admission.sh:84:    root_stat = os.stat(runtime_root, follow_symlinks=False)
+.devcontainer/gpu-admission.sh:98:    probe_data = b"agent-canon-shared-runtime-probe/v5\\n"
+.devcontainer/gpu-admission.sh:112:python3 - "$agent_canon_root" "$provision_receipt" "$runtime_source" "$runtime_target" "$host_uid" "$host_gid" <<'PY'
+.devcontainer/gpu-admission.sh:120:source_root, receipt_path, runtime_source, runtime_target, raw_uid, raw_gid = sys.argv[1:]
+.devcontainer/gpu-admission.sh:124:    write_runtime_receipt_atomic,
+.devcontainer/gpu-admission.sh:131:    "schema_version": "shared-runtime-provision/v1",
+.devcontainer/gpu-admission.sh:132:    "runtime_route": "MANAGED_CONTAINER",
+.devcontainer/gpu-admission.sh:136:    # the established receipt field for managed-run consumers, with no
+.devcontainer/gpu-admission.sh:155:write_runtime_receipt_atomic(receipt_path, payload)
+.devcontainer/gpu-admission.sh:158:[ -f "$provision_receipt" ] || fail "runtime provision receipt was not published"
+.devcontainer/gpu-admission.sh:167:task_id="${AGENT_CANON_TASK_ID:-gpu-admission-${host_uid}-${BASHPID}-${lifecycle_id}}"
+.devcontainer/gpu-admission.sh:181:compose_project_name="${compose_project_base_name}-${lifecycle_id}-gpu-admission"
+.devcontainer/gpu-admission.sh:188:lifecycle_receipt="$repository_root/.agent-canon/container-lifecycle/gpu-admission-${lifecycle_id}.json"
+.devcontainer/gpu-admission.sh:189:export AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT="$lifecycle_receipt"
+.devcontainer/gpu-admission.sh:193:  python3 - "$agent_canon_root" "$repository_root" "$lifecycle_receipt" "$phase" <<'PY'
+.devcontainer/gpu-admission.sh:200:agent_root, repository_root, receipt_path, phase = sys.argv[1:]
+.devcontainer/gpu-admission.sh:202:from container_runtime import (  # noqa: E402
+.devcontainer/gpu-admission.sh:206:    lifecycle_receipt_from_json,
+.devcontainer/gpu-admission.sh:208:    write_lifecycle_receipt,
+.devcontainer/gpu-admission.sh:212:target = Path(receipt_path)
+.devcontainer/gpu-admission.sh:214:    run = start_container_lifecycle(root, "docker", "gpu-admission")
+.devcontainer/gpu-admission.sh:215:    write_lifecycle_receipt(root, run.receipt)
+.devcontainer/gpu-admission.sh:216:    if run.receipt.state != "snapshot":
+.devcontainer/gpu-admission.sh:217:        print(f"GPU_ADMISSION_LIFECYCLE=blocked state={run.receipt.state}", file=sys.stderr)
+.devcontainer/gpu-admission.sh:219:    print(f"GPU_ADMISSION_LIFECYCLE=captured receipt={target}")
+.devcontainer/gpu-admission.sh:224:    raise SystemExit("GPU admission lifecycle receipt is malformed")
+.devcontainer/gpu-admission.sh:225:receipt = lifecycle_receipt_from_json(payload)
+.devcontainer/gpu-admission.sh:227:    receipt.context, CommandDaemonClient(receipt.context.builder, cwd=root)
+.devcontainer/gpu-admission.sh:230:receipt = boundary.record_create_or_pull(receipt, after, "gpu-admission")
+.devcontainer/gpu-admission.sh:232:    if receipt.state not in {"created", "not-created"}:
+.devcontainer/gpu-admission.sh:233:        write_lifecycle_receipt(root, receipt)
+.devcontainer/gpu-admission.sh:234:        print(f"GPU_ADMISSION_LIFECYCLE=finish-blocked state={receipt.state} receipt={target}", file=sys.stderr)
+.devcontainer/gpu-admission.sh:236:    write_lifecycle_receipt(root, receipt)
+.devcontainer/gpu-admission.sh:237:    print(f"GPU_ADMISSION_LIFECYCLE=ready state={receipt.state} receipt={target}")
+.devcontainer/gpu-admission.sh:239:result = boundary.cleanup(receipt)
+.devcontainer/gpu-admission.sh:240:write_lifecycle_receipt(root, receipt)
+.devcontainer/gpu-admission.sh:242:    f"GPU_ADMISSION_LIFECYCLE=cleanup state={result.state} receipt={target}",
+.devcontainer/gpu-admission.sh:252:  if [ ! -f "$lifecycle_receipt" ]; then
+.devcontainer/gpu-admission.sh:253:    printf 'GPU_ADMISSION_CLEANUP=skipped original_rc=%s reason=receipt-missing path=%s\n' \
+.devcontainer/gpu-admission.sh:254:      "$original_rc" "$lifecycle_receipt" >&2
+.devcontainer/gpu-admission.sh:259:    printf 'GPU_ADMISSION_CLEANUP=failed original_rc=%s cleanup_rc=%s receipt=%s\n' \
+.devcontainer/gpu-admission.sh:260:      "$original_rc" "$cleanup_rc" "$lifecycle_receipt" >&2
+.devcontainer/gpu-admission.sh:263:  printf 'GPU_ADMISSION_CLEANUP=pass original_rc=%s receipt=%s\n' \
+.devcontainer/gpu-admission.sh:264:    "$original_rc" "$lifecycle_receipt" >&2
+.devcontainer/gpu-admission.sh:275:      printf 'GPU_ADMISSION_CLEANUP_RESULT=failed original_rc=%s cleanup_rc=%s\n' \
+.devcontainer/gpu-admission.sh:283:export AGENT_CANON_GPU_ADMISSION_PROFILE=gpu-admission
+.devcontainer/gpu-admission.sh:284:export AGENT_CANON_RUNTIME_ROUTE=MANAGED_CONTAINER
+.devcontainer/gpu-admission.sh:285:export AGENT_CANON_SHARED_RUNTIME_SOURCE="$runtime_source"
+.devcontainer/gpu-admission.sh:286:export AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE="$runtime_source"
+.devcontainer/gpu-admission.sh:287:export AGENT_CANON_SHARED_RUNTIME_TARGET="$runtime_target"
+.devcontainer/gpu-admission.sh:288:export AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT="$provision_receipt"
+.devcontainer/gpu-admission.sh:289:export AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT="${runtime_source}/shared-runtime-readback.json"
+.devcontainer/gpu-admission.sh:291:printf 'GPU_ADMISSION_RUNTIME_PROVISION=pass source=%s target=%s provision=%s uid=%s gid=%s\n' \
+.devcontainer/gpu-admission.sh:292:  "$runtime_source" "$runtime_target" "$provision_receipt" "$host_uid" "$host_gid"
+.devcontainer/gpu-admission.sh:299:[ -f "$profile_compose" ] || fail "GPU-admission Compose output is missing: $profile_compose"
+.devcontainer/gpu-admission.sh:301:  || fail "GPU-admission Compose project identity does not match lifecycle"
+.devcontainer/gpu-admission.sh:303:  || fail "GPU-admission Compose image tag does not match lifecycle"
+.devcontainer/gpu-admission.sh:310:  exec .devcontainer/finalize-shared-runtime.sh
+.devcontainer/gpu-admission.sh:322:  printf 'GPU_ADMISSION_CLEANUP_RESULT=blocked original_rc=0 cleanup_rc=%s receipt=%s\n' \
+.devcontainer/gpu-admission.sh:323:    "$cleanup_rc" "$lifecycle_receipt" >&2
+.devcontainer/gpu-admission.sh:326:printf 'GPU_ADMISSION_PROFILE=pass selector=%s compose_project_suffix=-gpu-admission runtime=%s\n' \
+
+## definitions/references: tools/experiments/execution_resource_plan.py
+tools/experiments/execution_resource_plan.py:4:# responsibility Owns the immutable ExecutionResourcePlan transaction, canonical GPU allocation, reusable GPU admission primitives, managed ExperimentRunner handoff, and completion coverage.
+tools/experiments/execution_resource_plan.py:5:# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 U-18 implementation frame and exact packet identity
+tools/experiments/execution_resource_plan.py:11:# upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md official nvidia-smi C/G/M/O/C+G/M+C process visibility, PID/start/container mapping, MIG UUID mapping
+tools/experiments/execution_resource_plan.py:13:# downstream implementation ./gpu_command_admission.py provider-independent direct GPU admission adapter
+tools/experiments/execution_resource_plan.py:17:# downstream environment ../../.devcontainer/devcontainer.json selects the shared runtime receipt stages
+tools/experiments/execution_resource_plan.py:61:HOST_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+tools/experiments/execution_resource_plan.py:62:CONTAINER_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+tools/experiments/execution_resource_plan.py:63:RUNTIME_ROOT = Path(HOST_RUNTIME_ROOT)
+tools/experiments/execution_resource_plan.py:73:LOCK_ROOT = RUNTIME_ROOT / "locks"
+tools/experiments/execution_resource_plan.py:219:SHARED_RUNTIME_PROVISION_SCHEMA_VERSION = "shared-runtime-provision/v1"
+tools/experiments/execution_resource_plan.py:220:SHARED_RUNTIME_READBACK_SCHEMA_VERSION = "shared-runtime-readback/v1"
+tools/experiments/execution_resource_plan.py:298:                    "runtime_receipt_invalid",
+tools/experiments/execution_resource_plan.py:299:                    "runtime receipts must not contain duplicate JSON keys",
+tools/experiments/execution_resource_plan.py:311:            "runtime_receipt_invalid",
+tools/experiments/execution_resource_plan.py:312:            "runtime receipts must be UTF-8 JSON",
+tools/experiments/execution_resource_plan.py:317:            "runtime_receipt_invalid",
+tools/experiments/execution_resource_plan.py:318:            "runtime receipts must contain one JSON object",
+tools/experiments/execution_resource_plan.py:324:def _read_runtime_receipt(
+tools/experiments/execution_resource_plan.py:341:            "runtime_receipt_unavailable",
+tools/experiments/execution_resource_plan.py:342:            "runtime receipt could not be opened with no-follow flags",
+tools/experiments/execution_resource_plan.py:357:                "runtime_receipt_invalid",
+tools/experiments/execution_resource_plan.py:358:                "runtime receipt fd identity, mode, or size is invalid",
+tools/experiments/execution_resource_plan.py:388:                "runtime_receipt_raced",
+tools/experiments/execution_resource_plan.py:389:                "runtime receipt identity changed while reading",
+tools/experiments/execution_resource_plan.py:405:                "runtime_receipt_write_ambiguous",
+tools/experiments/execution_resource_plan.py:406:                "receipt write was interrupted and is not retried",
+tools/experiments/execution_resource_plan.py:410:                "runtime_receipt_write_failed",
+tools/experiments/execution_resource_plan.py:411:                "receipt write made no progress",
+tools/experiments/execution_resource_plan.py:430:            "runtime_receipt_publish_failed",
+tools/experiments/execution_resource_plan.py:431:            "temporary runtime receipt could not be linked atomically",
+tools/experiments/execution_resource_plan.py:436:def write_runtime_receipt_atomic(
+tools/experiments/execution_resource_plan.py:440:    """Publish one canonical receipt atomically under the runtime receipt lock."""
+tools/experiments/execution_resource_plan.py:444:            "runtime_receipt_lock_unavailable",
+tools/experiments/execution_resource_plan.py:445:            "runtime receipt publication requires POSIX flock",
+tools/experiments/execution_resource_plan.py:450:    lock_path = os.path.join(parent, "locks", "shared-runtime-receipt.lock")
+tools/experiments/execution_resource_plan.py:468:                "runtime_receipt_lock_unavailable",
+tools/experiments/execution_resource_plan.py:469:                "runtime receipt publication lock could not be opened",
+tools/experiments/execution_resource_plan.py:480:                "runtime_receipt_lock_tampered",
+tools/experiments/execution_resource_plan.py:481:                "runtime receipt publication lock identity is not exact",
+tools/experiments/execution_resource_plan.py:504:                    "runtime_receipt_target_tampered",
+tools/experiments/execution_resource_plan.py:505:                    "runtime receipt target identity is not replaceable",
+tools/experiments/execution_resource_plan.py:545:    runtime_route: RuntimeRoute
+tools/experiments/execution_resource_plan.py:551:class SharedRuntimeProvisionReceipt:
+tools/experiments/execution_resource_plan.py:552:    schema_version: Literal["shared-runtime-provision/v1"]
+tools/experiments/execution_resource_plan.py:553:    runtime_route: RuntimeRoute
+tools/experiments/execution_resource_plan.py:604:class SourceFreezeReceipt:
+tools/experiments/execution_resource_plan.py:606:    runtime_route: RuntimeRoute
+tools/experiments/execution_resource_plan.py:617:    receipt_fingerprint: Sha256Hex
+tools/experiments/execution_resource_plan.py:621:class SharedRuntimeReadbackReceipt:
+tools/experiments/execution_resource_plan.py:622:    schema_version: Literal["shared-runtime-readback/v1"]
+tools/experiments/execution_resource_plan.py:623:    runtime_route: RuntimeRoute
+tools/experiments/execution_resource_plan.py:640:class RuntimeIdentityReceipt:
+tools/experiments/execution_resource_plan.py:642:    runtime_route: RuntimeRoute
+tools/experiments/execution_resource_plan.py:654:    receipt_fingerprint: Sha256Hex
+tools/experiments/execution_resource_plan.py:658:class CudaRuntimeCapabilityReceipt:
+tools/experiments/execution_resource_plan.py:667:    receipt_fingerprint: Sha256Hex
+tools/experiments/execution_resource_plan.py:670:def _receipt_field(
+tools/experiments/execution_resource_plan.py:684:            "runtime_receipt_invalid",
+tools/experiments/execution_resource_plan.py:685:            "runtime receipt field has the wrong type",
+tools/experiments/execution_resource_plan.py:692:def _receipt_gids(
+tools/experiments/execution_resource_plan.py:698:    value = _receipt_field(payload, name, list, path=path)
+tools/experiments/execution_resource_plan.py:701:            "runtime_receipt_invalid",
+tools/experiments/execution_resource_plan.py:709:            "runtime_receipt_invalid",
+tools/experiments/execution_resource_plan.py:717:def _require_receipt_shape(
+tools/experiments/execution_resource_plan.py:725:            "runtime_receipt_invalid",
+tools/experiments/execution_resource_plan.py:726:            "runtime receipt schema contains missing or extra fields",
+tools/experiments/execution_resource_plan.py:733:def read_shared_runtime_provision(
+tools/experiments/execution_resource_plan.py:735:) -> SharedRuntimeProvisionReceipt:
+tools/experiments/execution_resource_plan.py:736:    payload, _receipt_stat = _read_runtime_receipt(path)
+tools/experiments/execution_resource_plan.py:737:    _require_receipt_shape(
+tools/experiments/execution_resource_plan.py:742:                "runtime_route",
+tools/experiments/execution_resource_plan.py:755:    schema_version = _receipt_field(payload, "schema_version", str, path=path)
+tools/experiments/execution_resource_plan.py:756:    route = _receipt_field(payload, "runtime_route", str, path=path)
+tools/experiments/execution_resource_plan.py:757:    bind_source_path = _receipt_field(payload, "bind_source_path", str, path=path)
+tools/experiments/execution_resource_plan.py:758:    if schema_version != SHARED_RUNTIME_PROVISION_SCHEMA_VERSION:
+tools/experiments/execution_resource_plan.py:760:            "runtime_receipt_invalid",
+tools/experiments/execution_resource_plan.py:761:            "runtime provision receipt schema version is unsupported",
+tools/experiments/execution_resource_plan.py:766:            "runtime_receipt_invalid",
+tools/experiments/execution_resource_plan.py:767:            "runtime provision receipt route is unsupported",
+tools/experiments/execution_resource_plan.py:773:        "runtime_route": route,
+tools/experiments/execution_resource_plan.py:774:        "host_uid": _receipt_field(payload, "host_uid", int, path=path),
+tools/experiments/execution_resource_plan.py:775:        "host_gid": _receipt_field(payload, "host_gid", int, path=path),
+tools/experiments/execution_resource_plan.py:776:        "host_supplementary_gids": _receipt_gids(
+tools/experiments/execution_resource_plan.py:781:        "host_umask": _receipt_field(payload, "host_umask", int, path=path),
+tools/experiments/execution_resource_plan.py:783:        "bind_source_dev": _receipt_field(payload, "bind_source_dev", int, path=path),
+tools/experiments/execution_resource_plan.py:784:        "bind_source_ino": _receipt_field(payload, "bind_source_ino", int, path=path),
+tools/experiments/execution_resource_plan.py:785:        "provision_fingerprint": _receipt_field(
+tools/experiments/execution_resource_plan.py:795:            "runtime_receipt_fingerprint_mismatch",
+tools/experiments/execution_resource_plan.py:796:            "runtime provision receipt fingerprint does not match its payload",
+tools/experiments/execution_resource_plan.py:802:            "runtime provision receipt UID/GID must be nonzero/nonnegative",
+tools/experiments/execution_resource_plan.py:808:            "runtime provision receipt supplementary groups must equal its primary GID",
+tools/experiments/execution_resource_plan.py:811:    return SharedRuntimeProvisionReceipt(
+tools/experiments/execution_resource_plan.py:813:            Literal["shared-runtime-provision/v1"],
+tools/experiments/execution_resource_plan.py:816:        runtime_route=cast(RuntimeRoute, typed_payload["runtime_route"]),
+tools/experiments/execution_resource_plan.py:837:def read_shared_runtime_readback(
+tools/experiments/execution_resource_plan.py:839:) -> SharedRuntimeReadbackReceipt:
+tools/experiments/execution_resource_plan.py:840:    payload, _receipt_stat = _read_runtime_receipt(path)
+tools/experiments/execution_resource_plan.py:841:    _require_receipt_shape(
+tools/experiments/execution_resource_plan.py:846:                "runtime_route",
+tools/experiments/execution_resource_plan.py:864:    schema_version = _receipt_field(payload, "schema_version", str, path=path)
+tools/experiments/execution_resource_plan.py:865:    route = _receipt_field(payload, "runtime_route", str, path=path)
+tools/experiments/execution_resource_plan.py:866:    bind_target_path = _receipt_field(payload, "bind_target_path", str, path=path)
+tools/experiments/execution_resource_plan.py:867:    mount_root = _receipt_field(payload, "mount_root", str, path=path)
+tools/experiments/execution_resource_plan.py:868:    probe_disposition = _receipt_field(
+tools/experiments/execution_resource_plan.py:874:    if schema_version != SHARED_RUNTIME_READBACK_SCHEMA_VERSION:
+tools/experiments/execution_resource_plan.py:876:            "runtime_receipt_invalid",
+tools/experiments/execution_resource_plan.py:877:            "runtime readback receipt schema version is unsupported",
+tools/experiments/execution_resource_plan.py:882:            "runtime_receipt_invalid",
+tools/experiments/execution_resource_plan.py:883:            "runtime readback receipt route is unsupported",
+tools/experiments/execution_resource_plan.py:888:            "runtime_receipt_invalid",
+tools/experiments/execution_resource_plan.py:889:            "runtime readback receipt must report a closed probe",
+tools/experiments/execution_resource_plan.py:895:        "runtime_route": route,
+tools/experiments/execution_resource_plan.py:896:        "container_uid": _receipt_field(payload, "container_uid", int, path=path),
+tools/experiments/execution_resource_plan.py:897:        "container_gid": _receipt_field(payload, "container_gid", int, path=path),
+tools/experiments/execution_resource_plan.py:898:        "container_supplementary_gids": _receipt_gids(
+tools/experiments/execution_resource_plan.py:903:        "container_umask": _receipt_field(payload, "container_umask", int, path=path),
+tools/experiments/execution_resource_plan.py:905:        "bind_target_dev": _receipt_field(payload, "bind_target_dev", int, path=path),
+tools/experiments/execution_resource_plan.py:906:        "bind_target_ino": _receipt_field(payload, "bind_target_ino", int, path=path),
+tools/experiments/execution_resource_plan.py:907:        "namespace_inode": _receipt_field(payload, "namespace_inode", int, path=path),
+tools/experiments/execution_resource_plan.py:908:        "mount_id": _receipt_field(payload, "mount_id", int, path=path),
+tools/experiments/execution_resource_plan.py:909:        "mount_parent_id": _receipt_field(payload, "mount_parent_id", int, path=path),
+tools/experiments/execution_resource_plan.py:912:        "readback_fingerprint": _receipt_field(
+tools/experiments/execution_resource_plan.py:922:            "runtime_receipt_fingerprint_mismatch",
+tools/experiments/execution_resource_plan.py:923:            "runtime readback receipt fingerprint does not match its payload",
+tools/experiments/execution_resource_plan.py:929:            "runtime readback receipt UID/GID must be nonzero/nonnegative",
+tools/experiments/execution_resource_plan.py:937:            "runtime readback receipt supplementary groups must equal its primary GID",
+tools/experiments/execution_resource_plan.py:940:    return SharedRuntimeReadbackReceipt(
+tools/experiments/execution_resource_plan.py:942:            Literal["shared-runtime-readback/v1"],
+tools/experiments/execution_resource_plan.py:945:        runtime_route=cast(RuntimeRoute, typed_payload["runtime_route"]),
+tools/experiments/execution_resource_plan.py:975:    """Validate script-owned runtime receipts without mutating runtime state."""
+tools/experiments/execution_resource_plan.py:979:        provision: SharedRuntimeProvisionReceipt,
+tools/experiments/execution_resource_plan.py:980:        readback: SharedRuntimeReadbackReceipt,
+tools/experiments/execution_resource_plan.py:981:    ) -> RuntimeIdentityReceipt:
+tools/experiments/execution_resource_plan.py:982:        if provision.runtime_route != readback.runtime_route:
+tools/experiments/execution_resource_plan.py:1013:        receipt_payload = {
+tools/experiments/execution_resource_plan.py:1015:            "runtime_route": provision.runtime_route,
+tools/experiments/execution_resource_plan.py:1028:        receipt_fingerprint = _canonical_fingerprint(
+tools/experiments/execution_resource_plan.py:1029:            receipt_payload,
+tools/experiments/execution_resource_plan.py:1030:            "receipt_fingerprint",
+tools/experiments/execution_resource_plan.py:1032:        return RuntimeIdentityReceipt(
+tools/experiments/execution_resource_plan.py:1035:                receipt_payload["schema_version"],
+tools/experiments/execution_resource_plan.py:1037:            runtime_route=cast(RuntimeRoute, receipt_payload["runtime_route"]),
+tools/experiments/execution_resource_plan.py:1038:            namespace_inode=cast(int, receipt_payload["namespace_inode"]),
+tools/experiments/execution_resource_plan.py:1039:            uid=cast(int, receipt_payload["uid"]),
+tools/experiments/execution_resource_plan.py:1040:            gid=cast(int, receipt_payload["gid"]),
+tools/experiments/execution_resource_plan.py:1043:                receipt_payload["supplementary_gids"],
+tools/experiments/execution_resource_plan.py:1045:            umask=cast(int, receipt_payload["umask"]),
+tools/experiments/execution_resource_plan.py:1046:            bind_source_dev=cast(int, receipt_payload["bind_source_dev"]),
+tools/experiments/execution_resource_plan.py:1047:            bind_source_ino=cast(int, receipt_payload["bind_source_ino"]),
+tools/experiments/execution_resource_plan.py:1048:            bind_target_dev=cast(int, receipt_payload["bind_target_dev"]),
+tools/experiments/execution_resource_plan.py:1049:            bind_target_ino=cast(int, receipt_payload["bind_target_ino"]),
+tools/experiments/execution_resource_plan.py:1052:                receipt_payload["provision_fingerprint"],
+tools/experiments/execution_resource_plan.py:1056:                receipt_payload["readback_fingerprint"],
+tools/experiments/execution_resource_plan.py:1058:            receipt_fingerprint=receipt_fingerprint,
+tools/experiments/execution_resource_plan.py:1064:) -> CudaRuntimeCapabilityReceipt:
+tools/experiments/execution_resource_plan.py:1129:            return CudaRuntimeCapabilityReceipt(
+tools/experiments/execution_resource_plan.py:1136:                receipt_fingerprint=_canonical_fingerprint(
+tools/experiments/execution_resource_plan.py:1138:                    "receipt_fingerprint",
+tools/experiments/execution_resource_plan.py:1189:    def freeze(self, request: GpuRunRequest) -> SourceFreezeReceipt:
+tools/experiments/execution_resource_plan.py:1202:        if request.runtime_route not in {"MANAGED_CONTAINER", "HOST_DIRECT"}:
+tools/experiments/execution_resource_plan.py:1331:            receipt_payload: dict[str, object] = {
+tools/experiments/execution_resource_plan.py:1333:                "runtime_route": request.runtime_route,
+tools/experiments/execution_resource_plan.py:1347:            receipt_fingerprint = _canonical_fingerprint(
+tools/experiments/execution_resource_plan.py:1348:                receipt_payload,
+tools/experiments/execution_resource_plan.py:1349:                "receipt_fingerprint",
+tools/experiments/execution_resource_plan.py:1351:            receipt = SourceFreezeReceipt(
+tools/experiments/execution_resource_plan.py:1353:                runtime_route=request.runtime_route,
+tools/experiments/execution_resource_plan.py:1364:                receipt_fingerprint=receipt_fingerprint,
+tools/experiments/execution_resource_plan.py:1367:            return receipt
+tools/experiments/execution_resource_plan.py:1646:def freeze_source_tree(request: GpuRunRequest) -> SourceFreezeReceipt:
+tools/experiments/execution_resource_plan.py:1656:        receipt = owner.freeze(request)
+tools/experiments/execution_resource_plan.py:1658:        return receipt
+tools/experiments/execution_resource_plan.py:1966:    """The immutable process-root identity used by GPU admission."""
+tools/experiments/execution_resource_plan.py:4079:    runtime_root: Literal["/var/lib/agent-canon/runtime"]
+tools/experiments/execution_resource_plan.py:4129:    provision_receipt_fingerprint: Sha256Hex
+tools/experiments/execution_resource_plan.py:4135:    runtime_root: Literal["/var/lib/agent-canon/runtime"]
+tools/experiments/execution_resource_plan.py:4157:class RunGpuAdmissionReceipt:
+tools/experiments/execution_resource_plan.py:4160:    schema_version: Literal["gpu-admission/v1"]
+tools/experiments/execution_resource_plan.py:4210:                "gpu_admission_fingerprint_mismatch",
+tools/experiments/execution_resource_plan.py:4211:                "GPU admission fingerprint does not match the complete receipt preimage",
+tools/experiments/execution_resource_plan.py:4217:def _admission_content_payload(value: RunGpuAdmissionReceipt) -> dict[str, object]:
+tools/experiments/execution_resource_plan.py:4229:def build_lock_bound_admission_receipt(
+tools/experiments/execution_resource_plan.py:4245:) -> RunGpuAdmissionReceipt:
+tools/experiments/execution_resource_plan.py:4246:    """Create the canonical lock-held composite admission receipt."""
+tools/experiments/execution_resource_plan.py:4247:    return RunGpuAdmissionReceipt(
+tools/experiments/execution_resource_plan.py:4248:        schema_version="gpu-admission/v1",
+tools/experiments/execution_resource_plan.py:4268:def _admission_receipt_payload(value: RunGpuAdmissionReceipt) -> dict[str, object]:
+tools/experiments/execution_resource_plan.py:4353:                "provision_receipt_fingerprint": value.container_visible_uuid_mapping.provision_receipt_fingerprint,
+tools/experiments/execution_resource_plan.py:4361:                "runtime_root": value.os_safe_lock_placement.runtime_root,
+tools/experiments/execution_resource_plan.py:4390:    value: RunGpuAdmissionReceipt,
+tools/experiments/execution_resource_plan.py:4393:    """Bind content, reservation receipt, lock identity, and selected UUIDs."""
+tools/experiments/execution_resource_plan.py:4406:                "reservation_receipt": value.reservation_fingerprint,
+tools/experiments/execution_resource_plan.py:4437:        "runtime_root": value.runtime_root,
+tools/experiments/execution_resource_plan.py:4460:        lock_root: AbsolutePosixPath | Path = LOCK_ROOT,
+tools/experiments/execution_resource_plan.py:4462:        runtime_root: AbsolutePosixPath = HOST_RUNTIME_ROOT,
+tools/experiments/execution_resource_plan.py:4469:        if runtime_root != HOST_RUNTIME_ROOT:
+tools/experiments/execution_resource_plan.py:4472:                "GPU reservation must use the canonical shared runtime root",
+tools/experiments/execution_resource_plan.py:4473:                runtime_root=runtime_root,
+tools/experiments/execution_resource_plan.py:4475:        self._lock_root = Path(validate_absolute_posix_path(str(lock_root)))
+tools/experiments/execution_resource_plan.py:4476:        self._runtime_root: Literal["/var/lib/agent-canon/runtime"] = HOST_RUNTIME_ROOT
+tools/experiments/execution_resource_plan.py:4479:                self._lock_root,
+tools/experiments/execution_resource_plan.py:4487:                lock_root=str(self._lock_root),
+tools/experiments/execution_resource_plan.py:4495:                lock_root=str(self._lock_root),
+tools/experiments/execution_resource_plan.py:4501:            self._read_filesystem_type(self._lock_root)
+tools/experiments/execution_resource_plan.py:4592:                            path=str(self._lock_root / f"gpu-{_safe_uuid_filename(uuid)}.lock"),
+tools/experiments/execution_resource_plan.py:4776:            "lock_namespace": str(self._lock_root),
+tools/experiments/execution_resource_plan.py:4800:                runtime_root=self._runtime_root,
+tools/experiments/execution_resource_plan.py:4930:                "gpu_lock_root_close_ambiguous",
+tools/experiments/execution_resource_plan.py:4966:        runtime_root: Path,
+tools/experiments/execution_resource_plan.py:5143:    runtime_root: Path
+tools/experiments/execution_resource_plan.py:5151:        runtime_root: Path,
+tools/experiments/execution_resource_plan.py:5156:            runtime_root=runtime_root,
+tools/experiments/execution_resource_plan.py:5163:            runtime_root=self.runtime_root,
+tools/experiments/execution_resource_plan.py:5313:        root: Path = LOCK_ROOT,
+tools/experiments/execution_resource_plan.py:5325:                lock_root=str(root),
+tools/experiments/execution_resource_plan.py:5329:                "gpu_lock_namespace_host_runtime",
+tools/experiments/execution_resource_plan.py:5331:                lock_root=str(root),
+tools/experiments/execution_resource_plan.py:5337:                lock_root=str(root),
+tools/experiments/execution_resource_plan.py:5789:    runtime_root: Path = RUNTIME_ROOT
+tools/experiments/execution_resource_plan.py:5793:    lock_root: Path = LOCK_ROOT
+tools/experiments/execution_resource_plan.py:5910:    lock_root: Path
+tools/experiments/execution_resource_plan.py:6067:    runtime_root: Path
+tools/experiments/execution_resource_plan.py:6144:    runtime_root: Path
+tools/experiments/execution_resource_plan.py:6512:        admission: RunGpuAdmissionReceipt | None,
+tools/experiments/execution_resource_plan.py:6513:        source_freeze: SourceFreezeReceipt | None,
+tools/experiments/execution_resource_plan.py:6514:        runtime_identity: RuntimeIdentityReceipt | None,
+tools/experiments/execution_resource_plan.py:6529:            source_freeze.receipt_fingerprint if source_freeze is not None else None
+tools/experiments/execution_resource_plan.py:6585:    source_freeze_evidence: SourceFreezeReceipt | None
+tools/experiments/execution_resource_plan.py:6644:    admission: RunGpuAdmissionReceipt | None,
+tools/experiments/execution_resource_plan.py:6645:    source_freeze: SourceFreezeReceipt | None,
+tools/experiments/execution_resource_plan.py:6646:    runtime_identity: RuntimeIdentityReceipt | None,
+tools/experiments/execution_resource_plan.py:6659:            provision_receipt_fingerprint=runtime_identity.provision_fingerprint,
+tools/experiments/execution_resource_plan.py:6697:        "receipt_fingerprint",
+tools/experiments/execution_resource_plan.py:7158:            if not admission_source.namespace_id or not admission_source.provision_receipt_fingerprint:
+tools/experiments/execution_resource_plan.py:7166:                "provision_receipt_fingerprint": admission_source.provision_receipt_fingerprint,
+tools/experiments/execution_resource_plan.py:7411:        request.runtime_root / "runs" / transaction_id,
+tools/experiments/execution_resource_plan.py:7417:    runtime_root: Path,
+tools/experiments/execution_resource_plan.py:7425:                runtime_root / filename,
+tools/experiments/execution_resource_plan.py:7536:    runtime_root, projection_root = _pre_execution_failure_roots(
+tools/experiments/execution_resource_plan.py:7573:            runtime_root,
+tools/experiments/execution_resource_plan.py:7592:            runtime_root,
+tools/experiments/execution_resource_plan.py:7642:        runtime_root,
+tools/experiments/execution_resource_plan.py:7651:            runtime_root,
+tools/experiments/execution_resource_plan.py:7726:                "lock_root": str(allocation.lock_root),
+tools/experiments/execution_resource_plan.py:7762:            runtime_root,
+tools/experiments/execution_resource_plan.py:7880:            runtime_root=request.runtime_root,
+tools/experiments/execution_resource_plan.py:7959:            lock_root=str(request.lock_root),
+tools/experiments/execution_resource_plan.py:7982:                request.lock_root,
+tools/experiments/execution_resource_plan.py:8114:            "lock_root": str(request.lock_root),
+tools/experiments/execution_resource_plan.py:8133:            lock_root=request.lock_root,
+tools/experiments/execution_resource_plan.py:8388:        "lock_root": str(request.lock_root),
+tools/experiments/execution_resource_plan.py:8441:        lock_root=request.lock_root,
+tools/experiments/execution_resource_plan.py:8468:        lock_root=allocation.lock_root,
+tools/experiments/execution_resource_plan.py:8638:    runtime_root = request.runtime_root
+tools/experiments/execution_resource_plan.py:8639:    run_root = runtime_root / "runs" / plan_id
+tools/experiments/execution_resource_plan.py:8660:            "lock_root": str(gpu_allocation.lock_root),
+tools/experiments/execution_resource_plan.py:8688:            "runtime_root": str(runtime_root),
+tools/experiments/execution_resource_plan.py:8727:        "runtime_root": str(runtime_root),
+tools/experiments/execution_resource_plan.py:8745:        {"id": "runtime-root", "owner": "ExecutionResourcePlan", "target": str(runtime_root), "policy": "container-local", "disposal": "record_only"},
+tools/experiments/execution_resource_plan.py:8750:        {"id": "gpu-leases", "owner": "GpuReservationTransaction", "target": str(request.lock_root), "policy": "shared_scheduler_visibility", "disposal": "owner_callback_after_runner_join"},
+tools/experiments/execution_resource_plan.py:8819:    runtime_root = Path(cast(str, plan.resources["temp"]["runtime_root"]))
+tools/experiments/execution_resource_plan.py:8850:            "runtime_root": str(runtime_root),
+tools/experiments/execution_resource_plan.py:8873:        runtime_root=runtime_root,
+tools/experiments/execution_resource_plan.py:9113:        "runtime_root": plan.container["runtime_root"],
+tools/experiments/execution_resource_plan.py:9175:        runtime_root=Path(cast(str, plan.container["runtime_root"])),
+tools/experiments/execution_resource_plan.py:10034:            "lock_root": str(allocation.lock_root),
+tools/experiments/execution_resource_plan.py:10146:    "CONTAINER_RUNTIME_ROOT",
+tools/experiments/execution_resource_plan.py:10154:    "CudaRuntimeCapabilityReceipt",
+tools/experiments/execution_resource_plan.py:10172:    "HOST_RUNTIME_ROOT",
+tools/experiments/execution_resource_plan.py:10202:    "RunGpuAdmissionReceipt",
+tools/experiments/execution_resource_plan.py:10203:    "build_lock_bound_admission_receipt",
+tools/experiments/execution_resource_plan.py:10205:    "RuntimeIdentityReceipt",
+tools/experiments/execution_resource_plan.py:10211:    "SharedRuntimeProvisionReceipt",
+tools/experiments/execution_resource_plan.py:10212:    "SharedRuntimeReadbackReceipt",
+tools/experiments/execution_resource_plan.py:10217:    "SourceFreezeReceipt",
+tools/experiments/execution_resource_plan.py:10240:    "read_shared_runtime_provision",
+tools/experiments/execution_resource_plan.py:10241:    "read_shared_runtime_readback",
+tools/experiments/execution_resource_plan.py:10245:    "write_runtime_receipt_atomic",
+
+## definitions/references: tools/experiments/gpu_command_admission.py
+tools/experiments/gpu_command_admission.py:4:# responsibility Owns provider-independent GPU admission, immutable direct-command plans, exact GPU environments, and descendant-safe lock release.
+tools/experiments/gpu_command_admission.py:5:# upstream implementation ./execution_resource_plan.py owns strict NVIDIA evidence, BUSY/UNKNOWN/FREE classification, UUID reservation, and admission receipts
+tools/experiments/gpu_command_admission.py:12:"""Provider-independent GPU admission for arbitrary shell-free commands.
+tools/experiments/gpu_command_admission.py:45:    HOST_RUNTIME_ROOT,
+tools/experiments/gpu_command_admission.py:46:    LOCK_ROOT,
+tools/experiments/gpu_command_admission.py:54:    RunGpuAdmissionReceipt,
+tools/experiments/gpu_command_admission.py:57:    build_lock_bound_admission_receipt,
+tools/experiments/gpu_command_admission.py:464:    """Complete direct-command request before GPU admission."""
+tools/experiments/gpu_command_admission.py:473:    runtime_root: Path = Path(HOST_RUNTIME_ROOT)
+tools/experiments/gpu_command_admission.py:474:    lock_root: Path = LOCK_ROOT
+tools/experiments/gpu_command_admission.py:510:        validate_absolute_posix_path(str(self.runtime_root))
+tools/experiments/gpu_command_admission.py:511:        validate_absolute_posix_path(str(self.lock_root))
+tools/experiments/gpu_command_admission.py:512:        if self.runtime_root != Path(HOST_RUNTIME_ROOT) or self.lock_root != LOCK_ROOT:
+tools/experiments/gpu_command_admission.py:516:                runtime_root=str(self.runtime_root),
+tools/experiments/gpu_command_admission.py:517:                lock_root=str(self.lock_root),
+tools/experiments/gpu_command_admission.py:805:    runtime_root: Path,
+tools/experiments/gpu_command_admission.py:810:        runtime_root=runtime_root,
+tools/experiments/gpu_command_admission.py:814:def _production_reservation_factory(lock_root: Path) -> ReservationTransaction:
+tools/experiments/gpu_command_admission.py:815:    return GpuReservationTransaction(lock_root)
+tools/experiments/gpu_command_admission.py:1159:            "direct GPU admission requires strict NVIDIA inventory evidence",
+tools/experiments/gpu_command_admission.py:1166:            "direct GPU admission requires the local PID namespace identity",
+tools/experiments/gpu_command_admission.py:1214:            "direct GPU admission requires strict NVIDIA inventory evidence",
+tools/experiments/gpu_command_admission.py:1298:def _host_runtime_identity_fingerprint(
+tools/experiments/gpu_command_admission.py:1304:        lock_identity = os.stat(request.lock_root)
+tools/experiments/gpu_command_admission.py:1313:            "runtime_root": str(request.runtime_root),
+tools/experiments/gpu_command_admission.py:1314:            "lock_root": str(request.lock_root),
+tools/experiments/gpu_command_admission.py:1327:def _build_admission_receipt(
+tools/experiments/gpu_command_admission.py:1334:) -> RunGpuAdmissionReceipt:
+tools/experiments/gpu_command_admission.py:1374:    return build_lock_bound_admission_receipt(
+tools/experiments/gpu_command_admission.py:1387:        runtime_identity_fingerprint=_host_runtime_identity_fingerprint(
+tools/experiments/gpu_command_admission.py:1407:    admission: RunGpuAdmissionReceipt,
+tools/experiments/gpu_command_admission.py:1631:    admission: RunGpuAdmissionReceipt
+tools/experiments/gpu_command_admission.py:1652:            provision_receipt_fingerprint=self.admission.runtime_identity_fingerprint,
+tools/experiments/gpu_command_admission.py:1748:        admission: RunGpuAdmissionReceipt | None = None
+tools/experiments/gpu_command_admission.py:1754:                request.runtime_root,
+tools/experiments/gpu_command_admission.py:1769:            transaction = self._reservation_factory(request.lock_root)
+tools/experiments/gpu_command_admission.py:1794:                request.runtime_root,
+tools/experiments/gpu_command_admission.py:1805:            admission = _build_admission_receipt(
+
+## definitions/references: tools/experiments/run_gpu_command.py
+tools/experiments/run_gpu_command.py:27:    HOST_RUNTIME_ROOT,
+tools/experiments/run_gpu_command.py:28:    LOCK_ROOT,
+tools/experiments/run_gpu_command.py:124:            runtime_root=Path(HOST_RUNTIME_ROOT),
+tools/experiments/run_gpu_command.py:125:            lock_root=LOCK_ROOT,
+
+## definitions/references: tools/experiments/run_managed_experiment.py
+tools/experiments/run_managed_experiment.py:6:# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 composition and terminal frame
+tools/experiments/run_managed_experiment.py:7:# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md external admitted CLI ownership and task boundary
+tools/experiments/run_managed_experiment.py:10:# downstream implementation ../../documents/experiments/gpu-admission-r5-ordered-integration-interface.json ordered W2-W4 interface
+tools/experiments/run_managed_experiment.py:13:# upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md NVIDIA process/PID/MIG/UUID visibility gate
+tools/experiments/run_managed_experiment.py:54:        HOST_RUNTIME_ROOT,
+tools/experiments/run_managed_experiment.py:79:        RunGpuAdmissionReceipt,
+tools/experiments/run_managed_experiment.py:81:        RuntimeIdentityReceipt,
+tools/experiments/run_managed_experiment.py:87:        build_lock_bound_admission_receipt,
+tools/experiments/run_managed_experiment.py:91:        read_shared_runtime_provision,
+tools/experiments/run_managed_experiment.py:92:        read_shared_runtime_readback,
+tools/experiments/run_managed_experiment.py:108:        HOST_RUNTIME_ROOT,
+tools/experiments/run_managed_experiment.py:133:        RunGpuAdmissionReceipt,
+tools/experiments/run_managed_experiment.py:135:        RuntimeIdentityReceipt,
+tools/experiments/run_managed_experiment.py:141:        build_lock_bound_admission_receipt,
+tools/experiments/run_managed_experiment.py:145:        read_shared_runtime_provision,
+tools/experiments/run_managed_experiment.py:146:        read_shared_runtime_readback,
+tools/experiments/run_managed_experiment.py:182:MANAGED_RUN_RECEIPT_FILENAME = "managed-run-receipt.json"
+tools/experiments/run_managed_experiment.py:320:class ReservationReceipt:
+tools/experiments/run_managed_experiment.py:425:    runtime_identity: RuntimeIdentityReceipt,
+tools/experiments/run_managed_experiment.py:430:    if runtime_identity.runtime_route != "MANAGED_CONTAINER":
+tools/experiments/run_managed_experiment.py:434:            runtime_route=runtime_identity.runtime_route,
+tools/experiments/run_managed_experiment.py:558:                "GPU admission context is one-shot",
+tools/experiments/run_managed_experiment.py:569:                "GPU admission context exit occurred outside an active state",
+tools/experiments/run_managed_experiment.py:1104:    receipt = {
+tools/experiments/run_managed_experiment.py:1105:        "schema_version": "agentcanon-managed-run-receipt/v1",
+tools/experiments/run_managed_experiment.py:1123:        receipt.update(context_identity.to_dict())
+tools/experiments/run_managed_experiment.py:1124:    receipt_path = context.paths.result_dir.joinpath("runtime", MANAGED_RUN_RECEIPT_FILENAME)
+tools/experiments/run_managed_experiment.py:1125:    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+tools/experiments/run_managed_experiment.py:1126:    receipt_path.write_text(
+tools/experiments/run_managed_experiment.py:1127:        json.dumps(receipt, sort_keys=True, indent=2),
+tools/experiments/run_managed_experiment.py:2300:) -> ReservationReceipt:
+tools/experiments/run_managed_experiment.py:2347:    receipt = ReservationReceipt(
+tools/experiments/run_managed_experiment.py:2369:            receipt = replace(receipt, report_parent_inode=report_parent_inode)
+tools/experiments/run_managed_experiment.py:2373:                receipt = replace(
+tools/experiments/run_managed_experiment.py:2374:                    receipt,
+tools/experiments/run_managed_experiment.py:2384:        rollback_empty_reservation(receipt)
+tools/experiments/run_managed_experiment.py:2386:    return receipt
+tools/experiments/run_managed_experiment.py:2416:def _reservation_owner_matches(receipt: ReservationReceipt) -> bool:
+tools/experiments/run_managed_experiment.py:2419:        result_stat = receipt.result_dir.stat()
+tools/experiments/run_managed_experiment.py:2420:        marker_stat = receipt.marker_path.stat()
+tools/experiments/run_managed_experiment.py:2421:        if receipt.result_dir.is_symlink() or receipt.marker_path.is_symlink():
+tools/experiments/run_managed_experiment.py:2423:        if result_stat.st_ino != receipt.result_inode:
+tools/experiments/run_managed_experiment.py:2425:        if marker_stat.st_ino != receipt.marker_inode:
+tools/experiments/run_managed_experiment.py:2427:        marker = load_json_file(receipt.marker_path)
+tools/experiments/run_managed_experiment.py:2442:        if marker.get("token") != receipt.token:
+tools/experiments/run_managed_experiment.py:2444:        if marker.get("result_inode") != receipt.result_inode:
+tools/experiments/run_managed_experiment.py:2446:        if identity_from_manifest(marker) != receipt.identity:
+tools/experiments/run_managed_experiment.py:2453:def rollback_empty_reservation(receipt: ReservationReceipt) -> bool:
+tools/experiments/run_managed_experiment.py:2454:    """Remove only a receipt-owned empty result/report reservation."""
+tools/experiments/run_managed_experiment.py:2455:    if not _reservation_owner_matches(receipt):
+tools/experiments/run_managed_experiment.py:2458:        receipt.result_parent,
+tools/experiments/run_managed_experiment.py:2459:        receipt.result_parent_preexisted,
+tools/experiments/run_managed_experiment.py:2460:        receipt.result_parent_inode,
+tools/experiments/run_managed_experiment.py:2464:        receipt.report_parent,
+tools/experiments/run_managed_experiment.py:2465:        receipt.report_parent_preexisted,
+tools/experiments/run_managed_experiment.py:2466:        receipt.report_parent_inode,
+tools/experiments/run_managed_experiment.py:2470:        children = list(receipt.result_dir.iterdir())
+tools/experiments/run_managed_experiment.py:2473:    if children != [receipt.marker_path]:
+tools/experiments/run_managed_experiment.py:2476:    if receipt.report_reserved:
+tools/experiments/run_managed_experiment.py:2477:        if receipt.report_inode is None or receipt.report_parent_inode is None:
+tools/experiments/run_managed_experiment.py:2480:            report_stat = receipt.report_path.stat()
+tools/experiments/run_managed_experiment.py:2481:            report_parent_stat = receipt.report_parent.stat()
+tools/experiments/run_managed_experiment.py:2485:            receipt.report_path.is_symlink()
+tools/experiments/run_managed_experiment.py:2486:            or report_stat.st_ino != receipt.report_inode
+tools/experiments/run_managed_experiment.py:2487:            or report_parent_stat.st_ino != receipt.report_parent_inode
+tools/experiments/run_managed_experiment.py:2491:        receipt.marker_path.unlink()
+tools/experiments/run_managed_experiment.py:2492:        receipt.result_dir.rmdir()
+tools/experiments/run_managed_experiment.py:2495:    if receipt.report_reserved:
+tools/experiments/run_managed_experiment.py:2497:            receipt.report_path.unlink()
+tools/experiments/run_managed_experiment.py:2502:            receipt.report_parent,
+tools/experiments/run_managed_experiment.py:2503:            receipt.report_parent_preexisted,
+tools/experiments/run_managed_experiment.py:2504:            receipt.report_parent_inode,
+tools/experiments/run_managed_experiment.py:2507:            receipt.result_parent,
+tools/experiments/run_managed_experiment.py:2508:            receipt.result_parent_preexisted,
+tools/experiments/run_managed_experiment.py:2509:            receipt.result_parent_inode,
+tools/experiments/run_managed_experiment.py:2518:def release_reservation_marker(receipt: ReservationReceipt) -> bool:
+tools/experiments/run_managed_experiment.py:2519:    """Remove a receipt-owned marker after initial artifacts are durable."""
+tools/experiments/run_managed_experiment.py:2520:    if not _reservation_owner_matches(receipt):
+tools/experiments/run_managed_experiment.py:2523:        receipt.marker_path.unlink()
+tools/experiments/run_managed_experiment.py:2663:    lock_root_value = "/var/lib/agent-canon/runtime/locks"
+tools/experiments/run_managed_experiment.py:2687:        runtime_root=Path("/var/lib/agent-canon/runtime"),
+tools/experiments/run_managed_experiment.py:2692:        lock_root=Path(lock_root_value),
+tools/experiments/run_managed_experiment.py:2695:        lock_namespace_visibility_witness="shared-runtime-receipt",
+tools/experiments/run_managed_experiment.py:2758:        runtime_route="MANAGED_CONTAINER",
+tools/experiments/run_managed_experiment.py:2765:    admission: RunGpuAdmissionReceipt | None = None
+tools/experiments/run_managed_experiment.py:2794:            runtime_root = os.environ.get(
+tools/experiments/run_managed_experiment.py:2795:                "AGENT_CANON_SHARED_RUNTIME_SOURCE",
+tools/experiments/run_managed_experiment.py:2796:                HOST_RUNTIME_ROOT,
+tools/experiments/run_managed_experiment.py:2798:            if runtime_root != HOST_RUNTIME_ROOT:
+tools/experiments/run_managed_experiment.py:2801:                    "managed execution requires the exact shared runtime root",
+tools/experiments/run_managed_experiment.py:2802:                    runtime_root=runtime_root,
+tools/experiments/run_managed_experiment.py:2805:                f"{HOST_RUNTIME_ROOT}/shared-runtime-provision.json"
+tools/experiments/run_managed_experiment.py:2808:                "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
+tools/experiments/run_managed_experiment.py:2814:                    "managed execution requires the exact provision receipt path",
+tools/experiments/run_managed_experiment.py:2817:            provision = read_shared_runtime_provision(provision_path)
+tools/experiments/run_managed_experiment.py:2818:            readback = read_shared_runtime_readback(
+tools/experiments/run_managed_experiment.py:2819:                f"{HOST_RUNTIME_ROOT}/shared-runtime-readback.json"
+tools/experiments/run_managed_experiment.py:2826:                runtime_root=request.runtime_root,
+tools/experiments/run_managed_experiment.py:2835:                        "GPU admission requires the strict NVIDIA inventory owner output",
+tools/experiments/run_managed_experiment.py:2860:                reservation_transaction = GpuReservationTransaction(request.lock_root)
+tools/experiments/run_managed_experiment.py:2893:                    runtime_root=request.runtime_root,
+tools/experiments/run_managed_experiment.py:2968:                    runtime_root="/var/lib/agent-canon/runtime",
+tools/experiments/run_managed_experiment.py:2970:                    filesystem_source=str(request.lock_root),
+tools/experiments/run_managed_experiment.py:2978:                            "runtime_root": "/var/lib/agent-canon/runtime",
+tools/experiments/run_managed_experiment.py:2980:                            "filesystem_source": str(request.lock_root),
+tools/experiments/run_managed_experiment.py:3032:                    lock_root=request.lock_root,
+tools/experiments/run_managed_experiment.py:3064:                    lock_root=request.lock_root,
+tools/experiments/run_managed_experiment.py:3079:                admission = build_lock_bound_admission_receipt(
+tools/experiments/run_managed_experiment.py:3113:                        "GPU admission completed without a final NVIDIA probe",
+tools/experiments/run_managed_experiment.py:3171:                    provision_receipt_fingerprint=runtime_identity.provision_fingerprint,
+tools/experiments/run_managed_experiment.py:3178:                            "provision_receipt_fingerprint": runtime_identity.provision_fingerprint,
+tools/experiments/run_managed_experiment.py:3384:        # receipt-owned empty reservation.  Once an artifact is present, the
+
+## definitions/references: tools/ci/container_config.py
+tools/ci/container_config.py:9:# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md explicit GPU-admission selector and scenario validation
+tools/ci/container_config.py:10:# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md opt-in GPU runtime identity contract
+tools/ci/container_config.py:17:# upstream implementation ./container_runtime.py loads runtime pack contracts
+tools/ci/container_config.py:21:# downstream implementation ../../.devcontainer/gpu-admission/devcontainer.json selects the opt-in Compose scenario
+tools/ci/container_config.py:22:# downstream implementation ../../.devcontainer/gpu-admission.sh owns the opt-in lifecycle scenario
+tools/ci/container_config.py:868:def validate_gpu_admission_selector(root: Path) -> list[Finding]:
+tools/ci/container_config.py:869:    """Validate the explicit GPU-admission selector without inspecting script text."""
+tools/ci/container_config.py:870:    selector_path = root / ".devcontainer" / "gpu-admission" / "devcontainer.json"
+tools/ci/container_config.py:875:                ".devcontainer/gpu-admission/devcontainer.json",
+tools/ci/container_config.py:883:        "name": "${localWorkspaceFolderBasename}-gpu-admission-devcontainer",
+tools/ci/container_config.py:884:        "initializeCommand": "AGENT_CANON_GPU_ADMISSION_PROFILE=gpu-admission AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/gpu-admission-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
+tools/ci/container_config.py:885:        "dockerComposeFile": "../../.agent-canon/gpu-admission-compose.generated.yml",
+tools/ci/container_config.py:900:                    ".devcontainer/gpu-admission/devcontainer.json",
+tools/ci/container_config.py:908:                ".devcontainer/gpu-admission/devcontainer.json",
+tools/ci/container_config.py:912:    orchestrator = shared_devcontainer_dir(root) / "gpu-admission.sh"
+tools/ci/container_config.py:1038:    if profile not in {"default", "gpu-admission"}:
+tools/ci/container_config.py:1046:    if profile == "gpu-admission":
+tools/ci/container_config.py:1049:            "-gpu-admission"
+tools/ci/container_config.py:1055:                    "gpu-admission-project-name-suffix-required",
+tools/ci/container_config.py:1386:                    "default-shared-runtime-field-forbidden:group_add",
+tools/ci/container_config.py:1403:                    "gpu-admission-group-add-forbidden",
+tools/ci/container_config.py:1411:                    "gpu-admission-gpus-all-required",
+tools/ci/container_config.py:1421:                    "default-shared-runtime-field-forbidden:runtime-bind",
+tools/ci/container_config.py:1429:    if profile == "gpu-admission":
+tools/ci/container_config.py:1435:                    f"gpu-admission-runtime-mount-count:{len(runtime_mounts)}",
+tools/ci/container_config.py:1443:                    "gpu-admission-runtime-mount-type-must-be-bind",
+tools/ci/container_config.py:1453:                        "gpu-admission-runtime-mount-source-must-be-repository-local",
+tools/ci/container_config.py:1461:                        "gpu-admission-runtime-mount-target-must-be-canonical",
+tools/ci/container_config.py:1474:                            "gpu-admission-runtime-mount-must-be-read-write",
+tools/ci/container_config.py:1482:                        "gpu-admission-runtime-mount-must-be-read-write",
+tools/ci/container_config.py:1712:    if profile == "gpu-admission":
+tools/ci/container_config.py:1750:        "AGENT_CANON_RUNTIME_ROUTE": (
+tools/ci/container_config.py:1751:            "MANAGED_CONTAINER" if profile == "gpu-admission" else "CONTAINER_LOCAL"
+tools/ci/container_config.py:1777:        expected_gpu_mode = "enabled" if profile == "gpu-admission" else "disabled"
+tools/ci/container_config.py:1794:                "AGENT_CANON_SHARED_RUNTIME_SOURCE",
+tools/ci/container_config.py:1795:                "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE",
+tools/ci/container_config.py:1796:                "AGENT_CANON_SHARED_RUNTIME_TARGET",
+tools/ci/container_config.py:1797:                "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
+tools/ci/container_config.py:1798:                "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT",
+tools/ci/container_config.py:1805:                        else "default-shared-runtime-field-forbidden"
+tools/ci/container_config.py:1817:                "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
+tools/ci/container_config.py:1818:                "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
+tools/ci/container_config.py:1819:                "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(runtime_source),
+tools/ci/container_config.py:1820:                "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+tools/ci/container_config.py:1821:                "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
+tools/ci/container_config.py:1822:                "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
+tools/ci/container_config.py:1830:                            f"gpu-admission-environment-required:{name}",
+tools/ci/container_config.py:1838:                            f"gpu-admission-environment:{name}",
+tools/ci/container_config.py:1874:    """Generate and validate the mandatory default and GPU-admission scenarios."""
+tools/ci/container_config.py:1930:                    "gpu-admission",
+tools/ci/container_config.py:1932:                        "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
+tools/ci/container_config.py:1933:                        "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(runtime_source),
+tools/ci/container_config.py:1934:                        "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(runtime_source),
+tools/ci/container_config.py:1935:                        "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+tools/ci/container_config.py:1936:                        "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(runtime_source / "shared-runtime-provision.json"),
+tools/ci/container_config.py:1937:                        "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(runtime_source / "shared-runtime-readback.json"),
+tools/ci/container_config.py:1944:            if profile == "gpu-admission":
+tools/ci/container_config.py:1945:                gpu_pack_path = packs_dir / "gpu-admission.toml"
+tools/ci/container_config.py:1981:                    runtime_source=(runtime_source if profile == "gpu-admission" else None),
+tools/ci/container_config.py:1989:            parent_receipt = boundary.resolve_parent_owned_path(
+tools/ci/container_config.py:1993:                attestation, parent_receipt, "container-config-runtime-base-cleanup"
+tools/ci/container_config.py:1996:            root_receipt = boundary.resolve_parent_owned_path(
+tools/ci/container_config.py:2000:                attestation, root_receipt, "container-config-agent-base-cleanup"
+tools/ci/container_config.py:2031:        findings.extend(validate_gpu_admission_selector(root))
+tools/ci/container_config.py:2084:    profile_compose = root / ".agent-canon" / "gpu-admission-compose.generated.yml"
+tools/ci/container_config.py:2087:        gpu_pack_path = root / "docker" / "packs" / "gpu-admission.toml"
+tools/ci/container_config.py:2095:                profile="gpu-admission",
+
+## definitions/references: tools/ci/container_runtime.py
+tools/ci/container_runtime.py:6:# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md exact runtime receipt names
+tools/ci/container_runtime.py:52:HOST_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+tools/ci/container_runtime.py:53:CONTAINER_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+tools/ci/container_runtime.py:59:PROVISION_RECEIPT_NAME = "shared-runtime-provision.json"
+tools/ci/container_runtime.py:60:READBACK_RECEIPT_NAME = "shared-runtime-readback.json"
+tools/ci/container_runtime.py:61:RUNTIME_ROUTE = "MANAGED_CONTAINER"
+tools/ci/container_runtime.py:241:        """Serialize this immutable resource for a lifecycle receipt."""
+tools/ci/container_runtime.py:270:        """Serialize this daemon snapshot for a lifecycle receipt."""
+tools/ci/container_runtime.py:580:class LifecycleResourceReceipt:
+tools/ci/container_runtime.py:629:def _empty_resource_receipts() -> list[LifecycleResourceReceipt]:
+tools/ci/container_runtime.py:635:class ContainerLifecycleReceipt:
+tools/ci/container_runtime.py:641:    resources: list[LifecycleResourceReceipt] = field(
+tools/ci/container_runtime.py:642:        default_factory=_empty_resource_receipts
+tools/ci/container_runtime.py:650:        """Serialize the complete lifecycle receipt."""
+tools/ci/container_runtime.py:674:    """Cleanup outcome with the receipt retained for blocked states."""
+tools/ci/container_runtime.py:677:    receipt: ContainerLifecycleReceipt
+tools/ci/container_runtime.py:687:    receipt: ContainerLifecycleReceipt
+tools/ci/container_runtime.py:696:        """Capture post-state, optionally clean exact IDs, and write a receipt."""
+tools/ci/container_runtime.py:698:        self.receipt = self.boundary.record_create_or_pull(
+tools/ci/container_runtime.py:699:            self.receipt, after, self.context.operation
+tools/ci/container_runtime.py:702:            result = self.boundary.cleanup(self.receipt)
+tools/ci/container_runtime.py:704:            result = CleanupResult(self.receipt.state, self.receipt)
+tools/ci/container_runtime.py:705:        write_lifecycle_receipt(self.workspace_root, self.receipt)
+tools/ci/container_runtime.py:709:def emit_not_created_lifecycle_receipt(
+tools/ci/container_runtime.py:711:) -> ContainerLifecycleReceipt:
+tools/ci/container_runtime.py:712:    """Publish a typed no-daemon receipt for a print-only invocation."""
+tools/ci/container_runtime.py:714:    receipt = ContainerLifecycleReceipt(
+tools/ci/container_runtime.py:727:    write_lifecycle_receipt(workspace_root, receipt)
+tools/ci/container_runtime.py:728:    return receipt
+tools/ci/container_runtime.py:769:def lifecycle_receipt_path(
+tools/ci/container_runtime.py:770:    workspace_root: Path, receipt: ContainerLifecycleReceipt
+tools/ci/container_runtime.py:772:    """Resolve a lifecycle receipt strictly below the selected workspace."""
+tools/ci/container_runtime.py:774:    configured = os.environ.get("AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT")
+tools/ci/container_runtime.py:780:        task = re.sub(r"[^A-Za-z0-9._-]+", "_", receipt.context.task_id).strip("._")
+tools/ci/container_runtime.py:782:            r"[^A-Za-z0-9._-]+", "_", receipt.context.operation
+tools/ci/container_runtime.py:785:            r"[^A-Za-z0-9._-]+", "_", receipt.context.lifecycle_id
+tools/ci/container_runtime.py:795:            "AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT must remain below workspace root"
+tools/ci/container_runtime.py:800:def write_lifecycle_receipt(
+tools/ci/container_runtime.py:801:    workspace_root: Path, receipt: ContainerLifecycleReceipt
+tools/ci/container_runtime.py:803:    """Atomically publish one receipt through the authenticated parent boundary."""
+tools/ci/container_runtime.py:804:    target = lifecycle_receipt_path(workspace_root, receipt)
+tools/ci/container_runtime.py:809:            raise ValueError(f"lifecycle receipt collision at {target}") from exc
+tools/ci/container_runtime.py:811:            raise ValueError(f"lifecycle receipt collision at {target}")
+tools/ci/container_runtime.py:813:        if existing_mapping.get("lifecycle_id") != receipt.context.lifecycle_id:
+tools/ci/container_runtime.py:814:            raise ValueError(f"lifecycle receipt collision at {target}")
+tools/ci/container_runtime.py:828:        purpose="container-lifecycle-receipt",
+tools/ci/container_runtime.py:831:    payload = (json.dumps(receipt.as_json(), sort_keys=True, indent=2) + "\n").encode(
+tools/ci/container_runtime.py:838:        "container-lifecycle-receipt",
+tools/ci/container_runtime.py:983:    def begin(self) -> ContainerLifecycleReceipt:
+tools/ci/container_runtime.py:984:        """Start a receipt from the pre-operation snapshot."""
+tools/ci/container_runtime.py:987:        return ContainerLifecycleReceipt(self.context, before, state=state)
+tools/ci/container_runtime.py:991:        before: DaemonSnapshot | ContainerLifecycleReceipt,
+tools/ci/container_runtime.py:994:    ) -> ContainerLifecycleReceipt:
+tools/ci/container_runtime.py:996:        receipt = (
+tools/ci/container_runtime.py:998:            if isinstance(before, ContainerLifecycleReceipt)
+tools/ci/container_runtime.py:999:            else ContainerLifecycleReceipt(self.context, before)
+tools/ci/container_runtime.py:1001:        receipt.before = replace(
+tools/ci/container_runtime.py:1002:            receipt.before,
+tools/ci/container_runtime.py:1003:            resources=self.dedupe_resources(receipt.before.resources),
+tools/ci/container_runtime.py:1006:        receipt.after = after
+tools/ci/container_runtime.py:1009:            for source, snapshot in (("before", receipt.before), ("after", after))
+tools/ci/container_runtime.py:1015:            for source, snapshot in (("before", receipt.before), ("after", after))
+tools/ci/container_runtime.py:1019:            receipt.before.query_status != "ok"
+tools/ci/container_runtime.py:1025:                for status in (receipt.before.query_status, after.query_status)
+tools/ci/container_runtime.py:1027:            receipt.state = "partial-failure" if partial else "daemon-unavailable"
+tools/ci/container_runtime.py:1028:            receipt.failure = (
+tools/ci/container_runtime.py:1033:            receipt.finished_at = time.time()
+tools/ci/container_runtime.py:1034:            return receipt
+tools/ci/container_runtime.py:1035:        before_identity = daemon_identity_fingerprint(receipt.before)
+tools/ci/container_runtime.py:1037:        if receipt.before.builder != after.builder or before_identity != after_identity:
+tools/ci/container_runtime.py:1038:            receipt.state = "cleanup-blocked"
+tools/ci/container_runtime.py:1039:            receipt.failure = (
+tools/ci/container_runtime.py:1041:                f"before={receipt.before.builder}/{before_identity} "
+tools/ci/container_runtime.py:1044:            receipt.finished_at = time.time()
+tools/ci/container_runtime.py:1045:            return receipt
+tools/ci/container_runtime.py:1046:        previous = {(item.kind, item.immutable_id) for item in receipt.before.resources}
+tools/ci/container_runtime.py:1048:        for item in receipt.before.resources:
+tools/ci/container_runtime.py:1055:        # A receipt may be re-bound to a fresh post-operation snapshot during
+tools/ci/container_runtime.py:1058:        receipt.resources = []
+tools/ci/container_runtime.py:1075:                        for item in receipt.before.resources
+tools/ci/container_runtime.py:1095:                    # without an explicit daemon create receipt.
+tools/ci/container_runtime.py:1107:            receipt.resources.append(
+tools/ci/container_runtime.py:1108:                LifecycleResourceReceipt(
+tools/ci/container_runtime.py:1123:            receipt.state = "partial-failure"
+tools/ci/container_runtime.py:1124:            receipt.failure = ";".join(partial_reasons)
+tools/ci/container_runtime.py:1126:            receipt.state = "cleanup-blocked"
+tools/ci/container_runtime.py:1127:            receipt.failure = ";".join(blocked_reasons)
+tools/ci/container_runtime.py:1129:            receipt.state = (
+tools/ci/container_runtime.py:1131:                if any(item.created_or_pulled_by_task for item in receipt.resources)
+tools/ci/container_runtime.py:1134:        receipt.finished_at = time.time()
+tools/ci/container_runtime.py:1135:        return receipt
+tools/ci/container_runtime.py:1140:    def cleanup(self, receipt: ContainerLifecycleReceipt) -> CleanupResult:
+tools/ci/container_runtime.py:1142:        has_alias_cleanup = any(item.alias_tags for item in receipt.resources)
+tools/ci/container_runtime.py:1143:        if receipt.state in {"daemon-unavailable", "cleanup-blocked"}:
+tools/ci/container_runtime.py:1144:            return CleanupResult(receipt.state, receipt)
+tools/ci/container_runtime.py:1145:        if receipt.state == "not-created" and not has_alias_cleanup:
+tools/ci/container_runtime.py:1146:            return CleanupResult(receipt.state, receipt)
+tools/ci/container_runtime.py:1147:        if receipt.state == "partial-failure":
+tools/ci/container_runtime.py:1148:            receipt.state = "cleanup-blocked"
+tools/ci/container_runtime.py:1149:            receipt.failure = receipt.failure or "partial lifecycle observation"
+tools/ci/container_runtime.py:1150:            receipt.finished_at = time.time()
+tools/ci/container_runtime.py:1152:                receipt.state, receipt, failure=receipt.failure
+tools/ci/container_runtime.py:1154:        receipt.state = "cleaning"
+tools/ci/container_runtime.py:1162:            for item in receipt.resources
+tools/ci/container_runtime.py:1200:                receipt.state = "cleanup-blocked"
+tools/ci/container_runtime.py:1201:                receipt.failure = f"{resource.kind}:{resource.immutable_id}:{exc}"
+tools/ci/container_runtime.py:1202:                receipt.finished_at = time.time()
+tools/ci/container_runtime.py:1203:                return CleanupResult(receipt.state, receipt, tuple(removed), receipt.failure)
+tools/ci/container_runtime.py:1204:            index = receipt.resources.index(item)
+tools/ci/container_runtime.py:1205:            receipt.resources[index] = replace(
+tools/ci/container_runtime.py:1213:        for item in receipt.resources:
+tools/ci/container_runtime.py:1229:                    receipt.state = "cleanup-blocked"
+tools/ci/container_runtime.py:1230:                    receipt.failure = f"image-alias:{item.resource.immutable_id}:{tag}:{exc}"
+tools/ci/container_runtime.py:1231:                    receipt.finished_at = time.time()
+tools/ci/container_runtime.py:1232:                    return CleanupResult(receipt.state, receipt, tuple(removed), receipt.failure)
+tools/ci/container_runtime.py:1234:        receipt.state = "cleanup-blocked" if retargeted else "cleaned"
+tools/ci/container_runtime.py:1236:            receipt.failure = (
+tools/ci/container_runtime.py:1240:        receipt.finished_at = time.time()
+tools/ci/container_runtime.py:1241:        return CleanupResult(receipt.state, receipt, tuple(removed))
+tools/ci/container_runtime.py:1265:    """Read one receipt string without Python truthiness/coercion."""
+tools/ci/container_runtime.py:1280:    """Read one nullable receipt string with strict type and control checks."""
+tools/ci/container_runtime.py:1334:def lifecycle_receipt_from_json(payload: Mapping[str, object]) -> ContainerLifecycleReceipt:
+tools/ci/container_runtime.py:1335:    """Restore a boundary receipt for a later post-state or cleanup phase."""
+tools/ci/container_runtime.py:1336:    payload = _object_mapping(payload, "lifecycle receipt")
+tools/ci/container_runtime.py:1338:        payload.get("schema", _STRICT_MISSING), "lifecycle receipt schema"
+tools/ci/container_runtime.py:1341:        raise ValueError("lifecycle receipt schema does not match the supported schema")
+tools/ci/container_runtime.py:1343:        payload.get("before"), "lifecycle receipt before snapshot"
+tools/ci/container_runtime.py:1345:    task_id = _strict_json_string(payload.get("task_id"), "lifecycle receipt task_id")
+tools/ci/container_runtime.py:1347:        payload.get("repo_identity"), "lifecycle receipt repo_identity"
+tools/ci/container_runtime.py:1350:        payload.get("task_repo_label"), "lifecycle receipt task_repo_label"
+tools/ci/container_runtime.py:1353:        raise ValueError("lifecycle receipt task/repository identity contradicts its label")
+tools/ci/container_runtime.py:1358:            payload.get("builder", "docker"), "lifecycle receipt builder"
+tools/ci/container_runtime.py:1362:            payload.get("operation", "gpu-admission"), "lifecycle receipt operation"
+tools/ci/container_runtime.py:1365:            payload.get("lifecycle_id"), "lifecycle receipt lifecycle_id"
+tools/ci/container_runtime.py:1369:            "lifecycle receipt expected_image_tags",
+tools/ci/container_runtime.py:1375:            value.get("resources", ()), "lifecycle receipt resources"
+tools/ci/container_runtime.py:1378:            value.get("daemon", {}), "lifecycle receipt daemon identity"
+tools/ci/container_runtime.py:1383:                "lifecycle receipt snapshot builder",
+tools/ci/container_runtime.py:1388:                "lifecycle receipt snapshot query_status",
+tools/ci/container_runtime.py:1402:        payload.get("resources", ()), "lifecycle receipt resources"
+tools/ci/container_runtime.py:1404:    resources: list[LifecycleResourceReceipt] = []
+tools/ci/container_runtime.py:1406:        item = _object_mapping(raw_item, "lifecycle receipt resource row")
+tools/ci/container_runtime.py:1410:            item.get("restore_tags", ()), "lifecycle receipt restore_tags"
+tools/ci/container_runtime.py:1412:            row = _object_mapping(raw_row, "lifecycle receipt restore tag")
+tools/ci/container_runtime.py:1414:                raise ValueError("lifecycle receipt restore tag requires tag and immutable_id")
+tools/ci/container_runtime.py:1417:                    _strict_json_string(row["tag"], "lifecycle receipt restore tag tag"),
+tools/ci/container_runtime.py:1420:                        "lifecycle receipt restore tag immutable_id",
+tools/ci/container_runtime.py:1426:            "lifecycle receipt preexisting",
+tools/ci/container_runtime.py:1431:            "lifecycle receipt created_or_pulled_by_task",
+tools/ci/container_runtime.py:1436:            "lifecycle receipt preservation_policy",
+tools/ci/container_runtime.py:1440:            "lifecycle receipt exclusion_authority",
+tools/ci/container_runtime.py:1444:            policy_owner, "lifecycle receipt preservation_policy_owner"
+tools/ci/container_runtime.py:1446:            raise ValueError("lifecycle receipt preservation policy owner mismatch")
+tools/ci/container_runtime.py:1449:            authority_owner, "lifecycle receipt exclusion_authority_owner"
+tools/ci/container_runtime.py:1451:            raise ValueError("lifecycle receipt exclusion authority owner mismatch")
+tools/ci/container_runtime.py:1453:            LifecycleResourceReceipt(
+tools/ci/container_runtime.py:1459:                    item.get("alias_tags", ()), "lifecycle receipt alias_tags"
+tools/ci/container_runtime.py:1465:                    "lifecycle receipt operation",
+tools/ci/container_runtime.py:1470:                    "lifecycle receipt cleanup_operation",
+tools/ci/container_runtime.py:1474:                    item.get("cleanup_exit"), "lifecycle receipt cleanup_exit"
+tools/ci/container_runtime.py:1478:                    "lifecycle receipt post_inspect",
+tools/ci/container_runtime.py:1482:                    "lifecycle receipt absence",
+tools/ci/container_runtime.py:1488:        snapshot_from(_object_mapping(after_payload, "lifecycle receipt after snapshot"))
+tools/ci/container_runtime.py:1492:    return ContainerLifecycleReceipt(
+tools/ci/container_runtime.py:1498:            payload.get("state", "snapshot"), "lifecycle receipt state"
+tools/ci/container_runtime.py:1501:            payload.get("failure"), "lifecycle receipt failure"
+tools/ci/container_runtime.py:1729:def detect_host_runtime_features() -> HostRuntimeFeatures:
+tools/ci/container_runtime.py:1753:    features = detect_host_runtime_features()
+
