@@ -1,0 +1,90 @@
+name: Issue 783 Source Bundle
+
+on:
+  push:
+    branches:
+      - fix/783-remove-agent-canon-runtime
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build compressed source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .transport-783
+          mkdir -p .transport-783
+          paths=(
+            .devcontainer/Dockerfile
+            .devcontainer/devcontainer.json
+            .devcontainer/generate-runtime-compose.sh
+            .devcontainer/gpu-admission.sh
+            .devcontainer/finalize-shared-runtime.sh
+            .devcontainer/post-create.sh
+            .devcontainer/post-attach.sh
+            agent-canon-environment.toml
+            CONTAINER_OPERATIONS.md
+            documents/contracts/linux-wsl-host-requirements.md
+            documents/design/devcontainer/parent-devcontainer-policy.md
+            documents/experiments/gpu-admission-r5-source-packet.md
+            documents/experiments/gpu-direct-command.md
+            documents/parent-repository/CONTAINER_OPERATIONS.md
+            tools/experiments/execution_resource_plan.py
+            tools/experiments/gpu_command_admission.py
+            tools/experiments/run_gpu_command.py
+            tools/experiments/run_managed_experiment.py
+            tools/ci/container_config.py
+            tools/ci/container_runtime.py
+            tests/tools/test_container_config.py
+            tests/tools/test_execution_resource_plan.py
+            tests/tools/test_gpu_admission_devcontainer.py
+            tests/tools/test_run_codex_in_repo_container.py
+            tests/tools/test_run_gpu_command.py
+            tests/tools/test_run_managed_experiment.py
+          )
+          tar -czf /tmp/issue-783-source.tar.gz "${paths[@]}"
+          base64 -w0 /tmp/issue-783-source.tar.gz | fold -w 30000 | split -d -a 3 - .transport-783/chunk-
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          archive = Path('/tmp/issue-783-source.tar.gz').read_bytes()
+          chunks = sorted(Path('.transport-783').glob('chunk-*'))
+          Path('.transport-783/manifest.json').write_text(
+              json.dumps(
+                  {
+                      'schema_version': 'issue-783-source-bundle/v1',
+                      'archive_sha256': hashlib.sha256(archive).hexdigest(),
+                      'archive_bytes': len(archive),
+                      'chunks': [
+                          {
+                              'path': str(path),
+                              'characters': len(path.read_text(encoding='ascii')),
+                              'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+                          }
+                          for path in chunks
+                      ],
+                  },
+                  indent=2,
+                  sort_keys=True,
+              ) + '\n',
+              encoding='utf-8',
+          )
+          PY
+      - name: Publish bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/issue-783-source-bundle.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .transport-783 .github/workflows/issue-783-source-bundle.yml
+          git commit -m "chore: stage runtime-removal source bundle (#783)"
+          git push origin HEAD:fix/783-remove-agent-canon-runtime
