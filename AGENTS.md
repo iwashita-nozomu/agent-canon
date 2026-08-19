@@ -5,6 +5,7 @@ contract agent-runtime
 responsibility Routes standalone AgentCanon source-tree readers to canonical owners without re-owning task procedures.
 upstream design documents/design/entrypoint-owner-map.md root entrypoint grammar and responsibility boundary
 upstream design documents/conventions/software-engineering-principles.md contract-complete engineering decision policy
+upstream design agents/internal-routines/chatgpt-codex-routing.md request modality and Codex handoff owner
 upstream design agents/skills/comprehensive-development.md cross-surface implementation-basis consumer
 upstream design agents/canonical/CODEX_WORKFLOW.md executable task and closeout owner
 upstream design agents/canonical/CODEX_SUBAGENTS.md subagent lifecycle owner
@@ -35,7 +36,8 @@ root, workflow, or Skill policy for visibility.
 
 | Task intent | Canonical owner |
 | --- | --- |
-| request interpretation and task transport | `agents/skills/agent-orchestration.md`, `agents/skills/codex-task-workflow.md`, `agents/canonical/CODEX_WORKFLOW.md` |
+| ChatGPT conversation closure vs Codex workspace execution | `agents/internal-routines/chatgpt-codex-routing.md` |
+| request interpretation and task transport after Codex admission | `agents/skills/agent-orchestration.md`, `agents/skills/codex-task-workflow.md`, `agents/canonical/CODEX_WORKFLOW.md` |
 | contract-complete implementation and engineering basis | `documents/conventions/software-engineering-principles.md`, `agents/skills/comprehensive-development.md`, task-specific implementation Skills |
 | mathematical, algorithmic, and numerical obligation ownership | `documents/design/semantic-responsibility-contract.md`, `documents/design/algorithm-implementation-boundary.md`, selected proof / optimization Skill |
 | design-to-implementation correspondence | `agents/internal-routines/design-implementation-correspondence.md` |
@@ -73,15 +75,23 @@ here.
 
 ## Task Entry
 
-Resolve the task shape and canonical owner from the reader map and public Skill
-registry. Read the selected owner surface before editing. A bounded request with
-an identified owner, path, and targeted validation stays bounded; broader
-design, orchestration, research, or subagent machinery activates only when its
-owner-defined condition is present.
+Resolve request modality through
+`agents/internal-routines/chatgpt-codex-routing.md` before repository
+orchestration. A `chatgpt` route closes in conversation without workspace
+execution. A `codex` route hands its typed scope and validation oracle to
+`agent-orchestration` before task-shape skill selection.
 
-Questions and read-only inspections remain read-only unless the user includes
-an explicit write request. Repository-changing work follows the selected Skill
-and workflow; this entrypoint does not restate their sequence.
+Resolve the task shape and canonical owner from the reader map and public Skill
+registry only after Codex admission. Read the selected owner surface before
+editing. A bounded request with an identified owner, path, and targeted
+validation stays bounded; broader design, orchestration, research, or subagent
+machinery activates only when its owner-defined condition is present.
+
+Read-only web, connector, and supplied-material analysis remain ChatGPT work
+unless the requested result depends on repository-local state, command
+observation, mutation, iterative validation, or durable repository delivery.
+Repository-changing work follows the selected Skill and workflow; this
+entrypoint does not restate their sequence.
 
 ## Validation Routing
 
