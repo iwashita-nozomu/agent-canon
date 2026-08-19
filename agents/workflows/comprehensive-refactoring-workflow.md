@@ -58,9 +58,9 @@ primary family は `Large Delivery` または `Comprehensive Development` とし
 - `Path Mapping:` old path / symbol から new path / symbol への対応。
 - `Deletion Plan:` 消す file、helper、alias、alternate route、旧 route。
 - `Removal and Caller Migration Plan:` compatibility-preservation drift と duplicate implementation を残さず、旧 entry、旧 alias、alternate route の caller migration と削除順序を固定する。
-- C++ project migration では `cpp/CMakeLists.txt`、`cpp/src`、`cpp/include`、`tests/cpp`、
-  `cpp/experiments` を target responsibility map に固定し、parent root の language-neutral
-  state、consumer-to-provider target graph、root-anchored command contract を同じ packet に置く。
+- C++ project migration では root `CMakeLists.txt`、`src/`、`include/`、`tests/cpp/`、
+  任意の `experiments/cpp/` を target responsibility map に固定し、consumer-to-provider
+  target graph、root source-anchor command、legacy `cpp/` tree の削除を同じ packet に置く。
 
 設計見直しは、既存コードを読まずに始めません。
 構造化された owner 探索、`git grep`、dependency graph、test inventory、必要なら `tools/agent_tools/analyze_refactor_surface.py` の baseline を取ってから target boundary を決めます。
@@ -134,8 +134,11 @@ python3 tools/oop/cpp/readability.py \
   --include-snippets \
   --exclude vendor \
   --exclude reports \
-  cpp/include cpp/src tests/cpp cpp/experiments
+  include src tests/cpp experiments/cpp
 ```
+
+存在しない optional source path は入力から除外します。legacy `cpp/` path を fallback
+として加えてはいけません。
 
 C++ tool は責務不明 type 名、巨大 class / function、public field / method 過多、base class / parameter 過多、`nullptr` runtime routing、純粋変換と副作用の混在、redundant wrapper を検出します。`OOP_READABILITY` は scalar threshold ではなく signal class で判定します。size / surface / parameter / complexity finding は boundary review signal であり、caller contract や ownership から安定した境界が読めない限り分割指示にしません。JSON / Markdown report の `typed_boundary_evidence`、`scanned_paths`、`signal_counts` を review artifact に保持します。
 signal counts は設計判断の補助であり、behavior correctness の代替ではありません。
