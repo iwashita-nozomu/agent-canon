@@ -33,6 +33,12 @@ metric を固定し、algorithm / data movement / memory hierarchy / concurrency
 ## Required Checks
 
 - project-native configure / build / test evidence
+- When native static analysis is relevant and a CMake-generated database exists, use:
+  `python3 tools/static_analysis/cpp/static_analysis.py select-db --workspace-root <workspace-root> --build-dir <build-dir>`;
+  `python3 tools/static_analysis/cpp/static_analysis.py clangd-check --workspace-root <workspace-root> --source <source> --build-dir <build-dir>`;
+  and `python3 tools/static_analysis/cpp/static_analysis.py clang-tidy --workspace-root <workspace-root> --source <source> --build-dir <build-dir>`.
+  The build directory is explicit per module; the tool does not enumerate or add include paths,
+  compiler flags, or provider-specific diagnostics.
 - `ctest` があるならその結果
 - CMake project なら `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`、
   `cmake --build "$ROOT/build/cpp/<profile>" --parallel`、
