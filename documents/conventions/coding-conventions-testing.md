@@ -74,18 +74,19 @@ upstream design ../design/semantic-responsibility-contract.md semantic responsib
 ### 2.1 C++ test ownership
 
 - derived project の C++ adapter/integration test source は `tests/cpp/` に置きます。
-- `cpp/CMakeLists.txt` は `${ROOT}/tests/cpp` を source directory、
-  `${CMAKE_CURRENT_BINARY_DIR}/tests/cpp` を binary directory として指定した
-  out-of-tree `add_subdirectory` で `cpp-test-<name>` executable、`cpp-tests` aggregate、
+- root `CMakeLists.txt` は `tests/cpp/` を source directory、
+  `${CMAKE_BINARY_DIR}/tests/cpp` を binary directory として指定した
+  `add_subdirectory` で `cpp-test-<name>` executable、`cpp-tests` aggregate、
   CTest registration を同じ configure graph へ接続します。
 - AgentCanon runtime/template tests は AgentCanon の `tests/`、cppdev の数値・数学・NN
   oracle tests は cppdev の owning repository に置き、derived project の `tests/cpp/` に
   複製しません。production subtree には test compatibility path を作成しません。
 - 各 individual test executable は `cpp-core` を consume します。`cpp-tests` は build
   grouping を提供し、CTest が execution と failure output を所有します。
-- C++ test validation は同じ profile cache を使います。
+- C++ test validation は root source anchor から作成した同じ profile cache を使います。
 
 ```bash
+cmake -S "$ROOT" -B "$ROOT/build/cpp/<profile>"
 cmake --build "$ROOT/build/cpp/<profile>" --target cpp-tests
 ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure
 ```
