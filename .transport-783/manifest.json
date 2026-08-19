@@ -1,0 +1,12 @@
+{
+  "archive_bytes": 262857,
+  "archive_sha256": "a9cc27d80e89ba6d3c51b28c19abba4a758b256bcc614e7faf5313d1aa60a5dc",
+  "chunks": [
+    {
+      "characters": 350487,
+      "path": ".transport-783/chunk-000",
+      "sha256": "3543458160b2bb0c72bb16f36804facd683382b7f2d477e365c4d1470f181f4a"
+    }
+  ],
+  "schema_version": "issue-783-source-bundle/v1"
+}
