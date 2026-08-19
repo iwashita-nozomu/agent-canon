@@ -11,10 +11,13 @@ prefix = "vendor/agent-canon"
 integration_mode = "live-agent-canon"
 default_consumer = false
 selection = "explicit-opt-in"
+projection_forbidden_roots = ["rust"]
 
-# These projections belong only to the named live integration. The default
-# template/bootstrap path owns a source-free static seed and never consumes
-# this manifest.
+# Rust/Cargo source and tests are AgentCanon standalone-only. This exclusion is
+# not a cleanup entry and grants no ownership over a parent's regular rust/ tree.
+
+# Codex reads these repository-scoped paths directly. The default static
+# consumer does not consult this manifest; an explicit live integration does.
 [[surface]]
 path = "AGENTS.md"
 mode = "symlink"
@@ -40,13 +43,22 @@ projection_kind = "runtime_surface"
 local_override_allowed = false
 
 [[surface]]
-path = "tools/agent-canon"
+path = ".codex/hooks.json"
 mode = "symlink"
-source = "tools"
+source = ".codex/hooks.json"
 projection_producer = "agent-canon"
 projection_kind = "runtime_surface"
 local_override_allowed = false
 
+[[surface]]
+path = ".codex/hooks"
+mode = "symlink"
+source = ".codex/hooks"
+projection_producer = "agent-canon"
+projection_kind = "runtime_surface"
+local_override_allowed = false
+
+# Update state is lifecycle-owned local state, not a Codex discovery surface.
 [[surface]]
 path = ".agent-canon"
 mode = "repo_state"
@@ -55,6 +67,17 @@ projection_kind = "transaction_state"
 optional = true
 local_override_allowed = false
 
+# This former directory-wide alias is one bounded legacy path, not an active
+# Codex surface. Parent-owned regular content remains protected by sync rules.
+[[surface]]
+path = "tools/agent-canon"
+mode = "removed_legacy"
+projection_producer = "legacy"
+projection_kind = "removed_legacy"
+local_override_allowed = false
+
+# These entries are bounded migration cleanup only. Parent-owned regular
+# content is preserved; stale AgentCanon symlinks may be removed.
 [[group]]
 mode = "removed_legacy"
 projection_producer = "legacy"
@@ -63,8 +86,6 @@ paths = [
   ".agents",
   "agents",
   ".codex/README.md",
-  ".codex/hooks.json",
-  ".codex/hooks",
   ".devcontainer",
   ".devcontainer/devcontainer.json",
   ".devcontainer/gpu-admission",
@@ -73,7 +94,6 @@ paths = [
   "evidence",
   "memory",
   "notes",
-  "tests",
   ".github/AGENTS.md",
   ".github/workflows/agent-coordination.yml",
   ".github/workflows/agent-improvement-guide.yml",

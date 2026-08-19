@@ -479,6 +479,8 @@ Current promoted helpers:
 - `tools/audit/audit_logger.py`
 - `tools/docs/create_design_template.py`
 - `tools/docs/find_redundant_designs.py`
+- `tools/docs/extract_docx.py`
+  - 標準ライブラリで、DOCXを検索用Markdown・raw member・manifest付きのreference bundleへ展開します。
 - `tools/docs/find_similar_designs.py`
 - `tools/docs/organize_designs.py`
 - `tools/docs/tfidf_similar_docs.py`
