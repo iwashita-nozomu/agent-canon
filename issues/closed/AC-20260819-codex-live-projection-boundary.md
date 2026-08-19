@@ -15,7 +15,8 @@ downstream implementation ../../tests/agent_tools/test_codex_projection_boundary
 # [Codex投影境界] project-scoped .codex surface を保持し、内部 tools/tests 投影を除去する
 
 issue_id: AC-20260819-codex-live-projection-boundary
-status: in_progress
+status: resolved
+resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/799
 source: user
 severity: S2
 problem: live AgentCanon integration が Codex の project-scoped discovery surface と AgentCanon internal tools/tests tree を同じ projection contract に混在させ、同時に hooks を legacy removal 扱いしている。
