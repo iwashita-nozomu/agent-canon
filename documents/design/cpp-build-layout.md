@@ -91,10 +91,10 @@ write set）、`validation`（その判断を読み戻す検証）を記録す�
 | closure id (`RDC-ID`) | path + section read | edge | decision | implementation target | validation |
 | --- | --- | --- | --- | --- | --- |
 | `RDC-REGISTRY` | `logical:documents/experiments/experiment-registry.md`: `役割`, `正本ファイル`, `branch-only topics`, `validation` | registry → managed entrypoint/config/result root | native topic adapter is registered through the existing experiment registry; CMake target does not become a second registry | `experiments/registry.toml`, `experiments/<topic>/run.py`, topic README | `make experiment-check`, registry command/result-root readback |
-| `RDC-RESULT-RETENTION` | `logical:documents/experiments/result-log-retention-and-visualization.md`: `Storage Classes`, `Required Bundle Shape`, `Visualization Rules`, `Retention Rules`, `Closeout Evidence` | result storage → run evidence and retention | result directory remains `experiments/<topic>/result/<variant>/<run_name>/`; native target emits domain outputs, lifecycle/save owner emits manifests/report/retention evidence | native runner arguments, result bundle, save-results publish | bundle shape, artifact/eval manifests, report/retention evidence |
+| `RDC-RESULT-RETENTION` | `logical:documents/experiments/result-log-retention-and-visualization.md`: `Storage Classes`, `Required Bundle Shape`, `Visualization Rules`, `Retention Rules`, `Closeout Evidence` | result storage → run evidence and retention | result directory remains `experiments/<topic>/result/<run-id>/`; native target emits domain outputs, lifecycle/save owner emits manifests/report/retention evidence | native runner arguments, result bundle, save-results publish | bundle shape, artifact/eval manifests, report/retention evidence |
 | `RDC-CONTAINER` | `logical:CONTAINER_OPERATIONS.md`: `Canonical Source Contract`, `Ownership Boundary`, `Manifest Source Roles And Cardinality`, `Dockerfile Rules`, `GitHub Workflow Rules`, `Required Validation` | container source/pack → CMake smoke projection | Docker pack/check owns container build and smoke; its CMake command changes to the parent anchor without moving C++ ownership into Docker | `docker/README.md`, `docker/check_build.sh`, `docker/packs/default.toml`, CI | `docker_dependency_validator.sh`, pack print/smoke, Docker workflow checker |
 | `RDC-EXPERIMENT-LIFECYCLE` | `logical:agents/skills/experiment-lifecycle.md`: `Purpose`, `Use When`, `Core References`, `Boundary`; `logical:agents/workflows/experiment-workflow.md`: `1. この文書の役割`, `2. 段階別手順` (`準備`, `静的チェック`, `実験実行`, `結果レポート`) | lifecycle skill/workflow → run protocol | build target creation and native execution are two events; lifecycle owns `run_name`, config snapshot, result root, command/environment/source evidence | `cpp-experiment-<name>` build target plus managed adapter/direct run contract | lifecycle run manifest, command/env/source snapshot, exit status; build/run separation gate |
-| `RDC-RESULT-PERSISTENCE` | `logical:agents/skills/experiment-lifecycle.md`: `Canonical ownership`, `Lifecycle`; `logical:agents/skills/result-artifact-writeout.md`: `Contract`, `Reports and publication` | lifecycle/writeout owners → explicit annex retention | C++ target never archives directly; lifecycle owns run identity and explicit retention decisions while writeout owns concrete artifact identity/checksum/no-overwrite readback | `experiments/<topic>/result/<variant>/<run_name>/`, `save_experiment_result_annex.py` | lifecycle terminal-status/retention evidence and artifact manifest/checksum/readback |
+| `RDC-RESULT-PERSISTENCE` | `logical:agents/skills/experiment-lifecycle.md`: `Canonical ownership`, `Lifecycle`; `logical:agents/skills/result-artifact-writeout.md`: `Contract`, `Reports and publication` | lifecycle/writeout owners → explicit annex retention | C++ target never archives directly; lifecycle owns run identity and explicit retention decisions while writeout owns concrete artifact identity/checksum/no-overwrite readback | `experiments/<topic>/result/<run-id>/`, `save_experiment_result_annex.py` | lifecycle terminal-status/retention evidence and artifact manifest/checksum/readback |
 | `RDC-ARTIFACT-WRITEOUT` | `logical:agents/skills/result-artifact-writeout.md`: `Output Contract`, `Destination Rules`, `Required Shape`, `Closeout Tokens` | artifact writer → evidence shape | native result output is written below lifecycle-selected run directory and is not a build-tree artifact | runner result arguments and artifact manifest | result-artifact checker/manifest shape |
 | `RDC-EXPERIMENT-REVIEW` | `logical:agents/skills/experiment-review.md`: `Review Checklist`, `Findings Policy` | experiment review → executable/config/result review | review checks target source, registry adapter, config, evidence, and report as one trace without changing experiment protocol in design pass | `P-EXPERIMENT-*`, native source packet | experiment review findings and managed run evidence |
 | `RDC-CPP-REVIEW` | `logical:agents/skills/cpp-review.md`: `Use When`, `Required Checks`, `Core References`, `Expected Outcome`, `Mandatory Checklist` | C++ reviewer → native build/header/CTest evidence | project-native configure/build/test is implementation-phase evidence; this design phase records the route and does not claim execution | `cpp/CMakeLists.txt`, `cpp/include`, `tests/cpp`, target graph | configure/build/CTest, header/link/ownership review; `not_run` until implementation |
@@ -222,13 +222,13 @@ test source は C++ production subtree (`cpp/src`, `cpp/include`) と分離さ�
 | `cpp/cmake/` | project-local Find/module/helper logic when the root file needs a reusable boundary | C++ build owner | `cpp/CMakeLists.txt` and subdirectories |
 | `build/cpp/<profile>/` | generated configure/build tree、compile database、test discovery、native binaries | CMake generator | developer/CI |
 | `.state/cpp-install/<profile>/` | generated reusable install tree for headers、libraries、executables、CMake package metadata | install step | downstream CMake consumers |
-| `experiments/<topic>/result/<variant>/<run_name>/` | native experiment run outputs、lifecycle manifests、logs、summaries、plots/data produced by a target (`D-EXPERIMENT-LIFECYCLE`) | experiment-lifecycle / result-artifact-writeout direct owners | result/report tooling |
+| `experiments/<topic>/result/<run-id>/` | native experiment run outputs、lifecycle manifests、logs、summaries、plots/data produced by a target (`D-EXPERIMENT-LIFECYCLE`) | experiment-lifecycle / result-artifact-writeout direct owners | result/report tooling |
 
 `cpp/include` と `cpp/src` は checked-in source の正本です。`build/` と
 `.state/` は configure/install/run が生成する state で、source owner は持ちません。
 root `experiments/` は experiment lifecycle、registry、result、report の正本として
 残り、native C++ experiment の checked-in source/target は `cpp/experiments`、
-run result は `experiments/<topic>/result/<variant>/<run_name>/` が所有します (`D-SOURCE-BOUNDARIES`)。
+run result は `experiments/<topic>/result/<run-id>/` が所有します (`D-SOURCE-BOUNDARIES`)。
 
 ## Configure、build、install、test、experiment の関係
 
@@ -253,7 +253,7 @@ cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROO
 | test run | `ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure` | CTest-registered tests を実行する (`D-TEST-GRAPH`) | individual test registrations が同一 configure cache を使用する |
 | build experiments | `cmake --build "$ROOT/build/cpp/<profile>" --target cpp-experiments` | individual experiment executables と aggregate target を build する | experiment executable が `cpp-core` に link され、run は発生しない |
 | install | `cmake --install "$ROOT/build/cpp/<profile>"` | 同じ configure cache の `.state/cpp-install/<profile>/` を更新する | public headers と production artifacts が install contract に従う |
-| experiment run | `"$ROOT/build/cpp/<profile>/bin/cpp-experiment-<name>" --run-name "$RUN_NAME" --config "$CONFIG" --result-root "$RESULT_ROOT"` | build 済み individual executable を lifecycle-owned result root へ実行する (`D-EXPERIMENT-LIFECYCLE`) | build と run が分離され、run evidence が `result/<variant>/<run_name>/` に残る |
+| experiment run | `"$ROOT/build/cpp/<profile>/bin/cpp-experiment-<name>" --run-name "$RUN_NAME" --config "$CONFIG" --result-root "$RESULT_ROOT"` | build 済み individual executable を lifecycle-owned result root へ実行する (`D-EXPERIMENT-LIFECYCLE`) | build と run が分離され、run evidence が `result/<run-id>/` に残る |
 
 ### Out-of-tree project-test registration
 
@@ -386,7 +386,7 @@ configure graph に入り、各 `cpp-experiment-<name>` executable は
 | install headers | `.state/cpp-install/<profile>/include/` | install rules |
 | install libraries | `.state/cpp-install/<profile>/lib/` | install rules |
 | install executables/package metadata | `.state/cpp-install/<profile>/bin/`, `.state/cpp-install/<profile>/lib/cmake/<project>/` | install/export rules |
-| experiment run output | `experiments/<topic>/result/<variant>/<run_name>/` | experiment-lifecycle / result-artifact-writeout (`D-GENERATED-PATHS`) |
+| experiment run output | `experiments/<topic>/result/<run-id>/` | experiment-lifecycle / result-artifact-writeout (`D-GENERATED-PATHS`) |
 
 Profile identity is part of every generated path. A toolchain、ABI、compiler
 feature、dependency version、public header、source、test、experiment target、or
@@ -425,7 +425,7 @@ through `report-writing` only when requested.
 | config source | `cpp/experiments/<topic>/config.yaml`, recorded in the lifecycle evidence as `config_source` |
 | `run_name` | unique run identity selected before execution; reruns use a new name |
 | result root | `$ROOT/experiments/<topic>/result` |
-| result directory | `$ROOT/experiments/<topic>/result/<variant>/<run_name>/` |
+| result directory | `$ROOT/experiments/<topic>/result/<run-id>/` |
 | raw domain outputs | `summary.json`, `cases.jsonl`, case artifacts under the result directory |
 | lifecycle evidence | `run_manifest.json`, `command.json`, `environment.json`, `source_snapshot.json`, config snapshot, logs, exit status |
 | save/report evidence | `artifact_manifest.json`, `eval_manifest.json`, report path, retention plan, annex archive status |
@@ -543,7 +543,7 @@ passes. A partial individual-file update remains an open migration slice.
 
 The parent migration keeps Python `experiments/` and its registry/report contract
 at the parent root. It introduces `cpp/experiments/` for native CMake targets and
-connects native run results to `experiments/<topic>/result/<variant>/<run_name>/` (`D-PARENT-MIGRATION`), so source,
+connects native run results to `experiments/<topic>/result/<run-id>/` (`D-PARENT-MIGRATION`), so source,
 build, lifecycle, and retention remain independently owned.
 
 ### Individual downstream write set and trace
@@ -563,7 +563,7 @@ Every exact downstream file in this table is a parent namespace record, written 
 | `P-DOCKER-PACK` | `parent:docker/packs/default.toml` | update default pack command records and profile build path | `D-COMMANDS` | pack command source root is `cpp` |
 | `P-MAKE` | `parent:Makefile` | add/repair C++ build/test/experiment wrappers that delegate to the anchor commands | `D-COMMANDS`, `D-EXPERIMENT-LIFECYCLE` | wrapper inventory and command grep resolve to `cpp` |
 | `P-DOCKER-CI` | `parent:.github/workflows/docker-build.yml` | retain workflow entry and consume the updated Docker script-owned command path | `D-COMMANDS` | CI workflow invokes the updated pack/check surface |
-| `P-EXPERIMENT-REGISTRY` | `parent:experiments/registry.toml` | register native topic/adaptor, config placeholder, result root, formal command, and evidence artifacts | `D-EXPERIMENT-LIFECYCLE`, `D-EXPERIMENT-GRAPH` | registry points to the native lifecycle adapter and `result/<variant>/<run_name>` |
+| `P-EXPERIMENT-REGISTRY` | `parent:experiments/registry.toml` | register native topic/adaptor, config placeholder, result root, formal command, and evidence artifacts | `D-EXPERIMENT-LIFECYCLE`, `D-EXPERIMENT-GRAPH` | registry points to the native lifecycle adapter and `result/<run-id>` |
 | `P-EXPERIMENT-ADAPTER` | `parent:experiments/<topic>/run.py` | invoke built `cpp-experiment-<topic>` with managed `run_name`, config snapshot, result root, and lifecycle evidence | `D-EXPERIMENT-LIFECYCLE`, `D-EXPERIMENT-GRAPH` | adapter command and `source_snapshot` point to the same native executable |
 | `P-EXPERIMENT-README` | `parent:experiments/<topic>/README.md` | document question, config source, build command, formal run command, result schema, run_name, and report route | `D-EXPERIMENT-LIFECYCLE` | README traces every run artifact and save-results route |
 | `P-RESPONSIBILITY-SCOPE` | `parent:responsibility-scope.toml` | project the production/native owner transition from root CMake/src/include to `cpp/*`, retain `tests/cpp/*` as the project-test owner, and retain parent Docker/docs/result and AgentCanon clone scopes | `D-SOURCE-BOUNDARIES`, `D-PARENT-MIGRATION` | `responsibility_scope.py --root .` reports `cpp/*` and `tests/cpp/*` coverage without owner overlap |
@@ -740,7 +740,7 @@ build=cmake --build "$ROOT/build/cpp/<profile>" --parallel
 install=cmake --install "$ROOT/build/cpp/<profile>"
 test=ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure
 experiment-build=cmake --build "$ROOT/build/cpp/<profile>" --target cpp-experiment-<name>
-experiment-run="$ROOT/build/cpp/<profile>/bin/cpp-experiment-<name>" --run-name "$RUN_NAME" --config "$CONFIG" --result-root "$ROOT/experiments/<topic>/result/<variant>" # evidence: `D-EXPERIMENT-LIFECYCLE`
+experiment-run="$ROOT/build/cpp/<profile>/bin/cpp-experiment-<name>" --run-name "$RUN_NAME" --config "$CONFIG" --result-root "$ROOT/experiments/<topic>/result" # evidence: `D-EXPERIMENT-LIFECYCLE`
 docs=tools/bin/agent-canon docs check <touched-design-and-parent-docs>
 structure=repo_structure_contract.py + responsibility_scope.py
 review=cpp-review + project/repository integration review

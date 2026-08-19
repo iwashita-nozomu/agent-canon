@@ -31,7 +31,7 @@ Use this when the HTML file is visible from the shell where the helper runs.
 
 ```bash
 python3 tools/experiments/html_artifact_access.py \
-  experiments/<topic>/result/<variant>/<run-id>/report.html
+  experiments/<topic>/result/<run-id>/summary/report.html
 ```
 
 Run `HTML_ARTIFACT_SERVER_COMMAND` on the HPC shell where the file exists. On
@@ -48,7 +48,7 @@ target and binds the Python server to `0.0.0.0` inside the container.
 
 ```bash
 python3 tools/experiments/html_artifact_access.py \
-  /workspace/experiments/<topic>/result/<variant>/<run-id>/report.html \
+  /workspace/experiments/<topic>/result/<run-id>/summary/report.html \
   --use-container-ip
 ```
 
@@ -63,7 +63,7 @@ bind the server to all container interfaces.
 
 ```bash
 python3 tools/experiments/html_artifact_access.py \
-  /workspace/experiments/<topic>/result/<variant>/<run-id>/report.html \
+  /workspace/experiments/<topic>/result/<run-id>/summary/report.html \
   --bind 0.0.0.0 \
   --tunnel-target <container-ip>
 ```

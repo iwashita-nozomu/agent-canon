@@ -34,15 +34,13 @@ def _context(tmp_path: Path) -> RunContext:
     repo_root = tmp_path / "repo"
     topic_dir = repo_root / "experiments" / "demo"
     (topic_dir / "result").mkdir(parents=True)
-    (topic_dir / "raw").mkdir()
-    (repo_root / "experiments" / "report").mkdir()
+    (topic_dir / "report").mkdir()
     identity = ExperimentIdentity("demo", "formal", "run-a")
     report_path = (
         repo_root
         / "experiments"
-        / "report"
         / identity.topic
-        / identity.variant
+        / "report"
         / f"{identity.run_name}.md"
     )
     paths = build_run_paths(topic_dir, identity, report_path)
@@ -71,7 +69,9 @@ def test_identity_derives_result_and_raw_paths_once(tmp_path: Path) -> None:
     """Both homes are projections of the same complete identity."""
     context = _context(tmp_path)
     identity = context.identity
-    assert context.paths.result_dir == context.repo_root / result_relative_path(identity)
+    assert context.paths.result_dir == context.repo_root / result_relative_path(
+        identity
+    )
     assert context.paths.raw_dir == context.repo_root / raw_relative_path(identity)
     placeholders = build_placeholders(
         context.repo_root,
@@ -110,23 +110,21 @@ def test_reservation_owns_result_raw_and_report_as_one_identity(tmp_path: Path) 
     assert not context.paths.report_path.exists()
 
 
-def test_build_run_paths_rejects_symlinked_raw_variant(tmp_path: Path) -> None:
+def test_build_run_paths_rejects_symlinked_nested_raw_directory(tmp_path: Path) -> None:
     """Raw writes fail closed when the identity path is redirected."""
     repo_root = tmp_path / "repo"
     topic_dir = repo_root / "experiments" / "demo"
-    (topic_dir / "result").mkdir(parents=True)
-    raw_root = topic_dir / "raw"
-    raw_root.mkdir()
+    result_dir = topic_dir / "result" / "run-a"
+    result_dir.mkdir(parents=True)
     outside = tmp_path / "outside"
     outside.mkdir()
-    (raw_root / "formal").symlink_to(outside, target_is_directory=True)
+    (result_dir / "raw").symlink_to(outside, target_is_directory=True)
     identity = ExperimentIdentity("demo", "formal", "run-a")
     report_path = (
         repo_root
         / "experiments"
-        / "report"
         / identity.topic
-        / identity.variant
+        / "report"
         / f"{identity.run_name}.md"
     )
     try:
@@ -135,5 +133,5 @@ def test_build_run_paths_rejects_symlinked_raw_variant(tmp_path: Path) -> None:
         assert "raw" in str(error)
         assert "symlink" in str(error)
     else:
-        raise AssertionError("symlinked raw variant was accepted")
+        raise AssertionError("symlinked nested raw directory was accepted")
     assert not list(outside.iterdir())

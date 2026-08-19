@@ -18,6 +18,14 @@ upstream design ../../../agents/skills/experiment-lifecycle.md owner
 
 Canonical workflow and policy: [experiment-lifecycle](../../../agents/skills/experiment-lifecycle.md).
 
+## Topic Preparation
+
+新規 topic の準備は canonical owner の `Topic Preparation` を読み、次の creator route に入ります。
+
+```bash
+python3 tools/experiments/create_experiment_topic.py <topic>
+```
+
 ## Tool Commands
 
 <!-- skill-tool-commands:start -->

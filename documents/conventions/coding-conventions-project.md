@@ -147,7 +147,7 @@ cmake --install "$ROOT/build/cpp/<profile>"
 
 - Python managed experiment の registry、run、result、report は `experiments/` 配下に集約します。
 - Native C++ experiment source と target は `cpp/experiments/` に置き、build は
-  `cpp-experiment-<name>`、run は lifecycle-owned `experiments/<topic>/result/<variant>/<run_name>/`
+  `cpp-experiment-<name>`、run は lifecycle-owned `experiments/<topic>/result/<run-id>/`
   へ分離します。
 - 1 回の run は fresh 実行として扱います。
 - 正式結果は planned run と acceptance criteria が揃った実行から採用します。

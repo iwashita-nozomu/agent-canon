@@ -32,7 +32,9 @@ SCRIPT = (
     / "save_experiment_result_annex.py"
 )
 GIT_ANNEX = shutil.which("git-annex")
-requires_git_annex = pytest.mark.skipif(GIT_ANNEX is None, reason="git-annex is required")
+requires_git_annex = pytest.mark.skipif(
+    GIT_ANNEX is None, reason="git-annex is required"
+)
 
 
 def run_git(
@@ -53,13 +55,13 @@ def run_git(
 def init_source(root: Path) -> Path:
     """Create a committed source repository with compact result evidence and ignored raw."""
     identity = ExperimentIdentity("demo", "formal", "run-a")
-    raw_dir = root / "experiments" / "demo" / "raw" / "formal" / "run-a"
-    result_dir = root / "experiments" / "demo" / "result" / "formal" / "run-a"
-    report_path = root / "experiments" / "report" / "demo" / "formal" / "run-a.md"
+    result_dir = root / "experiments" / "demo" / "result" / "run-a"
+    raw_dir = result_dir / "raw"
+    summary_dir = result_dir / "summary"
+    report_path = root / "experiments" / "demo" / "report" / "run-a.md"
     raw_dir.mkdir(parents=True)
-    result_dir.mkdir(parents=True)
     report_path.parent.mkdir(parents=True)
-    (root / "experiments" / "demo" / "raw" / ".gitignore").write_text(
+    (raw_dir / ".gitignore").write_text(
         "*\n!.gitignore\n",
         encoding="utf-8",
     )
@@ -68,7 +70,8 @@ def init_source(root: Path) -> Path:
     executable = raw_dir / "nested" / "collect.sh"
     executable.write_text("#!/bin/sh\nprintf raw\n", encoding="utf-8")
     executable.chmod(0o755)
-    (result_dir / "summary.json").write_text(
+    summary_dir.mkdir()
+    (summary_dir / "summary.json").write_text(
         json.dumps(
             {
                 "run_id": identity.run_name,
@@ -86,7 +89,7 @@ def init_source(root: Path) -> Path:
                 **identity.to_dict(),
                 "status": "completed",
                 "raw_artifacts": {
-                    "path": "experiments/demo/raw/formal/run-a",
+                    "path": "experiments/demo/result/run-a/raw",
                     "retention": {"state": "unarchived"},
                 },
             },
@@ -154,7 +157,7 @@ def archive_members(path: Path) -> list[tarfile.TarInfo]:
 
 def archive_manifest(path: Path) -> dict[str, object]:
     """Read the internal canonical retention manifest."""
-    member_path = "experiments/demo/raw/formal/run-a/annex_retention_manifest.json"
+    member_path = "experiments/demo/result/run-a/raw/annex_retention_manifest.json"
     with tarfile.open(path, "r:gz") as archive:
         member = archive.getmember(member_path)
         stream = archive.extractfile(member)
@@ -206,20 +209,20 @@ def test_parse_and_archive_are_raw_only_without_git_annex(tmp_path: Path) -> Non
         manifest_path.as_posix(),
     )
     names = [member.name for member in archive_members(archive)]
-    assert "experiments/demo/raw/formal/run-a/samples.bin" in names
-    assert "experiments/demo/raw/formal/run-a/nested/collect.sh" in names
-    assert not any("/result/" in name for name in names)
+    assert "experiments/demo/result/run-a/raw/samples.bin" in names
+    assert "experiments/demo/result/run-a/raw/nested/collect.sh" in names
+    assert not any("/summary/" in name for name in names)
     assert not any("/report/" in name for name in names)
     assert not any(name.endswith("summary.json") for name in names)
     payload = archive_manifest(archive)
     assert payload["schema"] == "git-annex-raw-retention/v1"
-    assert payload["raw"]["directory"] == "experiments/demo/raw/formal/run-a"
+    assert payload["raw"]["directory"] == "experiments/demo/result/run-a/raw"
     evidence = payload["tracked_result_evidence"]
     assert evidence["summary"]["path"] == (
-        "experiments/demo/result/formal/run-a/summary.json"
+        "experiments/demo/result/run-a/summary/summary.json"
     )
     assert evidence["run_manifest"]["path"] == (
-        "experiments/demo/result/formal/run-a/run_manifest.json"
+        "experiments/demo/result/run-a/run_manifest.json"
     )
     for key in ("summary", "run_manifest"):
         assert len(evidence[key]["sha256"]) == 64
@@ -257,9 +260,10 @@ def test_raw_archive_bytes_are_deterministic_without_git_annex(tmp_path: Path) -
             manifest_path.as_posix(),
         )
     assert first.read_bytes() == second.read_bytes()
-    assert hashlib.sha256(first.read_bytes()).hexdigest() == hashlib.sha256(
-        second.read_bytes()
-    ).hexdigest()
+    assert (
+        hashlib.sha256(first.read_bytes()).hexdigest()
+        == hashlib.sha256(second.read_bytes()).hexdigest()
+    )
     for member in archive_members(first):
         assert member.uid == 0
         assert member.gid == 0
@@ -296,9 +300,9 @@ def test_raw_identity_rejects_manifest_path_or_state_mismatch(tmp_path: Path) ->
     source = tmp_path / "source"
     source.mkdir()
     raw_dir = init_source(source)
-    manifest_path = source / "experiments/demo/result/formal/run-a/run_manifest.json"
+    manifest_path = source / "experiments/demo/result/run-a/run_manifest.json"
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-    payload["raw_artifacts"]["path"] = "experiments/demo/raw/formal/other"
+    payload["raw_artifacts"]["path"] = "experiments/demo/result/other/raw"
     manifest_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
     with pytest.raises(retention.RetentionError, match="must match source commit"):
         parse_source(source, raw_dir)
@@ -313,7 +317,7 @@ def test_raw_identity_rejects_untracked_summary(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()
     raw_dir = init_source(source)
-    summary = source / "experiments/demo/result/formal/run-a/summary.json"
+    summary = source / "experiments/demo/result/run-a/summary/summary.json"
     run_git(source, "rm", "--cached", str(summary.relative_to(source)))
     summary.write_text('{"run_id":"run-a"}\n', encoding="utf-8")
     with pytest.raises(retention.RetentionError, match="must be tracked"):
@@ -328,7 +332,9 @@ def test_empty_symlink_special_lfs_and_reserved_raw_are_rejected(
     source.mkdir()
     raw_dir = init_source(source)
     raw = parse_source(source, raw_dir)
-    for child in sorted(raw_dir.rglob("*"), key=lambda item: len(item.parts), reverse=True):
+    for child in sorted(
+        raw_dir.rglob("*"), key=lambda item: len(item.parts), reverse=True
+    ):
         if child.is_dir():
             child.rmdir()
         else:
@@ -378,7 +384,17 @@ def test_public_save_archives_raw_only_and_binds_tracked_evidence(
     retained = archive_path(annex)
     members = archive_members(retained)
     names = [member.name for member in members]
-    assert not any("/result/" in name for name in names)
+    assert all(
+        name.startswith("experiments/demo/result/run-a/raw")
+        or name
+        in {
+            "experiments",
+            "experiments/demo",
+            "experiments/demo/result",
+            "experiments/demo/result/run-a",
+        }
+        for name in names
+    )
     assert not any("/report/" in name for name in names)
     assert not any(name.endswith("summary.json") for name in names)
     manifest = archive_manifest(retained)
@@ -388,9 +404,10 @@ def test_public_save_archives_raw_only_and_binds_tracked_evidence(
         "variant": "formal",
         "run_name": "run-a",
     }
-    assert manifest["source"]["commit"] == run_git(
-        source, "rev-parse", "HEAD"
-    ).stdout.strip()
+    assert (
+        manifest["source"]["commit"]
+        == run_git(source, "rev-parse", "HEAD").stdout.strip()
+    )
     assert "source-dirty.txt" in manifest["source"]["dirty_paths"]
     key = run_git(
         annex,
@@ -482,7 +499,9 @@ def test_postcommit_failure_retains_commit_without_rewind(
         retention.save_raw(raw, annex.resolve())
     retained_head = run_git(annex, "rev-parse", "HEAD").stdout.strip()
     assert retained_head != initial_head
-    assert run_git(annex, "rev-parse", f"{retained_head}^").stdout.strip() == initial_head
+    assert (
+        run_git(annex, "rev-parse", f"{retained_head}^").stdout.strip() == initial_head
+    )
 
 
 @requires_git_annex

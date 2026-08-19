@@ -39,10 +39,15 @@ def test_identity_round_trip_is_nested_v2_wire() -> None:
         }
     }
     assert ExperimentIdentity.from_dict(payload) == identity
-    assert result_relative_path(identity) == Path("experiments/topic.v1/result/smoke.v2/run.3")
-    assert raw_relative_path(identity) == Path("experiments/topic.v1/raw/smoke.v2/run.3")
-    assert identity_from_raw_relative_path(raw_relative_path(identity)) == identity
-    assert report_relative_path(identity) == Path("experiments/report/topic.v1/smoke.v2/run.3.md")
+    assert result_relative_path(identity) == Path("experiments/topic.v1/result/run.3")
+    assert raw_relative_path(identity) == Path("experiments/topic.v1/result/run.3/raw")
+    assert (
+        identity_from_raw_relative_path(raw_relative_path(identity), identity.variant)
+        == identity
+    )
+    assert report_relative_path(identity) == Path(
+        "experiments/topic.v1/report/run.3.md"
+    )
 
 
 @pytest.mark.parametrize("value", ["", ".", "..", "a/b", "a\\b", "a b", "a\x00b", "é"])
@@ -84,16 +89,16 @@ def test_strict_json_decoder_rejects_nested_and_outer_duplicate_keys(
 @pytest.mark.parametrize(
     "path",
     (
-        Path("experiments/demo/result/formal/run-a"),
-        Path("experiments/demo/raw/formal"),
-        Path("experiments/demo/raw/formal/run-a/extra"),
-        Path("../experiments/demo/raw/formal/run-a"),
+        Path("experiments/demo/result/run-a"),
+        Path("experiments/demo/result/run-a/summary"),
+        Path("experiments/demo/result/run-a/raw/extra"),
+        Path("../experiments/demo/result/run-a/raw"),
     ),
 )
 def test_raw_path_inverse_rejects_noncanonical_shapes(path: Path) -> None:
     """Only the complete canonical raw path is invertible."""
     with pytest.raises(ExperimentIdentityError):
-        identity_from_raw_relative_path(path)
+        identity_from_raw_relative_path(path, "formal")
 
 
 def test_contained_path_rejects_escape(tmp_path: Path) -> None:

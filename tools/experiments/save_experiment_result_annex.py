@@ -37,7 +37,6 @@ from tools.experiments.experiment_identity import (
     ExperimentIdentityError,
     identity_from_raw_relative_path,
     load_json_file,
-    raw_relative_path,
     result_relative_path,
 )
 
@@ -305,16 +304,18 @@ def _parse_raw_identity(source_root: Path, raw_dir: Path) -> RawIdentity:
     except ValueError as exc:
         raise RetentionError("raw-dir must be inside source repo root") from exc
     _validate_source_components(source_root, raw_relative)
-    try:
-        identity = identity_from_raw_relative_path(raw_relative)
-    except ExperimentIdentityError as exc:
-        raise RetentionError(str(exc)) from exc
-    if raw_relative != raw_relative_path(identity):
-        raise RetentionError(f"raw-dir has an invalid identity: {raw_relative}")
-
-    result_relative = result_relative_path(identity)
-    result_dir = source_root / result_relative
-    summary_path = result_dir / "summary.json"
+    parts = raw_relative.parts
+    if (
+        len(parts) != 5
+        or parts[0] != EXPERIMENTS
+        or parts[2] != "result"
+        or parts[4] != RAW
+    ):
+        raise RetentionError(
+            "raw path must be experiments/<topic>/result/<run_name>/raw"
+        )
+    result_dir = raw_dir.parent
+    summary_path = result_dir / "summary" / "summary.json"
     run_manifest_path = result_dir / "run_manifest.json"
     summary = _tracked_evidence(source_root, summary_path, label="summary evidence")
     run_manifest = _tracked_evidence(
@@ -329,9 +330,6 @@ def _parse_raw_identity(source_root: Path, raw_dir: Path) -> RawIdentity:
         raise RetentionError("summary evidence must be strict JSON") from exc
     if not isinstance(summary_payload, Mapping):
         raise RetentionError("summary evidence must be a JSON object")
-    if summary_payload.get("run_id") != identity.run_name:
-        raise RetentionError("summary run_id does not match raw-dir identity")
-
     try:
         manifest_payload = load_json_file(run_manifest_path)
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
@@ -342,11 +340,25 @@ def _parse_raw_identity(source_root: Path, raw_dir: Path) -> RawIdentity:
         manifest_identity = ExperimentIdentity.from_dict(manifest_payload)
     except (ExperimentIdentityError, TypeError) as exc:
         raise RetentionError("run manifest identity is invalid") from exc
+    try:
+        identity = identity_from_raw_relative_path(
+            raw_relative, manifest_identity.variant
+        )
+    except ExperimentIdentityError as exc:
+        raise RetentionError(str(exc)) from exc
     if manifest_identity != identity:
         raise RetentionError("run manifest identity does not match raw-dir identity")
+    if summary_payload.get("run_id") != identity.run_name:
+        raise RetentionError("summary run_id does not match raw-dir identity")
+    result_relative = result_relative_path(identity)
     raw_binding = manifest_payload.get("raw_artifacts")
-    if not isinstance(raw_binding, Mapping) or set(raw_binding) != {"path", "retention"}:
-        raise RetentionError("run manifest must contain the canonical raw_artifacts binding")
+    if not isinstance(raw_binding, Mapping) or set(raw_binding) != {
+        "path",
+        "retention",
+    }:
+        raise RetentionError(
+            "run manifest must contain the canonical raw_artifacts binding"
+        )
     if raw_binding.get("path") != raw_relative.as_posix():
         raise RetentionError("run manifest raw path does not match raw-dir identity")
     retention = raw_binding.get("retention")
@@ -355,7 +367,9 @@ def _parse_raw_identity(source_root: Path, raw_dir: Path) -> RawIdentity:
     if retention.get("state") != "unarchived":
         raise RetentionError("run manifest raw retention state must be unarchived")
 
-    source_branch, source_commit, source_dirty_paths = _source_git_provenance(source_root)
+    source_branch, source_commit, source_dirty_paths = _source_git_provenance(
+        source_root
+    )
     return RawIdentity(
         source_root=source_root,
         identity=identity,
@@ -417,12 +431,7 @@ def _scan_source_tree(
 
     raw_archive = raw.raw_relative.as_posix()
     visit(raw.raw_dir, raw_archive)
-    for parent in (
-        Path(EXPERIMENTS),
-        Path(EXPERIMENTS) / raw.identity.topic,
-        Path(EXPERIMENTS) / raw.identity.topic / RAW,
-        Path(EXPERIMENTS) / raw.identity.topic / RAW / raw.identity.variant,
-    ):
+    for parent in tuple(raw.raw_relative.parents)[:-1]:
         entries[parent.as_posix()] = ArchiveEntry(
             parent.as_posix(),
             raw.source_root / parent,
@@ -460,36 +469,39 @@ def _manifest_bytes(
             or entry.archive_path.startswith(raw.raw_relative.as_posix() + "/")
         )
     )
-    return _canonical_json(
-        {
-            "append_only": True,
-            **raw.identity.to_dict(),
-            "archive": {
-                "compression": "gzip",
-                "gzip_filename": "",
-                "gzip_level": 9,
-                "gzip_mtime": 0,
-                "path": archive_relative.as_posix(),
-                "tar_format": "pax",
-            },
-            "raw": {
-                "directory": raw.raw_relative.as_posix(),
-                "directories": raw_directories,
-                "files": raw_files,
-            },
-            "schema": "git-annex-raw-retention/v1",
-            "source": {
-                "branch": raw.source_branch,
-                "commit": raw.source_commit,
-                "dirty_paths": list(raw.source_dirty_paths),
-            },
-            "tracked_result_evidence": {
-                "directory": raw.result_relative.as_posix(),
-                "run_manifest": raw.run_manifest.manifest_record(),
-                "summary": raw.summary.manifest_record(),
-            },
-        }
-    ) + b"\n"
+    return (
+        _canonical_json(
+            {
+                "append_only": True,
+                **raw.identity.to_dict(),
+                "archive": {
+                    "compression": "gzip",
+                    "gzip_filename": "",
+                    "gzip_level": 9,
+                    "gzip_mtime": 0,
+                    "path": archive_relative.as_posix(),
+                    "tar_format": "pax",
+                },
+                "raw": {
+                    "directory": raw.raw_relative.as_posix(),
+                    "directories": raw_directories,
+                    "files": raw_files,
+                },
+                "schema": "git-annex-raw-retention/v1",
+                "source": {
+                    "branch": raw.source_branch,
+                    "commit": raw.source_commit,
+                    "dirty_paths": list(raw.source_dirty_paths),
+                },
+                "tracked_result_evidence": {
+                    "directory": raw.result_relative.as_posix(),
+                    "run_manifest": raw.run_manifest.manifest_record(),
+                    "summary": raw.summary.manifest_record(),
+                },
+            }
+        )
+        + b"\n"
+    )
 
 
 def _tar_info(path: str, *, is_dir: bool, size: int = 0) -> tarfile.TarInfo:
@@ -639,7 +651,9 @@ def _validate_source_and_annex_roots(source_root: Path, annex_root: Path) -> Non
     if source_root == annex_root:
         raise RetentionError("source repo root and annex repo root must differ")
     if source_root in annex_root.parents or annex_root in source_root.parents:
-        raise RetentionError("source repo root and annex repo root must not contain one another")
+        raise RetentionError(
+            "source repo root and annex repo root must not contain one another"
+        )
 
 
 def _validate_visible_paths(annex_root: Path) -> None:
@@ -652,17 +666,18 @@ def _validate_visible_paths(annex_root: Path) -> None:
         relative_root = root_path.relative_to(annex_root).parts
         if relative_root:
             valid_directory = (
-                len(relative_root) == 1 and relative_root[0] == EXPERIMENTS
-            ) or (
-                len(relative_root) == 2 and relative_root[0] == EXPERIMENTS
-            ) or (
-                len(relative_root) == 3
-                and relative_root[0] == EXPERIMENTS
-                and relative_root[2] == RAW
-            ) or (
-                len(relative_root) == 4
-                and relative_root[0] == EXPERIMENTS
-                and relative_root[2] == RAW
+                (len(relative_root) == 1 and relative_root[0] == EXPERIMENTS)
+                or (len(relative_root) == 2 and relative_root[0] == EXPERIMENTS)
+                or (
+                    len(relative_root) == 3
+                    and relative_root[0] == EXPERIMENTS
+                    and relative_root[2] == RAW
+                )
+                or (
+                    len(relative_root) == 4
+                    and relative_root[0] == EXPERIMENTS
+                    and relative_root[2] == RAW
+                )
             )
             if not valid_directory:
                 raise RetentionError(
@@ -718,7 +733,9 @@ def _validate_annex_repo(annex_root: Path) -> AnnexState:
     ):
         raise RetentionError("annex repo must not contain experiment-results/* refs")
     gitattributes = annex_root / ".gitattributes"
-    gitattributes_info = _lstat(gitattributes) if os.path.lexists(gitattributes) else None
+    gitattributes_info = (
+        _lstat(gitattributes) if os.path.lexists(gitattributes) else None
+    )
     if gitattributes_info is not None and (
         stat.S_ISLNK(gitattributes_info.st_mode)
         or not stat.S_ISREG(gitattributes_info.st_mode)
@@ -794,13 +811,10 @@ def _rollback_precommit(
     if remove_archive and os.path.lexists(archive_path):
         archive_path.unlink()
     attrs = annex_root / ".gitattributes"
-    attrs_changed = (
-        state.gitattributes_exists != os.path.lexists(attrs)
-        or (
-            state.gitattributes_exists
-            and os.path.lexists(attrs)
-            and attrs.read_bytes() != state.gitattributes_bytes
-        )
+    attrs_changed = state.gitattributes_exists != os.path.lexists(attrs) or (
+        state.gitattributes_exists
+        and os.path.lexists(attrs)
+        and attrs.read_bytes() != state.gitattributes_bytes
     )
     if attrs_changed:
         try:
@@ -828,7 +842,9 @@ def _link_no_replace(temporary_path: Path, archive_path: Path) -> None:
         raise RetentionError(f"archive target already exists: {archive_path}") from exc
     except OSError as exc:
         if exc.errno == errno.EEXIST:
-            raise RetentionError(f"archive target already exists: {archive_path}") from exc
+            raise RetentionError(
+                f"archive target already exists: {archive_path}"
+            ) from exc
         raise
     try:
         directory_fd = os.open(archive_path.parent, os.O_RDONLY)
@@ -875,9 +891,7 @@ def _verify_annex_content(
         location = annex_root / location
     location = location.resolve()
     if not location.is_file():
-        raise RetentionError(
-            f"annex contentlocation is not a regular file: {location}"
-        )
+        raise RetentionError(f"annex contentlocation is not a regular file: {location}")
     size, digest = _sha256_file(location)
     if size != archive_size or digest != archive_sha256:
         raise RetentionError("annex contentlocation bytes do not match the archive")
@@ -966,7 +980,9 @@ def save_raw(raw: RawIdentity, annex_root: Path) -> ArchiveResult:
             annex_root,
             ["status", "--porcelain=v1", "--untracked-files=all"],
         )
-        changed_paths = {line[3:] for line in status_text.splitlines() if len(line) >= 4}
+        changed_paths = {
+            line[3:] for line in status_text.splitlines() if len(line) >= 4
+        }
         allowed_paths = {archive_relative.as_posix()}
         attrs_changed = ".gitattributes" in changed_paths
         if attrs_changed:

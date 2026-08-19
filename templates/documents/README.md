@@ -5,8 +5,8 @@ responsibility Documents Templates for this repository.
 upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../../documents/rule/README.md document filename, placement, and language rules
 downstream implementation ./github/README.md GitHub template source and checked-in standalone target map
-downstream implementation ./experiment/README.template.md experiment topic planning contract
-downstream implementation ./experiment/experiment-provenance.template.toml machine-readable provenance contract
+downstream implementation ../experiments/_template/README.md runnable experiment topic planning contract
+downstream implementation ../experiments/_template/provenance.toml machine-readable provenance contract
 downstream implementation ../../tools/experiments/create_experiment_topic.py places experiment templates in new topics
 @dependency-end
 -->
@@ -26,7 +26,7 @@ reader path の要約を置き、読者が本文を逆戻りせずに owner と�
 - purpose: 設計・README・experiment・GitHub の適応可能な文書雛形を提供する。
 - intended reader: 文書作成者、実装者、reviewer、親repo integrator。
 - what this directory contains: Markdown、TOML、GitHub Issue Form、PR source。
-- canonical source: `templates/documents/`。checked-in standalone `.github` targets と run-local report は source とは別の責務を持つ。
+- canonical source: `templates/documents/` for document templates and `templates/experiments/_template/` for the runnable experiment topic scaffold。checked-in standalone `.github` targets と run-local report は source とは別の責務を持つ。
 - validation: dependency header、YAML/TOML parse、`agent-canon docs check`、`python3 tools/ci/check_github_workflows.py --root .`。
 - lifecycle: checked-in standalone targets と result/report artifact の retention/cleanup owner を本文で固定する。
 
@@ -53,7 +53,7 @@ reader path の要約を置き、読者が本文を逆戻りせずに owner と�
 | design document | `design-document.template.md` | Markdown | authority、責務、型境界、依存、effects、options、review、reconstruction、acceptance |
 | semantic responsibility contract | `semantic-responsibility-contract.template.toml` | TOML | run-local semantic delta、obligation、一次検証 owner、hard-edge closure |
 | README | `README.template.md` | Markdown | purpose、structure、owner、entrypoint、reproduce、canonical/non-canonical boundary |
-| experiment plan | `experiment/` | directory + Markdown/TOML | plan、resource/GPU、run/result provenance、accepted failure、reproducibility |
+| experiment topic scaffold | `../experiments/_template/` | directory + Python/Markdown/TOML | plan、resource/GPU、run/result provenance、accepted failure、reproducibility |
 | GitHub Issue | `github/issue/*.yml` | GitHub Issue Form YAML | observed facts、reproduction、owner、impact、options、acceptance、non-goal |
 | GitHub PR | `github/pull-request/agent_canon.md` | GitHub Markdown template | essence、dependency closure、head/review/validation/artifact/cleanup evidence |
 
