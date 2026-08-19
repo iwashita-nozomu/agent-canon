@@ -22,8 +22,8 @@ metric を固定し、algorithm / data movement / memory hierarchy / concurrency
 
 ## Use When
 
-- `cpp/src/`, `cpp/include/`, `tests/cpp/`, `cpp/experiments/` 配下を触る
-- `cpp/CMakeLists.txt` や native build 設定を触る
+- `src/`, `include/`, `tests/cpp/`, `experiments/cpp/` 配下を触る
+- root `CMakeLists.txt`、`cmake/`、native build 設定を触る
 - public header、ABI、FFI、CLI binary の挙動を変える
 - C++ documentation / Docstring projection を触る
 - latency、throughput、memory footprint、allocation、scaling、起動時間、binary size、
@@ -34,7 +34,7 @@ metric を固定し、algorithm / data movement / memory hierarchy / concurrency
 
 - project-native configure / build / test evidence
 - `ctest` があるならその結果
-- CMake project なら `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`、
+- CMake project なら `cmake -S "$ROOT" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`、
   `cmake --build "$ROOT/build/cpp/<profile>" --parallel`、
   `ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure` の結果
 - install contract がある場合は `cmake --install "$ROOT/build/cpp/<profile>"` の結果
@@ -60,20 +60,20 @@ policy owner ではなく、この Skill の evidence contract を解釈する�
 
 ## Target graph readback
 
-- `cpp/CMakeLists.txt` が単一の native project entry として `cpp/src`、`cpp/include`、
-  `${ROOT}/tests/cpp`、`cpp/experiments` を同じ configure graph に接続します。tests/cpp
-  は source/binary directory を明示した out-of-tree `add_subdirectory` で登録します。
+- root `CMakeLists.txt` が単一の native project entry として `src/`、`include/`、
+  `tests/cpp/`、任意の `experiments/cpp/` を同じ configure graph に接続します。consumer
+  subtree は source/binary directory を明示した out-of-tree `add_subdirectory` で登録します。
 - `cpp-test-<name>` と `cpp-experiment-<name>` は `cpp-core` を consume し、
   `cpp-tests` と `cpp-experiments` は build grouping を提供します。
-- root anchor、build tree、install prefix は `$ROOT/cpp`、`$ROOT/build/cpp/<profile>`、
+- source anchor、build tree、install prefix は `$ROOT`、`$ROOT/build/cpp/<profile>`、
   `$ROOT/.state/cpp-install/<profile>` に read back します。run/result publication は
   experiment lifecycle owner に残します。
+- `cpp/` production compatibility path や root からの forwarding wrapper がないことを確認します。
 
 ## Docstring projection route
 
 `agent_team.language_review_candidates` が native C/C++ implementation or test path（native suffix、
-`cpp/CMakeLists.txt`、`cpp/src/`、`cpp/include/`、`tests/cpp/`、`cpp/experiments/`、
-`cpp/cmake/` marker）を含む
+root `CMakeLists.txt`、`src/`、`include/`、`tests/cpp/`、`experiments/cpp/`、`cmake/` marker）を含む
 changed surface に `cpp_reviewer` を候補として返した場合に、reviewer を起動します。
 convention/template documentation は同じ
 path inventory から `docs_workflow_steward` が担当し、catalog capability は OOP/type design
@@ -257,23 +257,3 @@ system boundary と一致させます。microbenchmark の改善を end-to-end �
    確認します。
 1. findings を ABI and interface、memory and ownership、error path、correctness coverage、
    performance evidence、docs drift に分けて返します。
-
-## Common Failure Modes
-
-- header だけ変わって call site や docs が追随していない
-- ownership、move/copy、resource cleanup の仮定が暗黙のまま壊れている
-- `CMakeLists.txt` や link setting が変わったのに build evidence が薄い
-- error path や malformed input の regression test が不足している
-- profile や representative workload なしに局所コードを「高速」と断定する
-- Debug と Release、異なる compiler flags / hardware / input を before / after として比較する
-- warm-up、反復、ばらつき、setup / transfer / synchronization、dead-code elimination を扱わず
-  単一 timing を採用する
-- complexity、不要処理、data movement、allocation を残したまま branchless trick、manual unroll、
-  intrinsic、custom allocator、LTO / PGO / fast-math を先に追加する
-- microbenchmark の改善を end-to-end throughput / latency の改善として外挿する
-- cache locality、working set、copy / temporary、false sharing、contention、oversubscription を
-  説明せず並列化または layout 変更を行う
-- performance のために memory order、bounds、lifetime、overflow、alias、floating-point、
-  NaN / Inf、determinism の契約を暗黙に弱める
-- repository-owned benchmark / validation route があるのに第二 framework、wrapper、threshold、
-  score、CI gate を追加する
