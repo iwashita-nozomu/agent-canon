@@ -33,8 +33,10 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
 - `docker/` は template / project の runtime image、build library、dependency pack の定義です。
 - `.devcontainer/` は AgentCanon-owned shared runtime ergonomics です。Codex、agent 用 npm / Node、GitHub CLI / `gh`、auth mount、attach status はここで扱います。
 - `experiments/` は Python managed experiment の registry、run、result、report の正本です。
-- `cpp/` は native C++ project の正本です。`cpp/CMakeLists.txt` が project entrypoint、
-  `cpp/src/`、`cpp/include/`、`cpp/tests/`、`cpp/experiments/` が target ownership を持ちます。
+- `cpp/` は native C++ production project の正本です。`cpp/CMakeLists.txt` が project
+  entrypoint、`cpp/src/`、`cpp/include/`、`cpp/experiments/` が production/native target
+  ownership を持ちます。derived project の C++ adapter/integration tests は
+  `tests/cpp/` が所有し、root CMake から out-of-tree に接続します。
 - `python/` は Python implementation の正本です。parent root は language-neutral な
   command/document entry として保ちます。
 - C++ を使う場合の build layout は `documents/design/cpp-build-layout.md` を正本にします。
@@ -133,8 +135,10 @@ cmake --install "$ROOT/build/cpp/<profile>"
 
 ## 5. テストとレビュー
 
-- 実装変更には、対応するテストまたは検証手順を同じ変更でそろえます。C++ test source
-  は `cpp/tests/`、CTest registration は `cpp/tests/CMakeLists.txt` が所有します。
+- 実装変更には、対応するテストまたは検証手順を同じ変更でそろえます。derived project の
+  C++ test source は `tests/cpp/`、CTest registration は `tests/cpp/CMakeLists.txt` が
+  所有します。`cpp/CMakeLists.txt` は `${ROOT}/tests/cpp` と明示的な binary directory を
+  `add_subdirectory` に渡し、production subtree の test fallback は作成しません。
 - 仕上げ前に `make ci-quick`、必要に応じて `make ci` を流します。
 - 文書変更ではリンク切れと記述の入口整合を確認します。
 - legacy forwarder / migration wrapper の warning policy は `python3 tools/agent_tools/check_convention_compliance.py` で確認します。
