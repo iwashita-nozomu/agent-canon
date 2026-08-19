@@ -95,6 +95,51 @@ class AgentCanonUpdateAliasTest(unittest.TestCase):
                 ),
             )
 
+    def test_define_and_conditional_bodies_are_not_target_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "Makefile").write_text(
+                "define DOCUMENTED_ALIAS\n"
+                "agent-canon-ensure-latest:\n"
+                "\t@true\n"
+                "endef\n"
+                "ifeq ($(ENABLE_AGENT_CANON_ALIAS),1)\n"
+                "agent-canon-latest:\n"
+                "\t@true\n"
+                "endif\n"
+                "agent-canon-update-plan:\n"
+                "\t@true\n",
+                encoding="utf-8",
+            )
+
+            self.assertTrue(
+                make_target_is_explicit(root, "agent-canon-update-plan")
+            )
+            self.assertFalse(
+                make_target_is_explicit(root, "agent-canon-latest")
+            )
+            self.assertFalse(
+                make_target_is_explicit(root, "agent-canon-ensure-latest")
+            )
+
+    def test_assignment_value_with_colon_is_not_target_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "Makefile").write_text(
+                "DOCUMENTED_ALIAS = agent-canon-ensure-latest:\n",
+                encoding="utf-8",
+            )
+
+            self.assertFalse(
+                make_target_is_explicit(root, "agent-canon-ensure-latest")
+            )
+            self.assertIn(
+                "tools/update_agent_canon.sh latest",
+                resolve_optional_agent_canon_make_alias(
+                    "make agent-canon-ensure-latest", root
+                ),
+            )
+
     def test_resolution_never_evaluates_makefile_functions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)

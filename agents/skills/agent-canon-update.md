@@ -222,8 +222,10 @@ Generate the command packet from the current repository root. The packet treats
 It keeps an alias only when the first default Makefile selected from
 `GNUmakefile`, `makefile`, or `Makefile` declares that exact literal target.
 The detector reads text only: it does not execute Make, expand variables, load
-dynamic target names, or evaluate parse-time functions. Any absent, dynamic, or
-unreadable alias fails closed to the canonical owner command; the parent
+dynamic target names, or evaluate parse-time functions. Variable-definition
+bodies, assignment text, and unevaluated conditional branches are not target
+evidence. Any absent, dynamic, conditional, or unreadable alias fails closed to
+the canonical owner command; the parent
 Makefile is never projected or modified.
 
 The direct plan command is:

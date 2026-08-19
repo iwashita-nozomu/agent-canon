@@ -161,24 +161,87 @@ def _strip_unescaped_comment(line: str) -> str:
 
 
 def explicit_make_targets(makefile: Path) -> frozenset[str]:
-    """Return literal target names without expanding Make syntax or includes."""
+    """Return only unconditional top-level literal target declarations."""
     try:
         text = makefile.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return frozenset()
 
     targets: set[str] = set()
+    define_depth = 0
+    conditional_depth = 0
     for logical_line in _logical_makefile_lines(text):
         line = _strip_unescaped_comment(logical_line).strip()
-        if not line or line.startswith(("define ", "endef")) or ":" not in line:
+        if not line:
             continue
+
+        words = line.split()
+        directive_words = words
+        while directive_words and directive_words[0] in {
+            "export",
+            "override",
+            "private",
+        }:
+            directive_words = directive_words[1:]
+        directive = directive_words[0] if directive_words else ""
+
+        if define_depth:
+            if directive == "define":
+                define_depth += 1
+            elif directive == "endef":
+                define_depth -= 1
+            continue
+        if directive == "define":
+            define_depth = 1
+            continue
+        if directive == "endef":
+            return frozenset()
+
+        if directive in {"ifeq", "ifneq", "ifdef", "ifndef"}:
+            conditional_depth += 1
+            continue
+        if directive == "else":
+            if conditional_depth == 0:
+                return frozenset()
+            continue
+        if directive == "endif":
+            if conditional_depth == 0:
+                return frozenset()
+            conditional_depth -= 1
+            continue
+        if conditional_depth or ":" not in line:
+            continue
+
         left, right = line.split(":", maxsplit=1)
-        # ``:=`` and ``::=`` are assignments, not target declarations.
-        if right.lstrip().startswith(("=", ":=")):
+        # Reject every assignment spelling and directive-shaped line. A
+        # colon in an assignment value is not evidence for a target.
+        if "=" in left or right.lstrip().startswith(("=", ":=")):
             continue
-        for token in left.split():
-            if token and not any(marker in token for marker in ("$", "%")):
-                targets.add(token.replace(r"\#", "#"))
+        literal_targets = left.split()
+        if (
+            not literal_targets
+            or literal_targets[0]
+            in {
+                "-include",
+                "export",
+                "include",
+                "override",
+                "private",
+                "sinclude",
+                "undefine",
+                "unexport",
+                "vpath",
+            }
+            or any(
+                re.fullmatch(r"[A-Za-z0-9_.@/+,-]+", token) is None
+                for token in literal_targets
+            )
+        ):
+            continue
+        targets.update(literal_targets)
+
+    if define_depth or conditional_depth:
+        return frozenset()
     return frozenset(targets)
 
 
