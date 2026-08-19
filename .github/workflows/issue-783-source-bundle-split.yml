@@ -1,0 +1,64 @@
+name: Issue 783 Source Bundle Split
+
+on:
+  push:
+    branches:
+      - fix/783-remove-agent-canon-runtime
+
+permissions:
+  contents: write
+
+jobs:
+  split:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Split encoded archive into bounded files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .transport-783
+          cat .transport-783/chunk-000 > /tmp/archive.b64
+          rm -f .transport-783/chunk-* .transport-783/manifest.json
+          split -b 30000 -d -a 3 /tmp/archive.b64 .transport-783/chunk-
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import json
+          from pathlib import Path
+
+          chunks = sorted(Path('.transport-783').glob('chunk-*'))
+          encoded = b''.join(path.read_bytes() for path in chunks)
+          archive = base64.b64decode(encoded, validate=True)
+          Path('.transport-783/manifest.json').write_text(
+              json.dumps(
+                  {
+                      'schema_version': 'issue-783-source-bundle/v1',
+                      'archive_sha256': hashlib.sha256(archive).hexdigest(),
+                      'archive_bytes': len(archive),
+                      'chunks': [
+                          {
+                              'path': str(path),
+                              'characters': len(path.read_bytes()),
+                              'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+                          }
+                          for path in chunks
+                      ],
+                  },
+                  indent=2,
+                  sort_keys=True,
+              ) + '\n',
+              encoding='utf-8',
+          )
+          PY
+      - name: Publish split bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/issue-783-source-bundle-split.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .transport-783 .github/workflows/issue-783-source-bundle-split.yml
+          git commit -m "chore: split runtime-removal source bundle (#783)"
+          git push origin HEAD:fix/783-remove-agent-canon-runtime
