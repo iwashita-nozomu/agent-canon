@@ -28,7 +28,8 @@
       "activates": [
         "`AGENTS.md`",
         "`.codex/config.toml`",
-        "`tools/agent-canon`",
+        "direct `vendor/agent-canon/tools/` dispatch",
+        "`tools/agent-canon` is standalone-only",
         "project-owned `agents/`, `.agents/`, `.codex/`, and `tools/` remain separate"
       ],
       "required_when": "An agent performs or reviews repo work"

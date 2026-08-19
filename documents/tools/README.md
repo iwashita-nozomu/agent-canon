@@ -268,7 +268,7 @@ second command manual.
   - 例: `profile_surface_resolver.py` は `route.py --area surface`、`$runtime-capability-routing` は `route.py --area runtime` として扱います。
   - 新しい public tool / skill を足す前に `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳めるか確認します。
 - `tools/sync_agent_canon.sh`
-  - shared agent canon surface の drift check と再同期を行う source 側の低レベル入口です。parent では `tools/agent-canon/` view または source-root resolver から実体を解決します。通常の作業者は直接 `pull` せず、task 開始時の latest route、root view 修復の link-root route、resolver 経由の `check` を使います。
+  - shared agent canon surface の drift check と再同期を行う source 側の低レベル入口です。parent では `vendor/agent-canon/tools/` を直接呼ぶか source-root resolver から実体を解決します。通常の作業者は直接 `pull` せず、task 開始時の latest route、root view 修復の link-root route、resolver 経由の `check` を使います。
   - `pull`、`ensure-latest`、`link-root` などのmutating入口は、staging・checkout・submodule update・root-view mutationの前に同じcommit request evidenceをfail-closedで検証します。自動sync commitは固定identityと `AgentCanon-*` formal trailersを持ちます。
   - `link-root` は symlink view と root copy surface を復元します。`goal.md` は repo-local state なので shared symlink に戻しません。
 - `tools/agent_tools/waterfall_gate_check.py`

@@ -158,7 +158,8 @@ remote 名や一台の host path に合わせて変えません。
 root 側は owner class ごとに薄い wrapper、symlink view、copy surface、regular active contract を分けます。
 
 - AgentCanon-owned active views:
-  - `AGENTS.md`, `.codex/config.toml`, `tools/agent-canon`
+  - `AGENTS.md`, `.codex/config.toml`, `.codex/agents`
+  - AgentCanon tools stay in `vendor/agent-canon/tools/` and are dispatched directly
   - optional transaction state under `.agent-canon/`
 - Parent-owned regular content:
   - `agents/`, `.agents/`, `.codex/agents/`, `.devcontainer/`, `.vscode/`, `.github/`
@@ -321,7 +322,8 @@ from a derived repo must follow the intended named vendor branch source-owner ro
 - `vendor/agent-canon/` の submodule pin を置く
 - submodule-first の sync / review script を追加する
 - root `AGENTS.md` を shared runtime surface に寄せる
-- root の `AGENTS.md`、`.codex/config.toml`、`tools/agent-canon` だけを symlink view に寄せる
+- root の `AGENTS.md`、`.codex/config.toml`、`.codex/agents` だけを symlink view に寄せる
+- `vendor/agent-canon/tools/` は source checkout の direct dispatch path とし、`tools/agent-canon` の parent link は作らない
 - root `.codex/config.toml` も shared default に寄せる
 
 ### Phase 1. upstream `agent-canon` repo を作る

@@ -46,14 +46,14 @@ downstream design ../../README.md AgentCanon source reader route
 │   └── post-create-parent.sh         # parent-specific source
 ├── .gitmodules                       # AgentCanon submodule declaration
 ├── documents/README.md                # parent document index
-├── tools/
-│   └── agent-canon -> ../vendor/agent-canon/tools
+├── tools/                              # parent-owned project tools
 └── vendor/agent-canon/                # AgentCanon submodule pin
 ```
 
-The active child views `.codex/config.toml`, `.codex/agents`, and
-`tools/agent-canon` shown above are required when the AgentCanon runtime is
-installed. Additional children under
+The active child views `.codex/config.toml` and `.codex/agents` shown above are
+required when the AgentCanon runtime is installed. AgentCanon tools remain in
+`vendor/agent-canon/tools/` and are dispatched there directly; no `tools/`
+child link is required. Additional children under
 `.codex/` and `tools/` are parent-owned optional content. Other allowed extensions
 include `.agents/`, `agents/`, `.github/`, `.vscode/`, `docker/`, `experiments/`,
 `notes/`, `reports/`, implementation directories, and additional parent content.
@@ -72,7 +72,8 @@ AgentCanon source の topic branch と PR から行います。
 - `AGENTS.md`: root runtime instruction の view。
 - `.codex/config.toml`: shared Codex runtime config の view。
 - `.codex/agents`: config が相対 path で参照する generated role 定義の view。
-- `tools/agent-canon`: shared automation の唯一のAgentCanon view。
+- `vendor/agent-canon/tools/`: shared automation の canonical source。親の
+  `tools/` は project-specific automation 専用。
 
 ### Regular directory / file
 

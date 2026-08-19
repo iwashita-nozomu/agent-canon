@@ -34,9 +34,9 @@ failure routes, and the legacy compatibility appendix for non-submodule repos.
 | Path | Expected State | Owner | Check |
 | --- | --- | --- | --- |
 | `vendor/agent-canon/` | AgentCanon Git submodule checkout and parent gitlink | AgentCanon | `git submodule status vendor/agent-canon` and `git rev-parse HEAD:vendor/agent-canon` |
-| `AGENTS.md`, `.codex/config.toml`, `.codex/agents/`, `tools/agent-canon` | active root runtime views of AgentCanon | AgentCanon | source-root resolver `check` |
+| `AGENTS.md`, `.codex/config.toml`, `.codex/agents/` | active root runtime views of AgentCanon | AgentCanon | source-root resolver `check` |
 | `agents/`, `.agents/`, `.vscode/`, `.devcontainer/` | optional parent-owned regular content | template or derived repo | parent structure/environment checks when present |
-| `tools/` | parent-owned regular container; shared tooling is only `tools/agent-canon/` | parent / AgentCanon | source-root resolver `check` |
+| `tools/` | parent-owned regular container for project-specific tooling; AgentCanon tools remain under `vendor/agent-canon/tools/` | parent / AgentCanon | source-root resolver `check` |
 | `vendor/agent-canon/templates/` | centralized AgentCanon template source with no parent-root symlink view | AgentCanon | manifest `link-specs` and consumer path readback |
 | `.github/` | parent-owned GitHub workflows, templates, and automation | template or derived repo | GitHub workflow checks |
 | `documents/runtime/SHARED_RUNTIME_SURFACES.md`, `documents/runtime/shared-runtime-surfaces.toml` | shared surface policy and machine manifest | AgentCanon | source-root resolver `check-convention` |

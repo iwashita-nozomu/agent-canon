@@ -20,7 +20,7 @@ Use this after cloning a repository that vendors AgentCanon under
 ```bash
 git submodule update --init --recursive
 git submodule status vendor/agent-canon
-PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec vendor/agent-canon/tools/sync_agent_canon.sh check
 python3 tools/agent_tools/parent_repo_readiness.py --root .
 ```
 
@@ -28,15 +28,16 @@ If root views are broken:
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
-PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
+  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec vendor/agent-canon/tools/sync_agent_canon.sh link-root
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec vendor/agent-canon/tools/sync_agent_canon.sh check
 ```
 
 ## Source Of Truth
 
 AgentCanon-owned active root surfaces are sourced from `vendor/agent-canon/`:
-`AGENTS.md`, `.codex/config.toml`, and `tools/agent-canon`; optional transaction
-state may live under `.agent-canon/`. `.agents/`, `agents/`, `.codex/agents/`,
+`AGENTS.md`, `.codex/config.toml`, and `.codex/agents/`; AgentCanon tools are
+invoked directly from `vendor/agent-canon/tools/`; optional transaction state
+may live under `.agent-canon/`. `.agents/`, `agents/`,
 `.devcontainer/`, `.vscode/`, GitHub paths, project implementation, experiments,
 reports, scripts, runtime data, and `goal.md` remain parent-owned regular content.
 

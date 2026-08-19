@@ -189,6 +189,17 @@ class RepoStructureContractTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("missing-file", result.stdout)
 
+    def test_template_parent_may_omit_standalone_only_tools_view(self) -> None:
+        """The retired AgentCanon tools view is optional in a derived root."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_template_fixture(root)
+
+            result = self.run_checker(root, "--profile", "template_or_derived_repo")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("tools/agent-canon", result.stdout)
+
     def write_standalone_fixture(self, root: Path) -> None:
         """Create the minimal standalone structure required by the contract."""
         for file_path in [

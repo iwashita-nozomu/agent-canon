@@ -706,17 +706,14 @@ def check_command(
 
 def projected_runtime_snippet(root: Path, snippet: str) -> str:
     """Map standalone AgentCanon tool paths to a parent runtime projection."""
-    if (
-        not (root / "tools" / "agent-canon").exists()
-        or (root / "tools" / "ci").exists()
-    ):
+    if not (root / "vendor" / "agent-canon" / "tools").exists():
         return snippet
     return (
-        snippet.replace("tools/agent_tools/", "tools/agent-canon/agent_tools/")
-        .replace("tools/ci/", "tools/agent-canon/ci/")
-        .replace("tools/sync_agent_canon.sh", "tools/agent-canon/sync_agent_canon.sh")
+        snippet.replace("tools/agent_tools/", "vendor/agent-canon/tools/agent_tools/")
+        .replace("tools/ci/", "vendor/agent-canon/tools/ci/")
+        .replace("tools/sync_agent_canon.sh", "vendor/agent-canon/tools/sync_agent_canon.sh")
         .replace(
-            "tools/update_agent_canon.sh", "tools/agent-canon/update_agent_canon.sh"
+            "tools/update_agent_canon.sh", "vendor/agent-canon/tools/update_agent_canon.sh"
         )
     )
 

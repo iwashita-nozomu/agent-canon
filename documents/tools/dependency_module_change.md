@@ -15,8 +15,9 @@ downstream implementation ../../tests/agent_tools/test_dependency_module_change.
 repository name を解決し、generic `repository_topic_clone.py` を呼ぶ policy adapter です。
 clone implementation、path alias、fresh/continuation の別 route は持ちません。
 public entry はこの direct executable だけです。同じ `agent_tools/` directory の
-`repository_topic_clone.py` をlibrary ownerとして解決するため、standalone sourceと
-derived `tools/agent-canon` viewのどちらでもpackage contextや`PYTHONPATH`を要求しません。
+`repository_topic_clone.py` をlibrary ownerとして解決するため、standalone sourceでは
+`tools/`、derived parentでは `vendor/agent-canon/tools/` から直接呼び出します。
+`tools/agent-canon` の親側 view や package alias は要求しません。
 
 ## Commands
 

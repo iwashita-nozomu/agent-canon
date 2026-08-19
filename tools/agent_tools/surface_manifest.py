@@ -89,10 +89,9 @@ DOC_ALWAYS_REQUIRED_MARKERS = (
     "AGENTS.md",
     ".codex/config.toml",
     ".codex/agents",
-    "tools/agent-canon",
-    "Root `tools/` is a parent-owned regular container",
-    "tools/agent-canon -> ../vendor/agent-canon/tools",
     "vendor/agent-canon/tools/",
+    "`tools/agent-canon` is standalone-only",
+    "direct source-root dispatch",
     "Project-local automation must stay in project-owned paths",
 )
 

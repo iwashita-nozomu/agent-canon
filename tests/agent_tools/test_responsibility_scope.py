@@ -173,6 +173,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
                 if scope_covers(scope, path)
             )
             for path in (
+                "vendor/agent-canon/tools/sync_agent_canon.sh",
                 "tools/agent-canon/sync_agent_canon.sh",
                 "tools/project_check.py",
                 "tools/team/local.sh",
@@ -186,8 +187,12 @@ class ResponsibilityScopeTest(unittest.TestCase):
         }
 
         self.assertEqual(
-            ownership["tools/agent-canon/sync_agent_canon.sh"],
+            ownership["vendor/agent-canon/tools/sync_agent_canon.sh"],
             ("agent-canon-runtime-view",),
+        )
+        self.assertEqual(
+            ownership["tools/agent-canon/sync_agent_canon.sh"],
+            ("parent-repo-active-contract",),
         )
         self.assertEqual(
             ownership["tools/project_check.py"],

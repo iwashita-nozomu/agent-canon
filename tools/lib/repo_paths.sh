@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract tool
-# responsibility Resolves the repository root and AgentCanon tool view for standalone and parent-projected runs.
+# responsibility Resolves the repository root and AgentCanon source tools for standalone and vendored runs.
 # downstream implementation ../ci/run_all_checks.sh uses the resolved tool view for repository checks.
 # downstream implementation ../ci/check_fresh_clone.sh uses the resolved root for temporary clone checks.
 # downstream implementation ../update_agent_canon.sh uses the resolved root and tool view for pin updates.
@@ -29,10 +29,10 @@ agent_canon_repo_root() {
 
 agent_canon_tools_root() {
   local repository_root="$1"
-  if [ -d "$repository_root/tools/agent_tools" ]; then
+  if [ -d "$repository_root/vendor/agent-canon/tools/agent_tools" ]; then
+    printf '%s\n' "$repository_root/vendor/agent-canon/tools"
+  elif [ -d "$repository_root/tools/agent_tools" ]; then
     printf '%s\n' "$repository_root/tools"
-  else
-    printf '%s\n' "$repository_root/tools/agent-canon"
   fi
 }
 
@@ -60,11 +60,6 @@ agent_canon_source_tools_root() {
   if [ -d "$repository_root/$source_prefix/tools" ] \
     && [ -f "$repository_root/$source_prefix/tools/sync_agent_canon.sh" ]; then
     printf '%s\n' "$repository_root/$source_prefix/tools"
-    return 0
-  fi
-  if [ -d "$repository_root/tools/agent-canon" ] \
-    && [ -f "$repository_root/tools/agent-canon/sync_agent_canon.sh" ]; then
-    printf '%s\n' "$repository_root/tools/agent-canon"
     return 0
   fi
   if [ -d "$repository_root/tools" ] && [ -f "$repository_root/tools/sync_agent_canon.sh" ]; then

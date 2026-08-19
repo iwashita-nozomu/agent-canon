@@ -42,7 +42,6 @@ SHARED_CANON_DIRTY_PATH_PREFIXES = (
     "agents/",
     "documents/runtime/SHARED_RUNTIME_SURFACES.md",
     "mcp/",
-    "tools/agent-canon/",
     "vendor/agent-canon",
 )
 LATEST_CHECKLIST = Path("documents/agent-canon/agent-canon-parent-repo-latest-checklist.md")

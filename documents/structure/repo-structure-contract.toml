@@ -225,6 +225,10 @@ kind = "dir"
 path = "tools"
 kind = "any"
 
+[[profile.optional]]
+path = "tools/agent-canon"
+kind = "any"
+
 [[profile.required]]
 path = ".codex"
 kind = "dir"

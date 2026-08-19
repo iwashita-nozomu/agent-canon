@@ -414,9 +414,17 @@ class SurfaceReadinessChecker:
         return ()
 
     def check_root_absent(self, entry: SurfaceEntry) -> tuple[Finding, ...]:
-        """Return a finding when a standalone-only path leaked into the parent root."""
+        """Reject only an AgentCanon symlink; preserve parent-owned regular content."""
         path = self.root / entry.path
-        if os.path.lexists(path):
+        if not path.is_symlink():
+            return ()
+        try:
+            resolved = path.resolve(strict=False)
+            source_root = (self.root / self.prefix).resolve(strict=False)
+            is_agentcanon_link = resolved == source_root or source_root in resolved.parents
+        except (OSError, RuntimeError):
+            is_agentcanon_link = False
+        if is_agentcanon_link:
             return (
                 Finding(
                     ERROR,

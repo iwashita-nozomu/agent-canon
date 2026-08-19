@@ -36,11 +36,9 @@ import yaml
 HELPER_PATHS = (
     ".github/scripts/checkout_agent_canon_submodule.sh",
     "tools/ci/checkout_agent_canon_submodule.sh",
-    "tools/agent-canon/ci/checkout_agent_canon_submodule.sh",
 )
 AGENT_CANON_WORKFLOW_SURFACE_MARKERS = (
     "vendor/agent-canon",
-    "tools/agent-canon",
 )
 LITERAL_ENV_REFERENCE_PATTERN = re.compile(
     r"\$\{\{\s*env\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}"
@@ -1124,11 +1122,11 @@ def projected_template_requirements(
     if not is_template_or_derived_repo(root):
         return tuple(required)
     return tuple(
-        item.replace("tools/agent_tools/", "tools/agent-canon/agent_tools/")
-        .replace("tools/ci/", "tools/agent-canon/ci/")
-        .replace("tools/sync_agent_canon.sh", "tools/agent-canon/sync_agent_canon.sh")
+        item.replace("tools/agent_tools/", "vendor/agent-canon/tools/agent_tools/")
+        .replace("tools/ci/", "vendor/agent-canon/tools/ci/")
+        .replace("tools/sync_agent_canon.sh", "vendor/agent-canon/tools/sync_agent_canon.sh")
         .replace(
-            "tools/update_agent_canon.sh", "tools/agent-canon/update_agent_canon.sh"
+            "tools/update_agent_canon.sh", "vendor/agent-canon/tools/update_agent_canon.sh"
         )
         for item in required
     )

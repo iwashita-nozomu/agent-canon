@@ -129,9 +129,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "documents/runtime/SHARED_RUNTIME_SURFACES.md": (
         "surface_manifest.py documents/runtime/shared-runtime-surfaces.toml AGENTS.md "
-        ".codex/config.toml .codex/agents tools/agent-canon Root `tools/` is a parent-owned regular container "
-        "tools/agent-canon -> ../vendor/agent-canon/tools "
-        "vendor/agent-canon/tools/ "
+        ".codex/config.toml .codex/agents vendor/agent-canon/tools/ "
+        "`tools/agent-canon` is standalone-only direct source-root dispatch "
         "Project-local automation must stay in project-owned paths\n"
     ),
     "documents/runtime/shared-runtime-surfaces.toml": (
@@ -144,6 +143,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         'path = ".codex/config.toml"\n'
         'path = ".codex/agents"\n'
         'path = "tools/agent-canon"\n'
+        'mode = "standalone_only"\n'
+        'projection_producer = "agent-canon-standalone"\n'
         'path = ".agent-canon"\n'
         'mode = "removed_legacy"\n'
         'paths = [\n'
@@ -580,7 +581,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "`check_agent_runtime_alignment.py` |\n"
         "| skill routing and public skill surface | "
         "`vendor/agent-canon/agents/skills/catalog.yaml` | "
-        "`python3 tools/agent-canon/agent_tools/route.py --prompt` |\n"
+        "`python3 vendor/agent-canon/tools/agent_tools/route.py --prompt` |\n"
         "| report and closeout structure | `task_close.py` | closeout gate |\n"
     ),
     "AGENTS.md": (

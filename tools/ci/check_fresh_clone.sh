@@ -332,7 +332,6 @@ if [ "$parent_projection_mode" = true ]; then
   FRESH_CLONE_RUNTIME_SURFACES=(
     AGENTS.md
     .codex/config.toml
-    tools/agent-canon
     vendor/agent-canon
   )
   AGENT_CANON_COMMIT_REQUEST_WORKFLOW_PATH=vendor/agent-canon/agents/workflows/agent-canon-pr-workflow.md

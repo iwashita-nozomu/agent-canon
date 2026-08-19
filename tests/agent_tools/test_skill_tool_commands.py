@@ -48,7 +48,7 @@ class SkillToolCommandsTest(unittest.TestCase):
         )
         self.assertEqual(standalone.public_argv[1], "tools/agent_tools/workflow_monitor.py")
         self.assertEqual(
-            derived.public_argv[1], "tools/agent-canon/agent_tools/workflow_monitor.py"
+            derived.public_argv[1], "vendor/agent-canon/tools/agent_tools/workflow_monitor.py"
         )
         self.assertEqual(
             standalone.public_argv[2:],
@@ -63,7 +63,9 @@ class SkillToolCommandsTest(unittest.TestCase):
                 "vendor/agent-canon/documents/structure/repo-structure-contract.toml",
             ),
         )
-        self.assertEqual(derived.public_env, (("PYTHONPATH", "tools/agent-canon"),))
+        self.assertEqual(
+            derived.public_env, (("PYTHONPATH", "vendor/agent-canon/tools"),)
+        )
 
     def run_tool(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the skill command tool against a root."""

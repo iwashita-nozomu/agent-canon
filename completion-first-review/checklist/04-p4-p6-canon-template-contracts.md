@@ -29,9 +29,9 @@ when shared-canon propagation and contract checks are ready for later layers.
 
 ### [ ] P4-002: reject root view direct edits
 
-- Target: the active AgentCanon root views `AGENTS.md`, `.codex/config.toml`, and `tools/agent-canon` in Template/derived repos.
+- Target: the active AgentCanon root views `AGENTS.md`, `.codex/config.toml`, and `.codex/agents` in Template/derived repos; AgentCanon tools remain under `vendor/agent-canon/tools/`.
 - Problem: root view can be edited instead of source.
-- Action: classify these three paths as `root_symlink_view` and require the AgentCanon source edit route; classify other runtime directories as parent-owned regular content.
+- Action: classify these three paths as `root_symlink_view` and require the AgentCanon source edit route; classify `vendor/agent-canon/tools/` as the direct source path and other runtime directories as parent-owned regular content.
 - Acceptance: direct root view edit fails unless explicitly allowed by profile.
 
 ### [ ] P4-003: synced-copy source hash

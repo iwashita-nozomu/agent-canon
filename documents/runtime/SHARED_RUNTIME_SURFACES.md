@@ -28,7 +28,7 @@ or building a product image is not selection evidence.
 | Mode | Default | Source requirement | Root behavior |
 | --- | --- | --- | --- |
 | Static seed consumer | yes | none after maintainer export | consumer-owned regular files; no projection or update state |
-| `live-agent-canon` integration | no | explicit AgentCanon source checkout | manifest-owned symlink views and optional transaction state |
+| `live-agent-canon` integration | no | explicit AgentCanon source checkout | manifest-owned instruction/config views and optional transaction state |
 
 The machine-readable source of truth for the opt-in mode is
 `documents/runtime/shared-runtime-surfaces.toml`. It records
@@ -48,9 +48,11 @@ set is invalid, and a non-v1 manifest must state the complete typed selection ex
 
 AgentCanon source is authoritative under `vendor/agent-canon/` only after the opt-in mode is
 selected. The root projection then contains only the instruction view `AGENTS.md`, the Codex
-runtime config bundle `.codex/config.toml` and `.codex/agents`, and the shared CLI/tool namespace
-`tools/agent-canon`. The update lifecycle may create optional transaction state under
-`.agent-canon/`.
+runtime config bundle `.codex/config.toml` and `.codex/agents`. AgentCanon tools remain in the
+standalone source tree and derived repositories dispatch them directly from
+`vendor/agent-canon/tools/`; `tools/agent-canon` is standalone-only and is not a parent view.
+Use direct source-root dispatch for derived repositories.
+The update lifecycle may create optional transaction state under `.agent-canon/`.
 
 Tests, notes, memory, evidence, editor, GitHub, and parent `.devcontainer/` paths are not mirrored
 shared surfaces. Parent-owned regular content at retired paths is preserved; only a stale symlink
@@ -72,14 +74,14 @@ creation or repository bootstrap, return to `documents/contracts/template-bootst
 | AgentCanon source | explicitly selected source checkout | AgentCanon source | no |
 | Project-owned content | regular file or directory in the parent repository | parent repository | yes |
 | Update transaction state | optional records under `.agent-canon/` | selected update transaction | no |
-| Retired root view | absent; stale AgentCanon symlinks may be removed | none | parent regular content is preserved |
+| Retired root view | absent; a stale AgentCanon symlink may be removed | none | parent regular content is preserved |
 
 ## Manifest Contract
 
 Each `[[surface]]` in `shared-runtime-surfaces.toml` declares projection metadata:
 
 - `path`: root-relative path of the view;
-- `mode`: `symlink` or `repo_state` for active surfaces;
+- `mode`: `symlink`, `repo_state`, or `standalone_only` for active and retired surfaces;
 - `projection_producer`: the process or source family that produces the view;
 - `projection_kind`: synchronization behavior metadata;
 - `source`: optional AgentCanon-relative source path; and
@@ -94,7 +96,8 @@ exception and maps to the historical live selection, while partial metadata is r
 spec commands require the typed `live-agent-canon` / `false` / `explicit-opt-in` contract. A
 static-seed manifest, including one containing a symlink entry, cannot produce or apply sync
 specifications.
-The `removed_legacy` group records paths that must not be materialized. The manifest contains no
+The `standalone_only` mode records a source-owned path that is not materialized in a parent. The
+`removed_legacy` group records paths that must not be materialized. The manifest contains no
 general path-owner fallback and no full-tree or all-tracked entry. `responsibility-scope.toml` remains
 the sole general owner/class source.
 
@@ -107,14 +110,25 @@ The active projection for the explicitly selected live mode is deliberately limi
 | `AGENTS.md` | symlink | `ROOT_AGENTS.md` |
 | `.codex/config.toml` | symlink | `.codex/config.toml` |
 | `.codex/agents` | symlink | `.codex/agents` |
-| `tools/agent-canon` | symlink | `tools` |
 | `.agent-canon` | optional transaction state | update lifecycle |
 
-Root `tools/` is a parent-owned regular container; only its `agent-canon` child is shared in the
-opt-in mode. The standalone source owns `vendor/agent-canon/tools/`, and the parent view is
-`tools/agent-canon -> ../vendor/agent-canon/tools`. AgentCanon templates and documents remain in the
-source checkout and are not copied into parent root views. A regular parent file or directory at a
-retired path is left untouched.
+Root `tools/` is a parent-owned regular container. The standalone source owns
+`vendor/agent-canon/tools/`, and derived repositories invoke it through a direct source-root
+dispatch such as `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root
+exec tools/sync_agent_canon.sh`. The manifest records `tools/agent-canon` as
+`standalone_only` so an existing AgentCanon symlink can be retired while a missing path is accepted.
+AgentCanon templates and documents remain in the source checkout and are not copied into parent root
+views. A regular parent file or directory at a retired path is left untouched.
+
+## Projection State Transition
+
+The `tools/agent-canon` decision is explicit and bounded:
+
+`operation: load the manifest -> resulting state: standalone_only tools path -> completion evidence: link-specs omits the path, root-absent-paths may remove only a stale AgentCanon symlink, and check accepts its absence`.
+
+This is the supported compatibility decision for derived repositories. Standalone AgentCanon keeps
+its source-owned `tools/` tree (including any local self-view needed by standalone tooling), while
+parent repositories do not acquire a second shared-tool ownership surface.
 
 ## Editing Rule
 

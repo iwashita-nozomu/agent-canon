@@ -35,7 +35,8 @@ template-derived repository.
 This document is AgentCanon-owned. It describes the shared rule boundary. The
 actual project container contract remains repository-local unless the path is one
 of the active AgentCanon root views (`AGENTS.md`, `.codex/config.toml`, or
-`tools/agent-canon`).
+`.codex/agents`). AgentCanon tools are dispatched directly from
+`vendor/agent-canon/tools/`.
 
 Read this file when a task touches any of these surfaces:
 
@@ -460,7 +461,7 @@ python3 tools/ci/python_env_policy.py --create
 ## GitHub Workflow Rules
 
 Any template or derived-repository GitHub workflow that consumes an AgentCanon-owned
-path under `vendor/agent-canon/` or `tools/agent-canon/` must prepare a coherent
+path under `vendor/agent-canon/` must prepare a coherent
 repository checkout and AgentCanon submodule checkout before that consumer runs.
 Each consuming job owns this sequence locally: an earlier safe `actions/checkout`
 step, then the checkout helper, then the first AgentCanon consumer. A checkout or

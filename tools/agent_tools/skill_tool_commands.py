@@ -414,7 +414,7 @@ class PublicCommandProjection:
 
 def _public_tool_prefix(root_resolution: RootResolution) -> str:
     """Return the one public tool prefix for the selected checkout layout."""
-    return "tools" if root_resolution.layout == "standalone" else "tools/agent-canon"
+    return "tools" if root_resolution.layout == "standalone" else "vendor/agent-canon/tools"
 
 
 def _project_public_path(token: str, prefix: str) -> str:
@@ -430,7 +430,7 @@ def _project_public_path(token: str, prefix: str) -> str:
             f"Repeated vendor source prefix is not valid: {token}",
         )
     if token.startswith("vendor/agent-canon/tools/"):
-        token = "tools/" + token.removeprefix("vendor/agent-canon/tools/")
+        return f"{prefix}/{token.removeprefix('vendor/agent-canon/tools/')}"
     if token.startswith("tools/"):
         return f"{prefix}/{token.removeprefix('tools/')}"
     return token
@@ -518,9 +518,9 @@ def project_public_command(
         else:
             projected_tokens.append(token)
     public_tokens = tuple(projected_tokens)
-    if root_resolution.layout != "standalone":
+    if root_resolution.layout != "standalone" and root_resolution.public_tool_root is not None:
         public_root = (
-            root_resolution.current_repository_root / "tools" / "agent-canon"
+            root_resolution.current_repository_root / prefix
         ).resolve()
         for token in _public_executable_tokens(public_tokens):
             candidate = (
@@ -563,7 +563,7 @@ def project_public_command_for_layout(
         source_root=Path("."),
         layout=layout,
         canon_root=Path("."),
-        public_tool_root=Path("tools/agent-canon"),
+        public_tool_root=None,
     )
     return project_public_command(logical_command, resolution)
 

@@ -288,7 +288,7 @@ class SurfaceMigrationTest(unittest.TestCase):
         self.assertTrue((root / "tools" / "sync_agent_canon.sh").is_file())
         self.assertTrue((root / "tools" / "agent_tools" / "surface_manifest.py").is_file())
         self.assertTrue((root / "tools" / "agent_tools" / "update_agent_canon.sh").is_file())
-        self.assertTrue((root / "tools" / "agent-canon").is_symlink())
+        self.assertFalse(os.path.lexists(root / "tools" / "agent-canon"))
         self.assertTrue(devcontainer.is_dir() and not devcontainer.is_symlink())
         self.assertEqual(custom_hook.read_text(encoding="utf-8"), "#!/usr/bin/env bash\necho parent hook\n")
         self.assertTrue(os.access(custom_hook, os.X_OK))
@@ -347,7 +347,7 @@ class SurfaceMigrationTest(unittest.TestCase):
             diverged.read_text(encoding="utf-8"),
             "# parent-owned implementation\n",
         )
-        self.assertTrue((root_tools / "agent-canon").is_symlink())
+        self.assertFalse(os.path.lexists(root_tools / "agent-canon"))
         check = self.run_sync(root, "check")
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
 
@@ -434,7 +434,7 @@ class SurfaceMigrationTest(unittest.TestCase):
         self.assertFalse(count_path.exists())
         for path in LEGACY_ROOT_PROJECTIONS:
             self.assertTrue((root / path).is_file(), path)
-        self.assertTrue((root / "tools" / "agent-canon").is_symlink())
+        self.assertFalse(os.path.lexists(root / "tools" / "agent-canon"))
 
     def test_removed_legacy_surface_preserves_unknown_mirror(self) -> None:
         """Known retired mirrors are removed while unknown mirrors remain untouched."""
@@ -529,6 +529,21 @@ class SurfaceMigrationTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertFalse(os.path.lexists(retired))
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+
+    def test_standalone_only_tools_view_is_removed_without_touching_parent_tools(self) -> None:
+        """Retire the old tools view while preserving project-owned tools files."""
+        root = self.clone_parent_fixture()
+        parent_tool = root / "tools" / "project_tool.sh"
+        parent_tool.parent.mkdir(parents=True, exist_ok=True)
+        parent_tool.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+        old_view = root / "tools" / "agent-canon"
+        old_view.symlink_to("../vendor/agent-canon/tools", target_is_directory=True)
+
+        result = self.run_sync(root, "link-root")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(os.path.lexists(old_view))
+        self.assertEqual(parent_tool.read_text(encoding="utf-8"), "#!/usr/bin/env bash\n")
 
     def test_absolute_agentcanon_symlink_is_removed(self) -> None:
         """An absolute AgentCanon target is removed at a retired name."""

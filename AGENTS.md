@@ -69,6 +69,7 @@ here.
 | root runtime entrypoint | `ROOT_AGENTS.md` | `PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check` |
 | workflow family, spawn budget, role topology | `agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |
 | public skill registry | `agents/skills/catalog.yaml` | `check_agent_runtime_alignment.py` |
+| skill routing and public skill surface | `vendor/agent-canon/agents/skills/catalog.yaml` | `python3 vendor/agent-canon/tools/agent_tools/route.py --prompt` |
 | AgentCanon update transaction | `documents/agent-canon/agent-canon-update-route.md` | `update_lifecycle_contract.py` |
 | entrypoint responsibility grammar | `documents/design/entrypoint-owner-map.md` | `check_entrypoint_owner_map.py` |
 | implementation decision precedence | `documents/conventions/software-engineering-principles.md` | task-specific Skill and review evidence |

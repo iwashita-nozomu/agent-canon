@@ -1823,19 +1823,19 @@ project_copy_source() {
       s{vendor/agent-canon/issues/}{__CANON_ISSUES__/}g;
       s{documents/tools/}{__DOCUMENTS_TOOLS__/}g;
       s{tests/tools/}{__TESTS_TOOLS__/}g;
-      s{tools/agent-canon/}{__PARENT_TOOLS__/}g;
+      s{tools/agent-canon/}{__CANON_TOOLS__/}g;
       s{((?:\.\./)+)documents/}{$1vendor/agent-canon/documents/}g;
       s{((?:\.\./)+)issues/}{$1vendor/agent-canon/issues/}g;
-      s{((?:\.\./)+)tools/}{$1tools/agent-canon/}g;
+      s{((?:\.\./)+)tools/}{$1vendor/agent-canon/tools/}g;
       s{(?<![A-Za-z0-9_./-])templates/}{vendor/agent-canon/templates/}g;
-      s{(?<![A-Za-z0-9_./-])tools/}{tools/agent-canon/}g;
+      s{(?<![A-Za-z0-9_./-])tools/}{vendor/agent-canon/tools/}g;
       s{__CANON_TOOLS__/}{vendor/agent-canon/tools/}g;
       s{__CANON_DOCUMENTS__/}{vendor/agent-canon/documents/}g;
       s{__CANON_TEMPLATES__/}{vendor/agent-canon/templates/}g;
       s{__CANON_ISSUES__/}{vendor/agent-canon/issues/}g;
       s{__DOCUMENTS_TOOLS__/}{documents/tools/}g;
       s{__TESTS_TOOLS__/}{tests/tools/}g;
-      s{__PARENT_TOOLS__/}{tools/agent-canon/}g;
+      s{__CANON_TOOLS__/}{vendor/agent-canon/tools/}g;
       print;
     ' "$source")"
   else
@@ -1853,7 +1853,7 @@ project_copy_source() {
           $block =~ s{\.\./\.\./\.\./\.\./documents/}{../../vendor/agent-canon/documents/}g;
           $block =~ s{\.\./\.\./\.\./\.\./agents/}{../../agents/}g;
           $block =~ s{\.\./\.\./\.\./\.\./issues/}{../../vendor/agent-canon/issues/}g;
-          $block =~ s{\.\./\.\./\.\./\.\./tools/}{../../tools/agent-canon/}g;
+          $block =~ s{\.\./\.\./\.\./\.\./tools/}{../../vendor/agent-canon/tools/}g;
           $block =~ s{\.\./\.\./README\.md}{../../vendor/agent-canon/templates/documents/README.md}g;
           $block;
         }gse

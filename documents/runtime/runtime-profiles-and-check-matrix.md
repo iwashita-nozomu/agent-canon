@@ -27,7 +27,7 @@ for parent AgentCanon PR graph selection; unknown IDs fail selection.
 | Profile ID | Profile | Activates | Required when | Strict dependency graph |
 | --- | --- | --- | --- | --- |
 | base-project | Base project | `README.md`, `QUICK_START.md`, `documents/README.md`, project code and tests | Every template or derived repo | no |
-| agent-runtime | Agent runtime | `AGENTS.md`, `.codex/config.toml`, `tools/agent-canon`, project-owned `agents/`, `.agents/`, `.codex/`, and `tools/` remain separate | An agent performs or reviews repo work | no |
+| agent-runtime | Agent runtime | `AGENTS.md`, `.codex/config.toml`, direct `vendor/agent-canon/tools/` dispatch, and project-owned `agents/`, `.agents/`, `.codex/`, and `tools/` remain separate; `tools/agent-canon` is standalone-only | An agent performs or reviews repo work | no |
 | devcontainer | Devcontainer | `.devcontainer/`, shared post-create helpers | VS Code devcontainer or agent ergonomics are used | no |
 | docker-runtime | Docker runtime | root `docker/`, runtime packs | Dockerfile, image, pack, Jupyter, or container setup changes | no |
 | github-automation | GitHub automation | `.github/`, PR templates, Actions helpers | GitHub Actions, PR automation, or GitHub path-constrained copies change | no |

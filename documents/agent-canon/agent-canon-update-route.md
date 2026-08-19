@@ -160,7 +160,7 @@ invalid gitlink record cannot shift fields into the remote section.
 | runtime state | `.agent-canon/update-lifecycle/state/` | resumable transaction pointer and typed GitHub/source-publication packets; never source canon |
 | generated evidence | `reports/agents/<run-id>/` and `.agent-canon/update-lifecycle/evidence/` | immutable receipts, timings, review and readback evidence |
 | projection queue | `.agent-canon/update-lifecycle/projection-queue/` | accepted QueueReceipt and pending/accepted DependencyFrontier |
-| parent projection | parent `vendor/agent-canon` gitlink and the active root views `AGENTS.md`, `.codex/config.toml`, `tools/agent-canon` | downstream view after frontier acceptance only; regular parent paths are preserved |
+| parent projection | parent `vendor/agent-canon` gitlink and the active root views `AGENTS.md`, `.codex/config.toml`, `.codex/agents`; direct tool dispatch from `vendor/agent-canon/tools/` | downstream view after frontier acceptance only; regular parent paths are preserved |
 
 Unknown shared state is outside the task-owned namespace and remains unchanged.
 There is no legacy subtree, snapshot, wrapper, or alternate owner route.

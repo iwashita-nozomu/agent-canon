@@ -62,7 +62,7 @@ upstream design ../../documents/design/source-owned-dependency-validation.md sou
 標準 bundle を作るときは次を使います。
 
 ```bash
-python3 tools/agent-canon/agent_tools/bootstrap_agent_run.py \
+python3 vendor/agent-canon/tools/agent_tools/bootstrap_agent_run.py \
   --task "short task summary" \
   --task-id T1 \
   --owner "human-or-agent" \
@@ -77,7 +77,7 @@ path、`document_flow_required` からなる closed record です。unknown fiel
 `run.active_design_packet` です。
 
 ```bash
-python3 tools/agent-canon/agent_tools/bootstrap_agent_run.py \
+python3 vendor/agent-canon/tools/agent_tools/bootstrap_agent_run.py \
   --task "design packet run" \
   --task-id T12 \
   --owner codex \
@@ -93,7 +93,7 @@ decision または distinct unresolved claim/risk が選択したものだけ ma
 へ反映されます。
 
 ```bash
-python3 tools/agent-canon/agent_tools/bootstrap_agent_run.py \
+python3 vendor/agent-canon/tools/agent_tools/bootstrap_agent_run.py \
   --task "research-backed change" \
   --task-id T4 \
   --owner "codex" \
@@ -108,7 +108,7 @@ python3 tools/agent-canon/agent_tools/bootstrap_agent_run.py \
 unresolved claim/risk が選択した role だけを materialize します。
 
 ```bash
-python3 tools/agent-canon/agent_tools/bootstrap_agent_run.py \
+python3 vendor/agent-canon/tools/agent_tools/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
   --task-id T12 \
   --owner "codex" \
@@ -139,7 +139,7 @@ The generic source-bound context certificate is created first from native
 Codex rollout evidence and the active run bundle:
 
 ```bash
-python3 tools/agent-canon/agent_tools/runtime_log_archive_git.py append-context-discovery \
+python3 vendor/agent-canon/tools/agent_tools/runtime_log_archive_git.py append-context-discovery \
   --run-id <run-id> --agent-context-id <agent-context-id> --turn-id <turn-id>
 ```
 
@@ -151,7 +151,7 @@ Missing, duplicate, malformed, or mismatched native evidence fails closed.
 The runtime-event materializer then consumes exactly one certificate:
 
 ```bash
-python3 tools/agent-canon/agent_tools/runtime_log_archive_git.py materialize-runtime-event \
+python3 vendor/agent-canon/tools/agent_tools/runtime_log_archive_git.py materialize-runtime-event \
   --result-family <requirements|design|review|validation|lifecycle> \
   --run-id <run-id> --gate-id <gate-id> --base-ref <base-ref>
 ```
@@ -179,8 +179,8 @@ the hot path without building repository/archive context, then publish one
 explicit checkpoint when requested:
 
 ```bash
-python3 tools/agent-canon/agent_tools/runtime_log_archive_git.py check-hook-hot-path
-python3 tools/agent-canon/agent_tools/runtime_log_archive_git.py sync
+python3 vendor/agent-canon/tools/agent_tools/runtime_log_archive_git.py check-hook-hot-path
+python3 vendor/agent-canon/tools/agent_tools/runtime_log_archive_git.py sync
 ```
 
 `sync` owns one nonblocking lock and one archive ensure. It snapshots, ingests,
@@ -210,7 +210,7 @@ is owned by `source_dependency_graph.py` and `graph_client.py`.
 The normal repository review command is:
 
 ```bash
-bash tools/agent-canon/agent_tools/run_repo_dependency_review.sh \
+bash vendor/agent-canon/tools/agent_tools/run_repo_dependency_review.sh \
   --root <repo-root> --fail-missing --cycle-report-only
 ```
 
@@ -226,10 +226,10 @@ transaction may capture a prepared-artifact/committed-receipt pair when active
 runtime evidence exists:
 
 ```bash
-tools/agent-canon/bin/agent-canon graph build --root <repo-root> --format json
-tools/agent-canon/bin/agent-canon graph status --root <repo-root> --format json
-tools/agent-canon/bin/agent-canon graph query --root <repo-root> --relation owner --all --format json
-tools/agent-canon/bin/agent-canon graph context --root <repo-root> --path <repo-relative-path> --token <token> --format json
+vendor/agent-canon/tools/bin/agent-canon graph build --root <repo-root> --format json
+vendor/agent-canon/tools/bin/agent-canon graph status --root <repo-root> --format json
+vendor/agent-canon/tools/bin/agent-canon graph query --root <repo-root> --relation owner --all --format json
+vendor/agent-canon/tools/bin/agent-canon graph context --root <repo-root> --path <repo-relative-path> --token <token> --format json
 ```
 
 These public graph commands are explicit persisted-runtime consumers. `status`,

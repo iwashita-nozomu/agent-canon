@@ -100,6 +100,20 @@ class ParentRepoReadinessTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("PARENT_REPO_READINESS=pass", result.stdout)
 
+    def test_standalone_only_tools_path_preserves_parent_regular_content(self) -> None:
+        """A parent-owned regular path is not mistaken for an AgentCanon projection."""
+        with self.temporary_directory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_parent_fixture(root)
+            local_tools = root / "tools" / "agent-canon"
+            local_tools.mkdir(parents=True)
+            (local_tools / "project_tool.py").write_text("# local\n", encoding="utf-8")
+
+            result = self.run_checker(root, skip_submodule_check=True)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue((local_tools / "project_tool.py").is_file())
+
     def test_skip_container_config_skips_parent_environment_semantics(self) -> None:
         """Readiness skip mode leaves parent-environment semantics to container_config."""
         with self.temporary_directory() as tmp_dir:
@@ -162,7 +176,6 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 "AGENTS.md",
                 ".codex/config.toml",
                 ".codex/agents",
-                "tools/agent-canon",
             },
         )
         for entry in active.values():
@@ -178,7 +191,6 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 "AGENTS.md": "vendor/agent-canon/ROOT_AGENTS.md",
                 ".codex/config.toml": "vendor/agent-canon/.codex/config.toml",
                 ".codex/agents": "vendor/agent-canon/.codex/agents",
-                "tools/agent-canon": "vendor/agent-canon/tools",
             }.items():
                 projection = root / path
                 self.assertTrue(projection.is_symlink(), path)
@@ -216,7 +228,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
             self.assertEqual(resolution.source_root, source.resolve())
             self.assertEqual(
                 resolution.public_tool_root,
-                (root / "tools" / "agent-canon").absolute(),
+                (root / "vendor" / "agent-canon" / "tools").absolute(),
             )
             self.assertNotEqual(resolution.current_repository_root, resolution.source_root)
 
@@ -669,9 +681,9 @@ class ParentRepoReadinessTest(unittest.TestCase):
             ".devcontainer/devcontainer.json": "\n".join(
                 [
                     "{",
-                    '  "initializeCommand": "AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",',
-                    '  "postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",',
-                    '  "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",',
+                    '  "initializeCommand": "AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 vendor/agent-canon/tools/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",',
+                    '  "postCreateCommand": "python3 vendor/agent-canon/tools/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",',
+                    '  "postAttachCommand": "python3 vendor/agent-canon/tools/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",',
                     '  "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",',
                     '  "service": "workspace",',
                     '  "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",',

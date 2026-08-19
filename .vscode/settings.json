@@ -24,8 +24,8 @@
     "./python",
     "./src",
     "./tools",
-    "./tools/agent-canon",
-    "./tools/agent-canon/agent_tools"
+    "./vendor/agent-canon/tools",
+    "./vendor/agent-canon/tools/agent_tools"
   ],
   "python-envs.defaultEnvManager": "ms-python.python:system",
   "python-envs.pythonProjects": [],

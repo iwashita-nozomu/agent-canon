@@ -320,7 +320,7 @@ def _explicit_resolution(raw_root: Path, source: Path, canon: Path) -> RootResol
         source_root=source,
         layout=LAYOUT_OVERRIDE,
         canon_root=canon,
-        public_tool_root=current_root / "tools" / "agent-canon",
+        public_tool_root=current_root / "vendor" / "agent-canon" / "tools",
     )
 
 
@@ -395,7 +395,7 @@ def resolve_agent_canon_source_root(
                 source_root=vendor_source_root,
                 layout=LAYOUT_VENDORED,
                 canon_root=vendor_source_root,
-                public_tool_root=current_repository_root / "tools" / "agent-canon",
+                public_tool_root=current_repository_root / "vendor" / "agent-canon" / "tools",
             )
         candidate_labels = (
             f"{LAYOUT_STANDALONE}:{current_repository_root}",
@@ -413,9 +413,11 @@ def resolve_agent_canon_source_root(
         source_root=source_root,
         layout=layout,
         canon_root=source_root,
-        public_tool_root=current_repository_root / "tools" / "agent-canon"
-        if layout == LAYOUT_VENDORED
-        else source_root / "tools" / "agent-canon",
+        public_tool_root=(
+            current_repository_root / "vendor" / "agent-canon" / "tools"
+            if layout == LAYOUT_VENDORED
+            else source_root / "tools"
+        ),
     )
 
 

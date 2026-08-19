@@ -67,8 +67,11 @@ class VscodeTaskPortabilityTest(unittest.TestCase):
             self.assertIn("tools/lib/repo_paths.sh", command, label)
             self.assertIn("agent_canon_tools_root", command, label)
         settings = json.loads(SETTINGS_JSON.read_text(encoding="utf-8"))
-        self.assertIn("./tools/agent-canon", settings["python.analysis.extraPaths"])
-        self.assertIn("./tools/agent-canon/agent_tools", settings["python.analysis.extraPaths"])
+        self.assertIn("./vendor/agent-canon/tools", settings["python.analysis.extraPaths"])
+        self.assertIn(
+            "./vendor/agent-canon/tools/agent_tools",
+            settings["python.analysis.extraPaths"],
+        )
         self.assertFalse((PROJECT_ROOT / ".code-workspace").exists())
 
     def test_vscode_tasks_resolve_standalone_tools(self) -> None:
@@ -112,30 +115,30 @@ class VscodeTaskPortabilityTest(unittest.TestCase):
             self.assertEqual(headers.returncode, 0, headers.stderr)
             self.assertIn("DEP_HEADERS=standalone", headers.stdout)
 
-    def test_vscode_tasks_resolve_parent_tool_view(self) -> None:
-        """Task commands should resolve tools/agent-canon in parent mode."""
+    def test_vscode_tasks_resolve_parent_tool_source(self) -> None:
+        """Task commands should resolve the vendored tools source in parent mode."""
         commands = self.task_commands()
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace = Path(tmp_dir)
             self.install_repo_paths(workspace)
             self.write_exec(
-                workspace / "tools" / "agent-canon" / "bin" / "agent-canon",
+                workspace / "vendor" / "agent-canon" / "tools" / "bin" / "agent-canon",
                 '#!/usr/bin/env bash\necho DOCS_BIN=parent',
             )
             self.write_py(
-                workspace / "tools" / "agent-canon" / "agent_tools" / "check_convention_compliance.py",
+                workspace / "vendor" / "agent-canon" / "tools" / "agent_tools" / "check_convention_compliance.py",
                 'print("CONVENTION=parent")',
             )
             self.write_py(
-                workspace / "tools" / "agent-canon" / "agent_tools" / "check_dependency_headers.py",
+                workspace / "vendor" / "agent-canon" / "tools" / "agent_tools" / "check_dependency_headers.py",
                 'print("DEP_HEADERS=parent")',
             )
             self.write_exec(
-                workspace / "tools" / "agent-canon" / "agent_tools" / "scan_dependency_headers.sh",
+                workspace / "vendor" / "agent-canon" / "tools" / "agent_tools" / "scan_dependency_headers.sh",
                 "echo SCAN_HEADERS=parent",
             )
             self.write_exec(
-                workspace / "tools" / "agent-canon" / "agent_tools" / "check_dependency_header_format.sh",
+                workspace / "vendor" / "agent-canon" / "tools" / "agent_tools" / "check_dependency_header_format.sh",
                 "echo CHECK_HEADER_FORMAT=parent",
             )
 

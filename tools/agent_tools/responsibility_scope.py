@@ -142,6 +142,8 @@ def load_catalog_paths(root: Path) -> tuple[set[str], list[Finding]]:
 
 def logical_tool_path(path: object) -> object:
     """Normalize a parent projection path to AgentCanon's logical tool path."""
+    if isinstance(path, str) and path.startswith("vendor/agent-canon/tools/"):
+        return "tools/" + path.removeprefix("vendor/agent-canon/tools/")
     if isinstance(path, str) and path.startswith("tools/agent-canon/"):
         return "tools/" + path.removeprefix("tools/agent-canon/")
     return path

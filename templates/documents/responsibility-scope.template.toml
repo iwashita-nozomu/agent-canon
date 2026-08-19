@@ -81,12 +81,12 @@ paths = [
   "AGENTS.md",
   ".codex/config.toml",
   ".codex/agents/**",
-  "tools/agent-canon/**",
+  "vendor/agent-canon/tools/**",
 ]
 protecting_tools = [
-  "tools/agent-canon/agent_tools/agent_canon_source_root.py",
-  "tools/agent-canon/agent_tools/responsibility_scope.py",
-  "tools/agent-canon/sync_agent_canon.sh",
+  "vendor/agent-canon/tools/agent_tools/agent_canon_source_root.py",
+  "vendor/agent-canon/tools/agent_tools/responsibility_scope.py",
+  "vendor/agent-canon/tools/sync_agent_canon.sh",
 ]
 issues = []
 
@@ -127,12 +127,10 @@ exclude_paths = [
   ".codex/config.toml",
   ".codex/agents",
   ".codex/agents/**",
-  "tools/agent-canon",
-  "tools/agent-canon/**",
 ]
 protecting_tools = [
-  "tools/agent-canon/agent_tools/responsibility_scope.py",
-  "tools/agent-canon/agent_tools/import_responsibility.py",
+  "vendor/agent-canon/tools/agent_tools/responsibility_scope.py",
+  "vendor/agent-canon/tools/agent_tools/import_responsibility.py",
 ]
 issues = []
 
@@ -149,8 +147,8 @@ paths = [
   "references/**",
 ]
 protecting_tools = [
-  "tools/agent-canon/agent_tools/task_close.py",
-  "tools/agent-canon/agent_tools/responsibility_scope.py",
+  "vendor/agent-canon/tools/agent_tools/task_close.py",
+  "vendor/agent-canon/tools/agent_tools/responsibility_scope.py",
 ]
 issues = []
 
@@ -163,8 +161,8 @@ paths = [
   ".github/**",
 ]
 protecting_tools = [
-  "tools/agent-canon/ci/check_github_workflows.py",
-  "tools/agent-canon/agent_tools/github_status_lifecycle.py",
+  "vendor/agent-canon/tools/ci/check_github_workflows.py",
+  "vendor/agent-canon/tools/agent_tools/github_status_lifecycle.py",
 ]
 issues = []
 
@@ -181,6 +179,6 @@ exclude_paths = [
   "vendor/agent-canon/**",
 ]
 protecting_tools = [
-  "tools/agent-canon/agent_tools/task_authority.py",
+  "vendor/agent-canon/tools/agent_tools/task_authority.py",
 ]
 issues = []

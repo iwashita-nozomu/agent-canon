@@ -738,7 +738,9 @@ def load_devcontainer_json(
 def expected_post_create_command(*, parent_layout: bool) -> str:
     """Return the lifecycle command for standalone or parent-projected layouts."""
     resolver = (
-        "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec"
+        "python3 vendor/agent-canon/tools/agent_tools/agent_canon_source_root.py exec"
+        if parent_layout
+        else "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec"
     )
     entrypoint = (
         f"{resolver} .devcontainer/post-create-entrypoint.sh "
@@ -879,18 +881,22 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
     config, findings = load_devcontainer_json(selector_path)
     if config is None:
         return findings
+    parent_layout = (root / "vendor" / "agent-canon").is_dir()
+    resolver = (
+        "python3 vendor/agent-canon/tools/agent_tools/agent_canon_source_root.py exec"
+        if parent_layout
+        else "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec"
+    )
     expected = {
         "name": "${localWorkspaceFolderBasename}-gpu-admission-devcontainer",
-        "initializeCommand": "AGENT_CANON_GPU_ADMISSION_PROFILE=gpu-admission AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/gpu-admission-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
+        "initializeCommand": f"AGENT_CANON_GPU_ADMISSION_PROFILE=gpu-admission AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/gpu-admission-compose.generated.yml {resolver} .devcontainer/generate-runtime-compose.sh",
         "dockerComposeFile": "../../.agent-canon/gpu-admission-compose.generated.yml",
         "service": "workspace",
         "containerUser": "project",
         "remoteUser": "project",
         "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
-        "postCreateCommand": expected_post_create_command(
-            parent_layout=(root / "vendor" / "agent-canon").is_dir()
-        ),
-        "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
+        "postCreateCommand": expected_post_create_command(parent_layout=parent_layout),
+        "postAttachCommand": f"{resolver} .devcontainer/post-attach.sh",
     }
     for key, expected_value in expected.items():
         if config.get(key) != expected_value:

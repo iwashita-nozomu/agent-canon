@@ -25,6 +25,7 @@ from surface_manifest import (  # noqa: E402
     load_manifest,
     main,
     normalized_snapshot,
+    render_specs,
 )
 
 
@@ -52,6 +53,24 @@ class SurfaceManifestMetadataTest(unittest.TestCase):
         # selection metadata is represented by the typed manifest above.
         self.assertEqual(
             normalized_snapshot(manifest)["schema"], "agent-canon.surface-manifest.v1"
+        )
+
+    def test_tools_view_is_standalone_only_and_not_linked(self) -> None:
+        """Derived repositories use the vendored source directly for AgentCanon tools."""
+        manifest = load_manifest(
+            PROJECT_ROOT,
+            ".",
+            "documents/runtime/shared-runtime-surfaces.toml",
+        )
+        entry = next(item for item in manifest.entries if item.path == "tools/agent-canon")
+
+        self.assertEqual(entry.mode, "standalone_only")
+        self.assertTrue(entry.optional)
+        self.assertEqual(entry.projection_producer, "agent-canon-standalone")
+        self.assertEqual(entry.projection_kind, "standalone_only")
+        self.assertNotIn(
+            "tools/agent-canon:",
+            render_specs(manifest.entries, PROJECT_ROOT, "."),
         )
 
     def test_invalid_metadata_is_rejected(self) -> None:

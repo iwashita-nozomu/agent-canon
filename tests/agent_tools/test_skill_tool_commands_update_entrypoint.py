@@ -200,8 +200,8 @@ class SkillToolCommandsUpdateEntrypointTest(unittest.TestCase):
             "#!/usr/bin/env bash\nexit 0\n",
             encoding="utf-8",
         )
-        public = parent / "tools" / "agent-canon"
-        public.mkdir(parents=True)
+        public = parent / "vendor" / "agent-canon" / "tools"
+        public.mkdir(parents=True, exist_ok=True)
         (public / "update_agent_canon.sh").write_text(
             "#!/usr/bin/env bash\nexit 0\n",
             encoding="utf-8",
@@ -255,8 +255,14 @@ class SkillToolCommandsUpdateEntrypointTest(unittest.TestCase):
                 packet.conditional_commands[0],
                 resolution,
             )
-            self.assertEqual(projection.public_env, (("PYTHONPATH", "tools/agent-canon"),))
-            self.assertIn("tools/agent-canon/update_agent_canon.sh", projection.public_argv)
+            self.assertEqual(
+                projection.public_env,
+                (("PYTHONPATH", "vendor/agent-canon/tools"),),
+            )
+            self.assertIn(
+                "vendor/agent-canon/tools/update_agent_canon.sh",
+                projection.public_argv,
+            )
 
     def test_explicit_parent_targets_remain_packet_aliases(self) -> None:
         makefile = (

@@ -41,10 +41,10 @@ local_override_allowed = false
 
 [[surface]]
 path = "tools/agent-canon"
-mode = "symlink"
-source = "tools"
-projection_producer = "agent-canon"
-projection_kind = "runtime_surface"
+mode = "standalone_only"
+projection_producer = "agent-canon-standalone"
+projection_kind = "standalone_only"
+optional = true
 local_override_allowed = false
 
 [[surface]]

@@ -39,15 +39,17 @@ downstream implementation ../rust/agent-canon/src/test_design.rs runs test desig
 @dependency-end
 -->
 
-The standalone AgentCanon source owns the real `tools/` directory and carries
-the tracked public self-view `tools/agent-canon -> .`. In a template or derived
-parent repository, root `tools/` is a parent-owned regular container and
-`tools/agent-canon -> ../vendor/agent-canon/tools` is the single shared-tool
-view. These paths must not become separate AgentCanon ownership surfaces.
+The standalone AgentCanon source owns the real `tools/` directory. A standalone
+checkout may retain its local `tools/agent-canon` self-view for source-local
+commands, but that path is `standalone_only` and is never a parent projection.
+In a template or derived parent repository, root `tools/` is a parent-owned
+regular container and AgentCanon commands run directly from
+`vendor/agent-canon/tools/`. These paths must not become separate AgentCanon
+ownership surfaces.
 
 Shared agent helper, CI/check, container runner, experiment helper, Markdown
 maintenance, and validation tools live in the standalone source `tools/` and
-are called through `tools/agent-canon/...` from parent repositories.
+are called through `vendor/agent-canon/tools/...` from parent repositories.
 Project-local automation that is not reusable AgentCanon capability belongs in
 the parent-owned `tools/` container or other project-owned paths such as
 `scripts/`, package-local modules, or repo-specific CI files. Do not copy
@@ -55,12 +57,15 @@ AgentCanon files directly into that container.
 
 When a change is generic, read `documents/rule/dependency-module-changes.md`,
 edit the managed source clone in the topic workspace, open or merge an
-AgentCanon change, update the parent repo submodule pin, and repair the parent
-view through the source-root resolver `exec tools/sync_agent_canon.sh link-root`.
+AgentCanon change, update the parent repo submodule pin, and invoke the source
+checkout directly through `vendor/agent-canon/tools/` (the source-root resolver
+remains available for commands that need parent-root dispatch). The parent
+view repair route only manages instruction/config links and retired-path
+cleanup; it does not create a shared tools link.
 In the standalone source the resolver uses `AGENT_CANON_PREFIX=.`; in a parent
-it binds the prefix to `vendor/agent-canon`. When a parent command or test log
-mentions `tools/agent-canon/...`, read it as the execution path for
-AgentCanon-owned tooling unless the path is explicitly project-owned elsewhere.
+it binds the prefix to `vendor/agent-canon`. Parent commands should name
+`vendor/agent-canon/tools/...` explicitly; `tools/agent-canon` is only a
+standalone compatibility self-view and is not a derived-repository contract.
 
 Mutating AgentCanon update routes must receive the existing validated Git
 authority/reason fields and

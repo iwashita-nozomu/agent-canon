@@ -670,10 +670,9 @@ SURFACE_POLICY_MARKERS = (
     "AGENTS.md",
     ".codex/config.toml",
     ".codex/agents",
-    "tools/agent-canon",
-    "Root `tools/` is a parent-owned regular container",
-    "tools/agent-canon -> ../vendor/agent-canon/tools",
     "vendor/agent-canon/tools/",
+    "`tools/agent-canon` is standalone-only",
+    "direct source-root dispatch",
     "Project-local automation must stay in project-owned paths",
 )
 SURFACE_MANIFEST_MARKERS = (
@@ -686,6 +685,8 @@ SURFACE_MANIFEST_MARKERS = (
     'path = ".codex/config.toml"',
     'path = ".codex/agents"',
     'path = "tools/agent-canon"',
+    'mode = "standalone_only"',
+    'projection_producer = "agent-canon-standalone"',
     'path = ".agent-canon"',
     'mode = "removed_legacy"',
     "paths = [",
@@ -771,7 +772,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "skill routing and public skill surface",
                     "vendor/agent-canon/agents/skills/catalog.yaml",
-                    "python3 tools/agent-canon/agent_tools/route.py --prompt",
+                    "python3 vendor/agent-canon/tools/agent_tools/route.py --prompt",
                 ),
                 (
                     "report and closeout structure",
