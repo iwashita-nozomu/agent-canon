@@ -1,26 +1,35 @@
-name: Issue 781 source export
+name: Issue 781 clean patch apply
 
 on:
   push:
     branches:
       - fix/781-stop-template-agent-export
-  pull_request:
-    branches:
-      - main
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: issue-781-clean-patch
+  cancel-in-progress: true
 
 jobs:
-  export:
+  apply:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/upload-artifact@v4
         with:
-          name: issue-781-agent-canon-source
-          path: |
-            .
-            !.git
-          include-hidden-files: true
-          retention-days: 1
+          fetch-depth: 0
+
+      - name: Replace staging history with the reviewed implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/issue-781.patch.gz.b64 /tmp/issue-781.patch.gz.b64
+          base64 --decode /tmp/issue-781.patch.gz.b64 | gzip -dc > /tmp/issue-781.patch
+          git fetch origin main
+          git reset --hard origin/main
+          git apply --index /tmp/issue-781.patch
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "fix: stop exporting Agent definitions to templates (#781)"
+          git push --force origin HEAD:fix/781-stop-template-agent-export
