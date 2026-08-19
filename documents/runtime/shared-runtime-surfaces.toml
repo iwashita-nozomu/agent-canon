@@ -63,6 +63,15 @@ projection_kind = "transaction_state"
 optional = true
 local_override_allowed = false
 
+# This former directory-wide alias is one bounded legacy path, not an active
+# Codex surface. Parent-owned regular content remains protected by sync rules.
+[[surface]]
+path = "tools/agent-canon"
+mode = "removed_legacy"
+projection_producer = "legacy"
+projection_kind = "removed_legacy"
+local_override_allowed = false
+
 # These entries are bounded migration cleanup only. Parent-owned regular
 # content is preserved; stale AgentCanon symlinks may be removed.
 [[group]]
@@ -81,7 +90,6 @@ paths = [
   "evidence",
   "memory",
   "notes",
-  "tools/agent-canon",
   ".github/AGENTS.md",
   ".github/workflows/agent-coordination.yml",
   ".github/workflows/agent-improvement-guide.yml",

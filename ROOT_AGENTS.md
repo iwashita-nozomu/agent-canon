@@ -69,7 +69,7 @@ This entrypoint only routes to that contract.
 | task bootstrap and CLI entrypoints | `vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md` | `bootstrap_agent_run.py` |
 | subagent lifecycle, same-role instances, wave ledger | `vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md` | `workflow_monitor.py` |
 | role behavior and stage conditions | `vendor/agent-canon/.codex/agents/*.toml` | `check_agent_runtime_alignment.py` |
-| skill routing and public skill surface | `vendor/agent-canon/agents/skills/catalog.yaml` | `python3 vendor/agent-canon/tools/agent_tools/route.py --prompt` |
+| skill routing and public skill surface | `vendor/agent-canon/agents/skills/catalog.yaml` | active `python3 vendor/agent-canon/tools/agent_tools/route.py --prompt`; retired `python3 tools/agent-canon/agent_tools/route.py --prompt` is not executable without the removed alias |
 | report and closeout structure | `vendor/agent-canon/tools/agent_tools/task_close.py` | `closeout gate` |
 | explicit live integration surface | `vendor/agent-canon/documents/runtime/shared-runtime-surfaces.toml` | `surface_manifest.py` |
 | entrypoint responsibility grammar | `vendor/agent-canon/documents/design/entrypoint-owner-map.md` | `check_entrypoint_owner_map.py` |

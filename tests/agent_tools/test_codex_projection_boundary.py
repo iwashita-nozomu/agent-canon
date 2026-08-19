@@ -84,8 +84,11 @@ class CodexProjectionBoundaryTest(unittest.TestCase):
         manifest = self.manifest()
         self.assertEqual(check_doc(PROJECT_ROOT, ".", manifest), [])
         root_entrypoint = (PROJECT_ROOT / "ROOT_AGENTS.md").read_text(encoding="utf-8")
-        self.assertNotIn("tools/agent-canon", root_entrypoint)
-        self.assertIn("vendor/agent-canon/tools/agent_tools/route.py", root_entrypoint)
+        active_route = "python3 vendor/agent-canon/tools/agent_tools/route.py --prompt"
+        retired_route = "python3 tools/agent-canon/agent_tools/route.py --prompt"
+        self.assertIn(active_route, root_entrypoint)
+        self.assertIn(f"retired `{retired_route}`", root_entrypoint)
+        self.assertNotIn(f"active `{retired_route}`", root_entrypoint)
 
 
 if __name__ == "__main__":
