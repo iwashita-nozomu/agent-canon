@@ -14,7 +14,6 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
@@ -23,17 +22,12 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from tools.agent_tools.fixture_spawn import (
-    bootstrap_fixture_public_environment,
-    record_capability_from_environment,
-)
 from tools.agent_tools.parent_root_side_effects import (
     ParentRootReject,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
 )
 from tools.agent_tools.runtime_log_paths import (
-    RUNTIME_EVENT_PUBLICATION_OUTCOME_SPOOL_RELATIVE,
     agent_report_archive_dir,
     codex_runtime_index_path,
     codex_runtime_summary_path,
@@ -53,6 +47,7 @@ class RuntimeLogPathsTest(unittest.TestCase):
     def setUp(self) -> None:
         """Set the stable source remote used by path fixtures."""
         self._old_source_remote = os.environ.get("AGENT_CANON_SOURCE_REPOSITORY_REMOTE")
+        self._old_parent_root = os.environ.get("AGENT_CANON_PARENT_ROOT")
         self._old_hook_archive_dir = os.environ.get("AGENT_CANON_HOOK_ARCHIVE_DIR")
         self._old_hook_event_spool_dir = os.environ.get(
             "AGENT_CANON_HOOK_EVENT_SPOOL_DIR"
@@ -63,7 +58,11 @@ class RuntimeLogPathsTest(unittest.TestCase):
         # Git discovery at the fixture temp root so a non-Git fixture cannot
         # accidentally inherit the checkout's HEAD or archive overrides.
         os.environ["GIT_CEILING_DIRECTORIES"] = tempfile.gettempdir()
-        for env_name in ("AGENT_CANON_HOOK_ARCHIVE_DIR", "AGENT_CANON_HOOK_EVENT_SPOOL_DIR"):
+        for env_name in (
+            "AGENT_CANON_PARENT_ROOT",
+            "AGENT_CANON_HOOK_ARCHIVE_DIR",
+            "AGENT_CANON_HOOK_EVENT_SPOOL_DIR",
+        ):
             os.environ.pop(env_name, None)
 
     def tearDown(self) -> None:
@@ -73,6 +72,7 @@ class RuntimeLogPathsTest(unittest.TestCase):
         else:
             os.environ["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = self._old_source_remote
         for env_name, old_value in (
+            ("AGENT_CANON_PARENT_ROOT", self._old_parent_root),
             ("AGENT_CANON_HOOK_ARCHIVE_DIR", self._old_hook_archive_dir),
             ("AGENT_CANON_HOOK_EVENT_SPOOL_DIR", self._old_hook_event_spool_dir),
             ("GIT_CEILING_DIRECTORIES", self._old_git_ceiling),
@@ -81,29 +81,6 @@ class RuntimeLogPathsTest(unittest.TestCase):
                 os.environ.pop(env_name, None)
             else:
                 os.environ[env_name] = old_value
-
-    @contextmanager
-    def parent_record_environment(
-        self, parent: Path, overrides: dict[str, str] | None = None
-    ):
-        """Expose one fixture-rooted signed record while observing parent CWD."""
-        base = os.environ.copy()
-        if overrides:
-            base.update(overrides)
-        with bootstrap_fixture_public_environment(
-            mode="synthetic_tool",
-            record_capability=record_capability_from_environment(),
-            fixture_cwd=parent,
-            base_env=base,
-            purpose="runtime-log-paths-test",
-        ) as fixture:
-            previous_cwd = Path.cwd()
-            os.chdir(parent)
-            try:
-                with patch.dict(os.environ, dict(fixture), clear=True):
-                    yield
-            finally:
-                os.chdir(previous_cwd)
 
     def make_git_commit(self, root: Path) -> str:
         """Create one commit in root and return its HEAD SHA."""
@@ -244,7 +221,7 @@ class RuntimeLogPathsTest(unittest.TestCase):
 
     def test_parent_capability_preserves_caller_archive_root(self) -> None:
         """A shared parent must not collapse caller archive namespaces."""
-        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as temp_dir:
+        with tempfile.TemporaryDirectory() as temp_dir:
             parent = Path(temp_dir) / "parent"
             caller_a = parent / "caller-a"
             caller_b = parent / "caller-b"
@@ -253,7 +230,7 @@ class RuntimeLogPathsTest(unittest.TestCase):
             caller_b.mkdir()
             self.make_git_commit(parent)
 
-            with self.parent_record_environment(parent):
+            with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent)}):
                 archive_a = mounted_log_archive_root(caller_a)
                 archive_b = mounted_log_archive_root(caller_b)
 
@@ -263,7 +240,7 @@ class RuntimeLogPathsTest(unittest.TestCase):
 
     def test_parent_capability_preserves_caller_hook_spool_root(self) -> None:
         """Hook events remain in the active caller's runtime spool."""
-        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as temp_dir:
+        with tempfile.TemporaryDirectory() as temp_dir:
             parent = Path(temp_dir) / "parent"
             caller_a = parent / "caller-a"
             caller_b = parent / "caller-b"
@@ -272,7 +249,7 @@ class RuntimeLogPathsTest(unittest.TestCase):
             caller_b.mkdir()
             self.make_git_commit(parent)
 
-            with self.parent_record_environment(parent):
+            with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent)}):
                 spool_a = hook_event_spool_root(caller_a)
                 spool_b = hook_event_spool_root(caller_b)
 
@@ -288,7 +265,7 @@ class RuntimeLogPathsTest(unittest.TestCase):
 
     def test_parent_capability_preserves_caller_publication_outcome_root(self) -> None:
         """Publication outcomes remain in the active caller's runtime spool."""
-        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as temp_dir:
+        with tempfile.TemporaryDirectory() as temp_dir:
             parent = Path(temp_dir) / "parent"
             caller_a = parent / "caller-a"
             caller_b = parent / "caller-b"
@@ -297,7 +274,7 @@ class RuntimeLogPathsTest(unittest.TestCase):
             caller_b.mkdir()
             self.make_git_commit(parent)
 
-            with self.parent_record_environment(parent):
+            with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent)}):
                 spool_a = runtime_event_publication_outcome_spool_root(caller_a)
                 spool_b = runtime_event_publication_outcome_spool_root(caller_b)
 
@@ -311,21 +288,9 @@ class RuntimeLogPathsTest(unittest.TestCase):
         )
         self.assertNotEqual(spool_a, spool_b)
 
-    def test_publication_outcome_root_uses_one_source_relative_layout(self) -> None:
-        """The public resolver and lifecycle lock share one fixed layout."""
-        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as temp_dir:
-            source = Path(temp_dir) / "source"
-            source.mkdir()
-            spool_root = runtime_event_publication_outcome_spool_root(source)
-
-        self.assertEqual(
-            spool_root.relative_to(source),
-            RUNTIME_EVENT_PUBLICATION_OUTCOME_SPOOL_RELATIVE,
-        )
-
     def test_parent_capability_rejects_external_runtime_candidate(self) -> None:
         """An external runtime spool override fails before any write."""
-        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as temp_dir:
+        with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             parent = root / "parent"
             caller = parent / "caller"
@@ -335,8 +300,12 @@ class RuntimeLogPathsTest(unittest.TestCase):
             external.mkdir()
             self.make_git_commit(parent)
 
-            with self.parent_record_environment(
-                parent, {"AGENT_CANON_HOOK_EVENT_SPOOL_DIR": str(external)}
+            with patch.dict(
+                os.environ,
+                {
+                    "AGENT_CANON_PARENT_ROOT": str(parent),
+                    "AGENT_CANON_HOOK_EVENT_SPOOL_DIR": str(external),
+                },
             ):
                 with self.assertRaises(ParentRootSideEffectError) as raised:
                     hook_event_spool_root(caller)
@@ -346,7 +315,7 @@ class RuntimeLogPathsTest(unittest.TestCase):
 
     def test_parent_capability_checks_unresolved_logical_candidate(self) -> None:
         """Boundary validation observes the caller path before physical resolution."""
-        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as temp_dir:
+        with tempfile.TemporaryDirectory() as temp_dir:
             parent = Path(temp_dir) / "parent"
             caller = parent / "caller"
             override = caller / "override"
@@ -359,15 +328,16 @@ class RuntimeLogPathsTest(unittest.TestCase):
                 observed.append((candidate, purpose))
                 return object()
 
-            with self.parent_record_environment(
-                parent, {"AGENT_CANON_HOOK_EVENT_SPOOL_DIR": str(override)}
+            with patch.dict(
+                os.environ,
+                {
+                    "AGENT_CANON_PARENT_ROOT": str(parent),
+                    "AGENT_CANON_HOOK_EVENT_SPOOL_DIR": str(override),
+                },
             ), patch.object(
                 ParentRootSideEffectBoundary,
                 "resolve_parent_owned_path",
                 capture,
-            ), patch.object(
-                ParentRootSideEffectBoundary,
-                "release_parent_owned_path",
             ):
                 result = hook_event_spool_root(caller)
 

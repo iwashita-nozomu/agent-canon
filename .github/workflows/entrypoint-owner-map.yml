@@ -1,0 +1,39 @@
+# @dependency-start
+# contract configuration
+# responsibility Verifies the thin root entrypoint owner-map contract on pull requests.
+# upstream design ../../documents/design/entrypoint-owner-map.md structural grammar and ownership contract
+# upstream implementation ../../tools/agent_tools/check_entrypoint_owner_map.py verifier
+# upstream implementation ../../tests/agent_tools/test_check_entrypoint_owner_map.py regression suite
+# @dependency-end
+
+name: Entrypoint Owner Map
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: entrypoint-owner-map-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: false
+          persist-credentials: false
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify entrypoint grammar
+        run: python3 tools/agent_tools/check_entrypoint_owner_map.py --root . --format json
+      - name: Run entrypoint regression tests
+        run: python3 -m unittest tests.agent_tools.test_check_entrypoint_owner_map -v

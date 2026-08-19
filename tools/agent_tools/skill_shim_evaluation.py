@@ -8,7 +8,7 @@
 # upstream implementation ./skill_shim_materializer.py owns generated shim records and content
 # downstream implementation ../../tests/agent_tools/test_skill_shim_evaluation.py focused producer tests
 # @dependency-end
-"""Produce route goldens, packet receipts, and automatic-discovery shim measurements."""
+"""Produce route goldens, answer-free packet receipts, and shim measurements."""
 
 from __future__ import annotations
 
@@ -37,17 +37,19 @@ from skill_shim_materializer import (  # pyright: ignore[reportMissingTypeStubs]
 
 try:
     from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        resolve_parent_writer_attestation,
+        attest_parent_root,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        resolve_parent_writer_attestation,
+        attest_parent_root,
     )
 
 SCHEMA_ROUTE = "agent_canon.route_golden_case.v1"
@@ -72,13 +74,16 @@ HOST_OBSERVATION_SCHEMA = "agent_canon.skill_runtime_shim.host_observation"
 
 
 def _parent_capability(purpose: str):
-    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if not configured:
         raise ParentRootSideEffectError(
             ParentRootReject.HANDOFF_INVALID,
             f"{purpose}: explicit parent root is required",
         )
-    attestation = resolve_parent_writer_attestation(purpose=purpose)
+    parent = Path(configured)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
     return ParentRootSideEffectBoundary(), attestation
 
 
@@ -163,23 +168,6 @@ def deterministic_measure(value: str) -> tuple[int, int, bytes]:
     normalized = normalize_text(value)
     encoded = normalized.encode("utf-8")
     return len(encoded), len(normalized), encoded
-
-
-def _host_envelope_value(
-    model: str, profile: str, skill: str, prompt_sha256: str
-) -> dict[str, object]:
-    """Build candidate-independent metadata for automatic skill discovery.
-
-    Runtime skill discovery is provided by ``.agents/skills`` itself.  The
-    materializer context therefore intentionally has no host-config registry;
-    measurement envelopes must not reconstruct the removed config input.
-    """
-    return {
-        "model_id": model,
-        "host_profile": profile,
-        "skill_id": skill,
-        "prompt_sha256": prompt_sha256,
-    }
 
 
 def _empty_route(mode: str) -> dict[str, object]:
@@ -628,7 +616,7 @@ def _paired_reduction_summary(
         variant = row.get("variant")
         if not isinstance(skill_id, str) or variant not in VARIANTS:
             raise ProducerError(f"deterministic_candidate_identity:{candidate_id}")
-        if host_envelope_id != f"deterministic-{skill_id}":
+        if host_envelope_id != f"deterministic-{skill_id}-{variant}":
             raise ProducerError(f"deterministic_candidate_envelope:{candidate_id}")
         pair_id = f"deterministic:{skill_id}"
         pair_values = pairs.setdefault(pair_id, {})
@@ -694,22 +682,31 @@ def measurement(
         raise ProducerError("host_evaluations_empty")
     _validate_host_observations(observations, packets)
     host_envelopes: list[dict[str, object]] = []
-    host_envelope_bytes: dict[str, bytes] = {}
     candidate_rows: list[dict[str, object]] = []
     scenario_rows: list[dict[str, object]] = []
-
-    def ensure_host_envelope(
-        envelope_id: str, skill: str, prompt_sha: str
-    ) -> bytes:
-        """Materialize one candidate-independent envelope per comparison pair."""
-        existing = host_envelope_bytes.get(envelope_id)
-        if existing is not None:
-            return existing
-        envelope_value = _host_envelope_value(model, profile, skill, prompt_sha)
+    records = {skill: build_record(context, skill) for skill in context.skill_ids}
+    generated_contents = {skill: render_shim(records[skill]) for skill in context.skill_ids}
+    for index, observation in enumerate(observations):
+        skill = str(observation["skill_id"])
+        if skill not in context.host_entries:
+            raise ProducerError(f"unknown_skill:{skill}")
+        variant = cast(str, observation["variant"])
+        host = context.host_entries[skill]
+        prompt = str(observation["prompt"])
+        prompt_sha = sha256_bytes(prompt.encode("utf-8"))
+        envelope_id = f"host-{index:04d}-{observation['scenario_id']}-{variant}"
+        envelope_value = {
+            "model_id": model,
+            "host_profile": profile,
+            "skill_id": skill,
+            "config_entry_index": host.index,
+            "config_order": host.order,
+            "config_path": host.path,
+            "enabled": host.enabled,
+            "prompt_sha256": prompt_sha,
+        }
         envelope_bytes = canonical_json_bytes(envelope_value)
-        host_bytes, host_scalars, normalized_envelope = deterministic_measure(
-            envelope_bytes.decode("utf-8")
-        )
+        host_bytes, host_scalars, normalized_envelope = deterministic_measure(envelope_bytes.decode("utf-8"))
         host_envelopes.append(
             {
                 "row_type": "host_envelope",
@@ -717,26 +714,16 @@ def measurement(
                 "model_id": model,
                 "host_profile": profile,
                 "skill_id": skill,
+                "config_entry_index": host.index,
+                "config_order": host.order,
+                "config_path": host.path,
+                "enabled": host.enabled,
                 "prompt_sha256": prompt_sha,
                 "host_envelope_sha256": sha256_bytes(normalized_envelope),
                 "host_utf8_bytes": host_bytes,
                 "host_unicode_scalars": host_scalars,
             }
         )
-        host_envelope_bytes[envelope_id] = envelope_bytes
-        return envelope_bytes
-
-    records = {skill: build_record(context, skill) for skill in context.skill_ids}
-    generated_contents = {skill: render_shim(records[skill]) for skill in context.skill_ids}
-    for index, observation in enumerate(observations):
-        skill = str(observation["skill_id"])
-        if skill not in context.skill_ids:
-            raise ProducerError(f"unknown_skill:{skill}")
-        variant = cast(str, observation["variant"])
-        prompt = str(observation["prompt"])
-        prompt_sha = sha256_bytes(prompt.encode("utf-8"))
-        envelope_id = f"host-{observation['scenario_id']}"
-        envelope_bytes = ensure_host_envelope(envelope_id, skill, prompt_sha)
         if variant == "generated":
             candidate_text = generated_contents[skill]
         else:
@@ -781,15 +768,42 @@ def measurement(
     baseline_prompt = "agent-canon.skill-runtime-shim.deterministic-measurement"
     baseline_prompt_sha = sha256_bytes(baseline_prompt.encode("utf-8"))
     for skill in context.skill_ids:
-        envelope_id = f"deterministic-{skill}"
-        envelope_bytes = ensure_host_envelope(envelope_id, skill, baseline_prompt_sha)
+        host = context.host_entries[skill]
+        envelope_value = {
+            "model_id": model,
+            "host_profile": profile,
+            "skill_id": skill,
+            "config_entry_index": host.index,
+            "config_order": host.order,
+            "config_path": host.path,
+            "enabled": host.enabled,
+            "prompt_sha256": baseline_prompt_sha,
+        }
+        envelope_bytes = canonical_json_bytes(envelope_value)
+        host_bytes, host_scalars, normalized_envelope = deterministic_measure(envelope_bytes.decode("utf-8"))
         for variant in VARIANTS:
+            envelope_id = f"deterministic-{skill}-{variant}"
+            host_envelopes.append(
+                {
+                    "row_type": "host_envelope",
+                    "host_envelope_id": envelope_id,
+                    "model_id": model,
+                    "host_profile": profile,
+                    "skill_id": skill,
+                    "config_entry_index": host.index,
+                    "config_order": host.order,
+                    "config_path": host.path,
+                    "enabled": host.enabled,
+                    "prompt_sha256": baseline_prompt_sha,
+                    "host_envelope_sha256": sha256_bytes(normalized_envelope),
+                    "host_utf8_bytes": host_bytes,
+                    "host_unicode_scalars": host_scalars,
+                }
+            )
             if variant == "generated":
                 candidate_text = generated_contents[skill]
             else:
-                candidate_text = (root / "agents/skills" / f"{skill}.md").read_text(
-                    encoding="utf-8"
-                )
+                candidate_text = _git_content(root, f".agents/skills/{skill}/SKILL.md", ("origin/main", "HEAD")).decode("utf-8")
             _, _, normalized_candidate = deterministic_measure(candidate_text)
             combined = normalize_text(envelope_bytes.decode("utf-8") + "\n" + candidate_text)
             candidate_rows.append(
@@ -806,30 +820,22 @@ def measurement(
                     "denominator_status": "valid" if combined else "not_applicable",
                 }
             )
-    deterministic_rows = [
-        row
-        for row in candidate_rows
-        if str(row["host_envelope_id"]).startswith("deterministic-")
-    ]
-    current = [row for row in deterministic_rows if row["variant"] == "current"]
-    generated = [row for row in deterministic_rows if row["variant"] == "generated"]
+    current = [row for row in candidate_rows if row["variant"] == "current"]
+    generated = [row for row in candidate_rows if row["variant"] == "generated"]
     current_bytes = sum(cast(int, row["utf8_bytes"]) for row in current)
     generated_bytes = sum(cast(int, row["utf8_bytes"]) for row in generated)
     current_scalars = sum(cast(int, row["unicode_scalars"]) for row in current)
     generated_scalars = sum(cast(int, row["unicode_scalars"]) for row in generated)
-    valid_rows = sum(row["denominator_status"] == "valid" for row in deterministic_rows)
-    not_applicable_rows = sum(
-        row["denominator_status"] == "not_applicable" for row in deterministic_rows
-    )
+    valid_rows = sum(row["denominator_status"] == "valid" for row in candidate_rows)
     pair_status, positive_pair_count, non_positive_pair_count = (
-        _paired_reduction_summary(deterministic_rows)
+        _paired_reduction_summary(candidate_rows, scenario_rows)
     )
     summary = {
         "host_envelope_count": len(host_envelopes),
         "candidate_row_count": len(candidate_rows),
         "scenario_row_count": len(scenario_rows),
         "valid_denominator_row_count": valid_rows,
-        "not_applicable_row_count": not_applicable_rows,
+        "not_applicable_row_count": len(candidate_rows) - valid_rows,
         "current_utf8_bytes_total": current_bytes,
         "generated_utf8_bytes_total": generated_bytes,
         "current_unicode_scalars_total": current_scalars,

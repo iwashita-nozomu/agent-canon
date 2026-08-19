@@ -38,11 +38,68 @@ body:
       placeholder: "agents/workflows/...、tools/...、.codex/..."
     validations:
       required: true
+  - type: markdown
+    attributes:
+      value: |
+        ## 発生事象と現在の作業状態
+        以下は起票時だけの計画ではなく current snapshot です。branch、commit、PR、validation、blocker が変わるたびに Issue 本文を更新します。
   - type: textarea
     id: current_behavior
     attributes:
-      label: 観測事実 / 現在の挙動
-      description: command、hook、CI、workflow、artifact の観測事実だけを path と時刻付きで記録します。
+      label: 何が起きているか / 観測事実
+      description: 発生した event、影響を受けた操作、観測状態を、path、command、時刻などの証拠とともに具体的に記録します。推測は観測事実と分けます。
+      value: |
+        affected operation / event:
+        observed state:
+        evidence (path / command / timestamp):
+    validations:
+      required: true
+  - type: textarea
+    id: change_purpose
+    attributes:
+      label: 何のために変更するか
+      description: 誰のどの判断または操作を可能にする変更か、変更後に到達させる状態を記録します。
+      value: |
+        intended reader / operator:
+        decision or operation enabled:
+        resulting state:
+    validations:
+      required: true
+  - type: textarea
+    id: work_progress
+    attributes:
+      label: どこまで作業が進んでいるか
+      description: 完了済みと作業中を分け、branch、commit、PR、validation evidence を current snapshot として更新します。
+      value: |
+        snapshot at:
+        completed:
+        in progress:
+        branch / commit / PR:
+        validation evidence:
+    validations:
+      required: true
+  - type: textarea
+    id: remaining_work
+    attributes:
+      label: 何が残っているか
+      description: 未完了の作業、次の owner、完了を示す証拠を記録します。最終受入条件ではなく、現在未達の差分だけを記録します。
+      value: |
+        remaining:
+        next owner:
+        completion evidence:
+    validations:
+      required: true
+  - type: textarea
+    id: update_blocker
+    attributes:
+      label: 何が更新をブロックしているか
+      description: merge、AgentCanon update、downstream projection など、止まっている操作と blocker、観測証拠、解除条件を記録します。blocker がなければ none と理由を記録します。
+      value: |
+        blocked operation:
+        blocker:
+        cause class: none | implementation | validation | infrastructure | external dependency | decision pending
+        evidence:
+        unblock condition:
     validations:
       required: true
   - type: textarea

@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -28,8 +29,8 @@ if str(AGENT_TOOLS_ROOT) not in sys.path:
 from artifact_identity import canonical_json_bytes  # noqa: E402
 from parent_root_side_effects import (  # noqa: E402
     ParentRootAttestationReceipt,
+    ParentRootAttestationRequest,
     ParentRootSideEffectBoundary,
-    resolve_parent_writer_attestation,
 )
 from update_lifecycle_contract import (  # noqa: E402
     materialize_gate_verdict,
@@ -137,8 +138,18 @@ def main() -> int:
     parser.add_argument("--source-root", type=Path, required=True)
     args = parser.parse_args()
     source_root = args.source_root.resolve()
+    parent_root = Path(
+        os.environ.get("AGENT_CANON_PARENT_ROOT", str(source_root))
+    ).resolve()
     boundary = ParentRootSideEffectBoundary()
-    attestation = resolve_parent_writer_attestation(purpose="agent-canon-g2")
+    attestation = boundary.attest(
+        ParentRootAttestationRequest(
+            cwd=parent_root,
+            explicit_root=parent_root,
+            source_root=source_root,
+            purpose="agent-canon-g2",
+        )
+    )
     output_root = (args.output or source_root).resolve()
     try:
         output_root.relative_to(source_root)

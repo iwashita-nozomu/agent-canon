@@ -106,7 +106,6 @@ class OopRuleInventoryTest(unittest.TestCase):
                 / "vendor"
                 / "agent-canon"
                 / "documents"
-                / "conventions"
                 / "object-oriented-design.md"
             )
             vendor_doc.parent.mkdir(parents=True)

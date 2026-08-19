@@ -822,9 +822,12 @@ def write_lifecycle_receipt(
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     boundary = module.ParentRootSideEffectBoundary()
-    attestation = module.resolve_parent_writer_attestation(
-        purpose="container-lifecycle-receipt"
+    request = module.ParentRootAttestationRequest(
+        cwd=workspace_root,
+        explicit_root=workspace_root,
+        purpose="container-lifecycle-receipt",
     )
+    attestation = boundary.attest(request)
     payload = (json.dumps(receipt.as_json(), sort_keys=True, indent=2) + "\n").encode(
         "utf-8"
     )

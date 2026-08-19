@@ -56,7 +56,7 @@ agent がこの反復を自律実行する場合、単一 run と rerun 分岐�
 `templates/experiments/_template/` の直接コピーは利用者向けの作成手順にしません。
 
 ```bash
-python3 -m tools.experiments.create_experiment_topic <topic>
+python3 tools/experiments/create_experiment_topic.py <topic>
 ```
 
 コピー後は次の順で編集します。
@@ -64,7 +64,7 @@ python3 -m tools.experiments.create_experiment_topic <topic>
 1. `run.py` の `main::main`
 1. `cases.py`
 1. `config.yaml`
-1. `visualize.ipynb`
+1. `visualization.py`
 1. `README.md`
 
 その後、最低限次を固定します。
@@ -74,25 +74,25 @@ python3 -m tools.experiments.create_experiment_topic <topic>
 - `Comparison Target:`
   - main 実装、旧実装、baseline、外部 reference のどれと比べるか。
 - `Metrics:`
-  - `summary.json` と report に何を残すか。少なくとも時間、成功率、failure kind、主要誤差を含めます。
+  - `summary/summary.json` と report に何を残すか。少なくとも時間、成功率、failure kind、主要誤差を含めます。
 - `Stop Condition:`
   - smoke で止めるのか、verified まで進めるのか、正式な比較表や report まで必要なのか。
 - `Fairness Notes:`
   - 同じ case set、同じ timeout、同じ hardware、同じ seed policy、同じ allocator 方針をどこまで維持するか。
 - `Artifact Plan:`
-  - 実験ディレクトリ、`result/<variant>/<run_name>/` の出力先、`result/<variant>/<run_name>/logs/` のログ置き場、`experiments/report/<topic>/<variant>/<run_name>.md` の置き場、result branch 名を先に固定します。
+  - 実験ディレクトリ、`result/<run-id>/` の出力先、`result/<run-id>/logs/` のログ置き場、`experiments/<topic>/report/<run-id>.md` の置き場、annex archive path を先に固定します。
 - `Visualization Plan:`
-  - 可視化 notebook を `experiments/<topic>/visualize.ipynb` に置き、読む result artifact と生成する figure / table を先に固定します。Notebook を formal run の起動手順や設定正本にしません。
+  - 可視化 visualization.py renderer を `experiments/<topic>/visualization.py` に置き、読む result artifact と生成する figure / table を先に固定します。Visualization renderer を formal run の起動手順や設定正本にしません。
 - `Naming Plan:`
   - topic 名、run_name、result ディレクトリ名、report 名の規則を先に決め、topic README か対応する正本文書へ残します。
 - `Registry Plan:`
   - `experiments/registry.toml` の topic entry、canonical entrypoint、formal command、必要なら `active_branch` を先に固定します。
 - `Config Snapshot Plan:`
-  - checked-in 正本は `experiments/<topic>/config.yaml` に置き、runner が `result/<variant>/<run_name>/config.json` と `result/<variant>/<run_name>/config_source.yaml` に残す設定 snapshot の key を固定します。seed、case range、timeout、dtype、backend、worker 数、allocator、feature flag、比較対象を artifact から辿れる形にします。
+  - checked-in 正本は `experiments/<topic>/config.yaml` に置き、runner が `result/<run-id>/config.json` と `result/<run-id>/config_source.yaml` に残す設定 snapshot の key を固定します。seed、case range、timeout、dtype、backend、worker 数、allocator、feature flag、比較対象を artifact から辿れる形にします。
 - `Make Target Plan:`
-  - `make experiment-smoke TOPIC=<topic>`、`make experiment-formal TOPIC=<topic>`、または topic 固有 alias を先に固定します。正式 run の exact command を chat や notebook だけに残しません。
+  - `make experiment-smoke TOPIC=<topic>`、`make experiment-formal TOPIC=<topic>`、または topic 固有 alias を先に固定します。正式 run の exact command を chat や visualization.py renderer だけに残しません。
 - `Execution Plan:`
-  - formal run は `main` source checkout で進めます。隔離が必要な実験だけ短期 branch を使い、その場合も生成結果の保存先は専用 result branch にします。
+  - formal run は `main` source checkout で進めます。隔離が必要な実験だけ短期 branch を使い、生成結果は独立した annex worktree に archive します。
 - `Server Run Surface:`
   - main server host で formal run を回す場合、`tools/experiments/run_managed_experiment.py` を使い、`command.json`、`environment.json`、`source_snapshot.json`、`artifact_manifest.json`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` を topic README の artifact plan に固定します。
 
@@ -108,19 +108,19 @@ python3 -m tools.experiments.create_experiment_topic <topic>
 - 実験コード
   - `experiments/<topic>/`
 - runtime 生成物
-  - `experiments/<topic>/result/<variant>/<run_name>/`
+  - `experiments/<topic>/result/<run-id>/raw/` と `experiments/<topic>/result/<run-id>/summary/`
 - run-local log
-  - `experiments/<topic>/result/<variant>/<run_name>/logs/`
-- 可視化 notebook
-  - `experiments/<topic>/visualize.ipynb`
+  - managed rootの `experiments/<topic>/result/<run-id>/logs/`
+- 可視化 renderer
+  - `experiments/<topic>/visualization.py`
 - 1 回の実験 report
-  - `experiments/report/<topic>/<variant>/<run_name>.md`
-- result branch
-  - `experiment-results/<topic>/<variant>`
+  - `experiments/<topic>/report/<run-id>.md`
+- annex archive
+  - `experiments/<topic>/result/<run-id>.tar.gz`
 - 複数 run をまたぐ要約や知見
-  - `notes/experiments/<topic>.md` または `notes/themes/`
+  - `documents/notes/experiments/<topic>.md` または `documents/notes/themes/`
 
-top-level の `reports/` は project-wide な review、automation、management report の置き場として扱い、topic ごとの experiment report の正本には使いません。`notes/experiments/` は run ごとの一次 report ではなく、横断的な要約の置き場として使います。
+top-level の `reports/` は project-wide な review、automation、management report の置き場として扱い、topic ごとの experiment report の正本には使いません。`documents/notes/experiments/` は run ごとの一次 report ではなく、横断的な要約の置き場として使います。
 
 準備段階で固定する命名は次です。
 
@@ -129,35 +129,35 @@ top-level の `reports/` は project-wide な review、automation、management r
 - run_name
   - `<topic>_<variant>_<YYYYMMDDTHHMMSSZ>`
 - runtime 生成物
-  - `result/<variant>/<run_name>/summary.json`
-  - `result/<variant>/<run_name>/cases.jsonl`
-  - `result/<variant>/<run_name>/config.json`
-  - `result/<variant>/<run_name>/config_source.yaml`
-  - `result/<variant>/<run_name>/run_manifest.json`
-  - `result/<variant>/<run_name>/eval_manifest.json`
-  - `result/<variant>/<run_name>/artifact_manifest.json`
-  - `result/<variant>/<run_name>/command.json`
-  - `result/<variant>/<run_name>/environment.json`
-  - `result/<variant>/<run_name>/source_snapshot.json`
-  - `result/<variant>/<run_name>/run.log`
-  - `result/<variant>/<run_name>/logs/startup.jsonl`
-  - `result/<variant>/<run_name>/logs/stdout.log`
-  - `result/<variant>/<run_name>/logs/stderr.log`
-  - 図を出力する場合は `result/<variant>/<run_name>/figures/`
-- 可視化 notebook
-  - `visualize.ipynb`
+  - `result/<run-id>/summary/summary.json`
+  - `result/<run-id>/summary/cases.jsonl`
+  - `result/<run-id>/config.json`
+  - `result/<run-id>/config_source.yaml`
+  - `result/<run-id>/run_manifest.json`
+  - `result/<run-id>/eval_manifest.json`
+  - `result/<run-id>/summary/artifact-manifest.json`（topic compact manifest）
+  - `result/<run-id>/command.json`
+  - `result/<run-id>/environment.json`
+  - `result/<run-id>/source_snapshot.json`
+  - `result/<run-id>/run.log`
+  - `result/<run-id>/logs/startup.jsonl`
+  - `result/<run-id>/logs/stdout.log`
+  - `result/<run-id>/logs/stderr.log`
+  - 生データは `result/<run-id>/raw/`、図とHTMLは `result/<run-id>/summary/`
+- 可視化 renderer
+  - `visualization.py`
 - report 名
-  - `experiments/report/<topic>/<variant>/<run_name>.md`
+  - `experiments/<topic>/report/<run-id>.md`
 
 準備段階で確認するものは次です。
 
 - topic の `README.md`
 - `experiments/registry.toml`
 - 直近の experiment report
-- `summary.json` / `cases.jsonl` の schema
+- `summary/summary.json` / `summary/cases.jsonl` の schema
 - `git status --short`
 - 既定の出力先と命名が topic README に書かれているか
-- 可視化 notebook の入口と `logs/` の扱いが topic README に書かれているか
+- 可視化 visualization.py renderer の入口と `logs/` の扱いが topic README に書かれているか
 
 `Interpretation:`
 準備段階の目的は、今回の run が debug なのか、verified なのか、正式比較なのかを曖昧にしないことです。
@@ -170,15 +170,15 @@ process 管理や GPU 割当は runner 側の責務であり、実験 script 側
 推奨構成は次です。
 
 - `README.md`
-  - 実験目的、コード配置、Make target、YAML config、出力先、可視化 notebook、report の入口、命名規則を書く。
+  - 実験目的、コード配置、Make target、YAML config、出力先、可視化 visualization.py renderer、report の入口、命名規則を書く。
 - `cases.py`
   - case 定義、difficulty range、resource estimate を置く。
 - `run.py`
   - orchestration と CLI に集中させる。
-- `visualize.ipynb`
-  - run artifact を読む可視化 notebook を置く。Notebook は説明と図表化を担い、正式 run の起動や test を担いません。
+- `visualization.py`
+  - run artifact を読む可視化 visualization.py renderer を置く。Visualization renderer は説明と図表化を担い、正式 run の起動や test を担いません。
 - `result/`
-  - `result/<variant>/<run_name>/` ごとに JSON、JSONL、`logs/`、図を置く。
+  - `result/<run-id>/` ごとに JSON、JSONL、`logs/`、図を置く。
 
 `experiment_runner` を使う実験で、実験側が実装する対象は次の 5 点に絞ります。
 
@@ -198,11 +198,11 @@ process 管理や GPU 割当は runner 側の責務であり、実験 script 側
 実装時点で、少なくとも次の配置と名前を README に明記します。
 
 - 実験コードの topic パス
-- `result/<variant>/<run_name>/` の canonical 出力先
-- `result/<variant>/<run_name>/logs/` のログ置き場
-- `visualize.ipynb` の可視化入口
-- `experiments/report/<topic>/<variant>/<run_name>.md` の置き場
-- 関連する `notes/` を使う場合はその入口
+- `result/<run-id>/` の canonical 出力先
+- `result/<run-id>/logs/` のログ置き場
+- `visualization.py` の可視化入口
+- `experiments/<topic>/report/<run-id>.md` の置き場
+- 関連する `documents/notes/` を使う場合はその入口
 - run_name の形式
 
 `experiment_runner` を使う場合の入口は次です。
@@ -255,7 +255,7 @@ topic、Hook、admission context、互換 wrapper が runner return を result �
 - import path
   - top-level import と package path が壊れていないことを確認する。
 - 出力 schema
-  - `summary.json` に必要な key が揃うよう、集計コードを静的に読んでおく。
+  - `summary/summary.json` に必要な key が揃うよう、集計コードを静的に読んでおく。
 - 設定 schema
   - 実験 script が `--config {config_path}` で runner 生成の `config.json` を読めることを確認する。
   - managed runner 経由の `config.json` と `config_source.yaml` から run 条件を復元できることを確認する。
@@ -268,7 +268,7 @@ pickle 可否、JAX import 後の env 汚染、GPU visibility の実際の反映
 それらは次の実行段階で smoke / verified として確認します。
 
 server 実行の formal run では、`run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、`command.json`、`environment.json`、`source_snapshot.json`、`config.json`、`config_source.yaml`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` が残ることを確認します。
-topic 固有の追加ログは `result/<variant>/<run_name>/logs/` に出ることも確認します。
+topic 固有の追加ログは `result/<run-id>/logs/` に出ることも確認します。
 
 ### 4. 実験実行
 
@@ -281,7 +281,7 @@ topic 固有の追加ログは `result/<variant>/<run_name>/logs/` に出るこ�
 - import が通る
 - worker が起動する
 - JSONL が追記される
-- `summary.json` が生成される
+- `summary/summary.json` が生成される
 - report 再生成の入口が成立する
 
 #### 4.2 verified
@@ -293,7 +293,7 @@ topic 固有の追加ログは `result/<variant>/<run_name>/logs/` に出るこ�
 - allocator 設定
 - worker slot / timeout の挙動
 - failure kind の記録
-- `summary.json` と `cases.jsonl` の整合
+- `summary/summary.json` と `summary/cases.jsonl` の整合
 
 #### 4.3 formal run
 
@@ -317,23 +317,21 @@ make experiment-formal TOPIC=<topic>
 ```
 
 この Make target は内側で `tools/experiments/run_managed_experiment.py` を呼びます。
-wrapper は `experiments/registry.toml` の `formal_inner_command` を見て `result/<variant>/<run_name>/`、`config.json`、`config_source.yaml`、`command.json`、`environment.json`、`source_snapshot.json`、`run_manifest.json`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log`、`experiments/report/<topic>/<variant>/<run_name>.md` の初期 stub をそろえます。
+wrapper は `experiments/registry.toml` の `formal_inner_command` を見て `result/<run-id>/`、`config.json`、`config_source.yaml`、`command.json`、`environment.json`、`source_snapshot.json`、`run_manifest.json`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log`、`experiments/<topic>/report/<run-id>.md` の初期 stub をそろえます。
 run 終了時に `eval_manifest.json` と `artifact_manifest.json` も更新されます。
 
-formal run の完了後、生成物を source checkout から専用 result branch へ保存します。
-checkout は `main` のまま保ち、保存対象は `result/<variant>/<run_name>/` と
-`experiments/report/<topic>/<variant>/<run_name>.md` に限定します。
+formal run の完了後、生成物を source checkout から独立した annex worktree へ一つの圧縮 archive として保存します。
+source checkout は `main` のまま保ち、保存対象は `result/<run-id>/` と
+`experiments/<topic>/report/<run-id>.md` に限定します。
 
 ```bash
-python3 -m tools.experiments.publish_result_branch \
-  --variant <variant> \
-  --result-dir experiments/<topic>/result/<variant>/<run_name> \
-  --branch experiment-results/<topic>/<variant>
+python3 -m tools.experiments.save_experiment_result_annex \
+  --result-dir experiments/<topic>/result/<run-id> \
+  --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
 ```
 
-remote にも保持する正式 run では `--push` を足します。
-この tool は `run_manifest.json` の source branch と current checkout が `main`
-で一致することを確認してから result branch を更新します。
+この tool は `run_manifest.json` の source provenance と current source tree を記録し、
+`experiments/<topic>/result/<run-id>.tar.gz` を append-only で一度だけ作成します。
 
 #### 4.4 long run のルール
 
@@ -357,8 +355,8 @@ user-facing report の体裁と根拠導線は [experiment-report-style.md](../.
 
 最低限残すものは次です。
 
-- `summary.json`
-- `cases.jsonl`
+- `summary/summary.json`
+- `summary/cases.jsonl`
 - `config.json`
 - `config_source.yaml`
 - `run_manifest.json`
@@ -371,7 +369,7 @@ user-facing report の体裁と根拠導線は [experiment-report-style.md](../.
 - `logs/startup.jsonl`
 - `logs/stdout.log`
 - `logs/stderr.log`
-- `visualize.ipynb`
+- `visualization.py`
 - report へのリンク
 - `Result Summary:`
 - `Quantitative Summary:`
@@ -402,12 +400,12 @@ report 本文は次の構成を基本にします。
 
 carry-over のルールは次です。
 
-- 実行ごとの生成物は `experiments/<topic>/result/<variant>/<run_name>/` に残す
-- 実行ごとの追加ログは `experiments/<topic>/result/<variant>/<run_name>/logs/` に残す
-- 可視化 notebook は `experiments/<topic>/visualize.ipynb` に残し、run artifact を読む形にする
-- 1 回の実験 report は `experiments/report/<topic>/<variant>/<run_name>.md` に残す
-- formal run の生成物は `tools/experiments/publish_result_branch.py` で専用 result branch に保存する
-- 複数 run をまたぐ知見だけを `notes/` へ持ち上げる
+- 実行ごとの生成物は `experiments/<topic>/result/<run-id>/` に残す
+- 実行ごとの追加ログは `experiments/<topic>/result/<run-id>/logs/` に残す
+- 可視化 visualization.py renderer は `experiments/<topic>/visualization.py` に残し、run artifact を読む形にする
+- 1 回の実験 report は `experiments/<topic>/report/<run-id>.md` に残す
+- formal run の生成物は `tools/experiments/save_experiment_result_annex.py` で専用 annex worktree に archive する
+- 複数 run をまたぐ知見だけを `documents/notes/` へ持ち上げる
 - partial run は診断用とし、正式な report の正本にしない
 
 ## 2.5 Log-Derived Prohibitions
@@ -448,7 +446,7 @@ repo と対応する worktree logs から抽出した再発防止事項を、実
 1. `experimenter`
    - 同じ protocol で fresh run を実行する。
 1. `experimenter`
-   - `summary.json`、`cases.jsonl`、draft report を生成する。`notes/` を使う場合は対応する experiment note も生成する。
+   - `summary/summary.json`、`summary/cases.jsonl`、draft report を生成する。`documents/notes/` を使う場合は対応する experiment note も生成する。
 1. `experiment_reviewer`
    - report と結果の読み方を批判的にレビューする。
    - [experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md) を使って、math validity、evidence sufficiency、figure validity、overclaim を確認する。
@@ -491,9 +489,9 @@ repo と対応する worktree logs から抽出した再発防止事項を、実
 - `Validation Plan:`
 - 静的チェック結果
 - 実行コマンド
-- `result/<variant>/<run_name>/` の所在
-- `result/<variant>/<run_name>/logs/` の所在
-- 可視化 notebook の所在
+- `result/<run-id>/` の所在
+- `result/<run-id>/logs/` の所在
+- 可視化 visualization.py renderer の所在
 - `config.json` と `config_source.yaml` の所在と主要 key
 - `command.json`、`environment.json`、`source_snapshot.json`、`artifact_manifest.json` の所在
 - report の所在
@@ -520,7 +518,7 @@ repo と対応する worktree logs から抽出した再発防止事項を、実
 - この文書
   - 実験全般の標準手順
 - topic README
-  - その実験固有の目的、入力、CLI、可視化 notebook、`result/<variant>/<run_name>/` と `logs/` の置き場、`experiments/report/<topic>/<variant>/<run_name>.md` の置き場、run_name 規則、既知の注意点
+  - その実験固有の目的、入力、CLI、可視化 visualization.py renderer、`result/<run-id>/` と `logs/` の置き場、`experiments/<topic>/report/<run-id>.md` の置き場、run_name 規則、既知の注意点
 
 個別 README は「そのモジュールや実験をどう使うか」を書き、
 この文書は「repo で実験をどう進めるか」を書く、という分担にします。

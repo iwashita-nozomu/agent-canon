@@ -106,7 +106,13 @@ UUID を結合して composite admission fingerprint を作ります。この co
 terminal/closeout evidence で同一値を参照します。terminal evidence の追記は admission
 composite 自体を変更しません。
 
-実行順序は次の固定 sequence です。
+以下の sequence と CLI handshake は managed experiment adapter の固定契約です。
+provider-independent direct command は同じ NVIDIA evidence、BUSY/UNKNOWN/FREE
+分類、full UUID lock、lock-held fresh readback、plan freeze を再利用しますが、
+外部 provider protocol と completion coverage を要求しません。direct route の
+正本は `documents/experiments/gpu-direct-command.md` です。
+
+managed experiment の実行順序は次の固定 sequence です。
 
 ```text
 S0

@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Owns the canonical v2 experiment identity tuple and path/ref grammar.
 # upstream design ../../documents/experiments/experiment-registry.md defines experiment identity.
-# downstream implementation ./run_managed_experiment.py, ./publish_result_branch.py, ./update_latest_result.py consume this owner.
+# downstream implementation ./run_managed_experiment.py, ./save_experiment_result_annex.py, ./update_latest_result.py consume this owner.
 # @dependency-end
 """Canonical identity and path helpers for managed experiment runs.
 
@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -61,15 +60,15 @@ def validate_segment(value: object, field: str = "segment") -> str:
     if value in {".", ".."}:
         raise ExperimentIdentityError(f"{field} must not be . or ..")
     if any(char in value for char in ("/", "\\", "\x00")):
-        raise ExperimentIdentityError(f"{field} must not contain a path separator or NUL")
+        raise ExperimentIdentityError(
+            f"{field} must not contain a path separator or NUL"
+        )
     if any(char.isspace() for char in value):
         raise ExperimentIdentityError(f"{field} must not contain whitespace")
     if unicodedata.normalize("NFKC", value) != value:
         raise ExperimentIdentityError(f"{field} must not change under normalization")
     if _SAFE_SEGMENT.fullmatch(value) is None:
-        raise ExperimentIdentityError(
-            f"{field} must match [A-Za-z0-9][A-Za-z0-9._-]*"
-        )
+        raise ExperimentIdentityError(f"{field} must match [A-Za-z0-9][A-Za-z0-9._-]*")
     return value
 
 
@@ -106,13 +105,19 @@ class ExperimentIdentity:
             raise ExperimentIdentityError("identity payload must be an object")
         nested = payload.get("identity")
         if not isinstance(nested, Mapping):
-            raise ExperimentIdentityError("identity payload must contain an identity object")
+            raise ExperimentIdentityError(
+                "identity payload must contain an identity object"
+            )
         if any(key in payload for key in ("topic", "variant", "run_name")):
-            raise ExperimentIdentityError("identity fields must not be duplicated at top level")
+            raise ExperimentIdentityError(
+                "identity fields must not be duplicated at top level"
+            )
         if set(nested) != {"schema", "topic", "variant", "run_name"}:
             raise ExperimentIdentityError("identity object has missing or extra fields")
         if nested.get("schema") != IDENTITY_SCHEMA:
-            raise ExperimentIdentityError("identity schema must be agentcanon.experiment-run-identity/v2")
+            raise ExperimentIdentityError(
+                "identity schema must be agentcanon.experiment-run-identity/v2"
+            )
         return cls(
             topic=validate_segment(nested.get("topic"), "topic"),
             variant=validate_segment(nested.get("variant"), "variant"),
@@ -121,33 +126,42 @@ class ExperimentIdentity:
 
 
 def result_relative_path(identity: ExperimentIdentity) -> Path:
-    """Return the canonical repository-relative result directory."""
-    return Path("experiments") / identity.topic / "result" / identity.variant / identity.run_name
+    """Return the canonical repository-relative compact result directory."""
+    return Path("experiments") / identity.topic / "result" / identity.run_name
+
+
+def raw_relative_path(identity: ExperimentIdentity) -> Path:
+    """Return the canonical repository-relative bulky raw directory."""
+    return result_relative_path(identity) / "raw"
+
+
+def identity_from_raw_relative_path(path: Path, variant: object) -> ExperimentIdentity:
+    """Invert a canonical raw path using its manifest-owned variant metadata."""
+    if path.is_absolute() or ".." in path.parts:
+        raise ExperimentIdentityError(
+            "raw path must be repository-relative and contained"
+        )
+    parts = path.parts
+    if (
+        len(parts) != 5
+        or parts[0] != "experiments"
+        or parts[2] != "result"
+        or parts[4] != "raw"
+    ):
+        raise ExperimentIdentityError(
+            "raw path must be experiments/<topic>/result/<run_name>/raw"
+        )
+    identity = ExperimentIdentity(
+        parts[1], validate_segment(variant, "variant"), parts[3]
+    )
+    if path != raw_relative_path(identity):
+        raise ExperimentIdentityError("raw path is not canonical for its identity")
+    return identity
 
 
 def report_relative_path(identity: ExperimentIdentity) -> Path:
     """Return the canonical repository-relative reader report path."""
-    return (
-        Path("experiments")
-        / "report"
-        / identity.topic
-        / identity.variant
-        / f"{identity.run_name}.md"
-    )
-
-
-def result_branch(identity: ExperimentIdentity) -> str:
-    """Return and validate the canonical result branch for an identity."""
-    branch = f"experiment-results/{identity.topic}/{identity.variant}"
-    checked = subprocess.run(
-        ["git", "check-ref-format", "--branch", branch],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if checked.returncode != 0:
-        raise ExperimentIdentityError(f"invalid result branch: {branch}")
-    return branch
+    return Path("experiments") / identity.topic / "report" / f"{identity.run_name}.md"
 
 
 def contained_path(repo_root: Path, path: Path) -> Path:
@@ -173,10 +187,11 @@ __all__ = [
     "ExperimentIdentityError",
     "contained_path",
     "identity_from_manifest",
+    "identity_from_raw_relative_path",
     "load_json_file",
     "load_json_text",
+    "raw_relative_path",
     "report_relative_path",
-    "result_branch",
     "result_relative_path",
     "validate_segment",
 ]

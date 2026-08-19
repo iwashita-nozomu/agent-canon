@@ -15,14 +15,7 @@ import sys
 import tempfile
 import time
 import unittest
-from collections.abc import Iterator
-from contextlib import contextmanager
 from pathlib import Path
-
-from tools.agent_tools.fixture_spawn import (
-    bootstrap_fixture_public_environment,
-    record_capability_from_environment,
-)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "compare_codex_token_footprints.py"
@@ -93,46 +86,6 @@ def write_two_event_session(path: Path, total_tokens: int) -> None:
         stream.write("\n")
 
 
-@contextmanager
-def writer_environment(root: Path) -> Iterator[dict[str, str]]:
-    """Issue and deterministically release a fixture-local writer session."""
-    subprocess.run(
-        ["git", "init", "--quiet", "--initial-branch=main", str(root)],
-        check=True,
-    )
-    environment = {
-        key: value
-        for key, value in os.environ.items()
-        if not key.startswith("AGENT_CANON_")
-        and key
-        not in {
-            "HOME",
-            "TMPDIR",
-            "TEMP",
-            "TMP",
-            "XDG_CACHE_HOME",
-            "XDG_CONFIG_HOME",
-            "XDG_DATA_HOME",
-            "PYTHONPYCACHEPREFIX",
-            "AGENT_CANON_TOOLS_HOME",
-            "CARGO_HOME",
-            "CARGO_TARGET_DIR",
-            "AGENT_CANON_CLI_TARGET_DIR",
-        }
-    }
-    invocation_script = root / ".agent-canon-test-runner.py"
-    invocation_script.write_text("# authenticated fixture runner\n", encoding="utf-8")
-    with bootstrap_fixture_public_environment(
-        mode="synthetic_tool",
-        record_capability=record_capability_from_environment(),
-        fixture_cwd=root,
-        base_env=environment,
-        invocation_script=invocation_script,
-        purpose="token-footprint-test",
-    ) as fixture:
-        yield dict(fixture.environment)
-
-
 class CompareCodexTokenFootprintsTest(unittest.TestCase):
     """Verify session token footprint comparison status and evidence."""
 
@@ -147,26 +100,24 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
             write_session(baseline, total_tokens=200)
             write_session(candidate, total_tokens=80)
 
-            with writer_environment(root) as environment:
-                result = subprocess.run(
-                    [
-                        sys.executable,
-                        str(SCRIPT),
-                        "--baseline-session",
-                        str(baseline),
-                        "--candidate-session",
-                        str(candidate),
-                        "--report-out",
-                        str(report),
-                        "--report-dir",
-                        str(report_dir),
-                    ],
-                    cwd=root,
-                    env=environment,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--baseline-session",
+                    str(baseline),
+                    "--candidate-session",
+                    str(candidate),
+                    "--report-out",
+                    str(report),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("TOKEN_FOOTPRINT_COMPARISON=pass", result.stdout)
@@ -218,26 +169,24 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
             report_dir = root / "reports" / "agents" / "run-1"
             report = root / "token-summary.md"
 
-            with writer_environment(root) as environment:
-                result = subprocess.run(
-                    [
-                        sys.executable,
-                        str(SCRIPT),
-                        "--session-glob",
-                        str(sessions / "*.jsonl"),
-                        "--moving-average-window",
-                        "2",
-                        "--report-out",
-                        str(report),
-                        "--report-dir",
-                        str(report_dir),
-                    ],
-                    cwd=root,
-                    env=environment,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--session-glob",
+                    str(sessions / "*.jsonl"),
+                    "--moving-average-window",
+                    "2",
+                    "--report-out",
+                    str(report),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("TOKEN_USAGE_SUMMARY=pass", result.stdout)

@@ -19,6 +19,7 @@ import json
 import re
 import subprocess
 import tempfile
+import os
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,13 +27,19 @@ from typing import Any
 
 try:
     from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
         ParentRootSideEffectBoundary,
-        resolve_parent_writer_attestation,
+        ParentRootSideEffectError,
+        attest_parent_root,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
         ParentRootSideEffectBoundary,
-        resolve_parent_writer_attestation,
+        ParentRootSideEffectError,
+        attest_parent_root,
     )
 
 MAX_ERROR_CHARS = 4000
@@ -43,17 +50,33 @@ AGENT_CANON_BIN = Path("tools/bin/agent-canon")
 
 def _wiki_temp_dir() -> str | None:
     """Return parent-local staging for formatter scratch files."""
-    attestation = resolve_parent_writer_attestation(purpose="wiki-publication")
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "wiki-staging: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="wiki-publication")
+    )
     directory = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
-        attestation,
-        attestation.parent_root / ".agent-canon" / "tmp" / "wiki",
-        "wiki-staging",
+        attestation, parent / ".agent-canon" / "tmp" / "wiki", "wiki-staging"
     )
     return str(directory.physical_path)
 
 
 def _write_wiki_file(path: Path, data: bytes) -> None:
-    attestation = resolve_parent_writer_attestation(purpose="wiki-publication")
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "wiki-publication: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="wiki-publication")
+    )
     ParentRootSideEffectBoundary().write_parent_owned_file(
         attestation, path, data, "wiki-publication"
     )
@@ -69,16 +92,12 @@ class CommandResult:
     stderr: str
 
 
+@dataclass(frozen=True)
 class UserVisibleFailure(Exception):
     """Raised when an explicit precondition blocks publication."""
 
     message: str
     next_action: str
-
-    def __init__(self, message: str, next_action: str) -> None:
-        self.message = message
-        self.next_action = next_action
-        super().__init__(message, next_action)
 
 
 Runner = Callable[[Sequence[str], Path], CommandResult]

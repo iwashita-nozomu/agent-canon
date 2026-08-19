@@ -378,16 +378,9 @@ the captured snapshot remain for the next checkpoint. It skips
 files. The source repo's ignored `reports/agents/` directory remains run-local
 working evidence; the log archive is the durable accumulated store.
 
-The publication-attempt lock is source-owned at
-`<source-repo>/.agent-canon/runtime-event-spool/publication-outcome/<attempt-id>/.attempt.lock`.
-When a nested source checkout runs with `AGENT_CANON_PARENT_ROOT` set to an
-outer repository, the outer root authenticates and contains each directory
-operation; it does not replace `<source-repo>` as the publication spool path
-basis. The archive transaction lock remains
+The lock is
 `<source-repo>/.agent-canon/runtime-event-spool/.archive-transaction.lock`.
-A held publication-attempt lock fails immediately as
-`publication_attempt_busy`; a held archive transaction lock fails immediately
-as `archive_transaction_busy`. `sync --no-push`
+A held lock fails immediately as `archive_transaction_busy`. `sync --no-push`
 reports `partial_retained`; malformed input, archive failure, failed or
 uncertain publication, and readback mismatch retain every source event.
 

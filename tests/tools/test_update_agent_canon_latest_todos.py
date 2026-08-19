@@ -267,7 +267,7 @@ def _make_parent_with_tools_projection_with_submodule(
             source_dir = PROJECT_ROOT / "tools" / source_dir_name
             target_dir = vendor_tool_root / source_dir_name
             if not target_dir.exists():
-                shutil.copytree(source_dir, target_dir, symlinks=True)
+                shutil.copytree(source_dir, target_dir)
     if not init_submodule:
         shutil.rmtree(repo / "vendor" / "agent-canon")
     return repo, helper
@@ -289,12 +289,8 @@ def _make_parent_with_legacy_projection(tmp_root: Path) -> Path:
     legacy_agent_tools = repo / "vendor" / "agent-canon" / "tools" / "agent_tools"
     shutil.rmtree(legacy_ci, ignore_errors=True)
     shutil.rmtree(legacy_agent_tools, ignore_errors=True)
-    shutil.copytree(PROJECT_ROOT / "tools" / "ci", legacy_ci, symlinks=True)
-    shutil.copytree(
-        PROJECT_ROOT / "tools" / "agent_tools",
-        legacy_agent_tools,
-        symlinks=True,
-    )
+    shutil.copytree(PROJECT_ROOT / "tools" / "ci", legacy_ci)
+    shutil.copytree(PROJECT_ROOT / "tools" / "agent_tools", legacy_agent_tools)
     for asset in [
         "agents",
         "evidence",
@@ -321,7 +317,7 @@ def _make_parent_with_legacy_projection(tmp_root: Path) -> Path:
                 shutil.copy2(source_path, target_path)
             continue
         if source_path.is_dir():
-            shutil.copytree(source_path, target_path, symlinks=True)
+            shutil.copytree(source_path, target_path)
         elif source_path.is_file():
             shutil.copy2(source_path, target_path)
     legacy_contract = repo / "vendor" / "agent-canon" / "documents" / "repo-structure-contract.toml"
@@ -339,7 +335,7 @@ def _make_parent_with_legacy_projection(tmp_root: Path) -> Path:
         shutil.copy2(PROJECT_ROOT / "ROOT_AGENTS.md", legacy_root_file)
     legacy_codex_dir = repo / ".codex"
     if not legacy_codex_dir.exists():
-        shutil.copytree(PROJECT_ROOT / ".codex", legacy_codex_dir, symlinks=True)
+        shutil.copytree(PROJECT_ROOT / ".codex", legacy_codex_dir)
     return repo
 
 
@@ -421,7 +417,7 @@ def test_source_tools_root_prefers_vendor_tools_in_fresh_clone(tmp_path: Path) -
             source_dir = PROJECT_ROOT / "tools" / source_dir_name
             target_dir = fresh_vendor_tools / source_dir_name
             if not target_dir.exists():
-                shutil.copytree(source_dir, target_dir, symlinks=True)
+                shutil.copytree(source_dir, target_dir)
     (fresh_root / "tools").mkdir(parents=True, exist_ok=True)
     fallback_sync = fresh_root / "tools" / "sync_agent_canon.sh"
     fallback_sync.write_text(

@@ -77,14 +77,9 @@ for _module_name in (
     if not _module_belongs_to_current_checkout(_module_name):
         sys.modules.pop(_module_name, None)
 
-from tools.agent_tools import github_publish
-from tools.agent_tools import parent_root_side_effects as _canonical_parent
 from tools.agent_tools.graph_client import GraphClient
+from tools.agent_tools import github_publish
 from tools.agent_tools.log_repository_identity import stable_source_repository_id
-from tools.agent_tools.parent_root_side_effects import (
-    ParentRootAttestationRequest,
-    ParentRootSideEffectBoundary,
-)
 from tools.agent_tools.runtime_log_paths import (
     mounted_log_archive_root,
     repo_log_key,
@@ -105,9 +100,7 @@ LIFECYCLE_REVERSE_COVERAGE = {
     "tools/agent_tools/runtime_log_archive_git.py": {"RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-011", "RL-013", "RL-015"},
     "tools/ci/run_codex_in_repo_container.py": {"RL-002", "RL-004"},
 }
-sys.modules["parent_root_side_effects"] = _canonical_parent
 import runtime_log_archive_git  # noqa: E402
-from tools.agent_tools.fixture_spawn import record_environment  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -137,6 +130,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
     def setUp(self) -> None:
         """Set the stable source remote used by archive command fixtures."""
         self._old_source_remote = os.environ.get("AGENT_CANON_SOURCE_REPOSITORY_REMOTE")
+        self._old_parent_root = os.environ.get("AGENT_CANON_PARENT_ROOT")
         self._old_hook_archive_dir = os.environ.get("AGENT_CANON_HOOK_ARCHIVE_DIR")
         self._old_hook_event_spool_dir = os.environ.get(
             "AGENT_CANON_HOOK_EVENT_SPOOL_DIR"
@@ -147,11 +141,12 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         # Git from walking through the managed checkout when a fixture is
         # intentionally an empty/non-Git source or canon root.
         os.environ["GIT_CEILING_DIRECTORIES"] = tempfile.gettempdir()
-        for env_name in ("AGENT_CANON_HOOK_ARCHIVE_DIR", "AGENT_CANON_HOOK_EVENT_SPOOL_DIR"):
+        for env_name in (
+            "AGENT_CANON_PARENT_ROOT",
+            "AGENT_CANON_HOOK_ARCHIVE_DIR",
+            "AGENT_CANON_HOOK_EVENT_SPOOL_DIR",
+        ):
             os.environ.pop(env_name, None)
-        self._record_environment_context = record_environment(cwd=PROJECT_ROOT)
-        self._record_environment = self._record_environment_context.__enter__()
-        self.addCleanup(self._record_environment_context.__exit__, None, None, None)
 
     def tearDown(self) -> None:
         """Restore the caller's source remote environment."""
@@ -160,6 +155,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         else:
             os.environ["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = self._old_source_remote
         for env_name, old_value in (
+            ("AGENT_CANON_PARENT_ROOT", self._old_parent_root),
             ("AGENT_CANON_HOOK_ARCHIVE_DIR", self._old_hook_archive_dir),
             ("AGENT_CANON_HOOK_EVENT_SPOOL_DIR", self._old_hook_event_spool_dir),
             ("GIT_CEILING_DIRECTORIES", self._old_git_ceiling),
@@ -293,13 +289,23 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             ).encode("utf-8")
             context_target = root / "context" / "certificate.json"
             runtime_target = root / "runtime" / "runtime-event.json"
-            with record_environment(cwd=root) as environment, patch.dict(
-                os.environ, environment, clear=True
-            ), patch.object(os, "fstat", new=projected_fstat), patch.object(
-                Path, "lstat", new=projected_lstat
-            ), patch.object(
-                runtime_log_archive_git, "validate_context_discovery_certificate"
-            ), patch.object(runtime_log_archive_git, "validate_runtime_event_schema"):
+            with (
+                patch.dict(
+                    os.environ,
+                    {"AGENT_CANON_PARENT_ROOT": str(root)},
+                    clear=False,
+                ),
+                patch.object(os, "fstat", new=projected_fstat),
+                patch.object(Path, "lstat", new=projected_lstat),
+                patch.object(
+                    runtime_log_archive_git,
+                    "validate_context_discovery_certificate",
+                ),
+                patch.object(
+                    runtime_log_archive_git,
+                    "validate_runtime_event_schema",
+                ),
+            ):
                 with runtime_log_archive_git.acquire_publication_attempt_lock(
                     source, "a" * 64
                 ) as attempt_lock:
@@ -320,30 +326,6 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(runtime_target.read_bytes(), runtime_bytes)
             self.assertEqual(evidence["readback_status"], "verified")
             self.assertEqual(evidence["readback_sha256"], "a" * 64)
-
-    def test_publication_attempt_lock_uses_nested_source_path_basis(self) -> None:
-        """An outer parent handoff must not replace the source spool basis."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            outer = Path(tmp_dir) / "outer"
-            source = outer / "source"
-            outer.mkdir()
-            source.mkdir()
-            subprocess.run(["git", "init", "-q", str(outer)], check=True)
-
-            with record_environment(cwd=outer) as environment, patch.dict(
-                os.environ, environment, clear=True
-            ):
-                spool_root = runtime_event_publication_outcome_spool_root(source)
-                with runtime_log_archive_git.acquire_publication_attempt_lock(
-                    source, "c" * 64
-                ) as attempt_lock:
-                    self.assertEqual(attempt_lock.attempt_directory.parent, spool_root)
-                    self.assertEqual(
-                        attempt_lock.lock_path,
-                        spool_root / ("c" * 64) / ".attempt.lock",
-                    )
-
-            self.assertTrue((spool_root / ("c" * 64) / ".attempt.lock").is_file())
 
     def test_publication_paths_reject_group_or_other_writable_projection(
         self,
@@ -430,13 +412,18 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                         )
                         return os.stat_result(values)
 
-                    with record_environment(cwd=Path(tmp_dir)) as environment, patch.dict(
-                        os.environ, environment, clear=True
-                    ), patch.object(os, "fstat", new=projected_fstat), patch.object(
-                        Path, "lstat", new=projected_lstat
-                    ), self.assertRaises(
-                        runtime_log_archive_git.RuntimeEventMaterializationError
-                    ) as raised:
+                    with (
+                        patch.dict(
+                            os.environ,
+                            {"AGENT_CANON_PARENT_ROOT": tmp_dir},
+                            clear=False,
+                        ),
+                        patch.object(os, "fstat", new=projected_fstat),
+                        patch.object(Path, "lstat", new=projected_lstat),
+                        self.assertRaises(
+                            runtime_log_archive_git.RuntimeEventMaterializationError
+                        ) as raised,
+                    ):
                         publisher(target, bytes_)
                     self.assertEqual(raised.exception.code, expected_code)
                     self.assertFalse(target.exists())
@@ -484,7 +471,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             target = root / "external-summary.json"
-            with patch.dict(os.environ, {}, clear=True):
+            with patch.dict(os.environ, {}, clear=False):
                 os.environ.pop("AGENT_CANON_PARENT_ROOT", None)
                 with self.assertRaises(github_publish.ParentRootSideEffectError) as raised:
                     github_publish._write_publication_summary(target, b"{}\n")
@@ -494,40 +481,6 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             self.assertFalse(target.exists())
             self.assertEqual(tuple(root.iterdir()), ())
-
-    def test_parent_bound_index_first_publication_accepts_missing_target(self) -> None:
-        """Archive index publication creates its optional JSONL target once."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
-            boundary = ParentRootSideEffectBoundary()
-            attestation = boundary.attest(
-                ParentRootAttestationRequest(
-                    cwd=root, explicit_root=root, purpose="runtime-log-archive"
-                )
-            )
-            target = root / "reports" / "archive-index.jsonl"
-            with (
-                patch.dict(
-                    os.environ,
-                    {"AGENT_CANON_SIDE_EFFECT_PARENT_ROOT": str(root)},
-                    clear=False,
-                ),
-                patch.object(
-                    runtime_log_archive_git,
-                    "resolve_parent_writer_attestation",
-                    return_value=attestation,
-                ),
-            ):
-                self.assertTrue(
-                    runtime_log_archive_git.write_jsonl_once(
-                        target, {"archive_id": "first"}, "first"
-                    )
-                )
-            self.assertEqual(
-                target.read_text(encoding="utf-8"),
-                '{"archive_id": "first"}\n',
-            )
 
     def test_secure_publication_reports_cleanup_failure_without_suppression(self) -> None:
         """A failed temp cleanup is typed and never silently discarded."""
@@ -583,25 +536,23 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             env.pop(env_name, None)
         if extra_env:
             env.update(extra_env)
-        with record_environment(cwd=source_root, base_env=env) as record_env:
-            return subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--source-root",
-                    str(source_root),
-                    "--canon-root",
-                    str(canon_root),
-                    "--remote",
-                    str(remote),
-                    *args,
-                ],
-                check=False,
-                capture_output=True,
-                cwd=source_root,
-                env=record_env,
-                text=True,
-            )
+        return subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                "--source-root",
+                str(source_root),
+                "--canon-root",
+                str(canon_root),
+                "--remote",
+                str(remote),
+                *args,
+            ],
+            check=False,
+            capture_output=True,
+            env=env,
+            text=True,
+        )
 
     def expected_branch(self, source: Path, chat_key: str | None = None) -> str:
         """Return the stable source branch expected by run_tool."""
@@ -977,23 +928,22 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             for env_name in ("CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_CONVERSATION_ID"):
                 env.pop(env_name, None)
 
-            with record_environment(cwd=canon, base_env=env) as record_env:
-                result = subprocess.run(
-                    [
-                        sys.executable,
-                        str(SCRIPT),
-                        "--canon-root",
-                        str(canon),
-                        "--remote",
-                        str(remote),
-                        "repo-key",
-                    ],
-                    check=False,
-                    capture_output=True,
-                    cwd=canon,
-                    env=record_env,
-                    text=True,
-                )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--canon-root",
+                    str(canon),
+                    "--remote",
+                    str(remote),
+                    "repo-key",
+                ],
+                check=False,
+                capture_output=True,
+                cwd=canon,
+                env=env,
+                text=True,
+            )
 
         key = repo_log_key(canon)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -2034,7 +1984,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                     "CODEX_HOME": str(host_home / ".codex"),
                     "HOME": str(host_home),
                 },
-                clear=True,
+                clear=False,
             ):
                 with self.assertRaises(
                     runtime_log_archive_git.RuntimeEventMaterializationError

@@ -44,15 +44,6 @@ def git(cwd: Path, *args: str, check: bool = True) -> str:
     return result.stdout.strip()
 
 
-def materialize_exact_fixture_root(root: Path) -> None:
-    """Materialize a nested Git root and canonical discovery sentinel."""
-    root.mkdir(parents=True, exist_ok=True)
-    git(root, "init", "-q", "-b", "main")
-    sentinel = root / ".agent-canon" / "fixture-sentinel"
-    sentinel.parent.mkdir(parents=True, exist_ok=True)
-    sentinel.write_text(f"{root.resolve()}\n", encoding="utf-8")
-
-
 class LogRepositoryLifecycleTest(unittest.TestCase):
     """Exercise stable identity, root resolution, snapshots, and publication."""
 
@@ -325,23 +316,14 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
             standalone = root / "standalone"
             (standalone / "agents" / "skills").mkdir(parents=True)
             (standalone / "agents" / "skills" / "catalog.yaml").write_text("version: 1\n", encoding="utf-8")
-            materialize_exact_fixture_root(standalone)
-            clean_identity = {
-                key: value
-                for key, value in os.environ.items()
-                if not key.startswith("AGENT_CANON_")
-            }
-            with patch.dict(os.environ, clean_identity, clear=True):
-                standalone_resolution = resolve_agent_canon_source_root(standalone)
+            standalone_resolution = resolve_agent_canon_source_root(standalone)
             self.assertEqual(standalone_resolution.layout, "standalone")
             self.assertEqual(standalone_resolution.source_root, standalone.resolve())
             self.assertEqual(standalone_resolution.canon_root, standalone.resolve())
             parent = root / "parent"
             (parent / "vendor" / "agent-canon" / "agents" / "skills").mkdir(parents=True)
             (parent / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml").write_text("version: 1\n", encoding="utf-8")
-            materialize_exact_fixture_root(parent)
-            with patch.dict(os.environ, clean_identity, clear=True):
-                vendored_resolution = resolve_agent_canon_source_root(parent)
+            vendored_resolution = resolve_agent_canon_source_root(parent)
             vendor = parent / "vendor" / "agent-canon"
             self.assertEqual(vendored_resolution.layout, "vendored")
             self.assertEqual(vendored_resolution.source_root, vendor.resolve())

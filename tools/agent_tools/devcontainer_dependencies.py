@@ -47,22 +47,24 @@ from typing import Any, Protocol
 try:
     from .parent_root_side_effects import (
         ParentRootAttestationReceipt,
+        ParentRootAttestationRequest,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
+        attest_parent_root,
         child_environment,
         ensure_parent_owned_directory,
         resolve_parent_owned_path,
-        resolve_parent_writer_attestation,
     )
 except ImportError:  # direct script execution
     from parent_root_side_effects import (  # type: ignore[no-redef]
         ParentRootAttestationReceipt,
+        ParentRootAttestationRequest,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
+        attest_parent_root,
         child_environment,
         ensure_parent_owned_directory,
         resolve_parent_owned_path,
-        resolve_parent_writer_attestation,
     )
 
 from packaging.utils import canonicalize_name
@@ -191,10 +193,14 @@ IMAGE_DIRECTORY_MODE = 0o555
 IMAGE_FILE_MODE = 0o444
 
 
-def _parent_attestation(purpose: str) -> ParentRootAttestationReceipt:
+def _parent_attestation(workspace: Path, purpose: str) -> ParentRootAttestationReceipt:
     """Authenticate the selected parent before dependency side effects."""
     try:
-        return resolve_parent_writer_attestation(purpose=purpose)
+        return attest_parent_root(
+            ParentRootAttestationRequest(
+                cwd=workspace, explicit_root=workspace, purpose=purpose
+            )
+        )
     except ParentRootSideEffectError as exc:
         raise DependencyError(
             f"parent-root-attestation:{exc.reject.value}:{exc.detail}"
@@ -208,7 +214,7 @@ def _parent_temp_root(workspace: Path, purpose: str) -> Path:
     # without manufacturing a repository outside the selected boundary.
     if not workspace.exists():
         workspace = workspace.parent
-    attestation = _parent_attestation(f"dependency-{purpose}")
+    attestation = _parent_attestation(workspace, f"dependency-{purpose}")
     try:
         receipt = resolve_parent_owned_path(
             attestation, Path(".agent-canon") / "tmp" / "devcontainer" / purpose,
@@ -218,12 +224,9 @@ def _parent_temp_root(workspace: Path, purpose: str) -> Path:
         raise DependencyError(
             f"parent-root-path:{exc.reject.value}:{exc.detail}"
         ) from exc
-    try:
-        return ensure_parent_owned_directory(
-            attestation, receipt.physical_path, f"dependency-{purpose}"
-        ).physical_path
-    finally:
-        ParentRootSideEffectBoundary().release_parent_owned_path(receipt)
+    return ensure_parent_owned_directory(
+        attestation, receipt.physical_path, f"dependency-{purpose}"
+    ).physical_path
 
 
 class DependencyError(ValueError):
@@ -3676,15 +3679,11 @@ class Installer:
             receipts.mkdir(parents=True, exist_ok=True)
             self._parent_attestation = None
         else:
-            self._parent_attestation = _parent_attestation("dependency-install")
+            self._parent_attestation = _parent_attestation(workspace, "dependency-install")
             try:
-                receipt = resolve_parent_owned_path(
+                receipts = resolve_parent_owned_path(
                     self._parent_attestation, receipts, "dependency-receipts", create=False
-                )
-                try:
-                    receipts = receipt.physical_path
-                finally:
-                    ParentRootSideEffectBoundary().release_parent_owned_path(receipt)
+                ).physical_path
             except ParentRootSideEffectError as exc:
                 raise DependencyError(
                     f"parent-root-path:{exc.reject.value}:{exc.detail}"

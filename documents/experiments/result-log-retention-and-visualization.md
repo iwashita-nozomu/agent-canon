@@ -26,7 +26,7 @@ JSONL and accumulated eval archive branch policy belong to
   closeout evidence for result logs and reports.
 - Main path: Storage Classes, Required Bundle Shape, Visualization Rules,
   Retention Rules, and Closeout Evidence.
-- Read this before deciding where run artifacts, summaries, images, notebooks,
+- Read this before deciding where run artifacts, summaries, and images,
   or report evidence should live.
 - Boundary: external runtime hook JSONL and accumulated eval archive branch
   policy are owned by `documents/runtime/runtime-log-archive.md`.
@@ -43,31 +43,35 @@ JSONL and accumulated eval archive branch policy belong to
   and archived agent run reports live under
   `.agent-canon/log-archive/...` as defined by
   `documents/runtime/runtime-log-archive.md`.
-- `experiments/<topic>/result/<variant>/<run-id>/` stores raw experiment outputs, JSONL,
-  generated plots, HTML, SVG, HLO dumps, and machine-readable summaries.
-- `experiments/<topic>/result/<variant>/<run-id>/logs/` stores per-run stdout/stderr,
+- `experiments/<topic>/result/<run-id>/raw/` stores raw experiment outputs, JSONL,
+  HLO dumps, and other producer-owned evidence.
+- `experiments/<topic>/result/<run-id>/summary/` stores compact summaries,
+  case records, manifests, snapshots, visualization status, and failure evidence.
+- `experiments/<topic>/result/<run-id>/logs/` stores per-run stdout/stderr,
   tool, checker, and diagnostic logs that are not the managed wrapper `run.log`.
-- `experiment-results/<topic>/<variant>` stores the
-  Git-retained copy of formal experiment result/report artifacts produced from
-  the source checkout.
-- `experiments/<topic>/visualize.ipynb` stores the Jupyter notebook used to visualize
-  run artifacts and regenerate figures/tables from `result/<variant>/<run-id>/`.
-- `experiments/report/<topic>/<variant>/<run-id>.md` stores the human-readable experiment report.
+- `experiments/<topic>/result/<run-id>.tar.gz` stores the
+  one-run compressed git-annex archive of formal experiment result/report
+  artifacts produced from the source checkout. The archive contains the result
+  tree, optional `experiments/<topic>/report/<run-id>.md`, and its
+  canonical retention manifest.
+- `experiments/<topic>/visualization.py` is the sole topic visualization entry. Its renderer may
+  produce deterministic HTML/SVG/PNG beside the summary artifacts; the default template has no notebook.
+- `experiments/<topic>/report/<run-id>.md` stores the human-readable experiment report.
 - `topic`, `variant`, and `run_name` form the immutable
   `agentcanon.experiment-run-identity/v2` nested identity in every manifest.
-- `experiments/<topic>/result/<variant>/LATEST.json` and `LATEST.md` are the
-  only latest-result pointers; they never compare or merge runs from another
-  variant.
+- `experiments/<topic>/result/LATEST.<variant>.json` and
+  `LATEST.<variant>.md` are the variant-scoped latest-result pointers. The
+  flat result root contains no global `LATEST.json` fallback.
 - Latest selection and the JSON/Markdown pair publication execute under one
-  per-variant directory lock with a generation check. An explicit older run
-  cannot overwrite a newer pointer, and a failed second replacement restores
+  result-root lock with a variant-specific generation check. An explicit older
+  run cannot overwrite a newer pointer, and a failed second replacement restores
   the first file so the pair is never left with mixed identities or temporary
-  files.
+  files. Different variants keep independent pointer pairs.
 - `tests/logs/[YYYYMMDD]-[HHMMSS]/` stores test-run raw logs, JSONL extracts,
   and exit-code records.
 
 Do not use `reports/` as the raw-data home for topic-specific experiments.
-Do not put raw experiment result trees directly under `notes/`.
+Do not put raw experiment result trees directly under `documents/notes/`.
 
 ## Required Bundle Shape
 
@@ -75,22 +79,23 @@ Every retained run directory should contain the smallest useful set below.
 
 - `manifest.json`: run identity, command, commit, branch, host/runtime,
   start/end time, tool versions, and paths to raw outputs.
-- `summary.json`: compact pass/fail, metrics, counts, and primary artifact paths.
+- `summary/summary.json`: compact pass/fail, metrics, counts, and primary artifact paths.
+- `summary/cases.jsonl`: terminal case records and typed failure fields.
 - `events.jsonl`: one JSON object per event or measurement when event-level
   data is useful.
 - `README.md` or `report.md`: short reader-facing entrypoint when the directory
   is not obvious from the parent report.
 
 Long raw logs may be retained as `*.raw.txt`, but the closeout evidence must
-point to a `summary.json`, `*.jsonl`, or reader-facing Markdown summary.
+point to `summary/summary.json`, `summary/cases.jsonl`, or reader-facing Markdown summary.
 
 ## Visualization Rules
 
 - Prefer text-first summaries for closeout gates, then link plots or HTML.
 - Store graph/plot outputs beside the data that generated them.
-- For experiment visualization, keep the Jupyter notebook at
-  `experiments/<topic>/visualize.ipynb` and read data from `result/<variant>/<run-id>/`.
-  Do not use notebooks as the formal run launcher or config source of truth.
+- For experiment visualization, use `experiments/<topic>/visualization.py` and read data from the
+  run's `raw/` and `summary/` directories. Do not use a notebook as the formal run launcher or
+  config source of truth.
 - Use deterministic formats (`svg`, `png`, `html`, `json`) and record the
   generation command in the manifest.
 - For dependency and structural graphs, keep the source edges or DOT input with
@@ -103,7 +108,7 @@ Canonical helper commands:
 python3 tools/data/jsonl_to_md.py <input.jsonl> <output.md>
 python3 tools/hlo/summarize_hlo_jsonl.py <hlo.jsonl> > summary.json
 python3 tools/experiments/html_artifact_access.py <report.html>
-python3 -m tools.experiments.publish_result_branch --variant <variant> --result-dir experiments/<topic>/result/<variant>/<run_name> --branch experiment-results/<topic>/<variant>
+python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<run-id> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
 python3 -m tools.experiments.update_latest_result experiments/<topic>/result --variant <variant>
 dot -V
 ```
@@ -128,11 +133,11 @@ directly from inside a container and tunneling to the container IP.
   task, archive it mechanically with `runtime_log_archive_git.py
   archive-agent-report`; do not create a hand-written duplicate report in the
   source tree.
-- For formal experiments, run from the source checkout and publish the generated
-  `experiments/<topic>/result/<variant>/<run_name>/` plus
-  `experiments/report/<topic>/<variant>/<run_name>.md` with
-  `tools/experiments/publish_result_branch.py`. Use `--push` when the retention
-  decision is remote result-branch storage.
+- For formal experiments, run from the source checkout and retain the generated
+  `experiments/<topic>/result/<run-id>/` plus optional
+  `experiments/<topic>/report/<run-id>.md` with
+  `tools/experiments/save_experiment_result_annex.py` in the configured annex
+  worktree. The archive operation is append-only and has no remote-push mode.
 
 ## Closeout Evidence
 

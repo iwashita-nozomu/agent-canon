@@ -30,12 +30,8 @@ DEFERRED_CANDIDATES=<candidate skills + activation evidence still required>
 
 `SELECTED_SKILLS` is the one source of truth for execution. Deferred candidates do not execute until their evidence becomes true.
 
-Structural lane evidence is separate from public skill IDs. Prompts about a
-parent repository's project-owned `.agents/skills/` discovery surface use the
-canonical detector concept `repository_skill_discovery_surface`, which routes
-to `task-routing` and `structure-refactor`; it is not a second catalog skill.
-
 LCPの `DEFERRED_SKILLS` 境界は [`agent-orchestration.md#Local Capability Priority`](./agent-orchestration.md#local-capability-priority) を参照します。ここではskill candidateの状態だけを投影します。
+
 Historical names such as `SKILLS`, `ACTIVE_SKILLS`, `MATCHED_SKILLS`, `RELATED_SKILLS`, or `RELATED_SKILL_CANDIDATES` may be accepted as compatibility reads while callers migrate, but they are not independent state owners. New consumers read only the canonical selected/candidate state. If compatibility projections are emitted, they must be derived from the canonical state and may not carry extra routing meaning.
 
 ## Operation

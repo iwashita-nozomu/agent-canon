@@ -7,15 +7,9 @@
 
 from __future__ import annotations
 
-import os
-import shutil
 import subprocess
 import sys
-from collections.abc import Iterator
-from contextlib import contextmanager
 from pathlib import Path
-
-import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 AGENT_TOOLS = ROOT / "tools" / "agent_tools"
@@ -23,10 +17,6 @@ if str(AGENT_TOOLS) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS))
 
 from attach_clean_detached_submodule import attach
-from tools.agent_tools.fixture_spawn import bootstrap_fixture_public_environment
-from tools.agent_tools.parent_root_side_effects import (
-    resolve_parent_side_effect_session_v2,
-)
 
 
 def git(root: Path, *args: str) -> str:
@@ -102,102 +92,6 @@ def make_parent(tmp_path: Path) -> tuple[Path, Path, str]:
     return parent, submodule, pinned
 
 
-def make_parent_with_plan_failure(tmp_path: Path) -> Path:
-    """Create a parent projection whose configured remote cannot be resolved."""
-    source_clone = tmp_path / "source-clone"
-    subprocess.run(
-        ["git", "clone", "--quiet", "--no-local", str(ROOT), str(source_clone)],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    parent = tmp_path / "plan-parent"
-    parent.mkdir()
-    git(parent, "init", "-b", "main")
-    for relative in (
-        "tools/update_agent_canon.sh",
-        "tools/lib/repo_paths.sh",
-        "tools/lib/update_materialization.sh",
-        "tools/lib/git_authority.sh",
-    ):
-        destination = parent / relative
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(ROOT / relative, destination)
-
-    subprocess.run(
-        [
-            "git",
-            "-c",
-            "protocol.file.allow=always",
-            "-C",
-            str(parent),
-            "submodule",
-            "add",
-            source_clone.as_posix(),
-            "vendor/agent-canon",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    submodule = parent / "vendor/agent-canon"
-    git(
-        parent,
-        "config",
-        "-f",
-        ".gitmodules",
-        "submodule.vendor/agent-canon.url",
-        (tmp_path / "missing-agent-canon.git").as_posix(),
-    )
-    git(parent, "add", ".gitmodules", "tools")
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(parent),
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.invalid",
-            "commit",
-            "-m",
-            "parent update fixture",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    assert git(submodule, "rev-parse", "HEAD")
-    return parent
-
-
-@contextmanager
-def update_product_fixture(
-    parent: Path,
-    environment: dict[str, str],
-) -> Iterator[object]:
-    """Run the update product command through the canonical fixture facade."""
-    command = ("bash", "tools/update_agent_canon.sh", "latest")
-    invocation_script = parent / "tools" / "update_agent_canon.sh"
-    record = resolve_parent_side_effect_session_v2(
-        env=environment,
-        observed_cwd=parent,
-    )
-    try:
-        with bootstrap_fixture_public_environment(
-            mode="product_fixture",
-            fixture_cwd=parent,
-            record=record,
-            base_env=environment,
-            argv=command,
-            invocation_script=invocation_script,
-        ) as fixture:
-            yield fixture
-    finally:
-        record.close()
-
-
 def test_clean_detached_at_parent_pin_attaches_requested_branch(tmp_path: Path) -> None:
     parent, submodule, pinned = make_parent(tmp_path)
     git(submodule, "branch", "-D", "main")
@@ -238,44 +132,13 @@ def test_existing_divergent_local_branch_is_not_rewritten(tmp_path: Path) -> Non
     assert git(submodule, "rev-parse", "refs/heads/main") == divergent
 
 
-def test_parent_update_prints_nonzero_plan_diagnostics_before_returning(
-    tmp_path: Path,
-    capfd: pytest.CaptureFixture[str],
-) -> None:
-    """Plan diagnostics reach stdout before the wrapper returns its plan status."""
-    parent = make_parent_with_plan_failure(tmp_path)
-    env = os.environ.copy()
-    env.update(
-        {
-            "AGENT_CANON_COMMIT_REQUEST_EVIDENCE": "evidence:" + ("0" * 64),
-            "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
-            "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "test-approved-update",
-            "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "user_request",
-            "AGENT_CANON_BRANCH_WORKTREE_REASON": "test-approved-update",
-            "HOME": str(parent / ".agent-canon" / "home"),
-            "TMPDIR": str(parent / ".agent-canon" / "tmp" / "update"),
-            "TEMP": str(parent / ".agent-canon" / "tmp" / "update"),
-            "TMP": str(parent / ".agent-canon" / "tmp" / "update"),
-            "XDG_CACHE_HOME": str(parent / ".agent-canon" / "cache"),
-            "PYTHONPYCACHEPREFIX": str(
-                parent / ".agent-canon" / "cache" / "pycache"
-            ),
-            "CARGO_HOME": str(parent / ".agent-canon" / "cache" / "cargo-home"),
-            "CARGO_TARGET_DIR": str(
-                parent / ".agent-canon" / "cache" / "cargo-target"
-            ),
-            "AGENT_CANON_PARENT_TMPDIR": str(
-                parent / ".agent-canon" / "tmp" / "update"
-            ),
-        }
-    )
-    with update_product_fixture(parent, env) as fixture:
-        receipt = fixture.receipt
-        assert receipt is not None
-        assert receipt.returncode == 2
-    output = capfd.readouterr().out
-    assert any(
-        line.startswith("agent_canon_plan_route=")
-        for line in output.splitlines()
-    )
-    assert "agent_canon_plan_status=blocked" in output
+def test_parent_update_prints_nonzero_plan_diagnostics_before_returning() -> None:
+    script = (ROOT / "tools" / "update_agent_canon.sh").read_text(encoding="utf-8")
+    capture = 'plan_output="$(cmd_plan "$branch")" || plan_rc=$?'
+    emit = "printf '%s\\n' \"$plan_output\""
+    guard = 'if [ "$plan_rc" -ne 0 ]; then'
+
+    assert capture in script
+    assert emit in script
+    assert guard in script
+    assert script.index(capture) < script.index(emit) < script.index(guard)

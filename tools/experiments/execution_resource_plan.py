@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Owns the immutable ExecutionResourcePlan transaction, canonical GPU allocation, ExperimentRunner handoff, and completion coverage.
+# responsibility Owns the immutable ExecutionResourcePlan transaction, canonical GPU allocation, reusable GPU admission primitives, managed ExperimentRunner handoff, and completion coverage.
 # upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 U-18 implementation frame and exact packet identity
 # upstream design ../../documents/design/experiment_runner.md ExperimentRunner lifecycle and scheduler boundary
 # upstream design ../../agents/skills/gpu-execution.md UUID GPU and readback contract
@@ -10,14 +10,16 @@
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md validation failure reader projection
 # upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md official nvidia-smi C/G/M/O/C+G/M+C process visibility, PID/start/container mapping, MIG UUID mapping
 # downstream implementation ./run_managed_experiment.py managed experiment adapter
+# downstream implementation ./gpu_command_admission.py provider-independent direct GPU admission adapter
 # downstream implementation ../agent_tools/execution_resource_projection.py validates exact coarse PostToolUse projection constants
 # downstream implementation ../agent_tools/jit_canonical_ir.py GPU requests must route here or fail typed preflight
 # downstream implementation ../../templates/experiments/_template/run.py direct GPU launch is statically prohibited
 # downstream environment ../../.devcontainer/devcontainer.json selects the shared runtime receipt stages
 # @dependency-end
 
-# Static consumer closure: run_managed_experiment.py is the only managed-run
-# consumer; generic lifecycle remains in the external admitted CLI.
+# Static consumer closure: run_managed_experiment.py is the managed-run
+# consumer; gpu_command_admission.py reuses only admission primitives for the
+# provider-independent direct-command route.
 
 """Canonical execution resource planning for admitted managed runs.
 
@@ -2807,22 +2809,7 @@ def build_source_path_set(
             "gpu_source_path_topic_invalid",
             "source path selection requires one simple topic name",
         )
-    fixed_core = (
-        "tools/experiments/execution_resource_plan.py",
-        "tools/experiments/run_managed_experiment.py",
-        "tools/experiments/registry_lib.py",
-        "tools/agent_tools/jit_canonical_ir.py",
-    )
     result: list[str] = []
-    for relative_path in fixed_core:
-        candidate = source_root / relative_path
-        if not candidate.is_file():
-            raise TypedPreflightFailure(
-                "gpu_source_path_missing",
-                "a fixed managed source path is missing",
-                relative_path=relative_path,
-            )
-        result.append(relative_path)
     registry_path = source_root / "experiments/registry.toml"
     if not registry_path.is_file():
         raise TypedPreflightFailure(
@@ -3009,7 +2996,7 @@ _NVIDIA_MIG_LINE_RE = re.compile(
     r"^[ ]{2,}MIG ([0-9]+c\.)?[0-9]+g\.[0-9]+gb[ ]{2,}Device[ ]{2}([0-9]+): \(UUID: (MIG-[A-Za-z0-9-]+)\)$"
 )
 _NVIDIA_UUID_RE = re.compile(r"^(GPU|MIG)-[A-Za-z0-9-]+$")
-_NVIDIA_UNSAFE_XML_RE = re.compile(r"<!\s*(?:DOCTYPE|ENTITY)\b", re.IGNORECASE)
+_NVIDIA_UNSAFE_XML_RE = re.compile(r"<!\s*ENTITY\b", re.IGNORECASE)
 _NVIDIA_PROCESS_CONTAINER_TAGS = frozenset(
     {"processes", "compute_processes", "graphics_processes"}
 )
@@ -3351,7 +3338,7 @@ def _parse_nvidia_smi_xml_document(evidence: EvidenceFd) -> _ParsedNvidiaXmlDocu
     if _NVIDIA_UNSAFE_XML_RE.search(data.decode("ascii", errors="ignore")):
         raise _nvidia_parser_failure(
             "gpu_structured_probe_unsafe_xml",
-            "NVIDIA XML must not contain DTD or entity declarations",
+            "NVIDIA XML must not contain entity declarations",
             evidence=evidence,
         )
     _decode_nvidia_utf8(data, evidence)

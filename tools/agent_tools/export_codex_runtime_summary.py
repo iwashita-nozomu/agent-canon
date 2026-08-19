@@ -31,17 +31,19 @@ from typing import cast
 
 try:
     from .parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        resolve_parent_writer_attestation,
+        attest_parent_root,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        resolve_parent_writer_attestation,
+        attest_parent_root,
     )
 
 if __package__ in (None, ""):
@@ -577,18 +579,21 @@ def summary_index_payload(
 def _append_parent_jsonl(path: Path, record: dict[str, object], purpose: str) -> None:
     """Append one record using parent-local atomic publication when attested."""
     line = (json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
-    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if configured:
-        attestation = resolve_parent_writer_attestation(purpose=purpose)
-        boundary = ParentRootSideEffectBoundary()
-        existing = boundary.read_parent_owned_bytes(
-            attestation,
-            path,
-            purpose,
-            allow_missing=True,
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
         )
-        if existing is None:
-            existing = b""
+        boundary = ParentRootSideEffectBoundary()
+        existing = b""
+        try:
+            existing = boundary.read_parent_owned_file(
+                boundary.resolve_parent_owned_path(attestation, path, purpose, create=False)
+            )
+        except ParentRootSideEffectError as exc:
+            if exc.reject is not ParentRootReject.ROOT_MISSING:
+                raise
         boundary.write_parent_owned_file(attestation, path, existing + line, purpose)
         return
     raise ParentRootSideEffectError(

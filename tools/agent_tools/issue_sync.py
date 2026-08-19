@@ -24,17 +24,19 @@ from pathlib import Path
 
 try:
     from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        resolve_parent_writer_attestation,
+        attest_parent_root,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        resolve_parent_writer_attestation,
+        attest_parent_root,
     )
 
 REQUIRED_FIELDS = (
@@ -60,9 +62,12 @@ FIELD_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$")
 
 def _write_issue_output(path: Path, payload: bytes, purpose: str) -> None:
     """Publish issue evidence/source updates through the parent root."""
-    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if configured:
-        attestation = resolve_parent_writer_attestation(purpose=purpose)
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+        )
         ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, payload, purpose)
         return
     raise ParentRootSideEffectError(
@@ -808,9 +813,12 @@ def render_markdown_summary(report: IssueSyncReport) -> str:
 def append_summary(path: Path, report: IssueSyncReport) -> None:
     """Append Markdown summary output to a file."""
     rendered = render_markdown_summary(report)
-    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if configured:
-        attestation = resolve_parent_writer_attestation(purpose="issue-sync-summary")
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="issue-sync-summary")
+        )
         boundary = ParentRootSideEffectBoundary()
         with boundary.open_parent_owned_file(
             attestation,

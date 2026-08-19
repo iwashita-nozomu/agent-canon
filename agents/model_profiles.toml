@@ -11,7 +11,7 @@
 
 schema_id = "model_profile_registry_v1"
 registry_id = "model_profile_registry"
-registry_version = 2
+registry_version = 3
 
 [writer_isolation_policy]
 current_checkout_mode = "parallel_only_for_disjoint_paths_without_shared_state"
@@ -97,19 +97,19 @@ worker = "workspace-write"
 
 [[role_instruction_templates.diff_triage_reviewer]]
 id = "diff_triage_solid_boundary"
-text = "Review bounded diffs findings-first; route SOLID-sensitive Python boundaries to python_reviewer and require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence. Return approve, revise, or escalate, and escalate public API, workflow, runtime, security, dependency, or cross-owner scope."
+text = "Review bounded diffs findings-first. Perform one initial owning review per candidate epoch, emit stable blocking finding IDs separately from advisory notes, and on repair perform only a focused recheck of addressed IDs and invalidated evidence; route SOLID-sensitive Python boundaries to python_reviewer and require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence. Return approve, revise, or escalate, and escalate public API, workflow, runtime, security, dependency, or cross-owner scope."
 priority = 100
 
 [[role_instruction_templates.python_reviewer]]
 id = "python_solid_boundary"
-text = "Review Python diffs findings-first for behavior, types, tests, and public boundaries. Follow agents/skills/python-review.md#Validation route and agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for validation scope; review the parent packet route and do not add validation outside that route. When the canonical route selects SOLID evidence, require a path-covered OOP readability report, SOLID principle signal, Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion, and check_solid_evidence.py path-coverage evidence; otherwise do not add those checks. Return revise only for evidence required by the canonical route."
+text = "Review Python diffs findings-first for behavior, types, tests, and public boundaries. Preserve the candidate epoch and stable blocking finding IDs; after repair, recheck only addressed IDs and invalidated evidence, never restart broad review. Follow agents/skills/python-review.md#Validation route and agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for validation scope; review the parent packet route and do not add validation outside that route. When the canonical route selects SOLID evidence, require a path-covered OOP readability report, SOLID principle signal, Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion, and check_solid_evidence.py path-coverage evidence; otherwise do not add those checks. Return revise only for evidence required by the canonical route."
 priority = 100
-consumer_static_text = "Review Python diffs findings-first for behavior, types, tests, and public boundaries. When the canonical route selects SOLID evidence, require a path-covered OOP readability report, SOLID principle signal, Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion, and check_solid_evidence.py path-coverage evidence; otherwise do not add those checks. Return revise only for evidence required by the canonical route."
+consumer_static_text = "Review Python diffs findings-first for behavior, types, tests, and public boundaries. Preserve the candidate epoch and stable blocking finding IDs; after repair, recheck only addressed IDs and invalidated evidence, never restart broad review. When the canonical route selects SOLID evidence, require a path-covered OOP readability report, SOLID principle signal, Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion, and check_solid_evidence.py path-coverage evidence; otherwise do not add those checks. Return revise only for evidence required by the canonical route."
 static_obligations = ["validation_owner", "parent_assignment"]
 
 [[role_instruction_templates.reviewer]]
 id = "reviewer_solid_boundary"
-text = "Review exact diffs findings-first against request clauses and owning evidence. For SOLID-sensitive Python changes require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence; return revise when that evidence or changed-path coverage is incomplete."
+text = "Review exact diffs findings-first against request clauses and owning evidence. Run one initial owning review per candidate epoch, separate stable blocking finding IDs from advisory notes, and use focused recheck only after repair. For SOLID-sensitive Python changes require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence; return revise when that evidence or changed-path coverage is incomplete."
 priority = 100
 
 [standalone_role_metadata.long_form_writer]
@@ -147,12 +147,12 @@ close_tool_target_binding = "terminal_agent_id"
 
 [[model_profiles.role_instructions]]
 id = "sol_core"
-text = "Use deterministic planning, request explicit evidence, and avoid speculative assumptions."
+text = "Use deterministic planning, request explicit evidence, and avoid speculative assumptions. Maintain one candidate epoch with stable blocking finding IDs; advisory notes do not reopen work. Reject the same state and action as non_convergent_cycle."
 priority = 1
 
 [[model_profiles.role_instructions]]
 id = "sol_execution"
-text = "Emit concrete step-by-step implementation plans and concrete completion checks."
+text = "Emit concrete implementation plans and completion checks only for actions that can change the decision tuple or strictly reduce unresolved blockers, validation, or request clauses. Prefer minimum decision-relevant total work before minimum makespan."
 priority = 2
 
 [[model_profiles]]
@@ -180,7 +180,7 @@ close_tool_target_binding = "terminal_agent_id"
 
 [[model_profiles.role_instructions]]
 id = "luna_reasoning"
-text = "Prioritize rigorous decomposition and evidence-first conclusions."
+text = "Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass."
 priority = 1
 
 [[model_profiles]]
@@ -208,9 +208,9 @@ close_tool_target_binding = "terminal_agent_id"
 
 [[model_profiles.role_instructions]]
 id = "luna_impl"
-text = "Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. For this role, execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop."
+text = "Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. For this role, execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop."
 priority = 1
-consumer_static_text = "Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Execute only implement, commit, and push actions within assigned authority; parent owns pull-request, admin-override, base-integration, and final editorial decisions."
+consumer_static_text = "Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Execute only implement, commit, and push actions within assigned authority; parent owns pull-request, admin-override, base-integration, and final editorial decisions."
 static_obligations = ["validation_owner", "parent_assignment", "parent_authority", "stop_handback"]
 
 [[model_profiles]]
@@ -238,7 +238,7 @@ close_tool_target_binding = "terminal_agent_id"
 
 [[model_profiles.role_instructions]]
 id = "terra_cross_owner"
-text = "Operate only as a conditional read-only cross-cutting specialist. Activate on multi-owner dependency closure, compaction/long-run/incomplete-handoff context reconstruction, or adversarial contradiction validation. Treat user-provided alternatives and alternatives already present in findings as admissible adversarial-comparison input. Return owner closure, context capsule, and accepted/rejected/escalated handback; send unresolved findings to Sol. Do not invent unrequested alternatives, adopt an architecture, coordinate, implement as a general worker, mutate repository state, create PRs, or make final integration decisions."
+text = "Operate only as a conditional read-only cross-cutting specialist. Activate on multi-owner dependency closure, compaction/long-run/incomplete-handoff context reconstruction, or adversarial contradiction validation. Preserve the current candidate epoch and stable blocker IDs; add a blocker only with new contract, reachable-behavior, or structural-contradiction evidence, and never repeat the same state/action. Treat user-provided alternatives and alternatives already present in findings as admissible adversarial-comparison input. Return owner closure, context capsule, and accepted/rejected/escalated handback; send unresolved findings to Sol. Do not invent unrequested alternatives, adopt an architecture, coordinate, implement as a general worker, mutate repository state, create PRs, or make final integration decisions."
 priority = 1
 
 [[model_profiles]]
@@ -266,7 +266,7 @@ close_tool_target_binding = "terminal_agent_id"
 
 [[model_profiles.role_instructions]]
 id = "luna_ship"
-text = "Constrain edits to one responsibility unit and one-pass materialization only when selected."
+text = "Act as the terminal gate for one candidate epoch. Confirm stable open blocking finding IDs and the selected validation result; do not restart broad review after repair. Zero blockers and validation pass or not_applicable is terminal, while advisory improvements go to a separate Issue or note."
 priority = 1
 
 [[model_profiles]]
@@ -294,9 +294,9 @@ close_tool_target_binding = "terminal_agent_id"
 
 [[model_profiles.role_instructions]]
 id = "spark_impl"
-text = "Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop."
+text = "Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Repair only assigned stable blocking finding IDs; do not repeat the same packet and evidence or restart broad review. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop."
 priority = 1
-consumer_static_text = "Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Execute only implement, commit, and push actions within assigned authority; parent owns pull-request, admin-override, base-integration, and final editorial decisions."
+consumer_static_text = "Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Repair only assigned stable blocking finding IDs; do not repeat the same packet and evidence or restart broad review. Execute only implement, commit, and push actions within assigned authority; parent owns pull-request, admin-override, base-integration, and final editorial decisions."
 static_obligations = ["validation_owner", "parent_assignment", "parent_authority", "stop_handback"]
 
 [[model_profiles]]

@@ -6,8 +6,6 @@
 # upstream design ../../documents/runtime/shared-runtime-surfaces.toml machine-readable surface manifest
 # downstream implementation ../sync_agent_canon.sh consumes sync specs from this manifest
 # downstream implementation ./check_convention_compliance.py validates manifest wiring
-# downstream implementation ../../tests/tools/test_update_agent_canon_surface_migration.py verifies nested retired descendants
-# downstream implementation ../../tests/tools/test_testrunner_schema.py validates source test-list ownership metadata
 # @dependency-end
 """Parse AgentCanon runtime surface projection manifests."""
 
@@ -17,6 +15,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 
 try:
@@ -24,8 +23,8 @@ try:
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
-from pathlib import Path
+from dataclasses import dataclass, replace
+from pathlib import Path, PurePosixPath
 from typing import cast
 
 DEFAULT_MANIFEST = Path("documents/runtime/shared-runtime-surfaces.toml")
@@ -44,7 +43,9 @@ SYNC_SPEC_COMMANDS = frozenset(
         "root-absent-paths",
     }
 )
-MANIFEST_COMMANDS = SYNC_SPEC_COMMANDS | frozenset({"normalized-snapshot", "check-doc"})
+MANIFEST_COMMANDS = SYNC_SPEC_COMMANDS | frozenset(
+    {"normalized-snapshot", "check-doc", "projection-forbidden-roots"}
+)
 ALLOWED_MODES = frozenset(
     {
         "symlink",
@@ -55,6 +56,9 @@ ALLOWED_MODES = frozenset(
         "removed_legacy",
     }
 )
+DELETION_MODES = frozenset({"removed_legacy", "standalone_only"})
+ROOT_ABSENCE_TASK = "root-absence"
+UPDATE_TRANSITION_TASK = "update-transition"
 ALLOWED_PROJECTION_PRODUCERS = frozenset(
     {
         "agent-canon",
@@ -85,47 +89,6 @@ ALLOWED_PROJECTION_KINDS = frozenset(
         "removed_legacy",
     }
 )
-CURRENT_TOP_LEVEL_KEYS = frozenset(
-    {
-        "version",
-        "prefix",
-        "integration_mode",
-        "default_consumer",
-        "selection",
-        "surface",
-        "group",
-        "update_transition",
-    }
-)
-LEGACY_TOP_LEVEL_KEYS = frozenset({"version", "prefix", "surface", "group"})
-CURRENT_SURFACE_KEYS = frozenset(
-    {
-        "path",
-        "mode",
-        "projection_producer",
-        "projection_kind",
-        "source",
-        "local_override_allowed",
-        "optional",
-    }
-)
-CURRENT_GROUP_KEYS = frozenset(
-    {
-        "mode",
-        "projection_producer",
-        "projection_kind",
-        "source_prefix",
-        "paths",
-        "local_override_allowed",
-        "optional",
-    }
-)
-LEGACY_SURFACE_KEYS = frozenset(
-    {"path", "mode", "owner", "class", "source", "local_override_allowed", "optional"}
-)
-LEGACY_GROUP_KEYS = frozenset(
-    {"mode", "owner", "class", "paths", "local_override_allowed"}
-)
 DOC_ALWAYS_REQUIRED_MARKERS = (
     "documents/runtime/shared-runtime-surfaces.toml",
     "AGENTS.md",
@@ -136,6 +99,8 @@ DOC_ALWAYS_REQUIRED_MARKERS = (
     "tools/agent-canon -> ../vendor/agent-canon/tools",
     "vendor/agent-canon/tools/",
     "Project-local automation must stay in project-owned paths",
+    "projection_forbidden_roots",
+    "tools/ci/run_standalone_static_gate_unit.sh",
 )
 
 
@@ -189,6 +154,8 @@ class SurfaceManifest:
     surface_selection: SurfaceSelection
     entries: tuple[SurfaceEntry, ...]
     update_transitions: tuple[UpdateTransition, ...]
+    deletion_targets: tuple[DeletionTarget, ...]
+    projection_forbidden_roots: tuple[str, ...] = ()
 
     @property
     def integration_mode(self) -> str:
@@ -240,6 +207,118 @@ class UpdateTransition:
     transition_id: str
     from_agent_canon_pins: tuple[str, ...]
     candidates: tuple[UpdateTransitionCandidate, ...]
+
+
+@dataclass(frozen=True)
+class DeletionTarget:
+    """One task-owned deletion target admitted below a canonical root."""
+
+    task: str
+    owner: str
+    path: str
+    canonical_path: Path
+
+
+def validate_sync_target_path(path: str, label: str) -> str:
+    """Return one normalized non-root repository-relative sync target."""
+    pure_path = PurePosixPath(path)
+    invalid = (
+        not path
+        or path != path.strip()
+        or path == "."
+        or pure_path.is_absolute()
+        or pure_path.as_posix() != path
+        or ".." in pure_path.parts
+        or any(character in path for character in ("\0", "\n", "\r", "\t", "\\", ":"))
+        or (pure_path.parts and pure_path.parts[0] == ".git")
+    )
+    if invalid:
+        raise ValueError(
+            f"{label} must be a normalized non-root repository-relative POSIX path"
+        )
+    return path
+
+
+def admit_deletion_targets(
+    root: Path,
+    entries: Sequence[SurfaceEntry],
+    transitions: Sequence[UpdateTransition],
+) -> tuple[
+    tuple[SurfaceEntry, ...],
+    tuple[UpdateTransition, ...],
+    tuple[DeletionTarget, ...],
+]:
+    """Generate, normalize, and admit every manifest deletion target."""
+    try:
+        canonical_root = root.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise ValueError(f"deletion root cannot be resolved: {root}") from exc
+    if not canonical_root.is_dir():
+        raise ValueError(f"deletion root is not a directory: {canonical_root}")
+
+    def admit(raw_path: str, *, task: str, owner: str) -> DeletionTarget:
+        if not task or not owner:
+            raise ValueError("deletion target requires an explicit task owner")
+        normalized = validate_sync_target_path(raw_path, f"{owner}: deletion target")
+        candidate_path = canonical_root / normalized
+        try:
+            canonical_parent = candidate_path.parent.resolve(strict=False)
+        except (OSError, RuntimeError) as exc:
+            raise ValueError(
+                f"{owner}: deletion target {raw_path!r} cannot be resolved"
+            ) from exc
+        canonical_path = canonical_parent / candidate_path.name
+        if canonical_path == canonical_root:
+            raise ValueError(
+                f"{owner}: deletion target {raw_path!r} resolves to the "
+                "canonical repository root"
+            )
+        try:
+            canonical_path.relative_to(canonical_root)
+        except ValueError as exc:
+            raise ValueError(
+                f"{owner}: deletion target {raw_path!r} resolves outside "
+                "the canonical repository root"
+            ) from exc
+        return DeletionTarget(
+            task=task,
+            owner=owner,
+            path=normalized,
+            canonical_path=canonical_path,
+        )
+
+    normalized_entries: list[SurfaceEntry] = []
+    normalized_transitions: list[UpdateTransition] = []
+    admitted: list[DeletionTarget] = []
+    for entry in entries:
+        if entry.mode in DELETION_MODES:
+            target = admit(
+                entry.path,
+                task=ROOT_ABSENCE_TASK,
+                owner=(
+                    f"surface:{entry.mode}:{entry.projection_producer}:"
+                    f"{entry.projection_kind}"
+                ),
+            )
+            entry = replace(entry, path=target.path)
+            admitted.append(target)
+        normalized_entries.append(entry)
+    for transition in transitions:
+        candidates: list[UpdateTransitionCandidate] = []
+        for candidate in transition.candidates:
+            target = admit(
+                candidate.path,
+                task=UPDATE_TRANSITION_TASK,
+                owner=f"update-transition:{transition.transition_id}",
+            )
+            candidates.append(replace(candidate, path=target.path))
+            admitted.append(target)
+        normalized_transitions.append(replace(transition, candidates=tuple(candidates)))
+    return (
+        tuple(normalized_entries),
+        tuple(normalized_transitions),
+        tuple(admitted),
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -298,8 +377,110 @@ def path_list(mapping: Mapping[str, object]) -> tuple[str, ...]:
     return tuple(paths)
 
 
+def optional_string_list(mapping: Mapping[str, object], key: str) -> tuple[str, ...]:
+    """Return an optional list of non-empty strings."""
+    raw_values = mapping.get(key, [])
+    if not isinstance(raw_values, list):
+        raise ValueError(f"{key} must be a list")
+    values: list[str] = []
+    for item in cast(list[object], raw_values):
+        if not isinstance(item, str) or not item:
+            raise ValueError(f"{key} entries must be non-empty strings")
+        values.append(item)
+    return tuple(values)
+
+
+def normalized_relative_path(value: str, field: str) -> str:
+    """Return one canonical repository-relative POSIX path."""
+    if not value or value.startswith("/") or "\\" in value:
+        raise ValueError(f"{field} must be a repository-relative POSIX path")
+    parts = value.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError(f"{field} must not contain empty, dot, or parent components")
+    normalized = PurePosixPath(*parts).as_posix()
+    if normalized != value:
+        raise ValueError(f"{field} must use canonical POSIX path syntax")
+    return normalized
+
+
+def path_intersects_root(path: str, root: str) -> bool:
+    """Return whether one path is equal to, below, or above one root boundary."""
+    path_parts = PurePosixPath(path).parts
+    root_parts = PurePosixPath(root).parts
+    shared_length = min(len(path_parts), len(root_parts))
+    return path_parts[:shared_length] == root_parts[:shared_length]
+
+
+def projection_forbidden_roots_from_mapping(
+    data: Mapping[str, object],
+) -> tuple[str, ...]:
+    """Load a minimal, non-overlapping projection exclusion set."""
+    roots = tuple(
+        normalized_relative_path(value, "projection_forbidden_roots entry")
+        for value in optional_string_list(data, "projection_forbidden_roots")
+    )
+    if len(roots) != len(set(roots)):
+        raise ValueError("projection_forbidden_roots entries must be unique")
+    for index, root in enumerate(roots):
+        for other in roots[index + 1 :]:
+            if path_intersects_root(root, other):
+                raise ValueError(
+                    "projection_forbidden_roots entries must not overlap: "
+                    f"{root},{other}"
+                )
+    return roots
+
+
+def entry_source_for_projection_policy(entry: SurfaceEntry) -> str:
+    """Return the source path that can materialize one manifest entry."""
+    if entry.mode in {"symlink", "copy"}:
+        return entry.source_or_default()
+    return entry.source
+
+
+def validate_projection_boundaries(
+    entries: Iterable[SurfaceEntry],
+    update_transitions: Iterable[UpdateTransition],
+    forbidden_roots: tuple[str, ...],
+) -> None:
+    """Reject manifest ownership that intersects standalone-only source roots."""
+    if not forbidden_roots:
+        return
+    for entry in entries:
+        path = normalized_relative_path(entry.path, f"{entry.path}: path")
+        for root in forbidden_roots:
+            if path_intersects_root(path, root):
+                raise ValueError(
+                    f"{entry.path}: manifest-owned path intersects "
+                    f"projection-forbidden root {root}"
+                )
+        source = entry_source_for_projection_policy(entry)
+        if not source:
+            continue
+        source = normalized_relative_path(source, f"{entry.path}: source")
+        for root in forbidden_roots:
+            if path_intersects_root(source, root):
+                raise ValueError(
+                    f"{entry.path}: source {source} intersects "
+                    f"projection-forbidden root {root}"
+                )
+    for transition in update_transitions:
+        for candidate in transition.candidates:
+            path = normalized_relative_path(
+                candidate.path,
+                f"{transition.transition_id}:{candidate.path}: candidate path",
+            )
+            for root in forbidden_roots:
+                if path_intersects_root(path, root):
+                    raise ValueError(
+                        f"{transition.transition_id}:{candidate.path}: update transition "
+                        f"candidate intersects projection-forbidden root {root}"
+                    )
+
+
 def validate_entry(entry: SurfaceEntry) -> SurfaceEntry:
     """Validate one manifest entry."""
+    validate_sync_target_path(entry.path, "surface path")
     if entry.mode not in ALLOWED_MODES:
         raise ValueError(f"{entry.path}: invalid mode {entry.mode}")
     if entry.projection_producer not in ALLOWED_PROJECTION_PRODUCERS:
@@ -450,11 +631,15 @@ def legacy_identity_from_mapping(mapping: Mapping[str, object]) -> LegacyIdentit
         raise ValueError("legacy identity content_sha256 must be lowercase SHA-256")
     if identity.kind == "regular":
         if identity.git_mode not in {"100644", "100755"}:
-            raise ValueError("regular legacy identity requires Git mode 100644 or 100755")
+            raise ValueError(
+                "regular legacy identity requires Git mode 100644 or 100755"
+            )
         if identity.symlink_target:
             raise ValueError("regular legacy identity must not define symlink_target")
     elif identity.git_mode != "120000" or not identity.symlink_target:
-        raise ValueError("symlink legacy identity requires mode 120000 and symlink_target")
+        raise ValueError(
+            "symlink legacy identity requires mode 120000 and symlink_target"
+        )
     return identity
 
 
@@ -472,8 +657,6 @@ def update_transition_from_mapping(mapping: Mapping[str, object]) -> UpdateTrans
     candidates: list[UpdateTransitionCandidate] = []
     for candidate in manifest_tables(mapping, "candidate"):
         path = string_value(candidate, "path")
-        if not path or path.startswith("/") or "\t" in path or "\n" in path:
-            raise ValueError(f"{transition_id}: invalid transition candidate path")
         identities = tuple(
             legacy_identity_from_mapping(identity)
             for identity in manifest_tables(candidate, "identity")
@@ -502,7 +685,9 @@ def manifest_path(root: Path, prefix: str, raw_manifest: str) -> Path:
     return root / relative
 
 
-def manifest_tables(data: Mapping[str, object], key: str) -> tuple[Mapping[str, object], ...]:
+def manifest_tables(
+    data: Mapping[str, object], key: str
+) -> tuple[Mapping[str, object], ...]:
     """Return a validated sequence of manifest tables."""
     raw_tables = data.get(key, [])
     if not isinstance(raw_tables, list):
@@ -515,105 +700,13 @@ def manifest_tables(data: Mapping[str, object], key: str) -> tuple[Mapping[str, 
     return tuple(tables)
 
 
-def _normalize_manifest_schema(
-    data: Mapping[str, object], *, allow_legacy_aliases: bool
-) -> Mapping[str, object]:
-    """Validate the manifest schema and normalize the one legacy alias form.
-
-    Legacy ``owner``/``class`` fields are accepted only for the producer's
-    version-1 normalized-snapshot command.  All other commands consume the
-    current field names directly, so a legacy file cannot silently influence
-    sync or cleanup decisions.
-    """
-    if "version" in data:
-        version = data["version"]
-        if type(version) is not int:
-            raise ValueError("version must be an integer")
-        if version != LEGACY_MANIFEST_VERSION:
-            raise ValueError(f"unsupported manifest version {version!r}")
-    unknown_top_level = set(data) - CURRENT_TOP_LEVEL_KEYS
-    if unknown_top_level:
-        raise ValueError(
-            "unknown top-level manifest keys: "
-            + ",".join(sorted(unknown_top_level))
-        )
-
-    normalized = dict(data)
-    legacy_modes: list[bool] = []
-    for table_name, allowed_current, allowed_legacy in (
-        ("surface", CURRENT_SURFACE_KEYS, LEGACY_SURFACE_KEYS),
-        ("group", CURRENT_GROUP_KEYS, LEGACY_GROUP_KEYS),
-    ):
-        tables = manifest_tables(data, table_name)
-        normalized_tables: list[Mapping[str, object]] = []
-        for index, table in enumerate(tables):
-            fields = set(table)
-            current_pair = {
-                "projection_producer",
-                "projection_kind",
-            } & fields
-            legacy_pair = {"owner", "class"} & fields
-            location = f"{table_name}[{index}]"
-            if current_pair and legacy_pair:
-                raise ValueError(f"{location}: dual current and legacy aliases")
-            if current_pair:
-                if current_pair != {"projection_producer", "projection_kind"}:
-                    raise ValueError(f"{location}: incomplete current projection pair")
-                if fields - allowed_current:
-                    raise ValueError(
-                        f"{location}: unknown current keys: "
-                        + ",".join(sorted(fields - allowed_current))
-                    )
-                legacy_modes.append(False)
-                normalized_tables.append(table)
-                continue
-            if legacy_pair:
-                if legacy_pair != {"owner", "class"}:
-                    raise ValueError(f"{location}: incomplete legacy owner/class pair")
-                if not allow_legacy_aliases:
-                    raise ValueError(f"{location}: legacy aliases are unsupported here")
-                if fields - allowed_legacy:
-                    raise ValueError(
-                        f"{location}: unknown legacy keys: "
-                        + ",".join(sorted(fields - allowed_legacy))
-                    )
-                converted = dict(table)
-                converted["projection_producer"] = converted.pop("owner")
-                converted["projection_kind"] = converted.pop("class")
-                legacy_modes.append(True)
-                normalized_tables.append(converted)
-                continue
-            raise ValueError(f"{location}: projection pair is missing")
-        normalized[table_name] = normalized_tables
-
-    if allow_legacy_aliases and any(legacy_modes):
-        if not all(legacy_modes):
-            raise ValueError("normalized snapshot cannot mix current and legacy aliases")
-        if set(data) - LEGACY_TOP_LEVEL_KEYS:
-            raise ValueError(
-                "legacy normalized snapshot has unsupported top-level keys: "
-                + ",".join(sorted(set(data) - LEGACY_TOP_LEVEL_KEYS))
-            )
-    return normalized
-
-
-def load_manifest(
-    root: Path,
-    prefix: str,
-    raw_manifest: str,
-    *,
-    allow_legacy_aliases: bool = False,
-) -> SurfaceManifest:
+def load_manifest(root: Path, prefix: str, raw_manifest: str) -> SurfaceManifest:
     """Load and validate the surface manifest."""
     path = manifest_path(root, prefix, raw_manifest)
-    raw_data = cast(
-        Mapping[str, object], tomllib.loads(path.read_text(encoding="utf-8"))
-    )
-    surface_selection = selection_from_mapping(raw_data)
-    data = _normalize_manifest_schema(
-        raw_data, allow_legacy_aliases=allow_legacy_aliases
-    )
+    data = cast(Mapping[str, object], tomllib.loads(path.read_text(encoding="utf-8")))
     manifest_prefix = string_value(data, "prefix", prefix)
+    surface_selection = selection_from_mapping(data)
+    projection_forbidden_roots = projection_forbidden_roots_from_mapping(data)
     entries: list[SurfaceEntry] = []
     for group in manifest_tables(data, "group"):
         entries.extend(entries_from_group(group))
@@ -630,11 +723,21 @@ def load_manifest(
     transition_ids = [transition.transition_id for transition in update_transitions]
     if len(transition_ids) != len(set(transition_ids)):
         raise ValueError("duplicate update_transition ids")
+    normalized_entries, normalized_transitions, deletion_targets = (
+        admit_deletion_targets(root, entries, update_transitions)
+    )
+    validate_projection_boundaries(
+        normalized_entries,
+        normalized_transitions,
+        projection_forbidden_roots,
+    )
     return SurfaceManifest(
         prefix=manifest_prefix,
         surface_selection=surface_selection,
-        entries=tuple(entries),
-        update_transitions=update_transitions,
+        entries=normalized_entries,
+        update_transitions=normalized_transitions,
+        deletion_targets=deletion_targets,
+        projection_forbidden_roots=projection_forbidden_roots,
     )
 
 
@@ -704,20 +807,67 @@ def render_regular_specs(entries: Iterable[SurfaceEntry], prefix: str) -> str:
     return "\n".join(lines)
 
 
+def render_projection_forbidden_roots(forbidden_roots: Iterable[str]) -> str:
+    """Render roots that may not participate in live projection ownership."""
+    return "\n".join(forbidden_roots)
+
+
 def render_removed_legacy(entries: Iterable[SurfaceEntry]) -> str:
     """Render removed legacy paths."""
     lines = [entry.path for entry in entries if entry.mode == "removed_legacy"]
     return "\n".join(lines)
 
 
-def render_root_absent_paths(entries: Iterable[SurfaceEntry]) -> str:
-    """Render paths that must not be materialized in a parent repo root."""
-    lines = [
-        entry.path
-        for entry in entries
-        if entry.mode in {"removed_legacy", "standalone_only"}
-    ]
+def render_root_absent_paths(targets: Iterable[DeletionTarget]) -> str:
+    """Render admitted paths that must be absent from a parent repo root."""
+    lines = [target.path for target in targets if target.task == ROOT_ABSENCE_TASK]
     return "\n".join(lines)
+
+
+def git_index_paths(root: Path) -> frozenset[str] | None:
+    """Return index paths, or None when repository state cannot be inspected."""
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z", "--"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None
+    if completed.returncode != 0:
+        return None
+    return frozenset(path for path in completed.stdout.split("\0") if path)
+
+
+def path_has_index_entry(path: str, index_paths: frozenset[str]) -> bool:
+    """Return whether the index contains a path or one of its descendants."""
+    normalized = path.rstrip("/")
+    prefix = f"{normalized}/"
+    return normalized in index_paths or any(
+        index_path.startswith(prefix) for index_path in index_paths
+    )
+
+
+def render_actionable_root_absent_paths(
+    targets: Iterable[DeletionTarget], root: Path
+) -> str:
+    """Render admitted R ∩ (E ∪ I), excluding fixed points.
+
+    R contains only task-owned strict descendants admitted by
+    ``admit_deletion_targets``. E is worktree existence and I is Git index
+    representation. A target absent from both is already at the fixed point.
+    """
+    candidates = [target.path for target in targets if target.task == ROOT_ABSENCE_TASK]
+    index_paths = git_index_paths(root)
+    if index_paths is None:
+        return "\n".join(candidates)
+    actionable = [
+        path
+        for path in candidates
+        if os.path.lexists(root / path) or path_has_index_entry(path, index_paths)
+    ]
+    return "\n".join(actionable)
 
 
 def normalized_snapshot(manifest: SurfaceManifest) -> Mapping[str, object]:
@@ -764,9 +914,19 @@ def check_doc(root: Path, prefix: str, manifest: SurfaceManifest) -> list[str]:
         sync_path = root / "tools" / "sync_agent_canon.sh"
     sync_text = sync_path.read_text(encoding="utf-8") if sync_path.is_file() else ""
     if "surface_manifest.py" not in sync_text:
-        findings.append("SURFACE_MANIFEST_FINDING=tools/sync_agent_canon.sh:missing-manifest-call")
+        findings.append(
+            "SURFACE_MANIFEST_FINDING=tools/sync_agent_canon.sh:missing-manifest-call"
+        )
     if not manifest.entries:
-        findings.append("SURFACE_MANIFEST_FINDING=documents/runtime/shared-runtime-surfaces.toml:empty-manifest")
+        findings.append(
+            "SURFACE_MANIFEST_FINDING=documents/runtime/shared-runtime-surfaces.toml:empty-manifest"
+        )
+    for root in manifest.projection_forbidden_roots:
+        marker = f"`{root}/`"
+        if marker not in doc_text:
+            findings.append(
+                f"SURFACE_MANIFEST_FINDING={marker}:missing-projection-boundary-doc"
+            )
     return findings
 
 
@@ -780,7 +940,10 @@ def render_command_outputs(manifest: SurfaceManifest, root: Path) -> Mapping[str
         ),
         "regular-specs": render_regular_specs(manifest.entries, manifest.prefix),
         "removed-legacy-paths": render_removed_legacy(manifest.entries),
-        "root-absent-paths": render_root_absent_paths(manifest.entries),
+        "root-absent-paths": render_root_absent_paths(manifest.deletion_targets),
+        "projection-forbidden-roots": render_projection_forbidden_roots(
+            manifest.projection_forbidden_roots
+        ),
         "normalized-snapshot": json.dumps(
             normalized_snapshot(manifest),
             ensure_ascii=False,
@@ -790,25 +953,33 @@ def render_command_outputs(manifest: SurfaceManifest, root: Path) -> Mapping[str
     }
 
 
+def write_command_output(output: str) -> None:
+    """Write a newline protocol without inventing an empty record."""
+    if not output:
+        return
+    sys.stdout.write(output)
+    sys.stdout.write("\n")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the manifest command."""
     args = build_parser().parse_args(argv)
     root = Path(args.root).resolve()
     try:
-        manifest = load_manifest(
-            root,
-            args.prefix,
-            args.manifest,
-            allow_legacy_aliases=args.command == "normalized-snapshot",
-        )
+        manifest = load_manifest(root, args.prefix, args.manifest)
         if args.command in SYNC_SPEC_COMMANDS:
             manifest.require_live_agent_canon(args.command)
     except ValueError as exc:
         print(f"SURFACE_MANIFEST_ERROR={exc}", file=sys.stderr)
         return 1
+    if args.command == "root-absent-paths":
+        write_command_output(
+            render_actionable_root_absent_paths(manifest.deletion_targets, root)
+        )
+        return 0
     outputs = render_command_outputs(manifest, root)
     if args.command in outputs:
-        print(outputs[args.command])
+        write_command_output(outputs[args.command])
         return 0
     if args.command == "check-doc":
         findings = check_doc(root, manifest.prefix, manifest)

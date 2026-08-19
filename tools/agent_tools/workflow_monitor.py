@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
@@ -45,14 +46,20 @@ from work_log import MONITOR_PASSTHROUGH_FIELDS, append_ledger_event
 try:
     from .parent_root_side_effects import (
         ParentOwnedFileHandle,
+        ParentRootAttestationRequest,
+        ParentRootReject,
         ParentRootSideEffectBoundary,
-        resolve_parent_writer_attestation,
+        ParentRootSideEffectError,
+        attest_parent_root,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
         ParentOwnedFileHandle,
+        ParentRootAttestationRequest,
+        ParentRootReject,
         ParentRootSideEffectBoundary,
-        resolve_parent_writer_attestation,
+        ParentRootSideEffectError,
+        attest_parent_root,
     )
 
 DECISION_KEYS = (
@@ -66,17 +73,22 @@ DECISION_VALUES = {"applied", "recorded", "not_applicable", "pending"}
 
 def _parent_path(path: Path, purpose: str, *, create: bool) -> Path:
     """Authenticate a monitoring path before any lock or file mutation."""
-    attestation = resolve_parent_writer_attestation(purpose=purpose)
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            f"{purpose}: explicit parent root is required",
+        )
+    parent = Path(configured)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
     boundary = ParentRootSideEffectBoundary()
     if create:
         boundary.ensure_parent_owned_directory(attestation, path.parent, purpose)
-    receipt = boundary.resolve_parent_owned_path(
+    return boundary.resolve_parent_owned_path(
         attestation, path, purpose, create=False
-    )
-    try:
-        return receipt.physical_path
-    finally:
-        boundary.release_parent_owned_path(receipt)
+    ).physical_path
 TOOL_WARNING_REQUIRED_KEYS = (
     "warning_id",
     "source_tool",
@@ -309,7 +321,18 @@ MONITORING_LEGACY_KEYS = {
 @contextmanager
 def locked_monitoring_artifact(path: Path) -> Iterator[ParentOwnedFileHandle]:
     """Hold an exclusive lock while updating the monitoring artifact."""
-    attestation = resolve_parent_writer_attestation(purpose="workflow-monitoring")
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "workflow-monitoring: explicit parent root is required",
+        )
+    parent = Path(configured)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(
+            cwd=parent, explicit_root=parent, purpose="workflow-monitoring"
+        )
+    )
     boundary = ParentRootSideEffectBoundary()
     with boundary.open_parent_owned_file(
         attestation, path, "workflow-monitoring", create=True, mode="a+"
@@ -321,7 +344,18 @@ def locked_monitoring_artifact(path: Path) -> Iterator[ParentOwnedFileHandle]:
 @contextmanager
 def locked_existing_artifact(path: Path) -> Iterator[ParentOwnedFileHandle]:
     """Hold an exclusive lock while updating an existing artifact."""
-    attestation = resolve_parent_writer_attestation(purpose="workflow-monitoring")
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "workflow-monitoring: explicit parent root is required",
+        )
+    parent = Path(configured)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(
+            cwd=parent, explicit_root=parent, purpose="workflow-monitoring"
+        )
+    )
     boundary = ParentRootSideEffectBoundary()
     with boundary.open_parent_owned_file(
         attestation, path, "workflow-monitoring", create=False, mode="r+"

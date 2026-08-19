@@ -8,19 +8,21 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
 import tempfile
 import unittest
+import os
 from pathlib import Path
 
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DOC_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "doc_start.py"
-TEST_TEMP_ROOT = Path(tempfile.gettempdir())
-TEST_PARENT_ROOT = Path(os.path.commonpath((PROJECT_ROOT, TEST_TEMP_ROOT))).resolve()
+TEST_PARENT_ROOT = Path(
+    os.environ.get("AGENT_CANON_TEST_PARENT_ROOT", PROJECT_ROOT.parents[2])
+)
+TEST_TEMP_ROOT = TEST_PARENT_ROOT / ".agent-canon" / "tmp"
 
 
 class DocStartTest(unittest.TestCase):

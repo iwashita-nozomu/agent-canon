@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shlex
 from collections.abc import Mapping
@@ -24,13 +25,19 @@ import yaml
 
 if __package__:
     from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
         ParentRootSideEffectBoundary,
-        resolve_parent_writer_attestation,
+        ParentRootSideEffectError,
+        attest_parent_root,
     )
 else:
     from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
         ParentRootSideEffectBoundary,
-        resolve_parent_writer_attestation,
+        ParentRootSideEffectError,
+        attest_parent_root,
     )
 
 if __package__:
@@ -238,7 +245,7 @@ CPP_PATH_MARKERS = (
     "cpp/cmake/",
     "cpp/src/",
     "cpp/include/",
-    "cpp/tests/",
+    "tests/cpp/",
     "cpp/experiments/",
 )
 
@@ -254,7 +261,7 @@ DOC_OR_RUNTIME_PATH_MARKERS = (
     "agents/",
     "documents/",
     "memory/",
-    "notes/",
+    "documents/notes/",
     "tools/catalog.yaml",
 )
 
@@ -839,7 +846,10 @@ def language_review_candidates(
     )
     has_python = any(
         normalized.startswith("python/")
-        or normalized.startswith("tests/")
+        or (
+            normalized.startswith("tests/")
+            and not normalized.startswith("tests/cpp/")
+        )
         or Path(normalized).suffix.lower() in PYTHON_SUFFIXES
         for normalized in normalized_paths
     )
@@ -1152,9 +1162,19 @@ def append_markdown_section_line(path: Path, heading: str, line: str) -> None:
             insert_at -= 1
         lines.insert(insert_at, line)
     rendered = ("\n".join(lines) + "\n").encode("utf-8")
-    attestation = resolve_parent_writer_attestation(purpose="manifest-rendering")
-    ParentRootSideEffectBoundary().write_parent_owned_file(
-        attestation, path, rendered, "manifest-rendering"
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="manifest-rendering")
+        )
+        ParentRootSideEffectBoundary().write_parent_owned_file(
+            attestation, path, rendered, "manifest-rendering"
+        )
+        return
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        "manifest-rendering: explicit parent root is required",
     )
 
 

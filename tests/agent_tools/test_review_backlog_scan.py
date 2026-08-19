@@ -17,42 +17,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.agent_tools.fixture_spawn import (
-    bootstrap_fixture_public_environment,
-    record_capability_from_environment,
-)
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 REVIEW_SCAN = PROJECT_ROOT / "tools" / "agent_tools" / "review_backlog_scan.sh"
-
-
-def fixture_session(parent: Path, invocation: Path):
-    """Issue a fixture-owned session through the canonical fixture facade."""
-    base_environment = {
-        key: value for key, value in os.environ.items()
-        if not key.startswith("AGENT_CANON_") and key != "PYTHONPATH"
-    }
-    return bootstrap_fixture_public_environment(
-        mode="synthetic_tool",
-        record_capability=record_capability_from_environment(),
-        fixture_cwd=parent,
-        base_env=base_environment,
-        invocation_script=invocation,
-        purpose="review-backlog-scan-test",
-    )
-
-
-def install_fixture_runner(root: Path) -> Path:
-    """Install the wrapper and boundary beside a selected fixture root."""
-    tools = root / "tools" / "agent_tools"
-    tools.mkdir(parents=True, exist_ok=True)
-    invocation = tools / REVIEW_SCAN.name
-    shutil.copy2(REVIEW_SCAN, invocation)
-    shutil.copy2(
-        PROJECT_ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py",
-        tools / "parent_root_side_effects.py",
-    )
-    return invocation
 
 
 class ReviewBacklogScanTest(unittest.TestCase):
@@ -63,8 +29,8 @@ class ReviewBacklogScanTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir) / "parent"
             subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
-            invocation = install_fixture_runner(root)
             fixture_tools = root / "tools" / "agent_tools"
+            fixture_tools.mkdir(parents=True)
             for tool_name in ("file_surface_inventory.py", "surface_manifest.py"):
                 shutil.copy2(
                     PROJECT_ROOT / "tools" / "agent_tools" / tool_name,
@@ -72,26 +38,28 @@ class ReviewBacklogScanTest(unittest.TestCase):
                 )
             report_dir = root / "reports"
             configured_target = root / ".agent-canon" / "cache" / "cargo-target"
-            with fixture_session(root, invocation) as env:
-                env["AGENT_CANON_REVIEW_SCAN_TARGET_DIR"] = str(configured_target)
-                result = subprocess.run(
-                    [
-                        "bash",
-                        str(invocation),
-                        "--root",
-                        str(root),
-                        "--report-dir",
-                        str(report_dir),
-                        "--root-only",
-                        "--check",
-                        "inventory",
-                    ],
-                    cwd=root,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                    env=env,
-                )
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(REVIEW_SCAN),
+                    "--root",
+                    str(root),
+                    "--report-dir",
+                    str(report_dir),
+                    "--root-only",
+                    "--check",
+                    "inventory",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_PARENT_ROOT": str(root.parent / "untrusted-parent"),
+                    "AGENT_CANON_REVIEW_SCAN_TARGET_DIR": str(configured_target),
+                },
+            )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("REVIEW_BACKLOG_SCAN=pass", result.stdout)
@@ -111,27 +79,24 @@ class ReviewBacklogScanTest(unittest.TestCase):
             (root / "README.md").write_text("# Clean\n", encoding="utf-8")
             subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
             report_dir = root / "reports"
-            invocation = REVIEW_SCAN
 
-            with fixture_session(root, invocation) as env:
-                result = subprocess.run(
-                    [
-                        "bash",
-                        str(invocation),
-                        "--root",
-                        str(root),
-                        "--report-dir",
-                        str(report_dir),
-                        "--root-only",
-                        "--check",
-                        "stale",
-                    ],
-                    cwd=root,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                    env=env,
-                )
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(REVIEW_SCAN),
+                    "--root",
+                    str(root),
+                    "--report-dir",
+                    str(report_dir),
+                    "--root-only",
+                    "--check",
+                    "stale",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             stale_output = (report_dir / "stale_wording_search.txt").read_text(
@@ -142,37 +107,31 @@ class ReviewBacklogScanTest(unittest.TestCase):
 
     def test_review_target_override_rejects_outside_without_side_effect(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir) / "parent"
+            root = Path(tmp_dir)
             subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
-            (root / "tools" / "agent_tools").mkdir(parents=True)
-            invocation = root / "tools" / "agent_tools" / REVIEW_SCAN.name
-            shutil.copy2(REVIEW_SCAN, invocation)
-            shutil.copy2(
-                PROJECT_ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py",
-                root / "tools" / "agent_tools" / "parent_root_side_effects.py",
-            )
             report_dir = root / "reports"
             outside_target = root.parent / "outside-review-target"
-            with fixture_session(root, invocation) as env:
-                env["AGENT_CANON_REVIEW_SCAN_TARGET_DIR"] = str(outside_target)
-                result = subprocess.run(
-                    [
-                        "bash",
-                        str(invocation),
-                        "--root",
-                        str(root),
-                        "--report-dir",
-                        str(report_dir),
-                        "--root-only",
-                        "--check",
-                        "inventory",
-                    ],
-                    cwd=root,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                    env=env,
-                )
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(REVIEW_SCAN),
+                    "--root",
+                    str(root),
+                    "--report-dir",
+                    str(report_dir),
+                    "--root-only",
+                    "--check",
+                    "inventory",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_REVIEW_SCAN_TARGET_DIR": str(outside_target),
+                },
+            )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("PARENT_ROOT_SIDE_EFFECT_ERROR", result.stderr)
             self.assertFalse(outside_target.exists())
@@ -197,7 +156,6 @@ class ReviewBacklogScanTest(unittest.TestCase):
             query = root / "query.txt"
             query.write_text("semantic review responsibility candidate", encoding="utf-8")
             report_dir = root / "reports"
-            invocation = REVIEW_SCAN
             fake_bin.mkdir()
             stale_agent_canon = fake_bin / "agent-canon"
             stale_agent_canon.write_text(
@@ -242,33 +200,34 @@ class ReviewBacklogScanTest(unittest.TestCase):
             )
             fake_cargo.chmod(0o755)
 
-            with fixture_session(root, invocation) as env:
-                env["AGENT_CANON_REVIEW_SCAN_TARGET_DIR"] = str(root / "cargo-target")
-                env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
-                result = subprocess.run(
-                    [
-                        "bash",
-                        str(invocation),
-                        "--root",
-                        str(root),
-                        "--report-dir",
-                        str(report_dir),
-                        "--root-only",
-                        "--check",
-                        "semantic-index",
-                        "--semantic-query-file",
-                        str(query),
-                        "--semantic-top-k",
-                        "5",
-                        "--semantic-min-score",
-                        "0.80",
-                    ],
-                    cwd=root,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                    env=env,
-                )
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(REVIEW_SCAN),
+                    "--root",
+                    str(root),
+                    "--report-dir",
+                    str(report_dir),
+                    "--root-only",
+                    "--check",
+                    "semantic-index",
+                    "--semantic-query-file",
+                    str(query),
+                    "--semantic-top-k",
+                    "5",
+                    "--semantic-min-score",
+                    "0.80",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_REVIEW_SCAN_TARGET_DIR": str(root / "cargo-target"),
+                    "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+                },
+            )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertTrue(

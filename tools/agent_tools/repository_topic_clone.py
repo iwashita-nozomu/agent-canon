@@ -31,9 +31,9 @@ else:  # direct CLI execution
 
 
 def _attest_parent(
-    purpose: str,
+    request: _parent_boundary.ParentRootAttestationRequest,
 ) -> _parent_boundary.ParentRootAttestationReceipt:
-    return _parent_boundary.resolve_parent_writer_attestation(purpose=purpose)
+    return _parent_boundary.attest_parent_root(request)
 
 
 def _resolve_parent_path(
@@ -41,14 +41,20 @@ def _resolve_parent_path(
     candidate: Path | str,
     purpose: str,
 ) -> Path:
-    boundary = _parent_boundary.ParentRootSideEffectBoundary()
-    receipt = boundary.resolve_parent_owned_path(
+    return _parent_boundary.resolve_parent_owned_path(
         attestation, candidate, purpose, create=False
+    ).physical_path
+
+
+def _parent_request(
+    root: Path,
+    *,
+    clone_root: Path | None = None,
+    purpose: str,
+) -> _parent_boundary.ParentRootAttestationRequest:
+    return _parent_boundary.ParentRootAttestationRequest(
+        cwd=root, explicit_root=root, clone_root=clone_root, purpose=purpose
     )
-    try:
-        return receipt.physical_path
-    finally:
-        boundary.release_parent_owned_path(receipt)
 
 
 def _parent_error(exc: Exception) -> str:
@@ -314,7 +320,9 @@ def _repository_workspace_root(
     """Validate the selected repository root before lifecycle path handling."""
     root = Path(workspace_root).absolute()
     try:
-        attestation = _attest_parent("repository-topic-clone")
+        attestation = _attest_parent(
+            _parent_request(root, purpose="repository-topic-clone")
+        )
         root = Path(getattr(attestation, "parent_root"))
     except Exception as exc:
         raise RepositoryTopicCloneError(_parent_error(exc)) from exc
@@ -411,7 +419,12 @@ def computed_clone_path(
     try:
         attestation = request.parent_attestation
         if attestation is None:
-            attestation = _attest_parent("repository-topic-clone")
+            attestation = _attest_parent(
+                _parent_request(
+                    request.workspace_root,
+                    purpose="repository-topic-clone",
+                )
+            )
         if create_topic:
             _parent_boundary.ensure_parent_owned_directory(
                 attestation,
@@ -444,7 +457,9 @@ def projected_clone_path(
         "topic clone path",
     )
     try:
-        attestation = _attest_parent("repository-topic-clone")
+        attestation = _attest_parent(
+            _parent_request(root.absolute(), purpose="repository-topic-clone")
+        )
         return _resolve_parent_path(attestation, candidate, "repository-topic-clone")
     except Exception as exc:
         raise RepositoryTopicCloneError(_parent_error(exc)) from exc
@@ -669,7 +684,9 @@ def request(
             topic=request_state.topic,
             branch=request_state.branch,
             owner_evidence=request_state.owner_evidence,
-            parent_attestation=_attest_parent("repository-topic-clone"),
+            parent_attestation=_attest_parent(
+                _parent_request(repository_root, purpose="repository-topic-clone")
+            ),
         )
     except Exception as exc:
         raise RepositoryTopicCloneError(_parent_error(exc)) from exc
@@ -991,7 +1008,12 @@ def cleanup(
         )
 
     try:
-        attestation = _attest_parent("repository-topic-clone-cleanup")
+        attestation = _attest_parent(
+            _parent_request(
+                request_state.workspace_root,
+                purpose="repository-topic-clone-cleanup",
+            )
+        )
         capability = _parent_boundary.resolve_parent_owned_path(
             attestation, clone, "repository-topic-clone-cleanup", create=False
         )

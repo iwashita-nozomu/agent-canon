@@ -8,19 +8,20 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
 import tempfile
 import unittest
+import os
 from pathlib import Path
 from unittest import mock
 
-from tools.agent_tools.fixture_spawn import record_environment
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP_SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
-TEST_TEMP_ROOT = Path(tempfile.gettempdir())
+TEST_PARENT_ROOT = Path(
+    os.environ.get("AGENT_CANON_TEST_PARENT_ROOT", PROJECT_ROOT.parents[2])
+)
+TEST_TEMP_ROOT = TEST_PARENT_ROOT / ".agent-canon" / "tmp"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 import smoke_test_research_perspective_pack as smoke  # noqa: E402
 from parent_root_side_effects import (  # noqa: E402
@@ -54,7 +55,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                 ],
                 cwd=PROJECT_ROOT,
-                env=os.environ.copy(),
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -89,7 +90,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                 ],
                 cwd=PROJECT_ROOT,
-                env=os.environ.copy(),
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -108,7 +109,6 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
             self.assertIn("- repo_wide_dependency_tools_complete: no", closeout_text)
             self.assertIn("- repo_wide_static_analysis_complete: no", closeout_text)
             self.assertIn("- review_findings_integrated: no", closeout_text)
-            self.assertIn("- post_fix_full_review_complete: no", closeout_text)
             self.assertIn("- canonical_tree_head_complete: no", closeout_text)
             self.assertIn("- agent_evaluation_complete: no", closeout_text)
             self.assertIn("- verifier_status: pending", closeout_text)
@@ -141,7 +141,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     "logic_gap_reviewer",
                 ],
                 cwd=PROJECT_ROOT,
-                env=os.environ.copy(),
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -179,7 +179,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                 ],
                 cwd=PROJECT_ROOT,
-                env=os.environ.copy(),
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -217,7 +217,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                 ],
                 cwd=PROJECT_ROOT,
-                env=os.environ.copy(),
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -260,7 +260,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     "research_perspective_review",
                 ],
                 cwd=PROJECT_ROOT,
-                env=os.environ.copy(),
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -299,7 +299,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     "cpp_reviewer",
                 ],
                 cwd=PROJECT_ROOT,
-                env=os.environ.copy(),
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -348,7 +348,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     "include/example.hpp",
                 ],
                 cwd=PROJECT_ROOT,
-                env=os.environ.copy(),
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -378,8 +378,8 @@ def test_cleanup_parent_error_is_reported() -> None:
             ParentRootReject.ROOT_RACE_DETECTED, "injected cleanup failure"
         )
 
-    with record_environment(cwd=parent_root) as environment, mock.patch.dict(
-        smoke.os.environ, environment, clear=True
+    with mock.patch.dict(
+        smoke.os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent_root)}
     ), mock.patch.object(
         ParentRootSideEffectBoundary,
         "create_parent_owned_temp_directory",

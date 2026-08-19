@@ -64,3 +64,16 @@ def test_public_acceptance_runs_exact_image_owned_commands() -> None:
     assert _workflow_run_step("Run source-owned public test contract") == (
         "docker run --rm agent-canon-current testrunner.sh"
     )
+
+
+def test_public_acceptance_removes_only_task_owned_docker_resources() -> None:
+    """Closeout removes the exact test image and avoids shared pruning."""
+    run_command = _workflow_run_step("Run source-owned public test contract")
+    cleanup = _workflow_run_step("Remove task-owned Docker resources")
+
+    assert "--mount" not in run_command
+    assert " -v " not in f" {run_command} "
+    assert "docker image inspect --format '{{.Id}}' agent-canon-current" in cleanup
+    assert 'docker image rm "${image_id}"' in cleanup
+    assert "docker image inspect agent-canon-current" in cleanup
+    assert "prune" not in cleanup

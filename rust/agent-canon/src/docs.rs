@@ -299,18 +299,16 @@ fn render_write_then_check(
     match output_format {
         OutputFormat::Text => {
             println!(
-                "DOCS_{}={} changed_files={} changes={}",
+                "DOCS_{}=wrote changed_files={} changes={}",
                 summary.action.to_ascii_uppercase().replace('-', "_"),
-                write_status(summary.changed_files),
                 summary.changed_files,
                 summary.changes
             );
         }
         OutputFormat::Json => {
             println!(
-                "{{\"action\":\"{}\",\"status\":\"{}\",\"changed_files\":{},\"changes\":{}}}",
+                "{{\"action\":\"{}\",\"changed_files\":{},\"changes\":{}}}",
                 json_escape(summary.action),
-                write_status(summary.changed_files),
                 summary.changed_files,
                 summary.changes
             );
@@ -318,14 +316,6 @@ fn render_write_then_check(
     }
     let findings = collect_check_findings(root, raw_paths);
     render_findings(&findings, root, output_format)
-}
-
-fn write_status(changed_files: usize) -> &'static str {
-    if changed_files == 0 {
-        "unchanged"
-    } else {
-        "wrote"
-    }
 }
 
 fn render_findings(findings: &[Finding], root: &Path, output_format: &OutputFormat) -> i32 {
@@ -2192,12 +2182,6 @@ mod tests {
 
         assert_eq!(changes, 4);
         assert_eq!(fixed, "$x$\n$$\ny\n$$\n$$z$$\n");
-    }
-
-    #[test]
-    fn reports_write_status_from_changed_file_count() {
-        assert_eq!(write_status(0), "unchanged");
-        assert_eq!(write_status(1), "wrote");
     }
 
     #[test]

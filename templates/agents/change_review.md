@@ -43,7 +43,7 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency 
 
 ## Design-Base Implementation Review（design 起点の実装レビュー）
 
-<!-- Abstract Design Frame と Implementation Source Packet を含む active-packet の 4 entry に対して、1 つの統合 responsibility-unit diff を確認します。各変更 slice が approved design section、Design Side-Effect Map、user-request clause ID、source/reuse document または code path、test design が有効な場合だけ test-plan item に trace することを確認します。scope が最寄りの file、helper、finding ではなく approved responsibility model から来ていることを確認します。Implementation scope must not be selected from the nearest file, helper, or current finding alone. source、generated、deletion の各 record は approved artifact、clause、owner、source/reuse path、dependency order、validation evidence に trace します。duplicate parser/writer path、file 単位だけの部分完了、test-first production behavior は revise、design drift または design gap は escalate とします。 -->
+<!-- Abstract Design Frame と Implementation Source Packet を含む active-packet の 4 entry に対して、1 つの統合 responsibility-unit diff を確認します。各変更 slice が approved design section、Design Side-Effect Map、user-request clause ID、source/reuse document または code path、test design が有効な場合だけ test-plan item に trace することを確認します。scope が最寄りの file、helper、finding ではなく approved responsibility model から来ていることを確認します。source、generated、deletion の各 record は approved artifact、clause、owner、source/reuse path、dependency order、validation evidence に trace します。duplicate parser/writer path、file 単位だけの部分完了、test-first production behavior は revise、design drift または design gap は escalate とします。 -->
 
 ## Canonical Tree-Head Review（canonical tree head レビュー）
 

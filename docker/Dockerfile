@@ -4,7 +4,8 @@
 # upstream design ../CONTAINER_OPERATIONS.md standalone source test boundary
 # upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md source/view ownership boundary
 # upstream design ../responsibility-scope.toml source responsibility scopes
-# downstream implementation ../test/testrunner.sh public test runner
+# downstream implementation ../test/testrunner.sh public shell entrypoint
+# downstream implementation ../test/testrunner.py typed test executor
 # downstream implementation ../test/testlist.toml typed test command contract
 # downstream implementation ../tests/tools/test_container_config.py container contract regression tests
 # @dependency-end
@@ -107,7 +108,8 @@ RUN source_root=/opt/agent-canon-parent/vendor/agent-canon \
     && GIT_AUTHOR_DATE=2026-08-14T00:00:00Z \
        GIT_COMMITTER_DATE=2026-08-14T00:00:00Z \
        git -C "${parent_root}" commit -m "Initialize parent image test snapshot" \
-    && AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:bbde708b7b3bb2a893da85652df55ea7337b1908c2e74cf3a9e0b2e054289593 \
+    && request_evidence="evidence:$(sha256sum "${source_root}/agents/workflows/agent-canon-pr-workflow.md" | awk '{print $1}')" \
+    && AGENT_CANON_COMMIT_REQUEST_EVIDENCE="${request_evidence}" \
        AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
        AGENT_CANON_DESTRUCTIVE_GIT_REASON=materialize-public-parent-runtime-views-in-image-fixture \
        HOME="${parent_root}/.agent-canon/home" \
@@ -123,7 +125,11 @@ RUN source_root=/opt/agent-canon-parent/vendor/agent-canon \
        bash "${source_root}/tools/sync_agent_canon.sh" link-root \
     && test -L "${parent_root}/AGENTS.md" \
     && test ! -e "${parent_root}/.agents" \
-    && test -L "${parent_root}/tools/agent-canon" \
+    && test -L "${parent_root}/.codex/config.toml" \
+    && test -L "${parent_root}/.codex/agents" \
+    && test -L "${parent_root}/.codex/hooks.json" \
+    && test -L "${parent_root}/.codex/hooks" \
+    && test ! -e "${parent_root}/tools/agent-canon" \
     && test "$(git -C "${parent_root}" ls-tree HEAD vendor/agent-canon | awk '{print $1":"$2":"$3}')" \
          = "160000:commit:$(git -C "${source_root}" rev-parse HEAD)" \
     && test "$(git -C "${source_root}" symbolic-ref HEAD)" = "refs/heads/main" \
@@ -152,6 +158,11 @@ RUN source_root=/opt/agent-canon-parent/vendor/agent-canon \
     && CARGO_TARGET_DIR="${runtime_root}/cargo-target" \
       cargo test --locked --offline --no-run \
       --manifest-path "${source_root}/rust/agent-canon/Cargo.toml" \
+    && mkdir -p "${parent_root}/.agent-canon/cache/cargo-home" \
+    && cp -a /usr/local/cargo/registry "${parent_root}/.agent-canon/cache/cargo-home/" \
+    && if [ -d /usr/local/cargo/git ]; then \
+         cp -a /usr/local/cargo/git "${parent_root}/.agent-canon/cache/cargo-home/"; \
+       fi \
     && python3 -m py_compile \
       "${source_root}/tools/agent_tools/surface_manifest.py" \
       "${source_root}/tools/agent_tools/repo_structure_contract.py" \
@@ -161,8 +172,18 @@ RUN source_root=/opt/agent-canon-parent/vendor/agent-canon \
 
 WORKDIR /opt/agent-canon-parent/vendor/agent-canon
 USER project
-ENV HOME=/home/project \
+ENV HOME=/opt/agent-canon-parent/.agent-canon/home \
     USER=project \
+    TMPDIR=/opt/agent-canon-parent/.agent-canon/tmp \
+    TEMP=/opt/agent-canon-parent/.agent-canon/tmp \
+    TMP=/opt/agent-canon-parent/.agent-canon/tmp \
+    XDG_CACHE_HOME=/opt/agent-canon-parent/.agent-canon/cache \
+    PYTHONPYCACHEPREFIX=/opt/agent-canon-parent/.agent-canon/cache/pycache \
+    AGENT_CANON_TOOLS_HOME=/opt/agent-canon-parent/.agent-canon/tools \
+    CARGO_HOME=/opt/agent-canon-parent/.agent-canon/cache/cargo-home \
+    CARGO_TARGET_DIR=/opt/agent-canon-parent/.agent-canon/image-runtime/cargo-target \
+    AGENT_CANON_CLI_TARGET_DIR=/opt/agent-canon-parent/.agent-canon/image-runtime/cargo-target \
+    AGENT_CANON_TEST_PARENT_ROOT=/opt/agent-canon-parent \
     AGENT_CANON_CONTAINER_USER=project
 
 CMD ["testrunner.sh"]

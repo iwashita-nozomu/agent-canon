@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
 import json
 import os
 import subprocess
@@ -18,45 +17,8 @@ from pathlib import Path
 
 import pytest
 
-from tools.agent_tools.fixture_spawn import (
-    bootstrap_fixture_public_environment,
-    record_capability_from_environment,
-)
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ORCHESTRATOR = PROJECT_ROOT / ".devcontainer" / "gpu-admission.sh"
-
-
-@contextmanager
-def fixture_session(
-    repository: Path, environment: dict[str, str], command_dir: Path
-):
-    """Run one GPU fixture through an authenticated selected-root session."""
-    with bootstrap_fixture_public_environment(
-        mode="synthetic_tool",
-        record_capability=record_capability_from_environment(),
-        fixture_cwd=repository,
-        base_env=environment,
-        invocation_script=repository / ".devcontainer" / "gpu-admission.sh",
-        purpose="gpu-admission-test",
-        explicit_path_entries=(str(command_dir),),
-    ) as fixture:
-        yield dict(fixture.environment)
-
-
-def run_gpu_admission(
-    repository: Path, environment: dict[str, str], command_dir: Path
-) -> subprocess.CompletedProcess[str]:
-    """Run the fixture entrypoint with the selected repository session."""
-    with fixture_session(repository, environment, command_dir) as child_environment:
-        return subprocess.run(
-            [str(repository / ".devcontainer" / "gpu-admission.sh")],
-            cwd=repository,
-            env=child_environment,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
 
 
 def test_gpu_runtime_checks_are_mapping_neutral_and_probe_cleanup_is_explicit() -> None:
@@ -86,9 +48,7 @@ def write_executable(path: Path, content: str) -> None:
     path.chmod(0o755)
 
 
-def write_gpu_admission_fixture(
-    tmp_path: Path,
-) -> tuple[Path, dict[str, str], Path, Path]:
+def write_gpu_admission_fixture(tmp_path: Path) -> tuple[Path, dict[str, str], Path]:
     """Create one repository with deterministic bootstrap and CLI fakes."""
     repository = tmp_path / "workspace" / "topic" / "derived-repo"
     orchestrator = repository / ".devcontainer" / "gpu-admission.sh"
@@ -128,7 +88,7 @@ def write_gpu_admission_fixture(
         ),
     )
 
-    command_dir = repository / ".fixture-bin"
+    command_dir = tmp_path / "commands"
     log_path = tmp_path / "commands.log"
     state_path = tmp_path / "docker-state"
     removed_path = tmp_path / "docker-removed"
@@ -271,29 +231,31 @@ esac
 exit 0
 """,
     )
-    base_environment = {
-        key: value
-        for key, value in os.environ.items()
-        if not key.startswith("AGENT_CANON_") and key != "PYTHONPATH"
-    }
     environment = {
-        **base_environment,
+        **os.environ,
+        "PATH": f"{command_dir}:{os.environ['PATH']}",
+        "AGENT_CANON_ACTIVE_REPOSITORY_ROOT": str(repository),
         "GPU_TEST_LOG": str(log_path),
         "GPU_TEST_REPOSITORY": str(repository),
         "GPU_TEST_DOCKER_STATE": str(state_path),
         "GPU_TEST_DOCKER_REMOVED": str(removed_path),
         "AGENT_CANON_REPOSITORY_ID": str(repository.resolve()),
-        "AGENT_CANON_LIFECYCLE_ID": "gpu-fixture-lifecycle",
-        "AGENT_CANON_TASK_ID": "gpu-fixture-task",
     }
-    return repository, environment, log_path, command_dir
+    return repository, environment, log_path
 
 
 def test_profile_exec_uses_selector_and_source_root_finalize(tmp_path: Path) -> None:
     """Up and exec select one config, and finalize resolves from AgentCanon source."""
-    repository, environment, log_path, command_dir = write_gpu_admission_fixture(tmp_path)
+    repository, environment, log_path = write_gpu_admission_fixture(tmp_path)
 
-    result = run_gpu_admission(repository, environment, command_dir)
+    result = subprocess.run(
+        [str(repository / ".devcontainer" / "gpu-admission.sh")],
+        cwd=repository,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
     assert result.returncode == 0, result.stdout + result.stderr
     selector = repository / ".devcontainer/gpu-admission/devcontainer.json"
@@ -339,10 +301,17 @@ def test_profile_success_preserves_original_rc_when_cleanup_blocks(
     tmp_path: Path,
 ) -> None:
     """A successful command retains rc=0 while receipt records cleanup blocking."""
-    repository, environment, _, command_dir = write_gpu_admission_fixture(tmp_path)
+    repository, environment, _ = write_gpu_admission_fixture(tmp_path)
     environment["GPU_TEST_DOCKER_REMOVE_RC"] = "19"
 
-    result = run_gpu_admission(repository, environment, command_dir)
+    result = subprocess.run(
+        [str(repository / ".devcontainer" / "gpu-admission.sh")],
+        cwd=repository,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
     assert result.returncode == 0, result.stdout + result.stderr
     receipts = list((repository / ".agent-canon/container-lifecycle").glob("*.json"))
@@ -356,10 +325,17 @@ def test_profile_failure_preserves_command_rc_when_cleanup_blocks(
     tmp_path: Path,
 ) -> None:
     """An up failure retains its rc even when exact cleanup also fails."""
-    repository, environment, _, command_dir = write_gpu_admission_fixture(tmp_path)
+    repository, environment, _ = write_gpu_admission_fixture(tmp_path)
     environment.update({"GPU_TEST_UP_RC": "23", "GPU_TEST_DOCKER_REMOVE_RC": "19"})
 
-    result = run_gpu_admission(repository, environment, command_dir)
+    result = subprocess.run(
+        [str(repository / ".devcontainer" / "gpu-admission.sh")],
+        cwd=repository,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
     assert result.returncode == 23
     assert "GPU_ADMISSION_CLEANUP_RESULT=failed" in result.stderr
@@ -369,10 +345,17 @@ def test_finalize_failure_preserves_command_rc_when_cleanup_blocks(
     tmp_path: Path,
 ) -> None:
     """A finalize failure retains its rc when exact cleanup also fails."""
-    repository, environment, _, command_dir = write_gpu_admission_fixture(tmp_path)
+    repository, environment, _ = write_gpu_admission_fixture(tmp_path)
     environment.update({"GPU_TEST_EXEC_RC": "37", "GPU_TEST_DOCKER_REMOVE_RC": "19"})
 
-    result = run_gpu_admission(repository, environment, command_dir)
+    result = subprocess.run(
+        [str(repository / ".devcontainer" / "gpu-admission.sh")],
+        cwd=repository,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
     assert result.returncode == 37
     assert "GPU_ADMISSION_CLEANUP_RESULT=failed" in result.stderr
@@ -390,12 +373,19 @@ def test_profile_failure_cleans_exact_project_and_preserves_rc(
     expects_exec: bool,
 ) -> None:
     """Up/finalize failures tear down only the selected project and retain their rc."""
-    repository, environment, log_path, command_dir = write_gpu_admission_fixture(tmp_path)
+    repository, environment, log_path = write_gpu_admission_fixture(tmp_path)
     environment.update(
         {"GPU_TEST_UP_RC": str(up_rc), "GPU_TEST_EXEC_RC": str(exec_rc)}
     )
 
-    result = run_gpu_admission(repository, environment, command_dir)
+    result = subprocess.run(
+        [str(repository / ".devcontainer" / "gpu-admission.sh")],
+        cwd=repository,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
     assert result.returncode == expected_rc
     calls = log_path.read_text(encoding="utf-8").splitlines()

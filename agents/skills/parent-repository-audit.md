@@ -2,147 +2,134 @@
 <!--
 @dependency-start
 contract skill
-responsibility Audits a complete parent tracked tree and routes every finding through repair, readback, and unit closure.
-upstream design ../../documents/design/parent-repository-audit.md owns target state, migration, and failure semantics
-upstream design ../../documents/parent-repository-audit/README.md owns canonical unit reader route
+responsibility Audits a parent repository by semantic unit and routes every finding through repair, readback, and closure.
+upstream design ../../documents/design/parent-repository-audit.md owns semantic unit selection and failure semantics
+upstream design ../../documents/parent-repository-audit/README.md owns the canonical reader route
+upstream design ../../responsibility-scope.toml owns the tracked-path owner/class relation
 upstream design ../skills/catalog.yaml owns public capability and command metadata
 upstream design ../skills/skill-dependencies.yaml owns prerequisite and routing relations
-upstream implementation ../../tools/agent_tools/parent_repository_audit.py owns deterministic unit selection and coverage
-downstream implementation ../../.agents/skills/parent-repository-audit/SKILL.md exposes this source skill as a runtime adapter
+upstream implementation ../../tools/agent_tools/parent_repository_audit.py owns deterministic unit selection and evidence receipts
+downstream implementation ../../.agents/skills/parent-repository-audit/SKILL.md exposes this source skill as a generated runtime adapter
 @dependency-end
 -->
 
 ## Reader Map
 
-- 目的: 親 repository の全 tracked tree を canonical audit unit ごとに読み、finding を owner repair、対象 readback、closed まで進める。
-- 入口: `documents/parent-repository-audit/README.md`、次に catalog capability、dependency map、resolver が解決した tool command を読む。
-- 順序: `parent_repository_audit.py list` が返す unit path を POSIX lexicographic order で一つずつ読む。unit closure 前に次へ進まない。
-- 境界: 親が orchestrator、writer delegation が修正を実行する。worker は AgentCanon/親 PR の create、merge、close、admin override を行わない。
-- 出力: unit ごとの `pass` または `finding -> repair -> readback -> closed`、blocked unit の blocker receipt、最後の全体 status。generated report は projection/evidence であり正本ではない。
+- 目的: AgentCanon を利用する親 repository を semantic audit unit ごとに読み、finding を owner repair、対象 readback、closure まで進める。
+- 入口: `documents/parent-repository-audit/README.md`、catalog capability、dependency map、resolver が解決した tool command の順に読む。
+- 順序: `parent_repository_audit.py list` が返す unit を path 昇順で一つずつ処理し、unit receipt を残してから次へ進む。
+- 境界: path owner/class は親の `responsibility-scope.toml`、path existence/kind は structure contract、runtime projection は shared surface manifest が所有する。
+- 出力: selected surface/unit、tracked evidence count、unit ごとの `pass|closed|failed|deferred|blocked`、repair/readback evidence、全体 status。
 
 ## Capability And Routing
 
-この skill は keyword trigger だけで起動しません。catalog の explicit capability
-`parent_repository_audit`、skill dependency map、`agent_canon_source_root` の typed
-resolution、親 root の tracked tree packet を routing authority とします。prompt の語句は
-候補説明に留め、capability が不明、重複、ambiguous、source root が missing の場合は既存
-typed failure を返して推測で別 route を選びません。
+この skill は catalog の explicit capability `parent_repository_audit`、skill dependency map、
+`agent_canon_source_root` の typed resolution、親 root の Git evidence を routing authority と
+します。prompt の語句や directory 名から owner/unit を推測しません。capability が不明・
+重複・ambiguous、または source root が解決不能なら既存 typed failure を返します。
 
 必要な前提は `agent-orchestration`、`codex-task-workflow`、`structure-refactor`、
-`dependency-analysis`、`subagent-bootstrap` です。finding の repair candidate は owner
-surface に応じて `change-review`、`document-canon-cleanup`、`tool-finding-report` へ
-routing します。public skill の catalog、shim、dependency map、runtime graph は owner
-tooling で更新し、この skill に別の routing schema を複製しません。
+`dependency-analysis`、`subagent-bootstrap` です。finding は change surface に応じて既存の
+owner skill/worker へ routing し、新しい path registry、checker、runtime graph を追加しません。
 
 ## Use When
 
-- AgentCanon を利用する親 repository の全 tracked tree を structure、ownership/root view、
-  environment/Docker/devcontainer、dependency、code/type/OOP、tests、docs/design trace、
-  CI/hooks/skills、templates/generated boundary、Git/PR lifecycle の owner unit で監査するとき。
-- 現在の規約違反を report に書くだけでなく、owner skill/worker へ修正を routing し、対象
-  readback と finding close まで同じ監査責務で完了するとき。
-- AgentCanon/shared contract、parent contract、public skill、resolver、catalog、dependency
-  map、tool command が変更され、関係する audit unit を同じ PR で更新するとき。
+- 親 repository の structure、AgentCanon root view、environment、dependency、code/type、
+  tests、docs/design、CI/hooks/skills、templates/generated boundary を横断監査するとき。
+- finding report だけで停止せず、owner repair、対象 readback、closure receipt まで完了するとき。
+- AgentCanon/shared contract、parent contract、public skill、catalog、dependency map、resolver、
+  tool command の変更に対応する audit unit を同じ PR で更新するとき。
 
 ## Source And Evidence Boundary
 
-正本は `documents/parent-repository-audit/README.md` と `audit-unit/*.md` だけです。一つの
-変更責務につき一つの unit Markdown file を使い、巨大 checklist、TOML/YAML/JSON を audit
-canon にしません。parent-specific tracked tree、branch、commit、finding、repair receipt、
-runtime output は親側 evidence です。generated summary/index、inventory、report、shim、
-run bundle は再生成可能な projection/evidence であり、unit invariant の source ではありません。
+正本は `documents/parent-repository-audit/README.md` と `audit-unit/*.md` です。各 unit は
+`Owner Responsibility`、`Invariant`、`Evidence Sources`、`Repair Route`、`Validation`、
+`Close Condition`、`Related Change Surfaces`、`Legacy Migration IDs` を持ちます。
 
-旧親 file `documents/repository-audit-checklist.md` は設計 packet の一回限り migration
-ledger（metadata、checkbox、command の stable ID）を通って各 unit へ移行済みです。旧 file
-を第二 checklist として読み続けず、親側では unit reader route への薄い参照または廃止を
-行います。未移行項目が見つかった場合は、意味が対応する unit のみを同じ PR で更新します。
+unit Markdown は broad path glob や owner map を持ちません。parent-specific tracked tree、
+branch、commit、finding、repair/readback receipt は親側 evidence です。generated report、
+summary、inventory、runtime shim は再生成可能な projection であり unit invariant の正本では
+ありません。
 
 ## Deterministic Unit Selection
 
-親 root から、既存 resolver 経由の owner command を実行します。
+親 root から resolver が返す owner command を実行します。
 
 ```bash
-python3 tools/agent_tools/parent_repository_audit.py list --root <parent-root> --format text
+python3 tools/agent_tools/parent_repository_audit.py list \
+  --root <parent-root> --format text
+python3 tools/agent_tools/parent_repository_audit.py list \
+  --root <parent-root> --surface <stable-surface> \
+  --scope <tracked-evidence-path> --format text
 ```
 
-tool は AgentCanon source root を `agent_canon_source_root.RootResolution` で解決し、
-`documents/parent-repository-audit/audit-unit/*.md` を filename の昇順で読みます。各 file に
-required section、`surface:<stable-id>`、`pattern:<parent-relative-glob>`、legacy migration
-ID が一つずつ以上あることを確認します。`--scope` は親 root 配下の tracked file/directory
-だけに限定でき、path escape と missing scope は failure です。`repository-structure` は
-structure contract の required path kind だけを確認し、一般 path owner/class は親の
-`responsibility-scope.toml` を参照します。`all-tracked` fallback や audit unit 間の二重
-ownership を判定 source にしません。submodule 内部は親 tracked universe に展開しません。
+- `--surface`: unit の `Related Change Surfaces` にある stable ID から unit を選択する。
+- `--scope`: 親 root 内の tracked file/directory evidence を絞るだけで、owner や unit を選ばない。
+- selector なし: 全 unit と全 tracked path evidence を返す。
+- submodule: 親の gitlink path だけを evidence とし、内部 tree を展開しない。
 
-readback が必要な check packet は次です。
+unknown surface、invalid unit、source/root path escape、missing evidence scope、parent Git missing
+は typed failure です。path coverage/overlap はこの tool では計算せず、親の
+`responsibility_scope.py` が canonical tracked-path relation を一度だけ検証します。
+
+check packet は unit receipt の全体状態を集約します。
 
 ```bash
-python3 tools/agent_tools/parent_repository_audit.py check --root <parent-root> --format text
+python3 tools/agent_tools/parent_repository_audit.py check \
+  --root <parent-root> \
+  --unit-status <pass|closed|failed|deferred|blocked> \
+  --format text
 ```
 
-`source_root_missing`、invalid unit、path escape、uncovered selected path は audit start の
-typed failure です。`repair_blocked` は unit を閉じず、owner、blocker、attempted repair、
-readback 欠落を closure record に残して次 unit へ進み、最終 status を blocked にします。
-failed または deferred check が残る状態は `closed` や `pass` に昇格しません。
+`failed|deferred` が一件でもあれば failed、blocked があれば blocked、全 receipt が
+`pass|closed` の場合だけ pass とします。未実行 command を pass に昇格しません。
 
 ## Sequential Audit And Repair Loop
 
-1. README、catalog capability、dependency row、resolved tool command、`list` packet を readback し、selected unit paths を固定します。
-2. selected unit を一つ読み、Owner Responsibility、Invariant、Evidence Sources、Repair Route、Validation、Close Condition をその順に消費します。
-3. static evidence と parent-specific readback で invariant を判定します。pass なら unit receipt を残して次 unit へ進みます。
-4. finding なら primary owner skill/worker に bounded handoff し、親 orchestrator が修正の validation route と write scope を保持します。監査を abort しません。
-5. 修正後に対象 path/source/config を再読し、unit の validation を必要十分な範囲で実行します。finding の解消を readback で確認して closed receipt を残します。
-6. owner が修正不能、権限、auth、network、toolchain、conflict などで blocked の場合は `parent_repository_audit_repair_blocked` を記録して次 unit へ進みます。
-7. 全 selected unit の receipt を集約し、closed/pass と blocked/unresolved を区別した最終 status を作ります。未実行 command を pass と記述しません。
-
-親は worker handoff の validation trust boundary を守り、worker は割り当てられた replaceable
-unit、write scope、targeted validation、commit/push の範囲だけを実行します。PR 作成、merge、
-close、admin override、最終 integration decision は親 integrator の責務です。
+1. README、catalog capability、dependency row、resolved tool command、`list` packet を readback する。
+2. selected unit の owner、invariant、evidence、repair、validation、close condition を読む。
+3. static evidence と parent-specific readback で invariant を判定する。
+4. finding は primary owner skill/worker へ bounded handoff し、親 orchestrator が write scope と validation route を保持する。
+5. 修正後に対象 source/config/path を再読し、必要十分な validation で finding 解消を確認する。
+6. blocked の場合は owner、blocker、attempted repair、欠けた readback を記録し、unit を閉じず次へ進む。
+7. 全 selected unit の receipt を集約し、pass/closed と blocked/unresolved を分離する。
 
 ## Owner Unit Routes
 
-| Unit | owner route | static-first evidence |
+| Unit | Owner route | Static-first evidence |
 | --- | --- | --- |
-| `repository-structure` | `structure-refactor` | structure contract、scope、required path kind |
+| `repository-structure` | `structure-refactor` | required/optional path existence、filesystem kind、canonical scope check |
 | `ownership-root-views` | `agent-canon-update` | source root、pin、root-view sync |
-| `environment-containers` | `environment-maintenance` | Ubuntu/base、cold-build、user/sudo、owner split、host driver、config |
-| `dependency-integrity` | `dependency-analysis` | headers、dependency graph、full-tree review |
-| `code-type-boundaries` | `oop-type-design`、`oop-readability-check` | OOP inventory と reviewer judgement |
-| `tests-and-oracles` | `test-design`、language review | necessary/sufficient oracle と targeted test |
+| `environment-containers` | `environment-maintenance` | base image、cold build、user/sudo、owner split、host driver |
+| `dependency-integrity` | `dependency-analysis` | headers、dependency manifests、graph direction |
+| `code-type-boundaries` | `oop-type-design`、language review | public type、state ownership、implementation trace |
+| `tests-and-oracles` | `test-design`、language review | necessary/sufficient oracle、targeted test |
 | `docs-design-trace` | `long-form-writing`、`md-style-check` | reader route、formatter、design correspondence |
 | `ci-hooks-skills` | `agent-orchestration` と owner tooling | catalog、capability、shim、dependency graph |
-| `templates-generated-boundaries` | `document-canon-cleanup`、`result-artifact-writeout` | source/evidence classification |
-
-各 unit の `Repair Route` が個別の owner/tool を追加で指定します。この表を新しい分類へ
-拡張せず、owner responsibility の変更は該当 unit だけを更新します。
+| `templates-generated-boundaries` | `document-canon-cleanup`、`result-artifact-writeout` | source/evidence/generated classification |
 
 ## Validation Boundary
 
-static structure、header、catalog、dependency、type、docs、CI syntax、Git readback を第一
-evidence とします。runtime validation は invariant が static に確定できない unit の
-`Validation` に明記された必要最小限だけ実行します。Docker image 間の差分 build、無関係な
-全 suite、重複 checker、全 repo の二重 rescan は行いません。
+static structure、scope relation、dependency、type、docs、CI syntax、Git readback を第一 evidence
+とします。runtime validation は unit invariant が static に確定できない場合だけ、その unit の
+`Validation` にある必要最小限を実行します。重複 checker、全 repo の二重 path scan、無関係な
+full suite、不要な Docker build は追加しません。
 
-Markdown、math、Mermaid、link formatter は `md-style-check` の owner route を使います。
-shim は `skill_shim_materializer.py` の既存 `--all` を一回実行し、second readback で no
-change を確認します。catalog/skill command/dependency route は既存 owner tool の readback
-で閉じ、新しい checker を作りません。
-
-## Contract Change Closure
-
-AgentCanon source、parent shared contract、public skill、catalog、dependency map、resolver、
-tool command の変更時は、変更 surface の `surface:<stable-id>` に対応する unit file のみを
-同じ PR で更新します。`repository-structure` の tracked coverage、`ci-hooks-skills` の
-capability/graph、`ownership-root-views` の source root、`environment-containers` の
-environment contract など、関係がない unit は触りません。変更後は source→skill→catalog/
-dependency→shim/graph→対象 unit の順で readback します。
+contract 変更時は変更 surface に対応する unit file だけを更新し、source→skill→catalog/
+dependency→generated shim→対象 unit の順で readback します。
 
 ## Closeout Tokens
 
-親側の completion report には少なくとも `audit_status`、selected unit list、各 unit の
-`pass|closed|blocked`、finding/repair/readback receipt、selected-scope uncovered count、source root
-resolution、実行した validation、未実行項目を記録します。blocked があれば全体を pass とせず、
-次の owner action と parent-only integration decision を残します。
+completion report には少なくとも次を残します。
+
+- audit status、selected surfaces、selected unit list
+- tracked evidence count と任意 `--scope` evidence path
+- unit ごとの `pass|closed|failed|deferred|blocked`
+- finding、repair、target readback、実行した validation
+- 未実行/検証不能事項と次の owner action
+
+blocked または unresolved があれば全体を pass とせず、parent-only integration decision を
+残します。
 
 ## Tool Commands
 

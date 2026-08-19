@@ -285,39 +285,70 @@ Validation command scope is governed by the preceding write-capable handoff
 trust boundary; work-conservation scheduling does not authorize a worker to
 expand a selected validation route.
 
-The execution route defaults to bounded_single_owner. Candidate count alone
-does not activate the execution graph: one node without an edge and multiple
-independent candidates without an edge remain non-active. Every route carries
-the always-required fields `owner`, `schema`, `dependency`, `validation`,
-`correctness`, and `publication_scope`.
+Use a dependency/overlap graph only when the selected work has real ordering,
+schema, validation, publication, or collision edges. A node is a full
+replaceable responsibility unit, not a file-sized chunk or timed slice. Direct
+owner edits and one-writer tasks need no manufactured DAG or schedule artifact;
+prompt-keyword routing is never a scheduling signal.
 
-Only a selected ordering, dependency, collision, or publication edge
-activates the execution graph. When such an edge is selected, model the
-selected subgraph as a dependency DAG and materialize the graph-only fields
-`dag`, `critical_path`, `ready_set`, `queue_snapshot`, and
-`makespan_objective`. Missing or invalid graph evidence rejects the active
-route; unrelated candidates do not expand the selected subgraph.
+The optimization objective is lexicographic, in this order: request
+completeness and correctness, minimum decision-relevant total work, then
+minimum makespan. Makespan therefore never makes extra parallel review,
+implementation, or validation work free. A ready action is admissible only
+when it can change the decision tuple `(owner, implementation mechanism,
+validation route, terminal state)`, strictly decrease the unresolved measure
+defined below, or open a typed new candidate epoch from new evidence.
+Efficiency is never permission to omit, split, weaken, or prematurely close a
+required node. Runtime observations may inform ordering, but no fixed duration,
+elapsed-time limit, or timeout cutoff may cut the requested scope. An
+operational timeout may mark a node blocked and trigger recovery; it may not
+turn incomplete work into completion.
 
-When the graph is active, the optimization objective is to minimize makespan
-subject to responsibility completeness and correctness. Efficiency is a
-scheduling objective, never permission to omit, split, weaken, or prematurely
-close a required node. Refresh the selected closure, compute its critical path
-and ready set, and dispatch every ready node that is non-conflicting under
-actual capacity. Batch remote reads and queue snapshots for that selected
-subgraph while preserving each node's identity and exact evidence.
+When coordination is selected, dispatch decisions:
 
-Reuse the warm worker and reviewer contexts when the responsibility unit and
-route are unchanged. Invalidate only evidence affected by the repaired node
-and its dependent closure. Compute owner, schema, dependency, validation, and
-publication closure before opening the owning review; review the exact
-candidate closure once and create only affected repair nodes from accepted
-findings. Wait only when the useful ready set is empty, recording the actual
-predecessor, conflict, capacity, or external-state blocker before resuming.
+1. Refresh only the dependency and collision edges that can change the next
+   owner, order, or merge decision.
+2. Dispatch every ready node that is non-conflicting and admissible under actual
+   capacity; serialize colliding units and do not invent timed stages.
+3. Batch remote reads, queue snapshots, and tool operations that share an
+   authority, input, or readback boundary. Preserve each node's identity and
+   exact evidence even when operations are batched.
+4. Reuse the warm worker and reviewer contexts for repeated repair when the
+   responsibility unit and route are unchanged. Invalidate only evidence
+   affected by the repaired node and its dependent closure; retain unaffected
+   evidence.
+5. Compute owner, schema, dependency, validation, and publication closure only
+   when the selected workflow requires those edges. Review the exact candidate
+   closure once; accepted findings create only affected repair nodes.
+6. Wait only when the useful ready set is empty. Record the predecessor,
+   conflict, capacity, or external-state blocker that makes it empty, then
+   resume when that state changes. Waiting is not an elapsed-time scope gate.
 
-No timeout, elapsed-time, or capacity cutoff may reduce scope in either the
-bounded single-owner or selected-edge graph state. An operational timeout may
-mark a node blocked and trigger recovery; it may not turn incomplete work into
-completion. Prompt-keyword routing is not a scheduling signal.
+For autonomous review and repair, one exact candidate digest defines one
+candidate epoch. The initial owning review runs at most once in that epoch and
+returns stable blocking finding IDs separately from advisory notes. Advisory,
+style preference, duplicate, already-covered, and evidence-free findings do not
+reopen implementation. A repair targets assigned blocking finding IDs, and the
+following focused recheck may inspect only those IDs plus evidence invalidated
+by the repair. It may not restart broad review or add a new blocker unless a
+new contract, reachable-behavior witness, or structural contradiction opens a
+new candidate epoch.
+
+For a state `S`, define the unresolved measure as
+`mu(S) = |blocking_finding_ids| + |unresolved_validation_ids| +
+|unresolved_request_clause_ids|`. After the one initial review, every admitted
+action must either change the decision tuple using typed evidence or strictly
+decrease `mu`. Repeating the same state fingerprint and action fingerprint is
+a `non_convergent_cycle`; stop that action and hand back the typed cycle rather
+than starting another review or implementation pass. Zero blocking findings,
+zero unresolved request clauses, and selected validation `pass` or
+`not_applicable` form the terminal ship/handoff condition. Improvement ideas
+after that point are advisory or separate-Issue work.
+
+The selected schedule continues until its required units, validation, and
+publication evidence are complete. This contract is state- and
+dependency-driven; prompt keywords, arbitrary serial waits, and hard-coded
+durations cannot replace a real ordering or collision decision.
 
 ### Canonical Skill Invocation Order
 

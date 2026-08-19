@@ -2,12 +2,10 @@
 
 # @dependency-start
 # contract test
-# responsibility Tests repo structure contract comparison from filesystem and tree JSON input.
+# responsibility Tests path existence/kind comparison without duplicating responsibility owner/class.
 # upstream implementation ../../tools/agent_tools/repo_structure_contract.py compares repo trees with contract profiles
 # upstream design ../../documents/structure/repo-structure-contract.toml defines expected repository structure profiles
-# upstream design ../../CONTAINER_OPERATIONS.md standalone public Docker test boundary
-# downstream implementation ../../docker/Dockerfile publishes the required source image paths
-# downstream implementation ../../test/testlist.toml registers structure validation
+# upstream design ../../responsibility-scope.toml owns path owner and class
 # @dependency-end
 
 from __future__ import annotations
@@ -18,6 +16,11 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "repo_structure_contract.py"
@@ -45,6 +48,14 @@ class RepoStructureContractTest(unittest.TestCase):
             text=True,
         )
 
+    def test_contract_rows_only_store_path_and_kind(self) -> None:
+        """Structure rows must not duplicate owner/class/category metadata."""
+        data = tomllib.loads(CONTRACT.read_text(encoding="utf-8"))
+        for profile in data["profile"]:
+            for row_kind in ("required", "optional"):
+                for row in profile.get(row_kind, []):
+                    self.assertEqual(set(row), {"path", "kind"})
+
     def test_standalone_fixture_passes_tree_command(self) -> None:
         """A minimal standalone AgentCanon shape should satisfy the contract."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -55,7 +66,9 @@ class RepoStructureContractTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("REPO_STRUCTURE=pass", result.stdout)
-            self.assertIn("REPO_STRUCTURE_PROFILE=agent_canon_standalone", result.stdout)
+            self.assertIn(
+                "REPO_STRUCTURE_PROFILE=agent_canon_standalone", result.stdout
+            )
             self.assertIn("REPO_STRUCTURE_TREE_SOURCE=tree-command:", result.stdout)
 
     def test_managed_results_are_excluded_by_exact_path(self) -> None:
@@ -63,9 +76,13 @@ class RepoStructureContractTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_standalone_fixture(root)
-            managed_artifact = root / "experiments" / "topic" / "result" / "run" / "artifact.json"
-            source_artifact = root / "notes" / "result" / "source.md"
-            self.write_file(root, str(managed_artifact.relative_to(root)), "generated\n")
+            managed_artifact = (
+                root / "experiments" / "topic" / "result" / "run" / "artifact.json"
+            )
+            source_artifact = root / "documents" / "notes" / "result" / "source.md"
+            self.write_file(
+                root, str(managed_artifact.relative_to(root)), "generated\n"
+            )
             self.write_file(root, str(source_artifact.relative_to(root)), "source\n")
 
             with_source = self.run_checker(
@@ -84,7 +101,9 @@ class RepoStructureContractTest(unittest.TestCase):
                 "json",
             )
 
-            self.assertEqual(with_source.returncode, 0, with_source.stdout + with_source.stderr)
+            self.assertEqual(
+                with_source.returncode, 0, with_source.stdout + with_source.stderr
+            )
             self.assertEqual(
                 without_source.returncode,
                 0,
@@ -108,7 +127,7 @@ class RepoStructureContractTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "REPO_STRUCTURE_FINDING=error:tooling:tools/catalog.yaml:missing-file",
+                "REPO_STRUCTURE_FINDING=error:required_path:tools/catalog.yaml:missing-file",
                 result.stdout,
             )
 
@@ -130,8 +149,8 @@ class RepoStructureContractTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("REPO_STRUCTURE_TREE_SOURCE=tree-json:", result.stdout)
 
-    def test_unexpected_top_level_is_warning_by_default(self) -> None:
-        """Top-level paths not classified by the profile should be visible."""
+    def test_unlisted_top_level_is_outside_structure_contract(self) -> None:
+        """Non-contract paths are left to the canonical ownership relation."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_standalone_fixture(root)
@@ -140,33 +159,10 @@ class RepoStructureContractTest(unittest.TestCase):
             result = self.run_checker(root, "--profile", "agent_canon_standalone")
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn(
-                "REPO_STRUCTURE_FINDING=warn:unexpected_top_level:scratch.txt:not-in-profile-contract",
-                result.stdout,
-            )
-
-    def test_unexpected_top_level_can_be_strict(self) -> None:
-        """Strict mode should fail on unclassified top-level paths."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_standalone_fixture(root)
-            self.write_file(root, "scratch.txt", "scratch\n")
-
-            result = self.run_checker(
-                root,
-                "--profile",
-                "agent_canon_standalone",
-                "--strict-extra-top-level",
-            )
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn(
-                "REPO_STRUCTURE_FINDING=error:unexpected_top_level:scratch.txt:not-in-profile-contract",
-                result.stdout,
-            )
+            self.assertNotIn("scratch.txt", result.stdout)
 
     def test_standalone_profile_allows_runtime_and_evidence_support_dirs(self) -> None:
-        """Standalone AgentCanon should classify shared runtime support dirs."""
+        """Standalone AgentCanon should allow shared runtime support dirs."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_standalone_fixture(root)
@@ -176,11 +172,9 @@ class RepoStructureContractTest(unittest.TestCase):
             result = self.run_checker(root, "--profile", "agent_canon_standalone")
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertNotIn("unexpected_top_level:.vscode", result.stdout)
-            self.assertNotIn("unexpected_top_level:evidence", result.stdout)
 
     def test_template_profile_allows_evidence_root_view(self) -> None:
-        """Template roots should classify parent-owned evidence content."""
+        """Template roots should allow parent-owned evidence content."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_template_fixture(root)
@@ -189,7 +183,6 @@ class RepoStructureContractTest(unittest.TestCase):
             result = self.run_checker(root, "--profile", "template_or_derived_repo")
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertNotIn("unexpected_top_level:evidence", result.stdout)
 
     def test_template_parent_may_omit_agent_and_editor_directories(self) -> None:
         """Parent-owned agents and editor directories are optional structure."""
@@ -217,12 +210,13 @@ class RepoStructureContractTest(unittest.TestCase):
             "documents/rule/directory-structure.md",
             "documents/runtime/shared-runtime-surfaces.toml",
             "documents/structure/repo-structure-contract.toml",
+            "docker/Dockerfile",
+            "test/testrunner.sh",
+            "test/testrunner.py",
+            "test/testlist.toml",
             "tools/catalog.yaml",
             "rust/agent-canon/Cargo.toml",
             "tools/agent_tools/update_lifecycle_contract.py",
-            "docker/Dockerfile",
-            "test/testrunner.sh",
-            "test/testlist.toml",
         ]:
             self.write_file(root, file_path, f"{file_path}\n")
         for dir_path in [
@@ -237,10 +231,8 @@ class RepoStructureContractTest(unittest.TestCase):
             "tools/internal",
             "tools/ci",
             "tests/agent_tools",
-            "docker",
-            "test",
             "memory",
-            "notes",
+            "documents/notes",
             "issues",
         ]:
             (root / dir_path).mkdir(parents=True, exist_ok=True)
@@ -307,10 +299,7 @@ class RepoStructureContractTest(unittest.TestCase):
                             "contents": [
                                 {"type": "file", "name": "README.md"},
                                 {"type": "file", "name": "naming.md"},
-                                {
-                                    "type": "file",
-                                    "name": "directory-structure.md",
-                                },
+                                {"type": "file", "name": "directory-structure.md"},
                             ],
                         },
                         {"type": "directory", "name": "tools"},
@@ -328,6 +317,21 @@ class RepoStructureContractTest(unittest.TestCase):
                                 {"type": "file", "name": "repo-structure-contract.toml"}
                             ],
                         },
+                        {"type": "directory", "name": "notes"},
+                    ],
+                },
+                {
+                    "type": "directory",
+                    "name": "docker",
+                    "contents": [{"type": "file", "name": "Dockerfile"}],
+                },
+                {
+                    "type": "directory",
+                    "name": "test",
+                    "contents": [
+                        {"type": "file", "name": "testrunner.sh"},
+                        {"type": "file", "name": "testrunner.py"},
+                        {"type": "file", "name": "testlist.toml"},
                     ],
                 },
                 {
@@ -339,10 +343,7 @@ class RepoStructureContractTest(unittest.TestCase):
                             "type": "directory",
                             "name": "agent_tools",
                             "contents": [
-                                {
-                                    "type": "file",
-                                    "name": "update_lifecycle_contract.py",
-                                }
+                                {"type": "file", "name": "update_lifecycle_contract.py"}
                             ],
                         },
                         {"type": "directory", "name": "user"},
@@ -366,21 +367,7 @@ class RepoStructureContractTest(unittest.TestCase):
                     "name": "tests",
                     "contents": [{"type": "directory", "name": "agent_tools"}],
                 },
-                {
-                    "type": "directory",
-                    "name": "docker",
-                    "contents": [{"type": "file", "name": "Dockerfile"}],
-                },
-                {
-                    "type": "directory",
-                    "name": "test",
-                    "contents": [
-                        {"type": "file", "name": "testrunner.sh"},
-                        {"type": "file", "name": "testlist.toml"},
-                    ],
-                },
                 {"type": "directory", "name": "memory"},
-                {"type": "directory", "name": "notes"},
                 {"type": "directory", "name": "issues"},
             ],
         }

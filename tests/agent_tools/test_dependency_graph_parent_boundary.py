@@ -8,13 +8,9 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
-
-from tools.agent_tools.fixture_spawn import (
-    bootstrap_fixture_public_environment,
-    record_capability_from_environment,
-)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "check_dependency_graph.sh"
@@ -61,20 +57,17 @@ def _parent_fixture(tmp_path: Path) -> tuple[Path, Path]:
 def test_graph_uses_selected_parent_for_temp_and_output(tmp_path: Path) -> None:
     parent, source = _parent_fixture(tmp_path)
     output = parent / "reports" / "dependency.tsv"
-    with bootstrap_fixture_public_environment(
-        mode="synthetic_tool",
-        record_capability=record_capability_from_environment(),
-        fixture_cwd=parent,
-        invocation_script=parent / "tools" / "bin" / "agent-canon",
-    ) as fixture:
-        result = subprocess.run(
-            ("bash", str(SCRIPT), "--root", str(source), "--graph-tsv", str(output)),
-            cwd=parent,
-            env=fixture.environment,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+    environment = os.environ.copy()
+    environment["AGENT_CANON_PARENT_ROOT"] = str(parent)
+
+    result = subprocess.run(
+        ("bash", str(SCRIPT), "--root", str(source), "--graph-tsv", str(output)),
+        cwd=parent,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert output.read_text(encoding="utf-8") == "direction\tkind\tsource\ttarget\n"
@@ -86,20 +79,17 @@ def test_graph_uses_selected_parent_for_temp_and_output(tmp_path: Path) -> None:
 def test_graph_rejects_output_outside_selected_parent(tmp_path: Path) -> None:
     parent, source = _parent_fixture(tmp_path)
     output = source / "dependency.tsv"
-    with bootstrap_fixture_public_environment(
-        mode="synthetic_tool",
-        record_capability=record_capability_from_environment(),
-        fixture_cwd=parent,
-        invocation_script=parent / "tools" / "bin" / "agent-canon",
-    ) as fixture:
-        result = subprocess.run(
-            ("bash", str(SCRIPT), "--root", str(source), "--graph-tsv", str(output)),
-            cwd=parent,
-            env=fixture.environment,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+    environment = os.environ.copy()
+    environment["AGENT_CANON_PARENT_ROOT"] = str(parent)
+
+    result = subprocess.run(
+        ("bash", str(SCRIPT), "--root", str(source), "--graph-tsv", str(output)),
+        cwd=parent,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
     assert result.returncode != 0
     assert "PARENT_ROOT_SIDE_EFFECT_ERROR" in result.stderr

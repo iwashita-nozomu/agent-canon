@@ -20,7 +20,6 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import contextmanager
 from pathlib import Path
 from typing import cast
 from unittest import mock
@@ -36,11 +35,6 @@ import hook_event_log  # noqa: E402
 from prompt_classifier import (  # noqa: E402
     PromptClassifierInputs,
     prompt_intake_signals,
-)
-from tools.agent_tools.fixture_spawn import (  # noqa: E402
-    bootstrap_fixture_public_environment,
-    record_capability_from_environment,
-    record_environment,
 )
 
 ACTIVE_EVENTS = ("UserPromptSubmit", "PreToolUse", "PostToolUse")
@@ -82,48 +76,6 @@ RETIRED_ROUTE_FIELDS = {
 class CodexHooksTest(unittest.TestCase):
     """Validate active hook behavior without exercising retired hook scripts."""
 
-    @staticmethod
-    def _bootstrap_fixture(root: Path) -> None:
-        """Create the canonical Git fixture owner used by v2 hook sessions."""
-        if (root / ".git").exists():
-            return
-        subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
-        subprocess.run(
-            ["git", "-C", str(root), "remote", "add", "origin", "https://example.invalid/hook-fixture.git"],
-            check=True,
-        )
-        subprocess.run(
-            [
-                "git",
-                "-C",
-                str(root),
-                "-c",
-                "user.name=Test",
-                "-c",
-                "user.email=test@example.invalid",
-                "commit",
-                "--allow-empty",
-                "-m",
-                "fixture",
-            ],
-            check=True,
-            capture_output=True,
-        )
-
-    @contextmanager
-    def _authenticated_fixture(self, root: Path):
-        """Yield one child environment from the canonical signed-session bootstrap."""
-        self._bootstrap_fixture(root)
-        with bootstrap_fixture_public_environment(
-            mode="synthetic_tool",
-            record_capability=record_capability_from_environment(),
-            fixture_cwd=root,
-            base_env=os.environ.copy(),
-            invocation_script=HOOK_DISPATCHER,
-            purpose="codex-hook-test",
-        ) as fixture:
-            yield fixture.environment
-
     def _run_hook(
         self,
         event: str,
@@ -134,18 +86,28 @@ class CodexHooksTest(unittest.TestCase):
         """Run the active dispatcher with its bounded telemetry rooted in a temp dir."""
         raw_payload = payload if isinstance(payload, str) else json.dumps(payload)
         with tempfile.TemporaryDirectory() as temp_dir:
-            return self._run_hook_in_root(Path(temp_dir), event, payload, extra_env=extra_env)
-
-    def _contract(self) -> dict[str, object]:
-        with record_environment(cwd=PROJECT_ROOT) as environment:
-            result = subprocess.run(
-                [sys.executable, str(HOOK_DISPATCHER), "--contract"],
+            return subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), event],
                 cwd=PROJECT_ROOT,
+                input=raw_payload,
                 check=True,
                 capture_output=True,
                 text=True,
-                env=environment,
+                env={
+                    **os.environ,
+                    **(extra_env or {}),
+                    "AGENT_CANON_HOOK_SOURCE_ROOT": temp_dir,
+                },
             )
+
+    def _contract(self) -> dict[str, object]:
+        result = subprocess.run(
+            [sys.executable, str(HOOK_DISPATCHER), "--contract"],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
         return cast("dict[str, object]", json.loads(result.stdout))
 
     def _run_hook_in_root(
@@ -158,18 +120,19 @@ class CodexHooksTest(unittest.TestCase):
     ) -> subprocess.CompletedProcess[str]:
         """Run one hook against an isolated fixture root and return its readback."""
         raw_payload = payload if isinstance(payload, str) else json.dumps(payload)
-        with self._authenticated_fixture(root) as environment:
-            environment.update(extra_env or {})
-            environment["AGENT_CANON_HOOK_SOURCE_ROOT"] = str(root)
-            return subprocess.run(
-                [sys.executable, str(HOOK_DISPATCHER), event],
-                cwd=root,
-                input=raw_payload,
-                check=True,
-                capture_output=True,
-                text=True,
-                env=environment,
-            )
+        return subprocess.run(
+            [sys.executable, str(HOOK_DISPATCHER), event],
+            cwd=PROJECT_ROOT,
+            input=raw_payload,
+            check=True,
+            capture_output=True,
+            text=True,
+            env={
+                **os.environ,
+                **(extra_env or {}),
+                "AGENT_CANON_HOOK_SOURCE_ROOT": str(root),
+            },
+        )
 
     def _run_hook_in_layout(
         self,
@@ -177,31 +140,29 @@ class CodexHooksTest(unittest.TestCase):
         event: str,
         payload: object,
         *,
-        session_root: Path | None = None,
         extra_env: dict[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         """Run one hook without the source-root test override."""
         raw_payload = payload if isinstance(payload, str) else json.dumps(payload)
-        with self._authenticated_fixture(session_root or cwd) as env:
-            for key in (
-                "AGENT_CANON_HOOK_EVENT_SPOOL_DIR",
-                "AGENT_CANON_HOOK_SOURCE_ROOT",
-                "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR",
-                "AGENT_CANON_SOURCE_ROOT",
-                "AGENT_CANON_ROOT",
-            ):
-                env.pop(key, None)
-            env.update(extra_env or {})
-            env.pop("AGENT_CANON_HOOK_SOURCE_ROOT", None)
-            return subprocess.run(
-                [sys.executable, str(HOOK_DISPATCHER), event],
-                cwd=cwd,
-                input=raw_payload,
-                check=True,
-                capture_output=True,
-                text=True,
-                env=env,
-            )
+        env = dict(os.environ)
+        for key in (
+            "AGENT_CANON_HOOK_EVENT_SPOOL_DIR",
+            "AGENT_CANON_HOOK_SOURCE_ROOT",
+            "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR",
+            "AGENT_CANON_SOURCE_ROOT",
+            "AGENT_CANON_ROOT",
+        ):
+            env.pop(key, None)
+        env.update(extra_env or {})
+        return subprocess.run(
+            [sys.executable, str(HOOK_DISPATCHER), event],
+            cwd=cwd,
+            input=raw_payload,
+            check=True,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
 
     @staticmethod
     def _spooled_event(root: Path, pattern: str = ".agent-canon/**/*.json") -> dict[str, object]:
@@ -329,19 +290,15 @@ class CodexHooksTest(unittest.TestCase):
         """A failed source-root resolution disables report projection as typed state."""
         payload = {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"}
         with tempfile.TemporaryDirectory() as tmp_dir:
-            parent = Path(tmp_dir) / "parent"
-            self._bootstrap_fixture(parent)
-            root = parent / "unresolved" / "child"
-            root.mkdir(parents=True)
-            spool = parent / "spool"
-            report = parent / "authority-report"
+            root = Path(tmp_dir)
+            spool = root / "spool"
+            report = root / "authority-report"
             report.mkdir()
 
             self._run_hook_in_layout(
                 root,
                 "UserPromptSubmit",
                 payload,
-                session_root=parent,
                 extra_env={
                     "AGENT_CANON_HOOK_EVENT_SPOOL_DIR": str(spool),
                     "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(report),
@@ -359,7 +316,7 @@ class CodexHooksTest(unittest.TestCase):
             parent = Path(tmp_dir) / "parent"
             source = parent / "vendor" / "agent-canon"
             catalog = source / "agents" / "skills" / "catalog.yaml"
-            self._bootstrap_fixture(parent)
+            (parent / ".git").mkdir(parents=True)
             source.mkdir(parents=True)
             (source / ".git").write_text(
                 "gitdir: ../../.git/modules/vendor/agent-canon\n",
@@ -374,12 +331,7 @@ class CodexHooksTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            self._run_hook_in_layout(
-                source,
-                "UserPromptSubmit",
-                payload,
-                session_root=parent,
-            )
+            self._run_hook_in_layout(source, "UserPromptSubmit", payload)
 
             event = self._spooled_event(parent)
             self.assertEqual(event["root"], str(parent))
@@ -1099,7 +1051,7 @@ def test_hook_event_publish_rejects_unattested_parent_without_raw_fallback() -> 
     """Missing parent capability returns typed failure without touching the path."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         target = Path(tmp_dir) / "event.json"
-        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": ""}, clear=True):
+        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": ""}):
             result = hook_event_log.publish_hook_event_noreplace(target, b"event\n")
         assert result == ("failed", "parent_unattested")
         assert not target.exists()
@@ -1109,7 +1061,7 @@ def test_hook_report_requires_parent_capability() -> None:
     """Report projection stays disabled until the parent capability is present."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         target = Path(tmp_dir) / "report"
-        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": ""}, clear=True):
+        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": ""}):
             assert hook_dispatcher._parent_bound_report(target, "hook-report") is None
 
 
@@ -1121,7 +1073,6 @@ def test_pointer_targets_reject_missing_and_containment_escapes() -> None:
             "AGENT_CANON_HOOK_EVENT_SPOOL_DIR": "",
             "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": "",
         },
-        clear=True,
     ):
         CodexHooksTest().test_pointer_targets_reject_missing_and_containment_escapes()
 

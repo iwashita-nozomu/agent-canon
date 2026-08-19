@@ -17,22 +17,48 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.agent_tools.fixture_spawn import (
-    bootstrap_fixture_public_environment,
-    record_capability_from_environment,
-)
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "issue_sync.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 import issue_sync  # noqa: E402
 
+_PARENT_BOUNDARY_PATH_KEYS = (
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "XDG_CACHE_HOME",
+    "PYTHONPYCACHEPREFIX",
+    "AGENT_CANON_TOOLS_HOME",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "AGENT_CANON_CLI_TARGET_DIR",
+    "AGENT_CANON_PARENT_ROOT",
+    "AGENT_CANON_PARENT_ROOT_DEV",
+    "AGENT_CANON_PARENT_ROOT_INO",
+    "AGENT_CANON_CHILD_HANDOFF",
+    "AGENT_CANON_CHILD_PURPOSE",
+    "AGENT_CANON_HANDOFF_AUDIENCE",
+    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+    "AGENT_CANON_ROOT",
+    "AGENT_CANON_SOURCE_ROOT",
+    "AGENT_CANON_TASK_ID",
+    "AGENT_CANON_REPOSITORY_ID",
+    "AGENT_CANON_TASK_REPOSITORY",
+    "AGENT_CANON_LIFECYCLE_ID",
+    "AGENT_CANON_EXPECTED_IMAGE_TAG",
+    "AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT",
+)
+
 
 class IssueSyncTest(unittest.TestCase):
     """Exercise local issue validation and sync planning."""
 
-    def prepare_fixture_repository(self, root: Path) -> None:
-        """Create the data-only fixture repository used by issue checks."""
+    def parent_bound_environment(
+        self,
+        root: Path,
+        base: dict[str, str] | None = None,
+    ) -> dict[str, str]:
+        """Return a clean environment bound to one real fixture repository."""
         if not (root / ".git").exists():
             subprocess.run(
                 ["git", "init", "-q", "-b", "main", str(root)],
@@ -68,9 +94,23 @@ class IssueSyncTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+        environment = (os.environ if base is None else base).copy()
+        for key in _PARENT_BOUNDARY_PATH_KEYS:
+            environment.pop(key, None)
+        fixture_root = str(root.resolve())
+        environment["AGENT_CANON_PARENT_ROOT"] = fixture_root
+        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = fixture_root
+        return environment
+
     def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the issue sync checker in its authenticated fixture root."""
-        return self.run_checker_with_env(root, os.environ.copy(), *args)
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), "--root", str(root), *args],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=self.parent_bound_environment(root),
+        )
 
     def run_checker_with_env(
         self,
@@ -79,36 +119,13 @@ class IssueSyncTest(unittest.TestCase):
         *args: str,
     ) -> subprocess.CompletedProcess[str]:
         """Run issue sync with fake tools inside its authenticated root."""
-        self.prepare_fixture_repository(root)
-        invocation_script = root / ".agent-canon-issue-sync.py"
-        invocation_script.write_text("# fixture issue-sync entrypoint\n", encoding="utf-8")
-        fixture_env = dict(env)
-        for key in ("CARGO_TARGET_DIR", "AGENT_CANON_CLI_TARGET_DIR"):
-            fixture_env.pop(key, None)
-        fixture_root = root.resolve()
-        fixture_path_entries: list[str] = []
-        for entry in env.get("PATH", "").split(os.pathsep):
-            if not entry:
-                continue
-            candidate = Path(entry).resolve(strict=False)
-            if candidate.is_relative_to(fixture_root):
-                fixture_path_entries.append(str(candidate))
-        with bootstrap_fixture_public_environment(
-            mode="synthetic_tool",
-            record_capability=record_capability_from_environment(),
-            fixture_cwd=root,
-            base_env=fixture_env,
-            invocation_script=invocation_script,
-            explicit_path_entries=fixture_path_entries,
-        ) as fixture:
-            return subprocess.run(
-                [sys.executable, str(SCRIPT), "--root", str(root), *args],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-                env=fixture.environment,
-            )
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), "--root", str(root), *args],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=self.parent_bound_environment(root, env),
+        )
 
     def test_missing_required_field_fails(self) -> None:
         """Local issue files must keep required fields."""

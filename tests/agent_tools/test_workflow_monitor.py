@@ -17,12 +17,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, Protocol, cast
+from typing import Protocol, cast
 from unittest import mock
-
-from tools.agent_tools.fixture_spawn import record_environment
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
@@ -54,32 +51,6 @@ def seed_bootstrap_workspace(workspace_root: Path) -> None:
         destination = workspace_root / relative_path
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes((PROJECT_ROOT / relative_path).read_bytes())
-
-
-def enclosing_repository_root() -> Path:
-    """Return the authenticated Git parent that contains this source checkout."""
-    for candidate in PROJECT_ROOT.parents:
-        result = subprocess.run(
-            ["git", "-C", str(candidate), "rev-parse", "--show-toplevel"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            continue
-        root = Path(result.stdout.strip()).resolve()
-        if root != PROJECT_ROOT and PROJECT_ROOT.is_relative_to(root):
-            return root
-    raise AssertionError("workflow bootstrap tests require an enclosing Git parent")
-
-
-@contextmanager
-def authenticated_tempdir() -> Iterator[str]:
-    """Create a per-test temp directory inside the authenticated source root."""
-    with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as tmp_dir:
-        with record_environment(cwd=PROJECT_ROOT) as environment:
-            with mock.patch.dict(os.environ, environment, clear=True):
-                yield tmp_dir
 
 
 class WorkflowMonitorModule(Protocol):
@@ -149,7 +120,7 @@ class WorkflowMonitorTest(unittest.TestCase):
             close_agent_tool_call_ref="close-token:" + "4" * 64,
         )
 
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             path = append_monitoring(
                 Path(tmp_dir),
                 entries_type(lifecycle_evidence=evidence),
@@ -167,15 +138,15 @@ class WorkflowMonitorTest(unittest.TestCase):
         module = load_monitor_module()
         entries_type = getattr(module, "MonitoringEntries")
         append_monitoring = getattr(module, "append_monitoring")
-        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT / ".agent-canon") as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             report_dir.mkdir(parents=True)
             prepared = "prepared-monitoring-prefix\n"
             (report_dir / "workflow_monitoring.md").write_text(
                 prepared, encoding="utf-8"
             )
-            with record_environment(cwd=PROJECT_ROOT) as environment, mock.patch.dict(
-                os.environ, environment, clear=True
+            with mock.patch.dict(
+                os.environ, {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}
             ):
                 append_monitoring(
                     report_dir,
@@ -207,7 +178,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_appends_signals_interventions_and_decisions(self) -> None:
         """The monitor CLI should update all monitored sections."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             result = subprocess.run(
@@ -259,7 +230,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_appends_structured_tool_warning(self) -> None:
         """Tool warnings should be recorded as closeout-obligating ledger rows."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             result = subprocess.run(
@@ -293,7 +264,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_preserves_schema_owned_completion_evidence(self) -> None:
         """Monitor projection must retain typed gate, failure, resource, and binding fields."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             semantic_event = " ".join(
@@ -355,7 +326,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_sets_no_tool_warning_status(self) -> None:
         """Runs with no observed warning should mark the ledger explicitly none."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             result = subprocess.run(
@@ -379,7 +350,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_appends_mid_task_user_input_to_wave_artifacts(self) -> None:
         """Mid-task user additions should checkpoint schedule and monitoring rows."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             (report_dir / "schedule.md").write_text(
@@ -449,12 +420,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_replaces_initial_blocker_with_actual_subagent_wave(self) -> None:
         """A real parent wave should replace the bootstrap authority blocker."""
-        parent_root = enclosing_repository_root()
-        with (
-            record_environment(cwd=PROJECT_ROOT) as environment,
-            mock.patch.dict(os.environ, environment, clear=True),
-            tempfile.TemporaryDirectory(dir=parent_root) as tmp_dir,
-        ):
+        with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True)
@@ -531,7 +497,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_rejects_delegated_child_wave_without_budget(self) -> None:
         """Delegated child waves must preserve bounded budget evidence."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             result = subprocess.run(
@@ -568,7 +534,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_records_read_only_validation_failure_triage_wave(self) -> None:
         """Validation-failure triage may stay read-only before cause evidence."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             (report_dir / "schedule.md").write_text(
@@ -640,7 +606,7 @@ class WorkflowMonitorTest(unittest.TestCase):
         self,
     ) -> None:
         """Generated manifest read-only triage value should be accepted."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             (report_dir / "schedule.md").write_text(
@@ -712,7 +678,7 @@ class WorkflowMonitorTest(unittest.TestCase):
         self,
     ) -> None:
         """Write-capable validation repair requires cause-classification evidence."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             result = subprocess.run(
@@ -750,7 +716,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_records_validation_failure_repair_evidence(self) -> None:
         """Write-capable validation repair should emit preserved-intent tokens."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             (report_dir / "schedule.md").write_text(
@@ -824,7 +790,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_rejects_noncanonical_validation_failure_cause_slug(self) -> None:
         """Validation failure cause_classification must use token-safe slugs."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             result = subprocess.run(
@@ -866,7 +832,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_rejects_mid_task_user_input_with_wrong_action(self) -> None:
         """Classification and redispatch action should be mechanically consistent."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             result = subprocess.run(
@@ -899,7 +865,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_requires_scope_change_fresh_wave_evidence(self) -> None:
         """Scope-changing user additions should name fresh follow-up wave evidence."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             result = subprocess.run(
@@ -933,7 +899,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_records_scope_change_fresh_wave_evidence(self) -> None:
         """Fresh follow-up wave evidence should be emitted as machine-readable tokens."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             (report_dir / "schedule.md").write_text(
@@ -1002,7 +968,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_rejects_mid_task_input_with_wrong_spawn_authority(self) -> None:
         """Classification should own spawn authority, not caller-supplied overrides."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             result = subprocess.run(
@@ -1036,7 +1002,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_preserves_parallel_tool_warning_updates(self) -> None:
         """Concurrent tool warning updates should not lose ledger rows."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             processes = [
@@ -1072,7 +1038,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_rejects_tool_warning_without_routeable_fields(self) -> None:
         """Tool warning rows should have enough fields to repair or defer."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             result = subprocess.run(
@@ -1095,7 +1061,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_monitor_rejects_runtime_feedback_without_target_action(self) -> None:
         """Runtime feedback should be routeable to a concrete update surface."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             result = subprocess.run(
@@ -1118,7 +1084,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_closeout_token_preset_records_behavior_eval_tokens(self) -> None:
         """The closeout preset should append the standard behavior tokens."""
-        with authenticated_tempdir() as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
             result = subprocess.run(
@@ -1176,12 +1142,7 @@ class WorkflowMonitorTest(unittest.TestCase):
 
     def test_bootstrap_seeds_monitoring_with_routing_evidence(self) -> None:
         """bootstrap_agent_run should seed workflow monitoring without manual edits."""
-        parent_root = enclosing_repository_root()
-        with (
-            record_environment(cwd=PROJECT_ROOT) as environment,
-            mock.patch.dict(os.environ, environment, clear=True),
-            tempfile.TemporaryDirectory(dir=parent_root) as tmp_dir,
-        ):
+        with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True)
@@ -1221,28 +1182,20 @@ class WorkflowMonitorTest(unittest.TestCase):
 
 def test_monitor_atomic_open_rejects_parent_path_replacement() -> None:
     """The monitor boundary rejects a replaced path component before opening it."""
-    with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as tmp_dir:
+    with tempfile.TemporaryDirectory() as tmp_dir:
         root = Path(tmp_dir)
+        outside = root / "outside"
+        outside.mkdir()
         replaced = root / "reports"
+        replaced.symlink_to(outside, target_is_directory=True)
         module = load_monitor_module()
         target = replaced / "workflow_monitoring.md"
-        with record_environment(cwd=PROJECT_ROOT) as environment, mock.patch.dict(
-            os.environ, environment, clear=True
-        ):
-            # Make the symlink target physically escape the signed parent
-            # rather than merely leaving the temporary fixture directory.
-            # The oracle is about parent-boundary rejection, so its target
-            # must be outside the authenticated parent root even when the
-            # runner itself is nested.
-            signed_parent = Path(
-                os.environ["AGENT_CANON_SIDE_EFFECT_PARENT_ROOT"]
-            ).resolve()
-            outside = signed_parent.parent
-            replaced.symlink_to(outside, target_is_directory=True)
+        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}):
             with unittest.TestCase().assertRaises(ParentRootSideEffectError) as rejected:
                 with module.locked_monitoring_artifact(target):
                     pass
         assert rejected.exception.reject is ParentRootReject.SYMLINK_ESCAPE
+        assert not (outside / "workflow_monitoring.md").exists()
 
 
 if __name__ == "__main__":

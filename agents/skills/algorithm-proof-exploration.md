@@ -587,4 +587,4 @@ Use these names in run bundles, proof notes, or `lean/<proof-theme>/` artifacts:
 - Do not treat one failed formal-proof route as an algorithmic blocker until
   `$formal-proof-workflow` has checked whether a weaker or bundled route can
   close the target.
-- Do not split one proof theme across competing proof notes. Implementation path explanation may live in Design docs; mathematical proof text belongs in `notes/themes/`.
+- Do not split one proof theme across competing proof notes. Implementation path explanation may live in Design docs; mathematical proof text belongs in `documents/notes/themes/`.

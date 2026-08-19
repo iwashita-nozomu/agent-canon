@@ -32,52 +32,38 @@ skill_families:
 class SkillToolCommandsTest(unittest.TestCase):
     """Verify materialized skill tool command sections."""
 
-    @staticmethod
-    def fixture_environment() -> dict[str, str]:
-        """Keep explicit fixture roots independent of the outer test session."""
-        return {
-            key: value
-            for key, value in os.environ.items()
-            if not key.startswith("AGENT_CANON_") and key != "PYTHONPATH"
-        }
-
     def test_public_projection_keeps_logical_plan_and_layout_prefix(self) -> None:
         """Derived public argv is separate from the source execution spelling."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            executable = root / "tools" / "agent-canon" / "agent_tools" / "workflow_monitor.py"
-            executable.parent.mkdir(parents=True)
-            executable.write_text("# fixture\n", encoding="utf-8")
-            logical = (
-                "PYTHONPATH=tools python3 tools/agent_tools/workflow_monitor.py "
-                "--root . --contract vendor/agent-canon/documents/structure/repo-structure-contract.toml"
-            )
-            standalone = project_public_command(
-                logical,
-                RootResolution(root, root, "standalone", root),
-            )
-            derived = project_public_command(
-                logical,
-                RootResolution(root, root, "vendored", root),
-            )
-            self.assertEqual(standalone.public_argv[1], "tools/agent_tools/workflow_monitor.py")
-            self.assertEqual(
-                derived.public_argv[1], "tools/agent-canon/agent_tools/workflow_monitor.py"
-            )
-            self.assertEqual(
-                standalone.public_argv[2:],
-                ("--root", ".", "--contract", "documents/structure/repo-structure-contract.toml"),
-            )
-            self.assertEqual(
-                derived.public_argv[2:],
-                (
-                    "--root",
-                    ".",
-                    "--contract",
-                    "vendor/agent-canon/documents/structure/repo-structure-contract.toml",
-                ),
-            )
-            self.assertEqual(derived.public_env, (("PYTHONPATH", "tools/agent-canon"),))
+        logical = (
+            "PYTHONPATH=tools python3 tools/agent_tools/workflow_monitor.py "
+            "--root . --contract vendor/agent-canon/documents/structure/repo-structure-contract.toml"
+        )
+        standalone = project_public_command(
+            logical,
+            RootResolution(Path("."), Path("."), "standalone", Path(".")),
+        )
+        derived = project_public_command(
+            logical,
+            RootResolution(Path("."), Path("."), "vendored", Path(".")),
+        )
+        self.assertEqual(standalone.public_argv[1], "tools/agent_tools/workflow_monitor.py")
+        self.assertEqual(
+            derived.public_argv[1], "tools/agent-canon/agent_tools/workflow_monitor.py"
+        )
+        self.assertEqual(
+            standalone.public_argv[2:],
+            ("--root", ".", "--contract", "documents/structure/repo-structure-contract.toml"),
+        )
+        self.assertEqual(
+            derived.public_argv[2:],
+            (
+                "--root",
+                ".",
+                "--contract",
+                "vendor/agent-canon/documents/structure/repo-structure-contract.toml",
+            ),
+        )
+        self.assertEqual(derived.public_env, (("PYTHONPATH", "tools/agent-canon"),))
 
     def run_tool(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the skill command tool against a root."""
@@ -87,7 +73,6 @@ class SkillToolCommandsTest(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
-            env=self.fixture_environment(),
         )
 
     def run_tool_from_cwd(
@@ -102,7 +87,6 @@ class SkillToolCommandsTest(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
-            env=self.fixture_environment(),
         )
 
     def write_skill(self, root: Path, skill: str, body: str) -> Path:
@@ -781,6 +765,20 @@ class SkillToolCommandsTest(unittest.TestCase):
             payload = json.loads(result.stdout)
             self.assertNotIn("tools/", payload["discovered_commands"])
 
+    def test_check_rejects_bare_internal_tool_command(self) -> None:
+        """Check reports issue-backed bare internal tool command drift."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_skill(
+                root,
+                "result-artifact-writeout",
+                "Run `runtime_log_archive_git.py push` after archiving.\n",
+            )
+            result = self.run_tool(root, "check")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("bare-runtime-log-archive-push:present", result.stdout)
+
     def test_check_requires_project_owned_bootstrap_document_markers(self) -> None:
         """Check keeps default repository startup on project-owned static contracts."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -803,7 +801,7 @@ class SkillToolCommandsTest(unittest.TestCase):
         """Check allows run-local and template workflow monitoring paths."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            runtime = self.write_skill(
+            self.write_skill(
                 root,
                 "tool-finding-report",
                 (
@@ -811,18 +809,10 @@ class SkillToolCommandsTest(unittest.TestCase):
                     "using template `templates/agents/workflow_monitoring.md`.\n"
                 ),
             )
-            runtime.write_text(
-                runtime.read_text(encoding="utf-8")
-                + "\n## Tool Commands\n"
-                + "<!-- skill-tool-commands:start -->\n"
-                + "python3 tools/agent_tools/skill_tool_commands.py show --skill tool-finding-report --format text\n"
-                + "<!-- skill-tool-commands:end -->\n",
-                encoding="utf-8",
-            )
             result = self.run_tool(root, "check")
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("SKILL_TOOL_COMMANDS=pass", result.stdout)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("workflow_monitoring.md:present", result.stdout)
 
 
 if __name__ == "__main__":

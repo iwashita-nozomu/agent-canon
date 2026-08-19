@@ -18,34 +18,12 @@ import sys
 from pathlib import Path
 
 import pytest
-from tools.agent_tools.fixture_spawn import (
-    bootstrap_fixture_public_environment,
-    record_capability_from_environment,
-)
 
 TOPIC = "dependency-module-change"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "dependency_module_change.py"
 GENERIC_TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "repository_topic_clone.py"
-
-
-def authenticated_fixture_environment(root: Path):
-    """Issue a fixture-owned session through the canonical fixture facade."""
-    invocation = root / ".agent-canon-fixture.py"
-    invocation.write_text("# fixture invocation\n", encoding="utf-8")
-    base_environment = {
-        key: value for key, value in os.environ.items()
-        if not key.startswith("AGENT_CANON_") and key != "PYTHONPATH"
-    }
-    return bootstrap_fixture_public_environment(
-        mode="synthetic_tool",
-        record_capability=record_capability_from_environment(),
-        fixture_cwd=root,
-        base_env=base_environment,
-        invocation_script=invocation,
-        purpose="dependency-module-change-test",
-    )
 
 
 def run_git(path: Path, *args: str) -> str:
@@ -149,36 +127,6 @@ def create_parent(
     selected = tmp_path / "host" / "parent"
     selected.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
-        ["git", "init", "-q", "-b", "main", str(selected.parent)],
-        check=True,
-    )
-    (selected.parent / ".gitmodules").write_text(
-        "\n".join(manifest), encoding="utf-8"
-    )
-    (selected.parent / "owner-evidence.md").write_text(
-        "source edit required\n", encoding="utf-8"
-    )
-    (selected.parent / ".gitignore").write_text("workspace/\n", encoding="utf-8")
-    run_git(selected.parent, "add", ".gitmodules", "owner-evidence.md", ".gitignore")
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(selected.parent),
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.invalid",
-            "commit",
-            "-m",
-            "fixture parent",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    run_git(selected.parent, "remote", "add", "origin", str(parent_remote))
-    subprocess.run(
         ["git", "clone", str(parent_remote), str(selected)],
         check=True,
         capture_output=True,
@@ -192,15 +140,15 @@ def create_parent(
 
 def invoke(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     """Run the dependency module adapter with provided command arguments."""
-    with authenticated_fixture_environment(root) as env:
-        return subprocess.run(
-            [sys.executable, str(TOOL), "--root", str(root), *args],
-            cwd=root,
-            check=False,
-            capture_output=True,
-            text=True,
-            env=env,
-        )
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+    return subprocess.run(
+        [sys.executable, str(TOOL), "--root", str(root), *args],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
 
 
 def install_public_cli_surface(root: Path, *, derived: bool) -> Path:
@@ -230,7 +178,6 @@ def test_public_cli_help_and_status_from_fresh_source_surfaces(
     """Run public help and status without ambient package context."""
     root = tmp_path / ("derived" if derived else "standalone")
     root.mkdir()
-    subprocess.run(["git", "init", "-q", "-b", "main", str(root.parent)], check=True)
     subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
     executable = install_public_cli_surface(root, derived=derived)
     (root / ".gitmodules").write_text(
@@ -254,25 +201,24 @@ def test_public_cli_help_and_status_from_fresh_source_surfaces(
     assert "prepare" in help_result.stdout
     assert "cleanup" in help_result.stdout
 
-    with authenticated_fixture_environment(root) as env:
-        status_result = subprocess.run(
-            [
-                sys.executable,
-                str(executable),
-                "--root",
-                str(root),
-                "status",
-                "--topic",
-                TOPIC,
-                "--module",
-                "vendor/dep",
-            ],
-            cwd=root,
-            check=False,
-            capture_output=True,
-            text=True,
-            env=env,
-        )
+    status_result = subprocess.run(
+        [
+            sys.executable,
+            str(executable),
+            "--root",
+            str(root),
+            "status",
+            "--topic",
+            TOPIC,
+            "--module",
+            "vendor/dep",
+        ],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
     assert status_result.returncode == 0, status_result.stderr
     assert "MODULE=vendor/dep STATE=absent" in status_result.stdout
 
@@ -301,7 +247,7 @@ def prepare(
 
 def module_clone(parent: Path) -> Path:
     """Return expected module clone path for the selected parent/topic."""
-    return parent.parent / "workspace" / TOPIC / "dep"
+    return parent / "workspace" / TOPIC / "dep"
 
 
 def test_prepare_reuses_local_existing_module_branch_via_generic_request(
@@ -400,21 +346,18 @@ def test_relative_module_url_and_merge_main_use_generic_lifecycle(
     assert run_git(clone, "merge-base", "--is-ancestor", "origin/main", "HEAD") == ""
 
 
-def test_cleanup_apply_delegates_generic_cleanup_for_dependency_clone(
+def test_cleanup_without_publication_packet_uses_computed_clone(
     tmp_path: Path,
 ) -> None:
-    """Adapter cleanup applies generic reconstructibility policy to the module clone."""
+    """Adapter cleanup needs no materialized packet or duplicated clone path."""
     remote = create_remote(tmp_path)
     parent = create_parent(tmp_path, remote)
-    prepared = prepare(parent, branch="feature/cleanup")
+    prepared = prepare(parent)
     assert prepared.returncode == 0, prepared.stderr
-
     clone = module_clone(parent)
-    run_git(clone, "push", "origin", "feature/cleanup")
-    selected_clone = parent / "workspace" / TOPIC / "dep"
-    selected_clone.parent.mkdir(parents=True)
-    shutil.copytree(clone, selected_clone)
-    cleaned = invoke(
+    run_git(clone, "push", "-u", "origin", "feature/foo")
+
+    result = invoke(
         parent,
         "cleanup",
         "--topic",
@@ -422,15 +365,14 @@ def test_cleanup_apply_delegates_generic_cleanup_for_dependency_clone(
         "--module",
         "vendor/dep",
         "--branch",
-        "feature/cleanup",
+        "feature/foo",
         "--owner-evidence",
         "owner-evidence.md",
         "--apply",
     )
-
-    assert cleaned.returncode == 0, cleaned.stderr
-    assert "CLEANUP module=vendor/dep topic=dependency-module-change action=removed" in cleaned.stdout
-    assert not selected_clone.exists()
+    assert result.returncode == 0, result.stderr
+    assert "action=removed" in result.stdout
+    assert not clone.exists()
 
 
 def test_prepare_requires_owner_evidence_and_returns_typed_topic_identity_error(

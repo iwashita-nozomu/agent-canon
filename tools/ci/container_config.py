@@ -20,7 +20,7 @@
 # downstream implementation ./run_all_checks.sh runs container configuration validation
 # downstream implementation ../../tests/tools/test_container_config.py tests validator
 # downstream implementation ../../docker/Dockerfile public source test image
-# downstream implementation ../../test/testrunner.sh public source test runner
+# downstream implementation ../../test/testrunner.sh public source test entrypoint
 # downstream implementation ../../.devcontainer/gpu-admission/devcontainer.json selects the opt-in Compose scenario
 # downstream implementation ../../.devcontainer/gpu-admission.sh owns the opt-in lifecycle scenario
 # @dependency-end
@@ -53,9 +53,10 @@ if str(AGENT_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS_DIR))
 
 from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
-    resolve_parent_writer_attestation,
+    attest_parent_root,
 )
 
 PARENT_ENVIRONMENT_MANIFEST = ".devcontainer/parent-environment.toml"
@@ -485,7 +486,9 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             findings.append(finding)
         elif section == "runtime":
             runtime_env = values
-    if any(item.partition("=")[0] == "AGENT_CANON_PYTHON_EXTRAS" for item in runtime_env):
+    if any(
+        item.partition("=")[0] == "AGENT_CANON_PYTHON_EXTRAS" for item in runtime_env
+    ):
         findings.append(
             Finding(
                 "dependency_contract_violation",
@@ -589,17 +592,15 @@ def validate_dockerignore(root: Path) -> list[Finding]:
         return [Finding("missing_file", relative, "missing")]
     text = path.read_text(encoding="utf-8")
     findings: list[Finding] = []
-    public_test_image = all(
-        (root / relative).is_file()
-        for relative in (
-            "docker/Dockerfile",
-            "test/testrunner.sh",
-            "test/testlist.toml",
+    ignored_paths = (".git", ".state", "vendor/agent-canon")
+    if is_public_test_source(root):
+        ignored_paths = (
+            ".git/config",
+            ".git/index",
+            ".git/logs/",
+            ".state",
+            "vendor/agent-canon",
         )
-    )
-    ignored_paths = (".state", "vendor/agent-canon")
-    if not public_test_image:
-        ignored_paths = (".git", *ignored_paths)
     for ignored_path in ignored_paths:
         if not re.search(rf"(^|\n){re.escape(ignored_path)}(\n|$)", text):
             findings.append(
@@ -609,136 +610,20 @@ def validate_dockerignore(root: Path) -> list[Finding]:
                     f"missing-ignore:{ignored_path}",
                 )
             )
-    if public_test_image:
-        findings.extend(validate_public_test_git_context(root))
     return findings
 
 
-def validate_public_test_git_context(root: Path) -> list[Finding]:
-    """Admit Git history while excluding host identity and mutable Git state."""
-    dockerignore = root / ".dockerignore"
-    dockerfile = root / "docker" / "Dockerfile"
-    findings: list[Finding] = []
-    if not dockerignore.is_file():
-        return [Finding("missing_file", ".dockerignore", "missing")]
-    if not dockerfile.is_file():
-        return [Finding("missing_file", "docker/Dockerfile", "missing")]
-
-    patterns = tuple(
-        line.strip()
-        for line in dockerignore.read_text(encoding="utf-8").splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
+def is_public_test_source(root: Path) -> bool:
+    """Return whether the standalone source owns the public image test route."""
+    return all(
+        (root / relative).is_file()
+        for relative in (
+            "docker/Dockerfile",
+            "test/testrunner.sh",
+            "test/testrunner.py",
+            "test/testlist.toml",
+        )
     )
-    required_sequence = (
-        ".git/*",
-        "!.git/HEAD",
-        "!.git/objects/",
-        "!.git/objects/**",
-        ".git/objects/info/",
-        ".git/objects/info/**",
-        "!.git/refs/",
-        ".git/refs/*",
-        "!.git/refs/heads/",
-        "!.git/refs/heads/**",
-        "!.git/packed-refs",
-        ".git/config",
-        ".git/index",
-        ".git/logs/",
-        ".git/logs/**",
-        ".git/hooks/",
-        ".git/hooks/**",
-        ".git/worktrees/",
-        ".git/worktrees/**",
-    )
-    previous = -1
-    for pattern in required_sequence:
-        try:
-            position = patterns.index(pattern)
-        except ValueError:
-            findings.append(
-                Finding(
-                    "dependency_contract_violation",
-                    ".dockerignore",
-                    f"public-git-context-rule-missing:{pattern}",
-                )
-            )
-            continue
-        if position <= previous:
-            findings.append(
-                Finding(
-                    "dependency_contract_violation",
-                    ".dockerignore",
-                    f"public-git-context-rule-order:{pattern}",
-                )
-            )
-        previous = position
-
-    allowed_git_negations = frozenset(
-        {
-            "!.git/HEAD",
-            "!.git/objects/",
-            "!.git/objects/**",
-            "!.git/refs/",
-            "!.git/refs/heads/",
-            "!.git/refs/heads/**",
-            "!.git/packed-refs",
-        }
-    )
-    for pattern in patterns:
-        if pattern.startswith("!.git") and pattern not in allowed_git_negations:
-            findings.append(
-                Finding(
-                    "dependency_contract_violation",
-                    ".dockerignore",
-                    f"public-git-context-unsafe-allow:{pattern}",
-                )
-            )
-
-    dockerfile_text = dockerfile.read_text(encoding="utf-8")
-    logical_lines = re.sub(r"\\\r?\n", " ", dockerfile_text)
-    normalized = re.sub(r"\s+", " ", logical_lines)
-    # Keep this static oracle aligned with the immutable Git state read back
-    # by docker/Dockerfile.  Each positive rule is intentionally paired with
-    # one command shape so a removed readback cannot hide behind the setup
-    # command that created the state.
-    dockerfile_rules = {
-        "history-head-required": r"rev-parse --verify HEAD\^\{commit\}",
-        "ref-normalization-required": r"for-each-ref .* refs .*update-ref -d",
-        "main-head-readback-required": (
-            r'test "\$\(git -C "\$\{source_root\}" symbolic-ref HEAD\)" '
-            r'= "refs/heads/main"'
-        ),
-        "main-commit-readback-required": (
-            r'test "\$\(git -C "\$\{source_root\}" rev-parse HEAD\)" '
-            r'= "\$\(git -C "\$\{source_root\}" rev-parse refs/heads/main\)"'
-        ),
-        "source-origin-name-readback-required": r'git -C "\$\{source_root\}" remote\)" = "origin"',
-        "parent-origin-name-readback-required": r'git -C "\$\{parent_root\}" remote\)" = "origin"',
-        "source-origin-url-readback-required": (
-            r'test "\$\(git -C "\$\{source_root\}" remote get-url origin\)" '
-            r"= 'https://github\.com/iwashita-nozomu/agent-canon\.git'"
-        ),
-        "parent-origin-url-readback-required": (
-            r'test "\$\(git -C "\$\{parent_root\}" remote get-url origin\)" '
-            r"= 'https://github\.com/iwashita-nozomu/project_template\.git'"
-        ),
-        "remote-ref-readback-required": r'git -C "\$\{source_root\}" for-each-ref .* refs/remotes.*git -C "\$\{parent_root\}" for-each-ref .* refs/remotes',
-        "credential-readback-required": r'git -C "\$\{source_root\}" config --get-regexp.*credential.*git -C "\$\{parent_root\}" config --get-regexp.*credential',
-        "non-local-bare-clone-readback-required": (
-            r'git clone --bare --no-local "\$\{source_root\}" '
-            r'"\$\{clone_probe\}/agent-canon\.git"'
-        ),
-    }
-    for detail, pattern in dockerfile_rules.items():
-        if re.search(pattern, normalized) is None:
-            findings.append(
-                Finding(
-                    "dependency_contract_violation",
-                    "docker/Dockerfile",
-                    detail,
-                )
-            )
-    return findings
 
 
 def validate_standalone_docker_context(root: Path) -> list[Finding]:
@@ -784,7 +669,10 @@ def validate_standalone_docker_context(root: Path) -> list[Finding]:
                     "standalone-context-copy-dot-forbidden",
                 )
             )
-        if "image_vendor_root" in dockerfile_text or "vendor/agent-canon" in dockerfile_text:
+        if (
+            "image_vendor_root" in dockerfile_text
+            or "vendor/agent-canon" in dockerfile_text
+        ):
             findings.append(
                 Finding(
                     "dependency_contract_violation",
@@ -879,9 +767,7 @@ def load_devcontainer_json(
 
 def expected_post_create_command(*, parent_layout: bool) -> str:
     """Return the lifecycle command for standalone or parent-projected layouts."""
-    resolver = (
-        "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec"
-    )
+    resolver = "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec"
     entrypoint = (
         f"{resolver} .devcontainer/post-create-entrypoint.sh "
         "/workspace/${localWorkspaceFolderBasename}"
@@ -1043,7 +929,10 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
                     f"{key}-expected:{expected_value}",
                 )
             )
-    if config.get("shutdownAction") != "stopCompose" or config.get("overrideCommand") is not False:
+    if (
+        config.get("shutdownAction") != "stopCompose"
+        or config.get("overrideCommand") is not False
+    ):
         findings.append(
             Finding(
                 "dependency_contract_violation",
@@ -1056,7 +945,9 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
     if not orchestrator.is_file() or orchestrator.stat().st_mode & 0o111 == 0:
         findings.append(
             Finding(
-                "missing_file" if not orchestrator.is_file() else "dependency_contract_violation",
+                "missing_file"
+                if not orchestrator.is_file()
+                else "dependency_contract_violation",
                 orchestrator_relative,
                 "executable-profile-orchestrator-required",
             )
@@ -1100,7 +991,8 @@ def is_managed_topic_root(root: Path) -> bool:
 def is_removed_legacy_topic_root(root: Path) -> bool:
     """Return True when the immediate parent directory is a removed legacy workspace root."""
     return (
-        root.parent.name.startswith("workspace-") and root.parent.parent.name != "workspace"
+        root.parent.name.startswith("workspace-")
+        and root.parent.parent.name != "workspace"
     )
 
 
@@ -1145,7 +1037,9 @@ def validate_generated_compose(
         except ValueError:
             relative = f"<generated-compose:{profile}>"
     if not compose_path.exists():
-        return [Finding("missing_file", relative, f"{profile}-scenario-compose-required")]
+        return [
+            Finding("missing_file", relative, f"{profile}-scenario-compose-required")
+        ]
     if yaml is None:
         return [Finding("invalid_manifest", relative, "yaml-parser-unavailable")]
     try:
@@ -1165,7 +1059,10 @@ def validate_generated_compose(
     expected_workspace_layout = (
         "managed-topic" if is_managed_topic_root(root) else "direct-repo"
     )
-    if is_removed_legacy_topic_root(root) and expected_workspace_layout != "managed-topic":
+    if (
+        is_removed_legacy_topic_root(root)
+        and expected_workspace_layout != "managed-topic"
+    ):
         return [
             Finding(
                 "dependency_contract_violation",
@@ -1203,7 +1100,9 @@ def validate_generated_compose(
                 "inconsistency", relative, f"working-dir:{service.get('working_dir')}"
             )
         )
-    expected_platform = pack.platform if pack is not None and pack.platform else "linux/amd64"
+    expected_platform = (
+        pack.platform if pack is not None and pack.platform else "linux/amd64"
+    )
     if service.get("platform") != expected_platform:
         findings.append(
             Finding(
@@ -1267,7 +1166,10 @@ def validate_generated_compose(
                 for name in ("PROJECT_UID", "PROJECT_GID"):
                     value = standalone_args.get(name)
                     pattern = r"[1-9][0-9]*" if name == "PROJECT_UID" else r"[0-9]+"
-                    if not isinstance(value, str) or re.fullmatch(pattern, value) is None:
+                    if (
+                        not isinstance(value, str)
+                        or re.fullmatch(pattern, value) is None
+                    ):
                         findings.append(
                             Finding(
                                 "dependency_contract_violation",
@@ -1324,7 +1226,9 @@ def validate_generated_compose(
         if environment is not None
         else ""
     )
-    optional_mounts = optional_mounts_value if isinstance(optional_mounts_value, str) else ""
+    optional_mounts = (
+        optional_mounts_value if isinstance(optional_mounts_value, str) else ""
+    )
     optional_tokens_list: list[str] = []
     if not isinstance(optional_mounts_value, str):
         findings.append(
@@ -1336,7 +1240,10 @@ def validate_generated_compose(
         )
     elif optional_mounts:
         optional_tokens_list = optional_mounts.split(",")
-        if any(not token or token != token.strip() or re.search(r"\s", token) for token in optional_tokens_list):
+        if any(
+            not token or token != token.strip() or re.search(r"\s", token)
+            for token in optional_tokens_list
+        ):
             findings.append(
                 Finding(
                     "dependency_contract_violation",
@@ -1418,7 +1325,9 @@ def validate_generated_compose(
         )
 
     repository_mounts = [
-        raw_volume for raw_volume in volumes if volume_fields(raw_volume)[1] == repo_target
+        raw_volume
+        for raw_volume in volumes
+        if volume_fields(raw_volume)[1] == repo_target
     ]
     if len(repository_mounts) != 1:
         findings.append(
@@ -1430,7 +1339,9 @@ def validate_generated_compose(
         )
     elif source_path(volume_fields(repository_mounts[0])[0]) != root:
         findings.append(
-            Finding("dependency_contract_violation", relative, "repository-mount-source")
+            Finding(
+                "dependency_contract_violation", relative, "repository-mount-source"
+            )
         )
     for raw_volume in volumes:
         source, target = volume_fields(raw_volume)
@@ -1452,9 +1363,10 @@ def validate_generated_compose(
             )
         )
     service_user = service.get("user")
-    service_user_valid = isinstance(service_user, str) and re.fullmatch(
-        r"[1-9][0-9]*:[0-9]+", service_user
-    ) is not None
+    service_user_valid = (
+        isinstance(service_user, str)
+        and re.fullmatch(r"[1-9][0-9]*:[0-9]+", service_user) is not None
+    )
     if not service_user_valid:
         findings.append(
             Finding(
@@ -1628,7 +1540,8 @@ def validate_generated_compose(
         zshrc_matches = [
             raw_volume
             for raw_volume in volumes
-            if volume_fields(raw_volume)[1] in {
+            if volume_fields(raw_volume)[1]
+            in {
                 f"{home_target}/.zshrc",
                 "/etc/project-template/zsh/.zshrc",
             }
@@ -1709,7 +1622,9 @@ def validate_generated_compose(
                 )
         for raw_volume in volumes:
             source, target = volume_fields(raw_volume)
-            if (source and "/root/" in source) or (target and target.startswith("/root/")):
+            if (source and "/root/" in source) or (
+                target and target.startswith("/root/")
+            ):
                 findings.append(
                     Finding(
                         "dependency_contract_violation",
@@ -2025,7 +1940,11 @@ def validate_generated_compose_scenarios(
     temporary_parent_existed = temporary_parent.is_dir()
     agent_canon_dir_existed = agent_canon_dir.is_dir()
     try:
-        attestation = resolve_parent_writer_attestation(purpose="container-config-runtime")
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(
+                cwd=root, explicit_root=root, purpose="container-config-runtime"
+            )
+        )
         temporary = boundary.create_parent_owned_temp_directory(
             attestation,
             temporary_parent,
@@ -2071,8 +1990,12 @@ def validate_generated_compose_scenarios(
                         "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(runtime_source),
                         "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(runtime_source),
                         "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
-                        "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(runtime_source / "shared-runtime-provision.json"),
-                        "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(runtime_source / "shared-runtime-readback.json"),
+                        "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(
+                            runtime_source / "shared-runtime-provision.json"
+                        ),
+                        "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(
+                            runtime_source / "shared-runtime-readback.json"
+                        ),
                     },
                 )
             )
@@ -2082,9 +2005,7 @@ def validate_generated_compose_scenarios(
             if profile == "gpu-admission":
                 gpu_pack_path = packs_dir / "gpu-admission.toml"
                 if gpu_pack_path.is_file():
-                    scenario_pack, gpu_pack_findings = load_pack(
-                        root, gpu_pack_path
-                    )
+                    scenario_pack, gpu_pack_findings = load_pack(root, gpu_pack_path)
                     findings.extend(gpu_pack_findings)
             environment = {
                 **base_environment,
@@ -2116,7 +2037,9 @@ def validate_generated_compose_scenarios(
                     scenario_pack,
                     profile=profile,
                     compose_path=compose_path,
-                    runtime_source=(runtime_source if profile == "gpu-admission" else None),
+                    runtime_source=(
+                        runtime_source if profile == "gpu-admission" else None
+                    ),
                 )
             )
     finally:
@@ -2125,14 +2048,20 @@ def validate_generated_compose_scenarios(
         )
         if not temporary_parent_existed and temporary_parent.is_dir():
             parent_receipt = boundary.resolve_parent_owned_path(
-                attestation, temporary_parent, "container-config-runtime-base-cleanup", create=False
+                attestation,
+                temporary_parent,
+                "container-config-runtime-base-cleanup",
+                create=False,
             )
             boundary.remove_empty_parent_owned_directory(
                 attestation, parent_receipt, "container-config-runtime-base-cleanup"
             )
         if not agent_canon_dir_existed and agent_canon_dir.is_dir():
             root_receipt = boundary.resolve_parent_owned_path(
-                attestation, agent_canon_dir, "container-config-agent-base-cleanup", create=False
+                attestation,
+                agent_canon_dir,
+                "container-config-agent-base-cleanup",
+                create=False,
             )
             boundary.remove_empty_parent_owned_directory(
                 attestation, root_receipt, "container-config-agent-base-cleanup"
@@ -2215,9 +2144,7 @@ def validate_devcontainer_pack_alignment(
     )
     if persisted_compose.exists():
         findings.extend(
-            validate_generated_compose(
-                root, pack, compose_path=persisted_compose
-            )
+            validate_generated_compose(root, pack, compose_path=persisted_compose)
         )
     profile_compose = root / ".agent-canon" / "gpu-admission-compose.generated.yml"
     if profile_compose.exists():
@@ -2290,9 +2217,7 @@ def validate_vscode(root: Path) -> list[Finding]:
                 findings.append(Finding("missing_file", path, "missing"))
             elif source_file.is_symlink():
                 findings.append(
-                    Finding(
-                        "inconsistency", path, "source-file-must-be-regular"
-                    )
+                    Finding("inconsistency", path, "source-file-must-be-regular")
                 )
         return findings
     if not root_vscode.is_dir():
@@ -2344,7 +2269,7 @@ def validate(root: Path) -> ValidationReport:
                 findings.extend(pack_findings)
                 if pack is not None:
                     packs.append(pack)
-        elif not parent_layout and not (docker_dir / "Dockerfile").is_file():
+        elif not parent_layout and not is_public_test_source(root):
             checked.append("docker/packs")
             findings.append(Finding("missing_file", "docker/packs", "missing"))
 
@@ -2357,7 +2282,7 @@ def validate(root: Path) -> ValidationReport:
         if (
             is_standalone_source(root)
             and (devcontainer_dir / "Dockerfile").is_file()
-            and not (docker_dir / "Dockerfile").is_file()
+            and not is_public_test_source(root)
         ):
             checked.append(".dockerignore")
             findings.extend(validate_standalone_docker_context(root))

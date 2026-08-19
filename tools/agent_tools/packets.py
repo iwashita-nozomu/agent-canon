@@ -186,8 +186,8 @@ COMMON_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = (
     "documents/operations/notes-lifecycle.md",
     "agents/workflows/agent-learning-workflow.md",
     "documents/agent-canon/agent-canon-subtree-migration.md",
-    "notes/guardrails/README.md",
-    "notes/guardrails/engineering_avoidances.md",
+    "documents/notes/guardrails/README.md",
+    "documents/notes/guardrails/engineering_avoidances.md",
 )
 
 OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = ("docker/README.md",)

@@ -60,10 +60,11 @@ ROOT = Path(__file__).resolve().parents[2]
 from parent_root_side_effects import (  # noqa: E402
     ParentOwnedPathReceipt,
     ParentRootAttestationReceipt,
+    ParentRootAttestationRequest,
     ParentRootReject,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
-    resolve_parent_writer_attestation,
+    attest_parent_root,
 )
 
 BASE_RESEARCH_ROLE_IDS = (
@@ -97,10 +98,13 @@ ROLE_TO_ARTIFACT_KEY = {
 def _parent_capability(
     purpose: str,
 ) -> tuple[ParentRootSideEffectBoundary, ParentRootAttestationReceipt]:
-    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if not configured:
         raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
-    attestation = resolve_parent_writer_attestation(purpose=purpose)
+    parent = Path(configured)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
     return ParentRootSideEffectBoundary(), attestation
 
 
@@ -336,14 +340,15 @@ def main() -> int:
         _ensure_parent(workspace_root, "research-perspective-smoke")
 
     if args.report_root is None:
-        configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+        configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
         if not configured:
             raise ParentRootSideEffectError(
                 ParentRootReject.HANDOFF_INVALID,
                 "research-perspective-smoke: explicit parent root is required",
             )
+        parent = Path(configured)
+        temp_root = parent / ".agent-canon" / "tmp" / "research-pack"
         boundary, attestation = _parent_capability("research-perspective-smoke")
-        temp_root = attestation.parent_root / ".agent-canon" / "tmp" / "research-pack"
         report_receipt = boundary.create_parent_owned_temp_directory(
             attestation,
             temp_root,

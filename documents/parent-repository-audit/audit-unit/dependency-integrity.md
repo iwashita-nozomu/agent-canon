@@ -57,15 +57,6 @@ design、skill、tool、runtime の関係が同じ責務境界を指している
 `surface:dependency.headers`、`surface:dependency.graph`、`surface:dependency.manifests`。
 header、dependency map、graph、import boundary を変更した同じ PR で本 unit を更新します。
 
-## Scope Patterns
-
-- `pattern:documents/**`
-- `pattern:agents/**`
-- `pattern:tools/**`
-- `pattern:tests/**`
-- `pattern:README.md`
-- `pattern:AGENTS.md`
-
 ## Legacy Migration IDs
 
 PRA-C025 PRA-C026 PRA-C027 PRA-C028 PRA-C029 PRA-C030 PRA-C031 PRA-C032 PRA-X018 PRA-X019 PRA-X020 PRA-X021

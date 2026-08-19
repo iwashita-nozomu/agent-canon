@@ -34,9 +34,11 @@ if str(AGENT_TOOLS_ROOT) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS_ROOT))
 
 from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootReject,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
-    resolve_parent_writer_attestation,
+    attest_parent_root,
 )
 
 PROFILE_INVENTORY = Path("documents/runtime/runtime-profiles-and-check-matrix.json")
@@ -63,13 +65,31 @@ GRAPH_STATUS_SCHEMA = "agent-canon.graph.status.v1"
 
 def _selector_write(path: Path, payload: bytes, purpose: str) -> None:
     """Publish selector evidence through the outer parent capability."""
-    attestation = resolve_parent_writer_attestation(purpose=purpose)
-    ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, payload, purpose)
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+        )
+        ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, payload, purpose)
+        return
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        f"{purpose}: explicit parent root is required",
+    )
 
 
 def _selector_temp_dir(root: Path) -> str:
-    attestation = resolve_parent_writer_attestation(purpose="pr-graph-staging")
-    parent = attestation.parent_root
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "pr-graph-staging: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="pr-graph-staging")
+    )
     directory = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
         attestation, parent / ".agent-canon" / "tmp" / "pr-graph", "pr-graph-staging"
     )
@@ -2363,14 +2383,12 @@ def parent_bound_graph_command(
     arguments: Sequence[str],
 ) -> list[str]:
     """Route one graph child through the authenticated outer parent."""
-    try:
-        attestation = resolve_parent_writer_attestation(purpose="trusted-base-graph")
-    except ParentRootSideEffectError as exc:
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
         raise SelectorFailure(
             "trusted_base_graph_parent_unavailable",
-            f"reason={exc}",
-        ) from exc
-    configured = str(attestation.parent_root)
+            "field=AGENT_CANON_PARENT_ROOT",
+        )
     boundary = source_root / "tools" / "agent_tools" / "parent_root_side_effects.py"
     return [
         sys.executable,

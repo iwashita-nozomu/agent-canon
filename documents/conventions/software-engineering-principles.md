@@ -10,7 +10,7 @@ downstream design ./object-oriented-design.md OOP and SOLID specialization
 downstream design ../../agents/skills/comprehensive-development.md cross-surface design and delivery consumer
 downstream design ../../agents/skills/refactor-loop.md behavior-preserving refactor consumer
 downstream design ../../agents/skills/change-review.md findings-first review consumer
-downstream design ../../notes/knowledge/coding_decision_methods.md external method and source note
+downstream design ../../documents/notes/knowledge/coding_decision_methods.md external method and source note
 @dependency-end
 -->
 
@@ -51,7 +51,7 @@ review finding、validation route に接続します。選ばれなかった原�
 | language convention | syntax、layout、language/toolchain 固有の境界 | repository-wide の意味上の owner |
 | task-specific design | target state、tradeoff、assumption、implementation trace | 一般原則の第二正本 |
 | Issue / PR | current snapshot 固有の要求、削減理由、実装・検証 evidence | 長期 policy の唯一の根拠 |
-| `notes/knowledge/` | 外部 source、method、再利用可能な調査 note | shared policy の正本 |
+| `documents/notes/knowledge/` | 外部 source、method、再利用可能な調査 note | shared policy の正本 |
 
 同じ policy、invariant、state、identity、lifecycle を複数 surface が所有してはなりません。
 専門文書はこの文書の一般原則を複製せず、専門領域で追加される判断だけを所有します。

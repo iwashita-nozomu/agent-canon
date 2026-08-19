@@ -3,14 +3,10 @@
 # contract tool
 # responsibility Runs one standalone AgentCanon static-gate execution unit without selecting whether that unit is required.
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
-# upstream implementation ./run_with_fixture_record.py owns the unit-level private fixture record bootstrap
 # downstream implementation ./check_agent_canon_pr.sh aggregates all units for the manual full-confidence route
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml remote execution boundary
 # downstream implementation ../../tests/tools/test_standalone_static_gate_units.py unit partition regression
 # downstream implementation ../../tests/tools/test_standalone_static_gate_source_runtime_contract.py source/runtime ownership regression
-# downstream implementation ../../tests/tools/test_standalone_static_gate_record_bootstrap.py record-bootstrap regression
-# downstream implementation ../../tests/tools/test_runtime_alignment_fixture_boundary.py runtime-alignment fixture-owner regression
-# downstream implementation ../../tests/agent_tools/test_environment_skill_expected_structure.py container acceptance/preflight regression
 # @dependency-end
 
 set -euo pipefail
@@ -27,22 +23,17 @@ ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 TOOLS_ROOT="$(agent_canon_source_tools_root "${ROOT}")"
 cd "${ROOT}"
 
-if [[ "${AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED:-}" != "1" \
-   || -z "${AGENT_CANON_SIDE_EFFECT_PARENT_ROOT:-}" \
-   || -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" \
-   || "${AGENT_CANON_PRIVATE_RECORD_REQUIRED:-}" != "1" \
-   || -z "${AGENT_CANON_PRIVATE_RECORD_PARENT_ROOT:-}" \
-   || -z "${AGENT_CANON_PRIVATE_RECORD_HANDOFF:-}" ]]; then
-  invocation_script="$(realpath -e "${BASH_SOURCE[0]}" 2>/dev/null || true)"
-  if [[ -z "${invocation_script}" || ! -f "${invocation_script}" ]]; then
-    echo "STANDALONE_STATIC_GATE=fail reason=invocation_script_missing" >&2
-    exit 2
-  fi
-  exec python3 "${TOOLS_ROOT}/ci/run_with_fixture_record.py" \
-    --invocation-script "${invocation_script}" \
-    --purpose standalone-static-gate-unit \
-    -- bash "${invocation_script}" "$UNIT"
+if [[ -z "${AGENT_CANON_CHILD_HANDOFF:-}" ]]; then
+  exec python3 "${TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    exec-parent-bound --root "${ROOT}" --source-root "${TOOLS_ROOT}/.." \
+    --issue-handoff --purpose "standalone-static-gate-unit" -- \
+    "${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")" "$UNIT"
 fi
+
+python3 "${TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" verify-child \
+  --root "${ROOT}" --source-root "${TOOLS_ROOT}/.." \
+  --purpose "standalone-static-gate-unit" --consume >/dev/null
+unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
 
 run_rust() {
   cargo build --manifest-path rust/agent-canon/Cargo.toml
@@ -66,9 +57,6 @@ run_contracts() {
     tests.tools.test_agent_canon_pr_dependency_source_gate \
     tests.tools.test_agent_canon_pr_graph_gate_integration \
     tests.tools.test_standalone_static_gate_source_runtime_contract \
-    tests.tools.test_standalone_static_gate_record_bootstrap \
-    tests.tools.test_runtime_alignment_fixture_boundary \
-    tests.agent_tools.test_environment_skill_expected_structure \
     tests.agent_tools.test_check_dependency_headers \
     tests.agent_tools.test_check_design_doc_claims \
     tests.agent_tools.test_tool_drift \

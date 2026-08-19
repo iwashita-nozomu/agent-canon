@@ -3,7 +3,7 @@
 # responsibility Declares the source-owned standard test commands and their route/ownership metadata.
 # upstream design ../CONTAINER_OPERATIONS.md public standalone test boundary
 # upstream design ../responsibility-scope.toml source responsibility scopes
-# downstream implementation ./testrunner.sh validates and executes these token arrays
+# downstream implementation ./testrunner.py validates and executes these token arrays
 # downstream implementation ../tests/tools/test_testrunner_schema.py validates this schema
 # downstream implementation ../tests/tools/test_testrunner.py validates route receipts
 # @dependency-end
@@ -46,7 +46,7 @@ environment = "tooling"
 require = "docker"
 code_owner = "tools/agent_tools"
 responsibility_scope = "shared-tooling"
-command = ["python3", "test/pytest_entrypoint.py", "tests/agent_tools", "-q", "--tb=short"]
+command = ["python3", "-m", "pytest", "tests/agent_tools", "-q", "--tb=short"]
 
 [[tests]]
 id = "python-tools-suite"
@@ -54,7 +54,7 @@ environment = "product"
 require = "docker"
 code_owner = "tools"
 responsibility_scope = "shared-tooling"
-command = ["python3", "test/pytest_entrypoint.py", "tests/tools", "-q", "--tb=short"]
+command = ["python3", "-m", "pytest", "tests/tools", "-q", "--tb=short"]
 
 [[tests]]
 id = "rust-cli-suite"

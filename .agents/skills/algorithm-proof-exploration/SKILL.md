@@ -2,7 +2,7 @@
 name: algorithm-proof-exploration
 description: "Use when exploring, refactoring, or choosing an algorithm under proof obligations; builds JIT-canonical IR, lemma dependency graphs, algorithmic blocker frontiers, and algorithm-change guidance before handing terminal proof work to formal-proof-workflow."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"98ea6ee7bd72f557beaace04aaf09c3bad9489b566860ea82bb42593142cf27c"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"3954d7aa25a780f6ef89148c122dc068ef9a7f4cdb2a23c79fe20566d62d4e9e"} -->
 
 <!--
 @dependency-start

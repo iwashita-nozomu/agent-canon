@@ -32,10 +32,11 @@ else:
     from workspace_scope import resolve_report_root
 from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
 from parent_root_side_effects import (
+    ParentRootAttestationRequest,
     ParentRootReject,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
-    resolve_parent_writer_attestation,
+    attest_parent_root,
 )
 from report_artifact_checks import (
     check_final_review_artifact,
@@ -50,10 +51,11 @@ DEFAULT_MIN_SCORE = 85
 
 
 def _parent_write(path: Path, data: bytes, purpose: str) -> None:
-    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if not configured:
         raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
-    attestation = resolve_parent_writer_attestation(purpose=purpose)
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
     ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, data, purpose)
 DEFAULT_BEHAVIOR_CRITERION_MAX_SCORE = 5
 ARTIFACT_COMPLETENESS_SCORE = 8
@@ -83,19 +85,9 @@ REQUIRED_ARTIFACTS = (
     "retrospective.md",
 )
 DEFAULT_BEHAVIOR_MANIFEST = eval_manifest_path("agent_behavior_eval.toml")
-BEHAVIOR_SOURCES = frozenset(
-    {
-        "behavior_events",
-        "bundle",
-        # The runtime-profile projection gate is recorded in the run bundle
-        # by the generated-view and capacity checks.
-        "runtime_profile_projection_gate",
-    }
-)
 RUNTIME_PROFILE_INVENTORY_PATH = (
     Path(__file__).resolve().parents[2]
     / "documents"
-    / "runtime"
     / "runtime-profiles-and-check-matrix.json"
 )
 
@@ -354,7 +346,7 @@ def behavior_criterion_from_manifest_entry(
     mapping = cast(dict[str, object], entry)
     name = str(mapping["name"])
     source = str(mapping.get("source", "behavior_events"))
-    if source not in BEHAVIOR_SOURCES:
+    if source not in {"behavior_events", "bundle"}:
         raise ValueError(f"behavior criterion {name} has invalid source={source}")
     feedback = str(mapping.get("feedback", f"Record behavior evidence for {name}."))
     return BehaviorCriterion(
@@ -946,7 +938,6 @@ def evaluate(
             {
                 "behavior_events": evidence.behavior_events_text,
                 "bundle": evidence.normalized_bundle,
-                "runtime_profile_projection_gate": evidence.normalized_bundle,
             },
             behavior_criteria,
         ),

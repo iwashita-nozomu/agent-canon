@@ -99,7 +99,9 @@ compose_bind_source = "${repository_root}/.agent-canon/runtime (user-owned)"
 compose_bind_target = "/var/lib/agent-canon/runtime"
 
 [external_provider.experiment_runner_admitted]
-owner = "gpu-execution and ExperimentRunner provider contract"
+owner = "managed experiment adapter contract"
+activation = "managed_experiment_only"
+direct_gpu_command_required = false
 repository = "https://github.com/iwashita-nozomu/experiment-runner"
 merged_commit = "71b3630266151703bdf88b11741b7492eca92fb4"
 contract_path = "documents/experiment-runner-admission.md"
@@ -108,9 +110,9 @@ executable = "experiment-runner-admitted"
 invocation = "experiment-runner-admitted --request <path> --result <path>"
 request_schema = "agentcanon-managed-run/v1"
 result_schema = "agentcanon-managed-run-result/v1"
-identity_binding = "request metadata and managed-run receipt"
-installation_owner = "consumer repository"
-agent_canon_install_policy = "forbidden; audit the consumer-provided executable"
+identity_binding = "managed request metadata and managed-run receipt"
+installation_owner = "consumer repository when managed mode is selected"
+agent_canon_install_policy = "forbidden; audit the consumer-provided executable only in managed mode"
 
 [structured_analysis_cache]
 owner = "agent-canon"

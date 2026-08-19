@@ -30,9 +30,8 @@ if str(AGENT_TOOLS_ROOT) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS_ROOT))
 
 from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
     ParentRootSideEffectBoundary,
-    SessionResolutionResult,
-    public_session,
 )
 
 TOPIC = "template-smoke"
@@ -88,7 +87,7 @@ def write_parent_registry(parent_root: Path) -> Path:
                 'managed_runner = "tools/experiments/run_managed_experiment.py"',
                 'report_root = "experiments/report"',
                 'topic_template_dir = "vendor/agent-canon/templates/experiments/_template"',
-                'required_eval_artifacts = ["summary.json", "cases.jsonl"]',
+                'required_eval_artifacts = ["summary/summary.json", "summary/cases.jsonl"]',
                 "",
             )
         ),
@@ -104,7 +103,9 @@ def materialize_parent_fixture(source_root: Path, parent_root: Path) -> None:
     shutil.copytree(source_root / "templates", canon_root / "templates")
     runner_path = parent_root / "tools" / "experiments" / "run_managed_experiment.py"
     runner_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source_root / "tools" / "experiments" / "run_managed_experiment.py", runner_path)
+    shutil.copy2(
+        source_root / "tools" / "experiments" / "run_managed_experiment.py", runner_path
+    )
 
 
 def complete_template_fixture(topic_dir: Path) -> None:
@@ -117,7 +118,9 @@ def complete_template_fixture(topic_dir: Path) -> None:
     config.update(
         {
             "template_complete": True,
-            "cases": {"example": {"values": [1.0, 2.0], "unit": "unitless", "shape": [2]}},
+            "cases": {
+                "example": {"values": [1.0, 2.0], "unit": "unitless", "shape": [2]}
+            },
             "metric": {"name": "sum", "direction": "higher_is_better"},
             "runtime": {"entrypoint": "run.py", "managed": True},
             "algorithm_contract": {
@@ -126,7 +129,10 @@ def complete_template_fixture(topic_dir: Path) -> None:
             },
             "oracle": {"necessary": ["case record"], "sufficient": ["digest readback"]},
             "provenance": {"source": "smoke fixture", "owner": "checker"},
-            "failure": {"classification": "expected_contract", "evidence": "failure-evidence.json"},
+            "failure": {
+                "classification": "expected_contract",
+                "evidence": "summary/failure-evidence.json",
+            },
             "lifecycle": {"retention": "test run", "cleanup": "temporary directory"},
         }
     )
@@ -136,7 +142,9 @@ def complete_template_fixture(topic_dir: Path) -> None:
     )
     provenance_path = topic_dir / "provenance.toml"
     provenance_text = provenance_path.read_text(encoding="utf-8")
-    provenance_text = provenance_text.replace("template_complete = false", "template_complete = true", 1)
+    provenance_text = provenance_text.replace(
+        "template_complete = false", "template_complete = true", 1
+    )
     provenance_text = provenance_text.replace(
         'completion_status = "incomplete"', 'completion_status = "complete"', 1
     )
@@ -163,7 +171,7 @@ def complete_template_fixture(topic_dir: Path) -> None:
         "required-or-not-applicable-with-reason": "required for smoke",
         "mechanism-and-cost": "local case worker",
         "rationale-or-none": "not selected",
-        "evidence-path-or-record": "summary.json",
+        "evidence-path-or-record": "summary/summary.json",
         "option-id": "option-a",
         "why-other-options-were-rejected": "not selected",
         "cpu-memory-gpu-request": "cpu-only smoke",
@@ -174,13 +182,13 @@ def complete_template_fixture(topic_dir: Path) -> None:
         "branch": "codex/template-canon-refresh",
         "commit-sha": "a" * 40,
         "config-path": "experiments/template-smoke/config.yaml",
-        "result-path": f"result/{VARIANT}/template-smoke-run",
+        "result-path": "result/template-smoke-run",
         "exit-status": "0",
         "required-close-condition": "rerun after contract repair",
         "required-oracle-and-observation": "summary and manifest pass",
         "preserved-intent-or-none": "none",
         "none-or-description": "none",
-        "evidence-path-or-command": "summary.json",
+        "evidence-path-or-command": "summary/summary.json",
         "seed-policy": "deterministic fixture",
         "managed-runner": "tools/experiments/run_managed_experiment.py",
         "exact-command": "python3 experiments/template-smoke/run.py",
@@ -200,18 +208,23 @@ def complete_template_fixture(topic_dir: Path) -> None:
     for token, value in placeholder_values.items():
         provenance_text = provenance_text.replace(f'"<{token}>"', f'"{value}"')
     provenance_text = provenance_text.replace(
-        "<result-path>", f"result/{VARIANT}/template-smoke-run"
+        "<result-path>", "result/template-smoke-run"
     )
     provenance_text = provenance_text.replace(
         'status = "selected-or-rejected"', 'status = "rejected"'
     )
-    provenance_text = provenance_text.replace('status = "rejected"', 'status = "selected"', 1)
+    provenance_text = provenance_text.replace(
+        'status = "rejected"', 'status = "selected"', 1
+    )
     provenance_path.write_text(provenance_text, encoding="utf-8")
 
 
-def validate_run_state(result_dir: Path, expected_state: str, expected_case_count: int) -> None:
+def validate_run_state(
+    result_dir: Path, expected_state: str, expected_case_count: int
+) -> None:
     """生成済み run の state、case 数、completion provenance を検証します."""
-    summary = json.loads((result_dir / "summary.json").read_text(encoding="utf-8"))
+    summary_dir = result_dir / "summary"
+    summary = json.loads((summary_dir / "summary.json").read_text(encoding="utf-8"))
     if summary.get("status") != expected_state:
         raise RuntimeError(
             f"expected run state {expected_state}, got {summary.get('status')}"
@@ -221,9 +234,9 @@ def validate_run_state(result_dir: Path, expected_state: str, expected_case_coun
     if summary.get("template_complete") != (expected_state == "success"):
         raise RuntimeError("run state and template completion provenance disagree")
     if expected_state == "incomplete":
-        if not (result_dir / "failure-evidence.json").is_file():
+        if not (summary_dir / "failure-evidence.json").is_file():
             raise RuntimeError("incomplete run must preserve failure evidence")
-        if (result_dir / "cases.jsonl").read_text(encoding="utf-8"):
+        if (summary_dir / "cases.jsonl").read_text(encoding="utf-8"):
             raise RuntimeError("incomplete run must not execute cases")
 
 
@@ -235,18 +248,20 @@ def validate_generated_topic(parent_root: Path, registry_path: Path) -> None:
         topic_dir / "provenance.toml",
         topic_dir / "run.py",
         topic_dir / "cases.py",
-        topic_dir / "case_model.py",
-        topic_dir / "case_execution.py",
-        topic_dir / "artifact_schema.py",
-        topic_dir / "artifact_io.py",
         topic_dir / "visualization.py",
         topic_dir / "config.yaml",
-        topic_dir / "visualize.ipynb",
+        topic_dir / "report" / ".gitkeep",
         topic_dir / "result" / ".gitkeep",
     )
-    missing = [str(path.relative_to(parent_root)) for path in required_files if not path.is_file()]
+    missing = [
+        str(path.relative_to(parent_root))
+        for path in required_files
+        if not path.is_file()
+    ]
     if missing:
-        raise RuntimeError(f"generated topic is missing required files: {', '.join(missing)}")
+        raise RuntimeError(
+            f"generated topic is missing required files: {', '.join(missing)}"
+        )
 
     registry_text = registry_path.read_text(encoding="utf-8")
     if 'registry_identity = "template-smoke-parent"' not in registry_text:
@@ -254,21 +269,28 @@ def validate_generated_topic(parent_root: Path, registry_path: Path) -> None:
     if f'name = "{TOPIC}"' not in registry_text:
         raise RuntimeError("canonical create route did not register template-smoke")
 
-    notebook = json.loads((topic_dir / "visualize.ipynb").read_text(encoding="utf-8"))
-    if not isinstance(notebook.get("cells"), list) or not notebook["cells"]:
-        raise RuntimeError("generated notebook has no cells")
-    if notebook.get("nbformat") != 4:
-        raise RuntimeError("generated notebook must use nbformat 4")
+    forbidden_files = (
+        topic_dir / "case_model.py",
+        topic_dir / "case_execution.py",
+        topic_dir / "artifact_schema.py",
+        topic_dir / "artifact_io.py",
+        topic_dir / "visualize.ipynb",
+    )
+    present_forbidden = [str(path) for path in forbidden_files if path.exists()]
+    if present_forbidden:
+        raise RuntimeError(
+            f"generated topic contains forbidden files: {', '.join(present_forbidden)}"
+        )
 
-    result_dir = topic_dir / "result" / VARIANT / "template-smoke-run"
+    result_dir = topic_dir / "result" / "template-smoke-run"
     required_artifacts = (
-        "summary.json",
-        "cases.jsonl",
-        "artifact-manifest.json",
-        "config_snapshot.json",
-        "provenance_snapshot.toml",
-        "environment.json",
-        "visualization-status.json",
+        "summary/summary.json",
+        "summary/cases.jsonl",
+        "summary/artifact-manifest.json",
+        "summary/config_snapshot.json",
+        "summary/provenance_snapshot.toml",
+        "summary/environment.json",
+        "summary/visualization-status.json",
     )
     missing_artifacts = [
         name for name in required_artifacts if not (result_dir / name).is_file()
@@ -282,26 +304,32 @@ def validate_generated_topic(parent_root: Path, registry_path: Path) -> None:
 
 
 def main() -> int:
-    """Enter the public source-root session before running the smoke check."""
-    with public_session(
-        invocation_script=Path(__file__),
-        purpose="experiment-template-smoke",
-    ) as session:
-        return _main_authenticated(session)
-
-
-def _main_authenticated(session: SessionResolutionResult) -> int:
     """分離した parent-shaped fixture を作成、検証、削除します."""
     args = build_parser().parse_args()
     source_root = Path(args.source_root).resolve()
     create_tool = source_root / "tools" / "experiments" / "create_experiment_topic.py"
     registry_checker = source_root / "tools" / "ci" / "check_experiment_registry.py"
-    if not source_root.is_dir() or not create_tool.is_file() or not registry_checker.is_file():
-        raise SystemExit("AgentCanon source root or canonical experiment tools are missing")
+    if (
+        not source_root.is_dir()
+        or not create_tool.is_file()
+        or not registry_checker.is_file()
+    ):
+        raise SystemExit(
+            "AgentCanon source root or canonical experiment tools are missing"
+        )
 
-    selected_parent = session.parent_root
+    selected_parent = Path(
+        os.environ.get("AGENT_CANON_PARENT_ROOT", str(source_root))
+    ).resolve()
     boundary = ParentRootSideEffectBoundary()
-    attestation = session.attestation
+    attestation = boundary.attest(
+        ParentRootAttestationRequest(
+            cwd=selected_parent,
+            explicit_root=selected_parent,
+            source_root=source_root,
+            purpose="experiment-template-smoke",
+        )
+    )
     temporary = boundary.create_parent_owned_temp_directory(
         attestation,
         selected_parent / ".agent-canon" / "tmp",
@@ -315,13 +343,10 @@ def _main_authenticated(session: SessionResolutionResult) -> int:
         runtime_pycache = runtime_cache / "pycache"
         runtime_tmp.mkdir(parents=True)
         runtime_pycache.mkdir(parents=True)
-        run_env = boundary.child_environment(
-            session.attestation,
-            os.environ,
-            issue_handoff=False,
-        )
+        run_env = dict(os.environ)
         run_env.update(
             {
+                "AGENT_CANON_PARENT_ROOT": str(selected_parent),
                 "PYTHONPYCACHEPREFIX": str(runtime_pycache),
                 "TEMP": str(runtime_tmp),
                 "TMP": str(runtime_tmp),
@@ -335,8 +360,7 @@ def _main_authenticated(session: SessionResolutionResult) -> int:
         run_checked(
             [
                 sys.executable,
-                "-m",
-                "tools.experiments.create_experiment_topic",
+                "tools/experiments/create_experiment_topic.py",
                 "--repo-root",
                 str(parent_root),
                 "--status",
@@ -349,7 +373,7 @@ def _main_authenticated(session: SessionResolutionResult) -> int:
             env=run_env,
         )
         topic_dir = parent_root / "experiments" / TOPIC
-        incomplete_run_dir = topic_dir / "result" / VARIANT / "template-smoke-incomplete"
+        incomplete_run_dir = topic_dir / "result" / "template-smoke-incomplete"
         run_env["EXPERIMENT_RUN_MANIFEST"] = str(parent_root / "manifest.json")
         run_env["EXPERIMENT_VARIANT"] = VARIANT
         run_env["EXPERIMENT_RUN_DIR"] = str(incomplete_run_dir)
@@ -366,9 +390,11 @@ def _main_authenticated(session: SessionResolutionResult) -> int:
         validate_run_state(incomplete_run_dir, "incomplete", 0)
 
         complete_template_fixture(topic_dir)
-        run_dir = topic_dir / "result" / VARIANT / "template-smoke-run"
+        run_dir = topic_dir / "result" / "template-smoke-run"
         run_env["EXPERIMENT_RUN_DIR"] = str(run_dir)
-        run_checked([sys.executable, str(topic_dir / "run.py")], cwd=source_root, env=run_env)
+        run_checked(
+            [sys.executable, str(topic_dir / "run.py")], cwd=source_root, env=run_env
+        )
         validate_generated_topic(parent_root, registry_path)
         run_checked(
             [

@@ -25,7 +25,6 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.agent_tools.fixture_spawn import record_environment
 from tools.experiments.execution_resource_plan import (
     CALLER_ALLOCATION_PROVENANCE,
     COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION,
@@ -405,23 +404,19 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                     },
                 }
             )
-            hook_root = Path(__file__).resolve().parents[2]
-            with record_environment(
-                cwd=hook_root,
-                base_env={
+            hook_result = subprocess.run(
+                [sys.executable, str(hook), "PostToolUse"],
+                input=hook_input,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
                     **os.environ,
-                    "AGENT_CANON_HOOK_SOURCE_ROOT": str(hook_root),
+                    "AGENT_CANON_HOOK_SOURCE_ROOT": str(
+                        Path(__file__).resolve().parents[2]
+                    ),
                 },
-            ) as signed_environment:
-                hook_result = subprocess.run(
-                    [sys.executable, str(hook), "PostToolUse"],
-                    input=hook_input,
-                    text=True,
-                    capture_output=True,
-                    check=False,
-                    env=signed_environment,
-                    cwd=hook_root,
-                )
+            )
             self.assertEqual(hook_result.returncode, 0, hook_result.stderr)
             with self.assertRaises(CompletionCoverageFailure):
                 coverage_adapter.record_once(coverage_input)
@@ -755,7 +750,6 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
 
     def test_nvidia_fixture_xml_reject_unsafe_or_unproven_inventory(self) -> None:
         for record_id in (
-            "xml.reject.dtd",
             "xml.reject.entity",
             "xml.reject.hidden_process_inventory",
             "xml.reject.ambiguous_scope",

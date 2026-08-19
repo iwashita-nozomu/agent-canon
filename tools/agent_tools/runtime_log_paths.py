@@ -26,13 +26,15 @@ from pathlib import Path
 
 try:
     from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
         ParentRootSideEffectBoundary,
-        resolve_parent_writer_attestation,
+        attest_parent_root,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
         ParentRootSideEffectBoundary,
-        resolve_parent_writer_attestation,
+        attest_parent_root,
     )
 
 try:
@@ -53,9 +55,6 @@ HOOK_EVENT_SPOOL_DIR_ENV = "AGENT_CANON_HOOK_EVENT_SPOOL_DIR"
 LOG_ENV_ENV = "AGENT_CANON_LOG_ENV"
 LOG_ARCHIVE_PARENT = Path(".agent-canon") / "log-archive"
 LOG_ARCHIVE_REMOTE = "git@github.com:iwashita-nozomu/agent-canon-log.git"
-RUNTIME_EVENT_PUBLICATION_OUTCOME_SPOOL_RELATIVE = (
-    Path(".agent-canon") / "runtime-event-spool" / "publication-outcome"
-)
 CODEX_RUNTIME_CHAT_DIR_NAME = "chats"
 CODEX_RUNTIME_INDEX_FILE = "index.jsonl"
 NAMESPACE_HASH_LENGTH = 8
@@ -80,18 +79,24 @@ def _parent_path(active_root: Path, candidate: Path, purpose: str) -> Path:
     The caller's candidate remains the logical path returned by this resolver;
     the boundary is used only to authenticate and containment-check it.
     """
-    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if not configured:
         return candidate
-    attestation = resolve_parent_writer_attestation(purpose=purpose)
+    parent = Path(configured)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(
+            cwd=parent,
+            explicit_root=parent,
+            purpose=purpose,
+        )
+    )
     boundary = ParentRootSideEffectBoundary()
-    receipt = boundary.resolve_parent_owned_path(
+    boundary.resolve_parent_owned_path(
         attestation,
         candidate,
         purpose,
         create=False,
     )
-    boundary.release_parent_owned_path(receipt)
     return candidate
 
 
@@ -134,7 +139,12 @@ def hook_event_spool_root(active_root: Path) -> Path:
 
 def runtime_event_publication_outcome_spool_root(active_root: Path) -> Path:
     """Return the repo-local publication-outcome observation spool root."""
-    candidate = active_root / RUNTIME_EVENT_PUBLICATION_OUTCOME_SPOOL_RELATIVE
+    candidate = (
+        active_root
+        / ".agent-canon"
+        / "runtime-event-spool"
+        / "publication-outcome"
+    )
     return _parent_path(active_root, candidate, "publication-outcome-spool")
 
 

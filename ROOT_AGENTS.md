@@ -1,475 +1,113 @@
+# AgentCanon Live-Integration Repository Instructions
 <!--
 @dependency-start
 contract agent-runtime
-responsibility Documents Agent Instructions for this repository.
-upstream design README.md repository entrypoint and clone/update guidance.
-upstream design documents/rule/README.md document filename, placement, and structure rules.
-upstream design documents/runtime/SHARED_RUNTIME_SURFACES.md shared AgentCanon surface policy.
-upstream design documents/runtime/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy.
-upstream design documents/agent-canon/template-agent-canon-audit-resolution.md audit resolution ledger for profile and gate simplification.
-upstream design documents/design/request-intent-and-update-relation.md positive rule, request authority, and sparse reconciliation projection contract.
-upstream design issues/README.md durable AgentCanon operational finding storage.
-downstream implementation tools/sync_agent_canon.sh updates AgentCanon submodule pins and shared root views.
-downstream implementation tools/agent_tools/bootstrap_agent_run.py emits task workflow packets and creates run bundles.
-downstream implementation tools/agent_tools/task_close.py validates run-bundle closeout gates.
-downstream implementation tools/agent_tools/check_agent_runtime_alignment.py validates runtime owner-map alignment.
-downstream implementation tools/agent_tools/hook_safety.py blocks unconfirmed shared-checkout Git mutations.
+responsibility Routes an explicitly selected live AgentCanon parent integration to vendored canonical owners without re-owning procedures.
+upstream design documents/design/entrypoint-owner-map.md root entrypoint grammar and responsibility boundary
+upstream design documents/runtime/SHARED_RUNTIME_SURFACES.md explicit live-agent-canon integration boundary
+upstream design documents/runtime/shared-runtime-surfaces.toml live integration manifest
+upstream design documents/runtime/task-contract-observation.md task contract observation and archive route
+upstream design documents/runtime/runtime-log-archive.md durable agent-canon-log ownership
+upstream design documents/tools/search-coordination.md coordinated search owner
+upstream design documents/conventions/software-engineering-principles.md contract-complete engineering decision policy
+upstream design agents/internal-routines/chatgpt-codex-routing.md request modality and Codex handoff owner
+upstream design agents/canonical/CODEX_WORKFLOW.md executable task and closeout owner
+upstream design agents/canonical/CODEX_SUBAGENTS.md subagent lifecycle owner
+upstream design agents/workflows/agent-canon-pr-workflow.md shared AgentCanon PR workflow
+downstream design evidence/agent-evals/skill_workflow_prompt_eval.toml validates root routing
+downstream implementation tools/agent_tools/check_entrypoint_owner_map.py validates thin entrypoint structure
+downstream implementation tools/agent_tools/check_agent_runtime_alignment.py validates runtime owner-map alignment
 @dependency-end
 -->
 
-# Agent Instructions
+This file is the thin root entrypoint for a parent repository that explicitly
+selects the `live-agent-canon` integration. It is not the default
+`project_template` instruction source. Task procedures, command recipes,
+implementation rules, role lifecycle, update mechanics, and closeout schemas
+remain in the vendored canonical owners named below.
 
-This file is the template-root runtime entrypoint for Codex. The shared agent
-canon lives in `vendor/agent-canon/`; root discovery paths are runtime views into
-that pin.
+## Integration Role
 
-Path note: `documents/...` entries in AgentCanon-owned packets are logical
-AgentCanon source paths. In standalone AgentCanon they resolve under `documents/`.
-In template or derived repo roots they resolve under
-`vendor/agent-canon/documents/` unless `documents/README.md` lists a
-template-owned active contract.
+The parent repository owns its product, project commands, local policy, and
+tracked files. AgentCanon owns only the explicitly selected shared runtime
+surface. Parent-local instructions take precedence for parent-owned behavior;
+AgentCanon instructions may not infer authority over unrelated project state.
 
-## Codex Loading Priority
-
-Codex instruction loading is runtime-defined and must be reflected in this
-repository's rule layout:
-
-1. Codex home guidance loads before repository guidance. `AGENTS.override.md`
-   wins over `AGENTS.md` at that global layer, and Codex uses only the first
-   non-empty file there.
-1. Project guidance is discovered from the project root down to the current
-   working directory. In each directory, Codex checks `AGENTS.override.md`,
-   then `AGENTS.md`, then fallback names listed in
-   `project_doc_fallback_filenames`; at most one instruction file from that
-   directory is included.
-1. Files closer to the current working directory appear later in the combined
-   prompt and therefore override earlier, broader guidance. The chain is built
-   once for the run or TUI session. Empty instruction files are skipped, and
-   Codex stops adding project-doc content when the combined size reaches
-   `project_doc_max_bytes`.
-1. Project `.codex/config.toml`, hooks, rules, MCP configuration, skills, and
-   plugins are separate Codex surfaces. They can affect runtime behavior, but
-   they are not a substitute for repository instruction discovery.
-1. Skills are selected from metadata first; `SKILL.md` is read only after the
-   skill is chosen. Skill instructions are task workflows, not always-loaded
-   repository rules.
-
-For this template, `/AGENTS.md` is the top repo instruction surface and is a
-runtime view of `vendor/agent-canon/ROOT_AGENTS.md`. Nested files such as
-`/.github/AGENTS.md` are local overlays for that subtree. When Codex is started
-inside `vendor/agent-canon/`, the AgentCanon source tree's own `AGENTS.md`
-becomes the repo-local entrypoint for that submodule checkout. README files,
-closed issues, reports, notes, and generated inventories are evidence or human
-navigation unless this file or an owner surface explicitly routes to them.
+A source-free static-seed consumer does not load this file and must not acquire
+`vendor/agent-canon`, root projections, source resolvers, update state, secrets,
+or network access as a fallback.
 
 ## Reader Map
 
-Target-State-First, Decision Sufficiency, model/profile, ToolCall, capacity,
-and lifecycle behavior is projected from the canonical owners:
-[workflow](agents/canonical/CODEX_WORKFLOW.md),
-[subagents](agents/canonical/CODEX_SUBAGENTS.md),
-[communication](agents/COMMUNICATION_PROTOCOL.md), and the approved
-[implementation contract](documents/design/codex-spark-implementation-routing.md).
-This entrypoint does not create a second policy source.
+| Task intent | Canonical owner in an explicit live integration |
+| --- | --- |
+| ChatGPT conversation closure vs Codex workspace execution | `vendor/agent-canon/agents/internal-routines/chatgpt-codex-routing.md` |
+| request interpretation and task transport after Codex admission | `vendor/agent-canon/agents/skills/agent-orchestration.md`, `vendor/agent-canon/agents/skills/codex-task-workflow.md` |
+| search, read scope, and reuse survey | `vendor/agent-canon/documents/tools/search-coordination.md`, `tools/bin/agent-canon semantic-index`, `vendor/agent-canon/tools/agent_tools/search.py`, dependency review artifacts |
+| contract-complete implementation and engineering basis | `vendor/agent-canon/documents/conventions/software-engineering-principles.md`, `vendor/agent-canon/agents/skills/comprehensive-development.md`, task-specific Skill |
+| mathematical, algorithmic, and numerical obligations | `vendor/agent-canon/documents/design/semantic-responsibility-contract.md`, selected proof / optimization Skill |
+| design-to-implementation correspondence | `vendor/agent-canon/agents/internal-routines/design-implementation-correspondence.md` |
+| repository structure and responsibility boundaries | parent structure owner plus `vendor/agent-canon/agents/skills/structure-refactor.md` when selected |
+| branch, worktree, and destructive Git safety | `vendor/agent-canon/agents/skills/worktree-health.md`, canonical workflow, active hooks |
+| task contract observation and durable archive | `vendor/agent-canon/documents/runtime/task-contract-observation.md`, `vendor/agent-canon/tools/agent_tools/task_contract_observation.py`, `vendor/agent-canon/documents/runtime/runtime-log-archive.md`, `agent-canon-log` |
+| shared AgentCanon update and PR evidence | `vendor/agent-canon/tools/update_agent_canon.sh`, `vendor/agent-canon/tools/sync_agent_canon.sh`, AgentCanon PR workflow, `agentcanon_structure_followup` |
+| AgentCanon source update and root projection | `vendor/agent-canon/agents/skills/agent-canon-update.md`, update route |
+| subagent activation and handoff | orchestration, subagent Skill, and canonical subagent inventory |
+| validation profile and closeout | `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md`, canonical workflow, closeout tools |
+| GitHub Issue / PR publication and status | `vendor/agent-canon/agents/skills/pr-processing.md`, GitHub status lifecycle owner |
 
-public API / behavior / schema、algorithm、ownership / path、runtime contract の変更、または
-明示的に選択した design workflow の implementation の前には、owning design を read して
-[`agents/internal-routines/design-implementation-correspondence.md`](agents/internal-routines/design-implementation-correspondence.md)
-の clause fingerprint と対応 route を作ります。実装 handoff と review は
-その routine の forward/reverse coverage と drift block を参照し、個別
-skill に同じ universal policy を複製しません。owner、path、targeted validation が固定された
-bounded edit は通常の owner route として短い owner/path/validation note で完了し、DIC の
-fingerprint/closure を要求しません。
+## Always-On Boundary
 
-## Positive Rule Contract
+The explicit user request, parent-owned tracked policy, and selected canonical
+owner define authority. Preserve unknown parent and vendored checkout state
+until the Git safety owner classifies it. Do not use a parent-direct fallback,
+compatibility wrapper, hidden source checkout, or copied policy to bypass an
+owner or validation failure.
 
-各規約は、実行する操作、到達する状態、完了を示す証拠を肯定形で記述する。
-制約は対応する操作の事前条件・適用境界・正規代替ルートとして配置する。
-この契約の設計正本は
-[`documents/design/request-intent-and-update-relation.md`](documents/design/request-intent-and-update-relation.md)
-であり、`ROOT_AGENTS.md` はその reader route と runtime write set を所有する。
-`AGENTS.md` は同じ契約を source-tree root view として投影する。
-各変更は `operation -> resulting state -> completion evidence` の順に
-`Design-To-Implementation Trace` へ接続する。
-質問・明示 write clause・進行中 update・integration cleanup の compact flow は
-[`documents/design/request-intent-and-update-relation.md`](documents/design/request-intent-and-update-relation.md)
-から各 canonical owner へ投影する。
-Related Document Closure は active DIC route でだけ DIC-010 の path+section+clause/ref receipt を
-owner packet が消費する。bounded owner/path/targeted-validation route には適用しない。
-
-この projection は `operation -> resulting state -> completion evidence` の順で
-materialize します。質問は read scope と evidence を読み、evidence-backed answer
-complete state に到達し、回答と read-scope packet readback を完了 evidence にします。
-明示 write clause は target、operation、owner、write set、acceptance evidence を結合し、
-owner handoff-ready state に到達し、既存 write packet readback を完了 evidence にします。
-追加または変更された request clause は既存 write gate を通って active context に overlay
-され、goal/artifact/order/handoff sparse delta state に到達し、変更 clause と delta packet
-readback および context reuse または必要並列 handoff を完了 evidence にします。
-completed integration は tree/remote readback を受け、既存 cleanup executor dispatch state
-に到達し、executor receipt、CleanupProof、closeout packet readback を完了 evidence にします。
-
-- This file owns the template-root runtime entrypoint for Codex and points each
-  runtime contract to its owner surface and checker.
-- 文書 filename は英語、本文は日本語とし、詳細は `documents/rule/README.md` を参照します。
-- Start with Scope Discipline and Structure-First Scope Formation, then use the
-  runtime owner map only to find the surface that owns the next decision. Task
-  entry, base runtime packet, shared canon flow, closeout evidence, and
-  validation commands are selected by the active profile or touched surface;
-  they are not a default checklist.
-- After context compaction, invoke the final-objective declaration required by
-  `agents/COMMUNICATION_PROTOCOL.md` section `Post-Compaction Objective
-  Re-Declaration Contract` before any work resumes.
-- Read it at the beginning of repository work or when resolving whether a rule
-  belongs to the root view, AgentCanon source, a generated task packet, or a
-  checker.
-- This entrypoint routes to owner surfaces; workflow stages, skills, role
-  behavior, validation matrices, and closeout gates are updated in their owner
-  documents first.
-
-## Scope Discipline
-
-Scope Discipline takes precedence over this file's owner map and command lists.
-If an owner surface names required evidence for its own workflow, apply that
-requirement only after the active task, profile, or touched surface selects that
-workflow.
-
-The user's request has authority over agent-side interpretation. Carry the
-user's literal request clauses into routing, edit-target selection, validation,
-and closeout. Treat changes to the target, requested scope, or success
-condition as authorized only by explicit user evidence or owner-surface
-evidence; convenience, nearby files, prior habits, and inferred intent carry
-zero authority. Scope is not frozen by the first plausible reading of the
-request: it is formed from request clauses plus repository structure, owner
-surface evidence, dependency edges, root-view state, and checker evidence.
-Adding a surface required by that evidence is part of scope formation; omitting
-it because it was not in the first edit guess is a scope error.
-
-Multiple chats or sessions may use the same checkout concurrently. Treat every
-unknown dirty, staged, untracked, branch, and worktree state as owned by the
-user or another chat, and preserve that state across routing and repair.
-Protected Git operations include `git restore`, `git reset`, forced `git clean`,
-mutating `git stash`, checkout/switch, and branch/worktree create, delete, move,
-rename, or prune. Normal branch/worktree creation records creation authority and
-reason; force-create/ref overwrite additionally requires destructive authority and
-reason. Existing checkout/switch, delete/rename/reset, and other history/ref
-mutations require destructive authority and reason. Reversible tracking metadata
-and `git worktree lock/unlock` do not mutate refs, history, or worktrees and are
-not destructive. Proven exact task ownership only bounds which paths may be
-named in an approval request; explicit destructive approval remains required for
-destructive operations.
-
-Canonical repo-local lifecycle commands are bounded to a separate workspace route:
-`repository_topic_clone.py` and `dependency_module_change.py` may prepare, reuse, and use
-`<project-root>/workspace/<topic-slug>/<repo-name>` without operation-level approval when
-non-empty owner evidence and exact computed identity are present. This does not authorize raw
-shared-checkout Git mutations or bypass the hook. At closeout, lifecycle skills dispatch proof-
-gated cleanup with computed clone identity, owner/marker evidence, clean state, and remote
-head/tree readback; publication artifacts are optional coherent enrichment. Only ordinary
-`CleanupProof` / cleanup receipt authorizes deletion. Collisions,
-unknown dirty state, and proof mismatch remain preserved typed holds.
-
-A protected destructive mutation proceeds only when the user explicitly approves
-it and the same command segment carries
-`AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` plus a nonempty
-`AGENT_CANON_DESTRUCTIVE_GIT_REASON`. Normal branch/worktree creation instead
-requires same-segment
-`AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request` or
-`agent_canon_workflow` plus a nonempty `AGENT_CANON_BRANCH_WORKTREE_REASON`;
-force-create/ref overwrite requires both authority pairs. `latest` / `apply` /
-merge wrappers require destructive authority only unless their owner route
-actually creates a branch/worktree. Collision handling keeps the current
-branch/worktree and requests user direction.
-
-## Structure-First Scope Formation
-
-Fix structure before ordinary task work when the repository shape, root views,
-path ownership, directory responsibility, submodule state, `.codex` / `.agents`
-views, or missing canonical paths affect where the task belongs. The reference
-route is `vendor/agent-canon/agents/skills/structure-refactor.md`
-`Pre-Task Structure Repair Contract`, backed by
-`vendor/agent-canon/documents/structure/repo-structure-contract.toml`,
-`vendor/agent-canon/tools/agent_tools/repo_structure_contract.py`,
-`vendor/agent-canon/tools/agent_tools/responsibility_scope.py`, and
-`vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md` `Missing File Or Path
-Triage`.
-
-Structure-first repair is not an optional broad audit. It is the intake path
-that decides the owning abstraction and edit surface before implementation,
-document edits, validation, PR cleanup, or subagent handoff. If the expected
-AgentCanon root view, `vendor/agent-canon/` state, `.gitmodules`, shared root
-copy, directory README responsibility, or responsibility-scope map is stale or
-missing, record the structure symptom and repair it through the owner route
-before proceeding with the ordinary task. If structure evidence shows no drift
-or no ownership impact, cite that evidence and continue without repo-wide
-cleanup.
-
-Default to design-complete, responsibility-bounded work for substantive
-changes. Completion is proportional to the changed surface: behavior or code
-changes must have coherent behavior, design/OOP boundary, ownership boundary,
-and required tests or docs; doc-only, format-only, and explicit bounded-route
-changes need the owner/path/design-boundary note and validation that exercises
-that surface. Parent-direct is only an execution route; needed design still
-comes from the changed surface.
-
-Design-complete is resolved through the owning abstraction. Find the full
-replaceable responsibility unit from structure and owner evidence, then finish
-the requested behavior inside that unit. Keep optional audits, historical
-cleanup, and adjacent workflow repair separate unless structure evidence,
-owner-surface evidence, or a blocking finding makes them part of the same
-responsibility unit.
-
-Owner-map entries, skill command packets, validation commands, and CI jobs are
-routing menus, not automatic worklists. Run or read only the item that changes
-the next decision: edit path, fix, validation, PR state, or explicit deferral.
-
-For repo-changing implementation, patch, or doc-edit work, parent is the default
-orchestrator and integrator, with implementation assigned through the selected
-write-capable handoff route. Parent owns route selection, monitoring, write-capable
-agent launch or recorded blocker
-evidence, additional instructions, integration, review gates, validation
-evidence, and closeout. After owner boundary, replaceable responsibility
-unit, context packet, and validation route are evidenced, implementation/doc-edit
-slices are handed to `spark_worker` or `worker`.
-
-Explicit bounded owner/path/targeted-validation requests use the normal parent-direct route with a
-short owner/path/design-boundary note. The exception environment markers are reserved for a
-genuinely out-of-scope or unbounded parent-direct route, with explicit rationale and fallback status.
-
-Split work only when coordination requires it; otherwise keep one replaceable
-responsibility unit in one packet and one writer unless independent workstreams
-have disjoint write scope, dependency order, integration order, and
-review/validation gates. Use subagents for distinct decisions and
-write-capable handoffs; reserve deterministic reads/checkers/searches for the
-owner-selected evidence path.
-
-Proceed after the selected evidence passes, and reserve repeated sync logs or
-repo-wide audits for owner-selected structure repair, explicit user evidence, or
-blocking findings. Hook, archive, or dashboard failures change the task route
-only when they block the selected edit, validation, or PR route; otherwise
-record a concrete deferral.
-
-## Design Integrity Gate
-
-Before implementation or write-capable handoff, prove that the work is derived
-from an owning responsibility model rather than from a nearby file, current
-finding, or chat impression. Semantic decision sufficiency is the universal
-gate: owner, replaceable unit, implementation mechanism, validation route, and
-each unresolved branch that could change one of those decisions must be explicit.
-When the active workflow or touched surface selects a full design route, or
-coordination/resumption needs durable transport, use the `Abstract Design
-Frame`, `Implementation Source Packet`, `Design Side-Effect Map`, and
-`Design-To-Implementation Trace`. A structured handoff, approved source packet,
-or tool result is sufficient when those file artifacts are not selected. A
-  An explicit bounded request with fixed owner/path/validation may use the short
-  owner/path/design-boundary note as the normal parent-direct route. The note is
-  handoff context, not a requirement to create a run bundle or separate public skill.
-
-Treat API shape, responsibility boundary, path layout, naming, algorithm,
-test oracle, dependency direction, runtime contract, and config-surface gaps as
-design issues. The valid route is `design_issue_blocker=<issue>` with evidence,
-then return to the owning design/review gate. Local fallback, wrapper, helper,
-branch, compatibility route, test relaxation, docs overwrite, and
-implementation shortcut are outside the gate.
-
-Algorithm repairs start from the algorithm contract and the implemented
-mechanism. Establish the public entrypoint, state transition or recurrence,
-invariants, stopping or acceptance rule, and failure semantics; then compare the
-current implementation to that contract and identify the first code-side
-mechanism that must change. Existing tests are evidence for contract
-classification and regression placement. Test edits, new expected values,
-tolerance changes, and oracle design enter after the algorithm contract and
-repair mechanism are fixed.
-
-Test design follows establishment or repair of the production design,
-algorithm contract, and owning implementation mechanism. Activate
-`test_designer` only when a concrete unresolved oracle, specification,
-regression, or failure-mode risk remains outside static analysis, existing
-checkers, and targeted validation. Ordinary code changes, bug fixes, parser
-changes, and validation failures alone leave the role inactive. Existing tests
-remain evidence, while the owning implementation mechanism is the first edit
-surface.
-
-## Context Construction
-
-Context construction is the primary runtime concern. Use
-`vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md` as the schema owner for
-context visibility, pre-edit investigation packets, and fresh subagent
-capsules.
-
-Build prompt context for shape, ownership, and traceability.
-LLM-visible context may be large when the next decision requires it, and each
-piece must tie to a request clause, owner, source packet, exact file section, or
-artifact path. Raw search output, full dashboards, logs, long histories, and
-broad workflow packets stay in local/tool context until selected.
-
-Treat AGENTS/root entrypoints as routing and context-construction guidance.
-Keep missing packet fields in the owning packet, hand off structured context
-capsules instead of broad chat summaries, and treat each subagent launch as
-fresh.
-
-## Repository Discovery and Reading
-
-Start from repository structure, dependency headers, and the runtime owner map
-before text search. In this repository, start with `find`,
-`git grep`, or targeted `grep` from known owner directories after the structure
-route is clear.
-
-When structure may determine the owner, run the structure intake route before
-manual broad reading: use `repo_structure_contract.py` for expected layout,
-`responsibility_scope.py` for ownership coverage and overlaps, and
-`import_responsibility.py` when import boundaries are implicated. Classify a
-missing path through `CODEX_WORKFLOW.md` `Missing File Or Path Triage` before
-creating it or treating it as absent, so the route records whether the path is
-an AgentCanon source, template root view, generated artifact, project-local
-surface, or personal runtime state.
-
-For long documents, read the reader map and section outline first. Split reads
-only at stable semantic boundaries such as headings, tables, generated blocks,
-or independent records. Keep a mathematical derivation, OOP abstraction,
-proof obligation, or replacement unit together even when the chunk is long.
+Implementation sufficiency is owned by the selected implementation and review
+Skills. They select the smallest contract-complete owning unit and require
+material mathematical, domain, or engineering grounds and a validation oracle.
+This entrypoint only routes to that contract.
 
 ## Runtime Owner Map
 
-| Contract | Owner Surface | Evidence / Checker |
-| -------- | ------------- | ------------------ |
-| workflow family, spawn budget, role topology | `vendor/agent-canon/agents/task_catalog.yaml` | `bootstrap_agent_run.py`; `check_agent_runtime_alignment.py` |
-| task bootstrap and CLI entrypoints | `vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md`; `bootstrap_agent_run.py` | generated task packet |
-| subagent lifecycle, same-role instances, wave ledger | `vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md`; `team_manifest.yaml`; `schedule.md`; `workflow_monitoring.md` | `workflow_monitor.py`; closeout lifecycle evidence |
-| role behavior and stage conditions | `vendor/agent-canon/.codex/agents/*.toml`; `vendor/agent-canon/agents/agents_config.json` | `check_agent_runtime_alignment.py` |
-| skill routing and public skill surface | `vendor/agent-canon/agents/skills/catalog.yaml`; `vendor/agent-canon/.agents/skills/*/SKILL.md` | `python3 tools/agent-canon/agent_tools/route.py --prompt`; `check_agent_runtime_alignment.py` |
-| internal workflow routines | `vendor/agent-canon/agents/internal-routines/README.md` | `repo_structure_contract.py`; runtime alignment |
-| design-to-implementation correspondence | `vendor/agent-canon/agents/internal-routines/design-implementation-correspondence.md`; `vendor/agent-canon/documents/design/*.md` | `check_design_doc_claims.py`; design/review readback |
-| implementation flow graph and source packet | run bundle design packet; `vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md`; `vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md` | design review; dependency review |
-| search, read scope, and reuse survey | semantic-index, deterministic `search.py` / `search_index.py`, dependency review artifacts | `run_repo_dependency_review.sh`; bounded search artifacts |
-| repo structure and root views | `vendor/agent-canon/documents/structure/repo-structure-contract.toml`; `responsibility-scope.toml`; `vendor/agent-canon/documents/runtime/shared-runtime-surfaces.toml` | structure/scope/import tools; `vendor/agent-canon/tools/sync_agent_canon.sh` |
-| shared-checkout Git mutation and branch/worktree creation route | `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`; `vendor/agent-canon/tools/agent_tools/hook_safety.py`; `vendor/agent-canon/agents/skills/worktree-health.md` | operation-risk Git authority matrix; critical PreToolUse guard; `check_convention_compliance.py` |
-| runtime profile and validation route | `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md` | profile-selected validation |
-| report and closeout structure | `task_close.py`; `report_artifact_checks.py`; run bundle `closeout_gate.md` | profile-selected closeout gate |
-| shared AgentCanon update | `vendor/agent-canon/tools/update_agent_canon.sh`; `vendor/agent-canon/tools/sync_agent_canon.sh`; AgentCanon PR workflow | submodule pin and PR evidence |
-
-This map is a routing index, not a checklist. Stage rules, skill selection, role
-behavior, validation matrices, and closeout gates are updated in their owner
-surfaces first, but the evidence/checker column is used only when the active
-profile, touched surface, or blocking finding selects it.
+| Responsibility | Canonical owner | Validation / reader route |
+| --- | --- | --- |
+| workflow family, spawn budget, role topology | `vendor/agent-canon/agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |
+| task bootstrap and CLI entrypoints | `vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md` | `bootstrap_agent_run.py` |
+| subagent lifecycle, same-role instances, wave ledger | `vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md` | `workflow_monitor.py` |
+| role behavior and stage conditions | `vendor/agent-canon/.codex/agents/*.toml` | `check_agent_runtime_alignment.py` |
+| skill routing and public skill surface | `vendor/agent-canon/agents/skills/catalog.yaml` | active `python3 vendor/agent-canon/tools/agent_tools/route.py --prompt`; retired `python3 tools/agent-canon/agent_tools/route.py --prompt` is not executable without the removed alias |
+| contract observation and archive evidence | `vendor/agent-canon/documents/runtime/task-contract-observation.md` | `task_contract_observation.py`, then runtime-log archive readback |
+| report and closeout structure | `vendor/agent-canon/tools/agent_tools/task_close.py` | `closeout gate` |
+| explicit live integration surface | `vendor/agent-canon/documents/runtime/shared-runtime-surfaces.toml` | `surface_manifest.py` |
+| entrypoint responsibility grammar | `vendor/agent-canon/documents/design/entrypoint-owner-map.md` | `check_entrypoint_owner_map.py` |
 
 ## Task Entry
 
-Task bootstrap commands and CLI-specific entry behavior are owned by
-`vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md`. Generated task packets
-from `bootstrap_agent_run.py` provide the active
-`workflow=...`, `skills=...`, `review=...`, source packet, wave plan, and
-validation route.
+Resolve request modality through the vendored
+`agents/internal-routines/chatgpt-codex-routing.md` before repository
+orchestration. A `chatgpt` route performs no parent or vendored workspace
+execution. A `codex` route hands its typed scope and validation oracle to the
+vendored `agent-orchestration` owner.
 
-Create a task packet or run bundle when the user asks for kickoff/run-bundle evidence, the
-task needs wave coordination, or the selected workflow requires more than a
-short owner/design/validation note.
+After Codex admission, resolve the parent or AgentCanon owner before reading
+implementation detail. Use the parent owner for product behavior and the
+vendored owner for the explicit shared runtime surface. Read the selected Skill
+or canonical workflow before mutation. Bounded owner/path/validation work
+remains bounded; activation of design, research, orchestration, or subagents
+follows the selected owner's conditions.
 
-## Base Runtime Packet Owner
+Read-only web, connector, and supplied-material analysis remain ChatGPT work
+unless the requested result depends on local parent/vendor state, command
+observation, mutation, iterative validation, or durable repository delivery.
+Repository-changing work follows the selected owner surface; this entrypoint
+does not reproduce its steps or environment protocol.
 
-- `README.md`
-- `vendor/agent-canon/agents/README.md`
-- `vendor/agent-canon/agents/TASK_WORKFLOWS.md`
-- `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`
-- `vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md`
-- `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md`
-- `vendor/agent-canon/documents/runtime/SHARED_RUNTIME_SURFACES.md`
+## Validation Routing
 
-Task-specific packet expansion is owned by the generated task packet,
-semantic-index/deterministic search, and dependency review artifacts when those
-routes are selected. The base packet is not a required reading list for every
-task.
-
-## Template Context
-
-- Human-facing primary language is Japanese.
-- The default integration branch is `main`.
-- Template-default implementation lives in `python/`.
-- Template-default environment and runtime guidance lives in `docker/`.
-- Repo-wide durable contracts live in `documents/`.
-- Experiment GPU allocation belongs to the scheduler or caller environment. Do
-  keep available GPUs visible and keep topic code / checked-in config free of
-  single-GPU or serial execution throttles. Serial debugging or a recorded
-  environment limit is required before narrowing GPU visibility or worker
-  parallelism.
-
-## Implementation Discipline
-
-- Keep production implementations aligned with the active design contract. If a
-  change would deviate from that contract, update the design contract first or
-  report the blocker.
-- Keep algorithm branches, solver choices, tolerances, diagnostics, and runtime
-  paths part of the product contract rather than adding test-only or
-  experiment-only production behavior.
-- For algorithm fixes, enter through contract, recurrence / state transition,
-  invariant, and failure-semantics evidence before changing tests. Tests record
-  the selected oracle and regression cases after the algorithm repair route is
-  known.
-- When an exploratory experiment is needed, keep it outside the production code path
-  and label it as experimental evidence. Production code must reflect the
-  approved design, not a temporary workaround.
-
-## Shared Canon Flow
-
-AgentCanon source changes are made in the managed dependency clone inside the
-`workspace/<topic-slug>/` lifecycle boundary directly below the parent repository,
-reviewed through the AgentCanon
-branch / PR workflow, then reflected in the template through the clean
-`vendor/agent-canon` pin and shared root views. Root view repair is owned by:
-
-```bash
-AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  PYTHONPATH=tools/agent-canon python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec tools/sync_agent_canon.sh link-root
-  PYTHONPATH=tools/agent-canon python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec tools/sync_agent_canon.sh check
-```
-
-Run these commands when `agents/skills/agent-canon-update.md` (active root
-projection owner) indicates parent sync evidence is required.
-Record `agentcanon_structure_followup=required` and `agentcanon_structure_followup=pass`
-only after `link-root` and `check` pass from the template / derived parent root.
-
-## Closeout Evidence
-
-Closeout cites only evidence required by the active runtime profile and touched
-surfaces. Create run bundles, dependency reviews, subagent lifecycle records,
-log archive syncs, shared-canon syncs, or full validation evidence only when the
-selected route requires them.
-
-For repo-changing implementation, patch, or doc-edit work, closeout cites the
-write-capable handoff route, integration result, review gate, validation
-evidence, and subagent lifecycle evidence.
-
-For active root projection updates and parent root sync, closeout also cites
-`agentcanon_structure_followup=required` and
-`agentcanon_structure_followup=pass`, including the parent-root
-request-evidence-authorized `PYTHONPATH=tools/agent-canon python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec tools/sync_agent_canon.sh` link-root and
-`PYTHONPATH=tools/agent-canon python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec tools/sync_agent_canon.sh` check evidence.
-
-A no-subagents closeout is valid for routing-only/advisory tasks, read-only audits, or a bounded
-parent-direct route with owner/path/validation evidence. An out-of-scope or unbounded exception
-also cites its recorded `PARENT_DIRECT_WRITE_EXCEPTION` evidence.
-
-If write-capable handoff was blocked, closeout records one of:
-`WRITE_SUBAGENT_AUTHORIZATION=required` or `write_capable_handoff_blocker=<gate>`
-with typed local blocker evidence:
-`status=blocked`, `selected_agent_type`, `evidence`,
-`parent_packet_ref`. The selected candidate remains blocked until a revised
-explicit parent packet authorizes another candidate.
-
-For CI and hook failures, first decide whether the failure belongs to the
-changed surface or blocks the requested PR/update. Stale, duplicated, or legacy
-check items are refactor findings; run the canonical shared script, and compare
-old and new paths only when the refactor itself requires that comparison.
-Mechanical readiness is owned by `task_close.py` and
-`report_artifact_checks.py` when a run bundle closeout is selected.
-
-## Validation Command Menu
-
-These are common commands, not a default checklist. Select the most targeted command
-that validates the changed responsibility unit, active profile, or blocking
-finding.
-
-- `python3 tools/agent-canon/agent_tools/check_agent_runtime_alignment.py`
-- `python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec python3 tools/agent_tools/repo_structure_contract.py --root . --contract documents/structure/repo-structure-contract.toml`
-- `python3 tools/agent-canon/agent_tools/responsibility_scope.py --root .`
-- `PYTHONPATH=tools/agent-canon python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec tools/sync_agent_canon.sh` check
-- `python3 tools/agent-canon/agent_tools/task_close.py ...`
+Select checks from the changed responsibility and active integration profile.
+Parent product validation remains parent-owned. AgentCanon validation applies
+to the changed shared surface, and root projection or update readback applies
+only when that integration surface changed. Use the canonical closeout owner
+rather than a command list embedded in this file.

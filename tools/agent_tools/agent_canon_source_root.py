@@ -16,6 +16,7 @@ import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, cast
 
 try:
     from . import parent_root_side_effects as _parent_boundary
@@ -34,16 +35,12 @@ VENDOR_OUTSIDE_REPOSITORY = "agent_canon_source_root_vendor_outside_repository"
 ROOT_VIEW_OUTSIDE_REPOSITORY = "agent_canon_source_root_root_view_outside_repository"
 
 
+@dataclass(frozen=True)
 class SourceRootFailure(ValueError):
     """Typed failure raised when source-root resolution is not deterministic."""
 
     code: str
     detail: str
-
-    def __init__(self, code: str, detail: str) -> None:
-        self.code = code
-        self.detail = detail
-        super().__init__(code, detail)
 
 
 @dataclass(frozen=True)
@@ -98,6 +95,11 @@ class RepositoryRoots:
         workspace = self.workspace_root.resolve()
         source = self.agentcanon_source_root.resolve()
         report = self.report_root.resolve()
+        if workspace != source and _is_within(report, source):
+            raise SourceRootFailure(
+                "runtime_roots_invalid",
+                f"report root must not be below AgentCanon source root: {report}",
+            )
         object.__setattr__(self, "workspace_root", workspace)
         object.__setattr__(self, "agentcanon_source_root", source)
         object.__setattr__(self, "report_root", report)
@@ -129,7 +131,7 @@ def _default_pythonpath(*, root: Path) -> str:
                 ) from exc
             if canonical == source_tools:
                 continue
-            if canonical == source_tools / "agent_tools" and candidate.parent.name == "agent-canon":
+            if canonical == source_tools / "agent_tools" and "agent-canon" in candidate.parts:
                 # The standalone public self-view aliases the selected source
                 # tools tree; retain only the canonical source tools entry.
                 continue
@@ -178,39 +180,33 @@ def _run_subcommand(resolution: RootResolution, command: Sequence[str]) -> int:
     else:
         executable = _resolve_executable(resolution, command[0])
         child_command = (str(executable), *command[1:])
-    command_path = command[1] if interpreter and len(command) > 1 else command[0]
-    rebase_inherited_temp = Path(command_path).name in {
-        "sync_agent_canon.sh",
-        "update_agent_canon.sh",
-    }
-    previous_cwd = Path.cwd()
     try:
-        os.chdir(resolution.current_repository_root)
-        with _parent_boundary.public_session(
-            invocation_script=Path(__file__),
-            purpose="agent-canon-source-root",
-        ) as session:
-            env = _parent_boundary.child_environment(
-                session.attestation,
-                os.environ,
-                issue_handoff=False,
-                rebase_inherited_temp=rebase_inherited_temp,
+        attestation = resolution.parent_attestation
+        if attestation is None:
+            attestation = _parent_boundary.attest_parent_root(
+                _parent_boundary.ParentRootAttestationRequest(
+                    cwd=resolution.current_repository_root,
+                    explicit_root=resolution.current_repository_root,
+                    source_root=resolution.source_root,
+                    purpose="agent-canon-source-root",
+                )
             )
-            env["PYTHONPATH"] = _default_pythonpath(root=resolution.source_root)
-            env[SOURCE_PREFIX_ENV] = _source_prefix(resolution)
-            process = subprocess.run(
-                child_command,
-                cwd=resolution.source_root.as_posix(),
-                env=env,
-                check=False,
-            )
-            return process.returncode
-    except _parent_boundary.ParentRootSideEffectError as exc:
-        raise SourceRootFailure(
-            f"agent_canon_parent_root_{exc.reject.value}", exc.detail
-        ) from exc
-    finally:
-        os.chdir(previous_cwd)
+        env = _parent_boundary.child_environment(cast(Any, attestation), os.environ)
+    except Exception as exc:
+        if isinstance(exc, _parent_boundary.ParentRootSideEffectError):
+            raise SourceRootFailure(
+                f"agent_canon_parent_root_{exc.reject.value}", exc.detail
+            ) from exc
+        raise
+    env["PYTHONPATH"] = _default_pythonpath(root=resolution.source_root)
+    env[SOURCE_PREFIX_ENV] = _source_prefix(resolution)
+    process = subprocess.run(
+        child_command,
+        cwd=resolution.source_root.as_posix(),
+        env=env,
+        check=False,
+    )
+    return process.returncode
 
 
 def _source_prefix(resolution: RootResolution) -> str:

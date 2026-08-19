@@ -123,7 +123,7 @@ Make target の両方を持ちます。
 - Python entrypoint
   - `experiments/<topic>/run.py`
   - `--config experiments/<topic>/config.yaml`
-  - `--run-dir experiments/<topic>/result/<variant>/<run_name>`
+  - `--run-dir experiments/<topic>/result/<run-id>`
   - 必要なら `--limit`、`--site`、`--day` などの入力範囲指定
 - run identity は `(topic, variant, run_name)` の ordered tuple とし、
   `agentcanon.experiment-run-identity/v2` の nested `identity` object を
@@ -145,9 +145,9 @@ topic README には、少なくとも次を書きます。
 - config 正本の path
 - smoke / formal の Make command
 - 代表的な direct single-case command
-- 出力先の `result/<variant>/<run_name>/`
+- 出力先の `result/<run-id>/raw/`（case worker の生結果）と `result/<run-id>/summary/`（要約・証跡）
 - 主要 artifact の一覧
-- report / notebook を再生成する command
+- report / `visualization.py` renderer を再生成する command
 
 ## 4. 標準の組み立て方
 

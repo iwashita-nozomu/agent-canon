@@ -33,17 +33,19 @@ import yaml
 
 try:
     from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        resolve_parent_writer_attestation,
+        attest_parent_root,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        resolve_parent_writer_attestation,
+        attest_parent_root,
     )
 
 try:
@@ -96,21 +98,19 @@ SKILL_HANDOFF_TARGETS = (
 
 def _parent_resolve(path: Path, purpose: str) -> Path:
     """Resolve graph DB/output paths under the attested outer parent."""
-    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if not configured:
         raise ParentRootSideEffectError(
             ParentRootReject.HANDOFF_INVALID,
             f"{purpose}: explicit parent root is required",
         )
-    attestation = resolve_parent_writer_attestation(purpose=purpose)
-    boundary = ParentRootSideEffectBoundary()
-    receipt = boundary.resolve_parent_owned_path(
-        attestation, path, purpose, create=False
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
     )
-    try:
-        return receipt.physical_path
-    finally:
-        boundary.release_parent_owned_path(receipt)
+    return ParentRootSideEffectBoundary().resolve_parent_owned_path(
+        attestation, path, purpose, create=False
+    ).physical_path
 ASCII_SENTENCE_ABBREVIATIONS = frozenset(
     {
         "dr",
@@ -532,7 +532,7 @@ def default_graph_home() -> Path:
     configured = os.environ.get(DEFAULT_DB_HOME_ENV)
     if configured:
         return _parent_resolve(Path(configured).expanduser(), "prose-reasoning-graph-home")
-    parent = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if parent:
         return _parent_resolve(
             Path(parent).resolve() / ".agent-canon" / "prose-reasoning-graph",
@@ -583,13 +583,20 @@ def sanitize_cache_segment(value: str) -> str:
 
 def connect(path: Path) -> sqlite3.Connection:
     """Open a SQLite connection and enable foreign keys."""
-    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if not configured:
         raise ParentRootSideEffectError(
             ParentRootReject.HANDOFF_INVALID,
             "prose-reasoning-graph-db: explicit parent root is required",
         )
-    attestation = resolve_parent_writer_attestation(purpose="prose-reasoning-graph-db")
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(
+            cwd=parent,
+            explicit_root=parent,
+            purpose="prose-reasoning-graph-db",
+        )
+    )
     physical_parent = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
         attestation, path.parent, "prose-reasoning-graph-db"
     ).physical_path
@@ -4265,13 +4272,20 @@ def command_check_document(args: argparse.Namespace) -> int:
     input_path = cast(Path, args.input)
     db_path = graph_db_path(args, [input_path])
     out_dir = _parent_resolve(cast(Path, args.out_dir), "prose-reasoning-graph-output")
-    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if not configured:
         raise ParentRootSideEffectError(
             ParentRootReject.HANDOFF_INVALID,
             "prose-reasoning-graph-output: explicit parent root is required",
         )
-    attestation = resolve_parent_writer_attestation(purpose="prose-reasoning-graph-output")
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(
+            cwd=parent,
+            explicit_root=parent,
+            purpose="prose-reasoning-graph-output",
+        )
+    )
     out_dir = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
         attestation, out_dir, "prose-reasoning-graph-output"
     ).physical_path
@@ -4803,9 +4817,12 @@ def render_document_check_report(
 
 def write_output(path: Path, text: str) -> None:
     """Write text to one output path."""
-    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if configured:
-        attestation = resolve_parent_writer_attestation(purpose="prose-reasoning-graph-output")
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="prose-reasoning-graph-output")
+        )
         ParentRootSideEffectBoundary().write_parent_owned_file(
             attestation, path, text.encode("utf-8"), "prose-reasoning-graph-output"
         )

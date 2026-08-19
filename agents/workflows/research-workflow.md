@@ -10,7 +10,7 @@ downstream design ../../documents/design/algorithm-implementation-boundary.md eq
 # 研究・実験改造ワークフロー
 
 この文書は、数式を伴うアルゴリズム研究、比較実験、段階的なコード改造を 1 つの workflow にまとめた正本です。
-対象は、`python/` 配下の実装改造、`experiments/` 配下の比較実験、`notes/` への知見整理を含みます。
+対象は、`python/` 配下の実装改造、`experiments/` 配下の比較実験、`documents/notes/` への知見整理を含みます。
 準備、実装、静的チェック、実行、結果レポートを通した実務上の統合入口は [experiment-workflow.md](experiment-workflow.md) を参照してください。
 この文書は、とくに問い、定式化、比較設計、段階的改造、claim 更新の正本を担います。
 批判的レビューの具体的な観点は [experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md) を参照してください。
@@ -46,10 +46,10 @@ downstream design ../../documents/design/algorithm-implementation-boundary.md eq
 - code change、protocol change、XLA / runtime flag change を 1 iteration に混ぜません。1 iteration では 1 種類の変更だけを入れ、差分の原因を追えるようにします。
 - user request が generic path の usable smoke を求めている場合、specialized path の tuning や bounded smoke だけで close しません。
 - 外部論文、公式 docs、web 記事、download artifact を参照する前に、既存の
-  `references/`、`notes/`、`documents/`、topic report に同じ source / claim があるか
+  `references/`、`documents/notes/`、`documents/`、topic report に同じ source / claim があるか
   を確認します。既存 source note がある場合は、そこを更新または引用します。
 - 外部 source を answer、report、design、benchmark 比較、claim に使った場合は、
-  `references/`、`notes/`、または run-local `source_packet.md` に URL / DOI、access date、
+  `references/`、`documents/notes/`、または run-local `source_packet.md` に URL / DOI、access date、
   採用 claim、limitation、download artifact の保存場所を残します。browser tab、
   download cache、chat 要約だけを provenance として close しません。
 
@@ -157,7 +157,7 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
 
 - branch は既定では分けません。
 - 長時間 run の隔離や破壊的な試行が必要な場合に限って、別 branch / worktree の使用を許可します。
-- topic README に、`result/<variant>/<run_name>/` と `experiments/report/<topic>/<variant>/<run_name>.md` の置き方を書きます。
+- topic README に、`result/<run-id>/` と `experiments/<topic>/report/<run-id>.md` の置き方を書きます。
 - 詳細な作業ログが必要な場合だけ、実験 note か別の補助メモに分けて残します。
 
 ### Step 5. prototype を作る
@@ -175,7 +175,7 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
   - `Expected Effect:`
   - `Risk:`
   - `Validation Plan:`
-- 大きな設計変更は、先に `notes/themes/` または experiment note 側へ意味を書き、あとから code だけが残る状態を避けます。
+- 大きな設計変更は、先に `documents/notes/themes/` または experiment note 側へ意味を書き、あとから code だけが残る状態を避けます。
 
 ### Step 7. 各段で検証する
 
@@ -223,9 +223,9 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
 
 ### Step 10. report をまとめ、summary の要否を決める
 
-- `main` へ戻すときは、code だけでなく test、document、`result/<variant>/<run_name>/`、`experiments/report/<topic>/<variant>/<run_name>.md` を同時に持ち帰ります。
-- 複数 run をまたぐ結論だけを `notes/experiments/` にまとめます。
-- 判断の流れが必要な場合だけ、`notes/` 側に補助メモとして残します。
+- `main` へ戻すときは、code だけでなく test、document、`result/<run-id>/`、`experiments/<topic>/report/<run-id>.md` を同時に持ち帰ります。
+- 複数 run をまたぐ結論だけを `documents/notes/experiments/` にまとめます。
+- 判断の流れが必要な場合だけ、`documents/notes/` 側に補助メモとして残します。
 
 ## 5. マルチエージェント実験ループ
 
@@ -331,11 +331,11 @@ agent が反復を自律実行する場合は、これに加えて iteration ご
 ## 7. 実験コードを書くときのコツ
 
 - 実験コードは「問いと比較」を表現する薄い層に保ちます。case 生成、metric 計算、集計、report 生成は実験コードの責務ですが、process 管理や GPU 割当は runner 側の責務です。
-- topic ディレクトリは、少なくとも `README.md`、`cases.py`、`config.yaml`、`run.py`、`visualize.ipynb`、`result/` を意識した構成にします。
+- topic ディレクトリは、少なくとも `README.md`、`cases.py`、`config.yaml`、`run.py`、`visualization.py`、`result/` を意識した構成にします。
 - `run.py` は orchestrator であり、数式や benchmark の意味を隠した巨大 script にしません。比較対象、case range、metric、run_name を読み取れる形にします。
 - `cases.py` には case 定義と resource estimate を寄せます。実験意味のある difficulty 設計はここで管理します。
 - ordered difficulty 軸は連続レンジを生成します。飛び飛びの点だけを返す helper の使用は debug / smoke 用に限って許可します。
-- 実験 README には、問い、比較対象、標準コマンド、`result/<variant>/<run_name>/` の出力先、`experiments/report/` の入口を書きます。実験者の頭の中にしかない運用を残しません。
+- 実験 README には、問い、比較対象、標準コマンド、`result/<run-id>/raw/`・`summary/` の出力先、`experiments/<topic>/report/` の入口を書きます。実験者の頭の中にしかない運用を残しません。
 
 ### やらないこと
 
@@ -425,7 +425,7 @@ review artifact では、次のラベルで切り分けます。
 
 ## 11. 生成物と carry-over
 
-- raw JSONL、HTML、SVG、大きい log は `experiments/<topic>/result/<variant>/<run_name>/` に残します。
+- raw JSONL、HTML、SVG、大きい log は `experiments/<topic>/result/<run-id>/` に残します。
 - `main` には、完走 run の report と、その意味を説明する要約 note を残します。
 - partial run は正本にせず、診断材料としてのみ扱います。
 - worktree を閉じる前に、action log を残した場合は `main` から辿れるようにします。
@@ -436,10 +436,10 @@ review artifact では、次のラベルで切り分けます。
 - report 体裁の正本: `documents/experiments/experiment-report-style.md`
 - 実験運用規約: `documents/conventions/coding-conventions-experiments.md`
 - worktree 規約: `documents/operations/worktree-lifecycle.md`
-- 1 run の report: `experiments/report/<topic>/<variant>/<run_name>.md`
-- 実験 note: `notes/experiments/<topic>.md`
-- supporting notes: `notes/experiments/<topic>.md` または `notes/themes/<topic>.md`
-- 一般化知見: `notes/themes/<topic>.md`
+- 1 run の report: `experiments/<topic>/report/<run-id>.md`
+- 実験 note: `documents/notes/experiments/<topic>.md`
+- supporting notes: `documents/notes/experiments/<topic>.md` または `documents/notes/themes/<topic>.md`
+- 一般化知見: `documents/notes/themes/<topic>.md`
 
 ## 13. 参考文献
 

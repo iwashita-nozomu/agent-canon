@@ -10,7 +10,6 @@
 # upstream implementation ./agent_tools/surface_manifest.py renders projection and update-transition specs
 # downstream implementation ../tests/tools/test_update_agent_canon.py verifies sync/update behavior
 # downstream implementation ../tests/tools/test_update_agent_canon_surface_migration.py verifies bounded migration
-# downstream implementation ../test/testrunner.sh exposes the source-owned public test route
 # @dependency-end
 set -euo pipefail
 export GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"
@@ -29,24 +28,31 @@ SOURCE_GIT_TOPLEVEL="$(git -C "${AGENT_CANON_SOURCE_ROOT}" rev-parse --show-topl
 if [[ "${SOURCE_GIT_TOPLEVEL}" != "${AGENT_CANON_SOURCE_ROOT}" ]]; then
   AGENT_CANON_SOURCE_ROOT="${ROOT_DIR}"
 fi
+PARENT_ROOT_DIR="${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}"
+PARENT_ROOT_DIR="$(cd "${PARENT_ROOT_DIR}" && pwd -P)"
 AGENT_CANON_BOUNDARY_SCRIPT="${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py"
-if [[ -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ]]; then
-  invocation_script="$(realpath -e "${BASH_SOURCE[0]}" 2>/dev/null || true)"
-  if [[ -z "${invocation_script}" || ! -f "${invocation_script}" ]]; then
-    echo "AGENT_CANON_SYNC=fail reason=invocation_script_missing" >&2
-    exit 2
-  fi
-  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" public-exec \
-    --invocation-script "${invocation_script}" \
-    --purpose agent-canon-sync-script \
-    -- bash "${invocation_script}" "$@"
-fi
-PARENT_ROOT_DIR="${AGENT_CANON_SIDE_EFFECT_PARENT_ROOT:-}"
-if [[ -z "${PARENT_ROOT_DIR}" ]]; then
-  echo "AGENT_CANON_SYNC=fail reason=side_effect_session_missing" >&2
+if [[ "${PARENT_ROOT_DIR}" != "${ROOT_DIR}" \
+  && "${AGENT_CANON_CHILD_PURPOSE:-}" != "agent-canon-sync-script" ]]; then
+  echo "AGENT_CANON_SYNC_PARENT_HANDOFF=missing" >&2
+  echo "AGENT_CANON_SYNC_PARENT_ROOT=${PARENT_ROOT_DIR}" >&2
+  echo "AGENT_CANON_SYNC_SOURCE_ROOT=${AGENT_CANON_SOURCE_ROOT}" >&2
   exit 2
 fi
-PARENT_ROOT_DIR="$(cd "${PARENT_ROOT_DIR}" && pwd -P)"
+if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "agent-canon-sync-script" ]]; then
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" verify-child \
+    --root "${PARENT_ROOT_DIR}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose agent-canon-sync-script \
+    --consume >/dev/null
+else
+  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${PARENT_ROOT_DIR}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose agent-canon-sync-script \
+    --issue-handoff \
+    -- bash "${BASH_SOURCE[0]}" "$@"
+fi
+unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
 
 CANON_PARENT_TMP_CANDIDATE="${AGENT_CANON_PARENT_TMPDIR:-$PARENT_ROOT_DIR/.agent-canon/tmp/sync}"
 CANON_PARENT_TMPDIR="$(python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
@@ -1816,6 +1822,7 @@ project_copy_source() {
       s{vendor/agent-canon/templates/}{__CANON_TEMPLATES__/}g;
       s{vendor/agent-canon/issues/}{__CANON_ISSUES__/}g;
       s{documents/tools/}{__DOCUMENTS_TOOLS__/}g;
+      s{tests/tools/}{__TESTS_TOOLS__/}g;
       s{tools/agent-canon/}{__PARENT_TOOLS__/}g;
       s{((?:\.\./)+)documents/}{$1vendor/agent-canon/documents/}g;
       s{((?:\.\./)+)issues/}{$1vendor/agent-canon/issues/}g;
@@ -1827,6 +1834,7 @@ project_copy_source() {
       s{__CANON_TEMPLATES__/}{vendor/agent-canon/templates/}g;
       s{__CANON_ISSUES__/}{vendor/agent-canon/issues/}g;
       s{__DOCUMENTS_TOOLS__/}{documents/tools/}g;
+      s{__TESTS_TOOLS__/}{tests/tools/}g;
       s{__PARENT_TOOLS__/}{tools/agent-canon/}g;
       print;
     ' "$source")"
@@ -1875,45 +1883,24 @@ regular_path() {
   local abs_path="$ROOT_DIR/$path"
   local abs_source=""
   [ "$(realpath -m "$abs_path")" != "$ROOT_DIR" ] || die "regular target must not be repository root"
-  if [ "$path" = ".vscode" ]; then
-    if [ -d "$abs_path" ] && [ ! -L "$abs_path" ]; then
-      return
-    fi
+  if [ -e "$abs_path" ] && [ ! -L "$abs_path" ] \
+    && { [ "$path" != ".vscode" ] || [ -d "$abs_path" ]; }; then
+    return
+  fi
+  if [ -z "$source" ]; then
     if [ -L "$abs_path" ]; then
+      # Remove legacy whole-directory views before child links materialize.
+      # Do not create an empty parent; the child surface creates it safely.
       parent_remove_file "$abs_path"
-      parent_ensure_dir "$abs_path"
-      return
     fi
-    if [ ! -e "$abs_path" ]; then
-      parent_ensure_dir "$abs_path"
-      return
-    fi
-    die "regular[${path}]=collision type=non-directory"
-  fi
-
-  if [ -f "$abs_path" ] && [ ! -L "$abs_path" ]; then
     return
   fi
-  if [ -L "$abs_path" ]; then
-    [ -n "$source" ] || die "regular path '$path' is a symlink and has no seed source"
-    abs_source="$ROOT_DIR/$source"
-    [ -f "$abs_source" ] && [ ! -L "$abs_source" ] \
-      || die "regular seed source '$source' is not a regular file"
-    parent_remove_file "$abs_path"
-    parent_ensure_dir "$(dirname "$abs_path")"
-    parent_copy_file "$abs_source" "$abs_path"
-    return
-  fi
-  if [ ! -e "$abs_path" ]; then
-    [ -n "$source" ] || die "regular path '$path' is absent and has no seed source"
-    abs_source="$ROOT_DIR/$source"
-    [ -f "$abs_source" ] && [ ! -L "$abs_source" ] \
-      || die "regular seed source '$source' is not a regular file"
-    parent_ensure_dir "$(dirname "$abs_path")"
-    parent_copy_file "$abs_source" "$abs_path"
-    return
-  fi
-  die "regular[${path}]=collision type=non-regular"
+  [ -n "$source" ] || die "regular path '$path' is missing or is a symlink and has no seed source"
+  abs_source="$ROOT_DIR/$source"
+  [ -e "$abs_source" ] || die "regular seed source '$source' does not exist"
+  parent_remove_tree "$abs_path"
+  parent_ensure_dir "$(dirname "$abs_path")"
+  parent_copy_file "$abs_source" "$abs_path"
 }
 
 path_is_tracked_in_head() {

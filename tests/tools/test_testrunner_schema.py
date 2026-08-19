@@ -1,274 +1,117 @@
-"""Tests for the source-owned typed test-list schema."""
-
 # @dependency-start
 # contract test
-# responsibility Tests comment handling, ownership validation, and fail-before-execution semantics for the public test list.
-# upstream design ../../CONTAINER_OPERATIONS.md public standalone test boundary
-# upstream implementation ../../test/testrunner.sh validates the typed test list
-# upstream implementation ../../test/testlist.toml declares source test commands
-# upstream implementation ../../tools/agent_tools/parent_root_side_effects.py authenticates child environments
-# downstream implementation ../../tests/tools/test_testrunner.py covers route receipts and execution
+# responsibility Tests full-list validation before public test command execution.
+# upstream implementation ../../test/testrunner.py typed schema owner
+# downstream implementation ./test_testrunner.py tests execution receipts
 # @dependency-end
+
+"""Schema and fail-before-run tests for the source-owned test list."""
 
 from __future__ import annotations
 
+import importlib.util
 import json
-import os
-import shutil
-import subprocess
-import tempfile
-import unittest
+import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RUNNER = PROJECT_ROOT / "test" / "testrunner.sh"
+SPEC = importlib.util.spec_from_file_location(
+    "agent_canon_test_runner", PROJECT_ROOT / "test" / "testrunner.py"
+)
+assert SPEC is not None and SPEC.loader is not None
+testrunner = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = testrunner
+SPEC.loader.exec_module(testrunner)
 
 
-class TestRunnerSchemaTest(unittest.TestCase):
-    """Exercise schema validation before command execution."""
-
-    def run_runner(
-        self,
-        root: Path,
-        list_path: Path,
-        *,
-        route: str = "docker",
-    ) -> subprocess.CompletedProcess[str]:
-        """Run the public runner against a temporary source root/list."""
-        env = {
-            **os.environ,
-            "AGENT_CANON_TESTLIST": str(list_path),
-            "AGENT_CANON_ACTIVE_ROUTE": route,
-        }
-        return subprocess.run(
-            ["bash", str(root / "test" / "testrunner.sh")],
-            cwd=root,
-            env=env,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-
-    def fixture(self, record_text: str) -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
-        """Create a minimal source root with one declared owner/scope."""
-        temp_dir = tempfile.TemporaryDirectory()
-        parent_root = Path(temp_dir.name)
-        root = parent_root / "vendor" / "agent-canon"
-        root.mkdir(parents=True)
-        (root / "test").mkdir()
-        shutil.copy(RUNNER, root / "test" / "testrunner.sh")
-        (root / "owner.py").write_text("# owner\n", encoding="utf-8")
-        subprocess.run(["git", "init", "--quiet", str(parent_root)], check=True)
-        subprocess.run(["git", "init", "--quiet", str(root)], check=True)
-        tool_dir = root / "tools" / "agent_tools"
-        tool_dir.mkdir(parents=True)
-        shutil.copy(
-            PROJECT_ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py",
-            tool_dir / "parent_root_side_effects.py",
-        )
-        (root / "owner-dir").mkdir()
-        (root / "responsibility-scope.toml").write_text(
-            '[[scope]]\nid = "container-test-route"\npaths = ["**"]\n',
-            encoding="utf-8",
-        )
-        list_path = root / "testlist.toml"
-        list_path.write_text(record_text, encoding="utf-8")
-        (parent_root / ".gitmodules").write_text(
-            '[submodule "vendor/agent-canon"]\n'
-            "\tpath = vendor/agent-canon\n"
-            "\turl = https://example.invalid/agent-canon.git\n",
-            encoding="utf-8",
-        )
-        subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
-        subprocess.run(
-            [
-                "git",
-                "-C",
-                str(root),
-                "-c",
-                "user.name=Runner Fixture",
-                "-c",
-                "user.email=runner-fixture@example.invalid",
-                "commit",
-                "-q",
-                "-m",
-                "source fixture",
-            ],
-            check=True,
-        )
-        subprocess.run(
-            ["git", "-C", str(parent_root), "add", ".gitmodules", "vendor/agent-canon"],
-            check=True,
-        )
-        subprocess.run(
-            [
-                "git",
-                "-C",
-                str(parent_root),
-                "-c",
-                "user.name=Runner Fixture",
-                "-c",
-                "user.email=runner-fixture@example.invalid",
-                "commit",
-                "-q",
-                "-m",
-                "parent fixture",
-            ],
-            check=True,
-        )
-        return temp_dir, root, list_path
-
-    def test_comments_and_required_typed_fields_are_accepted(self) -> None:
-        """TOML comments do not alter the typed record contract."""
-        fixture = self.fixture(
-            """
-# comments are part of the supported TOML format
-[[tests]]
-id = "commented"
-environment = "tooling"
-require = "docker"
-code_owner = "owner.py"
-responsibility_scope = "container-test-route"
-command = ["python3", "-c", "import sys; sys.exit(0)"]
-"""
-        )
-        with fixture[0]:
-            result = self.run_runner(fixture[1], fixture[2])
-        self.assertEqual(result.returncode, 0, result.stderr)
-        records = [json.loads(line) for line in result.stdout.splitlines()]
-        self.assertEqual([record["status"] for record in records], ["start", "pass"])
-
-    def test_existing_directory_owner_is_accepted(self) -> None:
-        """A responsibility owner may identify a source directory."""
-        fixture = self.fixture(
-            """
-[[tests]]
-id = "directory-owner"
-environment = "tooling"
-require = "docker"
-code_owner = "owner-dir"
-responsibility_scope = "container-test-route"
-command = ["python3", "-c", "import sys; sys.exit(0)"]
-"""
-        )
-        with fixture[0]:
-            result = self.run_runner(fixture[1], fixture[2])
-        self.assertEqual(result.returncode, 0, result.stderr)
-
-    def test_missing_field_fails_before_command_execution(self) -> None:
-        """A malformed record cannot run its command as a partial suite."""
-        fixture = self.fixture(
-            """
-[[tests]]
-id = "missing-command"
-environment = "tooling"
-require = "docker"
-code_owner = "owner.py"
-responsibility_scope = "container-test-route"
-"""
-        )
-        marker = fixture[1] / "executed"
-        with fixture[0]:
-            result = self.run_runner(fixture[1], fixture[2])
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("schema failure", result.stderr)
-        self.assertFalse(marker.exists())
-        self.assertEqual(result.stdout, "")
-
-    def test_non_string_route_fields_fail_before_command_execution(self) -> None:
-        """Array/table route fields are schema failures, not runtime type errors."""
-        for field, environment_value, require_value, expected in (
-            ("environment", '["tooling"]', '"docker"', "environment must"),
-            ("require", '"tooling"', '{route = "docker"}', "require must"),
-        ):
-            fixture = self.fixture(
-                f"""
-[[tests]]
-id = "malformed-{field}"
-environment = {environment_value}
-require = {require_value}
-code_owner = "owner.py"
-responsibility_scope = "container-test-route"
-command = ["python3", "-c", "from pathlib import Path; Path('executed').touch()"]
-"""
-            )
-            with fixture[0]:
-                result = self.run_runner(fixture[1], fixture[2])
-            self.assertEqual(result.returncode, 2)
-            self.assertIn("schema failure", result.stderr)
-            self.assertIn(expected, result.stderr)
-            self.assertFalse((fixture[1] / "executed").exists())
-            self.assertEqual(result.stdout, "")
-
-    def test_duplicate_and_unsupported_records_fail_before_execution(self) -> None:
-        """Duplicate IDs and unsupported fields are rejected atomically."""
-        fixture = self.fixture(
-            """
-[[tests]]
-id = "duplicate"
-environment = "tooling"
-require = "docker"
-code_owner = "owner.py"
-responsibility_scope = "container-test-route"
-command = ["python3", "-c", "raise SystemExit(0)"]
-
-[[tests]]
-id = "duplicate"
-environment = "tooling"
-require = "docker"
-code_owner = "owner.py"
-responsibility_scope = "container-test-route"
-command = ["python3", "-c", "raise SystemExit(0)"]
-"""
-        )
-        with fixture[0]:
-            duplicate = self.run_runner(fixture[1], fixture[2])
-        self.assertNotEqual(duplicate.returncode, 0)
-        self.assertIn("duplicate test ids", duplicate.stderr)
-        self.assertEqual(duplicate.stdout, "")
-
-        fixture = self.fixture(
-            """
-[[tests]]
-id = "unsupported"
-environment = "tooling"
-require = "docker"
-code_owner = "owner.py"
-responsibility_scope = "container-test-route"
-command = ["python3", "-c", "raise SystemExit(0)"]
-extra = "reject me"
-"""
-        )
-        with fixture[0]:
-            unsupported = self.run_runner(fixture[1], fixture[2])
-        self.assertNotEqual(unsupported.returncode, 0)
-        self.assertIn("unsupported fields", unsupported.stderr)
-        self.assertEqual(unsupported.stdout, "")
-
-    def test_owner_and_scope_are_validated_as_source_contract_fields(self) -> None:
-        """Absolute/missing owners and undeclared scopes fail schema validation."""
-        for owner, scope, expected in (
-            ("/owner.py", "container-test-route", "source-relative"),
-            ("missing.py", "container-test-route", "does not exist"),
-            ("owner.py", "unknown-scope", "undeclared"),
-        ):
-            fixture = self.fixture(
-                f"""
-[[tests]]
-id = "invalid-owner-or-scope"
-environment = "tooling"
-require = "docker"
-code_owner = "{owner}"
-responsibility_scope = "{scope}"
-command = ["python3", "-c", "raise SystemExit(0)"]
-"""
-            )
-            with fixture[0]:
-                result = self.run_runner(fixture[1], fixture[2])
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn(expected, result.stderr)
-            self.assertEqual(result.stdout, "")
+def valid_record(command: list[str] | None = None) -> dict[str, object]:
+    """Return one valid record mapping."""
+    return {
+        "id": "valid",
+        "environment": "product",
+        "require": "docker",
+        "code_owner": "test/testrunner.py",
+        "responsibility_scope": "repository-test-runner",
+        "command": command or ["python3", "-c", "raise SystemExit(0)"],
+    }
 
 
-if __name__ == "__main__":
-    unittest.main()
+def write_list(tmp_path: Path, records: list[dict[str, object]]) -> Path:
+    """Write records as simple TOML tables."""
+    lines: list[str] = []
+    for record in records:
+        lines.append("[[tests]]")
+        for key, value in record.items():
+            lines.append(f"{key} = {json.dumps(value)}")
+        lines.append("")
+    path = tmp_path / "testlist.toml"
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
+def test_comments_and_complete_record_are_accepted(tmp_path: Path) -> None:
+    """TOML comments are supported without changing the typed record."""
+    path = write_list(tmp_path, [valid_record()])
+    path.write_text(
+        "# operator comment\n" + path.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+
+    records = testrunner.load_records(PROJECT_ROOT, path)
+
+    assert len(records) == 1
+    assert records[0].record_id == "valid"
+    assert records[0].command[:2] == ("python3", "-c")
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    (
+        (lambda item: {**item, "unexpected": "field"}, "fields must be exactly"),
+        (lambda item: {**item, "environment": "mixed"}, "environment must be"),
+        (lambda item: {**item, "require": "host"}, "require must be"),
+        (lambda item: {**item, "code_owner": "../outside"}, "code_owner escapes"),
+        (
+            lambda item: {**item, "code_owner": "missing.py"},
+            "code_owner does not exist",
+        ),
+        (lambda item: {**item, "command": []}, "command must be"),
+        (
+            lambda item: {**item, "responsibility_scope": ""},
+            "responsibility_scope must be",
+        ),
+    ),
+)
+def test_invalid_record_is_rejected(
+    tmp_path: Path,
+    mutation: object,
+    message: str,
+) -> None:
+    """Every invalid field fails before execution."""
+    assert callable(mutation)
+    path = write_list(tmp_path, [mutation(valid_record())])
+
+    with pytest.raises(testrunner.SchemaError, match=message):
+        testrunner.load_records(PROJECT_ROOT, path)
+
+
+def test_duplicate_ids_are_rejected_before_execution(tmp_path: Path) -> None:
+    """Duplicate record identity cannot overwrite lifecycle output."""
+    path = write_list(tmp_path, [valid_record(), valid_record()])
+
+    with pytest.raises(testrunner.SchemaError, match="duplicate test id"):
+        testrunner.load_records(PROJECT_ROOT, path)
+
+
+def test_empty_or_malformed_list_is_rejected(tmp_path: Path) -> None:
+    """The list must provide one nonempty array of complete records."""
+    empty = tmp_path / "empty.toml"
+    empty.write_text("tests = []\n", encoding="utf-8")
+    malformed = tmp_path / "malformed.toml"
+    malformed.write_text("[[tests]\n", encoding="utf-8")
+
+    with pytest.raises(testrunner.SchemaError, match="at least one"):
+        testrunner.load_records(PROJECT_ROOT, empty)
+    with pytest.raises(testrunner.SchemaError, match="cannot load test list"):
+        testrunner.load_records(PROJECT_ROOT, malformed)

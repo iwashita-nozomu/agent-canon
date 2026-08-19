@@ -16,42 +16,61 @@ if command -v readlink >/dev/null 2>&1; then
   script_path="$(readlink -f "$script_path")"
 fi
 canon_root="$(cd "$(dirname "$script_path")/../.." && pwd)"
+if [ -n "${AGENT_CANON_CHILD_HANDOFF:-}" ]; then
+  if [ -z "${AGENT_CANON_SOURCE_ROOT:-}" ]; then
+    echo "agent-canon child handoff is missing its source repository root" >&2
+    exit 2
+  fi
+  canon_root="$(cd "${AGENT_CANON_SOURCE_ROOT}" && pwd -P)"
+elif [ ! -f "${canon_root}/rust/agent-canon/Cargo.toml" ]; then
+  invocation_source="$(git -C "${PWD}" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [ -n "${invocation_source}" ] \
+    && [ -f "${invocation_source}/rust/agent-canon/Cargo.toml" ]; then
+    canon_root="${invocation_source}"
+  fi
+fi
+manifest="${canon_root}/rust/agent-canon/Cargo.toml"
 boundary_script="${canon_root}/tools/agent_tools/parent_root_side_effects.py"
 
-resolve_roots() {
-  # The wrapper's physical source path is the invocation owner.  The public
-  # session bootstrap derives the side-effect parent from physical cwd; no
-  # ambient root/child-handoff variable is a selector.
-  local resolver_root="${canon_root}"
-  local resolution
-  local -a resolution_lines
-  resolution="$(
-    PYTHONPATH="${resolver_root}/tools${PYTHONPATH:+:${PYTHONPATH}}" \
-      python3 - "${resolver_root}" <<'PY'
-from pathlib import Path
-import sys
-
-from agent_tools.agent_canon_source_root import resolve_agent_canon_source_root
-
-resolution = resolve_agent_canon_source_root(
-    Path.cwd(),
-    source_root=Path(sys.argv[1]),
-    canon_root=Path(sys.argv[1]),
-)
-print(resolution.current_repository_root)
-print(resolution.source_root)
-PY
-  )"
-  mapfile -t resolution_lines <<< "${resolution}"
-  if [ "${#resolution_lines[@]}" -ne 2 ] \
-    || [ -z "${resolution_lines[0]}" ] \
-    || [ -z "${resolution_lines[1]}" ]; then
-    echo "agent-canon source-root resolution returned an invalid result" >&2
-    return 2
+git_toplevel() {
+  local root="$1"
+  if ! command -v git >/dev/null 2>&1; then
+    printf "%s\n" ""
+    return 0
   fi
-  parent_root="${resolution_lines[0]}"
-  source_root="${resolution_lines[1]}"
-  boundary_script="${source_root}/tools/agent_tools/parent_root_side_effects.py"
+  git -C "$root" rev-parse --show-toplevel 2>/dev/null || printf "%s\n" ""
+}
+
+resolve_parent_root() {
+  local active_root="${AGENT_CANON_ACTIVE_REPOSITORY_ROOT:-}"
+  local child_handoff="${AGENT_CANON_CHILD_HANDOFF:-}"
+  local invocation_root=""
+  if [ -n "${child_handoff}" ]; then
+    if [ -z "${active_root}" ]; then
+      echo "agent-canon child handoff is missing its active repository root" >&2
+      return 2
+    fi
+    printf "%s\n" "$active_root"
+    return 0
+  fi
+  invocation_root="$(git_toplevel "${PWD}")"
+  if [ -n "${invocation_root}" ]; then
+    if [ -n "${active_root}" ]; then
+      if [ ! -d "${active_root}" ] \
+        || [ "$(cd "${active_root}" && pwd -P)" != "${invocation_root}" ]; then
+        echo "agent-canon active repository root is not authoritative without a child handoff" >&2
+        return 2
+      fi
+    fi
+    printf "%s\n" "${invocation_root}"
+    return 0
+  fi
+  invocation_root="$(git_toplevel "${canon_root}")"
+  if [ -n "${invocation_root}" ]; then
+    printf "%s\n" "${invocation_root}"
+    return 0
+  fi
+  printf "%s\n" "${canon_root}"
 }
 
 run_parent_bound() {
@@ -59,26 +78,29 @@ run_parent_bound() {
   local boundary_args=(
     exec-parent-bound
     --root "${parent_root}"
-    --source-root "${source_root}"
+    --source-root "${canon_root}"
   )
-  if [ -n "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ] \
-    || [ -n "${AGENT_CANON_SIDE_EFFECT_PARENT_ROOT:-}" ]; then
+  if [ -n "${AGENT_CANON_CHILD_HANDOFF:-}" ]; then
+    if [ -z "${AGENT_CANON_HANDOFF_AUDIENCE:-}" ]; then
+      echo "agent-canon child handoff audience is missing" >&2
+      return 2
+    fi
     boundary_args+=(
-      --purpose "agent-canon-inherited-session"
+      --consume-inherited-handoff
+      --purpose "${AGENT_CANON_HANDOFF_AUDIENCE}"
     )
   fi
   python3 "${boundary_script}" "${boundary_args[@]}" -- "${command[@]}"
 }
 
-parent_root=""
-source_root=""
-resolve_roots
-manifest="${source_root}/rust/agent-canon/Cargo.toml"
+parent_root="$(resolve_parent_root)"
 
 if [ "${1:-}" = "pydocstyle-review" ]; then
   shift
-  run_parent_bound python3 \
-    "${source_root}/tools/agent_tools/pydocstyle_review.py" "$@"
+  AGENT_CANON_SOURCE_ROOT="${canon_root}" \
+    AGENT_CANON_ROOT="${canon_root}" \
+    run_parent_bound python3 \
+      "${canon_root}/tools/agent_tools/pydocstyle_review.py" "$@"
   exit $?
 fi
 
@@ -86,43 +108,33 @@ tools_home="${AGENT_CANON_TOOLS_HOME:-${parent_root}/.agent-canon/tools}"
 installed_binary="${tools_home}/agent-canon/bin/agent-canon"
 legacy_binary="/opt/agent-canon/bin/agent-canon"
 
-if [ ! -x "${installed_binary}" ] && [ -x "${legacy_binary}" ]; then
-  installed_binary="${legacy_binary}"
+if [ ! -x "$installed_binary" ] && [ -x "$legacy_binary" ]; then
+  installed_binary="$legacy_binary"
 fi
 
-if [ -x "${installed_binary}" ]; then
+if [ -x "$installed_binary" ]; then
   source_newer=""
-  if [ -d "${source_root}/rust/agent-canon/src" ] && command -v find >/dev/null 2>&1; then
+  if [ -d "${canon_root}/rust/agent-canon/src" ] && command -v find >/dev/null 2>&1; then
     source_newer="$(
-      find "${source_root}/rust/agent-canon" \
+      find "${canon_root}/rust/agent-canon" \
         \( -name '*.rs' -o -name 'Cargo.toml' \) \
-        -newer "${installed_binary}" \
+        -newer "$installed_binary" \
         -print -quit
     )"
   fi
-  if [ -z "${source_newer}" ]; then
-    if run_parent_bound "${installed_binary}" "$@"; then
-      exit 0
-    else
-      exit $?
-    fi
+  if [ -z "$source_newer" ]; then
+    run_parent_bound "$installed_binary" "$@" && exit 0
+    exit $?
   fi
 fi
 
 if command -v cargo >/dev/null 2>&1; then
-  if run_parent_bound cargo run --manifest-path "${manifest}" -- "$@"; then
-    exit 0
-  else
-    exit $?
-  fi
+  run_parent_bound cargo run --manifest-path "$manifest" -- "$@" && exit 0
 fi
 
-if [ -x "${installed_binary}" ]; then
-  if run_parent_bound "${installed_binary}" "$@"; then
-    exit 0
-  else
-    exit $?
-  fi
+if [ -x "$installed_binary" ]; then
+  run_parent_bound "$installed_binary" "$@" && exit 0
+  exit $?
 fi
 
 echo "agent-canon runtime is unavailable" >&2

@@ -55,26 +55,24 @@ if [ ! -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ] \
   && [ -f "${WORKSPACE_ROOT}/vendor/agent-canon/rust/agent-canon/Cargo.toml" ]; then
   AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
 fi
-# Every Python child of this public runner must resolve imports from the
-# selected AgentCanon source root. The boundary owns this environment so
-# standalone callers do not depend on a host-provided PYTHONPATH.
-AGENT_CANON_SOURCE_PYTHONPATH="${AGENT_CANON_SOURCE_ROOT}/tools"
-if [[ -n "${PYTHONPATH:-}" ]]; then
-  AGENT_CANON_SOURCE_PYTHONPATH="${AGENT_CANON_SOURCE_PYTHONPATH}:${PYTHONPATH}"
-fi
-export PYTHONPATH="${AGENT_CANON_SOURCE_PYTHONPATH}"
 cd "${WORKSPACE_ROOT}"
-if [[ -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ]]; then
-  invocation_script="$(realpath -e "${BASH_SOURCE[0]}" 2>/dev/null || true)"
-  if [[ -z "${invocation_script}" || ! -f "${invocation_script}" ]]; then
-    echo "AGENT_CANON_PR=fail reason=invocation_script_missing" >&2
-    exit 2
-  fi
-  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" public-exec \
-    --invocation-script "${invocation_script}" \
+export AGENT_CANON_PARENT_ROOT="${WORKSPACE_ROOT}"
+export AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${WORKSPACE_ROOT}"
+if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "agent-canon-pr-script" ]]; then
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" verify-child \
+    --root "${WORKSPACE_ROOT}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
     --purpose agent-canon-pr-script \
-    -- bash "${invocation_script}"
+    --consume >/dev/null
+else
+  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${WORKSPACE_ROOT}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose agent-canon-pr-script \
+    --issue-handoff \
+    -- bash "${BASH_SOURCE[0]}"
 fi
+unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
 AGENT_CANON_CLI_TARGET_DIR="$(
   python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" resolve \
     --root "${WORKSPACE_ROOT}" \

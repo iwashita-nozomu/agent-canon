@@ -3,128 +3,220 @@
 <!--
 @dependency-start
 contract skill
-responsibility Routes GPU execution through AgentCanon admission and records validation evidence.
-upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md admission and CLI handshake
-upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md NVIDIA evidence boundary
-upstream design experiment-lifecycle.md experiment artifact boundary
+responsibility Routes GPU execution through provider-independent AgentCanon admission by default and the optional managed experiment adapter only when managed lifecycle contracts are required.
+upstream design ../../documents/experiments/gpu-direct-command.md direct admission state machine, exact environment, lifecycle, and route-selection contract
+upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md canonical discovery, occupancy, lock, and admission evidence ownership
+upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md NVIDIA topology and full UUID boundary
+upstream design experiment-lifecycle.md managed experiment artifact boundary
+downstream design ./environment-maintenance.md consumes canonical CDI device and exact environment forwarding
+downstream implementation ../../tools/experiments/run_gpu_command.py provider-independent direct-command CLI
+downstream implementation ../../tools/experiments/run_managed_experiment.py optional managed provider adapter
 downstream implementation ../../.agents/skills/gpu-execution/SKILL.md Codex discovery shim
-upstream environment ../../agent-canon-environment.toml audited ExperimentRunner provider identity and runtime item
+downstream implementation ../../tests/agent_tools/test_gpu_execution_cdi_contract.py CDI documentation regression contract
+upstream environment ../../agent-canon-environment.toml audited managed ExperimentRunner provider identity and runtime item
 @dependency-end
 -->
 
 ## 目的
 
-この skill は GPU/CUDA/JAX/XLA/IREE 実行を AgentCanon の admission、固定 environment、
-外部 managed-run CLI、terminal evidence に接続します。static test や CPU-only smoke を
-実機 GPU validation と取り違えず、GPU が使えない場合は blocker evidence を残します。
+この skill は GPU/CUDA/JAX/XLA/IREE 実行を AgentCanon の厳格な admission、full UUID
+lock、固定 environment、terminal evidence に接続します。通常の pytest、benchmark、診断、
+任意 argv は provider-independent direct route を使います。topic/cases/source snapshot/
+artifact/completion coverage が必要な実験だけ managed route を使います。
 
-## 適用範囲と境界
+static test や CPU-only smoke を実機 GPU validation と取り違えず、GPU が使えない場合は
+blocker evidence を残します。
+
+## 適用範囲と owner 境界
 
 - GPU allocation、CUDA/NVIDIA visibility、MIG、`nvidia-smi`、JAX/XLA allocator、GPU
   smoke/benchmark/diagnosis が対象です。
-- topic の設計と registry、run artifact は `experiment-lifecycle` が所有します。
+- NVIDIA topology、process occupancy、BUSY/UNKNOWN/FREE、full UUID reservation、fresh
+  post-lock observation は `execution_resource_plan.py` が canonical owner です。
+- provider-independent plan/environment/child lifecycle は `gpu_command_admission.py`、CLI は
+  `run_gpu_command.py` が owner です。
+- topic の設計と registry、managed run artifact は `experiment-lifecycle` が所有します。
 - solver と数値 correctness は `computational-optimization`、Docker/driver/CI は
   `environment-maintenance`、Python/C++ review は各 review skill が所有します。
-- AgentCanon は親 `ExperimentRunner`、その local clone、Dockerfile、topic module を
-  import または `PYTHONPATH` fallback で利用しません。generic lifecycle は外部 CLI が
-  owner です。
 - hooks/resource projection の public schema は変更しません。
 
-## Runtime request packet
+## Route selection
 
-GPU 実行前に request clause、command type、runtime budget、resource target、artifact path、
-owner を記録します。GPU allocation がない、または実機が利用できない場合も、実行した
-static/owner checks と未検証の claim を分けて記録します。
+次の条件では direct route が既定です。
 
-## 固定 admission route
-
-managed route は次の一つだけです。
+- pytest、benchmark、diagnostic、smoke、one-off script を一つの argv として実行する。
+- 成否が child exit、stdout、stderr、GPU admission/lifecycle evidence で定義できる。
+- topic registry、cases、source snapshot、provider artifact schema、completion coverage を
+  必要としない。
 
 ```text
-S0 -> candidate -> UUID lock -> fresh S_lock -> validation
-   -> composite fingerprint -> plan freeze -> admitted environment
-   -> CUDA/NVIDIA variables -> experiment-runner-admitted
-   -> terminal evidence -> lock release
+python3 tools/experiments/run_gpu_command.py \
+  --gpu-count 1 \
+  --min-free-memory <bytes> \
+  -- <argv...>
+```
+
+次の contract が一つでも必要な場合だけ managed route を使います。
+
+- experiment topic/variant/run identity と registry command
+- case expansion と resource estimate/capacity wire schema
+- source/config snapshot と provider-owned artifact manifest
+- provider lifecycle result、worker coverage、completion coverage
+
+```text
+python3 -m tools.experiments.run_managed_experiment \
+  --topic <topic> --variant <variant> -- <inner argv...>
+```
+
+managed route だけが `experiment-runner-admitted` の存在、contract identity、request/result
+schema を検証します。direct route は provider、registry、topic、cases、snapshot、artifact、
+completion coverage を参照しません。
+
+## Direct admission contract
+
+```text
+strict nvidia-smi -L
+  -> executable physical/MIG leaves
+  -> S0 BUSY/UNKNOWN/FREE + memory
+  -> full UUID lock
+  -> distinct S_lock
+  -> race/memory validation
+  -> immutable plan
+  -> exact environment
+  -> shell=False child
+  -> descendant quiescence
+  -> one-attempt lock release
 ```
 
 XML topology/process hierarchy が UUID binding authority です。query-compute-apps は XML
-PID の一意 join 後の memory/name supplement だけです。unit state は `BUSY`、`UNKNOWN`、
-`FREE` で、`FREE` だけが eligible です。MIG/physical unknown の closure、proc ancestry
-の starttime/PPid/namespace/cgroup 検証、cycle/depth/race/reuse fail-closed、pstree
-diagnostic-only、probe の no-signal/no-kill を admission evidence に含めます。
+PID の一意 join 後の supplement だけです。`FREE` だけが eligible で、UNKNOWN、MIG parent
+closure、topology drift、visibility drift、memory shortage、lock contention は fail-closed です。
+integer index と UUID prefix は使用しません。
 
-snapshot content hash と freshness event ID を分離します。lock-held observation、
-reservation receipt、lock inode/device、selected UUID から作った composite admission
-fingerprint は `GPUAllocation`、frozen plan、admitted environment、request/result、
-terminal/closeout で同じ値を参照します。
-
-## 固定 CLI と request/result
-
-AgentCanon は shell なしで次を起動します。
-
-```text
-experiment-runner-admitted --request <path> --result <path>
-request field: schema = agentcanon-managed-run/v1
-result field:  schema = agentcanon-managed-run-result/v1
-```
-
-AgentCanon は shell なしで単一 invocation を起動します。別の `--version` ToolCall は
-ありません。request は provider v1 の `task`、`cases`、exact `environment`、`capacity`、
-`resource_estimate`、`selected_gpu_ids`、`fingerprint` を使います。module/callable は task
-へ、argv と snapshot/output/lifecycle references と admission/plan fingerprint は
-`metadata` extension へ写像します。parent process は topic/backend module を import しません。
-receipt は CLI identity/argv/request fingerprint を束縛します。
-
-result は provider v1 の schema、request fingerprint、worker PID 列、lifecycle、quiescence、
-completion coverage、exit/error を検証します。`quiescence.complete`、
-`lifecycle.quiescence_complete`、`direct_children_quiescent`、`completion_coverage_complete`、
-cleanup failure、worker/process-group IDs を hardcode せず実値で検証します。worker と
-descendants が quiescent になり、terminal result と completion coverage が成立するまで
-GPU reservation lock を release しません。CLI 不在、schema 不一致、壊れた result、request
-fingerprint 不一致、quiescence/completion coverage 不明は typed failure です。
-
-provider v1 の `selected_gpu_ids` と `capacity.gpu_devices[].gpu_id` は opaque
-physical/MIG identifier を保持します。AgentCanon は admission で確定した non-empty
-identifier の順序と重複禁止を維持して、そのまま wire へ転送します。provider は transport
-identity と scheduler の内部 numeric key を分離するため、consumer は UUID を整数へ
-再解釈しません。`task.callable=main` は provider の argv adapter 境界で実行されます。
-
-この invocation は merged ExperimentRunner provider `71b3630266151703bdf88b11741b7492eca92fb4`
-の contract identityへ束縛します。provider repository、contract SHA-256、shell-free argvは
-request metadata、receipt、`agent-canon-environment.toml` の audit itemで一致しなければ
-なりません。AgentCanonは親providerをimport/installせず、consumer環境の実在console scriptを
-このidentityに対して監査します。
+plan は argv/cwd、candidate inventory、MIG joins、initial/post-lock event、unit states、selected
+memory、全 reservation ID、全 lock device/inode、admission fingerprint を environment 生成前に
+固定して書き出します。
 
 ## Environment
 
-selected full physical/MIG UUID の visibility は plan freeze 後に
-`build_admitted_environment` が生成します。freeze 前に `CUDA_VISIBLE_DEVICES` または
-`NVIDIA_VISIBLE_DEVICES` を作りません。GPU 実行では必要に応じて次も exact environment
-へ入れます。
+selected full physical/MIG UUID の visibility は plan freeze 後にだけ生成します。
 
 ```text
+CUDA_VISIBLE_DEVICES=<selected full UUID list>
+NVIDIA_VISIBLE_DEVICES=<same list>
+JAX_PLATFORMS=cuda
 XLA_PYTHON_CLIENT_PREALLOCATE=false
 XLA_PYTHON_CLIENT_ALLOCATOR=platform
 XLA_PYTHON_CLIENT_USE_CUDA_HOST_ALLOCATOR=false
 ```
 
-CPU fallback、integer index、UUID prefix、direct launch、固定 local runner clone、
-compatibility route はありません。
+JAX は admitted child 内で初めて import します。`JAX_PLATFORMS=cuda` により GPU backend が
+ない場合の CPU fallback を成功扱いしません。継承した secret 値は plaintext evidence に
+書かず、fingerprint では値を hash して exact environment に束縛します。
+
+## Docker GPU wiring
+
+admitted child が Docker CLI で GPU container を起動する場合、device injection の canonical
+route は CDI です。Docker argv は `--device nvidia.com/gpu=<qualified-device>` を使い、
+legacy runtime hook を canonical route にしません。
+
+- CDI registry が selected full UUID に対応する個別 qualified device を公開する場合は、その
+  device を `--device` に渡します。admission identity は引き続き selected full UUID であり、
+  integer index や UUID prefix へ変換しません。
+- WSL など registry が `nvidia.com/gpu=all` だけを公開する環境では、device injection は
+  `--device nvidia.com/gpu=all` とし、container 内の compute visibility は admission が固定した
+  full UUID の `CUDA_VISIBLE_DEVICES` と `NVIDIA_VISIBLE_DEVICES` で制限します。
+- exact environment は値を書き換えず Docker の `-e NAME` で継承します。次の6変数を同じ
+  child argv で全て渡し、一部だけを alternate route にしません。
+- cgroup 全体を無効化する設定、rootful/rootless の自動判定、legacy hook と CDI を選ぶ新しい
+  runtime detector は追加しません。device injection failure は typed blocker として閉じます。
+- Docker socket URI の重複 slash は path 正規化上の事実であり、同一 socket の二重 mount を
+  単独では証明しません。socket mount evidence と CDI device evidence は別に記録します。
+
+```text
+docker run --rm \
+  --device nvidia.com/gpu=all \
+  -e CUDA_VISIBLE_DEVICES \
+  -e NVIDIA_VISIBLE_DEVICES \
+  -e JAX_PLATFORMS \
+  -e XLA_PYTHON_CLIENT_PREALLOCATE \
+  -e XLA_PYTHON_CLIENT_ALLOCATOR \
+  -e XLA_PYTHON_CLIENT_USE_CUDA_HOST_ALLOCATOR \
+  <canonical-image> <argv...>
+```
+
+JAX は host 側や既存 container state で先に import せず、上記 exact environment を受けた
+新規 container child 内で初めて import します。container 内で `jax.default_backend()` が
+`gpu` でない結果は CPU fallback であり、GPU validation pass ではありません。
+
+## Child lifecycle
+
+direct adapter は argv array、`shell=False`、新しい session で一度だけ child を起動します。
+Linux subreaper と PID/starttime/ancestry/session/process-group/adoption evidence で
+AgentCanon-started descendants の transitive closure を追跡します。既存 runner child は対象外
+です。signal/kill は送りません。
+
+`Popen` 後の内部例外も descendant quiescence が成立するまで保持します。root と全 descendant
+が停止する前に lock を release しません。release は一回だけ試行し、ambiguous close を再試行
+で上書きしません。
+
+## Managed route
+
+managed route は従来どおり shell なしで次を一度だけ起動します。
+
+```text
+experiment-runner-admitted --request <path> --result <path>
+request schema: agentcanon-managed-run/v1
+result schema:  agentcanon-managed-run-result/v1
+```
+
+request/result fingerprint、worker/process group、quiescence、completion coverage、cleanup、
+terminal evidence が成立するまで reservation を保持します。provider repository/contract
+identity は `agent-canon-environment.toml` と一致させます。direct route の導入は managed wire
+schema、provider identity、既存 completion coverage を変更しません。
 
 ## Validation と blocker
 
-owner tests は既存7 behavior と、provider wire schema、request/result mismatch、single
-invocation、実値 quiescence/completion coverage、lock release order、import/PYTHONPATH
-absence を実行します。fake CLI は provider approved schema と同じ field を返し、旧 consumer
-専用 schema では通しません。
+provider-independent owner tests:
 
-実機 GPU が必要な claim は `nvidia-smi` と allocation/backend evidence で検証します。
-GPU が利用不可なら `gpu_validation_blocker=<reason>`、実行できなかった claim、stderr または
-diagnostic を closeout へ記録します。static pass、owner test pass、CPU-only smoke は
-実機 GPU pass ではありません。
+```text
+python3 -m pytest tests/tools/test_run_gpu_command.py -q
+```
+
+実機 JAX smoke:
+
+```text
+python3 tools/experiments/run_gpu_command.py \
+  --gpu-count 1 --min-free-memory 2147483648 -- \
+  python3 -c 'import jax; assert jax.default_backend() == "gpu"; print(jax.devices())'
+```
+
+Docker CDI 実機 smoke:
+
+```text
+python3 tools/experiments/run_gpu_command.py \
+  --gpu-count 1 --min-free-memory 2147483648 -- \
+  docker run --rm \
+    --device nvidia.com/gpu=all \
+    -e CUDA_VISIBLE_DEVICES \
+    -e NVIDIA_VISIBLE_DEVICES \
+    -e JAX_PLATFORMS \
+    -e XLA_PYTHON_CLIENT_PREALLOCATE \
+    -e XLA_PYTHON_CLIENT_ALLOCATOR \
+    -e XLA_PYTHON_CLIENT_USE_CUDA_HOST_ALLOCATOR \
+    <canonical-image> \
+    python3 -c 'import jax; assert jax.default_backend() == "gpu"; print(jax.devices())'
+```
+
+GPU-heavy test/benchmark も同じ direct adapter の `--` 後へ argv として渡します。managed
+regression は既存 `tests/tools/test_run_managed_experiment.py` で確認します。
+
+GPU または CDI registry が利用不可なら `gpu_validation_blocker=<reason>`、未実行 claim、
+`nvidia-smi`/CDI diagnostic/stderr を closeout に記録します。fake test、static pass、CPU-only
+smoke は実機 GPU pass ではありません。
 
 ## Closeout
 
-closeout は managed route、plan/admission fingerprint、exact environment、source snapshot、
-CLI receipt、request/result/lifecycle、terminal evidence、lock release evidence、targeted
-test/docs/static の結果、`gpu_validation_blocker` を参照します。
+closeout は選択した route、candidate/selected full UUID、plan/admission/environment fingerprint、
+CDI qualified device、start/end、raw exit、stdout/stderr hash、descendant quiescence、release
+evidence、targeted tests、managed regression、`gpu_validation_blocker` を参照します。

@@ -10,34 +10,45 @@
 from __future__ import annotations
 
 import argparse
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 UTC = timezone.utc
 from pathlib import Path
-from typing import Any
 
 if __package__:
-    from . import parent_root_side_effects as _parent_boundary
-    from .agent_canon_source_root import resolve_agent_canon_source_root
     from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        resolve_parent_writer_attestation,
+        attest_parent_root,
     )
+    from .agent_canon_source_root import resolve_agent_canon_source_root
 else:
-    import parent_root_side_effects as _parent_boundary  # type: ignore[no-redef]
-    from agent_canon_source_root import resolve_agent_canon_source_root
     from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        resolve_parent_writer_attestation,
+        attest_parent_root,
     )
+    from agent_canon_source_root import resolve_agent_canon_source_root
 
 
 def _write_parent(path: Path, data: bytes, purpose: str) -> None:
-    attestation = resolve_parent_writer_attestation(purpose=purpose)
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            f"{purpose}: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
     ParentRootSideEffectBoundary().write_parent_owned_file(
         attestation, path, data, purpose
     )
@@ -783,7 +794,20 @@ def publish_prepared_run(
     post_move: Callable[[], None] | None = None,
 ) -> tuple[str, ...]:
     """Stage one prepared byte map, move it once, publish sidecars, and rollback."""
-    attestation = resolve_parent_writer_attestation(purpose="bootstrap-publish")
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "bootstrap-publish: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(
+            cwd=parent,
+            explicit_root=parent,
+            purpose="bootstrap-publish",
+        )
+    )
     boundary = ParentRootSideEffectBoundary()
     report_root = report_root.resolve()
     final_run = spec.report_dir.resolve()
@@ -935,44 +959,6 @@ def main() -> int:
     except RuntimeError as exc:
         print(str(exc), flush=True)
         return 2
-    public_scope = _parent_boundary.public_session(
-        invocation_script=Path(__file__),
-        purpose="bootstrap-agent-run",
-    )
-    try:
-        public_scope.__enter__()
-    except ParentRootSideEffectError as exc:
-        print(str(exc), flush=True)
-        return 1
-    try:
-        return _main_authenticated(
-            args,
-            source_resolution,
-            source_root,
-            config,
-            catalog,
-            explicit_active_design_packet,
-        )
-    except BaseException:
-        # ParentRootSideEffectError is an immutable value object; passing the
-        # traceback back through contextlib would make Python assign
-        # ``__traceback__`` to the frozen exception.  Cleanup is identical
-        # for this bootstrap boundary and does not suppress the exception.
-        public_scope.__exit__(None, None, None)
-        raise
-    else:
-        public_scope.__exit__(None, None, None)
-
-
-def _main_authenticated(
-    args: argparse.Namespace,
-    source_resolution: Any,
-    source_root: Path,
-    config: Any,
-    catalog: Any,
-    explicit_active_design_packet: Any,
-) -> int:
-    """Run bootstrap after the public side-effect session is established."""
     workspace_root = Path(args.workspace_root).resolve()
     try:
         repository_roots = resolve_repository_roots(

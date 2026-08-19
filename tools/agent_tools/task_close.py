@@ -30,21 +30,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import capacity_handshake
 from parent_root_side_effects import (
+    ParentRootAttestationRequest,
     ParentRootReject,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
-    resolve_parent_writer_attestation,
+    attest_parent_root,
 )
 
 
 def _parent_validate(path: Path, purpose: str) -> None:
-    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if not configured:
         raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
-    attestation = resolve_parent_writer_attestation(purpose=purpose)
-    boundary = ParentRootSideEffectBoundary()
-    receipt = boundary.resolve_parent_owned_path(attestation, path, purpose, create=False)
-    boundary.release_parent_owned_path(receipt)
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
+    ParentRootSideEffectBoundary().resolve_parent_owned_path(attestation, path, purpose, create=False)
 
 if __package__:
     from .tool_calls import (
@@ -84,9 +84,9 @@ from update_lifecycle_contract import (
     validate_durable_handback,
     validate_gate_chain,
 )
+from autonomous_convergence import validate_closeout_projection
 
 STATIC_ANALYSIS_COMPLETE_STATUSES = {"yes", "profile_selected"}
-MECHANICAL_STATIC_ANALYSIS_READY_STATUSES = {"pass", "targeted", "not_applicable"}
 DOCUMENT_STRUCTURE_MISSING_VALUES = {"", "missing", "none", "not_applicable"}
 DOCUMENT_SPLIT_DECISION_PREFIXES = (
     "keep:",
@@ -500,7 +500,7 @@ def current_diff_ref(workspace: Path) -> str:
     diff_bytes = unstaged.stdout + staged.stdout
     if untracked.returncode == 0 and untracked.stdout:
         for raw_path in sorted(path for path in untracked.stdout.split(b"\0") if path):
-            if raw_path.startswith((b"reports/agents/", b".agent-canon/")):
+            if raw_path.startswith(b"reports/agents/"):
                 continue
             path = workspace / raw_path.decode("utf-8", errors="surrogateescape")
             diff_bytes += b"\0UNTRACKED\0" + raw_path + b"\0"
@@ -1370,8 +1370,8 @@ def main() -> int:
 
     verification = parse_kv_lines(verification_path)
     closeout = parse_markdown_status_section(closeout_path, "Gate Status")
-    mechanical_loop = parse_markdown_status_section(
-        closeout_path, "Mechanical Completion Loop Evidence"
+    review_convergence = parse_markdown_status_section(
+        closeout_path, "Review Convergence Evidence"
     )
     tool_warning_evidence = parse_markdown_status_section(
         closeout_path, "Tool Warning Evidence"
@@ -1443,6 +1443,7 @@ def main() -> int:
     )
     report_artifact_blockers = report_artifact_placement_blockers(workspace, report_dir)
     completion_decision = completion_coverage_consumer(report_dir)
+    convergence_decision = validate_closeout_projection(review_convergence)
     update_lifecycle_decision = update_lifecycle_closeout_consumer(report_dir)
     wave_reconciliation = wave_reconciliation_blockers(
         schedule_text,
@@ -1546,7 +1547,7 @@ def main() -> int:
         )
         == "pass",
         "review_findings_integrated": closeout.get("review_findings_integrated") == "yes",
-        "post_fix_full_review_complete": closeout.get("post_fix_full_review_complete")
+        "focused_recheck_complete": closeout.get("focused_recheck_complete")
         in {"yes", "not_applicable"},
         "tool_warnings_resolved": closeout.get("tool_warnings_resolved") == "yes",
         "tool_warning_monitoring_status": tool_warning_evidence.get(
@@ -1563,49 +1564,12 @@ def main() -> int:
         "document_structure_paths_recorded": document_structure_paths_ready,
         "document_split_decision_evidence": document_split_decision_route_ready,
         "document_structure_evidence": document_structure_route_ready,
-        "mechanical_completion_loop_complete": closeout.get(
-            "mechanical_completion_loop_complete"
+        "review_convergence_complete": closeout.get(
+            "review_convergence_complete"
         )
         == "yes",
+        "review_convergence_evidence": convergence_decision.ready,
         "subagents_closed": closeout.get("subagents_closed") == "yes",
-        "mechanical_loop_iterations": mechanical_loop.get("mechanical_loop_iterations", "")
-        not in {"", "0", "none"},
-        "mechanical_loop_open_items": mechanical_loop.get("mechanical_loop_open_items")
-        == "none",
-        "mechanical_loop_stop_reason": mechanical_loop.get("mechanical_loop_stop_reason", "")
-        != "",
-        "mechanical_loop_planned_work_status": mechanical_loop.get(
-            "mechanical_loop_planned_work_status"
-        )
-        == "complete",
-        "mechanical_loop_review_findings_status": mechanical_loop.get(
-            "mechanical_loop_review_findings_status"
-        )
-        in {"none", "resolved"},
-        "mechanical_loop_validation_status": mechanical_loop.get(
-            "mechanical_loop_validation_status"
-        )
-        == "pass",
-        "mechanical_loop_dependency_review_status": mechanical_loop.get(
-            "mechanical_loop_dependency_review_status"
-        )
-        == "pass",
-        "mechanical_loop_static_analysis_status": mechanical_loop.get(
-            "mechanical_loop_static_analysis_status"
-        )
-        in MECHANICAL_STATIC_ANALYSIS_READY_STATUSES,
-        "mechanical_loop_commit_push_status": mechanical_loop.get(
-            "mechanical_loop_commit_push_status"
-        )
-        == "complete",
-        "mechanical_loop_canon_sync_status": mechanical_loop.get(
-            "mechanical_loop_canon_sync_status"
-        )
-        in {"complete", "not_applicable"},
-        "mechanical_loop_follow_up_status": mechanical_loop.get(
-            "mechanical_loop_follow_up_status"
-        )
-        in {"none", "resolved"},
         "fresh_subagents_required": subagent_lifecycle.get("fresh_subagents_required")
         in {"conditional", "yes", "no", "not_applicable"},
         "reuse_for_new_task": subagent_lifecycle.get("reuse_for_new_task")
@@ -1773,7 +1737,7 @@ def main() -> int:
     )
     print(
         "MAKE_CI_STATUS="
-        f"{mechanical_loop.get('mechanical_loop_static_analysis_status', '')}"
+        f"{review_convergence.get('review_convergence_static_analysis_status', '')}"
     )
     print(
         "AGENT_CANON_LATEST_COMPLETE="
@@ -1801,8 +1765,8 @@ def main() -> int:
     )
     print(f"REVIEW_FINDINGS_INTEGRATED={closeout.get('review_findings_integrated', '')}")
     print(
-        "POST_FIX_FULL_REVIEW_COMPLETE="
-        f"{closeout.get('post_fix_full_review_complete', '')}"
+        "FOCUSED_RECHECK_COMPLETE="
+        f"{closeout.get('focused_recheck_complete', '')}"
     )
     print(f"TOOL_WARNINGS_RESOLVED={closeout.get('tool_warnings_resolved', '')}")
     print(
@@ -1850,23 +1814,16 @@ def main() -> int:
         f"{'yes' if document_structure_route_ready else 'no'}"
     )
     print(
-        "MECHANICAL_COMPLETION_LOOP_COMPLETE="
-        f"{closeout.get('mechanical_completion_loop_complete', '')}"
-    )
-    print(f"SUBAGENTS_CLOSED={closeout.get('subagents_closed', '')}")
-    print(f"MECHANICAL_LOOP_ITERATIONS={mechanical_loop.get('mechanical_loop_iterations', '')}")
-    print(f"MECHANICAL_LOOP_OPEN_ITEMS={mechanical_loop.get('mechanical_loop_open_items', '')}")
-    print(
-        "MECHANICAL_LOOP_VALIDATION_STATUS="
-        f"{mechanical_loop.get('mechanical_loop_validation_status', '')}"
+        "REVIEW_CONVERGENCE_COMPLETE="
+        f"{closeout.get('review_convergence_complete', '')}"
     )
     print(
-        "MECHANICAL_LOOP_DEPENDENCY_REVIEW_STATUS="
-        f"{mechanical_loop.get('mechanical_loop_dependency_review_status', '')}"
+        "REVIEW_CONVERGENCE_READY="
+        f"{'yes' if convergence_decision.ready else 'no'}"
     )
     print(
-        "MECHANICAL_LOOP_STATIC_ANALYSIS_STATUS="
-        f"{mechanical_loop.get('mechanical_loop_static_analysis_status', '')}"
+        "REVIEW_CONVERGENCE_BLOCKERS="
+        f"{join_blockers(list(convergence_decision.reasons))}"
     )
     print(
         "SUBAGENT_FRESH_REQUIRED="

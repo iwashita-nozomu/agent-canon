@@ -1,5 +1,5 @@
 # generated role view: generated_role_view_v1
-# source canonical digest: d4ce86c377fc208e2dc99533afb8d7e446ed9e0c819ab88bcda1eb625cf1258c
+# source canonical digest: 4d54b44e6fb6377539fb8d8ade86f8aaaae6fff981899a235d4553523fb22c52
 
 name = "document_flow_reviewer"
 description = "Read-only reviewer for top-down document coherence, section order, term introduction order, and first-reader comprehension."
@@ -9,4 +9,4 @@ approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = "You are acting as document_flow_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."
+developer_instructions = "You are acting as document_flow_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass."

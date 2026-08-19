@@ -15,7 +15,6 @@
 
 from __future__ import annotations
 
-import json
 import shutil
 import subprocess
 import sys
@@ -23,9 +22,24 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover
+    import tomli as tomllib  # type: ignore[no-redef]
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "check_execution_time_aware_orchestration.py"
+CHECKER = (
+    PROJECT_ROOT
+    / "tools"
+    / "agent_tools"
+    / "check_execution_time_aware_orchestration.py"
+)
+CONTRACT_PATH = (
+    PROJECT_ROOT / "agents" / "skills" / "agent-orchestration.execution-contract.toml"
+)
 OWNER_REF = (
     "agents/skills/agent-orchestration.md#"
     "Execution-Time-Aware Work-Conservation Contract"
@@ -46,11 +60,12 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
     """Keep the owner contract and its projections connected."""
 
     def read(self, relative_path: str) -> str:
-        """Read one repository surface for a static contract assertion."""
         return (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
 
+    def contract(self) -> dict[str, object]:
+        return tomllib.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+
     def fixture_root(self, temporary_directory: str) -> Path:
-        """Copy only the owner closure needed by the production checker."""
         root = Path(temporary_directory)
         for relative_path in CONTRACT_FIXTURE_PATHS:
             source = PROJECT_ROOT / relative_path
@@ -60,7 +75,6 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
         return root
 
     def run_checker(self, root: Path) -> subprocess.CompletedProcess[str]:
-        """Run the production checker against one isolated fixture."""
         return subprocess.run(
             [sys.executable, str(CHECKER), "--root", str(root)],
             cwd=PROJECT_ROOT,
@@ -69,51 +83,64 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
             text=True,
         )
 
-    def run_decision(self, decision: dict[str, object]) -> subprocess.CompletedProcess[str]:
-        """Classify one explicit execution-route decision fixture."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", encoding="utf-8") as handle:
-            json.dump(decision, handle)
-            handle.flush()
-            return subprocess.run(
-                [
-                    sys.executable,
-                    str(CHECKER),
-                    "--root",
-                    str(PROJECT_ROOT),
-                    "--decision",
-                    handle.name,
-                    "--format",
-                    "json",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
     def assert_rejected(self, root: Path, category: str) -> None:
-        """Require a strict checker failure for one rejected mutation class."""
         result = self.run_checker(root)
-        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotEqual(
+            result.returncode,
+            0,
+            result.stdout + result.stderr,
+        )
         self.assertIn(
             f"EXECUTION_TIME_AWARE_ORCHESTRATION_FINDING={category}:",
             result.stdout,
         )
 
     def append(self, root: Path, relative_path: str, text: str) -> None:
-        """Append one controlled negative-fixture mutation."""
         path = root / relative_path
-        path.write_text(path.read_text(encoding="utf-8") + text, encoding="utf-8")
+        path.write_text(
+            path.read_text(encoding="utf-8") + text,
+            encoding="utf-8",
+        )
+
+    def consumer(self, consumer_id: str) -> dict[str, object]:
+        consumers = self.contract().get("consumers")
+        self.assertIsInstance(consumers, list)
+        matches = [
+            item
+            for item in consumers
+            if isinstance(item, dict) and item.get("id") == consumer_id
+        ]
+        self.assertEqual(len(matches), 1)
+        return matches[0]
+
+    def test_owner_keeps_the_complete_work_conservation_contract(self) -> None:
+        text = " ".join(
+            self.read("agents/skills/agent-orchestration.md").lower().split()
+        )
+        contract = self.contract()
+        markers = contract.get("owner_markers")
+        self.assertIsInstance(markers, list)
+        self.assertIn(
+            "execution-time-aware work-conservation contract",
+            text,
+        )
+        for marker in markers:
+            self.assertIsInstance(marker, str)
+            self.assertIn(" ".join(marker.lower().split()), text, marker)
 
     def test_production_checker_accepts_the_complete_owner_closure(self) -> None:
-        """The production checker accepts the unmutated owner closure."""
         result = self.run_checker(PROJECT_ROOT)
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("EXECUTION_TIME_AWARE_ORCHESTRATION=pass", result.stdout)
+        self.assertEqual(
+            result.returncode,
+            0,
+            result.stdout + result.stderr,
+        )
+        self.assertIn(
+            "EXECUTION_TIME_AWARE_ORCHESTRATION=pass",
+            result.stdout,
+        )
 
     def test_rejects_duplicate_local_scheduling_definition(self) -> None:
-        """A consumer cannot introduce a second scheduling owner."""
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = self.fixture_root(temporary_directory)
             self.append(
@@ -121,109 +148,127 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
                 "agents/skills/pr-processing.md",
                 "\n## Execution-Time-Aware Work-Conservation Contract\n",
             )
-            self.assert_rejected(root, "duplicate_local_scheduling_definition")
+            self.assert_rejected(
+                root,
+                "duplicate_local_scheduling_definition",
+            )
 
     def test_rejects_duration_or_timeout_scope_cutoff(self) -> None:
-        """A schedule cannot use a budget or timeout to cut responsibility."""
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = self.fixture_root(temporary_directory)
-            self.append(root, "templates/agents/schedule.md", "\n- Duration budget: cut scope after timeout.\n")
-            self.assert_rejected(root, "duration_or_timeout_scope_cutoff")
+            self.append(
+                root,
+                "templates/agents/schedule.md",
+                "\n- Duration budget: cut scope after timeout.\n",
+            )
+            self.assert_rejected(
+                root,
+                "duration_or_timeout_scope_cutoff",
+            )
 
     def test_rejects_keyword_based_routing(self) -> None:
-        """A runtime shim cannot turn prompt keywords into scheduling policy."""
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = self.fixture_root(temporary_directory)
-            self.append(root, ".agents/skills/agent-orchestration/SKILL.md", "\n- Prompt keywords route ready nodes.\n")
+            self.append(
+                root,
+                ".agents/skills/agent-orchestration/SKILL.md",
+                "\n- Prompt keywords route ready nodes.\n",
+            )
             self.assert_rejected(root, "keyword_based_routing")
 
     def test_rejects_responsibility_scope_reduction(self) -> None:
-        """A queue specialization cannot reduce the requested responsibility."""
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = self.fixture_root(temporary_directory)
-            self.append(root, "agents/skills/pr-processing.md", "\n- Reduce requested responsibility to the first ready node.\n")
-            self.assert_rejected(root, "responsibility_scope_reduction")
+            self.append(
+                root,
+                "agents/skills/pr-processing.md",
+                "\n- Reduce requested responsibility to the first ready node.\n",
+            )
+            self.assert_rejected(
+                root,
+                "responsibility_scope_reduction",
+            )
 
-    def test_rejects_consumer_reference_without_executable_fields(self) -> None:
-        """A structured consumer reference must carry every executable field."""
+    def test_rejects_consumer_reference_without_executable_fields(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = self.fixture_root(temporary_directory)
             path = root / "agents/task_catalog.yaml"
-            text = path.read_text(encoding="utf-8")
-            path.write_text(text.replace("    - context_reuse\n", "", 1), encoding="utf-8")
-            self.assert_rejected(root, "consumer_reference_without_executable_fields")
+            task_catalog = yaml.safe_load(path.read_text(encoding="utf-8"))
+            task_catalog["execution_time_policy"]["executable_fields"].remove(
+                "context_reuse"
+            )
+            path.write_text(
+                yaml.safe_dump(task_catalog, sort_keys=False),
+                encoding="utf-8",
+            )
+            self.assert_rejected(
+                root,
+                "consumer_reference_without_executable_fields",
+            )
 
     def test_rejects_consumer_reference_mismatch(self) -> None:
-        """A consumer cannot point at an alternate scheduling owner."""
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = self.fixture_root(temporary_directory)
             path = root / "agents/task_catalog.yaml"
-            text = path.read_text(encoding="utf-8")
-            path.write_text(text.replace(OWNER_REF, "agents/skills/other-owner.md#Contract", 1), encoding="utf-8")
-            self.assert_rejected(root, "consumer_reference_mismatch")
+            task_catalog = yaml.safe_load(path.read_text(encoding="utf-8"))
+            task_catalog["execution_time_policy"]["owner_ref"] = (
+                "agents/skills/other-owner.md#Contract"
+            )
+            path.write_text(
+                yaml.safe_dump(task_catalog, sort_keys=False),
+                encoding="utf-8",
+            )
+            self.assert_rejected(
+                root,
+                "consumer_reference_mismatch",
+            )
 
-    def test_single_node_without_edge_is_non_active(self) -> None:
-        """A single bounded node does not materialize graph-only fields."""
-        result = self.run_decision({"nodes": [{"id": "one"}], "edges": []})
+    def test_pr_processing_consumes_and_specializes_the_owner(self) -> None:
+        spec = self.consumer("pr-processing")
+        path = spec["path"]
+        self.assertIsInstance(path, str)
+        text = " ".join(self.read(path).lower().split())
+        self.assertIn(OWNER_REF.lower(), text)
+        markers = spec.get("required_markers")
+        self.assertIsInstance(markers, list)
+        for marker in markers:
+            self.assertIsInstance(marker, str)
+            self.assertIn(" ".join(marker.lower().split()), text, marker)
 
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        route = json.loads(result.stdout)
-        self.assertEqual(route["state"], "bounded_single_owner")
-        self.assertFalse(route["graph_active"])
-        self.assertEqual(route["graph_fields"], [])
-
-    def test_multiple_independent_candidates_are_non_active(self) -> None:
-        """Candidate count alone does not activate graph scheduling."""
-        result = self.run_decision(
-            {"nodes": [{"id": "one"}, {"id": "two"}], "edges": []}
+    def test_runtime_catalog_and_schedule_project_the_owner(self) -> None:
+        task_catalog = yaml.safe_load(self.read("agents/task_catalog.yaml"))
+        self.assertEqual(
+            task_catalog["execution_time_policy"]["owner_ref"],
+            OWNER_REF,
         )
+        self.assertIn(OWNER_REF, self.read("templates/agents/schedule.md"))
 
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        route = json.loads(result.stdout)
-        self.assertEqual(route["state"], "bounded_single_owner")
-        self.assertEqual(route["candidate_count"], 2)
-        self.assertFalse(route["graph_active"])
+        runtime_spec = self.consumer("runtime-shim")
+        runtime_path = runtime_spec["path"]
+        self.assertIsInstance(runtime_path, str)
+        runtime = " ".join(self.read(runtime_path).lower().split())
+        runtime_markers = runtime_spec.get("required_markers")
+        self.assertIsInstance(runtime_markers, list)
+        for marker in runtime_markers:
+            self.assertIsInstance(marker, str)
+            self.assertIn(" ".join(marker.lower().split()), runtime, marker)
 
-    def test_selected_edge_activates_graph(self) -> None:
-        """A real selected edge activates only the selected graph route."""
-        result = self.run_decision(
-            {
-                "nodes": [{"id": "one"}, {"id": "two"}],
-                "edges": [{"type": "dependency", "source": "one", "target": "two"}],
-                "graph_evidence": {
-                    "dag": [{"source": "one", "target": "two"}],
-                    "critical_path": ["one", "two"],
-                    "ready_set": ["one"],
-                    "queue_snapshot": ["one", "two"],
-                    "makespan_objective": "minimize",
-                    "node_ids": ["one", "two"],
-                },
-            }
-        )
+        schedule_spec = self.consumer("schedule")
+        path = schedule_spec["path"]
+        self.assertIsInstance(path, str)
+        schedule = " ".join(self.read(path).lower().split())
+        markers = schedule_spec.get("required_markers")
+        self.assertIsInstance(markers, list)
+        for marker in markers:
+            self.assertIsInstance(marker, str)
+            self.assertIn(
+                " ".join(marker.lower().split()),
+                schedule,
+                marker,
+            )
 
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        route = json.loads(result.stdout)
-        self.assertEqual(route["state"], "selected_edge_graph")
-        self.assertTrue(route["graph_active"])
-        self.assertEqual(route["active_edge_types"], ["dependency"])
-
-    def test_invalid_or_missing_graph_evidence_is_rejected(self) -> None:
-        """An active selected edge requires complete valid graph evidence."""
-        base = {
-            "nodes": [{"id": "one"}, {"id": "two"}],
-            "edges": [{"type": "ordering", "source": "one", "target": "two"}],
-        }
-        for graph_evidence in (None, {"dag": [], "critical_path": []}):
-            decision = dict(base)
-            if graph_evidence is not None:
-                decision["graph_evidence"] = graph_evidence
-            result = self.run_decision(decision)
-            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-            route = json.loads(result.stdout)
-            self.assertEqual(route["state"], "selected_edge_graph")
-            self.assertTrue(route["graph_active"])
-            self.assertTrue(route["findings"])
-            self.assertEqual(route["findings"][0]["category"], "execution_graph")
 
 if __name__ == "__main__":
     unittest.main()

@@ -46,14 +46,20 @@ from skill_tool_commands import SkillCommandPacket, packet_for_skill
 try:
     from .parent_root_side_effects import (
         ParentRootAttestationReceipt,
+        ParentRootAttestationRequest,
+        ParentRootReject,
         ParentRootSideEffectBoundary,
-        resolve_parent_writer_attestation,
+        ParentRootSideEffectError,
+        attest_parent_root,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
         ParentRootAttestationReceipt,
+        ParentRootAttestationRequest,
+        ParentRootReject,
         ParentRootSideEffectBoundary,
-        resolve_parent_writer_attestation,
+        ParentRootSideEffectError,
+        attest_parent_root,
     )
 
 SCHEMA = "agent_canon.skill_runtime_shim"
@@ -78,10 +84,16 @@ def _parent_boundary(
     root: Path, purpose: str
 ) -> tuple[ParentRootSideEffectBoundary, ParentRootAttestationReceipt]:
     """Return an authenticated capability for every materializer write."""
-    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if not configured:
-        raise MaterializerError("parent_session_missing", purpose)
-    attestation = resolve_parent_writer_attestation(purpose=purpose)
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            f"{purpose}: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
     return ParentRootSideEffectBoundary(), attestation
 
 

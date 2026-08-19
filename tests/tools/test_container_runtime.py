@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from tools.agent_tools.fixture_spawn import record_environment
 from tools.ci import container_runtime as runtime_module
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -183,22 +182,50 @@ def test_repo_program_defaults_without_pack_or_python_rules(tmp_path: Path) -> N
     (repo / "sample.py").write_text("print('fixture')\n", encoding="utf-8")
 
     environment = os.environ.copy()
+    for key in (
+        "TMPDIR",
+        "TEMP",
+        "TMP",
+        "XDG_CACHE_HOME",
+        "PYTHONPYCACHEPREFIX",
+        "AGENT_CANON_TOOLS_HOME",
+        "CARGO_HOME",
+        "CARGO_TARGET_DIR",
+        "AGENT_CANON_CLI_TARGET_DIR",
+        "AGENT_CANON_PARENT_ROOT",
+        "AGENT_CANON_PARENT_ROOT_DEV",
+        "AGENT_CANON_PARENT_ROOT_INO",
+        "AGENT_CANON_CHILD_HANDOFF",
+        "AGENT_CANON_CHILD_PURPOSE",
+        "AGENT_CANON_HANDOFF_AUDIENCE",
+        "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+        "AGENT_CANON_ROOT",
+        "AGENT_CANON_SOURCE_ROOT",
+        "AGENT_CANON_TASK_ID",
+        "AGENT_CANON_REPOSITORY_ID",
+        "AGENT_CANON_TASK_REPOSITORY",
+        "AGENT_CANON_LIFECYCLE_ID",
+        "AGENT_CANON_EXPECTED_IMAGE_TAG",
+        "AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT",
+    ):
+        environment.pop(key, None)
+    environment["AGENT_CANON_PARENT_ROOT"] = str(repo)
+    environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(repo)
 
-    with record_environment(cwd=repo, base_env=environment) as signed_environment:
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(REPO_PROGRAM_SCRIPT),
-                "--print-only",
-                "--skip-env-check",
-                "sample.py",
-            ],
-            cwd=repo,
-            env=signed_environment,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_PROGRAM_SCRIPT),
+            "--print-only",
+            "--skip-env-check",
+            "sample.py",
+        ],
+        cwd=repo,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
     assert result.returncode == 0, result.stderr
     assert "docker/python-execution-rules.toml" not in result.stderr

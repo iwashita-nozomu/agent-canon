@@ -64,18 +64,6 @@ readback と選択された validator が pass する。
 `surface:language.python`、`surface:language.native`。public API、型、algorithm boundary、
 OOP checker の契約変更時だけ本 unit を更新します。
 
-## Scope Patterns
-
-- `pattern:python/**`
-- `pattern:cpp/**`
-- `pattern:rust/**`
-- `pattern:include/**`
-- `pattern:tools/**`
-- `pattern:scripts/**`
-- `pattern:pyproject.toml`
-- `pattern:pyrightconfig.json`
-- `pattern:Makefile`
-
 ## Legacy Migration IDs
 
 PRA-C052 PRA-C053 PRA-C054 PRA-C071 PRA-C072 PRA-C073 PRA-C074 PRA-C075 PRA-C076 PRA-C077 PRA-C078 PRA-X032 PRA-X033 PRA-X040 PRA-X041 PRA-X042 PRA-X043 PRA-X044

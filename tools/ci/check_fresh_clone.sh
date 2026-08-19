@@ -19,17 +19,21 @@ ROOT_DIR="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$ROOT_DIR")"
 FRESH_CLONE_SOURCE_ROOT="$(git -C "${CANON_TOOLS_ROOT}" rev-parse --show-toplevel)"
 AGENT_CANON_BOUNDARY_SCRIPT="${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py"
-if [[ -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ]]; then
-  invocation_script="$(realpath -e "${BASH_SOURCE[0]}" 2>/dev/null || true)"
-  if [[ -z "${invocation_script}" || ! -f "${invocation_script}" ]]; then
-    echo "AGENT_CANON_FRESH_CLONE=fail reason=invocation_script_missing" >&2
-    exit 2
-  fi
-  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" public-exec \
-    --invocation-script "${invocation_script}" \
+if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "fresh-clone-script" ]]; then
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" verify-child \
+    --root "${ROOT_DIR}" \
+    --source-root "${FRESH_CLONE_SOURCE_ROOT}" \
     --purpose fresh-clone-script \
-    -- bash "${invocation_script}" "$@"
+    --consume >/dev/null
+else
+  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${ROOT_DIR}" \
+    --source-root "${FRESH_CLONE_SOURCE_ROOT}" \
+    --purpose fresh-clone-script \
+    --issue-handoff \
+    -- bash "${BASH_SOURCE[0]}" "$@"
 fi
+unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
 
 PARENT_TMP_CANDIDATE="${AGENT_CANON_PARENT_TMP_ROOT:-${ROOT_DIR}/.agent-canon/tmp/fresh-clone}"
 PARENT_TMP_ROOT="$(python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
@@ -57,7 +61,8 @@ parent_capture_subprocess() {
 run_parent_bound_update() {
   local source_root="$1" update_script="$2"
   shift 2
-  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+  AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${ROOT_DIR}" \
+    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
     --root "${ROOT_DIR}" \
     --source-root "${source_root}" \
     --purpose agent-canon-update-script \
@@ -80,7 +85,8 @@ run_update_for_parent_root() {
 run_parent_bound_sync() {
   local source_root="$1" sync_script="$2"
   shift 2
-  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+  AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${ROOT_DIR}" \
+    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
     --root "${ROOT_DIR}" \
     --source-root "${source_root}" \
     --purpose agent-canon-sync-script \
@@ -91,7 +97,8 @@ capture_parent_bound_update() {
   local candidate="$1" source_root="$2" update_script="$3"
   shift 3
   parent_capture_subprocess "${candidate}" \
-    env python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    env AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${ROOT_DIR}" \
+      python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
       --root "${ROOT_DIR}" \
       --source-root "${source_root}" \
       --purpose agent-canon-update-script \

@@ -16,6 +16,7 @@ downstream implementation .devcontainer/post-create.sh standalone AgentCanon ima
 downstream implementation .vscode/settings.json standalone AgentCanon source editor defaults.
 downstream implementation docker/Dockerfile standalone public full-test image.
 downstream implementation test/testrunner.sh source-owned typed test runner.
+downstream implementation test/testrunner.py source-owned schema and execution owner.
 downstream implementation test/testlist.toml route-aware test command contract.
 downstream implementation tests/tools/test_testrunner.py runner receipt regression tests.
 downstream implementation tools/ci/container_config.py container and devcontainer configuration validator.
@@ -54,6 +55,7 @@ Read this file when a task touches any of these surfaces:
 - `documents/contracts/github-first-module-and-devcontainer-policy.md`
 - `documents/design/rust-agent-tool-migration.md`
 - `test/testrunner.sh`
+- `test/testrunner.py`
 - `test/testlist.toml`
 - `docker/Dockerfile`
 
@@ -76,8 +78,7 @@ runner does not mount a workspace, install dependencies at runtime, discover
 host tests, or ask a parent repository to interpret the list. `test/testlist.toml`
 uses `[[tests]]` records with ordered token-array commands and typed
 `environment`, `require`, `code_owner`, and `responsibility_scope` fields.
-`require = "docker"` selects the canonical
-Docker route. A standalone Dev Container caller sets
+`require = "docker"` selects the canonical Docker route. A standalone Dev Container caller sets
 `AGENT_CANON_ACTIVE_ROUTE=devcontainer` and selects only
 `require = "devcontainer"` records. Nonmatching records emit an explicit
 `not_selected` receipt; selected records emit `start` and `pass` or `fail`.
@@ -90,20 +91,18 @@ status or query that is not `fresh` remains an error and never rebuilds the
 graph implicitly. Fixture-local graph-analysis tests may still create and read
 their own graph state; that route is separate from standard image acceptance.
 
-Parent repositories delegate to this source-Git-root command. They do not
-mirror, wrap, or parse AgentCanon test files. Standalone AgentCanon `notes/**`
-also remains source-owned; a parent keeps its regular `notes/README.md` and
-project note content, while only the explicit AgentCanon-targeting descendants
-are retired and never regenerated. The parent `tools/agent-canon` symlink remains
-the public non-test tool namespace.
+Parent repositories delegate by changing to the AgentCanon Git root and invoking
+this public command. They do not mirror, mount, wrap, parse, or enumerate
+AgentCanon test files. The test list and runner remain source-owned, and the
+parent receives only the command exit status and responsibility-aware receipts.
 
 ### Image Git topology and disposable clones
 
-The public image preserves two real Git roots: `/opt/agent-canon-parent` is the
-parent repository and `/opt/agent-canon-parent/vendor/agent-canon` is its
-submodule worktree. The image build normalizes the source worktree to `main`,
-records the nested `160000` gitlink in the parent, and checks both roots' remotes,
-refs, and credentials before the image is published.
+The public image preserves a real AgentCanon Git root under a synthetic parent
+repository so standalone and vendored path-resolution tests observe the same
+source identity. The source worktree is normalized to `main`, and the parent
+records the nested `160000` gitlink. Test command discovery still occurs only
+after the runner changes to the AgentCanon Git root.
 
 Docker's image filesystem is an overlay lower layer. Git's default local clone
 optimization attempts to hardlink source objects into the destination, which
@@ -111,8 +110,7 @@ fails against that lower layer with `hardlink different from source`. Disposable
 clones in the image therefore use `git clone --bare --no-local`; this changes
 only the transport mechanism, not the source commit, refs, gitlink, or `fsck`
 acceptance. The Dockerfile performs the same clone and `fsck --full` probe at
-build time, and `tools/ci/container_config.py` rejects a missing `--no-local`
-boundary.
+build time.
 
 ## Canonical Source Contract
 

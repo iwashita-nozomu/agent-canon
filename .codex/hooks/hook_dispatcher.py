@@ -60,10 +60,10 @@ from hook_safety import (  # noqa: E402
     secret_kind,
 )
 from parent_root_side_effects import (  # noqa: E402
-    ParentRootReject,
+    ParentRootAttestationRequest,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
-    resolve_parent_writer_attestation,
+    attest_parent_root,
 )
 from prompt_classifier import PromptClassifierInputs, freeze  # noqa: E402
 from subagent_selection import select_subagents  # noqa: E402
@@ -79,29 +79,22 @@ WORKFLOW_MONITOR_REPORT_DIR_ENV = "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR"
 ACTIVE_RUN_POINTER = Path("reports") / "agents" / ".active_run"
 REPORT_ROOT_RELATIVE = ACTIVE_RUN_POINTER.parent
 MAX_HOOK_PAYLOAD_BYTES = 256 * 1024
-SIDE_EFFECT_PARENT_ROOT_ENV = "AGENT_CANON_SIDE_EFFECT_PARENT_ROOT"
-SIDE_EFFECT_HANDOFF_ENV = "AGENT_CANON_SIDE_EFFECT_HANDOFF"
-LEGACY_PARENT_ROOT_ENV = "AGENT_CANON_PARENT_ROOT"
-
-
-def _parent_error_code(error: ParentRootSideEffectError) -> str:
-    """Return a stable bounded root error without exposing its detail."""
-    if error.reject is ParentRootReject.HANDOFF_INVALID and error.detail.endswith("session_missing"):
-        return "parent_unattested"
-    return error.reject.value
 
 
 def _parent_bound_report(path: Path, purpose: str) -> Path | None:
     """Return a report path only after parent capability validation."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        return None
     try:
-        attestation = resolve_parent_writer_attestation(purpose=purpose)
-        boundary = ParentRootSideEffectBoundary()
-        receipt = boundary.resolve_parent_owned_path(attestation, path, purpose, create=False)
-        try:
-            return receipt.physical_path
-        finally:
-            boundary.release_parent_owned_path(receipt)
-    except (ParentRootSideEffectError, OSError):
+        parent = Path(configured)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+        )
+        return ParentRootSideEffectBoundary().resolve_parent_owned_path(
+            attestation, path, purpose, create=False
+        ).physical_path
+    except (ParentRootSideEffectError, OSError, RuntimeError, ValueError):
         return None
 
 
@@ -130,7 +123,6 @@ class HookRootState:
     active_root: Path
     standalone: bool
     status: HookRootStatus
-    error_code: str = ""
 
     @property
     def report_projection_enabled(self) -> bool:
@@ -271,77 +263,25 @@ def hook_root() -> HookRootState:
     """Resolve the active workspace root and report-projection capability."""
     override = os.environ.get(DISPATCHER_SOURCE_ROOT_ENV, "").strip()
     if override:
-        state = HookRootState(
+        return HookRootState(
             active_root=Path(override).resolve(),
             standalone=True,
             status=HookRootStatus.OVERRIDE,
         )
-    else:
-        try:
-            resolution = resolve_agent_canon_source_root(Path.cwd())
-            state = HookRootState(
-                active_root=resolution.current_repository_root,
-                standalone=resolution.layout == LAYOUT_STANDALONE,
-                status=HookRootStatus.RESOLVED,
-            )
-        except (OSError, RuntimeError, ValueError):
-            # Spool capture remains fail-open, but unresolved roots cannot project reports.
-            return HookRootState(
-                active_root=SOURCE_ROOT,
-                standalone=False,
-                status=HookRootStatus.FAILED,
-                error_code="root_unresolved",
-            )
-
-    if not state.active_root.is_dir():
-        return HookRootState(
-            active_root=state.active_root,
-            standalone=state.standalone,
-            status=HookRootStatus.FAILED,
-            error_code="root_missing",
-        )
-
-    # A hook may continue to return its safety response without a session, but
-    # report projection and parent-owned spooling require the signed v2 pair.
-    channel = os.environ.get(SIDE_EFFECT_HANDOFF_ENV, "").strip()
-    root = os.environ.get(SIDE_EFFECT_PARENT_ROOT_ENV, "").strip()
-    if bool(channel) != bool(root):
-        return HookRootState(
-            active_root=state.active_root,
-            standalone=state.standalone,
-            status=HookRootStatus.FAILED,
-            error_code="handoff_invalid",
-        )
-    if not channel and not root:
-        if os.environ.get(LEGACY_PARENT_ROOT_ENV, "").strip():
-            code = "handoff_invalid"
-        else:
-            code = "parent_unattested"
-        return HookRootState(
-            active_root=state.active_root,
-            standalone=state.standalone,
-            status=HookRootStatus.FAILED,
-            error_code=code,
-        )
     try:
-        attestation = resolve_parent_writer_attestation(purpose="hook-root")
-        if attestation.session_lease is not None:
-            attestation.session_lease.close()
-    except ParentRootSideEffectError as error:
+        resolution = resolve_agent_canon_source_root(Path.cwd())
         return HookRootState(
-            active_root=state.active_root,
-            standalone=state.standalone,
-            status=HookRootStatus.FAILED,
-            error_code=_parent_error_code(error),
+            active_root=resolution.current_repository_root,
+            standalone=resolution.layout == LAYOUT_STANDALONE,
+            status=HookRootStatus.RESOLVED,
         )
-    except OSError:
+    except Exception:
+        # Spool capture remains fail-open, but unresolved roots cannot project reports.
         return HookRootState(
-            active_root=state.active_root,
-            standalone=state.standalone,
+            active_root=SOURCE_ROOT,
+            standalone=False,
             status=HookRootStatus.FAILED,
-            error_code="spool_unavailable",
         )
-    return state
 
 
 def _active_report_target(

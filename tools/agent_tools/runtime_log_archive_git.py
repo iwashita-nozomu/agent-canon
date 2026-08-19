@@ -23,8 +23,8 @@ import hashlib
 import json
 import os
 import re
-import secrets
 import shutil
+import secrets
 import subprocess
 import sys
 import tempfile
@@ -43,13 +43,6 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from log_repository_identity import source_repository_id_for_write  # noqa: E402
-from parent_root_side_effects import (  # noqa: E402
-    ParentRootAttestationReceipt,
-    ParentRootReject,
-    ParentRootSideEffectBoundary,
-    ParentRootSideEffectError,
-    resolve_parent_writer_attestation,
-)
 from report_artifact_checks import (  # noqa: E402
     MECHANICALLY_REGENERATED_REPORT_FILE_PATTERNS,
     check_final_review_artifact,
@@ -58,7 +51,6 @@ from report_artifact_checks import (  # noqa: E402
 )
 from runtime_log_paths import (  # noqa: E402
     LOG_ARCHIVE_REMOTE,
-    RUNTIME_EVENT_PUBLICATION_OUTCOME_SPOOL_RELATIVE,
     agent_canon_git_commit_key,
     agent_report_archive_dir,
     codex_trace_key,
@@ -68,6 +60,14 @@ from runtime_log_paths import (  # noqa: E402
     repo_log_key,
     runtime_event_publication_outcome_spool_root,
     source_git_head,
+)
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootAttestationReceipt,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
 )
 from task_authority import ACTIVE_RUN_POINTER  # noqa: E402
 
@@ -935,10 +935,17 @@ def default_source_root(canon_root: Path) -> Path:
 
 def _parent_boundary() -> tuple[ParentRootSideEffectBoundary, ParentRootAttestationReceipt] | None:
     """Return the parent capability for a bounded child invocation."""
-    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if not configured:
         return None
-    receipt = resolve_parent_writer_attestation(purpose="runtime-log-archive")
+    parent = Path(configured).resolve(strict=True)
+    receipt = attest_parent_root(
+        ParentRootAttestationRequest(
+            cwd=parent,
+            explicit_root=parent,
+            purpose="runtime-log-archive",
+        )
+    )
     return ParentRootSideEffectBoundary(), receipt
 
 
@@ -948,13 +955,9 @@ def _parent_archive_path(path: Path, purpose: str) -> Path:
     if bound is None:
         return path
     boundary, attestation = bound
-    receipt = boundary.resolve_parent_owned_path(
+    return boundary.resolve_parent_owned_path(
         attestation, path, purpose, create=False
-    )
-    try:
-        return receipt.physical_path
-    finally:
-        boundary.release_parent_owned_path(receipt)
+    ).physical_path
 
 
 def _parent_ensure_directory(path: Path, purpose: str) -> Path:
@@ -2201,7 +2204,11 @@ def _open_secure_publication_parent(
                 "parent_boundary_invalid",
                 "publication requires an attested Git parent root",
             )
-        attestation = resolve_parent_writer_attestation(purpose=purpose)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(
+                cwd=root, explicit_root=root, purpose=purpose
+            )
+        )
         boundary = ParentRootSideEffectBoundary()
     else:
         boundary, attestation = bound
@@ -2551,15 +2558,6 @@ def acquire_publication_attempt_lock(
         raise RuntimeEventMaterializationError(
             "publication_attempt_lock_invalid", "attempt id is invalid"
         )
-    # The publication spool is source-owned.  Resolve the source before
-    # deriving its path so an outer parent handoff cannot become the path
-    # basis for a nested source checkout.
-    try:
-        source_root = source_root.resolve(strict=True)
-    except (OSError, RuntimeError) as exc:
-        raise RuntimeEventMaterializationError(
-            "publication_attempt_lock_invalid", "source root is unavailable"
-        ) from exc
     spool_root = runtime_event_publication_outcome_spool_root(source_root)
     attempt_directory = spool_root / attempt_id
     lock_path = attempt_directory / ".attempt.lock"
@@ -2567,19 +2565,24 @@ def acquire_publication_attempt_lock(
     locked = False
     body_error: BaseException | None = None
     try:
-        relative_spool = spool_root.relative_to(source_root)
-        if relative_spool != RUNTIME_EVENT_PUBLICATION_OUTCOME_SPOOL_RELATIVE:
+        source_root = source_root.resolve(strict=True)
+        configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+        spool_base = Path(configured_parent).resolve(strict=True) if configured_parent else source_root
+        relative_spool = spool_root.relative_to(spool_base)
+        if relative_spool.parts != (
+            ".agent-canon",
+            "runtime-event-spool",
+            "publication-outcome",
+        ):
             raise RuntimeEventMaterializationError(
                 "publication_attempt_lock_invalid",
                 "publication spool root is not canonical",
             )
-        directory = source_root
+        directory = spool_base
         for component in (*relative_spool.parts, attempt_id):
             directory /= component
             try:
-                directory = _parent_ensure_directory(
-                    directory, "publication-outcome-directory"
-                )
+                _parent_ensure_directory(directory, "publication-outcome-directory")
             except FileExistsError:
                 pass
             metadata = directory.lstat()
@@ -5672,13 +5675,14 @@ def write_jsonl_once(path: Path, payload: dict[str, object], key: str) -> bool:
     bound = _parent_boundary()
     if bound is not None:
         boundary, attestation = bound
-        prior = boundary.read_parent_owned_bytes(
-            attestation,
-            path,
-            "runtime-archive-index",
-            allow_missing=True,
+        receipt = boundary.resolve_parent_owned_path(
+            attestation, path, "runtime-archive-index", create=False
         )
-        if prior is None:
+        try:
+            prior = boundary.read_parent_owned_file(receipt)
+        except ParentRootSideEffectError as exc:
+            if exc.reject is not ParentRootReject.ROOT_MISSING:
+                raise
             prior = b""
         for line in prior.decode("utf-8").splitlines():
             if not line.strip():

@@ -58,10 +58,31 @@ from tools.agent_tools.devcontainer_dependencies import (
     select_record_ids,
     validate_runtime_identity,
 )
-from tools.agent_tools.fixture_spawn import record_environment
 
 ROOT = Path(__file__).resolve().parents[2]
 ENGINE = ROOT / "tools" / "agent_tools" / "devcontainer_dependencies.py"
+_PARENT_BOUNDARY_PATH_KEYS = (
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "XDG_CACHE_HOME",
+    "PYTHONPYCACHEPREFIX",
+    "AGENT_CANON_TOOLS_HOME",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "AGENT_CANON_CLI_TARGET_DIR",
+    "AGENT_CANON_PARENT_ROOT",
+    "AGENT_CANON_PARENT_ROOT_DEV",
+    "AGENT_CANON_PARENT_ROOT_INO",
+    "AGENT_CANON_CHILD_HANDOFF",
+    "AGENT_CANON_CHILD_PURPOSE",
+    "AGENT_CANON_HANDOFF_AUDIENCE",
+    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+    "AGENT_CANON_ROOT",
+    "AGENT_CANON_SOURCE_ROOT",
+)
+
+
 def init_authentic_git(root: Path, *, remote: str = "https://example.invalid/fixture.git") -> None:
     """Create the minimal authenticated Git parent used by side-effect fixtures."""
     root.mkdir(parents=True, exist_ok=True)
@@ -477,11 +498,20 @@ class LeanToolchainRetryRunner(FakeRunner):
 
 class DependencyModelTests(unittest.TestCase):
     def setUp(self) -> None:
-        """Enter one ordinary record context for this owning test fixture."""
+        """Keep synthetic repository boundaries independent of the outer test runner."""
         super().setUp()
-        self._record_environment_context = record_environment(cwd=ROOT)
-        self._record_environment = self._record_environment_context.__enter__()
-        self.addCleanup(self._record_environment_context.__exit__, None, None, None)
+        saved = {key: os.environ.get(key) for key in _PARENT_BOUNDARY_PATH_KEYS}
+        for key in _PARENT_BOUNDARY_PATH_KEYS:
+            os.environ.pop(key, None)
+
+        def restore_environment() -> None:
+            for key, value in saved.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+        self.addCleanup(restore_environment)
 
     def test_base_capabilities_include_gnupg_for_repository_bootstrap(self) -> None:
         """A fixed image capability satisfies apt-repository gpg prerequisites."""
@@ -1886,7 +1916,7 @@ class DependencyModelTests(unittest.TestCase):
             receipt = root / "repo.json"
             installer = Installer()
             installer._parent_attestation = dependency_module._parent_attestation(
-                "test-receipt"
+                root, "test-receipt"
             )
             installer._write_receipt(receipt, plan, parsed)
             payload = json.loads(receipt.read_text(encoding="utf-8"))
@@ -2209,7 +2239,7 @@ class DependencyModelTests(unittest.TestCase):
             with mock.patch.object(dependency_module, "NPM_GLOBAL_PREFIX", str(prefix)):
                 installer = Installer()
                 installer._parent_attestation = dependency_module._parent_attestation(
-                    "test-receipt"
+                    root, "test-receipt"
                 )
                 bindings = installer._executable_bindings(parsed, workspace=root)
                 receipt = root / "receipts" / "pyright-language-server.json"
@@ -3082,9 +3112,7 @@ class DependencyModelTests(unittest.TestCase):
             init_authentic_git(root)
             receipt = root / "receipt.json"
             installer = Installer(FakeRunner())
-            installer._parent_attestation = dependency_module._parent_attestation(
-                "receipt-owner"
-            )
+            installer._parent_attestation = dependency_module._parent_attestation(root, "receipt-owner")
             installer._write_receipt(receipt, plan, parsed)
             saved = json.loads(receipt.read_text(encoding="utf-8"))
             self.assertEqual(saved["owner"], "image-installer")
@@ -3530,7 +3558,6 @@ class DependencyModelTests(unittest.TestCase):
             receipts = root / "receipts"
             environment = dict(os.environ)
             environment["CARGO_HOME"] = str(fake_cargo_home)
-            environment["PATH"] = f"{fake_bin}{os.pathsep}{environment['PATH']}"
             with mock.patch.dict(os.environ, environment, clear=True):
                 Installer().install(plan, workspace=root, receipts=receipts)
             self.assertFalse((receipts / "agent-canon-cli.json").exists())
@@ -3602,7 +3629,7 @@ class DependencyModelTests(unittest.TestCase):
                 ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py",
                 tools / "agent_tools",
             )
-            fake_bin = parent / "fake-bin"
+            fake_bin = root / "fake-bin"
             fake_bin.mkdir()
             cargo = fake_bin / "cargo"
             cargo.write_text(
@@ -3626,63 +3653,26 @@ class DependencyModelTests(unittest.TestCase):
             tools_home = parent / ".agent-canon" / "tools-home"
             environment = dict(os.environ)
             environment["PATH"] = f"{fake_bin}{os.pathsep}{environment['PATH']}"
-            cargo_home = parent / ".agent-canon/cache/cargo-home"
-            cargo_target = parent / ".agent-canon/cache/cargo-target"
+            environment["AGENT_CANON_TOOLS_HOME"] = str(tools_home)
+            environment["CARGO_HOME"] = str(parent / ".agent-canon/cache/cargo-home")
+            environment["CARGO_TARGET_DIR"] = str(
+                parent / ".agent-canon/cache/cargo-target"
+            )
+            environment["AGENT_CANON_CLI_TARGET_DIR"] = environment[
+                "CARGO_TARGET_DIR"
+            ]
             host_home = parent / "host-home"
             environment["HOME"] = str(host_home)
             environment["AGENT_CANON_SKIP_USR_LOCAL_LINK"] = "1"
 
-            def run_rebuild(
-                override_tools_home: Path,
-                run_environment: dict[str, str],
-            ) -> subprocess.CompletedProcess[str]:
-                """Run rebuild through public_exec with typed path overrides."""
-                wrapper = (
-                    "import sys\n"
-                    "from pathlib import Path\n"
-                    "sys.path.insert(0, sys.argv[1])\n"
-                    "from parent_root_side_effects import (\n"
-                    "    ParentRootSideEffectError, PublicExecOverrides, public_exec\n"
-                    ")\n"
-                    "script = Path(sys.argv[2])\n"
-                    "def path_or_none(value):\n"
-                    "    return Path(value) if value else None\n"
-                    "overrides = PublicExecOverrides(\n"
-                    "    tools_home=path_or_none(sys.argv[3]),\n"
-                    "    cargo_home=path_or_none(sys.argv[4]),\n"
-                    "    cargo_target_dir=path_or_none(sys.argv[5]),\n"
-                    "    cli_target_dir=path_or_none(sys.argv[6]),\n"
-                    ")\n"
-                    "try:\n"
-                    "    code = public_exec(\n"
-                    "        invocation_script=script, purpose='test-rebuild',\n"
-                    "        argv=('bash', str(script)), explicit_overrides=overrides\n"
-                    "    )\n"
-                    "except ParentRootSideEffectError as exc:\n"
-                    "    print(f'PARENT_ROOT_SIDE_EFFECT_ERROR={exc}', file=sys.stderr)\n"
-                    "    raise SystemExit(2)\n"
-                    "raise SystemExit(code)\n"
-                )
-                return subprocess.run(
-                    [
-                        sys.executable,
-                        "-c",
-                        wrapper,
-                        str(tools / "agent_tools"),
-                        str(tools / "rebuild_agent_tools.sh"),
-                        str(override_tools_home),
-                        str(cargo_home),
-                        str(cargo_target),
-                        str(cargo_target),
-                    ],
-                    cwd=parent,
-                    env=run_environment,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                )
-
-            accepted = run_rebuild(tools_home, environment)
+            accepted = subprocess.run(
+                ["bash", str(tools / "rebuild_agent_tools.sh")],
+                cwd=parent,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
             self.assertEqual(accepted.returncode, 0, accepted.stdout + accepted.stderr)
             self.assertIn(
                 f"AGENT_CANON_TOOL_REBUILD_CARGO_HOME={parent / '.agent-canon/cache/cargo-home'}",
@@ -3696,8 +3686,17 @@ class DependencyModelTests(unittest.TestCase):
             )
             self.assertIn(f"agent_canon_source_commit={source_commit}\n", state)
 
+            outside_environment = dict(environment)
             outside_tools = root / "outside-tools"
-            outside = run_rebuild(outside_tools, environment)
+            outside_environment["AGENT_CANON_TOOLS_HOME"] = str(outside_tools)
+            outside = subprocess.run(
+                ["bash", str(tools / "rebuild_agent_tools.sh")],
+                cwd=parent,
+                env=outside_environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
             self.assertNotEqual(outside.returncode, 0)
             self.assertIn("PARENT_ROOT_SIDE_EFFECT_ERROR", outside.stderr)
             self.assertFalse(outside_tools.exists())
@@ -3707,7 +3706,14 @@ class DependencyModelTests(unittest.TestCase):
             mutation_environment = dict(environment)
             mutation_environment["AGENT_CANON_FORCE_TOOL_REBUILD"] = "1"
             mutation_environment["AGENT_CANON_TEST_MUTATE_SOURCE"] = "1"
-            mutation = run_rebuild(tools_home, mutation_environment)
+            mutation = subprocess.run(
+                ["bash", str(tools / "rebuild_agent_tools.sh")],
+                cwd=parent,
+                env=mutation_environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
             self.assertNotEqual(mutation.returncode, 0)
             self.assertIn("provider identity mismatch", mutation.stderr)
             self.assertEqual(published_binary.read_bytes(), published_binary_before_mutation)
@@ -3723,7 +3729,14 @@ class DependencyModelTests(unittest.TestCase):
             subprocess.run(
                 ["git", "commit", "-m", "provider drift"], cwd=source, check=True
             )
-            rejected = run_rebuild(tools_home, environment)
+            rejected = subprocess.run(
+                ["bash", str(tools / "rebuild_agent_tools.sh")],
+                cwd=parent,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
             self.assertNotEqual(rejected.returncode, 0)
             self.assertIn("provider identity mismatch", rejected.stderr)
 
@@ -3845,13 +3858,7 @@ class DependencyModelTests(unittest.TestCase):
             binary.chmod(0o755)
             runner = FakeRunner()
             with mock.patch.dict(
-                os.environ,
-                {
-                    "HOME": str(root),
-                    "PATH": "/usr/bin",
-                    "CARGO_HOME": str(root / ".agent-canon/cache/cargo-home"),
-                },
-                clear=False,
+                os.environ, {"HOME": str(root), "PATH": "/usr/bin"}, clear=False
             ):
                 Installer(runner).install(
                     plan, workspace=root, receipts=root / "receipts"
@@ -3984,6 +3991,7 @@ class DependencyModelTests(unittest.TestCase):
         dockerfile = (ROOT / ".devcontainer" / "Dockerfile").read_text(
             encoding="utf-8"
         )
+        dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
         post_create = (ROOT / ".devcontainer" / "post-create.sh").read_text(
             encoding="utf-8"
         )
@@ -3998,6 +4006,7 @@ class DependencyModelTests(unittest.TestCase):
             "/opt/agent-canon/tools/agent_tools/parent_root_side_effects.py",
             dockerfile,
         )
+        self.assertIn("!tools/agent_tools/parent_root_side_effects.py", dockerignore)
         self.assertIn("image-install --workspace /opt/agent-canon", dockerfile)
         self.assertIn(
             "CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo", dockerfile

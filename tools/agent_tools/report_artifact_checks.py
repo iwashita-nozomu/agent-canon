@@ -29,17 +29,19 @@ from typing import cast
 
 try:
     from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        resolve_parent_writer_attestation,
+        attest_parent_root,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        resolve_parent_writer_attestation,
+        attest_parent_root,
     )
 
 from artifact_identity import canonical_body_sha256, canonical_json_bytes, git_blob_oid
@@ -170,7 +172,6 @@ COMPLETION_COVERAGE_TAXONOMY_REFS = (
 RUNTIME_PROFILE_TAXONOMY_PATH = (
     Path(__file__).resolve().parents[2]
     / "documents"
-    / "runtime"
     / "runtime-profiles-and-check-matrix.json"
 )
 COMPLETION_SEMANTIC_KINDS = (
@@ -593,16 +594,20 @@ def _validation_stream(
 
 def _write_validation_leaf(path: Path, data: bytes) -> None:
     """Create one deterministic leaf once, or accept exact replay bytes."""
-    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if configured:
-        attestation = resolve_parent_writer_attestation(purpose="validation-artifact")
-        boundary = ParentRootSideEffectBoundary()
-        existing = boundary.read_parent_owned_bytes(
-            attestation,
-            path,
-            "validation-artifact",
-            allow_missing=True,
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="validation-artifact")
         )
+        boundary = ParentRootSideEffectBoundary()
+        receipt = boundary.resolve_parent_owned_path(attestation, path, "validation-artifact", create=False)
+        try:
+            existing = boundary.read_parent_owned_file(receipt)
+        except ParentRootSideEffectError as exc:
+            if exc.reject is not ParentRootReject.ROOT_MISSING:
+                raise
+            existing = None
         if existing is not None:
             if existing != data:
                 raise ValidationMaterializerError("validation_artifact:byte_mismatch")

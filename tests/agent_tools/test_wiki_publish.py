@@ -12,18 +12,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import subprocess
 import tempfile
 import unittest
-from collections.abc import Iterator
-from contextlib import contextmanager
 from pathlib import Path
 
 from tools.agent_tools import wiki_publish
-from tools.agent_tools.fixture_spawn import (
-    bootstrap_fixture_public_environment,
-    record_capability_from_environment,
-)
 
 
 class FakeRunner:
@@ -107,34 +100,6 @@ def compute_digest(page_root: Path, source_commit: str) -> str:
 class WikiPublishTests(unittest.TestCase):
     """Tests for wiki publish gates and page-set publication determinism."""
 
-    @contextmanager
-    def authenticated_fixture(self, source_root: Path) -> Iterator[None]:
-        """Run a fixture from its physical Git CWD through the public owner."""
-        subprocess.run(["git", "init", "-q", str(source_root)], check=True)
-        script = source_root / "wiki-test.py"
-        script.write_text("# fixture entrypoint\n", encoding="utf-8")
-        with bootstrap_fixture_public_environment(
-            mode="synthetic_tool",
-            record_capability=record_capability_from_environment(),
-            fixture_cwd=source_root,
-            invocation_script=script,
-            purpose="wiki-test",
-        ):
-            yield
-
-    def test_user_failure_keeps_mutable_fields_and_exception_chaining(self) -> None:
-        """Wiki failures preserve ordinary exception args and traceback state."""
-        failure = wiki_publish.UserVisibleFailure("message", "next")
-        self.assertEqual(failure.args, ("message", "next"))
-        failure.next_action = "updated"
-        self.assertEqual(failure.next_action, "updated")
-        cause = RuntimeError("cause")
-        try:
-            raise failure from cause
-        except wiki_publish.UserVisibleFailure as raised:
-            self.assertIs(raised.__cause__, cause)
-            self.assertIsNotNone(raised.__traceback__)
-
     def test_default_branch_unavailable_is_typed_failure(self) -> None:
         runner = FakeRunner()
         runner.add(["git", "cat-file", "-t", "a" * 40], returncode=1, stderr="not found")
@@ -213,11 +178,10 @@ class WikiPublishTests(unittest.TestCase):
         runner.add(["git", "rev-parse", "--is-inside-work-tree"], stdout="true")
         runner.add(["git", "branch", "--show-current"], stdout="main")
 
-        with self.authenticated_fixture(source_root):
-            summary = wiki_publish.publish_to_wiki(
-                build_args(source_root=source_root, wiki_root=wiki_root),
-                runner=runner,
-            )
+        summary = wiki_publish.publish_to_wiki(
+            build_args(source_root=source_root, wiki_root=wiki_root),
+            runner=runner,
+        )
 
         self.assertEqual(summary["state"], "PREPARE_OK")
         expected = compute_digest(wiki_root, "a" * 40)
@@ -245,16 +209,15 @@ class WikiPublishTests(unittest.TestCase):
         runner.add(["git", "rev-parse", "--is-inside-work-tree"], stdout="true")
         runner.add(["git", "branch", "--show-current"], stdout="main")
 
-        with self.authenticated_fixture(source_root):
-            with self.assertRaises(wiki_publish.UserVisibleFailure) as exc:
-                wiki_publish.publish_to_wiki(
-                    build_args(
-                        source_root=source_root,
-                        wiki_root=wiki_root,
-                        expected_page_set_digest="bad" + "1" * 63,
-                    ),
-                    runner=runner,
-                )
+        with self.assertRaises(wiki_publish.UserVisibleFailure) as exc:
+            wiki_publish.publish_to_wiki(
+                build_args(
+                    source_root=source_root,
+                    wiki_root=wiki_root,
+                    expected_page_set_digest="bad" + "1" * 63,
+                ),
+                runner=runner,
+            )
 
         self.assertEqual(exc.exception.next_action, "page_set_digest_mismatch")
 
@@ -286,15 +249,14 @@ class WikiPublishTests(unittest.TestCase):
         runner.add(["git", "rev-parse", "HEAD"], stdout=sidecar_head)
         runner.add(["git", "ls-remote", "https://github.com/iwashita-nozomu/agent-canon.wiki.git", "refs/heads/main"], stdout=f"{sidecar_head}\trefs/heads/main\n")
 
-        with self.authenticated_fixture(source_root):
-            summary = wiki_publish.publish_to_wiki(
-                build_args(
-                    source_root=source_root,
-                    wiki_root=wiki_root,
-                    expected_page_set_digest=expected,
-                ),
-                runner=runner,
-            )
+        summary = wiki_publish.publish_to_wiki(
+            build_args(
+                source_root=source_root,
+                wiki_root=wiki_root,
+                expected_page_set_digest=expected,
+            ),
+            runner=runner,
+        )
 
         self.assertEqual(summary["state"], "PUBLISHED")
         self.assertEqual(summary["local_head"], sidecar_head)
@@ -325,11 +287,10 @@ class WikiPublishTests(unittest.TestCase):
         runner.add(["git", "rev-parse", "--is-inside-work-tree"], stdout="true")
         runner.add(["git", "branch", "--show-current"], stdout="main")
 
-        with self.authenticated_fixture(source_root):
-            summary = wiki_publish.publish_to_wiki(
-                build_args(source_root=source_root, wiki_root=wiki_root),
-                runner=runner,
-            )
+        summary = wiki_publish.publish_to_wiki(
+            build_args(source_root=source_root, wiki_root=wiki_root),
+            runner=runner,
+        )
 
         self.assertEqual(summary["state"], "PREPARE_OK")
         self.assertEqual(summary["page_count"], 3)

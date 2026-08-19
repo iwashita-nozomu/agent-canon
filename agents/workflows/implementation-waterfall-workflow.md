@@ -243,7 +243,7 @@ decision が `approve` の場合に approval evidence になります。
 - 文書主体の整理が要る場合は `docs_workflow_steward`
 
 必須ルール:
-- 選択された route が必要とする場合だけ、`documents/`、`notes/`、`references/` と local library の sweep を行います
+- 選択された route が必要とする場合だけ、`documents/`、`documents/notes/`、`references/` と local library の sweep を行います
 - durable artifact route が選択された場合だけ、`user_request_contract.md`、`schedule.md`、`work_log.md` をその route の正本として更新します
 - repo-changing task の subagent は owner-critical operation、coordination/resumption、または selected unresolved risk がある場合だけ activate します
 - active runtime が explicit user request なしの subagent spawn を禁止する場合は、actual spawn の代わりに `SUBAGENT_AUTHORIZATION=required`、role、input packet、expected output、review gate を structured handoff message/tool result に固定します。coordination/resumption が既に durable bundle を選択している場合だけ、その bundle を使います。許可が出るまでその specialist review を完了扱いにしません
@@ -299,7 +299,7 @@ source bucket:
   - まだ決められない項目。silent assumption にせず deferred / escalated にする
 
 ルール:
-- 不明点はすぐユーザーへ戻さず、まず `documents/`、`memory/`、`notes/themes/`、`notes/guardrails/`、`notes/knowledge/`、`notes/failures/`、prior logs、local code / tests から解決を試みます
+- 不明点はすぐユーザーへ戻さず、まず `documents/`、`memory/`、`documents/notes/themes/`、`documents/notes/guardrails/`、`documents/notes/knowledge/`、`documents/notes/failures/`、prior logs、local code / tests から解決を試みます
 - 蓄積情報で user intent、scope、acceptance criteria を変えずに解決できる場合は、evidence path とともに `Resolved From Accumulated Context` へ記録します
 - durable user preference は、今回の request や repo evidence と結び付いたときだけ task requirement に昇格します
 - unknown は requirement として採用せず、resolution sweep 後に open question、deferred clause、または escalation として残します
@@ -788,7 +788,7 @@ exit 条件:
 - `closeout_gate.md` の `all_planned_chunks_complete=yes` と `overall_delivery_complete=yes`
 - `closeout_gate.md` の `completion_coverage_consumer=yes`、`coverage_check.ok=true`、および `completion_boundary.topology_errors=[]`
 - selected review gate の post-fix evidence (full review は touched contract が要求する final candidate の場合だけ)
-- `closeout_gate.md` の `mechanical_completion_loop_complete=yes` と構造化 loop evidence
+- `closeout_gate.md` の `review_convergence_complete=yes` と構造化 loop evidence
 - selected diff-check review がある場合だけ `closeout_gate.md` の `diff_check_agent_complete=yes` と run-local artifact evidence
 - `closeout_gate.md` の `canonical_tree_head_complete=yes`
 - `user_request_contract.md` の `all_clauses_resolved=yes` と `forbidden_drift_detected=no`
@@ -810,7 +810,7 @@ exit 条件:
   revert ではなく、intent-preserving repair / redesign / escalation として
   証跡化されていることが `Review Finding Integration Evidence` に記録されている
 - review-driven fix が入った場合、changed behavior / owner / correctness / validation / publication を変えた accepted finding に限り selected gate の latest diff rerun evidence を記録する。full review rerun は final candidate が要求した場合だけ行う
-- planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙した loop evidence が `Mechanical Completion Loop Evidence` に記録されている
+- planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙した loop evidence が `Review Convergence Evidence` に記録されている
 - selected owning review gate の decision、latest diff ref、findings disposition が記録される。read-only diff-check artifact はその gate が選択した場合だけ要求する
 - canonical design path と implementation path だけが tracked tree に残っていることが `Canonical Tree-Head Evidence` に記録されている
 - user request clause の未解決がない

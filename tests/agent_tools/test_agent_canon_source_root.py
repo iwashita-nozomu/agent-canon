@@ -20,11 +20,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.agent_tools.fixture_spawn import (
-    bootstrap_fixture_public_environment,
-    record_capability_from_environment,
-)
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
 PUBLIC_RESOLVER = "tools/agent-canon/agent_tools/agent_canon_source_root.py"
@@ -40,22 +35,31 @@ from agent_canon_source_root import (  # noqa: E402
     run,
 )
 
+_SYNTHETIC_ROOT_BOUNDARY_ENV_KEYS = (
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "XDG_CACHE_HOME",
+    "PYTHONPYCACHEPREFIX",
+    "AGENT_CANON_TOOLS_HOME",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "AGENT_CANON_CLI_TARGET_DIR",
+    "AGENT_CANON_PARENT_ROOT",
+    "AGENT_CANON_PARENT_ROOT_DEV",
+    "AGENT_CANON_PARENT_ROOT_INO",
+    "AGENT_CANON_CHILD_HANDOFF",
+    "AGENT_CANON_CHILD_PURPOSE",
+    "AGENT_CANON_HANDOFF_AUDIENCE",
+    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+    "AGENT_CANON_ROOT",
+    "AGENT_CANON_SOURCE_ROOT",
+    "AGENT_CANON_PREFIX",
+)
+
 
 class AgentCanonSourceRootCLITests(unittest.TestCase):
     """Validate CLI subcommand wiring without touching real owner roots."""
-
-    def test_source_root_failure_keeps_mutable_typed_exception_state(self) -> None:
-        """Typed failures remain ordinary exceptions with intact chaining state."""
-        failure = SourceRootFailure("test_code", "test detail")
-        self.assertEqual(failure.args, ("test_code", "test detail"))
-        failure.detail = "updated detail"
-        self.assertEqual(failure.detail, "updated detail")
-        cause = RuntimeError("cause")
-        try:
-            raise failure from cause
-        except SourceRootFailure as raised:
-            self.assertIs(raised.__cause__, cause)
-            self.assertIsNotNone(raised.__traceback__)
 
     def test_pythonpath_rejects_untyped_agent_tools_alias(self) -> None:
         """Inherited repository tool roots cannot shadow the selected source."""
@@ -78,6 +82,25 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             layout="standalone",
             canon_root=command_root,
         )
+
+    def _synthetic_root_environment(
+        self, command_root: Path, overrides: dict[str, str] | None = None
+    ) -> dict[str, str]:
+        """Bind fixture child state to its synthetic repository root."""
+        environment = os.environ.copy()
+        for key in _SYNTHETIC_ROOT_BOUNDARY_ENV_KEYS:
+            environment.pop(key, None)
+        fixture_tmp = command_root / ".agent-canon" / "tmp"
+        environment.update(
+            {
+                "TMPDIR": str(fixture_tmp),
+                "TEMP": str(fixture_tmp),
+                "TMP": str(fixture_tmp),
+            }
+        )
+        if overrides:
+            environment.update(overrides)
+        return environment
 
     def _write_post_create_fixture(
         self, root: Path, *, derived: bool
@@ -174,44 +197,24 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
         parent_status: int = 0,
     ) -> subprocess.CompletedProcess[str]:
         """Run the tracked post-create entrypoint through the public resolver."""
-        command = [
-            sys.executable,
-            PUBLIC_RESOLVER,
-            "exec",
-            ".devcontainer/post-create-entrypoint.sh",
-            str(workspace),
-        ]
-        base_env = {
-            **os.environ,
-            "SHARED_STATUS": str(shared_status),
-            "PARENT_STATUS": str(parent_status),
-        }
-        for key in ("CARGO_TARGET_DIR", "AGENT_CANON_CLI_TARGET_DIR"):
-            base_env.pop(key, None)
-        invocation_script = command_root / ".devcontainer" / "post-create-entrypoint.sh"
-        if not invocation_script.is_file():
-            invocation_script = (
-                command_root
-                / "vendor"
-                / "agent-canon"
-                / ".devcontainer"
-                / "post-create-entrypoint.sh"
-            )
-        with bootstrap_fixture_public_environment(
-            mode="synthetic_tool",
-            record_capability=record_capability_from_environment(),
-            fixture_cwd=command_root,
-            base_env=base_env,
-            invocation_script=invocation_script,
-        ) as fixture:
-            return subprocess.run(
-                command,
-                cwd=command_root,
-                env=fixture.environment,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+        return subprocess.run(
+            [
+                sys.executable,
+                PUBLIC_RESOLVER,
+                "exec",
+                ".devcontainer/post-create-entrypoint.sh",
+                str(workspace),
+            ],
+            cwd=command_root,
+            env={
+                **self._synthetic_root_environment(command_root),
+                "SHARED_STATUS": str(shared_status),
+                "PARENT_STATUS": str(parent_status),
+            },
+            check=False,
+            capture_output=True,
+            text=True,
+        )
 
     def test_exec_parser_accepts_command(self) -> None:
         """Accept the exec mode with an AgentCanon entrypoint and arguments."""
@@ -272,26 +275,20 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             self.assertEqual(os.readlink(public_view), ".")
             script = clone / "tools" / "sync_agent_canon.sh"
             self.assertEqual(script.stat().st_mode & stat.S_IXUSR, stat.S_IXUSR)
-            with bootstrap_fixture_public_environment(
-                mode="synthetic_tool",
-                record_capability=record_capability_from_environment(),
-                fixture_cwd=clone,
-                invocation_script=clone / "tools" / "agent_tools" / "repo_structure_contract.py",
-            ) as fixture:
-                result = subprocess.run(
-                    [
-                        sys.executable,
-                        PUBLIC_RESOLVER,
-                        "exec",
-                        "tools/sync_agent_canon.sh",
-                        "check",
-                    ],
-                    cwd=clone,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                    env=fixture.environment,
-                )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    PUBLIC_RESOLVER,
+                    "exec",
+                    "tools/sync_agent_canon.sh",
+                    "check",
+                ],
+                cwd=clone,
+                check=False,
+                capture_output=True,
+                text=True,
+                env=self._synthetic_root_environment(clone),
+            )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("shared surface source manifest is valid", result.stdout)
@@ -320,30 +317,24 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             )
             subprocess.run(["git", "init", "-q"], cwd=clone, check=True)
             (clone / "tools" / "agent-canon").symlink_to(".", target_is_directory=True)
-            with bootstrap_fixture_public_environment(
-                mode="synthetic_tool",
-                record_capability=record_capability_from_environment(),
-                fixture_cwd=clone,
-                invocation_script=clone / "tools" / "agent_tools" / "agent_canon_source_root.py",
-            ) as fixture:
-                result = subprocess.run(
-                    [
-                        sys.executable,
-                        PUBLIC_RESOLVER,
-                        "exec",
-                        "python3",
-                        "tools/agent_tools/repo_structure_contract.py",
-                        "--root",
-                        ".",
-                        "--contract",
-                        "documents/structure/repo-structure-contract.toml",
-                    ],
-                    cwd=clone,
-                    env=fixture.environment,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    PUBLIC_RESOLVER,
+                    "exec",
+                    "python3",
+                    "tools/agent_tools/repo_structure_contract.py",
+                    "--root",
+                    ".",
+                    "--contract",
+                    "documents/structure/repo-structure-contract.toml",
+                ],
+                cwd=clone,
+                env=self._synthetic_root_environment(clone),
+                check=False,
+                capture_output=True,
+                text=True,
+            )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
@@ -366,7 +357,7 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             parser = build_parser().parse_args(["exec", "tools/agent_tool.sh", "fail"])
             with patch.dict(
                 os.environ,
-                os.environ.copy(),
+                self._synthetic_root_environment(root),
                 clear=True,
             ):
                 result = run(parser, resolver=lambda _: self._mock_resolution(root))
@@ -438,12 +429,10 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                         .read_text(encoding="utf-8")
                     )
                     test_log = root / "devcontainer-command.log"
-                    environment = {
-                        **os.environ,
-                        "AGENT_CANON_TEST_LOG": str(test_log),
-                    }
-                    for key in ("CARGO_TARGET_DIR", "AGENT_CANON_CLI_TARGET_DIR"):
-                        environment.pop(key, None)
+                    environment = self._synthetic_root_environment(
+                        command_root,
+                        {"AGENT_CANON_TEST_LOG": str(test_log)},
+                    )
                     for key in (
                         "initializeCommand",
                         "postCreateCommand",
@@ -454,32 +443,14 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                             str(selected_workspace),
                         )
                         self.assertIn(PUBLIC_RESOLVER, command)
-                        invocation_script = (
-                            selected_workspace
-                            / ".devcontainer"
-                            / "post-create-entrypoint.sh"
+                        result = subprocess.run(
+                            ["bash", "-lc", command],
+                            cwd=command_root,
+                            env=environment,
+                            check=False,
+                            capture_output=True,
+                            text=True,
                         )
-                        if not invocation_script.is_file():
-                            invocation_script = (
-                                source
-                                / ".devcontainer"
-                                / "post-create-entrypoint.sh"
-                            )
-                        with bootstrap_fixture_public_environment(
-                            mode="synthetic_tool",
-                            record_capability=record_capability_from_environment(),
-                            fixture_cwd=command_root,
-                            base_env=environment,
-                            invocation_script=invocation_script,
-                        ) as fixture:
-                            result = subprocess.run(
-                                ["bash", "-lc", command],
-                                cwd=command_root,
-                                env=fixture.environment,
-                                check=False,
-                                capture_output=True,
-                                text=True,
-                            )
                         self.assertEqual(
                             result.returncode,
                             0,

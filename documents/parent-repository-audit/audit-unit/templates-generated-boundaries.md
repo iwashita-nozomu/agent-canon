@@ -29,7 +29,7 @@ path が明示され、source と parent-specific evidence が分離される。
 
 ## Evidence Sources
 
-- `templates/`、`reports/`、`evidence/`、`memory/`、`notes/`、`.state/`
+- `templates/`、`reports/`、`evidence/`、`memory/`、`documents/notes/`、`.state/`
 - `documents/rule/README.md`
 - `document-canon-cleanup` の inventory result
 - `result-artifact-writeout` の artifact manifest
@@ -54,17 +54,6 @@ path/manifest/readback が pass し、旧 checklist の二重正本が残って�
 
 `surface:templates.generated-boundary`、`surface:evidence.artifacts`、`surface:docs.canon`。
 template、artifact schema、generated projection、document placement の変更時だけ本 unit を更新します。
-
-## Scope Patterns
-
-- `pattern:templates/**`
-- `pattern:reports/**`
-- `pattern:evidence/**`
-- `pattern:memory/**`
-- `pattern:notes/**`
-- `pattern:.state/**`
-- `pattern:.agent-canon/**`
-- `pattern:workspace/**`
 
 ## Legacy Migration IDs
 

@@ -3,16 +3,16 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents machine-readable responsibility scope management for each repository.
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership policy
-upstream design ../runtime/shared-runtime-surfaces.toml shared surface manifest
-upstream design ../../responsibility-scope.toml machine-readable repo-local scope manifest
+responsibility Documents the canonical total single-owner relation for tracked paths in each repository.
+upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared runtime projection policy
+upstream design ../runtime/shared-runtime-surfaces.toml shared surface projection mechanics
+upstream design ../structure/repo-structure-contract.toml separate path existence and kind contract
+upstream design ../../responsibility-scope.toml machine-readable repo-local ownership manifest
 downstream design ../../templates/documents/responsibility-scope.template.toml starter manifest for template-derived repositories
 upstream design ../../tools/catalog.yaml structured tool ownership
-downstream implementation ../../tools/agent_tools/responsibility_scope.py validates scope coverage
+downstream implementation ../../tools/agent_tools/responsibility_scope.py validates total single ownership
 downstream implementation ../../tools/agent_tools/import_responsibility.py validates local import ownership
 downstream implementation ../../tools/agent_tools/task_authority.py owns protected external dependency authority
-downstream implementation ../../tools/agent_tools/responsibility_scope.py owns helper placement evidence
 downstream implementation ../../tools/agent_tools/tool_drift.py validates scope/tool trace links
 @dependency-end
 -->
@@ -24,20 +24,43 @@ own the responsibility map for template-derived repositories.
 
 ## Reader Map
 
-- Owns responsibility-scope owner classes, tool contracts, issue/GitHub sync,
-  and eval evidence expectations.
-- Main path: Owner Classes, Tool Contract, Issue And GitHub Sync, and Eval
-  Evidence.
+- Owns responsibility-scope owner classes, the total single-owner invariant,
+  import boundaries, tool contracts, issue/GitHub sync, and eval evidence.
+- Main path: Ownership Relation, Owner Classes, Tool Contract, Issue And GitHub
+  Sync, and Eval Evidence.
 - Read this before changing responsibility-scope tooling, owner labels, or
   protecting-tool evidence.
-- Boundary: it defines scope-management contracts, not task-specific ownership
-  decisions for a single run.
+- Boundary: path existence and filesystem kind belong to
+  `repo-structure-contract.toml`; projection mechanics belong to
+  `shared-runtime-surfaces.toml`.
+
+## Ownership Relation
+
+Let `P` be the finite set returned by `git ls-files` and let `S` be the finite
+set of `[[scope]]` rows. A scope owns a tracked path when at least one `paths`
+pattern matches and no `exclude_paths` pattern matches. The manifest is valid
+exactly when this relation is total and single-valued:
+
+```text
+for every p in P, there exists exactly one s in S such that s owns p
+```
+
+This is an ownership relation over paths that actually exist in the tracked
+tree. A pattern may therefore have an empty preimage: optional, retired, or
+future paths such as `.agents/**`, `agents/**`, or `examples/**` do not fail
+ownership validation merely because they are absent. Required existence and
+filesystem kind are separate facts and must be declared only in the structure
+contract.
+
+Dependency-header selection is a separate finite path relation owned by
+`documents/design/dependency-contract-kinds.toml`. It is consumed by the
+dependency-header tools and is not stored in the ownership manifest.
 
 Each scope declares:
 
 - `owner`: who owns the surface.
 - `class`: what kind of responsibility the surface carries.
-- `paths`: path patterns covered by the scope.
+- `paths`: path patterns included in the ownership relation.
 - `exclude_paths`: optional path patterns removed from a broad `paths` claim.
   Use this when a cross-cutting surface inside a broad directory has a
   different owning responsibility.
@@ -66,13 +89,15 @@ Each `[[import_rule]]` declares which local Python scope imports are allowed:
 
 ## Tool Contract
 
-`tools/agent_tools/responsibility_scope.py` validates the manifest. It fails
-when a required top-level surface has no scope, a tracked file is claimed by
-multiple scopes after `exclude_paths` are applied, a scope names a missing tool,
-a tool is not present in `tools/catalog.yaml`, an issue link is stale, or an
-`[[import_rule]]` points at an unknown scope.
+`tools/agent_tools/responsibility_scope.py` validates the manifest. It scans the
+tracked path set once and fails when a tracked path has no owning scope or more
+than one owning scope after exclusions, a scope names a missing or uncataloged
+protecting tool, an issue link is stale, or an `[[import_rule]]` points at an
+unknown scope. It does not require every glob to match and it does not check
+required path existence or kind.
 
-Use it before adding a new checker, hook, skill, workflow, or issue family:
+Use it before adding a new checker, hook, skill, workflow, issue family, or
+tracked top-level path:
 
 ```bash
 python3 tools/agent_tools/responsibility_scope.py --root .
@@ -81,33 +106,26 @@ python3 tools/agent_tools/responsibility_scope.py --root .
 `tools/agent_tools/import_responsibility.py` uses the same manifest for code
 imports. It parses Python AST, flags unused imported aliases and wildcard
 imports, resolves local imports to files when possible, and rejects source-scope
-to target-scope crossings that are not present in `[[import_rule]]`. Scope
-resolution applies `exclude_paths` before choosing the most specific matching
-scope, so an evidence or state file inside a broad runtime/tooling directory can
-carry its own import boundary.
+to target-scope crossings that are not present in `[[import_rule]]`. Because
+tracked paths have exactly one owning scope, import resolution consumes the same
+canonical relation instead of choosing among competing owner maps.
 
 ```bash
 python3 tools/agent_tools/import_responsibility.py --root .
 python3 tools/agent_tools/import_responsibility.py --root . --changed
 ```
 
-Edit-time hooks use the same ownership model for two common failure modes:
+`tools/agent_tools/task_authority.py` owns direct rewrite authority for vendored
+or installed library implementation files. External code changes must be a
+wrapper/adapter, fork/upstream patch, or manifest-backed vendor import rather
+than an in-place patch to library internals.
 
-- `tools/agent_tools/task_authority.py` owns direct rewrite authority for
-  vendored or installed library implementation files. External code changes
-  must be a wrapper / adapter, fork / upstream patch, or manifest-backed vendor
-  import rather than an in-place patch to library internals.
-- `tools/agent_tools/responsibility_scope.py` validates helper-like function additions
-  that do not carry ownership evidence such as a test, issue, docs, or
-  responsibility-scope update. Its JSONL records include role, candidate rule,
-  judgment rule, incoming count, and specialization so prompt and skill evals
-  can identify where agents started from helpers instead of an owning contract.
-
-For template or derived repositories, run it from the parent root. The tool
-expects the parent repository to carry its own top-level
+For template or derived repositories, run the checker from the parent root. The
+tool expects the parent repository to carry its own top-level
 `responsibility-scope.toml`. Use
-`vendor/agent-canon/documents/../templates/responsibility-scope.template.toml` as
-the starter when initializing that file.
+`vendor/agent-canon/templates/documents/responsibility-scope.template.toml` as
+the starter when initializing that file, then specialize it until every tracked
+path has exactly one owner.
 
 ## Issue And GitHub Sync
 

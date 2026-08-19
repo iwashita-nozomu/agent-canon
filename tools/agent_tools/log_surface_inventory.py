@@ -23,17 +23,19 @@ from typing import Literal, cast
 
 try:
     from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        resolve_parent_writer_attestation,
+        attest_parent_root,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        resolve_parent_writer_attestation,
+        attest_parent_root,
     )
 
 SurfaceKind = Literal["hook", "skill", "tool"]
@@ -76,9 +78,12 @@ OUTPUT_LINE_VARIABLES = {"lines", "output_lines", "report_lines"}
 
 def _write_parent_output(path: Path, payload: bytes, purpose: str) -> None:
     """Publish output through the attested parent when running as a child."""
-    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if configured:
-        attestation = resolve_parent_writer_attestation(purpose=purpose)
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+        )
         ParentRootSideEffectBoundary().write_parent_owned_file(
             attestation, path, payload, purpose
         )

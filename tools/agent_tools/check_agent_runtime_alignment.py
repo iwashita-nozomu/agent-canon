@@ -14,7 +14,6 @@
 # upstream implementation ./packets.py owns active design packet normalization and materialization
 # upstream implementation ./team_config.py owns team and role configuration resolution
 # upstream implementation ./workspace_scope.py owns typed workspace/source/report roots
-# upstream implementation ./fixture_spawn.py owns synthetic repository identity and writable-environment projection
 # @dependency-end
 
 """Validate that agent runtime surfaces, task catalog, and bundle outputs align."""
@@ -33,38 +32,29 @@ try:
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 import sys
-from collections.abc import Collection, Iterator, Mapping
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
 try:
-    from .fixture_spawn import (
-        bootstrap_fixture_public_environment,
-        record_capability_from_environment,
-    )
     from .parent_root_side_effects import (
-        PRIVATE_RECORD_REQUIRED_ENV,
+        ParentRootAttestationRequest,
+        ParentRootReject,
         ParentRootSideEffectBoundary,
-        RecordCapability,
-        public_session,
-        resolve_parent_writer_attestation,
+        ParentRootSideEffectError,
+        attest_parent_root,
     )
 except ImportError:
-    from fixture_spawn import (  # type: ignore[no-redef]
-        bootstrap_fixture_public_environment,
-        record_capability_from_environment,
-    )
     from parent_root_side_effects import (  # type: ignore[no-redef]
-        PRIVATE_RECORD_REQUIRED_ENV,
+        ParentRootAttestationRequest,
+        ParentRootReject,
         ParentRootSideEffectBoundary,
-        RecordCapability,
-        public_session,
-        resolve_parent_writer_attestation,
+        ParentRootSideEffectError,
+        attest_parent_root,
     )
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
 
 import model_profile_registry
@@ -250,70 +240,38 @@ PRE_FINAL_REVIEW_ROLE_IDS = {
 
 @dataclass(frozen=True)
 class AlignmentWorkspace:
-    """Repository identity, writable workspace, report root, and tool roots."""
+    """Temporary workspace used for runtime bundle smoke checks."""
 
-    repository_root: Path
     workspace_root: Path
     report_root: Path
     repository_roots: RepositoryRoots
 
 
 @contextmanager
-def _project_process_environment(
-    environment: Mapping[str, str],
-) -> Iterator[None]:
-    """Replace the process environment for one fixture-owned operation.
-
-    ``bootstrap_fixture_public_environment`` deliberately returns a value and
-    restores its own caller environment before yielding.  Runtime alignment
-    therefore projects that value only across the derived-bundle operation,
-    then restores the complete prior mapping even when the operation fails.
-    """
-    previous = os.environ.copy()
-    primary_error: BaseException | None = None
-    try:
-        os.environ.clear()
-        os.environ.update(environment)
-        yield
-    except BaseException as error:
-        primary_error = error
-        raise
-    finally:
-        try:
-            os.environ.clear()
-            os.environ.update(previous)
-        except BaseException as restoration_error:
-            if primary_error is not None:
-                primary_error.add_note(
-                    "runtime-alignment environment restoration failed: "
-                    f"{restoration_error}"
-                )
-            else:
-                raise
-
-
-@contextmanager
 def runtime_alignment_parent(source_resolution: RootResolution):
-    """Yield one fixture-owned parent for derived runtime-alignment state.
+    """Yield an authenticated parent that can host derived alignment state.
 
-    Tooling remains loaded from ``source_root``.  When the caller's writable
-    parent is the source checkout itself, the source record authorizes only a
-    nested temporary Git fixture.  The central synthetic fixture bootstrap then
-    projects an independent repository identity and fixture-local writable
-    environment before any derived bundle is created.
+    The standalone static-gate wrapper authenticates the source checkout itself
+    as the parent.  A derived workspace cannot place reports below that source
+    without violating the typed root boundary, so the self-check creates a
+    short-lived Git parent beside the source checkout for this fixture only.
+    Managed parent/derived executions retain their caller-provided parent.
     """
+    configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured_parent:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "runtime-alignment-temp: explicit parent root is required",
+        )
+    parent = Path(configured_parent).resolve(strict=True)
     source_root = source_resolution.source_root.resolve()
-    configured_parent = os.environ.get(
-        "AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", ""
-    ).strip()
-    parent = (
-        Path(configured_parent).resolve(strict=True)
-        if configured_parent
-        else source_root
-    )
     if parent != source_root:
-        attestation = resolve_parent_writer_attestation(
-            purpose="runtime-alignment"
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(
+                cwd=parent,
+                explicit_root=parent,
+                purpose="runtime-alignment",
+            )
         )
         base = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
             attestation,
@@ -323,107 +281,49 @@ def runtime_alignment_parent(source_resolution: RootResolution):
         yield base.physical_path
         return
 
-    boundary = ParentRootSideEffectBoundary()
-    previous_cwd = Path.cwd().resolve()
-
-    @contextmanager
-    def source_capability():
-        if os.environ.get(PRIVATE_RECORD_REQUIRED_ENV) == "1":
-            yield (
-                resolve_parent_writer_attestation(
-                    purpose="runtime-alignment-source"
-                ),
-                record_capability_from_environment(
-                    observed_cwd=source_root
-                ),
-            )
-            return
-        with public_session(
-            invocation_script=Path(__file__).resolve(),
-            purpose="runtime-alignment-source",
-            cleanup_state=True,
-        ) as source_session:
-            yield (
-                source_session.attestation,
-                RecordCapability.from_record(source_session),
-            )
-
-    try:
-        os.chdir(source_root)
-        with source_capability() as (source_attestation, capability):
-            fixture_receipt = boundary.create_parent_owned_temp_directory(
-                source_attestation,
-                source_root / ".agent-canon" / "tmp",
-                "runtime-alignment-parent",
-                "runtime-alignment",
-            )
-            fixture_parent = fixture_receipt.physical_path
-            try:
-                subprocess.run(
-                    ["git", "init", "-q", str(fixture_parent)],
-                    check=True,
+    source_origin = subprocess.run(
+        ["git", "-C", str(source_root), "remote", "get-url", "origin"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    with tempfile.TemporaryDirectory(
+        prefix=".agent-canon-runtime-parent-",
+        dir=source_root.parent,
+    ) as fixture_parent_text:
+        fixture_parent = Path(fixture_parent_text)
+        subprocess.run(["git", "init", "-q", str(fixture_parent)], check=True)
+        subprocess.run(
+            ["git", "-C", str(fixture_parent), "remote", "add", "origin", source_origin],
+            check=True,
+        )
+        previous_parent = os.environ.get("AGENT_CANON_PARENT_ROOT")
+        previous_active = os.environ.get("AGENT_CANON_ACTIVE_REPOSITORY_ROOT")
+        os.environ["AGENT_CANON_PARENT_ROOT"] = str(fixture_parent)
+        os.environ["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(fixture_parent)
+        try:
+            attestation = attest_parent_root(
+                ParentRootAttestationRequest(
+                    cwd=fixture_parent,
+                    explicit_root=fixture_parent,
+                    purpose="runtime-alignment",
                 )
-                source_origin = subprocess.run(
-                    [
-                        "git",
-                        "-C",
-                        str(source_root),
-                        "remote",
-                        "get-url",
-                        "origin",
-                    ],
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                )
-                if source_origin.returncode == 0 and source_origin.stdout.strip():
-                    subprocess.run(
-                        [
-                            "git",
-                            "-C",
-                            str(fixture_parent),
-                            "remote",
-                            "add",
-                            "origin",
-                            source_origin.stdout.strip(),
-                        ],
-                        check=True,
-                    )
-
-                with bootstrap_fixture_public_environment(
-                    mode="synthetic_tool",
-                    fixture_cwd=fixture_parent,
-                    record_capability=capability,
-                    ambient_env=os.environ,
-                    purpose="agent-runtime-alignment",
-                ) as fixture:
-                    if fixture.session is None:
-                        raise RuntimeError(
-                            "runtime alignment synthetic session is missing"
-                        )
-                    base = boundary.ensure_parent_owned_directory(
-                        fixture.session.attestation,
-                        fixture_parent
-                        / ".agent-canon"
-                        / "tmp"
-                        / "runtime-alignment",
-                        "runtime-alignment-temp",
-                    )
-                    with _project_process_environment(fixture.environment):
-                        os.chdir(fixture_parent)
-                        try:
-                            yield base.physical_path
-                        finally:
-                            os.chdir(source_root)
-            finally:
-                os.chdir(source_root)
-                boundary.remove_parent_owned_tree(
-                    source_attestation,
-                    fixture_receipt,
-                    "runtime-alignment-parent-cleanup",
-                )
-    finally:
-        os.chdir(previous_cwd)
+            )
+            base = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
+                attestation,
+                fixture_parent / ".agent-canon" / "tmp" / "runtime-alignment",
+                "runtime-alignment-temp",
+            )
+            yield base.physical_path
+        finally:
+            if previous_parent is None:
+                os.environ.pop("AGENT_CANON_PARENT_ROOT", None)
+            else:
+                os.environ["AGENT_CANON_PARENT_ROOT"] = previous_parent
+            if previous_active is None:
+                os.environ.pop("AGENT_CANON_ACTIVE_REPOSITORY_ROOT", None)
+            else:
+                os.environ["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = previous_active
 
 
 def resolve_packet_probe_workspace() -> Path:
@@ -1757,93 +1657,26 @@ def alignment_workspace(
     tmp_root: Path,
     source_resolution: RootResolution,
 ) -> AlignmentWorkspace:
-    """Return the typed repository/workspace/tool product for bundle checks."""
+    """Return the temporary workspace layout for bundle smoke checks."""
     workspace_root = tmp_root / "workspace"
     report_root = tmp_root / "reports"
-    identity_resolution = resolve_agent_canon_source_root(
-        workspace_root,
-        source_root=source_resolution.source_root,
-        canon_root=source_resolution.canon_root,
-    )
     repository_roots = resolve_repository_roots(
         workspace_root,
         report_root,
         source_root=source_resolution.source_root,
         canon_root=source_resolution.canon_root,
     )
-    if identity_resolution.public_tool_root is None:
-        raise RuntimeError("runtime alignment identity has no public tool root")
-    if repository_roots.public_tool_root is None:
-        raise RuntimeError("runtime alignment roots have no public tool root")
-    if (
-        identity_resolution.public_tool_root.absolute()
-        != repository_roots.public_tool_root.absolute()
-    ):
-        raise RuntimeError(
-            "runtime alignment root projections disagree on the public tool view"
-        )
     return AlignmentWorkspace(
-        repository_root=identity_resolution.current_repository_root.resolve(),
         workspace_root=workspace_root,
         report_root=report_root,
         repository_roots=repository_roots,
     )
 
 
-def _materialize_alignment_public_tool_view(workspace: AlignmentWorkspace) -> None:
-    """Project source-owned tooling into the synthetic repository view.
-
-    The synthetic repository owns only the lexical public path.  Executable
-    bytes remain in ``agentcanon_source_root`` and are neither copied nor
-    installed into the fixture.  The writable task workspace must remain a
-    descendant of that independent repository identity.
-    """
-    roots = workspace.repository_roots
-    public_tool_root = roots.public_tool_root
-    if public_tool_root is None:
-        raise RuntimeError("runtime alignment public tool root is missing")
-
-    repository_root = workspace.repository_root.resolve(strict=True)
-    expected_public_root = repository_root / "tools" / "agent-canon"
-    if public_tool_root.absolute() != expected_public_root.absolute():
-        raise RuntimeError(
-            "runtime alignment public tool root is not repository-owned: "
-            f"{public_tool_root}"
-        )
-    try:
-        workspace.workspace_root.resolve().relative_to(repository_root)
-    except ValueError as error:
-        raise RuntimeError(
-            "runtime alignment workspace escapes repository identity: "
-            f"{workspace.workspace_root}"
-        ) from error
-
-    source_root = roots.agentcanon_source_root.resolve()
-    source_tools = (source_root / "tools").resolve()
-    try:
-        source_tools.relative_to(source_root)
-    except ValueError as error:
-        raise RuntimeError(
-            "runtime alignment source tools escape the canonical source root"
-        ) from error
-    if not source_tools.is_dir():
-        raise RuntimeError(
-            f"runtime alignment source tools are missing: {source_tools}"
-        )
-
-    public_tool_root.parent.mkdir(parents=True, exist_ok=False)
-    public_tool_root.symlink_to(source_tools, target_is_directory=True)
-    if public_tool_root.resolve() != source_tools:
-        raise RuntimeError(
-            "runtime alignment public tool projection does not resolve to source tooling"
-        )
-
-
 def initialize_alignment_workspace(workspace: AlignmentWorkspace) -> None:
     """Create the directories and scope file required by bundle smoke checks."""
     workspace.workspace_root.mkdir(parents=True, exist_ok=True)
     workspace.report_root.mkdir(parents=True, exist_ok=True)
-    _materialize_alignment_public_tool_view(workspace)
     (workspace.workspace_root / "python").mkdir()
     (workspace.workspace_root / "documents").mkdir()
     (workspace.workspace_root / "reports" / "runtime").mkdir(parents=True)

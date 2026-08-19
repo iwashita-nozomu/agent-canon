@@ -13,7 +13,6 @@
 # upstream implementation ./check_dependency_header_format.sh validates repo-wide manifest syntax
 # upstream implementation ./check_dependency_graph.sh validates source-derived dependency relations
 # upstream implementation ./check_design_doc_claims.py validates design claims against dependency evidence
-# upstream implementation ../lib/repo_paths.sh resolves the physical analyzer tools root
 # downstream implementation ../../tools/ci/check_agent_canon_pr.sh runs strict dependency review
 # downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies wrapper behavior
 # @dependency-end
@@ -23,10 +22,6 @@ ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REVIEW_PARENT_ROOT=""
 REVIEW_TEMP_BASE=""
-# shellcheck source=../lib/repo_paths.sh
-source "${script_dir}/../lib/repo_paths.sh"
-
-INVOCATION_SCRIPT="$(realpath -e "${BASH_SOURCE[0]}" 2>/dev/null || true)"
 
 parent_temp_base() {
   REVIEW_PARENT_ROOT="$(realpath -e "${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}")" || {
@@ -65,14 +60,12 @@ TRUSTED_BASE_SHA=""
 HEADER_SCAN_ONLY=0
 CHECK_DESIGN_DOC_CLAIMS=0
 ENSURE_GRAPH_ONLY=0
-ANALYZER_TOOLS_ROOT_OVERRIDE=""
-declare -a ANALYZER_REQUIRED_ENTRIES=()
 declare -a DESIGN_DOC_CLAIM_PATHS=()
 
 usage() {
   cat <<'EOF'
 Usage:
-  run_repo_dependency_review.sh [--root DIR] [--analyzer-tools-root DIR] [--check-bidirectional] [--cycle-report-only] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--changed-path-packet FILE] [--trusted-base-sha SHA] [--header-scan-only] [--ensure-graph] [--list-changed-dependencies] [--report-dir DIR] [--graph-tsv PATH] [--search-hits-file PATH] [--check-design-doc-claims] [--design-doc-claim-path PATH]
+  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--cycle-report-only] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--changed-path-packet FILE] [--trusted-base-sha SHA] [--header-scan-only] [--ensure-graph] [--list-changed-dependencies] [--report-dir DIR] [--graph-tsv PATH] [--search-hits-file PATH] [--check-design-doc-claims] [--design-doc-claim-path PATH]
 
 Runs dependency manifest review against all tracked, checkable text files in the repo.
 This is intended for checkpoint and final review, not just changed-file closeout.
@@ -93,8 +86,6 @@ With --header-scan-only, source relation/cycle validation and graph projections 
 skipped while the strict canonical header scan and format check still run.
 With --ensure-graph, the opt-in persisted graph status/build operation runs once
 and exits before source-owned dependency-header review.
-With --analyzer-tools-root, the physical analyzer tools tree is selected explicitly;
-otherwise AGENT_CANON_ANALYZER_TOOLS_ROOT or the invocation-source tools tree wins.
 With --check-design-doc-claims, changed design documents are compared with
 dependency header evidence and implementation-backed claim tokens. Repeat
 --design-doc-claim-path to check explicit design documents instead of changed
@@ -146,11 +137,6 @@ while [[ $# -gt 0 ]]; do
       ENSURE_GRAPH_ONLY=1
       shift
       ;;
-    --analyzer-tools-root)
-      [[ $# -ge 2 ]] || { echo "REPO_DEPENDENCY_REVIEW=fail reason=analyzer_tools_root_argument_missing"; exit 2; }
-      ANALYZER_TOOLS_ROOT_OVERRIDE="$2"
-      shift 2
-      ;;
     --list-changed-dependencies)
       LIST_CHANGED_DEPENDENCIES=1
       shift
@@ -192,11 +178,7 @@ ROOT_DIR="$(realpath -e "$ROOT_DIR")" || {
   echo "REPO_DEPENDENCY_REVIEW=fail reason=root_missing"
   exit 2
 }
-if [[ -n "$INVOCATION_SCRIPT" ]]; then
-  SCRIPT_TOOLS_ROOT="$(realpath -e "$(dirname "$INVOCATION_SCRIPT")/..")"
-else
-  SCRIPT_TOOLS_ROOT="$(realpath -e "$script_dir/..")"
-fi
+SCRIPT_TOOLS_ROOT="$(realpath -m "$(dirname "$(realpath -m "$script_dir")")")"
 cd "$ROOT_DIR"
 
 if [[ "$HEADER_SCAN_ONLY" -eq 1 && "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
@@ -208,62 +190,13 @@ if [[ "$HEADER_SCAN_ONLY" -eq 1 && ( -z "$CHANGED_PATH_PACKET" || -z "$TRUSTED_B
   exit 2
 fi
 
-SCRIPT_TOOLS_ROOT="$(realpath -e "$SCRIPT_TOOLS_ROOT")"
-
-if [[ -n "${AGENT_CANON_PARENT_ROOT:-}" ]]; then
-  REVIEW_PARENT_ROOT="$(realpath -e "$AGENT_CANON_PARENT_ROOT")" || {
-    echo "REPO_DEPENDENCY_REVIEW=fail reason=parent_root_missing" >&2
-    exit 2
-  }
-else
-  REVIEW_PARENT_ROOT="$ROOT_DIR"
-fi
-
-if [[ "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
-  ANALYZER_REQUIRED_ENTRIES=(
-    "bin/agent-canon"
-  )
-elif [[ "$HEADER_SCAN_ONLY" -eq 1 ]]; then
-  ANALYZER_REQUIRED_ENTRIES=(
-    "agent_tools/scan_dependency_headers.sh"
-    "agent_tools/check_dependency_header_format.sh"
-  )
-  if [[ -n "$REPORT_DIR" ]]; then
-    ANALYZER_REQUIRED_ENTRIES+=("agent_tools/workflow_monitor.py")
-  fi
-else
-  ANALYZER_REQUIRED_ENTRIES=(
-    "agent_tools/scan_dependency_headers.sh"
-    "agent_tools/check_dependency_header_format.sh"
-    "agent_tools/check_dependency_graph.sh"
-    "bin/agent-canon"
-  )
-  if [[ "$CHECK_DESIGN_DOC_CLAIMS" -eq 1 ]]; then
-    ANALYZER_REQUIRED_ENTRIES+=("agent_tools/check_design_doc_claims.py")
-  fi
-  if [[ -n "$REPORT_DIR" ]]; then
-    ANALYZER_REQUIRED_ENTRIES+=("agent_tools/workflow_monitor.py")
-  fi
-fi
-
-ANALYZER_PHYSICAL_DEFAULT=0
-if [[ -z "$ANALYZER_TOOLS_ROOT_OVERRIDE" \
-  && -z "${AGENT_CANON_ANALYZER_TOOLS_ROOT:-}" ]]; then
-  ANALYZER_PHYSICAL_DEFAULT=1
-fi
-ANALYZER_TOOLS_ROOT="$(agent_canon_analyzer_tools_root \
-  "$INVOCATION_SCRIPT" "$ANALYZER_TOOLS_ROOT_OVERRIDE" "$REVIEW_PARENT_ROOT" \
-  "$ANALYZER_PHYSICAL_DEFAULT" "${ANALYZER_REQUIRED_ENTRIES[@]}")" || {
-  echo "REPO_DEPENDENCY_REVIEW=fail reason=analyzer_tools_root_invalid" >&2
-  exit 2
-}
-
-CANON_TOOLS_ROOT="$ANALYZER_TOOLS_ROOT"
+CANON_TOOLS_ROOT="$SCRIPT_TOOLS_ROOT"
 SCAN_DEPENDENCY_HEADERS="${CANON_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh"
 CHECK_DEPENDENCY_HEADER_FORMAT="${CANON_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh"
 CHECK_DEPENDENCY_GRAPH="${CANON_TOOLS_ROOT}/agent_tools/check_dependency_graph.sh"
 CHECK_DESIGN_DOC_CLAIMS_TOOL="${CANON_TOOLS_ROOT}/agent_tools/check_design_doc_claims.py"
-GRAPH_CLI="${CANON_TOOLS_ROOT}/bin/agent-canon"
+# Persisted graph operations are repository-scoped; source review tools remain script-owned.
+GRAPH_CLI="${ROOT_DIR}/tools/bin/agent-canon"
 WORKFLOW_MONITOR="${CANON_TOOLS_ROOT}/agent_tools/workflow_monitor.py"
 
 if [[ "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then

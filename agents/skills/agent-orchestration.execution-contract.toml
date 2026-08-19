@@ -1,8 +1,9 @@
 # @dependency-start
 # contract design
-# responsibility Defines the machine-readable execution-time-aware orchestration contract owned by agent-orchestration.
+# responsibility Defines the machine-readable execution-time-aware orchestration and autonomous convergence contract owned by agent-orchestration.
 # upstream design agent-orchestration.md sole owner policy prose and invariants
 # downstream implementation ../../tools/agent_tools/check_execution_time_aware_orchestration.py production contract checker
+# downstream implementation ../../tools/agent_tools/autonomous_convergence.py transition and closeout validator
 # downstream implementation ../../tools/agent_tools/skill_tool_commands.py required selected-skill command route
 # downstream design pr-processing.md PR queue specialization consumer
 # downstream design ../../templates/agents/schedule.md schedule projection consumer
@@ -10,7 +11,7 @@
 # downstream implementation ../../.agents/skills/agent-orchestration/SKILL.md runtime discovery consumer
 # @dependency-end
 
-schema = "agent-canon.execution-time-aware-orchestration.v1"
+schema = "agent-canon.execution-time-aware-orchestration.v3"
 owner_skill = "agent-orchestration"
 owner_doc = "agents/skills/agent-orchestration.md"
 owner_heading = "Execution-Time-Aware Work-Conservation Contract"
@@ -19,55 +20,39 @@ checker = "tools/agent_tools/check_execution_time_aware_orchestration.py"
 checker_command = "python3 tools/agent_tools/check_execution_time_aware_orchestration.py --root ."
 required_skill_command = "python3 tools/agent_tools/check_execution_time_aware_orchestration.py --root ."
 
-activation_predicate = "selected_edge_type_present"
-default_state = "bounded_single_owner"
-candidate_count_alone = false
-selected_edge_types = [
-  "ordering",
-  "dependency",
-  "collision",
-  "publication",
-]
-always_required_fields = [
-  "owner",
-  "schema",
-  "dependency",
-  "validation",
-  "correctness",
-  "publication_scope",
-]
-graph_only_fields = [
-  "dag",
-  "critical_path",
-  "ready_set",
-  "queue_snapshot",
-  "makespan_objective",
-]
-# The task catalog is a read-only legacy projection. Its field list remains
-# stable while this owner contract carries the conditional route semantics.
-task_catalog_fields = [
+required_fields = [
   "dependency_dag",
   "responsibility_completeness",
   "correctness",
+  "decision_relevant_total_work",
+  "makespan_objective",
+  "critical_path",
+  "ready_set",
   "context_reuse",
   "affected_evidence_invalidation",
+  "candidate_epoch",
+  "blocking_finding_ids",
+  "focused_recheck",
+  "terminal_state",
 ]
 
 owner_markers = [
-  "execution route defaults to bounded_single_owner",
-  "candidate count alone does not activate the execution graph",
-  "selected ordering, dependency, collision, or publication edge",
-  "always-required fields",
-  "graph-only fields",
-  "model the selected subgraph as a dependency DAG",
-  "Dispatch every ready node that is non-conflicting",
+  "Use a dependency/overlap graph only when the selected work has real ordering",
+  "lexicographic, in this order",
+  "minimum decision-relevant total work",
+  "Dispatch every ready node that is non-conflicting and admissible",
   "Batch remote reads",
   "Reuse the warm worker and reviewer contexts",
-  "before opening the owning review",
+  "candidate epoch",
+  "stable blocking finding IDs",
+  "focused recheck",
+  "same state fingerprint and action fingerprint",
+  "non_convergent_cycle",
+  "zero blocking findings",
   "Invalidate only evidence affected by the repaired node",
   "Wait only when the useful ready set is empty",
-  "prompt-keyword routing is not a scheduling signal",
-  "no timeout, elapsed-time, or capacity cutoff may reduce scope",
+  "prompt-keyword routing is never a scheduling signal",
+  "no fixed duration, elapsed-time limit, or timeout cutoff may cut the requested scope",
 ]
 
 rejected_classes = [
@@ -75,6 +60,14 @@ rejected_classes = [
   "duration_or_timeout_scope_cutoff",
   "keyword_based_routing",
   "responsibility_scope_reduction",
+  "same_state_same_action_repeat",
+  "repeated_candidate_epoch",
+  "evidence_ref_cycle_evasion",
+  "terminal_gate_bypass",
+  "advisory_rework",
+  "unfocused_recheck_mutation",
+  "validation_global_reopen",
+  "broad_review_restart_without_new_epoch_evidence",
   "consumer_reference_without_executable_fields",
   "consumer_reference_mismatch",
 ]
@@ -92,7 +85,6 @@ scope_cutoff_markers = [
   "scope cutoff:",
   "elapsed-time budget:",
   "use timeout to cut",
-  "capacity cutoff:",
 ]
 keyword_routing_markers = [
   "prompt keywords route",
@@ -108,16 +100,72 @@ scope_reduction_markers = [
 ]
 
 [invariants]
-activation = "selected_edge_type_present"
-default = "bounded_single_owner"
-candidate_count = "candidate_count_alone_false"
-always = "owner_schema_dependency_validation_correctness_publication_scope"
-graph = "dag_critical_path_ready_set_queue_snapshot_makespan_objective"
-dispatch = "all_non_conflicting_ready_nodes"
+dag = "complete_dependency_dag_with_owner_and_consumer_closure"
+objective = "lexicographic_completeness_correctness_then_decision_relevant_total_work_then_makespan"
+dispatch = "all_non_conflicting_admissible_ready_nodes"
 wait = "only_when_useful_ready_set_is_empty"
 evidence = "warm_context_reuse_and_affected_evidence_only_invalidation"
-review = "closure_before_one_exact_candidate_review"
-scope = "no_timeout_elapsed_time_or_capacity_cutoff"
+review = "one_initial_review_per_candidate_epoch_then_focused_recheck"
+candidate_epoch = "exact_request_candidate_identity_with_no_repeated_epoch"
+convergence = "state_action_class_or_epoch_cycle_else_strict_measure_or_typed_decision_evidence"
+terminal = "zero_blockers_clauses_and_validations_with_selected_validation_pass"
+
+[convergence]
+state_fields = [
+  "request_digest",
+  "candidate_digest",
+  "candidate_epoch",
+  "owner",
+  "implementation_mechanism",
+  "validation_route",
+  "review_status",
+  "blocking_finding_ids",
+  "unresolved_validation_ids",
+  "unresolved_request_clause_ids",
+  "selected_validation_status",
+  "terminal_state",
+]
+action_classes = [
+  "initial_review",
+  "repair",
+  "focused_recheck",
+  "clause_resolution",
+  "validation",
+  "advisory",
+  "epoch_reopen",
+  "ship",
+]
+decision_evidence_kinds = [
+  "owner_change",
+  "implementation_mechanism_change",
+  "validation_route_change",
+  "ship_state_change",
+]
+new_epoch_evidence_kinds = [
+  "contract_change",
+  "reachable_behavior_change",
+  "structural_contradiction",
+]
+action_admission = [
+  "one_initial_review_for_candidate_epoch",
+  "typed_candidate_epoch_repair",
+  "strict_unresolved_measure_decrease",
+  "typed_new_epoch_evidence",
+  "advisory_record_without_rework",
+  "terminal_zero_measure",
+]
+action_fingerprint = "state_fingerprint_plus_action_class"
+epoch_fingerprint = "request_digest_plus_candidate_digest"
+repair_scope = "next_candidate_epoch_assigned_blockers_and_affected_validation_ids_only"
+focused_recheck_scope = "targeted_blocker_ids_only"
+validation_reopen_scope = "affected_validation_ids_only"
+terminal_conditions = [
+  "zero_open_blocking_findings",
+  "zero_unresolved_request_clauses",
+  "zero_unresolved_validation_ids",
+  "selected_validation_pass_or_not_applicable",
+]
+cycle_stop = "non_convergent_cycle"
 
 [[consumers]]
 id = "pr-processing"
@@ -126,28 +174,12 @@ kind = "specialization"
 reference_mode = "text"
 required_markers = [
   "Execution-Time-Aware Queue Specialization",
-  "single-candidate fast path",
-  "no queue-wide snapshot",
-  "candidate count alone does not activate",
-  "selected edge",
   "batched queue snapshot",
   "independent candidates",
-  "one closure review for each exact candidate",
+  "Each candidate epoch gets one initial owning review",
+  "focused recheck",
   "same warm worker and reviewer context",
   "merge candidates in dependency order",
-]
-required_fields = [
-  "owner",
-  "schema",
-  "dependency",
-  "validation",
-  "correctness",
-  "publication_scope",
-  "dag",
-  "critical_path",
-  "ready_set",
-  "queue_snapshot",
-  "makespan_objective",
 ]
 
 [[consumers]]
@@ -167,31 +199,16 @@ kind = "schedule_projection"
 reference_mode = "text"
 required_markers = [
   "Execution-Time-Aware Plan",
-  "bounded_single_owner",
-  "candidate count alone",
-  "Always-required fields",
-  "Graph-only fields",
-  "Selected edge activation",
   "Dependency DAG / closure",
   "Critical path",
   "Ready set",
-  "Queue snapshot",
   "Useful ready set",
   "Context reuse",
   "Affected evidence invalidation",
-]
-required_fields = [
-  "owner",
-  "schema",
-  "dependency",
-  "validation",
-  "correctness",
-  "publication_scope",
-  "dag",
-  "critical_path",
-  "ready_set",
-  "queue_snapshot",
-  "makespan_objective",
+  "Candidate epoch",
+  "Blocking finding IDs",
+  "Focused recheck",
+  "Terminal state",
 ]
 
 [[consumers]]

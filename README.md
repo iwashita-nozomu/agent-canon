@@ -140,7 +140,7 @@ subagent 定義を保持し、generated role views は対応する runtime owner
 `tools/` と `rust/` は contract を実行可能な command と checker にし、`tests/` は
 AgentCanon 自身の tool、workflow、policy mechanism を検証します。`reports/agents/`
 は run-local artifact、`evidence/` は tracked evaluation surface、`memory/` と
-`notes/` はそれぞれの lifecycle owner が管理する durable state です。これらの
+`documents/notes/` はそれぞれの lifecycle owner が管理する durable state です。これらの
 artifact/state surface に一律の retention policy はありません。
 
 ### Task の流れ
@@ -162,7 +162,7 @@ main readback、parent pin/root-view projection は AgentCanon source update の
 AgentCanon 単体 repository は shared runtime の source tree と、その canonical policy、
 contract、tool implementation を所有します。Generated runtime projections、parent
 root views、run reports、evaluation evidence、experiment results は対応する owner が
-生成・保持する例外 surface です。`memory/` と `notes/` は tracked durable owner
+生成・保持する例外 surface です。`memory/` と `documents/notes/` は tracked durable owner
 surface になり得ますが、shared policy source の代替ではありません。これらの surface
 はいずれも source tree の canonical policy、contract、tool implementation を置き換え
 ません。Template と派生 repository は `vendor/agent-canon/` の commit pin を
@@ -226,7 +226,7 @@ control-plane file を差し引く。2026-06-06 の再解析では、`exclude_pa
 | --- | --- | --- | --- |
 | `runtime-entrypoints` | primary | `AGENTS.md`, `ROOT_AGENTS.md`, `.agents/**`, `.codex/**`, `.devcontainer/**`, `.vscode/**`, `agents/**` | agent runtime の入口、workflow canon、skill、hook、runtime / editor config。 |
 | `shared-tooling` | primary | `tools/**`, `rust/**`, `helper_inventory_guard_policy.json` | shared automation、static gate、OOP checker、Rust CLI、tool catalog。 |
-| `shared-policy-documents` | primary | `README.md`, `CONTAINER_OPERATIONS.md`, `responsibility-scope.toml`, `documents/**`, `notes/**`, `memory/**`, `references/**` | policy、convention、container、bootstrap、tool documentation、記憶と参照資料。 |
+| `shared-policy-documents` | primary | `README.md`, `CONTAINER_OPERATIONS.md`, `responsibility-scope.toml`, `documents/**`, `documents/notes/**`, `memory/**`, `references/**` | policy、convention、container、bootstrap、tool documentation、記憶と参照資料。 |
 | `test-surfaces` | primary | `tests/**` | shared tools、workflow、責務 policy を検証する test surface。 |
 | `github-automation` | primary | `.github/**` | GitHub Actions、Issue / PR template、GitHub-facing entrypoint。 |
 | `operational-issues` | primary | `issues/**` | durable local issue files と GitHub Issue mirror metadata。 |
@@ -260,7 +260,7 @@ Top-level surface は次のように読む。`Tracked` は `git ls-files`、`Man
 | `documents/` | 115 | 113 | shared policy、運用規約、tool / structured-analysis / prose graph docs。runtime log archive docs は `eval-and-hook-evidence` scope。 |
 | `issues/` | 21 | 21 | AgentCanon operational finding の open / closed issue record。 |
 | `memory/` | 3 | 3 | user preference と agent philosophy の durable memory。 |
-| `notes/` | 30 | 30 | knowledge、guardrail、theme、failure、branch、worktree notes。 |
+| `documents/notes/` | 30 | 30 | knowledge、guardrail、theme、failure、branch、worktree notes。 |
 | `references/` | 3 | 3 | workflow、tool、research の外部参照索引。OpenAI / Codex product evidence は `$openai-docs` source route を参照する。 |
 | `rust/` | 15 | 14 | `agent-canon` Rust CLI implementation。 |
 | `tests/` | 97 | 96 | shared tool と responsibility policy の test suite。 |
@@ -288,7 +288,7 @@ historical filename の inventory です。これらは active rule や現行 wo
 | `.codex/` | `agents/`, `hooks/`, shared `config.toml` |
 | `.github/` | `workflows/`, `ISSUE_TEMPLATE/`, `PULL_REQUEST_TEMPLATE/` |
 | `tests/` | `agent_tools/`, `tools/`, `fixtures/` |
-| `notes/` | `knowledge/`, `guardrails/`, `themes/`, `experiments/`, `failures/`, `branches/`, `worktrees/` |
+| `documents/notes/` | `knowledge/`, `guardrails/`, `themes/`, `experiments/`, `failures/`, `branches/`, `worktrees/` |
 
 この構造表を更新するときは、AgentCanon root から次を実行し、結果を確認してから
 README を直す。

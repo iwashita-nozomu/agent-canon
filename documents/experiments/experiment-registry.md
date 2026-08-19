@@ -27,7 +27,7 @@ server 上でどの実験コードを正式に実行するかを、topic ごと�
 
 - experiment topic の正本 entrypoint を固定する
 - smoke / formal run の canonical inner command を固定する
-- `README.md`、`result/`、`report/` を固定し、topic README を通じて可視化 notebook の入口を固定する
+- `README.md`、`result/`、`report/` を固定し、topic README を通じて `visualization.py` renderer の入口を固定する
 - branch / worktree と実験 topic の対応を補助 metadata として残す
 
 branch 名は補助情報です。主キーにはしません。
@@ -35,11 +35,12 @@ durable な正本は常に topic 名です。
 
 run の主キーは topic だけではなく、`(topic, variant, run_name)` の順序付き tuple です。
 値は `agentcanon.experiment-run-identity/v2` の nested `identity` object として
-manifest、report、result pointer に一度だけ記録します。canonical path は
-`experiments/<topic>/result/<variant>/<run_name>/`、report は
-`experiments/report/<topic>/<variant>/<run_name>.md`、result branch は
-`experiment-results/<topic>/<variant>` です。旧 topic-only layout は新しい runner、
-publisher、LATEST updater から読み替えません。
+manifest、report、result pointer に一度だけ記録します。managed run root の canonical path は
+`experiments/<topic>/result/<run-id>/` とし、topic-produced artifact はその run root の
+`raw/` と `summary/` に分けます。report は
+`experiments/<topic>/report/<run-id>.md`、archive は annex worktree の
+`experiments/<topic>/result/<run-id>.tar.gz` です。旧 topic-only layout は
+新しい runner、annex retention、LATEST updater から読み替えません。
 
 ## 正本ファイル
 
@@ -64,14 +65,14 @@ publisher、LATEST updater から読み替えません。
 - 必要なら `required_eval_artifacts`
 - 必要なら `optional_eval_artifacts`
 
-`topic_readme` は、実験内容、問い、比較対象、標準コマンド、設定正本、可視化 notebook、
+`topic_readme` は、実験内容、問い、比較対象、標準コマンド、設定正本、`visualization.py` renderer、
 出力 schema、run_name 規則を辿る入口です。`result_root` は
-`result/<variant>/<run_name>/` だけでなく、各 run の `result/<variant>/<run_name>/logs/` も含む
+`result/<run-id>/` だけでなく、各 run の `result/<run-id>/logs/` も含む
 runtime artifact surface として扱います。
 
 `smoke_inner_command` と `formal_inner_command` は `{run_dir}` に加えて `{config_path}` を含めます。
 checked-in 設定正本は topic の `config.yaml` に置きます。managed runner は run 開始前に
-`result/<variant>/<run_name>/config.json` と `result/<variant>/<run_name>/config_source.yaml` を書き出し、inner command はその
+`result/<run-id>/config.json` と `result/<run-id>/config_source.yaml` を書き出し、inner command はその
 snapshot から今回 run の設定を復元します。必要な topic では `{config_source_path}`、
 `{stdout_log_path}`、`{stderr_log_path}`、`{startup_log_path}` も registered command で参照できます。
 
@@ -131,14 +132,14 @@ registry entry を一つの route で配置します。`templates/experiments/_t
 利用者向けの作成手順にしません。
 
 ```bash
-python3 -m tools.experiments.create_experiment_topic <topic>
+python3 tools/experiments/create_experiment_topic.py <topic>
 ```
 
 実行、publication、LATEST 更新には variant を必ず明示します。
 
 ```bash
 python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py
-python3 -m tools.experiments.publish_result_branch --variant <variant> --result-dir experiments/<topic>/result/<variant>/<run_name> --branch experiment-results/<topic>/<variant>
+python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<run-id> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
 python3 -m tools.experiments.update_latest_result experiments/<topic>/result --variant <variant>
 ```
 
@@ -153,11 +154,11 @@ python3 -m tools.experiments.update_latest_result experiments/<topic>/result --v
 - `run_manifest.json` には registry snapshot を残し、あとで「どの topic のどの正本 command を使ったか」を辿れるようにします。
 - checked-in 設定正本は topic の `config.yaml` に置きます。managed runner は `config.json` に今回 run の設定 dictionary と path map を残し、`config_source.yaml` に checked-in `config.yaml` のコピーを残します。`run_manifest.json` からも `config_path` と `config_source_path` を辿れるようにします。
 - run 開始時点の再現情報は managed runner が `command.json`、`environment.json`、`source_snapshot.json` に保存します。`command.json` は placeholder 解決後の command と cwd、`environment.json` は全 environment key を記録し secret-like key の値を redaction します。`source_snapshot.json` は topic source、registry、command source、runner source、dirty source file の bytes / sha256 と git status を持ちます。
-- 各 managed run は `result/<variant>/<run_name>/logs/` を持ちます。top-level `run.log` は runner が管理する互換ログで、追加の stdout / stderr、tool log、diagnostic log は `logs/` 配下へ置きます。
+- 各 managed run は `result/<run-id>/logs/` を持ちます。top-level `run.log` は runner が管理する互換ログで、追加の stdout / stderr、tool log、diagnostic log は `logs/` 配下へ置きます。
 - managed runner は標準で `logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` を作ります。`config.yaml` 欠落 preflight、command 起動失敗、子 process の非ゼロ終了は failed run として `run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、対応する `logs/` artifact に残します。
-- run 終了時には `artifact_manifest.json` を書き、`result/<variant>/<run_name>/` 内の managed file、raw result、summary、log の relative path、bytes、sha256 を記録します。`artifact_manifest.json` 自身は digest 対象から外します。
-- 可視化は `experiments/<topic>/visualize.ipynb` の Jupyter notebook を入口にします。notebook は `summary.json`、`cases.jsonl`、必要な `logs/` artifact を読んで図表化するためのもので、formal run の起動や設定正本にはしません。
-- `required_eval_artifacts` と `optional_eval_artifacts` は `result/<variant>/<run_name>/` から自動収集したい eval artifact pattern を表します。`summary.json` と `cases.jsonl` は managed runner の既定 required eval とし、topic 固有の追加 artifact だけを registry に書き足します。managed file と managed log (`run_manifest.json`、`eval_manifest.json`、`run.log`、`artifact_manifest.json`、`command.json`、`config_source.yaml`、`environment.json`、`source_snapshot.json`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log`) は `artifact_manifest.json` で辿ります。
+- run 終了時には `artifact_manifest.json` を書き、`result/<run-id>/` 内の managed file、raw result、summary、log の relative path、bytes、sha256 を記録します。`artifact_manifest.json` 自身は digest 対象から外します。
+- 可視化は `experiments/<topic>/visualization.py` の renderer を入口にします。renderer は `summary/` の compact artifact と `raw/` の必要な入力を読み、HTML/画像を生成します。formal run の起動や設定正本にはしません。既定 template は notebook を生成しません。
+- `required_eval_artifacts` と `optional_eval_artifacts` は managed run root から自動収集したい eval artifact pattern を表します。topic template の既定 required eval は `summary/summary.json` と `summary/cases.jsonl` とし、旧 root-level path へ fallback しません。managed file と managed log (`run_manifest.json`、`eval_manifest.json`、`run.log`、`artifact_manifest.json`、`command.json`、`config_source.yaml`、`environment.json`、`source_snapshot.json`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log`) は `artifact_manifest.json` で辿ります。
 
 ## validation
 

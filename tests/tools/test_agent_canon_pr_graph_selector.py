@@ -162,12 +162,6 @@ def graph_builder_exit_fixture(
     result_exit_code: int,
 ) -> tuple[Path, Path, str]:
     """Create a base repo and builder executable with independently chosen exits."""
-    git(root, "init", "-b", "main")
-    git(root, "config", "user.email", "selector@example.invalid")
-    git(root, "config", "user.name", "Selector Fixture")
-    (root / ".outer-parent").write_text("fixture\n", encoding="utf-8")
-    git(root, "add", ".outer-parent")
-    git(root, "commit", "-m", "Outer parent fixture")
     parent = root / "base-repo"
     parent.mkdir()
     manifest = parent / "documents" / "runtime" / "shared-runtime-surfaces.toml"
@@ -196,21 +190,12 @@ def graph_builder_exit_fixture(
     producer = source_root / "tools" / "agent_tools" / "surface_manifest.py"
     producer.parent.mkdir(parents=True)
     producer.write_text("# current producer fixture\n", encoding="utf-8")
-    shutil.copy2(
-        PROJECT_ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py",
-        producer.parent / "parent_root_side_effects.py",
-    )
     manifest = source_root / "documents" / "runtime" / "shared-runtime-surfaces.toml"
     manifest.parent.mkdir(parents=True)
     shutil.copy2(
         PROJECT_ROOT / "documents" / "runtime" / "shared-runtime-surfaces.toml",
         manifest,
     )
-    git(source_root, "init", "-b", "main")
-    git(source_root, "config", "user.email", "selector@example.invalid")
-    git(source_root, "config", "user.name", "Selector Fixture")
-    git(source_root, "add", ".")
-    git(source_root, "commit", "-m", "Builder source fixture")
     return parent, source_root, base
 
 
@@ -435,15 +420,12 @@ def source_diagnostic_fixture(
     }
 
 
-def isolated_parent_environment(parent_root: Path) -> dict[str, str]:
-    """Return the complete runner environment; ``parent_root`` is data only."""
-    del parent_root
-    return os.environ.copy()
-
-
-def isolated_current_builder_environment(_root: Path) -> dict[str, str]:
-    """Bind real-builder fixtures to the current authenticated source root."""
-    return isolated_parent_environment(PROJECT_ROOT)
+def isolated_current_builder_environment(root: Path) -> dict[str, str]:
+    """Bind real-builder fixtures to current source and temporary Cargo state."""
+    return {
+        "AGENT_CANON_TOOLS_HOME": str(root / "agent-canon-tools-home"),
+        "CARGO_TARGET_DIR": str(root / "agent-canon-cargo-target"),
+    }
 
 
 class AgentCanonPrGraphSelectorTest(unittest.TestCase):
@@ -897,18 +879,13 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             base = graph_change_fixture(root, {})
             packet = root / "reports" / "dependency-review" / "changed-paths.json"
 
-            with patch.dict(
-                os.environ,
-                isolated_parent_environment(root),
-                clear=True,
-            ):
-                selection = selector.select(
-                    root,
-                    PROJECT_ROOT,
-                    {},
-                    trusted_base_sha=base,
-                    changed_path_packet=packet,
-                )
+            selection = selector.select(
+                root,
+                PROJECT_ROOT,
+                {},
+                trusted_base_sha=base,
+                changed_path_packet=packet,
+            )
 
             self.assertEqual(selection.status, "skipped")
             payload = json.loads(packet.read_text(encoding="utf-8"))
@@ -1027,16 +1004,11 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 process_exit_code=0,
                 result_exit_code=1,
             )
-            with patch.dict(
-                os.environ,
-                isolated_parent_environment(Path(tmp_dir)),
-                clear=True,
+            with patch.object(
+                selector, "selector_source_root", return_value=source_root
             ):
-                with patch.object(
-                    selector, "selector_source_root", return_value=source_root
-                ):
-                    with self.assertRaises(selector.SelectorFailure) as raised:
-                        selector.build_trusted_base_graph(parent, base, source_root)
+                with self.assertRaises(selector.SelectorFailure) as raised:
+                    selector.build_trusted_base_graph(parent, base, source_root)
 
         self.assertEqual(
             raised.exception.reason,
@@ -1052,16 +1024,11 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 process_exit_code=1,
                 result_exit_code=0,
             )
-            with patch.dict(
-                os.environ,
-                isolated_parent_environment(Path(tmp_dir)),
-                clear=True,
+            with patch.object(
+                selector, "selector_source_root", return_value=source_root
             ):
-                with patch.object(
-                    selector, "selector_source_root", return_value=source_root
-                ):
-                    with self.assertRaises(selector.SelectorFailure) as raised:
-                        selector.build_trusted_base_graph(parent, base, source_root)
+                with self.assertRaises(selector.SelectorFailure) as raised:
+                    selector.build_trusted_base_graph(parent, base, source_root)
 
         self.assertEqual(
             raised.exception.reason,
@@ -1085,7 +1052,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             with patch.dict(
                 os.environ,
                 isolated_current_builder_environment(Path(tmp_dir)),
-                clear=True,
+                clear=False,
             ):
                 trusted_base = selector.build_trusted_base_graph(
                     parent,
@@ -1138,7 +1105,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             with patch.dict(
                 os.environ,
                 isolated_current_builder_environment(Path(tmp_dir)),
-                clear=True,
+                clear=False,
             ):
                 acceptance = selector.evaluate_built_graph(
                     parent,

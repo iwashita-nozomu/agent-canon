@@ -23,13 +23,19 @@ import yaml
 
 try:
     from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
         ParentRootSideEffectBoundary,
-        resolve_parent_writer_attestation,
+        ParentRootSideEffectError,
+        attest_parent_root,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
         ParentRootSideEffectBoundary,
-        resolve_parent_writer_attestation,
+        ParentRootSideEffectError,
+        attest_parent_root,
     )
 
 AUTHORITY_FILE_NAME = "task_authority.yaml"
@@ -51,9 +57,17 @@ AuthorityEntry: TypeAlias = dict[str, object]
 
 def _write_parent_file(path: Path, data: bytes, purpose: str) -> None:
     """Publish authority evidence through the selected parent root."""
-    attestation = resolve_parent_writer_attestation(purpose=purpose)
-    ParentRootSideEffectBoundary().write_parent_owned_file(
-        attestation, path, data, purpose
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+        )
+        ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, data, purpose)
+        return
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        f"{purpose}: explicit parent root is required for publication",
     )
 
 

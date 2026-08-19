@@ -148,7 +148,7 @@ artifact-only role や review role の write scope を確認するときは、`v
 - role 定義と write policy は `agents/agents_config.json` を正本にします。
 - handoff、review、response、escalation の書式は `agents/COMMUNICATION_PROTOCOL.md` を正本にします。
 - 共通 workflow と skill routing は `agents/` 側で保守し、runtime entrypoint へ role 一覧を重複記載しません。
-- 会話だけを根拠に実装へ進めず、`documents/`、`notes/`、`references/` と local library の sweep を先に行います。
+- 会話だけを根拠に実装へ進めず、`documents/`、`documents/notes/`、`references/` と local library の sweep を先に行います。
 - 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言します。
 - review feedback は、直前の execution role が反映してから次段へ handoff します。
 - 学術文章では `document_flow_reviewer`、`notation_definition_reviewer`、`logic_gap_reviewer`、completeness reviewer を兼務させません。

@@ -25,8 +25,6 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "check_agent_runtime_alignment.py"
-TEST_TEMP_ROOT = Path(tempfile.gettempdir())
-TEST_PARENT_ROOT = Path(os.path.commonpath((PROJECT_ROOT, TEST_TEMP_ROOT))).resolve()
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 import check_agent_runtime_alignment as runtime_alignment  # noqa: E402
@@ -44,9 +42,6 @@ from packets import (  # noqa: E402
     resolve_role_document_packet,
 )
 from team_config import TaskCatalog, load_team_config, resolve_role  # noqa: E402
-from tools.agent_tools.fixture_spawn import (  # noqa: E402
-    bootstrap_fixture_public_environment,
-)
 from workspace_scope import resolve_report_bundle_artifact_path  # noqa: E402
 
 
@@ -146,19 +141,21 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
     def test_alignment_script_passes(self) -> None:
         """The runtime alignment checker should succeed without findings."""
-        with bootstrap_fixture_public_environment(
-            mode="ordinary_tool",
-            fixture_cwd=PROJECT_ROOT,
-            base_env=os.environ,
-        ) as fixture:
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT_PATH)],
-                cwd=PROJECT_ROOT,
-                env=fixture.environment,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+        environment = os.environ.copy()
+        test_parent_root = os.environ.get(
+            "AGENT_CANON_TEST_PARENT_ROOT", str(PROJECT_ROOT.parents[2])
+        )
+        environment["AGENT_CANON_PARENT_ROOT"] = test_parent_root
+        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = test_parent_root
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT_PATH)],
+            cwd=PROJECT_ROOT,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("AGENT_RUNTIME_ALIGNMENT=pass", result.stdout)
 
@@ -168,20 +165,18 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
     def test_alignment_script_standalone_parent_uses_external_fixture_parent(self) -> None:
         """Standalone parent-bound checks keep derived reports outside source."""
+        environment = os.environ.copy()
+        environment["AGENT_CANON_PARENT_ROOT"] = str(PROJECT_ROOT)
+        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(PROJECT_ROOT)
         before = set(PROJECT_ROOT.parent.glob(".agent-canon-runtime-parent-*"))
-        with bootstrap_fixture_public_environment(
-            mode="ordinary_tool",
-            fixture_cwd=PROJECT_ROOT,
-            base_env=os.environ,
-        ) as fixture:
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT_PATH)],
-                cwd=PROJECT_ROOT,
-                env=fixture.environment,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT_PATH)],
+            cwd=PROJECT_ROOT,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
         after = set(PROJECT_ROOT.parent.glob(".agent-canon-runtime-parent-*"))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("AGENT_RUNTIME_ALIGNMENT=pass", result.stdout)
