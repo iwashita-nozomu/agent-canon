@@ -37,11 +37,11 @@ downstream design ../../.agents/skills/worktree-start/SKILL.md runtime skill shi
 - `documents/operations/worktree-lifecycle.md`
 - `documents/operations/WORKTREE_SCOPE_TEMPLATE.md`
 - `documents/operations/BRANCH_SCOPE.md`
-- `notes/guardrails/README.md`
-- `notes/failures/README.md`
-- `notes/worktrees/README.md`
-- `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
-- `notes/branches/README.md`
+- `documents/notes/guardrails/README.md`
+- `documents/notes/failures/README.md`
+- `documents/notes/worktrees/README.md`
+- `documents/notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
+- `documents/notes/branches/README.md`
 - `reports/agents/<run-id>/user_request_contract.md`
 - `tools/setup_worktree.sh` (legacy reference only; do not use for new tasks)
 - `tools/worktree_start.sh` (legacy cleanup diagnostic only)
@@ -65,14 +65,14 @@ downstream design ../../.agents/skills/worktree-start/SKILL.md runtime skill shi
 - `Editable Directories`、`Runtime Output Directories`、`Read-Only Or Avoid Directories` は legacy evidence として読み、current checkout の write scope は handoff packet で固定する
 - `Required References Before Editing` に broad directory 名ではなく concrete file や確認対象 command を書く
 - `Main Carry-Over Targets` と `Working Notes During Execution` に legacy action log path、branch summary path、主な result の置き場を書く
-- `notes/worktrees/worktree_<topic>_YYYY-MM-DD.md` は legacy evidence として扱い、current checkout の run-local `work_log.md` に carry-over 判断を追記する
+- `documents/notes/worktrees/worktree_<topic>_YYYY-MM-DD.md` は legacy evidence として扱い、current checkout の run-local `work_log.md` に carry-over 判断を追記する
 - `reports/agents/<run-id>/user_request_contract.md` の path を決め、最初の cleanup action がどの clause ID を処理するか固定する
 - 古い worktree が experiment topic を持つ場合は、`experiments/registry.toml` の stale `active_worktree` / `scope_file` を cleanup 対象にする
-- branch が複数 session 続いた場合や handoff する場合は `notes/branches/<branch_topic>.md` を summary evidence として作るか更新する
+- branch が複数 session 続いた場合や handoff する場合は `documents/notes/branches/<branch_topic>.md` を summary evidence として作るか更新する
 - この branch で必要な pre-commit check は current checkout の run-local handoff packet に固定する
 - `git status --short --branch` を確認し、unexpected dirty state があれば action log に残す
 - `git worktree list --porcelain` を確認し、duplicate / stale worktree が無いか見る
-- `notes/guardrails/README.md` と `notes/failures/README.md` を読み、今の task で踏みやすい avoid pattern と既知 failure を確認する
+- `documents/notes/guardrails/README.md` と `documents/notes/failures/README.md` を読み、今の task で踏みやすい avoid pattern と既知 failure を確認する
 - `python3 tools/agent_tools/worktree_scope_lint.py --current` で scope の placeholder や stale field を診断する。`bash tools/worktree_start.sh --current` は cleanup diagnostic 以外では使わない
 - 複数 worktree がある、または stale な再開で不安がある場合は `bash tools/docs/check_worktree_scopes.sh` を実行する
 - conflict risk、scope drift、carry-over 漏れの兆候があれば、編集前に action log に残す
@@ -82,9 +82,9 @@ downstream design ../../.agents/skills/worktree-start/SKILL.md runtime skill shi
 1. `python3 tools/agent_tools/worktree_scope_lint.py --current` で legacy `WORKTREE_SCOPE.md` と action log の不足を診断します。新しい `git worktree` は作成しません。
 1. `documents/operations/WORKTREE_SCOPE_TEMPLATE.md` は legacy scope の照合用としてだけ読み、current checkout の作業 scope は run-local handoff packet と `work_log.md` で管理します。
 1. experiment topic を持つ branch なら `experiments/registry.toml` の entry を見て、stale `active_worktree` と `scope_file` を cleanup 対象として記録します。
-1. `notes/worktrees/WORKTREE_LOG_TEMPLATE.md` 由来の action log は legacy evidence として読み、current checkout の run-local `work_log.md` に carry-over 判断を書きます。
+1. `documents/notes/worktrees/WORKTREE_LOG_TEMPLATE.md` 由来の action log は legacy evidence として読み、current checkout の run-local `work_log.md` に carry-over 判断を書きます。
 1. 以後の継続ログは `python3 tools/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"` を既定にし、entry に `request_clause_ids=` を残します。
-1. `notes/guardrails/README.md` と `notes/failures/README.md` を見て、今回の task で避けるべき既知 pattern を拾います。
+1. `documents/notes/guardrails/README.md` と `documents/notes/failures/README.md` を見て、今回の task で避けるべき既知 pattern を拾います。
 1. `git status --short --branch`、`git worktree list --porcelain`、必要なら `bash tools/docs/check_worktree_scopes.sh` を実行します。
 1. 次の一手と carry-over 先を action log に書いてから編集を始めます。
 

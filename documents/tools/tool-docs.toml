@@ -234,3 +234,10 @@ tool = "tools/agent_tools/lsp_code_analysis.py"
 doc = "documents/tools/lsp_code_analysis.md"
 language = "python"
 summary = "Canonical LSP 3.17 code-analysis protocol, report schema, and legacy adapter documentation."
+
+[[tool]]
+id = "extract-docx"
+tool = "tools/docs/extract_docx.py"
+doc = "documents/tools/extract_docx.md"
+language = "python"
+summary = "Standard-library DOCX decomposition into searchable and auditable reference bundles."

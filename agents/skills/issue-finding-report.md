@@ -17,14 +17,15 @@ downstream design ../../.agents/skills/issue-finding-report/SKILL.md exposes thi
 
 ## Reader Map
 
-- Purpose: turn accumulated runtime, prompt, hook, skill, tool, workflow, and
-  eval evidence into durable AgentCanon operational issue candidates.
+- Purpose: turn accumulated runtime evidence and direct AgentCanon-owned
+  defects into durable AgentCanon operational issue candidates.
 - Section path: Purpose and Use When set the route; Inputs and Abstract Cause
   Taxonomy define evidence and grouping; Multi-Agent Partition, Confirmed
   Occurrence Location Contract, Issue Candidate Contract, Output Packet, and
   Validation define production and checks.
-- Use when: repeated agent behavior, routing misses, workflow evidence, or log
-  dashboard signals should become issue-backed repair work.
+- Use when: repeated agent behavior, routing misses, workflow evidence, log
+  dashboard signals, or a current consumer task exposes an AgentCanon-owned
+  defect that should become issue-backed repair work.
 - Boundary: compact analysis comes from `agent-log-analysis`; this skill writes
   issue candidates or finding packets without replacing PR processing or tool
   finding ownership.
@@ -41,6 +42,10 @@ receives structured dashboard artifacts and produces issue records or a finding
 packet while leaving runtime analysis, tool finding packets, and PR processing
 with their owner skills.
 
+It also owns direct upstream escalation when a current repository task confirms
+that the failing invariant belongs to AgentCanon rather than the consumer
+repository. This direct route does not require repeated evidence or a dashboard.
+
 ## Use When
 
 - User asks to turn logs, prompt history, run bundles, or agent reports into
@@ -51,6 +56,57 @@ with their owner skills.
   user-request, or owner-bounded scope.
 - The task asks why agent behavior keeps recurring and wants issue-backed
   repair work.
+- A current repository task confirms that a failing contract, workflow, tool,
+  hook, runtime surface, or policy is owned by AgentCanon rather than by the
+  consumer repository.
+
+## Direct AgentCanon Defect Escalation
+
+Let `owner(f)` be the canonical owner of the failing invariant `f`. Activate
+this route only after bounded evidence establishes `owner(f) = AgentCanon`.
+A nearby vendored path, generated copy, or consumer observation alone does not
+establish ownership.
+
+Before changing the consumer repository, freeze this packet:
+
+```text
+consumer_task: <repository and Issue/PR/task reference>
+agentcanon_snapshot: <vendored pin, source commit, or immutable runtime identity>
+failure_condition: <minimal precondition plus command/action that reproduces the failure>
+expected_behavior: <owner contract or invariant>
+actual_behavior: <observed result>
+occurrence_locations: <confirmed AgentCanon and cross-surface endpoint records>
+duplicate_search: <durable issue search and result>
+consumer_scope_disposition: <blocked|deferred|independent-work-remains>
+upstream_issue: <existing or newly created durable AgentCanon Issue>
+```
+
+Apply these rules:
+
+1. Identify the minimal failure condition and the exact AgentCanon snapshot or
+   pin before proposing a fix.
+1. Use the Confirmed Occurrence Location Contract below. For a cross-repository
+   disconnect, record the consumer observation endpoint and every AgentCanon
+   endpoint needed to demonstrate the broken invariant. Keep proposed edit
+   paths separate from observed locations.
+1. Search existing AgentCanon durable issues by owner, root cause, and fix. Link
+   the matching issue, or create one durable local record and its GitHub mirror
+   through the issue and PR publication owners.
+1. Preserve the current consumer task's requested scope and completion criteria.
+   Record the AgentCanon Issue only as a dependency or blocker. Continue only
+   consumer work that is independent of the defect.
+1. Do not resolve or close the AgentCanon finding with a consumer-local copy,
+   symlink, monkeypatch, source override, fallback, bypass, validation
+   weakening, exception config, or other change whose purpose is to mask the
+   upstream defect.
+1. If AgentCanon ownership or a confirmed occurrence location is still
+   unresolved, do not assert an AgentCanon root cause or required fix. Keep the
+   finding as an investigation with `need verification` according to the
+   occurrence-location contract.
+
+The upstream repair is a separate AgentCanon Issue. Do not add it to the
+consumer Issue's done conditions or expand the active consumer write scope to
+implement it.
 
 ## Inputs
 
@@ -181,7 +237,7 @@ Before writing a new issue:
 1. Search existing durable surfaces.
 
    ```bash
-   git grep -n "<cause keywords>" -- issues memory notes/failures documents agents
+   git grep -n "<cause keywords>" -- issues memory documents/notes/failures documents agents
    ```
 
 1. Expand candidate affected surfaces through dependency review.

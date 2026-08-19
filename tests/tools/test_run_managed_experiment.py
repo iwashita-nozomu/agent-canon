@@ -91,7 +91,17 @@ def create_fake_repo_dirs(repo_root: Path) -> None:
         / "_template"
         / "result"
     ).mkdir(parents=True)
+    (
+        repo_root
+        / "vendor"
+        / "agent-canon"
+        / "templates"
+        / "experiments"
+        / "_template"
+        / "raw"
+    ).mkdir()
     (repo_root / "experiments" / "demo_topic" / "result").mkdir(parents=True)
+    (repo_root / "experiments" / "demo_topic" / "raw").mkdir()
     (repo_root / "experiments" / "report").mkdir(parents=True)
     (repo_root / "tools" / "experiments").mkdir(parents=True)
 
@@ -120,6 +130,10 @@ def write_template_topic(repo_root: Path) -> None:
     )
     (template_dir / "result" / "README.md").write_text(
         "# Result Directory\n",
+        encoding="utf-8",
+    )
+    (template_dir / "raw" / ".gitignore").write_text(
+        "*\n!.gitignore\n",
         encoding="utf-8",
     )
     document_template_dir = (
@@ -1377,8 +1391,8 @@ def test_check_experiment_registry_accepts_valid_branch_topic(tmp_path: Path) ->
         capture_output=True,
         text=True,
     )
-    (repo_root / "notes" / "branches").mkdir(parents=True)
-    (repo_root / "notes" / "branches" / "branch_only.md").write_text(
+    (repo_root / "documents" / "notes" / "branches").mkdir(parents=True)
+    (repo_root / "documents" / "notes" / "branches" / "branch_only.md").write_text(
         "# Branch Only\n",
         encoding="utf-8",
     )
@@ -1391,7 +1405,7 @@ def test_check_experiment_registry_accepts_valid_branch_topic(tmp_path: Path) ->
                 'name = "branch_only"',
                 'status = "active"',
                 'remote_branch = "experiment/branch-only"',
-                'primary_note = "notes/branches/branch_only.md"',
+                'primary_note = "documents/notes/branches/branch_only.md"',
                 "",
             ]
         ),
@@ -1419,8 +1433,8 @@ def test_check_experiment_registry_rejects_duplicate_branch_topic_name(
 ) -> None:
     """The registry checker should reject duplicate names across topic tables."""
     repo_root = build_repo(tmp_path)
-    (repo_root / "notes" / "branches").mkdir(parents=True)
-    (repo_root / "notes" / "branches" / "demo_topic.md").write_text(
+    (repo_root / "documents" / "notes" / "branches").mkdir(parents=True)
+    (repo_root / "documents" / "notes" / "branches" / "demo_topic.md").write_text(
         "# Demo Topic Branch\n",
         encoding="utf-8",
     )
@@ -1433,7 +1447,7 @@ def test_check_experiment_registry_rejects_duplicate_branch_topic_name(
                 'name = "demo_topic"',
                 'status = "active"',
                 'remote_branch = "experiment/demo-topic"',
-                'primary_note = "notes/branches/demo_topic.md"',
+                'primary_note = "documents/notes/branches/demo_topic.md"',
                 "",
             ]
         ),
@@ -1655,6 +1669,9 @@ def test_create_experiment_topic_scaffolds_directory_and_registry(
     assert result.returncode == 0
     topic_dir = repo_root / "experiments" / "new_topic"
     assert topic_dir.is_dir()
+    assert (topic_dir / "raw" / ".gitignore").read_text(encoding="utf-8") == (
+        "*\n!.gitignore\n"
+    )
     readme_text = (topic_dir / "README.md").read_text(encoding="utf-8")
     assert "# new_topic" in readme_text
     assert "<topic>" not in readme_text
@@ -1691,7 +1708,7 @@ def test_sync_experiment_registry_context_updates_branch_scope_and_worktree(
             "--branch",
             "work/demo-topic-20260406",
             "--branch-note",
-            "notes/branches/demo_topic.md",
+            "documents/notes/branches/demo_topic.md",
             "--topic",
             "demo_topic",
         ],
@@ -1707,4 +1724,4 @@ def test_sync_experiment_registry_context_updates_branch_scope_and_worktree(
     assert 'active_branch = "work/demo-topic-20260406"' in registry_text
     assert 'active_worktree = ".worktrees/demo-topic"' in registry_text
     assert 'scope_file = ".worktrees/demo-topic/WORKTREE_SCOPE.md"' in registry_text
-    assert 'branch_note = "notes/branches/demo_topic.md"' in registry_text
+    assert 'branch_note = "documents/notes/branches/demo_topic.md"' in registry_text

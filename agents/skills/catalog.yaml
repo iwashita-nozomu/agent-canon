@@ -324,6 +324,9 @@ skill_families:
       required: []
       conditional:
       - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      - python3 tools/static_analysis/cpp/static_analysis.py select-db --workspace-root <workspace-root> --build-dir <build-dir>
+      - python3 tools/static_analysis/cpp/static_analysis.py clangd-check --workspace-root <workspace-root> --source <source> --build-dir <build-dir>
+      - python3 tools/static_analysis/cpp/static_analysis.py clang-tidy --workspace-root <workspace-root> --source <source> --build-dir <build-dir>
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check
@@ -335,7 +338,7 @@ skill_families:
         - ["cpp/CMakeLists.txt"]
         - ["cpp/src"]
         - ["cpp/include"]
-        - ["cpp/tests"]
+        - ["tests/cpp"]
         - ["cpp/experiments"]
         - ["C++", "review"]
   - id: oop-readability-check
@@ -413,8 +416,8 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<variant>/<run_name>
-        --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
+      - python3 -m tools.experiments.save_experiment_result_annex --raw-dir experiments/<topic>/raw/<variant>/<run_name>
+        --annex-repo "$EXPERIMENT_RAW_ANNEX_REPO"
       - python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir
         reports/agents/<run-id>
       - python3 tools/agent_tools/runtime_log_archive_git.py push
@@ -518,7 +521,7 @@ skill_families:
       conditional:
       - python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
       - python3 tools/agent_tools/generate_agent_runtime_dashboard.py
-      - git grep -n "<cause keywords>" -- issues memory notes/failures documents agents
+      - git grep -n "<cause keywords>" -- issues memory documents/notes/failures documents agents
       - python3 tools/agent_tools/issue_sync.py --root .
       - bash tools/agent_tools/run_repo_dependency_review.sh
       - python3 tools/agent_tools/check_dependency_headers.py --changed
@@ -1528,8 +1531,8 @@ skill_families:
       - python3 -m tools.ci.check_experiment_registry
       - python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant
         <variant> -- python3 experiments/<topic>/run.py
-      - python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<variant>/<run_name>
-        --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
+      - python3 -m tools.experiments.save_experiment_result_annex --raw-dir experiments/<topic>/raw/<variant>/<run_name>
+        --annex-repo "$EXPERIMENT_RAW_ANNEX_REPO"
       - python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>
       - python3 -m pytest tests/tools/test_run_managed_experiment.py -q
       - agent-canon semantic-index discourse-relations --profile experiment-report

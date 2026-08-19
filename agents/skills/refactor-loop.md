@@ -114,7 +114,7 @@ source / pin routing を参照として担当します。
 
 For a C++ path or build-layout refactor, the replaceable project boundary is
 `cpp/CMakeLists.txt`. The path map is `cpp/include/` for public headers,
-`cpp/src/` for production source, `cpp/tests/` for CTest-owned test targets, and
+`cpp/src/` for production source, `tests/cpp/` for derived-project CTest-owned test targets, and
 `cpp/experiments/` for native experiment targets. The parent root remains
 language-neutral; commands use `cmake -S "$ROOT/cpp" -B
 "$ROOT/build/cpp/<profile>"` and the matching

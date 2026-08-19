@@ -32,7 +32,7 @@ for parent AgentCanon PR graph selection; unknown IDs fail selection.
 | docker-runtime | Docker runtime | root `docker/`, runtime packs | Dockerfile, image, pack, Jupyter, or container setup changes | no |
 | github-automation | GitHub automation | `.github/`, PR templates, Actions helpers | GitHub Actions, PR automation, or GitHub path-constrained copies change | no |
 | experiment | Experiment | `experiments/`, experiment registry, managed runner tools | Experiment topics, formal runs, result summaries, or research workflows change | no |
-| cpp | C++ | parent root remains language-neutral, `cpp/CMakeLists.txt` as the single native project entry, `cpp/cmake/`, `cpp/src/`, `cpp/include/`, `cpp/tests/`, `cpp/experiments/`, C++ OOP checks, `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"` | C or C++ code, build layout, or native artifacts change | no |
+| cpp | C++ | parent root remains language-neutral, `cpp/CMakeLists.txt` as the single native project entry, `cpp/cmake/`, `cpp/src/`, `cpp/include/`, `tests/cpp/` (out-of-tree project tests), `cpp/experiments/`, C++ OOP checks, `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"` | C or C++ code, build layout, or native artifacts change | no |
 | memory-and-learning | Memory and learning | `memory/`, notes promotion, learning workflows | User asks to persist memory, feedback/retrospective is observed, or agent-learning is in scope | no |
 | maintenance | Maintenance | inventories, review backlog scan, improvement guide, catalog drift tools | AgentCanon maintenance, repo-wide audit, or scheduled cleanup work | yes |
 

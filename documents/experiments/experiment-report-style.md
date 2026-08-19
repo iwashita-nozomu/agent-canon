@@ -29,7 +29,7 @@ repo 固有の結論を先に言うと、実験レポートは IMRaD をその�
 1. `Artifacts and Carry-Over`
 1. `Critical Review`
 
-これは外部の学術 writing guide を、この repo の `experiments/` と `notes/` の運用に合わせて再構成したものです。以下の「carry-over」や `summary.json` の扱いなどは repo 向けの推論です。
+これは外部の学術 writing guide を、この repo の `experiments/` と `documents/notes/` の運用に合わせて再構成したものです。以下の「carry-over」や `summary.json` の扱いなどは repo 向けの推論です。
 
 ## この文書の読み方
 
@@ -56,7 +56,7 @@ repo 固有の結論を先に言うと、実験レポートは IMRaD をその�
 - 追加ログは `experiments/<topic>/result/<variant>/<run_name>/logs/` に置きます。
 - 可視化 notebook は `experiments/<topic>/visualize.ipynb` に置きます。Notebook は formal run の起動手順や設定正本ではなく、図表と reader-facing exploration の入口です。
 - report 本文からは、少なくとも `eval_manifest.json`、`summary.json`、`cases.jsonl`、`logs/`、可視化 notebook、主要な図を辿れるようにします。
-- 複数 run をまたぐ考察は `notes/experiments/` や `notes/themes/` に分けます。
+- 複数 run をまたぐ考察は `documents/notes/experiments/` や `documents/notes/themes/` に分けます。
 
 ## 2.1 Title
 

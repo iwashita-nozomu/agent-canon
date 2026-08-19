@@ -24,7 +24,7 @@ context から必要な record だけを on-demand で read します。
 
 - raw chat、時系列、hook/event、run bundle evidence: runtime log/evidence owner
 - actionable defect と修正 action: `issues/open/`
-- 再発した failure pattern: `notes/failures/`
+- 再発した failure pattern: `documents/notes/failures/`
 - owner を参照する独立した problem-solving knowledge: `memory/records/*.md`
 - repo-wide rule、workflow、stable preference: canonical owner への明示変更
 

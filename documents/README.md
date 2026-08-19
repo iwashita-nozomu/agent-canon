@@ -24,6 +24,7 @@ downstream implementation ../rust/agent-canon/src/structured_analysis.rs documen
 - root view、Symlink、checked copy は [Runtime Surface](./runtime/SHARED_RUNTIME_SURFACES.md)
   と [親レポ構造](./parent-repository/README.md) を読みます。
 - 機械可読の構造契約は [structure](./structure/) にあります。
+- cross-run の知見、比較、補助記録は [notes](./notes/) に置き、正本へ昇格した内容は所有する責務文書へ移します。
 - workflow、skill、subagent の正本は `agents/` であり、この directory に複製しません。
 
 ## Directory Map
@@ -36,6 +37,7 @@ downstream implementation ../rust/agent-canon/src/structured_analysis.rs documen
 | `conventions/` | 言語、レビュー、logging、OOP、docstring の共通規約 |
 | `design/` | 数理・API・依存・build・tooling の設計境界 |
 | `experiments/` | 実験、GPU admission、ExperimentRunner、結果保持 |
+| `notes/` | cross-run insight、experiment/research summary、branch/worktree/failure の補助記録 |
 | `operations/` | branch、checklist、troubleshooting、legacy cleanup |
 | `parent-repository/` | AgentCanon をvendorする親レポのroot構造 |
 | `prose-reasoning-graph/` | 文書推論グラフのDSLと分析 |
@@ -66,6 +68,7 @@ downstream implementation ../rust/agent-canon/src/structured_analysis.rs documen
 - 共有runtimeの所有境界: [runtime](./runtime/)
 - 構造の機械検証: [structure](./structure/)
 - 文書の分割判断: [rule](./rule/)
+- cross-run の知見: [notes](./notes/)
 
 構造確認は `tree` と `repo_structure_contract.py` を使います。直下ファイルが
 `README.md` 以外に増えた場合は、責務を分類して適切な directory owner document を

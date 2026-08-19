@@ -2279,3 +2279,23 @@ entries:
       - documents/tools/README.md
     tests:
       - tests/tools/test_notebook_quality.py
+
+  - id: extract-docx
+    summary: Decomposes an authorized DOCX into a searchable and auditable reference bundle.
+    path: tools/docs/extract_docx.py
+    family: docs
+    role: helper
+    status: canonical
+    audience: user
+    placement: user_entrypoint
+    command: python3 tools/docs/extract_docx.py INPUT.docx --output-dir OUTPUT_DIR
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/extract_docx.md
+    tests:
+      - tests/tools/test_extract_docx.py

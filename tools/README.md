@@ -229,7 +229,7 @@ leave regenerated stdout/stderr captures in the source tree.
 `reports/agent-runtime-dashboard/`, or `reports/agent-improvement-guide/`
 remain tracked, untracked, or ignored in the checkout. Delete those outputs and
 rerun the producer, or promote the underlying rule to `documents/`, `agents/`,
-or `notes/` with a dependency manifest.
+or `documents/notes/` with a dependency manifest.
 `agent-canon test-design check` scans test-like files for missing oracle,
 static-analysis duplicate wrappers, generated execution-only placeholders,
 private-detail coupling, exact mock/output/prose assertions, wall-clock
@@ -479,6 +479,8 @@ Current promoted helpers:
 - `tools/audit/audit_logger.py`
 - `tools/docs/create_design_template.py`
 - `tools/docs/find_redundant_designs.py`
+- `tools/docs/extract_docx.py`
+  - 標準ライブラリで、DOCXを検索用Markdown・raw member・manifest付きのreference bundleへ展開します。
 - `tools/docs/find_similar_designs.py`
 - `tools/docs/organize_designs.py`
 - `tools/docs/tfidf_similar_docs.py`
