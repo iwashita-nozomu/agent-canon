@@ -1,0 +1,23 @@
+name: Issue 781 source export
+
+on:
+  push:
+    branches:
+      - fix/781-stop-template-agent-export
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: issue-781-agent-canon-source
+          path: |
+            .
+            !.git
+          include-hidden-files: true
+          retention-days: 1
