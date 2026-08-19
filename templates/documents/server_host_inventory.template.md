@@ -9,7 +9,7 @@ upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared docume
 # Server Host Inventory Template
 
 この template は、main server host の inventory と readiness gap を記録するためのものです。
-実値は host 固有なので、そのまま `documents/` に置かず、必要なら `notes/` か infra 管理 repo に複製して使います。
+実値は host 固有なので、そのまま `documents/` に置かず、必要なら `documents/notes/` か infra 管理 repo に複製して使います。
 
 ## Reader Map
 

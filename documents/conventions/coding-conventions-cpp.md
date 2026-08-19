@@ -24,7 +24,7 @@ layout と build tree の正本は [cpp-build-layout.md](../design/cpp-build-lay
 - template 既定の C++ 実装形態は header-only にします。
 - `cpp/CMakeLists.txt` を唯一の C++ project entrypoint にします。
 - `cpp/cmake/` は project-local helper module、`cpp/include/` は public header、
-  `cpp/src/` は production implementation、`cpp/tests/` は CTest source、
+  `cpp/src/` は production implementation、`tests/cpp/` は derived project の CTest source、
   `cpp/experiments/` は native experiment source と target wiring に固定します。
 - parent root は language-neutral な入口として保ち、C++ command は `cpp` を
   source anchor にして実行します。
@@ -33,10 +33,15 @@ layout と build tree の正本は [cpp-build-layout.md](../design/cpp-build-lay
 
 | owner | path/state | evidence command |
 | --- | --- | --- |
-| project | `cpp/CMakeLists.txt` が `cpp/src`、`cpp/include`、`cpp/tests`、`cpp/experiments` を同一 configure graph に登録する | `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>"` |
+| project | `cpp/CMakeLists.txt` が `cpp/src`、`cpp/include`、`${ROOT}/tests/cpp`、`cpp/experiments` を同一 configure graph に登録する。tests/cpp は明示 binary directory 付き out-of-tree `add_subdirectory` を使う | `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>"` |
 | production | `cpp-core` が public header と production source を提供する | `cmake --build "$ROOT/build/cpp/<profile>" --target cpp-core` |
 | tests | `cpp-test-<name>` が `cpp-core` を consume し、CTest が実行を所有する | `cmake --build "$ROOT/build/cpp/<profile>" --target cpp-tests`; `ctest --test-dir "$ROOT/build/cpp/<profile>"` |
 | experiments | `cpp-experiment-<name>` が `cpp-core` を consume し、build と run を分離する | `cmake --build "$ROOT/build/cpp/<profile>" --target cpp-experiments` |
+
+`tests/cpp/` は derived project の adapter/integration test owner です。AgentCanon の
+runtime/template test と cppdev の numerical/mathematical/NN oracle test は、それぞれの
+owning repository に保持し、この project の test tree に複製しません。production subtree
+には test compatibility path を作成しません。
 
 ## 禁止事項
 
@@ -90,7 +95,7 @@ design fact を再定義しません。
 
 ```bash
 python3 tools/agent_tools/check_hardcoded_numbers.py \
-  cpp/include cpp/src cpp/tests cpp/experiments \
+  cpp/include cpp/src tests/cpp cpp/experiments \
   --exclude vendor \
   --exclude reports
 ```

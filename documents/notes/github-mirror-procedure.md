@@ -9,7 +9,7 @@ upstream design README.md notes lifecycle index
 
 
 この note は、`origin` 以外の mirror remote を使う host 固有運用を記録するためのテンプレです。
-SSH key、remote URL、hook path は環境依存なので、repo の正本ではなく `notes/` に置きます。
+SSH key、remote URL、hook path は環境依存なので、repo の正本ではなく `documents/notes/` に置きます。
 
 ## 使う場面
 
@@ -63,5 +63,5 @@ git push --mirror <mirror-remote>
 
 ## Related
 
-- `notes/knowledge/git_mirroring.md`
+- `documents/notes/knowledge/git_mirroring.md`
 - `tools/push_origin.sh`

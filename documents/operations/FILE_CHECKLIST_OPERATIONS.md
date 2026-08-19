@@ -37,7 +37,7 @@ field が揃うまで作成しません。
 
 - stale `WORKTREE_SCOPE.md` を current task の scope authority として扱っていない
 - action log path が concrete になっている
-- `notes/guardrails/README.md` と `notes/failures/README.md` を見ている
+- `documents/notes/guardrails/README.md` と `documents/notes/failures/README.md` を見ている
 - kickoff 後の次の 1 手が action log に残っている
 
 ## 2. Python 実装変更
@@ -71,7 +71,7 @@ tools/bin/agent-canon docs check <changed-file>.md
 
 確認:
 
-- `documents/` と `notes/` の置き分けが合っている
+- `documents/` と `documents/notes/` の置き分けが合っている
 - hub 文書から辿れる
 - stale command や stale path を残していない
 

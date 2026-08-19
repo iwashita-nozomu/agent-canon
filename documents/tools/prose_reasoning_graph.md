@@ -191,7 +191,7 @@ python3 tools/agent_tools/prose_reasoning_graph.py check-document vendor/agent-c
 `.fields.PROSE_REASONING_GRAPH_DB` を後続 command へ渡します。
 
 ```bash
-python3 tools/agent_tools/prose_reasoning_graph.py ingest notes/draft.md \
+python3 tools/agent_tools/prose_reasoning_graph.py ingest documents/notes/draft.md \
   --prompt-file reports/agents/<run-id>/user_request_contract.md \
   --stats-out reports/agents/<run-id>/prose_ingest.stats.json
 GRAPH_DB="<PROSE_REASONING_GRAPH_DB from stats JSON>"

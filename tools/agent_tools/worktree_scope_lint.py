@@ -25,7 +25,7 @@ CORE_REF_GROUPS = (
         "vendor/agent-canon/documents/operations/BRANCH_SCOPE.md",
     ),
     (
-        "notes/worktrees/README.md",
+        "documents/notes/worktrees/README.md",
         "vendor/agent-canon/notes/worktrees/README.md",
     ),
 )
@@ -36,7 +36,7 @@ PLACEHOLDER_PATTERNS = (
     r"path/to/",
     r"another/path",
     r"documents/<",
-    r"notes/<",
+    r"documents/notes/<",
     r"reports/agents/<",
     r"worktree_<topic>",
     r"<branch_topic>",

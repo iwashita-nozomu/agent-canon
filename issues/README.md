@@ -123,7 +123,7 @@ AgentCanon PRs that change workflow, tooling, memory, evaluation, search behavio
 - link the issue file that drove the change, or
 - state that durable issue search found no existing finding and no new durable operational finding is required.
 
-If a run bundle exposes a workflow defect, the defect is not considered captured until this directory, `memory/`, or `notes/failures/` contains the durable record.
+If a run bundle exposes a workflow defect, the defect is not considered captured until this directory, `memory/`, or `documents/notes/failures/` contains the durable record.
 Do not delete closed findings during ordinary cleanup; archive or compact only during an explicit issue-retention pass.
 
 ## GitHub Issue Sync
