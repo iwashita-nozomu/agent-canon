@@ -72,8 +72,10 @@ jobs:
           if [ -n "$legacy_env" ]; then printf '%s\n' "$legacy_env"; exit 1; fi
           if [ -n "$legacy_schema" ]; then printf '%s\n' "$legacy_schema"; exit 1; fi
           if [ -n "$legacy_cli" ]; then printf '%s\n' "$legacy_cli"; exit 1; fi
-          test "$(git grep -l -- 'EXPERIMENT_RAW_DIR' tools/experiments/run_managed_experiment.py templates/experiments/_template/run.py | wc -l)" -eq 2
-          test "$(find tools/experiments -maxdepth 1 -type f -name '*annex*.py' | wc -l)" -eq 1
+          git grep -q -- 'EXPERIMENT_RAW_DIR' -- tools/experiments/run_managed_experiment.py
+          git grep -q -- 'EXPERIMENT_RAW_DIR' -- templates/experiments/_template/run.py
+          annex_owners="$(find tools/experiments -maxdepth 1 -type f -name '*annex*.py' -printf '%f\n')"
+          test "$annex_owners" = "save_experiment_result_annex.py"
 
       - name: Run repository-owned static units
         run: |
