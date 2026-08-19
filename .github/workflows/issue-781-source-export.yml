@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - fix/781-stop-template-agent-export
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
