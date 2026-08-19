@@ -18,10 +18,10 @@ upstream design README.md notes lifecycle index
 
 ## Read First
 
-- `notes/worktrees/...`
+- `documents/notes/worktrees/...`
 
 ## Main Carry-Over Targets
 
-- `notes/...`
+- `documents/notes/...`
 - `documents/...`
 - `reports/...`

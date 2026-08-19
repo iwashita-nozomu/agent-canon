@@ -71,7 +71,7 @@ experiments/report/
 - topic 固有ディレクトリの README や note から、定式化と比較対象を必ず辿れるようにします。
 - 長時間実行で生成される JSON、JSONL、HTML、SVG、ログは `result/<variant>/<run_name>/` に集約します。
 - 人が読む experiment report は `experiments/report/<topic>/<variant>/<run_name>.md` に置きます。
-- 複数 run をまたぐ要約は `notes/experiments/<topic>.md` に置きます。
+- 複数 run をまたぐ要約は `documents/notes/experiments/<topic>.md` に置きます。
 - top-level `reports/` は topic ごとの experiment report の正本にしません。
 - JSONL は run 中の progress 記録として扱い、resume 用の canonical input にはしません。
 - 生成物は `.gitignore` と `result/<variant>/<run_name>/` 運用で管理し、安定ライブラリやテストディレクトリへ混ぜません。

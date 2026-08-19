@@ -24,6 +24,6 @@ upstream design README.md notes lifecycle index
 
 ## References
 
-- `notes/...`
+- `documents/notes/...`
 - `documents/...`
 - external source:

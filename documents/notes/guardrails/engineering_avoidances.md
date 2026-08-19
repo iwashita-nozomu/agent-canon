@@ -24,7 +24,7 @@ upstream design README.md notes lifecycle index
 - `Implementation Source Packet` や `Design-To-Implementation Trace` がないまま worker が編集を始める
 - design artifact path、design section、test plan item、request clause ID を引用できない実装 slice を進める
 - design packet と repo docs / code の矛盾を worker がその場で解釈して実装する
-- `documents/`、`notes/`、`references/` の context sweep をせずに着手する
+- `documents/`、`documents/notes/`、`references/` の context sweep をせずに着手する
 - dependency surface、導入済みライブラリ、既存実装候補を見ずに、新規 helper や新規 module を足す
 - `python/`、`tests/`、`src/`、`include/`、`lib/`、`tools/`、`scripts/` の reuse sweep をせずに新しい file や module を増やす
 - 既存実装や導入済みライブラリでは足りない理由を書かずに、完全新規実装を選ぶ
@@ -79,13 +79,13 @@ upstream design README.md notes lifecycle index
 - toy-only、dense Jacobian、baseline 未比較の結果から trainer replacement、scalability、superiority、広い theorem を主張する
 - 理論 note が一般 weighted case の正しい抽象でないと示した unrestricted permutation-group enumeration を継続投資対象にする
 - failure-onset dimension を記録せず、implementation bug と真の frontier limit を混同する
-- `notes/` に置くべき一時メモを `documents/` へ混ぜる
+- `documents/notes/` に置くべき一時メモを `documents/` へ混ぜる
 - validation を飛ばして commit / push だけ進める
 - required review、validation、commit / push を省略して完了扱いにする
 
 ## Source
 
-- 2026-04-10 に `/mnt/git/agent-canon.git`、`/mnt/git/experiment_runner.git`、`/mnt/git/jax_util.git`、`/mnt/git/server_develop.git`、`/mnt/git/template.git` と対応する `/mnt/l/workspace/*` の `documents/`、`notes/`、worktree logs を検索して抽出しました。
+- 2026-04-10 に `/mnt/git/agent-canon.git`、`/mnt/git/experiment_runner.git`、`/mnt/git/jax_util.git`、`/mnt/git/server_develop.git`、`/mnt/git/template.git` と対応する `/mnt/l/workspace/*` の `documents/`、`documents/notes/`、worktree logs を検索して抽出しました。
 
 ## When To Re-Read
 

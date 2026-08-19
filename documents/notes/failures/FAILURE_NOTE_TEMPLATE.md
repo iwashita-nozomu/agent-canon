@@ -34,6 +34,6 @@ upstream design README.md notes lifecycle index
 
 ## References
 
-- `notes/worktrees/...`
-- `notes/experiments/...`
+- `documents/notes/worktrees/...`
+- `documents/notes/experiments/...`
 - `reports/...`

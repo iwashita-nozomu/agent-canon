@@ -56,7 +56,7 @@ The active child views `.codex/config.toml`, `.codex/agents`, and
 installed. Additional children under
 `.codex/` and `tools/` are parent-owned optional content. Other allowed extensions
 include `.agents/`, `agents/`, `.github/`, `.vscode/`, `docker/`, `experiments/`,
-`notes/`, `reports/`, implementation directories, and additional parent content.
+`documents/notes/`, `reports/`, implementation directories, and additional parent content.
 Their presence, absence, and internal shape are owned by the relevant parent
 contract or directory document; this minimum does not claim to be a complete
 repository shape.
@@ -89,7 +89,7 @@ Regular surface は親レポが ownership を持ち、親固有の責務や stat
 - `documents/`: 親レポ固有の design / contract と document index。
 - `docker/`: 親レポの image / pack / build contract。
 - `experiments/`: 実験計画と結果の親レポ固有 surface。
-- `notes/`: 親レポ固有の運用・知識・失敗記録。
+- `documents/notes/`: 親レポ固有の運用・知識・失敗記録。
 - `reports/`: generated report と raw evidence の置き場。
 - `vendor/agent-canon/`: source を編集しない clean submodule checkout。
 - `tools/`: 親固有toolを置ける実体directory。AgentCanon toolは直下へ複製しない。
@@ -118,7 +118,7 @@ validator は shell を実行せず、許可された export line と TOML の�
 - `.github/`、`.vscode/`、`vendor/`: 親レポの owner document と各 directory の README。
 - `documents/`: `../README.md` と `../rule/README.md`。
 - `docker/`: `../CONTAINER_OPERATIONS.md` と親レポの `docker/README.md`。
-- `experiments/`、`reports/`、`notes/`、project implementation directory:
+- `experiments/`、`reports/`、`documents/notes/`、project implementation directory:
   親レポ自身の README / design / experiment owner document。
 
 directory に README がある場合、その README は child tree と責務の reader

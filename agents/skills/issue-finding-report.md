@@ -181,7 +181,7 @@ Before writing a new issue:
 1. Search existing durable surfaces.
 
    ```bash
-   git grep -n "<cause keywords>" -- issues memory notes/failures documents agents
+   git grep -n "<cause keywords>" -- issues memory documents/notes/failures documents agents
    ```
 
 1. Expand candidate affected surfaces through dependency review.

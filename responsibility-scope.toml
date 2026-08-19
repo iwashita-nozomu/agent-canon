@@ -277,7 +277,6 @@ paths = [
   "completion-first-review/**",
   "documents/**",
   "memory/**",
-  "notes/**",
   "references/**",
 ]
 exclude_paths = [

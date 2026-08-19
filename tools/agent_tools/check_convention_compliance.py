@@ -23,7 +23,7 @@
 # upstream implementation ./agent_canon_source_root.py resolves canonical parent adapter targets
 # upstream design ../../documents/codex/codex-configuration-reference.md Codex hook severity policy
 # upstream design ../../documents/conventions/coding-conventions-house-style.md implementation ownership guardrail
-# upstream design ../../notes/guardrails/engineering_avoidances.md recurring implementation avoidances
+# upstream design ../../documents/notes/guardrails/engineering_avoidances.md recurring implementation avoidances
 # upstream design ../../.codex/README.md Codex runtime hook behavior summary
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR body checklist
@@ -553,7 +553,7 @@ IMPLEMENTATION_GUARDRAIL_MARKERS = {
         "implementation shortcut",
         "check_convention_compliance.py",
     ),
-    "notes/guardrails/engineering_avoidances.md": (
+    "documents/notes/guardrails/engineering_avoidances.md": (
         "compatibility-preservation drift",
         "duplicate implementation",
         "canonical owner",

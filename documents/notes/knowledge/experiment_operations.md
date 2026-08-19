@@ -24,12 +24,12 @@ upstream design README.md notes lifecycle index
 - raw JSONL は隔離場所に残します。
 - `main` には再集計できる final JSON を持ち帰ります。
 - note には source JSON と archived JSON の両方を辿れるようにします。
-- 外向けに残したい図は `notes/assets/` にコピーします。
+- 外向けに残したい図は `documents/notes/assets/` にコピーします。
 - reusable runtime は共通実装側に残し、topic 固有ロジックは `experiments/<topic>/` に残します。
 
 ## worktree の後始末
 
-- 削除前に `notes/worktrees/` へ要約を吸い出します。
+- 削除前に `documents/notes/worktrees/` へ要約を吸い出します。
 - 少なくとも用途、主要結果、分かったこと、次の案を書きます。
 - 過去の note 本文は書き換えず、補足が必要な場合は追記で補います。
 
@@ -53,7 +53,7 @@ upstream design README.md notes lifecycle index
 ## 運用チェックリスト
 
 - `tools/setup_worktree.sh` で作られた `WORKTREE_SCOPE.md` を埋める
-- `notes/worktrees/worktree_<topic>_YYYY-MM-DD.md` を action log の正本にする
+- `documents/notes/worktrees/worktree_<topic>_YYYY-MM-DD.md` を action log の正本にする
 - 実装を `main` に取り込む前に関連テストを実行する
 - ドキュメント更新はコード変更と同時に持ち帰る
 - 中断した長時間 run を再開する前に、`ps` と `nvidia-smi` で child の残骸がないことを確認する

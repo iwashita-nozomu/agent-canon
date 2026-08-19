@@ -46,7 +46,7 @@ worktree の作成と carry-over の流れは [worktree-lifecycle.md](worktree-l
 - branch を切ったら、必要に応じて対応する worktree root に `WORKTREE_SCOPE.md` を置きます。
 - `WORKTREE_SCOPE.md` には editable directories、carry-over target、action log を明記します。
 - branch で experiment topic を継続的に触る場合は、`experiments/registry.toml` の `active_branch` と必要なら `scope_file` を更新します。
-- branch の入口が必要な場合は `notes/branches/<branch_topic>.md` に置き、scope と関連 note をそこから辿れるようにします。
+- branch の入口が必要な場合は `documents/notes/branches/<branch_topic>.md` に置き、scope と関連 note をそこから辿れるようにします。
 
 ## 4. コミット・プッシュ
 
@@ -93,7 +93,7 @@ validation route を同じ entrypoint で再実行できることを指します
 - `main` 取り込みは、branch の目的に必要な最小限に留めます。
 - 履歴を読みやすく保つため、ローカル整理には `rebase` を使って構いません。
 - 統合時の安全性と文脈保持を優先する場合は `merge` を選びます。
-- 別 branch と同じファイルを触っている場合は、先に `notes/branches/` と `notes/worktrees/` で衝突リスクを明示します。
+- 別 branch と同じファイルを触っている場合は、先に `documents/notes/branches/` と `documents/notes/worktrees/` で衝突リスクを明示します。
 - file 追加、削除、rename、symlink 化、type 変更、ディレクトリ再編がある branch は、`agents/workflows/main-integration-workflow.md` の手順で統合します。
 - 構成変更がある branch は、`main` 側で file 単位に拾い直して close してはいけません。
 - 構成変更がある統合では、current checkout 上の integration branch で merge commit を作り、`python3 tools/ci/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
@@ -101,7 +101,7 @@ validation route を同じ entrypoint で再実行できることを指します
 
 ## 6. 削除前チェック
 
-- branch の目的が `notes/branches/` から辿れる
+- branch の目的が `documents/notes/branches/` から辿れる
 - `main` に持ち帰る note / final JSON が整理済み
 - raw 結果を残す場所が決まっている
 - `git worktree list` と `git branch -v` で後片付け対象が分かる

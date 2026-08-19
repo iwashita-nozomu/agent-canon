@@ -65,7 +65,7 @@ def write_scope(
                 "## Required References Before Editing",
                 "- `documents/operations/worktree-lifecycle.md`",
                 "- `documents/operations/BRANCH_SCOPE.md`",
-                "- `notes/worktrees/README.md`",
+                "- `documents/notes/worktrees/README.md`",
                 "",
                 "## Main Carry-Over Targets",
                 f"- `{action_log}`",

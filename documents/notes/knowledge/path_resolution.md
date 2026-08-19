@@ -12,7 +12,7 @@ upstream design README.md notes lifecycle index
 
 - Markdown の画像は、できるだけその file から見た相対パスで書きます。
 - `/workspace/...` のような絶対パスは Markdown preview で崩れることがあります。
-- 長く残したい図は `notes/assets/` にコピーします。
+- 長く残したい図は `documents/notes/assets/` にコピーします。
 - worktree の中にある画像へ直接リンクし続けません。
 
 ## Markdown のリンク
@@ -31,7 +31,7 @@ upstream design README.md notes lifecycle index
 
 - 実験中の raw data は隔離場所に置きます。
 - `main` に持ち帰るのは、再集計に必要な final JSON と note です。
-- 画像を `main` に埋め込むなら `notes/assets/` に置きます。
+- 画像を `main` に埋め込むなら `documents/notes/assets/` に置きます。
 
 ## よくある失敗
 

@@ -69,7 +69,7 @@ JSONL and accumulated eval archive branch policy belong to
   and exit-code records.
 
 Do not use `reports/` as the raw-data home for topic-specific experiments.
-Do not put raw experiment result trees directly under `notes/`.
+Do not put raw experiment result trees directly under `documents/notes/`.
 
 ## Required Bundle Shape
 
