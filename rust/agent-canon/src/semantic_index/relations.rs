@@ -195,7 +195,7 @@ pub(super) fn document_responsibility_bucket(path: &str) -> &'static str {
     if path.starts_with("memory/") {
         return "memory";
     }
-    if path.starts_with("notes/") {
+    if path.starts_with("documents/notes/") {
         return "note";
     }
     if path.starts_with("references/") {

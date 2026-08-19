@@ -1,18 +1,4 @@
 {
   "version": 4,
-  "configurations": [
-    {
-      "name": "Linux",
-      "compilerPath": "/usr/bin/c++",
-      "intelliSenseMode": "linux-gcc-x64",
-      "cppStandard": "c++20",
-      "includePath": [
-        "${workspaceFolder}/include",
-        "${workspaceFolder}/src",
-        "/usr/include",
-        "/usr/local/include"
-      ],
-      "forcedInclude": []
-    }
-  ]
+  "configurations": []
 }

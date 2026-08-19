@@ -347,7 +347,7 @@ checked boundary を top-level 分岐として返してはいけません。個�
   `lean/<proof-theme>/` に置き、再利用する profile / arithmetic library は
   `lean/lib/` に置きます。profile library を読むのは
   `jit_canonical_ir.py` などの証明ツールであり、production algorithm は
-  読みません。reader-facing な証明本文は `notes/themes/` を正本にし、`lean/` には
+  読みません。reader-facing な証明本文は `documents/notes/themes/` を正本にし、`lean/` には
   機械可読 artifact と checker artifact を置きます。
 - JIT-canonical IR から theorem graph を作成し、`proof_lemma_graph`、
   `proof_target_chains`、graph validation evidence として proof note または
@@ -791,7 +791,7 @@ checked boundary を top-level 分岐として返してはいけません。個�
      `verified` の claim だけでなく、`unverified` の理由と次に必要な
      implementation-instantiation obligation も明示する。
 1. Existing proof search:
-   - local repo、`references/`、`notes/`、`documents/` を先に確認する
+   - local repo、`references/`、`documents/notes/`、`documents/` を先に確認する
    - formal library docs と theorem search tools を確認する
    - web search / paper search は `$literature-survey` として source packet に残す
 1. Formalization:
@@ -1631,7 +1631,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    For optimization problems, "differentiable" refers to the target `Problem`
    objective and constraint functions only; do not use differentiability of a
    residual sequence, update rule, or proof-introduced helper as a substitute.
-1. Store checker-facing IR, theorem graphs, profile libraries, and generated Lean files under `lean/<proof-theme>/`; store reusable proof profiles under `lean/lib/`. Proof tools such as `jit_canonical_ir.py` read those profile libraries; production algorithms do not. Keep reader-facing proof text in `notes/themes/`.
+1. Store checker-facing IR, theorem graphs, profile libraries, and generated Lean files under `lean/<proof-theme>/`; store reusable proof profiles under `lean/lib/`. Proof tools such as `jit_canonical_ir.py` read those profile libraries; production algorithms do not. Keep reader-facing proof text in `documents/notes/themes/`.
 1. Build the implementation evidence layer through the route chosen for the
    public root. For JIT-canonical roots, run
    `python3 tools/agent_tools/jit_canonical_ir.py --python-symbol <path.py::qualname> --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir> --backend-trace-dir <dir> --backend-trace-out <backend.json>`
@@ -1912,7 +1912,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    callee guarantee not expanded is not a final row. Expand, repair,
    regenerate, or reduce it to a checked boundary before returning.
 1. When an algorithm module owns nested initialization through `initialize(config: InitializeConfig)`, use that initialize/config pair only to expand the required independent proof scopes. Do not make `initialize` itself a mathematical proof premise.
-1. Search local repo sources, `references/`, `notes/`, and `documents/` before external web search.
+1. Search local repo sources, `references/`, `documents/notes/`, and `documents/` before external web search.
 1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean, read `documents/tools/lean_capability_matrix.md` and route each frontier by shape: direct equations through `rfl`/`rw`/`simp`/`simpa`; structural goals through `constructor`/`cases`/`use`/`aesop?`/`aesop`; Nat/Int arithmetic through `omega` and focused `grind`; ordered linear arithmetic through `linarith`; polynomial recurrence through `ring_nf` and `nlinarith`; positivity/monotonicity through `positivity` and `gcongr`; theorem discovery through `exact?`/`apply?`/`rw?`/`simp?`, Mathlib docs, LeanSearch, Loogle, LeanSearchClient, and Moogle-style tools; over-strong executable claims through Plausible counterexample probes. For active proof themes, pin Mathlib/Aesop/Plausible/LeanSearchClient once in the topic-local Lake package so ordinary retries use `lake build`; use `python3 tools/agent_tools/lean_proof_env.py all-smoke|smoke|agent-smoke|counterexample-smoke|check-file --env-dir reports/formal-proof/lean-proof-env` for exploratory or fallback environment checks. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
 1. Use `$literature-survey` for external papers, official docs, source packets, adoption/exclusion reasons, and contrary or scope-limiting evidence.
 1. Do not mark a claim verified unless the target proof assistant or solver checks the exact artifact without placeholders, `sorry`, `Admitted`, unchecked axioms, or equivalent proof escape hatches.

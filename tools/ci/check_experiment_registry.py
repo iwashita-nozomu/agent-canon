@@ -27,12 +27,16 @@ from typing import cast
 if __package__:
     from tools.experiments.experiment_identity import validate_segment
 else:
-    _IDENTITY_PATH = Path(__file__).resolve().parents[1] / "experiments" / "experiment_identity.py"
+    _IDENTITY_PATH = (
+        Path(__file__).resolve().parents[1] / "experiments" / "experiment_identity.py"
+    )
     _IDENTITY_SPEC = importlib.util.spec_from_file_location(
         "agentcanon_experiment_identity", _IDENTITY_PATH
     )
     if _IDENTITY_SPEC is None or _IDENTITY_SPEC.loader is None:
-        raise ImportError(f"experiment identity source is unavailable: {_IDENTITY_PATH}")
+        raise ImportError(
+            f"experiment identity source is unavailable: {_IDENTITY_PATH}"
+        )
     _IDENTITY_MODULE = importlib.util.module_from_spec(_IDENTITY_SPEC)
     sys.modules[_IDENTITY_SPEC.name] = _IDENTITY_MODULE
     _IDENTITY_SPEC.loader.exec_module(_IDENTITY_MODULE)
@@ -163,7 +167,9 @@ def normalize_topics(raw_topics: object) -> list[dict[str, object]]:
     return topics
 
 
-def normalize_optional_topics(raw_topics: object, table_name: str) -> list[dict[str, object]]:
+def normalize_optional_topics(
+    raw_topics: object, table_name: str
+) -> list[dict[str, object]]:
     """Return an optional topic table list."""
     if raw_topics is None:
         return []
@@ -395,9 +401,13 @@ def validate_topic_layout(
             )
         )
     if not topic_dir.is_dir():
-        findings.append(Finding("error", f"{topic_name}: topic_dir is missing: {topic_dir}"))
+        findings.append(
+            Finding("error", f"{topic_name}: topic_dir is missing: {topic_dir}")
+        )
     if not topic_readme.is_file():
-        findings.append(Finding("error", f"{topic_name}: topic_readme is missing: {topic_readme}"))
+        findings.append(
+            Finding("error", f"{topic_name}: topic_readme is missing: {topic_readme}")
+        )
     if not expected_entrypoint.is_file():
         findings.append(
             Finding(
@@ -413,9 +423,13 @@ def validate_topic_layout(
             )
         )
     if not result_root.is_dir():
-        findings.append(Finding("error", f"{topic_name}: result_root is missing: {result_root}"))
+        findings.append(
+            Finding("error", f"{topic_name}: result_root is missing: {result_root}")
+        )
     if not report_root.is_dir():
-        findings.append(Finding("error", f"{topic_name}: report_root is missing: {report_root}"))
+        findings.append(
+            Finding("error", f"{topic_name}: report_root is missing: {report_root}")
+        )
 
 
 def validate_topic_commands(
@@ -452,14 +466,11 @@ def validate_topic_commands(
         managed_runner_module = None
         if isinstance(managed_runner, str) and managed_runner.endswith(".py"):
             managed_runner_module = managed_runner[:-3].replace("/", ".")
-        if (
-            isinstance(managed_runner, str)
-            and (
-                managed_runner in command_text
-                or (
-                    managed_runner_module is not None
-                    and managed_runner_module in command_text
-                )
+        if isinstance(managed_runner, str) and (
+            managed_runner in command_text
+            or (
+                managed_runner_module is not None
+                and managed_runner_module in command_text
             )
         ):
             findings.append(
@@ -508,7 +519,12 @@ def validate_topic_references(
             )
         )
 
-    for optional_path_key in ("active_worktree", "scope_file", "branch_note", "primary_note"):
+    for optional_path_key in (
+        "active_worktree",
+        "scope_file",
+        "branch_note",
+        "primary_note",
+    ):
         optional_path = maybe_string(topic, optional_path_key)
         if optional_path is None:
             continue
@@ -586,7 +602,9 @@ def validate_topic(
         default_command,
         findings,
     )
-    validate_topic_variant(topic_name, topic, complete_values["default_variant"], findings)
+    validate_topic_variant(
+        topic_name, topic, complete_values["default_variant"], findings
+    )
     validate_topic_references(repo_root, topic_name, topic, findings)
     validate_topic_eval_artifacts(topic_name, topic, findings)
 
@@ -635,7 +653,9 @@ def validate_branch_topic(
     primary_note_path = repo_root / primary_note
     if not primary_note_path.is_file():
         findings.append(
-            Finding("error", f"{topic_name}: primary_note is missing: {primary_note_path}")
+            Finding(
+                "error", f"{topic_name}: primary_note is missing: {primary_note_path}"
+            )
         )
 
     branch_note = maybe_string(topic, "branch_note")
@@ -666,7 +686,9 @@ def collect_findings(repo_root: Path, registry_path: Path) -> list[Finding]:
     registry = load_registry(registry_path)
     schema_version = registry.get("schema_version")
     if schema_version != 1:
-        findings.append(Finding("error", f"schema_version must be 1, got {schema_version!r}"))
+        findings.append(
+            Finding("error", f"schema_version must be 1, got {schema_version!r}")
+        )
 
     defaults = registry.get("defaults", {})
     if not isinstance(defaults, dict):
@@ -678,7 +700,10 @@ def collect_findings(repo_root: Path, registry_path: Path) -> list[Finding]:
         managed_runner_path = repo_root / managed_runner
         if not managed_runner_path.is_file():
             findings.append(
-                Finding("error", f"defaults.managed_runner is missing: {managed_runner_path}")
+                Finding(
+                    "error",
+                    f"defaults.managed_runner is missing: {managed_runner_path}",
+                )
             )
     else:
         findings.append(Finding("error", "defaults.managed_runner must be a string"))
@@ -688,7 +713,10 @@ def collect_findings(repo_root: Path, registry_path: Path) -> list[Finding]:
         resolved_template_dir = repo_root / topic_template_dir
         if not resolved_template_dir.is_dir():
             findings.append(
-                Finding("error", f"defaults.topic_template_dir is missing: {resolved_template_dir}")
+                Finding(
+                    "error",
+                    f"defaults.topic_template_dir is missing: {resolved_template_dir}",
+                )
             )
 
     required_raw = optional_string_list_value(defaults, "required_eval_artifacts")
@@ -719,7 +747,9 @@ def collect_findings(repo_root: Path, registry_path: Path) -> list[Finding]:
     )
 
     topics = normalize_topics(registry.get("topics", []))
-    branch_topics = normalize_optional_topics(registry.get("branch_topics"), "branch_topics")
+    branch_topics = normalize_optional_topics(
+        registry.get("branch_topics"), "branch_topics"
+    )
     seen_names: set[str] = set()
     for topic in topics:
         topic_name = topic.get("name")

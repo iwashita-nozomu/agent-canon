@@ -36,6 +36,7 @@ from agent_team import (  # noqa: E402
 )
 from implementation_dispatch import dispatch_fixed_implementation  # noqa: E402
 from manifest_rendering import (  # noqa: E402
+    language_review_candidates,
     render_code_template,
     render_template,
     suggested_public_skills,
@@ -56,6 +57,22 @@ TEST_TEMP_ROOT = TEST_PARENT_ROOT / ".agent-canon" / "tmp"
 
 class AgentTeamTemplateTest(unittest.TestCase):
     """Verify reusable template partial expansion."""
+
+    def test_project_cpp_tests_select_cpp_reviewer_without_python_reviewer(self) -> None:
+        """Out-of-tree project C++ tests route only to the native reviewer."""
+        candidates = language_review_candidates(
+            PROJECT_ROOT,
+            ("tests/cpp/CMakeLists.txt", "tests/cpp/adapter.cpp"),
+        )
+        self.assertEqual(candidates, ("cpp_reviewer", "docs_workflow_steward"))
+
+    def test_cppdev_owned_cpp_paths_select_cpp_reviewer(self) -> None:
+        """Native production paths retain the C++ review route."""
+        candidates = language_review_candidates(
+            PROJECT_ROOT,
+            ("cpp/src/model.cpp", "cpp/include/model.hpp"),
+        )
+        self.assertEqual(candidates, ("cpp_reviewer",))
 
     def test_packet_helpers_require_explicit_source_and_derived_source(self) -> None:
         """Packet helpers fail closed and resolve derived reads from the source root."""

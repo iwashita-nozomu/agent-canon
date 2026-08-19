@@ -1,5 +1,13 @@
 {
   "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "cppBuildDirectory",
+      "type": "promptString",
+      "description": "CMake build directory containing compile_commands.json",
+      "default": "build/cpp/dev"
+    }
+  ],
   "tasks": [
     {
       "label": "AgentCanon: Docs Check",
@@ -19,6 +27,27 @@
       "label": "AgentCanon: Dependency Headers",
       "type": "shell",
       "command": "source \"${workspaceFolder}/tools/lib/repo_paths.sh\" && CANON_TOOLS_ROOT=\"$(agent_canon_tools_root \"${workspaceFolder}\")\" && python3 \"${CANON_TOOLS_ROOT}/agent_tools/check_dependency_headers.py\" --changed && bash \"${CANON_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh\" --changed --fail-missing && bash \"${CANON_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh\" --changed --require-header",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "C++: Select Compile Database",
+      "type": "shell",
+      "command": "source \"${workspaceFolder}/tools/lib/repo_paths.sh\" && CANON_TOOLS_ROOT=\"$(agent_canon_tools_root \"${workspaceFolder}\")\" && python3 \"${CANON_TOOLS_ROOT}/static_analysis/cpp/static_analysis.py\" select-db --workspace-root \"${workspaceFolder}\" --build-dir \"${input:cppBuildDirectory}\"",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "C++: clangd Check",
+      "type": "shell",
+      "command": "source \"${workspaceFolder}/tools/lib/repo_paths.sh\" && CANON_TOOLS_ROOT=\"$(agent_canon_tools_root \"${workspaceFolder}\")\" && python3 \"${CANON_TOOLS_ROOT}/static_analysis/cpp/static_analysis.py\" clangd-check --workspace-root \"${workspaceFolder}\" --build-dir \"${input:cppBuildDirectory}\" --source \"${file}\"",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "C++: clang-tidy",
+      "type": "shell",
+      "command": "source \"${workspaceFolder}/tools/lib/repo_paths.sh\" && CANON_TOOLS_ROOT=\"$(agent_canon_tools_root \"${workspaceFolder}\")\" && python3 \"${CANON_TOOLS_ROOT}/static_analysis/cpp/static_analysis.py\" clang-tidy --workspace-root \"${workspaceFolder}\" --build-dir \"${input:cppBuildDirectory}\" --source \"${file}\"",
       "group": "test",
       "problemMatcher": []
     }

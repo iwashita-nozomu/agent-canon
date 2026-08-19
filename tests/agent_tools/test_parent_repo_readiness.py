@@ -482,6 +482,22 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_project_design_readme_is_parent_owned(self) -> None:
+        """Project-owned design README paths are not standalone-only leaks."""
+        with self.temporary_directory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_parent_fixture(root)
+            self.write_file(
+                root,
+                "documents/design/README.md",
+                "project-owned design index\n",
+            )
+
+            result = self.run_checker(root, skip_submodule_check=True)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("PARENT_REPO_READINESS=pass", result.stdout)
+
     def test_plain_nested_clone_is_rejected_by_identity(self) -> None:
         """A plain nested clone fails through an observable OID mismatch."""
         with self.temporary_directory() as tmp_dir:

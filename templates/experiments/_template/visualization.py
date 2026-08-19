@@ -32,7 +32,9 @@ def _atomic_write_json(path: Path, payload: dict[str, object]) -> None:
     temporary_path = Path(temporary_name)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
+            handle.write(
+                json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+            )
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary_path, path)
@@ -79,7 +81,9 @@ def execute_visualization(run_dir: Path, template_dir: Path) -> str:
                 "failure_message": str(error),
             },
         )
-        raise RuntimeError("visualization_requested_but_renderer_unimplemented") from error
+        raise RuntimeError(
+            "visualization_requested_but_renderer_unimplemented"
+        ) from error
     _atomic_write_json(
         run_dir / VISUALIZATION_STATUS_NAME,
         {

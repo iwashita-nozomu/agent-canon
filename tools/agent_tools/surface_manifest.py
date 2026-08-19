@@ -24,7 +24,7 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import cast
 
 DEFAULT_MANIFEST = Path("documents/runtime/shared-runtime-surfaces.toml")
@@ -43,7 +43,9 @@ SYNC_SPEC_COMMANDS = frozenset(
         "root-absent-paths",
     }
 )
-MANIFEST_COMMANDS = SYNC_SPEC_COMMANDS | frozenset({"normalized-snapshot", "check-doc"})
+MANIFEST_COMMANDS = SYNC_SPEC_COMMANDS | frozenset(
+    {"normalized-snapshot", "check-doc", "projection-forbidden-roots"}
+)
 ALLOWED_MODES = frozenset(
     {
         "symlink",
@@ -94,6 +96,8 @@ DOC_ALWAYS_REQUIRED_MARKERS = (
     "tools/agent-canon -> ../vendor/agent-canon/tools",
     "vendor/agent-canon/tools/",
     "Project-local automation must stay in project-owned paths",
+    "projection_forbidden_roots",
+    "tools/ci/run_standalone_static_gate_unit.sh",
 )
 
 
@@ -147,6 +151,7 @@ class SurfaceManifest:
     surface_selection: SurfaceSelection
     entries: tuple[SurfaceEntry, ...]
     update_transitions: tuple[UpdateTransition, ...]
+    projection_forbidden_roots: tuple[str, ...] = ()
 
     @property
     def integration_mode(self) -> str:
@@ -254,6 +259,107 @@ def path_list(mapping: Mapping[str, object]) -> tuple[str, ...]:
             raise ValueError("group paths entries must be non-empty strings")
         paths.append(item)
     return tuple(paths)
+
+
+def optional_string_list(mapping: Mapping[str, object], key: str) -> tuple[str, ...]:
+    """Return an optional list of non-empty strings."""
+    raw_values = mapping.get(key, [])
+    if not isinstance(raw_values, list):
+        raise ValueError(f"{key} must be a list")
+    values: list[str] = []
+    for item in cast(list[object], raw_values):
+        if not isinstance(item, str) or not item:
+            raise ValueError(f"{key} entries must be non-empty strings")
+        values.append(item)
+    return tuple(values)
+
+
+def normalized_relative_path(value: str, field: str) -> str:
+    """Return one canonical repository-relative POSIX path."""
+    if not value or value.startswith("/") or "\\" in value:
+        raise ValueError(f"{field} must be a repository-relative POSIX path")
+    parts = value.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError(f"{field} must not contain empty, dot, or parent components")
+    normalized = PurePosixPath(*parts).as_posix()
+    if normalized != value:
+        raise ValueError(f"{field} must use canonical POSIX path syntax")
+    return normalized
+
+
+def path_intersects_root(path: str, root: str) -> bool:
+    """Return whether one path is equal to, below, or above one root boundary."""
+    path_parts = PurePosixPath(path).parts
+    root_parts = PurePosixPath(root).parts
+    shared_length = min(len(path_parts), len(root_parts))
+    return path_parts[:shared_length] == root_parts[:shared_length]
+
+
+def projection_forbidden_roots_from_mapping(
+    data: Mapping[str, object],
+) -> tuple[str, ...]:
+    """Load a minimal, non-overlapping projection exclusion set."""
+    roots = tuple(
+        normalized_relative_path(value, "projection_forbidden_roots entry")
+        for value in optional_string_list(data, "projection_forbidden_roots")
+    )
+    if len(roots) != len(set(roots)):
+        raise ValueError("projection_forbidden_roots entries must be unique")
+    for index, root in enumerate(roots):
+        for other in roots[index + 1 :]:
+            if path_intersects_root(root, other):
+                raise ValueError(
+                    "projection_forbidden_roots entries must not overlap: "
+                    f"{root},{other}"
+                )
+    return roots
+
+
+def entry_source_for_projection_policy(entry: SurfaceEntry) -> str:
+    """Return the source path that can materialize one manifest entry."""
+    if entry.mode in {"symlink", "copy"}:
+        return entry.source_or_default()
+    return entry.source
+
+
+def validate_projection_boundaries(
+    entries: Iterable[SurfaceEntry],
+    update_transitions: Iterable[UpdateTransition],
+    forbidden_roots: tuple[str, ...],
+) -> None:
+    """Reject manifest ownership that intersects standalone-only source roots."""
+    if not forbidden_roots:
+        return
+    for entry in entries:
+        path = normalized_relative_path(entry.path, f"{entry.path}: path")
+        for root in forbidden_roots:
+            if path_intersects_root(path, root):
+                raise ValueError(
+                    f"{entry.path}: manifest-owned path intersects "
+                    f"projection-forbidden root {root}"
+                )
+        source = entry_source_for_projection_policy(entry)
+        if not source:
+            continue
+        source = normalized_relative_path(source, f"{entry.path}: source")
+        for root in forbidden_roots:
+            if path_intersects_root(source, root):
+                raise ValueError(
+                    f"{entry.path}: source {source} intersects "
+                    f"projection-forbidden root {root}"
+                )
+    for transition in update_transitions:
+        for candidate in transition.candidates:
+            path = normalized_relative_path(
+                candidate.path,
+                f"{transition.transition_id}:{candidate.path}: candidate path",
+            )
+            for root in forbidden_roots:
+                if path_intersects_root(path, root):
+                    raise ValueError(
+                        f"{transition.transition_id}:{candidate.path}: update transition "
+                        f"candidate intersects projection-forbidden root {root}"
+                    )
 
 
 def validate_entry(entry: SurfaceEntry) -> SurfaceEntry:
@@ -479,6 +585,7 @@ def load_manifest(root: Path, prefix: str, raw_manifest: str) -> SurfaceManifest
     data = cast(Mapping[str, object], tomllib.loads(path.read_text(encoding="utf-8")))
     manifest_prefix = string_value(data, "prefix", prefix)
     surface_selection = selection_from_mapping(data)
+    projection_forbidden_roots = projection_forbidden_roots_from_mapping(data)
     entries: list[SurfaceEntry] = []
     for group in manifest_tables(data, "group"):
         entries.extend(entries_from_group(group))
@@ -495,11 +602,17 @@ def load_manifest(root: Path, prefix: str, raw_manifest: str) -> SurfaceManifest
     transition_ids = [transition.transition_id for transition in update_transitions]
     if len(transition_ids) != len(set(transition_ids)):
         raise ValueError("duplicate update_transition ids")
+    validate_projection_boundaries(
+        entries,
+        update_transitions,
+        projection_forbidden_roots,
+    )
     return SurfaceManifest(
         prefix=manifest_prefix,
         surface_selection=surface_selection,
         entries=tuple(entries),
         update_transitions=update_transitions,
+        projection_forbidden_roots=projection_forbidden_roots,
     )
 
 
@@ -567,6 +680,11 @@ def render_regular_specs(entries: Iterable[SurfaceEntry], prefix: str) -> str:
         if entry.mode == "regular" and not entry.optional
     ]
     return "\n".join(lines)
+
+
+def render_projection_forbidden_roots(forbidden_roots: Iterable[str]) -> str:
+    """Render roots that may not participate in live projection ownership."""
+    return "\n".join(forbidden_roots)
 
 
 def render_removed_legacy(entries: Iterable[SurfaceEntry]) -> str:
@@ -684,6 +802,12 @@ def check_doc(root: Path, prefix: str, manifest: SurfaceManifest) -> list[str]:
         findings.append("SURFACE_MANIFEST_FINDING=tools/sync_agent_canon.sh:missing-manifest-call")
     if not manifest.entries:
         findings.append("SURFACE_MANIFEST_FINDING=documents/runtime/shared-runtime-surfaces.toml:empty-manifest")
+    for root in manifest.projection_forbidden_roots:
+        marker = f"`{root}/`"
+        if marker not in doc_text:
+            findings.append(
+                f"SURFACE_MANIFEST_FINDING={marker}:missing-projection-boundary-doc"
+            )
     return findings
 
 
@@ -698,6 +822,9 @@ def render_command_outputs(manifest: SurfaceManifest, root: Path) -> Mapping[str
         "regular-specs": render_regular_specs(manifest.entries, manifest.prefix),
         "removed-legacy-paths": render_removed_legacy(manifest.entries),
         "root-absent-paths": render_root_absent_paths(manifest.entries),
+        "projection-forbidden-roots": render_projection_forbidden_roots(
+            manifest.projection_forbidden_roots
+        ),
         "normalized-snapshot": json.dumps(
             normalized_snapshot(manifest),
             ensure_ascii=False,

@@ -16,7 +16,9 @@ from pathlib import Path
 
 import pytest
 
-TEMPLATE_ROOT = Path(__file__).resolve().parents[2] / "templates" / "experiments" / "_template"
+TEMPLATE_ROOT = (
+    Path(__file__).resolve().parents[2] / "templates" / "experiments" / "_template"
+)
 sys.path.insert(0, str(TEMPLATE_ROOT))
 
 from run import (  # noqa: E402
@@ -93,7 +95,9 @@ def test_case_result_rejects_terminal_cross_field_mismatch() -> None:
     """Success と failure field の混在を publication 前に拒否します."""
     with pytest.raises(ValueError, match="successful case cannot carry failure fields"):
         _result(failure_class="implementation_algorithm", failure_message="unexpected")
-    with pytest.raises(ValueError, match="failed or blocked case requires failure fields"):
+    with pytest.raises(
+        ValueError, match="failed or blocked case requires failure fields"
+    ):
         _result(
             state="failed",
             result={"case_parameters": {}},
@@ -115,7 +119,9 @@ def test_artifact_manifest_reads_nested_regular_files(tmp_path: Path) -> None:
 
     write_artifact_manifest(tmp_path, _summary())
 
-    manifest = (tmp_path / "summary" / "artifact-manifest.json").read_text(encoding="utf-8")
+    manifest = (tmp_path / "summary" / "artifact-manifest.json").read_text(
+        encoding="utf-8"
+    )
     expected_digest = hashlib.sha256(b"trace\n").hexdigest()
     assert "logs/nested/trace.txt" in manifest
     assert "logs/artifact-manifest.json" in manifest
@@ -160,7 +166,7 @@ def test_completion_gate_recursively_rejects_nested_reviewer_placeholder(
     (tmp_path / "provenance.toml").write_text(
         "\n".join(
             (
-                'template_complete = true',
+                "template_complete = true",
                 'completion_status = "complete"',
                 "[review]",
                 'reviewer = { identity = "<nested-reviewer>" }',
@@ -200,7 +206,7 @@ def test_completion_gate_requires_alternatives_selection_and_review_fields(
     (tmp_path / "provenance.toml").write_text(
         "\n".join(
             (
-                'template_complete = true',
+                "template_complete = true",
                 'completion_status = "complete"',
                 "[plan]",
                 'options = [{ id = "option-a", mechanism = "m", status = "rejected", rejected_rationale = "r", selection_evidence = "e" }]',
@@ -216,7 +222,10 @@ def test_completion_gate_requires_alternatives_selection_and_review_fields(
 
     completion = load_completion_provenance(tmp_path)
 
-    assert "provenance.plan.options requires at least 2 records" in completion.missing_fields
+    assert (
+        "provenance.plan.options requires at least 2 records"
+        in completion.missing_fields
+    )
     assert "provenance.plan.selection.rejected_rationale" in completion.missing_fields
     assert "provenance.review.independent_reviewer" in completion.missing_fields
 
@@ -284,7 +293,7 @@ def test_completion_gate_rejects_option_selection_invariants(
     (tmp_path / "provenance.toml").write_text(
         "\n".join(
             (
-                'template_complete = true',
+                "template_complete = true",
                 'completion_status = "complete"',
                 "[plan]",
                 f"options = [{option_records}]",
@@ -327,7 +336,9 @@ def test_summary_requires_run_state_enum_and_completion_readback() -> None:
             }
         )
     with pytest.raises(ValueError, match="non-zero exit status"):
-        RunSummary(**{**_summary().__dict__, "status": RunState.FAILED, "exit_status": 0})
+        RunSummary(
+            **{**_summary().__dict__, "status": RunState.FAILED, "exit_status": 0}
+        )
 
 
 def test_manifest_requires_run_state_enum() -> None:

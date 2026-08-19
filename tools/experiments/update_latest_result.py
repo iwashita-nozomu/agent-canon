@@ -93,7 +93,9 @@ def _parse_created_at_utc(value: object, manifest_path: Path) -> datetime:
     return parsed.astimezone(UTC)
 
 
-def _load_result_identity(result_dir: Path, topic: str, variant: str) -> tuple[ExperimentIdentity, dict[str, object], Path]:
+def _load_result_identity(
+    result_dir: Path, topic: str, variant: str
+) -> tuple[ExperimentIdentity, dict[str, object], Path]:
     if result_dir.is_symlink() or not result_dir.is_dir():
         raise ValueError(f"result directory must be a real directory: {result_dir}")
     resolved_dir = result_dir.resolve()
@@ -106,11 +108,15 @@ def _load_result_identity(result_dir: Path, topic: str, variant: str) -> tuple[E
         )
     manifest_path = candidates[0]
     if manifest_path.is_symlink() or not manifest_path.is_file():
-        raise ValueError(f"manifest must be a regular non-symlink file: {manifest_path}")
+        raise ValueError(
+            f"manifest must be a regular non-symlink file: {manifest_path}"
+        )
     try:
         manifest_path.resolve().relative_to(result_dir.resolve())
     except ValueError as exc:
-        raise ValueError(f"manifest is outside result directory: {manifest_path}") from exc
+        raise ValueError(
+            f"manifest is outside result directory: {manifest_path}"
+        ) from exc
     try:
         payload = load_json_file(manifest_path)
     except (json.JSONDecodeError, DuplicateJSONKeyError) as exc:
@@ -127,8 +133,12 @@ def _load_result_identity(result_dir: Path, topic: str, variant: str) -> tuple[E
     return identity, dict(payload), manifest_path
 
 
-def _result_timestamp(result_dir: Path, topic: str, variant: str) -> tuple[datetime, str]:
-    identity, manifest, manifest_path = _load_result_identity(result_dir, topic, variant)
+def _result_timestamp(
+    result_dir: Path, topic: str, variant: str
+) -> tuple[datetime, str]:
+    identity, manifest, manifest_path = _load_result_identity(
+        result_dir, topic, variant
+    )
     return (
         _parse_created_at_utc(manifest["created_at_utc"], manifest_path),
         identity.run_name,
@@ -179,9 +189,7 @@ def _result_root_lock(result_root: Path):
         os.close(directory_fd)
 
 
-def _latest_result_dir_unlocked(
-    result_root: Path, topic: str, variant: str
-) -> Path:
+def _latest_result_dir_unlocked(result_root: Path, topic: str, variant: str) -> Path:
     """Return the newest result matching variant metadata under the flat root."""
     candidates: list[tuple[tuple[datetime, str], Path]] = []
     for path in sorted(result_root.iterdir()):
@@ -200,7 +208,9 @@ def _latest_result_dir_unlocked(
             raise
         candidates.append((timestamp, path))
     if not candidates:
-        raise ValueError(f"no result directories for variant {variant!r} under {result_root}")
+        raise ValueError(
+            f"no result directories for variant {variant!r} under {result_root}"
+        )
     return max(candidates, key=lambda item: item[0])[1]
 
 
@@ -222,7 +232,9 @@ def _canonical_text(path: Path, result_root: Path) -> str:
         raise ValueError(f"pointer path is outside repository root: {path}") from exc
 
 
-def _latest_payload(result_root: Path, result_dir: Path, variant: str) -> dict[str, object]:
+def _latest_payload(
+    result_root: Path, result_dir: Path, variant: str
+) -> dict[str, object]:
     topic = _root_topic(result_root)
     identity, _, manifest_path = _load_result_identity(result_dir, topic, variant)
     report_path = result_root.parents[2] / report_relative_path(identity)
@@ -241,8 +253,12 @@ def _latest_payload(result_root: Path, result_dir: Path, variant: str) -> dict[s
         "latest_result": _canonical_text(result_dir, result_root),
         "latest_result_name": identity.run_name,
         "result_manifest": _canonical_text(manifest_path, result_root),
-        "summary_json": _canonical_text(summary_path, result_root) if summary_path.is_file() else None,
-        "visual_report_html": _canonical_text(visual_report, result_root) if visual_report else None,
+        "summary_json": _canonical_text(summary_path, result_root)
+        if summary_path.is_file()
+        else None,
+        "visual_report_html": _canonical_text(visual_report, result_root)
+        if visual_report
+        else None,
         "experiment_report": _canonical_text(report_path, result_root),
     }
 
@@ -358,9 +374,7 @@ def _publish_pointer_pair(
         "utf-8"
     )
     markdown_content = _latest_markdown(payload).encode("utf-8")
-    json_fd, json_temp = tempfile.mkstemp(
-        prefix=f".{json_name}.", dir=result_root
-    )
+    json_fd, json_temp = tempfile.mkstemp(prefix=f".{json_name}.", dir=result_root)
     markdown_fd, markdown_temp = tempfile.mkstemp(
         prefix=f".{markdown_name}.", dir=result_root
     )
@@ -414,7 +428,9 @@ def _latest_markdown(payload: Mapping[str, object]) -> str:
     )
 
 
-def update_latest_result(result_root: Path, result_dir: Path | None, variant: str) -> Path:
+def update_latest_result(
+    result_root: Path, result_dir: Path | None, variant: str
+) -> Path:
     """Select and publish one deterministic latest pointer pair under the flat root lock."""
     if result_dir is not None:
         if result_root.is_symlink():
@@ -425,7 +441,9 @@ def update_latest_result(result_root: Path, result_dir: Path | None, variant: st
             raise ValueError(f"result directory must not be a symlink: {result_dir}")
         preliminary_result_dir = result_dir.resolve()
         if preliminary_result_dir.parent != preliminary_root:
-            raise ValueError("explicit result directory must be directly below result root")
+            raise ValueError(
+                "explicit result directory must be directly below result root"
+            )
     result_root, topic = _prepare_result_root(result_root)
     validate_segment(variant, "variant")
     with _result_root_lock(result_root):
@@ -436,7 +454,9 @@ def update_latest_result(result_root: Path, result_dir: Path | None, variant: st
             )
         else:
             if result_dir.is_symlink():
-                raise ValueError(f"result directory must not be a symlink: {result_dir}")
+                raise ValueError(
+                    f"result directory must not be a symlink: {result_dir}"
+                )
             original_result_dir = result_dir
             selected_result_dir = result_dir.resolve()
             if selected_result_dir != original_result_dir:
@@ -445,14 +465,14 @@ def update_latest_result(result_root: Path, result_dir: Path | None, variant: st
                 )
             expected_parent = result_root
             if selected_result_dir.parent != expected_parent:
-                raise ValueError("explicit result directory must be directly below result root")
+                raise ValueError(
+                    "explicit result directory must be directly below result root"
+                )
             if not selected_result_dir.is_dir():
                 raise ValueError(
                     f"result directory does not exist: {selected_result_dir}"
                 )
-        selected_timestamp = _result_timestamp(
-            selected_result_dir, topic, variant
-        )
+        selected_timestamp = _result_timestamp(selected_result_dir, topic, variant)
         current = _read_current_pointer(result_root, topic, variant)
         if current is not None:
             current_timestamp, current_result_dir, current_generation = current

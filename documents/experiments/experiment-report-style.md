@@ -29,7 +29,7 @@ repo 固有の結論を先に言うと、実験レポートは IMRaD をその�
 1. `Artifacts and Carry-Over`
 1. `Critical Review`
 
-これは外部の学術 writing guide を、この repo の `experiments/` と `notes/` の運用に合わせて再構成したものです。以下の「carry-over」や `summary.json` の扱いなどは repo 向けの推論です。
+これは外部の学術 writing guide を、この repo の `experiments/` と `documents/notes/` の運用に合わせて再構成したものです。以下の「carry-over」や `summary.json` の扱いなどは repo 向けの推論です。
 
 ## この文書の読み方
 
@@ -56,7 +56,7 @@ repo 固有の結論を先に言うと、実験レポートは IMRaD をその�
 - 追加ログは owner を明示して raw または summary の適切な側に置きます。
 - 可視化 renderer は `experiments/<topic>/visualization.py` に置きます。notebook は既定の入口ではありません。
 - report 本文からは、少なくとも `summary/artifact-manifest.json`、`summary/summary.json`、`summary/cases.jsonl`、主要な図を辿れるようにします。
-- 複数 run をまたぐ考察は `notes/experiments/` や `notes/themes/` に分けます。
+- 複数 run をまたぐ考察は `documents/notes/experiments/` や `documents/notes/themes/` に分けます。
 
 ## 2.1 Title
 

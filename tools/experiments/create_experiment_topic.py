@@ -103,7 +103,11 @@ def resolve_canon_path(repo_root: Path, logical_path: str) -> Path:
     source_root = Path(__file__).resolve().parents[2]
     vendor_root = repo_root / "vendor" / "agent-canon"
     candidates = (
-        [vendor_root / logical_path, repo_root / logical_path, source_root / logical_path]
+        [
+            vendor_root / logical_path,
+            repo_root / logical_path,
+            source_root / logical_path,
+        ]
         if vendor_root.exists()
         else [repo_root / logical_path, source_root / logical_path]
     )
@@ -115,7 +119,9 @@ def resolve_canon_path(repo_root: Path, logical_path: str) -> Path:
 
 def resolve_topic_template_dir(repo_root: Path, configured_path: str) -> Path:
     """Resolve the runnable scaffold without changing its owner."""
-    configured = resolve_canon_path(repo_root, configured_path.removeprefix("vendor/agent-canon/"))
+    configured = resolve_canon_path(
+        repo_root, configured_path.removeprefix("vendor/agent-canon/")
+    )
     if configured.is_dir():
         return configured
     fallback = resolve_canon_path(repo_root, "templates/experiments/_template")
@@ -131,7 +137,11 @@ def main() -> int:
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
     repo_root = Path(args.repo_root).resolve()
-    registry_path = Path(args.registry).resolve() if args.registry else repo_root / "experiments" / "registry.toml"
+    registry_path = (
+        Path(args.registry).resolve()
+        if args.registry
+        else repo_root / "experiments" / "registry.toml"
+    )
     if registry_path.exists():
         registry = load_registry(registry_path)
     elif args.dry_run:
@@ -158,7 +168,9 @@ def main() -> int:
     )
     missing_templates = [str(path) for path in required_templates if not path.exists()]
     if missing_templates:
-        raise SystemExit(f"canonical experiment templates are missing: {', '.join(missing_templates)}")
+        raise SystemExit(
+            f"canonical experiment templates are missing: {', '.join(missing_templates)}"
+        )
     if topic_dir.exists():
         if not args.force:
             raise SystemExit(f"topic directory already exists: {topic_dir}")
@@ -168,7 +180,9 @@ def main() -> int:
         print(f"template_dir={template_dir}")
         print(f"topic_dir={topic_dir}")
         print(f"registry_path={registry_path}")
-        print("planned_topic_files=README.md,provenance.toml,run.py,cases.py,visualization.py,config.yaml,report/.gitkeep,result/.gitkeep")
+        print(
+            "planned_topic_files=README.md,provenance.toml,run.py,cases.py,visualization.py,config.yaml,report/.gitkeep,result/.gitkeep"
+        )
         return 0
 
     if topic_dir.exists():

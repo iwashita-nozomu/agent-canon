@@ -31,27 +31,27 @@ upstream design prose-reasoning-graph.md prose graph claim and evidence handoff 
 - survey、代表論文、比較論文、仕様資料を整理したい
 - ある主張を支える資料と弱める資料の両方を見たい
 - baseline、評価指標、failure mode の根拠を文献ベースで決めたい
-- `references/` や `notes/` に残す索引を作りたい
+- `references/` や `documents/notes/` に残す索引を作りたい
 
 ## Core References
 
 - `agents/workflows/research-workflow.md`
 - `agents/workflows/workflow-references.md`
 - `references/README.md`
-- 必要なら対象 topic の既存 `notes/themes/*.md`
-- 必要なら対象 topic の既存 `notes/experiments/*.md`
+- 必要なら対象 topic の既存 `documents/notes/themes/*.md`
+- 必要なら対象 topic の既存 `documents/notes/experiments/*.md`
 
 ## Mandatory Checklist
 
 - web search、PDF download、citation lookup の前に、同じ topic / source / claim が
-  既存の `references/`、`notes/`、`documents/`、topic report にあるかを確認します。
+  既存の `references/`、`documents/notes/`、`documents/`、topic report にあるかを確認します。
 - 既存 source note がある場合は、それを更新または引用し、同じ source の並行 truth
   surface を作りません。
 - primary source、survey、benchmark comparison を優先します
 - peer-reviewed、preprint、vendor doc、blog を区別して記録します
 - 支持資料だけでなく、限定条件や反証候補も集めます
 - query、探索日、採用理由、除外理由を残します
-- answer / report / design で使った source は、`references/`、`notes/`、
+- answer / report / design で使った source は、`references/`、`documents/notes/`、
   `reports/agents/<run-id>/source_packet.md` などの tracked artifact に残します。
 - durable source record には URL / DOI、access date、使った claim、limitation、
   download artifact の有無と保存場所を入れます。
@@ -67,14 +67,14 @@ upstream design prose-reasoning-graph.md prose graph claim and evidence handoff 
 1. 問いを 1 文で固定する
 1. inclusion / exclusion を決める
 1. query pack を作る
-1. 既存 `references/`、`notes/`、`documents/`、topic report を topic keyword、
+1. 既存 `references/`、`documents/notes/`、`documents/`、topic report を topic keyword、
    source title、DOI / URL で確認する
 1. survey、代表論文、比較論文、公式資料を優先して集める
 1. 支持資料と反証候補を分ける
 1. 各 source について、setting、claim、limitations、使える点を短く抜く
 1. baseline、metric、failure mode、artifact policy に効く source を抜き出す
 1. `Known`、`Contested`、`Open` に整理する
-1. 使った source と採用/除外理由を `references/`、`notes/`、または run-local
+1. 使った source と採用/除外理由を `references/`、`documents/notes/`、または run-local
    `source_packet.md` に残す
 
 ## Deliverable Shape
@@ -106,7 +106,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Read `agents/skills/literature-survey.md`.
 1. Read `agents/workflows/workflow-references.md`.
 1. Fix the question, scope, and exclusion criteria before searching.
-1. Before web search, PDF download, or citation lookup, inspect existing `references/`, `notes/`, `documents/`, and topic reports for the same source or claim. Reuse or update the existing source note instead of creating a parallel truth surface.
+1. Before web search, PDF download, or citation lookup, inspect existing `references/`, `documents/notes/`, `documents/`, and topic reports for the same source or claim. Reuse or update the existing source note instead of creating a parallel truth surface.
 1. Prefer primary sources, surveys, benchmark comparison papers, and official docs over tertiary summaries.
 1. Record contrary or scope-limiting evidence, not only supporting sources.
 1. If a prose graph handoff is present, use unsupported-claim and citation/evidence-gap diagnostics to seed query terms, source adoption decisions, and source exclusion checks.

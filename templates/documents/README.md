@@ -82,7 +82,7 @@ Template / derived parent の `.github` target は parent-owned regular content 
 
 - host 固有の実値は repo に置きません
 - template の key 追加や意味変更は、関連設計文書と同じ変更で行います
-- 実値の例は匿名化し、必要なら `notes/` に補助説明を書きます
+- 実値の例は匿名化し、必要なら `documents/notes/` に補助説明を書きます
 - checked-in standalone targets、run-local report、raw log、Issue/PR mirror は canonical
   template source と別の責務として扱います。
 - 新しい template を追加したら、owner、entrypoint、reconstruct command、validation、

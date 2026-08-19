@@ -10,7 +10,7 @@ downstream design ../../documents/design/algorithm-implementation-boundary.md eq
 # 研究・実験改造ワークフロー
 
 この文書は、数式を伴うアルゴリズム研究、比較実験、段階的なコード改造を 1 つの workflow にまとめた正本です。
-対象は、`python/` 配下の実装改造、`experiments/` 配下の比較実験、`notes/` への知見整理を含みます。
+対象は、`python/` 配下の実装改造、`experiments/` 配下の比較実験、`documents/notes/` への知見整理を含みます。
 準備、実装、静的チェック、実行、結果レポートを通した実務上の統合入口は [experiment-workflow.md](experiment-workflow.md) を参照してください。
 この文書は、とくに問い、定式化、比較設計、段階的改造、claim 更新の正本を担います。
 批判的レビューの具体的な観点は [experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md) を参照してください。
@@ -46,10 +46,10 @@ downstream design ../../documents/design/algorithm-implementation-boundary.md eq
 - code change、protocol change、XLA / runtime flag change を 1 iteration に混ぜません。1 iteration では 1 種類の変更だけを入れ、差分の原因を追えるようにします。
 - user request が generic path の usable smoke を求めている場合、specialized path の tuning や bounded smoke だけで close しません。
 - 外部論文、公式 docs、web 記事、download artifact を参照する前に、既存の
-  `references/`、`notes/`、`documents/`、topic report に同じ source / claim があるか
+  `references/`、`documents/notes/`、`documents/`、topic report に同じ source / claim があるか
   を確認します。既存 source note がある場合は、そこを更新または引用します。
 - 外部 source を answer、report、design、benchmark 比較、claim に使った場合は、
-  `references/`、`notes/`、または run-local `source_packet.md` に URL / DOI、access date、
+  `references/`、`documents/notes/`、または run-local `source_packet.md` に URL / DOI、access date、
   採用 claim、limitation、download artifact の保存場所を残します。browser tab、
   download cache、chat 要約だけを provenance として close しません。
 
@@ -175,7 +175,7 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
   - `Expected Effect:`
   - `Risk:`
   - `Validation Plan:`
-- 大きな設計変更は、先に `notes/themes/` または experiment note 側へ意味を書き、あとから code だけが残る状態を避けます。
+- 大きな設計変更は、先に `documents/notes/themes/` または experiment note 側へ意味を書き、あとから code だけが残る状態を避けます。
 
 ### Step 7. 各段で検証する
 
@@ -224,8 +224,8 @@ agent がこの loop を自律実行する場合は、単一 run の実行と re
 ### Step 10. report をまとめ、summary の要否を決める
 
 - `main` へ戻すときは、code だけでなく test、document、`result/<run-id>/`、`experiments/<topic>/report/<run-id>.md` を同時に持ち帰ります。
-- 複数 run をまたぐ結論だけを `notes/experiments/` にまとめます。
-- 判断の流れが必要な場合だけ、`notes/` 側に補助メモとして残します。
+- 複数 run をまたぐ結論だけを `documents/notes/experiments/` にまとめます。
+- 判断の流れが必要な場合だけ、`documents/notes/` 側に補助メモとして残します。
 
 ## 5. マルチエージェント実験ループ
 
@@ -437,9 +437,9 @@ review artifact では、次のラベルで切り分けます。
 - 実験運用規約: `documents/conventions/coding-conventions-experiments.md`
 - worktree 規約: `documents/operations/worktree-lifecycle.md`
 - 1 run の report: `experiments/<topic>/report/<run-id>.md`
-- 実験 note: `notes/experiments/<topic>.md`
-- supporting notes: `notes/experiments/<topic>.md` または `notes/themes/<topic>.md`
-- 一般化知見: `notes/themes/<topic>.md`
+- 実験 note: `documents/notes/experiments/<topic>.md`
+- supporting notes: `documents/notes/experiments/<topic>.md` または `documents/notes/themes/<topic>.md`
+- 一般化知見: `documents/notes/themes/<topic>.md`
 
 ## 13. 参考文献
 

@@ -229,7 +229,7 @@ leave regenerated stdout/stderr captures in the source tree.
 `reports/agent-runtime-dashboard/`, or `reports/agent-improvement-guide/`
 remain tracked, untracked, or ignored in the checkout. Delete those outputs and
 rerun the producer, or promote the underlying rule to `documents/`, `agents/`,
-or `notes/` with a dependency manifest.
+or `documents/notes/` with a dependency manifest.
 `agent-canon test-design check` scans test-like files for missing oracle,
 static-analysis duplicate wrappers, generated execution-only placeholders,
 private-detail coupling, exact mock/output/prose assertions, wall-clock

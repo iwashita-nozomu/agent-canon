@@ -103,7 +103,9 @@ def materialize_parent_fixture(source_root: Path, parent_root: Path) -> None:
     shutil.copytree(source_root / "templates", canon_root / "templates")
     runner_path = parent_root / "tools" / "experiments" / "run_managed_experiment.py"
     runner_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source_root / "tools" / "experiments" / "run_managed_experiment.py", runner_path)
+    shutil.copy2(
+        source_root / "tools" / "experiments" / "run_managed_experiment.py", runner_path
+    )
 
 
 def complete_template_fixture(topic_dir: Path) -> None:
@@ -116,7 +118,9 @@ def complete_template_fixture(topic_dir: Path) -> None:
     config.update(
         {
             "template_complete": True,
-            "cases": {"example": {"values": [1.0, 2.0], "unit": "unitless", "shape": [2]}},
+            "cases": {
+                "example": {"values": [1.0, 2.0], "unit": "unitless", "shape": [2]}
+            },
             "metric": {"name": "sum", "direction": "higher_is_better"},
             "runtime": {"entrypoint": "run.py", "managed": True},
             "algorithm_contract": {
@@ -125,7 +129,10 @@ def complete_template_fixture(topic_dir: Path) -> None:
             },
             "oracle": {"necessary": ["case record"], "sufficient": ["digest readback"]},
             "provenance": {"source": "smoke fixture", "owner": "checker"},
-        "failure": {"classification": "expected_contract", "evidence": "summary/failure-evidence.json"},
+            "failure": {
+                "classification": "expected_contract",
+                "evidence": "summary/failure-evidence.json",
+            },
             "lifecycle": {"retention": "test run", "cleanup": "temporary directory"},
         }
     )
@@ -135,7 +142,9 @@ def complete_template_fixture(topic_dir: Path) -> None:
     )
     provenance_path = topic_dir / "provenance.toml"
     provenance_text = provenance_path.read_text(encoding="utf-8")
-    provenance_text = provenance_text.replace("template_complete = false", "template_complete = true", 1)
+    provenance_text = provenance_text.replace(
+        "template_complete = false", "template_complete = true", 1
+    )
     provenance_text = provenance_text.replace(
         'completion_status = "incomplete"', 'completion_status = "complete"', 1
     )
@@ -204,11 +213,15 @@ def complete_template_fixture(topic_dir: Path) -> None:
     provenance_text = provenance_text.replace(
         'status = "selected-or-rejected"', 'status = "rejected"'
     )
-    provenance_text = provenance_text.replace('status = "rejected"', 'status = "selected"', 1)
+    provenance_text = provenance_text.replace(
+        'status = "rejected"', 'status = "selected"', 1
+    )
     provenance_path.write_text(provenance_text, encoding="utf-8")
 
 
-def validate_run_state(result_dir: Path, expected_state: str, expected_case_count: int) -> None:
+def validate_run_state(
+    result_dir: Path, expected_state: str, expected_case_count: int
+) -> None:
     """生成済み run の state、case 数、completion provenance を検証します."""
     summary_dir = result_dir / "summary"
     summary = json.loads((summary_dir / "summary.json").read_text(encoding="utf-8"))
@@ -240,9 +253,15 @@ def validate_generated_topic(parent_root: Path, registry_path: Path) -> None:
         topic_dir / "report" / ".gitkeep",
         topic_dir / "result" / ".gitkeep",
     )
-    missing = [str(path.relative_to(parent_root)) for path in required_files if not path.is_file()]
+    missing = [
+        str(path.relative_to(parent_root))
+        for path in required_files
+        if not path.is_file()
+    ]
     if missing:
-        raise RuntimeError(f"generated topic is missing required files: {', '.join(missing)}")
+        raise RuntimeError(
+            f"generated topic is missing required files: {', '.join(missing)}"
+        )
 
     registry_text = registry_path.read_text(encoding="utf-8")
     if 'registry_identity = "template-smoke-parent"' not in registry_text:
@@ -259,7 +278,9 @@ def validate_generated_topic(parent_root: Path, registry_path: Path) -> None:
     )
     present_forbidden = [str(path) for path in forbidden_files if path.exists()]
     if present_forbidden:
-        raise RuntimeError(f"generated topic contains forbidden files: {', '.join(present_forbidden)}")
+        raise RuntimeError(
+            f"generated topic contains forbidden files: {', '.join(present_forbidden)}"
+        )
 
     result_dir = topic_dir / "result" / "template-smoke-run"
     required_artifacts = (
@@ -288,8 +309,14 @@ def main() -> int:
     source_root = Path(args.source_root).resolve()
     create_tool = source_root / "tools" / "experiments" / "create_experiment_topic.py"
     registry_checker = source_root / "tools" / "ci" / "check_experiment_registry.py"
-    if not source_root.is_dir() or not create_tool.is_file() or not registry_checker.is_file():
-        raise SystemExit("AgentCanon source root or canonical experiment tools are missing")
+    if (
+        not source_root.is_dir()
+        or not create_tool.is_file()
+        or not registry_checker.is_file()
+    ):
+        raise SystemExit(
+            "AgentCanon source root or canonical experiment tools are missing"
+        )
 
     selected_parent = Path(
         os.environ.get("AGENT_CANON_PARENT_ROOT", str(source_root))
@@ -365,7 +392,9 @@ def main() -> int:
         complete_template_fixture(topic_dir)
         run_dir = topic_dir / "result" / "template-smoke-run"
         run_env["EXPERIMENT_RUN_DIR"] = str(run_dir)
-        run_checked([sys.executable, str(topic_dir / "run.py")], cwd=source_root, env=run_env)
+        run_checked(
+            [sys.executable, str(topic_dir / "run.py")], cwd=source_root, env=run_env
+        )
         validate_generated_topic(parent_root, registry_path)
         run_checked(
             [

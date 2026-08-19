@@ -53,13 +53,13 @@ upstream design ../README.md convention index
 
 - 出力は JSON に固定し、後段の比較や note への転記がしやすい形にします。
 - 継続参照する出力は topic ごとの結果ディレクトリに置き、巨大生成物は入口文書へ混ぜません。
-- 比較用の代表結果だけを `notes/` に残します。生の繰返し結果は必要なら別保管に分離します。
+- 比較用の代表結果だけを `documents/notes/` に残します。生の繰返し結果は必要なら別保管に分離します。
 
 ### 6. Benchmark と Experiment の境界
 
 - 「数分以内に終わる前後比較」「同一条件の基本スケーリング」は benchmark とします。
 - 「多数条件の sweep」「failure kind の分類」「JSONL 逐次保存」は experiment とします。
-- 詳細な使い分けは [notes/knowledge/benchmark_vs_experiment.md](../../../notes/knowledge/benchmark_vs_experiment.md) を参照します。
+- 詳細な使い分けは [documents/notes/knowledge/benchmark_vs_experiment.md](../../../documents/notes/knowledge/benchmark_vs_experiment.md) を参照します。
 
 ## 更新手順
 

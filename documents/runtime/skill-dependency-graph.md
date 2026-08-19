@@ -11,7 +11,7 @@ downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py c
 <!-- Generated from the typed skill/tool invocation graph; do not edit by hand. -->
 # Public Skill/Tool Invocation Graph
 
-<!-- graph_digest=9ed75329133885cb0a83f1f5d8de5a11b1525efe95d2617b414ab5da2d9cc8bf coverage_digest=53eb0d2f7925d973c6a1a54452b916d44e12b1b5dda775165aed814c6ad697f1 -->
+<!-- graph_digest=5c9a0da8d47fee8865a0f99b45cd8fbde11b1ec130e5cee9b783e3d64110ed27 coverage_digest=3f993e1dcc42488300626bf03f9c51eacb5abeb781293be1a4525cbc35c05348 -->
 ```mermaid
 graph LR
   subgraph responsibility_n_analysis["Responsibility: analysis"]
@@ -553,8 +553,8 @@ graph LR
     n_command_issue_finding_report_conditional_0000["python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain (order=0; ref=c713ee5611ab879c759e29265f3c9b3470dea9d6c40479dc11db3a7704c9753e)"]
     %% node kind=command id=command:issue-finding-report:conditional:0001 digest=739249e32c7e585633c7bef73e34b652d3f649db313b4da3f9e352f9a8458e68 order=1
     n_command_issue_finding_report_conditional_0001["python3 tools/agent_tools/generate_agent_runtime_dashboard.py (order=1; ref=739249e32c7e585633c7bef73e34b652d3f649db313b4da3f9e352f9a8458e68)"]
-    %% node kind=command id=command:issue-finding-report:conditional:0002 digest=267dc70ce8567164cea1a47ce3b3bc8eca2cc75fcf374e28eb0b81f86c00a787 order=2
-    n_command_issue_finding_report_conditional_0002["git grep -n '<cause keywords>' -- issues memory notes/failures documents agents (order=2; ref=267dc70ce8567164cea1a47ce3b3bc8eca2cc75fcf374e28eb0b81f86c00a787)"]
+    %% node kind=command id=command:issue-finding-report:conditional:0002 digest=d11a1e617a76184cf86877578b67fffda932cc10b943f49e9dc5105bb786aec8 order=2
+    n_command_issue_finding_report_conditional_0002["git grep -n '<cause keywords>' -- issues memory documents/notes/failures documents agents (order=2; ref=d11a1e617a76184cf86877578b67fffda932cc10b943f49e9dc5105bb786aec8)"]
     %% node kind=command id=command:issue-finding-report:conditional:0003 digest=507725598916f55f9cd0ad0dee921f443b694247d4057be7d23b169c74b37ffa order=3
     n_command_issue_finding_report_conditional_0003["python3 tools/agent_tools/issue_sync.py --root . (order=3; ref=507725598916f55f9cd0ad0dee921f443b694247d4057be7d23b169c74b37ffa)"]
     %% node kind=command id=command:issue-finding-report:conditional:0004 digest=1f994f80b9a46c1abd2eeda812d76e671ad7db1ef29ba12dea3526578e2acdac order=4
@@ -1865,8 +1865,8 @@ graph LR
   %% source kind=identity id=source:identity:00001:93546c91e6069e9b digest=712eacbd723a092acd43393ce821f176f17f5a2ee55b0243d3596b197061bdac locator=agents/skills/catalog.yaml#skill:issue-finding-report.tool_commands.conditional[1] ordinal=1
   %% source kind=field id=source:field:00001:f9bc391694ba1c3e digest=9e1fa5b0b4282ff1c0e2ae8af721a736a1f5d6f92a220bf82e2bed1408e2bf88 locator=tools/agent_tools/skill_tool_commands.py#issue-finding-report:conditional:1 ordinal=1
   %% source kind=module id=source:module:00023:1fcd3067c0529ce1 digest=26a128b4cecb4da189e5bc1c43511f6b08fb55e86a15486dc46bb6de01305808 locator=tools/catalog.yaml#tool:generate-agent-runtime-dashboard ordinal=23
-  %% source kind=identity id=source:identity:00002:79add3aa9aa974b6 digest=7b72d103fa5d8104e6e2cd3b942621ed3ce1c2c2f7a74fcd7834c540b634cc06 locator=agents/skills/catalog.yaml#skill:issue-finding-report.tool_commands.conditional[2] ordinal=2
-  %% source kind=field id=source:field:00002:eabe9d2dd80ccd42 digest=8e154ed344af9dece1e3c461d80f3cb78c28a6be976fea4e0604bd968c7386d4 locator=tools/agent_tools/skill_tool_commands.py#issue-finding-report:conditional:2 ordinal=2
+  %% source kind=identity id=source:identity:00002:0314c88ef2deb0ea digest=cbeb7320196896815f79468bc6ef0a95ba9a7fd5fbedfc491de3ba512ce60d01 locator=agents/skills/catalog.yaml#skill:issue-finding-report.tool_commands.conditional[2] ordinal=2
+  %% source kind=field id=source:field:00002:c392e3c08dc4fdbd digest=f5e16df34fee1ff4d0aedcd633206e362810b6297d777487679470dab44f75f6 locator=tools/agent_tools/skill_tool_commands.py#issue-finding-report:conditional:2 ordinal=2
   %% source kind=identity id=source:identity:00003:cc0fcca2538698af digest=661b1f7a9a1133d966c2e12c8084faa1041d02895066c62733c236be280dd61d locator=agents/skills/catalog.yaml#skill:issue-finding-report.tool_commands.conditional[3] ordinal=3
   %% source kind=field id=source:field:00003:a7ef4040231c5d93 digest=72907058512ddc11f1f9543eced391be8e44302dca5df73cdd0778d2b06eb3ec locator=tools/agent_tools/skill_tool_commands.py#issue-finding-report:conditional:3 ordinal=3
   %% source kind=identity id=source:identity:00004:272b2432191412b5 digest=8355e3bf0bc48d62f58ceb6ce39dcb668179109d542d4d5644a3c0ccbe2eab71 locator=agents/skills/catalog.yaml#skill:issue-finding-report.tool_commands.conditional[4] ordinal=4
@@ -2676,11 +2676,11 @@ graph LR
   %% source kind=field id=source:field:00004:223dcdaa3baf12ed digest=aec681624a1f36ff10838531f6486f9ad0640154a1f416b3c199323e11b91ab1 locator=tools/agent_tools/skill_tool_commands.py#skill-cleanup:conditional:4 ordinal=4
   %% source kind=phase id=source:phase:00002:61a912619cf9ec2e digest=5a15b0c459a6d82aa0fd513841b62ad9256c7ce85328f9a7231b57efaea9ed12 locator=agents/skills/catalog.yaml#skill:skill-cleanup.tool_commands.maintenance ordinal=2
   %% source kind=module id=source:module:00000:efcc8c1d91224b3c digest=929389bbc1c9cd97297a6137e33d39eafb83ad7ccb941f49da39bd7d31bbd642 locator=agents/skills/code-visualization.md ordinal=0
-  %% source kind=evidence id=source:evidence:01188:ff4d23c2bd323f05 digest=df2f1b4362d19d2a7eac1736fd4ee2aa9c51a5ea7c7fd3831e1ccc23e44e7be8 locator=agents/skills/catalog.yaml ordinal=1188
+  %% source kind=evidence id=source:evidence:01188:fdf1809685a7dab4 digest=174817d865411f25b2bd72c2079b8ad223290ec23ae410ed25c7efe6c743d2a9 locator=agents/skills/catalog.yaml ordinal=1188
   %% source kind=evidence id=source:evidence:01189:3ea0b82da8f72a3a digest=99ebf2b77a9fbca9acae3f46d5aa5ee6b4401fcd69c3f0b092dc2e842123b05c locator=agents/skills/skill-dependencies.yaml ordinal=1189
   %% source kind=evidence id=source:evidence:01190:ba8453820538ac9b digest=e0c542454425e870f0a86fe817fd18130dd1a36dc28fe9939ee764d89bf85764 locator=agents/canonical/skills.md ordinal=1190
   %% source kind=evidence id=source:evidence:01191:0f812db7cc3ac65c digest=14f9721b80ba6305ef167b09ef91ddbff1b137a58c0273b4e1f39269cb484296 locator=agents/skills/catalog.yaml#routing ordinal=1191
-  %% source kind=evidence id=source:evidence:01192:af5bdedf1fdf239e digest=ca668530ae14f299f023c5ce6ece75905f5b31a0847b6a34314867b5f2fa960e locator=tools/agent_tools/skill_tool_commands.py#canonical-resolution ordinal=1192
+  %% source kind=evidence id=source:evidence:01192:a4b2618239107a4f digest=ce692a4521042b14bfef8da168427ed186027b030e7e48e8b01dc9c3fedadad1 locator=tools/agent_tools/skill_tool_commands.py#canonical-resolution ordinal=1192
   %% source kind=evidence id=source:evidence:01193:c0b11f5f09620e70 digest=c9d5c016537ae820e5815ec31460913b4c738c96b0d3b061f76431a3222fc244 locator=agents/skills/catalog.yaml#typed-visualization-toolcalls ordinal=1193
   %% source kind=edge id=source:edge:00000:fc6e388d1a034763 digest=4caf05610f97ddedb2b303961308da403f7e2584df7eafeba152bc11b136a9ad locator=graph:edge:00000 ordinal=0
   %% source kind=edge id=source:edge:00001:393efbc033d17a1f digest=a4edc37be2840ecbec90abb3f94b178c30e71666802659057a798bb4c967dc9c locator=graph:edge:00001 ordinal=1
@@ -2817,7 +2817,7 @@ graph LR
   %% source kind=edge id=source:edge:00132:8644ed6ec2962de3 digest=1b313352df1222c94b717a092517ce14b62558fdda4b3c80c1f6967e6ad5eab1 locator=graph:edge:00132 ordinal=132
   %% source kind=edge id=source:edge:00133:ab0e84cd81e6017b digest=38041cc985e205b8e4b2e2238441baa970eaceb04bba9b8816ca2afdf29745fa locator=graph:edge:00133 ordinal=133
   %% source kind=edge id=source:edge:00134:ffac662da3d62ac2 digest=101d0bda79f3f5598bcd5abb93b2708e2c0562611269b5835910d6babe3a534e locator=graph:edge:00134 ordinal=134
-  %% source kind=edge id=source:edge:00135:b39a82abb85cd038 digest=5a596051411f675800d280cd8b7178c9e4a6b52b0d1825e3242377b35a30e20c locator=graph:edge:00135 ordinal=135
+  %% source kind=edge id=source:edge:00135:b3e86232ad276156 digest=fa94caac2d3031e1ef4d01d06fbc709b5fc5a3797f5dd9cbbb189ed22123b716 locator=graph:edge:00135 ordinal=135
   %% source kind=edge id=source:edge:00136:cf6f5025ff46eb5e digest=6e244c8ef1ef759670f132faabefdf3c36b962a3356a9e4a83dd3402cfca60b4 locator=graph:edge:00136 ordinal=136
   %% source kind=edge id=source:edge:00137:327109972b6c9e50 digest=02a8db0baa56cf5fbe7423b7794bce252f2dd2e25cd838c38e5e016cf401755b locator=graph:edge:00137 ordinal=137
   %% source kind=edge id=source:edge:00138:a65dc7331737b3b4 digest=605af24ab823ca0ea8adc067055e67307d144e4f087ea838cf012ff4ee758be3 locator=graph:edge:00138 ordinal=138
@@ -4195,7 +4195,7 @@ graph LR
   n_phase_issue_finding_report_conditional -->|"invocation (order=133; ref=5b97f5c87b1aac915a4c6ddb8ebf8658f5ec27687ad1f2608706725f166d828e)"| n_command_issue_finding_report_conditional_0000
   %% edge id=edge:00134 digest=f2adb900fd96bd74e1dd2e590f1347207915752296e9a4177b22943a0f7aa1da type=invocation source=phase:issue-finding-report:conditional source_digest=62bad7d142202975accbae91f35dad150e3bca3b9ee1a22125ee04d4b689ce53 target=command:issue-finding-report:conditional:0001 target_digest=739249e32c7e585633c7bef73e34b652d3f649db313b4da3f9e352f9a8458e68 order=134
   n_phase_issue_finding_report_conditional -->|"invocation (order=134; ref=f2adb900fd96bd74e1dd2e590f1347207915752296e9a4177b22943a0f7aa1da)"| n_command_issue_finding_report_conditional_0001
-  %% edge id=edge:00135 digest=be3c06a5f9bff55290110111e00232ae2f17c4a0cd15065ee0d3162f64757741 type=invocation source=phase:issue-finding-report:conditional source_digest=62bad7d142202975accbae91f35dad150e3bca3b9ee1a22125ee04d4b689ce53 target=command:issue-finding-report:conditional:0002 target_digest=267dc70ce8567164cea1a47ce3b3bc8eca2cc75fcf374e28eb0b81f86c00a787 order=135
+  %% edge id=edge:00135 digest=be3c06a5f9bff55290110111e00232ae2f17c4a0cd15065ee0d3162f64757741 type=invocation source=phase:issue-finding-report:conditional source_digest=62bad7d142202975accbae91f35dad150e3bca3b9ee1a22125ee04d4b689ce53 target=command:issue-finding-report:conditional:0002 target_digest=d11a1e617a76184cf86877578b67fffda932cc10b943f49e9dc5105bb786aec8 order=135
   n_phase_issue_finding_report_conditional -->|"invocation (order=135; ref=be3c06a5f9bff55290110111e00232ae2f17c4a0cd15065ee0d3162f64757741)"| n_command_issue_finding_report_conditional_0002
   %% edge id=edge:00136 digest=26fb393f975500eab5bfab56022595502e9bb203104509c986a39a1d589bcacf type=invocation source=phase:issue-finding-report:conditional source_digest=62bad7d142202975accbae91f35dad150e3bca3b9ee1a22125ee04d4b689ce53 target=command:issue-finding-report:conditional:0003 target_digest=507725598916f55f9cd0ad0dee921f443b694247d4057be7d23b169c74b37ffa order=136
   n_phase_issue_finding_report_conditional -->|"invocation (order=136; ref=26fb393f975500eab5bfab56022595502e9bb203104509c986a39a1d589bcacf)"| n_command_issue_finding_report_conditional_0003
@@ -6419,5 +6419,5 @@ graph LR
 - `prerequisite`, `successor`, `order`, `invocation`, and `tool-resolution`: solid directed edges.
 - `routing` and `parallel`: dashed directed edges.
 
-Coverage digest: `53eb0d2f7925d973c6a1a54452b916d44e12b1b5dda775165aed814c6ad697f1`.
-Graph digest: `9ed75329133885cb0a83f1f5d8de5a11b1525efe95d2617b414ab5da2d9cc8bf`.
+Coverage digest: `3f993e1dcc42488300626bf03f9c51eacb5abeb781293be1a4525cbc35c05348`.
+Graph digest: `5c9a0da8d47fee8865a0f99b45cd8fbde11b1ec130e5cee9b783e3d64110ed27`.

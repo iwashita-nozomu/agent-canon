@@ -11,11 +11,32 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
+import re
+import sys
+import tempfile
+from collections.abc import Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from enum import Enum
 from pathlib import Path
+from typing import Literal
+
+import yaml
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 from cases import CaseResult, CaseSpec, execute_case, registry_failure
-from visualization import execute_visualization, write_visualization_not_requested_status
+from visualization import (
+    execute_visualization,
+    write_visualization_not_requested_status,
+)
+
 
 def resolve_run_dir() -> Path:
     """
@@ -95,7 +116,11 @@ def _run_acceptance(
             "実行前に config.yaml と provenance.toml の completion が必要です",
         )
     if not records:
-        return RunState.BLOCKED, "expected_contract", "cases.py に少なくとも一つの case を宣言してください"
+        return (
+            RunState.BLOCKED,
+            "expected_contract",
+            "cases.py に少なくとも一つの case を宣言してください",
+        )
     failed_records = [record for record in records if record.state == "failed"]
     if failed_records:
         return (
@@ -178,7 +203,9 @@ def run_experiment(run_dir: Path) -> RunSummary:
             visualization_status = "blocked"
             status = RunState.FAILED
             failure_class = "infrastructure_environment"
-            close_condition = "visualization runtime を用意して managed command を再実行してください"
+            close_condition = (
+                "visualization runtime を用意して managed command を再実行してください"
+            )
             failure_evidence = f"{SUMMARY_ARTIFACT_PREFIX}{FAILURE_EVIDENCE_NAME}"
             write_failure_evidence(
                 summary_dir,
@@ -271,13 +298,6 @@ def main() -> int:
     return summary.exit_status
 
 
-from dataclasses import dataclass
-from enum import Enum
-import re
-from collections.abc import Mapping
-from typing import Literal
-
-
 class RunState(str, Enum):
     """実験 run が公開できる終端状態を定義します."""
 
@@ -285,6 +305,7 @@ class RunState(str, Enum):
     SUCCESS = "success"
     FAILED = "failed"
     BLOCKED = "blocked"
+
 
 CaseState = Literal["success", "failed", "blocked"]
 
@@ -363,7 +384,12 @@ REQUIRED_COMPLETION_STRUCTURES = (
     (
         "review",
         1,
-        ("independent_reviewer", "source_snapshot", "selection_evidence", "review_decision"),
+        (
+            "independent_reviewer",
+            "source_snapshot",
+            "selection_evidence",
+            "review_decision",
+        ),
     ),
 )
 PLACEHOLDER_RE = re.compile(r"<[^>\n]+>")
@@ -445,6 +471,7 @@ class CompletionProvenance:
             "missing_fields": list(self.missing_fields),
             "state": "complete" if self.is_complete else "incomplete",
         }
+
 
 @dataclass(frozen=True)
 class ArtifactEntry:
@@ -623,7 +650,11 @@ class RunSummary:
         Raises:
             ValueError: count が負/不整合、または必須 text field が空の場合。
         """
-        if not self.run_id.strip() or not self.started_at.strip() or not self.finished_at.strip():
+        if (
+            not self.run_id.strip()
+            or not self.started_at.strip()
+            or not self.finished_at.strip()
+        ):
             raise ValueError("summary identity and timestamps must be non-empty")
         if not isinstance(self.status, RunState):
             raise ValueError("summary status must be a RunState enum value")
@@ -635,17 +666,26 @@ class RunSummary:
             self.failed_count,
             self.blocked_count,
         )
-        if any(not isinstance(value, int) or isinstance(value, bool) for value in count_values):
+        if any(
+            not isinstance(value, int) or isinstance(value, bool)
+            for value in count_values
+        ):
             raise ValueError("summary counts must be integers")
-        if min(
-            self.exit_status,
-            self.case_count,
-            self.success_count,
-            self.failed_count,
-            self.blocked_count,
-        ) < 0:
+        if (
+            min(
+                self.exit_status,
+                self.case_count,
+                self.success_count,
+                self.failed_count,
+                self.blocked_count,
+            )
+            < 0
+        ):
             raise ValueError("summary counts and exit status must not be negative")
-        if self.success_count + self.failed_count + self.blocked_count != self.case_count:
+        if (
+            self.success_count + self.failed_count + self.blocked_count
+            != self.case_count
+        ):
             raise ValueError("summary state counts must equal case_count")
         if not self.failure_class.strip() or not self.failure_evidence.strip():
             raise ValueError("summary failure fields must be explicit")
@@ -653,7 +693,9 @@ class RunSummary:
             raise ValueError("summary template_complete must be boolean")
         if not isinstance(self.completion_provenance, dict):
             raise ValueError("summary completion provenance must be a mapping")
-        provenance_template_complete = self.completion_provenance.get("template_complete")
+        provenance_template_complete = self.completion_provenance.get(
+            "template_complete"
+        )
         provenance_path = self.completion_provenance.get("provenance_path")
         provenance_state = self.completion_provenance.get("state")
         provenance_status = self.completion_provenance.get("completion_status")
@@ -664,16 +706,26 @@ class RunSummary:
             raise ValueError("summary completion readback must include provenance_path")
         if not isinstance(missing_fields, list):
             raise ValueError("summary completion readback must include missing_fields")
-        if not all(isinstance(field, str) and field.strip() for field in missing_fields):
-            raise ValueError("summary completion readback missing_fields must be strings")
-        expected_provenance_state = "complete" if self.template_complete else "incomplete"
+        if not all(
+            isinstance(field, str) and field.strip() for field in missing_fields
+        ):
+            raise ValueError(
+                "summary completion readback missing_fields must be strings"
+            )
+        expected_provenance_state = (
+            "complete" if self.template_complete else "incomplete"
+        )
         if provenance_state != expected_provenance_state:
             raise ValueError("summary completion readback state disagrees")
         if self.template_complete:
             if provenance_status != "complete" or missing_fields:
-                raise ValueError("complete summary requires complete provenance readback")
+                raise ValueError(
+                    "complete summary requires complete provenance readback"
+                )
         elif provenance_status == "complete" and not missing_fields:
-            raise ValueError("incomplete summary cannot have complete provenance readback")
+            raise ValueError(
+                "incomplete summary cannot have complete provenance readback"
+            )
         required_readback = {
             f"{SUMMARY_ARTIFACT_PREFIX}{RESULT_SUMMARY_NAME}",
             f"{SUMMARY_ARTIFACT_PREFIX}{RESULT_CASES_NAME}",
@@ -683,13 +735,21 @@ class RunSummary:
             f"{SUMMARY_ARTIFACT_PREFIX}{PROVENANCE_SNAPSHOT_NAME}",
             f"{SUMMARY_ARTIFACT_PREFIX}{VISUALIZATION_STATUS_NAME}",
         }
-        if not all(isinstance(path, str) and path.strip() for path in self.preserved_artifacts):
+        if not all(
+            isinstance(path, str) and path.strip() for path in self.preserved_artifacts
+        ):
             raise ValueError("summary preserved artifacts must be non-empty paths")
         if not required_readback.issubset(self.preserved_artifacts):
             raise ValueError("summary preserved artifacts must cover required readback")
         if self.status is RunState.SUCCESS:
-            if not self.template_complete or self.exit_status != 0 or self.case_count == 0:
-                raise ValueError("success requires complete provenance and successful cases")
+            if (
+                not self.template_complete
+                or self.exit_status != 0
+                or self.case_count == 0
+            ):
+                raise ValueError(
+                    "success requires complete provenance and successful cases"
+                )
             if self.failed_count or self.blocked_count:
                 raise ValueError("success cannot contain failed or blocked cases")
         elif self.exit_status == 0:
@@ -738,20 +798,6 @@ class RunSummary:
             ],
         }
 
-import hashlib
-import json
-import os
-import sys
-import tempfile
-from datetime import UTC, datetime
-from pathlib import Path
-
-import yaml
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
 
 def _completion_value(data: object, path: str) -> object:
     """指定した TOML dotted path の値を取得します."""
@@ -811,7 +857,9 @@ def _missing_option_selection_invariants(provenance: object) -> list[str]:
     """plan.options と plan.selection の cross-field invariant を検証します."""
     options = _completion_value(provenance, "plan.options")
     selection = _completion_value(provenance, "plan.selection")
-    if not isinstance(options, list) or not all(isinstance(item, dict) for item in options):
+    if not isinstance(options, list) or not all(
+        isinstance(item, dict) for item in options
+    ):
         return []
     if not isinstance(selection, dict):
         return []
@@ -832,9 +880,13 @@ def _missing_option_selection_invariants(provenance: object) -> list[str]:
             "provenance.plan.selection.selected_option must reference an option id"
         )
 
-    selected_records = [record for record in records if record.get("status") == "selected"]
+    selected_records = [
+        record for record in records if record.get("status") == "selected"
+    ]
     if len(selected_records) != 1:
-        missing.append("provenance.plan.options must contain exactly one selected option")
+        missing.append(
+            "provenance.plan.options must contain exactly one selected option"
+        )
     elif selected_records[0].get("id") != selected_option:
         missing.append(
             "provenance.plan.selection.selected_option must identify the selected option"
@@ -866,7 +918,9 @@ def load_completion_provenance(template_dir: Path) -> CompletionProvenance:
     """
     config_path = template_dir / "config.yaml"
     provenance_path = template_dir / "provenance.toml"
-    config_text = config_path.read_text(encoding="utf-8") if config_path.is_file() else ""
+    config_text = (
+        config_path.read_text(encoding="utf-8") if config_path.is_file() else ""
+    )
     missing: list[str] = []
     config: object = None
     if not config_path.is_file():
@@ -916,7 +970,9 @@ def load_completion_provenance(template_dir: Path) -> CompletionProvenance:
         missing.append("provenance.template_complete=true")
     if completion_status != "complete":
         missing.append("provenance.completion_status=complete")
-    if PLACEHOLDER_RE.search(provenance_text) or UNRESOLVED_MARKER_RE.search(provenance_text):
+    if PLACEHOLDER_RE.search(provenance_text) or UNRESOLVED_MARKER_RE.search(
+        provenance_text
+    ):
         missing.append("provenance.raw unresolved")
     missing.extend(
         f"{path} unresolved"
@@ -1046,7 +1102,9 @@ def write_provenance_snapshots(
     """
     config_path = template_dir / "config.yaml"
     provenance_path = template_dir / "provenance.toml"
-    config_content = config_path.read_text(encoding="utf-8") if config_path.is_file() else ""
+    config_content = (
+        config_path.read_text(encoding="utf-8") if config_path.is_file() else ""
+    )
     atomic_write_json(
         run_dir / CONFIG_SNAPSHOT_NAME,
         {
@@ -1069,7 +1127,9 @@ def write_provenance_snapshots(
             "cwd": str(Path.cwd()),
             "run_dir": str(run_dir.resolve()),
             "managed_runner_manifest": os.environ.get("EXPERIMENT_RUN_MANIFEST", ""),
-            "resource_visibility": os.environ.get("CUDA_VISIBLE_DEVICES", "caller-managed"),
+            "resource_visibility": os.environ.get(
+                "CUDA_VISIBLE_DEVICES", "caller-managed"
+            ),
         },
     )
     return CONFIG_SNAPSHOT_NAME, PROVENANCE_SNAPSHOT_NAME, ENVIRONMENT_SNAPSHOT_NAME
@@ -1177,6 +1237,7 @@ def write_artifact_manifest(run_dir: Path, summary: RunSummary) -> None:
         artifacts=entries,
     )
     atomic_write_json(run_dir / "summary" / RESULT_MANIFEST_NAME, manifest.to_dict())
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

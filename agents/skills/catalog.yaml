@@ -518,7 +518,7 @@ skill_families:
       conditional:
       - python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
       - python3 tools/agent_tools/generate_agent_runtime_dashboard.py
-      - git grep -n "<cause keywords>" -- issues memory notes/failures documents agents
+      - git grep -n "<cause keywords>" -- issues memory documents/notes/failures documents agents
       - python3 tools/agent_tools/issue_sync.py --root .
       - bash tools/agent_tools/run_repo_dependency_review.sh
       - python3 tools/agent_tools/check_dependency_headers.py --changed

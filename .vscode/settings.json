@@ -19,6 +19,22 @@
     "build": true,
     "logs": true
   },
+  "clangd.arguments": [
+    "--compile-commands-dir=${workspaceFolder}/build/cpp/dev"
+  ],
+  "clangd.path": "clangd",
+  "clang-format.executable": "clang-format",
+  "[c]": {
+    "editor.defaultFormatter": "xaver.clang-format"
+  },
+  "[cpp]": {
+    "editor.defaultFormatter": "xaver.clang-format"
+  },
+  "[cuda-cpp]": {
+    "editor.defaultFormatter": "xaver.clang-format"
+  },
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "C_Cpp.errorSquiggles": "disabled",
   "explorer.excludeGitIgnore": false,
   "python.analysis.extraPaths": [
     "./python",

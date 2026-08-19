@@ -60,7 +60,7 @@ pub(super) fn responsibility_scope_bucket(path: &str) -> &'static str {
         || normalized == "README.md"
         || normalized == "responsibility-scope.toml"
         || normalized.starts_with("documents/")
-        || normalized.starts_with("notes/")
+        || normalized.starts_with("documents/notes/")
         || normalized.starts_with("memory/")
         || normalized.starts_with("references/")
     {

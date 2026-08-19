@@ -368,7 +368,7 @@ bash tools/agent_tools/review_backlog_scan.sh \
 ```bash
 python3 tools/oop/python/readability.py --format markdown python tools tests
 python3 tools/oop/python/rule_inventory.py --format markdown
-python3 tools/oop/cpp/readability.py --format markdown cpp/include cpp/src cpp/tests cpp/experiments
+python3 tools/oop/cpp/readability.py --format markdown cpp/include cpp/src tests/cpp cpp/experiments
 python3 tools/oop/cpp/rule_inventory.py --format markdown
 ```
 

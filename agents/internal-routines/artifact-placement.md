@@ -27,6 +27,6 @@ task 中に増える文書や出力を、run-local artifact、repo-wide 正本�
 - `reports/agents/<run-id>/`
 - `documents/`
 - `agents/`
-- `notes/`
+- `documents/notes/`
 
 のいずれに置くかの判断

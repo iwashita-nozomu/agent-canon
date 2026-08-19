@@ -50,7 +50,7 @@ C++ experiment target を、build、run、result、report の責務に分けて�
 - 1 回の run の report は `experiments/<topic>/report/<run-id>.md` に置きます。
 - run identity は `(topic, variant, run_name)` の ordered tuple とし、各 manifest は
   `agentcanon.experiment-run-identity/v2` の nested `identity` object を一つだけ持ちます。
-- 複数 run をまたぐ要約や知見は `notes/experiments/` や `notes/themes/` に置きます。
+- 複数 run をまたぐ要約や知見は `documents/notes/experiments/` や `documents/notes/themes/` に置きます。
 - C++ native target の build は `cmake --build "$ROOT/build/cpp/<profile>" --target
   cpp-experiments`、run は build 済み executable から lifecycle-owned result root へ行います。
 - server 上の formal run では `result/<run-id>/run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、`command.json`、`environment.json`、`source_snapshot.json`、`config.json`、`config_source.yaml`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` を残します。topic 固有の追加 stdout / stderr、tool log、diagnostic log は `result/<run-id>/logs/` に置きます。
@@ -142,7 +142,7 @@ demand-site-battery-formal:
 ## 4. report と notes
 
 - 1 回の run の一次 report は `experiments/<topic>/report/` に置きます。
-- 複数 run の比較や再利用知識は `notes/` に残します。
+- 複数 run の比較や再利用知識は `documents/notes/` に残します。
 - `Results` と `Discussion` を混ぜません。
 - 解釈と limitation を同じ文書内で確認できるようにします。
 

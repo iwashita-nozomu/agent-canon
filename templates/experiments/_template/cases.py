@@ -11,7 +11,10 @@ from __future__ import annotations
 
 import json
 import math
+import subprocess
+import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Literal
 
 CaseState = Literal["success", "failed", "blocked"]
@@ -121,7 +124,9 @@ class CaseResult:
             self.finished_at,
         )
         if not all(isinstance(value, str) and value.strip() for value in required_text):
-            raise ValueError("case result identity and provenance fields must be non-empty")
+            raise ValueError(
+                "case result identity and provenance fields must be non-empty"
+            )
         if self.state not in {"success", "failed", "blocked"}:
             raise ValueError("case state must be terminal success, failed, or blocked")
         if not isinstance(self.result, dict):
@@ -166,18 +171,12 @@ class CaseResult:
             "duration_seconds": self.duration_seconds,
         }
 
-from datetime import UTC, datetime
-import subprocess
-import time
 
 FAILURE_EVIDENCE_NAME = "failure-evidence.json"
 
+
 def utc_now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
-
-import subprocess
-import time
-
 
 
 def failure_class(error: BaseException) -> str:
@@ -329,6 +328,7 @@ def execute_case(case: CaseSpec, run_dir_text: str) -> CaseResult:
             finished_at=utc_now(),
             duration_seconds=round(time.perf_counter() - start_clock, 6),
         )
+
 
 # The default registry is intentionally small; topics replace it with their domain cases.
 CASES: tuple[CaseSpec, ...] = (

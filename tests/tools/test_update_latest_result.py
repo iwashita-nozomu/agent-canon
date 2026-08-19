@@ -31,8 +31,12 @@ def write_run(root: Path, variant: str, run_name: str, created_at: str) -> Path:
         encoding="utf-8",
     )
     (run_dir / "summary").mkdir()
-    (run_dir / "summary" / "summary.json").write_text('{"metric": 1}\n', encoding="utf-8")
-    (run_dir / "summary" / "report.html").write_text("<html></html>\n", encoding="utf-8")
+    (run_dir / "summary" / "summary.json").write_text(
+        '{"metric": 1}\n', encoding="utf-8"
+    )
+    (run_dir / "summary" / "report.html").write_text(
+        "<html></html>\n", encoding="utf-8"
+    )
     return run_dir
 
 
@@ -134,7 +138,9 @@ def test_latest_result_rejects_mixed_timestamp_contracts(tmp_path: Path) -> None
         latest_result_dir(result_root, "smoke")
 
 
-def test_variant_pointers_are_independent_under_flat_result_root(tmp_path: Path) -> None:
+def test_variant_pointers_are_independent_under_flat_result_root(
+    tmp_path: Path,
+) -> None:
     """A→B→A updates preserve independent variant pointer pairs."""
     result_root = tmp_path / "experiments" / "demo.topic" / "result"
     smoke = write_run(tmp_path, "smoke", "run.smoke", "2026-01-01T00:00:00Z")
@@ -182,9 +188,9 @@ def test_latest_pointer_concurrency_keeps_newest_json_and_markdown_consistent(
     assert payload["identity"]["run_name"] == "run.b"
     assert payload["latest_result"].endswith("/result/run.b")
     assert "run.b" in latest_markdown.read_text(encoding="utf-8")
-    assert latest_markdown.read_text(encoding="utf-8") == latest_module._latest_markdown(
-        payload
-    )
+    assert latest_markdown.read_text(
+        encoding="utf-8"
+    ) == latest_module._latest_markdown(payload)
 
 
 def test_latest_pointer_pair_failure_rolls_back_without_temp_residue(

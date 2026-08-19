@@ -17,7 +17,9 @@ from tools.experiments.experiment_identity import (
     ExperimentIdentity,
     ExperimentIdentityError,
     contained_path,
+    identity_from_raw_relative_path,
     load_json_text,
+    raw_relative_path,
     report_relative_path,
     result_relative_path,
     validate_segment,
@@ -38,7 +40,14 @@ def test_identity_round_trip_is_nested_v2_wire() -> None:
     }
     assert ExperimentIdentity.from_dict(payload) == identity
     assert result_relative_path(identity) == Path("experiments/topic.v1/result/run.3")
-    assert report_relative_path(identity) == Path("experiments/topic.v1/report/run.3.md")
+    assert raw_relative_path(identity) == Path("experiments/topic.v1/result/run.3/raw")
+    assert (
+        identity_from_raw_relative_path(raw_relative_path(identity), identity.variant)
+        == identity
+    )
+    assert report_relative_path(identity) == Path(
+        "experiments/topic.v1/report/run.3.md"
+    )
 
 
 @pytest.mark.parametrize("value", ["", ".", "..", "a/b", "a\\b", "a b", "a\x00b", "é"])
@@ -75,6 +84,21 @@ def test_strict_json_decoder_rejects_nested_and_outer_duplicate_keys(
     """Reject duplicate keys before any identity mapping can consume them."""
     with pytest.raises(DuplicateJSONKeyError):
         load_json_text(payload)
+
+
+@pytest.mark.parametrize(
+    "path",
+    (
+        Path("experiments/demo/result/run-a"),
+        Path("experiments/demo/result/run-a/summary"),
+        Path("experiments/demo/result/run-a/raw/extra"),
+        Path("../experiments/demo/result/run-a/raw"),
+    ),
+)
+def test_raw_path_inverse_rejects_noncanonical_shapes(path: Path) -> None:
+    """Only the complete canonical raw path is invertible."""
+    with pytest.raises(ExperimentIdentityError):
+        identity_from_raw_relative_path(path, "formal")
 
 
 def test_contained_path_rejects_escape(tmp_path: Path) -> None:

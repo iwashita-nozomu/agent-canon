@@ -26,15 +26,17 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
 ## 2. ディレクトリの考え方
 
 - `documents/` は正本として扱います。
-- `notes/` は知見、比較メモ、補助整理です。
+- `documents/notes/` は知見、比較メモ、補助整理です。
 - `agents/` はエージェント運用の正本です。
 - `tools/` は shared automation の正本です。agent helper、CI / review / validation、container runner、experiment helper、Markdown helper はここに置きます。
 - `scripts/` は repo-local bootstrap の入口です。template 固有の初期化、slug 置換、bare remote 初期化だけをここに置きます。
 - `docker/` は template / project の runtime image、build library、dependency pack の定義です。
 - `.devcontainer/` は AgentCanon-owned shared runtime ergonomics です。Codex、agent 用 npm / Node、GitHub CLI / `gh`、auth mount、attach status はここで扱います。
 - `experiments/` は Python managed experiment の registry、run、result、report の正本です。
-- `cpp/` は native C++ project の正本です。`cpp/CMakeLists.txt` が project entrypoint、
-  `cpp/src/`、`cpp/include/`、`cpp/tests/`、`cpp/experiments/` が target ownership を持ちます。
+- `cpp/` は native C++ production project の正本です。`cpp/CMakeLists.txt` が project
+  entrypoint、`cpp/src/`、`cpp/include/`、`cpp/experiments/` が production/native target
+  ownership を持ちます。derived project の C++ adapter/integration tests は
+  `tests/cpp/` が所有し、root CMake から out-of-tree に接続します。
 - `python/` は Python implementation の正本です。parent root は language-neutral な
   command/document entry として保ちます。
 - C++ を使う場合の build layout は `documents/design/cpp-build-layout.md` を正本にします。
@@ -55,7 +57,7 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
   `documents/conventions/common/05_docs.md` を正本にします。
 - Markdown を編集したら、対象の `.md` に formatter を適用し、その後で `tools/bin/agent-canon docs check` を通します。
 - 上の Markdown 運用は `documents/`、`tools/`、`scripts/`、`.github/`、root `README.md`、`QUICK_START.md` を含む正本文書に適用します。
-- 日付付きの途中報告、個別メモ、比較の試行錯誤は `notes/` に置きます。
+- 日付付きの途中報告、個別メモ、比較の試行錯誤は `documents/notes/` に置きます。
 - agent team の要約は `agents/README.md` に集約します。
 
 ## 4. 開発環境
@@ -133,8 +135,10 @@ cmake --install "$ROOT/build/cpp/<profile>"
 
 ## 5. テストとレビュー
 
-- 実装変更には、対応するテストまたは検証手順を同じ変更でそろえます。C++ test source
-  は `cpp/tests/`、CTest registration は `cpp/tests/CMakeLists.txt` が所有します。
+- 実装変更には、対応するテストまたは検証手順を同じ変更でそろえます。derived project の
+  C++ test source は `tests/cpp/`、CTest registration は `tests/cpp/CMakeLists.txt` が
+  所有します。`cpp/CMakeLists.txt` は `${ROOT}/tests/cpp` と明示的な binary directory を
+  `add_subdirectory` に渡し、production subtree の test fallback は作成しません。
 - 仕上げ前に `make ci-quick`、必要に応じて `make ci` を流します。
 - 文書変更ではリンク切れと記述の入口整合を確認します。
 - legacy forwarder / migration wrapper の warning policy は `python3 tools/agent_tools/check_convention_compliance.py` で確認します。
@@ -147,7 +151,7 @@ cmake --install "$ROOT/build/cpp/<profile>"
   へ分離します。
 - 1 回の run は fresh 実行として扱います。
 - 正式結果は planned run と acceptance criteria が揃った実行から採用します。
-- 複数 run をまたぐ知見は `notes/experiments/` または `notes/themes/` に残します。
+- 複数 run をまたぐ知見は `documents/notes/experiments/` または `documents/notes/themes/` に残します。
 - topic ごとの report は canonical artifact placement に従って配置します。
 
 ## 7. branch 方針
@@ -155,7 +159,7 @@ cmake --install "$ROOT/build/cpp/<profile>"
 - 既定の統合先は `main` です。
 - branch 分割は短期レビュー、切り分け、保護 surface の調整に使います。
 - 短期 branch は、レビューや安全な切り分けが必要なときだけ使います。
-- 統合が済んだ branch は削除し、運用知識は `documents/` か `notes/` に吸収します。
+- 統合が済んだ branch は削除し、運用知識は `documents/` か `documents/notes/` に吸収します。
 
 ## 8. 規約文の書き方
 
