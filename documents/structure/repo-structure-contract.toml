@@ -5,6 +5,7 @@
 # upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared root surface policy
 # upstream design ../runtime/shared-runtime-surfaces.toml machine-readable projection mechanics
 # upstream design ../../responsibility-scope.toml canonical path owner and class relation
+# upstream design ../design/cpp-build-layout.md derived C++ root surface and ownership contract
 # downstream implementation ../../tools/agent_tools/repo_structure_contract.py compares observed trees against this contract
 # downstream implementation ../../tests/agent_tools/test_repo_structure_contract.py tests structure contract validation
 # @dependency-end
@@ -250,7 +251,27 @@ path = "docker"
 kind = "dir"
 
 [[profile.optional]]
-path = "cpp"
+path = "CMakeLists.txt"
+kind = "file"
+
+[[profile.optional]]
+path = "cmake"
+kind = "dir"
+
+[[profile.optional]]
+path = "include"
+kind = "dir"
+
+[[profile.optional]]
+path = "src"
+kind = "dir"
+
+[[profile.optional]]
+path = "tests/cpp"
+kind = "dir"
+
+[[profile.optional]]
+path = "experiments/cpp"
 kind = "dir"
 
 [[profile.optional]]
