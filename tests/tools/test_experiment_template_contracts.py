@@ -1,9 +1,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests experiment completion, terminal case invariants, and nested manifest readback.
-# upstream implementation ../../templates/experiments/_template/artifact_io.py publishes artifacts.
-# upstream implementation ../../templates/experiments/_template/artifact_schema.py owns schemas.
-# upstream implementation ../../templates/experiments/_template/case_model.py owns case invariants.
+# upstream implementation ../../templates/experiments/_template/run.py owns schemas and artifact publication.
+# upstream implementation ../../templates/experiments/_template/cases.py owns case invariants.
 # @dependency-end
 
 """experiment template の completion、state、manifest contract を検証します."""
@@ -20,9 +19,14 @@ import pytest
 TEMPLATE_ROOT = Path(__file__).resolve().parents[2] / "templates" / "experiments" / "_template"
 sys.path.insert(0, str(TEMPLATE_ROOT))
 
-from artifact_io import load_completion_provenance, write_artifact_manifest  # noqa: E402
-from artifact_schema import ArtifactManifest, RunState, RunSummary  # noqa: E402
-from case_model import CaseResult  # noqa: E402
+from run import (  # noqa: E402
+    ArtifactManifest,
+    CaseResult,
+    RunState,
+    RunSummary,
+    load_completion_provenance,
+    write_artifact_manifest,
+)
 
 
 def _timestamp() -> str:
@@ -63,13 +67,13 @@ def _summary() -> RunSummary:
         failure_class="not_applicable",
         failure_evidence="not_applicable",
         preserved_artifacts=(
-            "summary.json",
-            "cases.jsonl",
-            "artifact-manifest.json",
-            "config_snapshot.json",
-            "environment.json",
-            "provenance_snapshot.toml",
-            "visualization-status.json",
+            "summary/summary.json",
+            "summary/cases.jsonl",
+            "summary/artifact-manifest.json",
+            "summary/config_snapshot.json",
+            "summary/environment.json",
+            "summary/provenance_snapshot.toml",
+            "summary/visualization-status.json",
         ),
         close_condition="not_applicable",
         validation_oracle="pass: complete provenance",
@@ -101,7 +105,8 @@ def test_case_result_rejects_terminal_cross_field_mismatch() -> None:
 
 def test_artifact_manifest_reads_nested_regular_files(tmp_path: Path) -> None:
     """Manifest が nested regular file の normalized path と hash を含めます."""
-    (tmp_path / "summary.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "summary").mkdir()
+    (tmp_path / "summary" / "summary.json").write_text("{}\n", encoding="utf-8")
     nested = tmp_path / "logs" / "nested" / "trace.txt"
     nested.parent.mkdir(parents=True)
     nested.write_text("trace\n", encoding="utf-8")
@@ -110,7 +115,7 @@ def test_artifact_manifest_reads_nested_regular_files(tmp_path: Path) -> None:
 
     write_artifact_manifest(tmp_path, _summary())
 
-    manifest = (tmp_path / "artifact-manifest.json").read_text(encoding="utf-8")
+    manifest = (tmp_path / "summary" / "artifact-manifest.json").read_text(encoding="utf-8")
     expected_digest = hashlib.sha256(b"trace\n").hexdigest()
     assert "logs/nested/trace.txt" in manifest
     assert "logs/artifact-manifest.json" in manifest

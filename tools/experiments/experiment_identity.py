@@ -121,16 +121,15 @@ class ExperimentIdentity:
 
 def result_relative_path(identity: ExperimentIdentity) -> Path:
     """Return the canonical repository-relative result directory."""
-    return Path("experiments") / identity.topic / "result" / identity.variant / identity.run_name
+    return Path("experiments") / identity.topic / "result" / identity.run_name
 
 
 def report_relative_path(identity: ExperimentIdentity) -> Path:
     """Return the canonical repository-relative reader report path."""
     return (
         Path("experiments")
-        / "report"
         / identity.topic
-        / identity.variant
+        / "report"
         / f"{identity.run_name}.md"
     )
 

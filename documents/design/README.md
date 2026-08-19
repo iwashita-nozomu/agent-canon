@@ -35,6 +35,8 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
     extras を Compose 境界へ projection します。
 - [experiment_runner.md](experiment_runner.md)
   - `experiment_runner` の契約と実行モデル
+- [experiment-topic-template.md](experiment-topic-template.md)
+  - single-source experiment topic scaffold、case/visualization owner、raw/summary result layout
 - [python-structure-hash.md](python-structure-hash.md)
   - Python の structural duplicate analysis と module-group dependency priority
 - [agentcanon-hook-simplification-wave3.md](agentcanon-hook-simplification-wave3.md)
@@ -87,6 +89,8 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
 
 - 共有契約や `Protocol` の責務を変えた場合は [protocols.md](protocols.md) を更新します。
 - `experiment_runner` の契約を変えた場合は [experiment_runner.md](experiment_runner.md) を更新します。
+- experiment topic scaffold、module boundary、または raw/summary layout を変えた場合は
+  [experiment-topic-template.md](experiment-topic-template.md) と直接結合する registry/retention docs を更新します。
 - 特定 topic の設計書を新設したら、この index にも入口を追加します。
 
 ## 正本維持ルール

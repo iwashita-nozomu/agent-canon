@@ -293,14 +293,14 @@ def validate_eval_patterns(
             findings.append(
                 Finding(
                     "error",
-                    f"{scope_name}: {key} must stay relative to result/<variant>/<run_name>: {pattern}",
+                    f"{scope_name}: {key} must stay relative to result/<run_name>: {pattern}",
                 )
             )
         if ".." in pattern_path.parts:
             findings.append(
                 Finding(
                     "error",
-                    f"{scope_name}: {key} must not escape result/<variant>/<run_name>: {pattern}",
+                    f"{scope_name}: {key} must not escape result/<run_name>: {pattern}",
                 )
             )
         if pattern in MANAGED_RUN_ARTIFACTS:
@@ -358,6 +358,7 @@ def validate_topic_layout(
     expected_entrypoint_raw = f"{expected_topic_dir_raw}/run.py"
     expected_config_raw = f"{expected_topic_dir_raw}/config.yaml"
     expected_result_root_raw = f"{expected_topic_dir_raw}/result"
+    expected_report_root_raw = f"{expected_topic_dir_raw}/report"
     expected_entrypoint = repo_root / expected_entrypoint_raw
     expected_config = repo_root / expected_config_raw
 
@@ -382,7 +383,15 @@ def validate_topic_layout(
             Finding(
                 "error",
                 f"{topic_name}: result_root must be {expected_result_root_raw} "
-                f"(variant/run names are appended by the lifecycle owner), got {result_root_raw}",
+                f"(run names are appended by the lifecycle owner; variant is metadata), got {result_root_raw}",
+            )
+        )
+    if report_root_raw != expected_report_root_raw:
+        findings.append(
+            Finding(
+                "error",
+                f"{topic_name}: report_root must be {expected_report_root_raw} "
+                f"(the run name is appended directly), got {report_root_raw}",
             )
         )
     if not topic_dir.is_dir():

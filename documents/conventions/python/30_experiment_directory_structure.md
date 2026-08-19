@@ -23,7 +23,7 @@ upstream design ../README.md convention index
 
 - 再利用できる汎用 runtime は pip installed `experiment_runner` package に置きます。
 - topic 固有のケース生成と実験本体は `experiments/` 配下に置きます。
-- 長時間実行の生成物は topic ごとの `result/<variant>/<run_name>/` に集約し、ライブラリ本体へ混ぜません。
+- 長時間実行の topic 生成物は run ごとの `result/<run-id>/raw/` と `result/<run-id>/summary/` に分け、ライブラリ本体へ混ぜません。
 - experiment run は 1 回の fresh 実行で完走させ、途中停止 run を継ぎ足して完了扱いにしません。
 
 ## 規約
@@ -37,7 +37,7 @@ upstream design ../README.md convention index
 ### 2. topic ごとの配置
 
 - 単独で完結する experiment は `experiments/<topic>/` に置きます。
-- `experiments/` 配下の topic ディレクトリには、少なくとも README、`cases.py`、`config.yaml`、`run.py`、`visualize.ipynb`、`result/` を置ける形にします。
+- `experiments/` 配下の topic ディレクトリには、少なくとも README、`cases.py`、`config.yaml`、`run.py`、`visualization.py`、`report/`、`result/` を置ける形にします。
 - topic ディレクトリ名は `snake_case` を使います。
 
 ### 3. 推奨レイアウト
@@ -50,41 +50,44 @@ experiments/
     ├── cases.py
     ├── config.yaml
     ├── run.py
-    ├── visualize.ipynb
+    ├── visualization.py
+    ├── report/
+    │   └── .gitkeep
     └── result/
-        └── <run_name>/
+        └── .gitkeep
 ```
 
 ```text
-experiments/report/
-└── <run_name>.md
+experiments/<topic>/report/
+├── .gitkeep
+└── <run-id>.md
 ```
 
 ### 4. どこへ何を置くか
 
 - topic をまたいで再利用する protocol や scheduler は pip installed `experiment_runner` 側へ置きます。
-- その topic のためだけに存在する `cases.py`、`config.yaml`、`run.py`、`visualize.ipynb` は `experiments/<topic>/` に置きます。
+- その topic のためだけに存在する `cases.py`、`config.yaml`、`run.py`、`visualization.py` は `experiments/<topic>/` に置きます。
 - `cases.py` には case 列の展開と `resource_estimate(case)` を置きます。
 - `run.py` には `main::main`、runner 起動、final summary 生成を置きます。
-- `visualize.ipynb` には run artifact を読む図表化 cell を置きます。
-- 可視化や report 用の生成物は `result/<variant>/<run_name>/` にまとめます。
+- `visualization.py` には run artifact を読む topic 固有 renderer を置きます。既定 template は notebook を生成しません。
+- 生結果は `result/<run-id>/raw/`、可視化・要約・report 参照用の compact artifact は `result/<run-id>/summary/` にまとめます。
 - topic 固有ディレクトリの README や note から、定式化と比較対象を必ず辿れるようにします。
-- 長時間実行で生成される JSON、JSONL、HTML、SVG、ログは `result/<variant>/<run_name>/` に集約します。
-- 人が読む experiment report は `experiments/report/<topic>/<variant>/<run_name>.md` に置きます。
+- 長時間実行で生成される raw JSON/JSONL と dump は `result/<run-id>/raw/`、summary JSON/JSONL、HTML、SVG、manifest は `result/<run-id>/summary/` に集約します。
+- 人が読む experiment report は `experiments/<topic>/report/<run-id>.md` に置きます。
 - 複数 run をまたぐ要約は `notes/experiments/<topic>.md` に置きます。
 - top-level `reports/` は topic ごとの experiment report の正本にしません。
 - JSONL は run 中の progress 記録として扱い、resume 用の canonical input にはしません。
-- 生成物は `.gitignore` と `result/<variant>/<run_name>/` 運用で管理し、安定ライブラリやテストディレクトリへ混ぜません。
+- 生成物は `.gitignore` と `result/<run-id>/{raw,summary}/` 運用で管理し、安定ライブラリやテストディレクトリへ混ぜません。
 
 ### 4.5 naming
 
 - run_name は `<topic>_<variant>_<YYYYMMDDTHHMMSSZ>` に固定します。
 - `result/` の主要生成物は次でそろえます。
-  - `result/<variant>/<run_name>/run_manifest.json`
-  - `result/<variant>/<run_name>/eval_manifest.json`
-  - `result/<variant>/<run_name>/summary.json`
-  - `result/<variant>/<run_name>/cases.jsonl`
-  - `result/<variant>/<run_name>/run.log`
+  - `result/<run-id>/run_manifest.json`
+  - `result/<run-id>/eval_manifest.json`
+  - `result/<run-id>/summary/summary.json`
+  - `result/<run-id>/summary/cases.jsonl`
+  - `result/<run-id>/run.log`
 - topic README には、run_name 形式、report パス、result ディレクトリ構成を明記します。
 - topic の canonical entrypoint と smoke / formal command は `experiments/registry.toml` にも書きます。
 - server 実行では、`tools/experiments/run_managed_experiment.py` のような wrapper で host / command / commit metadata を残すことを推奨します。
@@ -102,7 +105,7 @@ experiments/report/
 - `main` へ統合するときは、コードだけでなく test と document を同時にそろえます。
 - 隔離環境で削除した冗長ファイルは、`main` 側でも不要なら削除します。
 - 実行結果そのものは raw のまま全部を `main` へ戻さず、必要な最終 JSON と note を残します。
-- `main` へ持ち帰るのは完走 run の `result/<variant>/<run_name>/` と report だけにします。partial run は診断用に留めます。
+- `main` へ持ち帰るのは完走 run の `result/<run-id>/` と report だけにします。partial run は診断用に留めます。
 
 ## 補足
 

@@ -34,7 +34,7 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Metrics: <!-- primary metric と failure count。 -->
 - Case Set: <!-- dimension、level、dtype、seed、dataset slice。 -->
 - Fairness Notes: <!-- timeout、hardware、allocator、worker count、tuning rule。 -->
-- Artifact Paths: <!-- result/<variant>/<run_name>/ と report path。 -->
+- Artifact Paths: <!-- result/<run-id>/ と report path。 -->
 
 ## Iterations（反復）
 

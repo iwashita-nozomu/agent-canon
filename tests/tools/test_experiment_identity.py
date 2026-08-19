@@ -37,8 +37,8 @@ def test_identity_round_trip_is_nested_v2_wire() -> None:
         }
     }
     assert ExperimentIdentity.from_dict(payload) == identity
-    assert result_relative_path(identity) == Path("experiments/topic.v1/result/smoke.v2/run.3")
-    assert report_relative_path(identity) == Path("experiments/report/topic.v1/smoke.v2/run.3.md")
+    assert result_relative_path(identity) == Path("experiments/topic.v1/result/run.3")
+    assert report_relative_path(identity) == Path("experiments/topic.v1/report/run.3.md")
 
 
 @pytest.mark.parametrize("value", ["", ".", "..", "a/b", "a\\b", "a b", "a\x00b", "é"])

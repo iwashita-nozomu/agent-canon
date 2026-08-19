@@ -92,6 +92,7 @@ def create_fake_repo_dirs(repo_root: Path) -> None:
         / "result"
     ).mkdir(parents=True)
     (repo_root / "experiments" / "demo_topic" / "result").mkdir(parents=True)
+    (repo_root / "experiments" / "demo_topic" / "report").mkdir(parents=True)
     (repo_root / "experiments" / "report").mkdir(parents=True)
     (repo_root / "tools" / "experiments").mkdir(parents=True)
 
@@ -122,18 +123,14 @@ def write_template_topic(repo_root: Path) -> None:
         "# Result Directory\n",
         encoding="utf-8",
     )
-    document_template_dir = (
-        repo_root / "vendor" / "agent-canon" / "templates" / "documents" / "experiment"
-    )
-    document_template_dir.mkdir(parents=True, exist_ok=True)
-    (document_template_dir / "README.template.md").write_text(
-        "# Experiment Topic Template\n\n<topic>\n",
-        encoding="utf-8",
-    )
-    (document_template_dir / "experiment-provenance.template.toml").write_text(
+    (template_dir / "provenance.toml").write_text(
         "[experiment]\ntopic = \"<topic>\"\n",
         encoding="utf-8",
     )
+    (template_dir / "visualization.py").write_text("# visualization\n", encoding="utf-8")
+    (template_dir / "report" / ".gitkeep").parent.mkdir(parents=True, exist_ok=True)
+    (template_dir / "report" / ".gitkeep").write_text("", encoding="utf-8")
+    (template_dir / "result" / ".gitkeep").write_text("", encoding="utf-8")
 
 
 def write_demo_topic_base(repo_root: Path) -> None:
@@ -173,10 +170,10 @@ def write_demo_registry(repo_root: Path) -> None:
                 "",
                 "[defaults]",
                 'managed_runner = "tools/experiments/run_managed_experiment.py"',
-                'report_root = "experiments/report"',
+                'report_root = "experiments/demo_topic/report"',
                 'integration_branch = "main"',
                 'topic_template_dir = "vendor/agent-canon/templates/experiments/_template"',
-                'required_eval_artifacts = ["summary.json", "cases.jsonl"]',
+                'required_eval_artifacts = ["summary/summary.json", "summary/cases.jsonl"]',
                 "",
                 "[[topics]]",
                 'name = "demo_topic"',
@@ -185,7 +182,7 @@ def write_demo_registry(repo_root: Path) -> None:
                 'topic_readme = "experiments/demo_topic/README.md"',
                 f'canonical_entrypoint = "{CANONICAL_ENTRYPOINT}"',
                 'result_root = "experiments/demo_topic/result"',
-                'report_root = "experiments/report"',
+                'report_root = "experiments/demo_topic/report"',
                 'default_variant = "formal"',
                 f'default_inner_command = "{DEFAULT_INNER_COMMAND}"',
                 f'formal_inner_command = "{FORMAL_INNER_COMMAND}"',
@@ -205,9 +202,8 @@ def reservation_context(repo_root: Path, run_name: str = "run.a") -> RunContext:
         identity,
         repo_root
         / "experiments"
-        / "report"
         / identity.topic
-        / identity.variant
+        / "report"
         / f"{identity.run_name}.md",
     )
     return RunContext(
@@ -295,11 +291,11 @@ def test_skip_report_init_rolls_back_result_without_report_parent(
     assert (repo_root / "experiments" / "report").is_dir()
 
 
-@pytest.mark.parametrize("escaped_component", ("result", "variant"))
+@pytest.mark.parametrize("escaped_component", ("result",))
 def test_build_run_paths_rejects_symlinked_result_components(
     tmp_path: Path, escaped_component: str
 ) -> None:
-    """Reject a result or variant root that would redirect reservation writes."""
+    """Reject a result root that would redirect reservation writes."""
     repo_root = build_repo(tmp_path)
     identity = ExperimentIdentity("demo_topic", "smoke.v1", "run.a")
     topic_dir = repo_root / "experiments" / identity.topic
@@ -309,19 +305,14 @@ def test_build_run_paths_rejects_symlinked_result_components(
     if escaped_component == "result":
         result_root.rename(topic_dir / "result-real")
         result_root.symlink_to(outside, target_is_directory=True)
-    else:
-        variant_root = result_root / identity.variant
-        variant_root.symlink_to(outside, target_is_directory=True)
-
     with pytest.raises(ValueError, match="symlink"):
         build_run_paths(
             topic_dir,
             identity,
             repo_root
             / "experiments"
-            / "report"
             / identity.topic
-            / identity.variant
+            / "report"
             / f"{identity.run_name}.md",
         )
     assert not list(outside.iterdir())
@@ -1293,6 +1284,37 @@ def test_check_experiment_registry_accepts_valid_registry(tmp_path: Path) -> Non
     assert "OK: experiment registry is valid" in result.stdout
 
 
+def test_check_experiment_registry_rejects_double_topic_report_root(
+    tmp_path: Path,
+) -> None:
+    """The topic report root is exact and receives only the run name suffix."""
+    repo_root = build_repo(tmp_path)
+    registry_path = repo_root / "experiments" / "registry.toml"
+    registry_path.write_text(
+        registry_path.read_text(encoding="utf-8").replace(
+            'report_root = "experiments/demo_topic/report"',
+            'report_root = "experiments/demo_topic/report/demo_topic"',
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "tools.ci.check_experiment_registry",
+            "--repo-root",
+            str(repo_root),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "report_root must be experiments/demo_topic/report" in result.stdout
+
+
 def test_check_experiment_registry_reports_missing_required_field(
     tmp_path: Path,
 ) -> None:
@@ -1328,8 +1350,8 @@ def test_check_experiment_registry_reports_invalid_eval_artifact_item(
     registry_path = repo_root / "experiments" / "registry.toml"
     registry_path.write_text(
         registry_path.read_text(encoding="utf-8").replace(
-            'required_eval_artifacts = ["summary.json", "cases.jsonl"]',
-            'required_eval_artifacts = ["summary.json", ""]',
+            'required_eval_artifacts = ["summary/summary.json", "summary/cases.jsonl"]',
+            'required_eval_artifacts = ["summary/summary.json", ""]',
         ),
         encoding="utf-8",
     )
@@ -1607,9 +1629,9 @@ def test_check_experiment_registry_rejects_reserved_eval_artifact_pattern(
     repo_root = build_repo(tmp_path)
     registry_path = repo_root / "experiments" / "registry.toml"
     registry_text = registry_path.read_text(encoding="utf-8").replace(
-        'required_eval_artifacts = ["summary.json", "cases.jsonl"]',
+        'required_eval_artifacts = ["summary/summary.json", "summary/cases.jsonl"]',
         (
-            'required_eval_artifacts = ["summary.json", "cases.jsonl", '
+            'required_eval_artifacts = ["summary/summary.json", "summary/cases.jsonl", '
             '"run.log", "logs/stdout.log"]'
         ),
     )
@@ -1640,7 +1662,7 @@ def test_create_experiment_topic_scaffolds_directory_and_registry(
     result = subprocess.run(
         [
             sys.executable,
-            "-m", "tools.experiments.create_experiment_topic",
+            "tools/experiments/create_experiment_topic.py",
             "--repo-root",
             str(repo_root),
             "--active-branch",
@@ -1667,6 +1689,7 @@ def test_create_experiment_topic_scaffolds_directory_and_registry(
     new_topic = next(
         topic for topic in registry_data["topics"] if topic["name"] == "new_topic"
     )
+    assert new_topic["report_root"] == "experiments/new_topic/report"
     assert "formal_inner_command" not in new_topic
     assert "EXPERIMENT_CONFIG_PATH" not in new_topic["default_inner_command"]
 

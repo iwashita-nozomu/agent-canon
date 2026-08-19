@@ -9,9 +9,9 @@ upstream design result-log-retention-and-visualization.md defines artifact reten
 -->
 
 
-この文書は、`experiments/report/` に残す実験レポートを、学術的な report に近い体裁で書くための正本です。
+この文書は、`experiments/<topic>/report/` に残す実験レポートを、学術的な report に近い体裁で書くための正本です。
 対象は、`experiments/` 配下の比較実験、benchmark、アルゴリズム改造後の検証レポートです。
-human-readable な experiment report の正本は `experiments/report/` とし、render された HTML / SVG や JSON / JSONL / log は `experiments/<topic>/result/<variant>/<run_name>/` に置きます。可視化の作業入口は `experiments/<topic>/visualize.ipynb` の Jupyter notebook に置き、notebook から run artifact を読みます。top-level の `reports/` は project-wide な review や automation report の置き場であり、topic ごとの experiment report の正本にはしません。
+human-readable な experiment report の正本は topic の `experiments/<topic>/report/<run-id>.md` とし、render された HTML / SVG と compact JSON / JSONL は `experiments/<topic>/result/<run-id>/summary/`、raw data は `experiments/<topic>/result/<run-id>/raw/` に置きます。可視化の作業入口は `experiments/<topic>/visualization.py` に置きます。top-level の `reports/` は project-wide な review や automation report の置き場であり、topic ごとの experiment report の正本にはしません。
 raw log、summary、可視化 artifact の保持と closeout evidence は
 [result-log-retention-and-visualization.md](result-log-retention-and-visualization.md)
 を正本にします。
@@ -45,17 +45,17 @@ repo 固有の結論を先に言うと、実験レポートは IMRaD をその�
 - headline metric だけでなく、case 数、成功率、failure kind、ばらつき、比較条件を同時に示します。
 - 良い結果だけを report せず、negative result、unexpected result、limitations も同じ文書に残します。
 - 結論節では、根拠になった図表番号を明示して、結論と evidence の対応を切らさないようにします。
-- `experiments/report/<topic>/<variant>/<run_name>.md` は、`experiment_reviewer` と独立した `report_reviewer` の両方を通すまで draft 扱いにします。
+- `experiments/<topic>/report/<run-id>.md` は、`experiment_reviewer` と独立した `report_reviewer` の両方を通すまで draft 扱いにします。
 
 ## 2. 標準構成
 
 ## 2.0 置き場
 
-- experiment report の Markdown 正本は `experiments/report/<topic>/<variant>/<run_name>.md` を既定にします。
-- 対応する機械生成物は `experiments/<topic>/result/<variant>/<run_name>/` に置きます。
-- 追加ログは `experiments/<topic>/result/<variant>/<run_name>/logs/` に置きます。
-- 可視化 notebook は `experiments/<topic>/visualize.ipynb` に置きます。Notebook は formal run の起動手順や設定正本ではなく、図表と reader-facing exploration の入口です。
-- report 本文からは、少なくとも `eval_manifest.json`、`summary.json`、`cases.jsonl`、`logs/`、可視化 notebook、主要な図を辿れるようにします。
+- experiment report の Markdown 正本は `experiments/<topic>/report/<run-id>.md` を既定にします。
+- 対応する raw は `experiments/<topic>/result/<run-id>/raw/`、compact artifact は `experiments/<topic>/result/<run-id>/summary/` に置きます。
+- 追加ログは owner を明示して raw または summary の適切な側に置きます。
+- 可視化 renderer は `experiments/<topic>/visualization.py` に置きます。notebook は既定の入口ではありません。
+- report 本文からは、少なくとも `summary/artifact-manifest.json`、`summary/summary.json`、`summary/cases.jsonl`、主要な図を辿れるようにします。
 - 複数 run をまたぐ考察は `notes/experiments/` や `notes/themes/` に分けます。
 
 ## 2.1 Title
@@ -121,7 +121,7 @@ repo 固有の結論を先に言うと、実験レポートは IMRaD をその�
 - timeout
 - seeds
 - fairness notes
-- `summary.json` / `cases.jsonl` の生成手順
+- `summary/summary.json` / `summary/cases.jsonl` の生成手順
 
 `Protocol` に入れるが `Results` へ混ぜないもの:
 
@@ -193,7 +193,7 @@ repo では、次のラベルで observation と interpretation を分けると�
 ## 2.8 Reproducibility Record
 
 - 計算実験では、再現情報を report の一部として明示します。
-- 既に `summary.json` に入っている情報でも、本文から辿れるように要約を書きます。
+- 既に `summary/summary.json` に入っている情報でも、本文から辿れるように要約を書きます。
 
 最低限含めるもの:
 
@@ -207,16 +207,16 @@ repo では、次のラベルで observation と interpretation を分けると�
 - timeout
 - output paths
 - log directory
-- visualization notebook
+- `visualization.py` renderer
 
 ## 2.9 Artifacts and Carry-Over
 
 - `main` 側 note は raw 結果置き場ではないので、artifact への入口を整理します。
 - この section では次を分けます。
   - raw JSONL
-  - `summary.json`
+  - `summary/summary.json`
   - `logs/`
-  - plots / HTML report / Jupyter notebook
+  - plots / HTML report / `visualization.py` renderer output
   - `main` に持ち帰るもの
 - HTML report は standalone で開ける artifact として扱い、CSS で page background を明示的に白に指定します。browser / OS の dark mode に依存した背景色にしません。
 - SSH 越しの HPC / container で生成された HTML report を手元 PC のブラウザで確認する場合は、`tools/experiments/html_artifact_access.py` で server command、SSH tunnel command、local URL を出し、report または closeout evidence から辿れるようにします。
@@ -318,7 +318,7 @@ repo では、次のラベルで observation と interpretation を分けると�
 
 ## 4. repo 用の推奨見出し
 
-`experiments/report/` では、次の見出しを推奨します。
+`experiments/<topic>/report/` では、次の見出しを推奨します。
 
     # <Topic-First Title>
 

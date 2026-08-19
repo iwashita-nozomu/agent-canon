@@ -241,12 +241,21 @@ def _parse_result_identity(source_root: Path, result_dir: Path) -> ResultIdentit
         raise RetentionError(f"result-dir must be an existing directory: {result_dir}")
     result_relative = result_dir.relative_to(source_root)
     parts = result_relative.parts
-    if len(parts) != 5 or parts[0] != EXPERIMENTS or parts[2] != RESULT:
+    if len(parts) != 4 or parts[0] != EXPERIMENTS or parts[2] != RESULT:
         raise RetentionError(
-            "result-dir must be experiments/<topic>/result/<variant>/<run_name>: "
+            "result-dir must be experiments/<topic>/result/<run_name>: "
             f"{result_relative}"
         )
-    run_identity = ExperimentIdentity(parts[1], parts[3], parts[4])
+    run_manifest = result_dir / "run_manifest.json"
+    if not os.path.lexists(run_manifest):
+        raise RetentionError("result-dir must contain run_manifest.json with variant metadata")
+    _ensure_regular(run_manifest, label="run manifest")
+    manifest_payload = load_json_file(run_manifest)
+    if not isinstance(manifest_payload, dict):
+        raise RetentionError("run manifest must be a JSON object")
+    run_identity = ExperimentIdentity.from_dict(manifest_payload)
+    if run_identity.topic != parts[1] or run_identity.run_name != parts[3]:
+        raise RetentionError("run manifest identity does not match result-dir identity")
     if result_relative != result_relative_path(run_identity):
         raise RetentionError(f"result-dir has an invalid identity: {result_relative}")
     _validate_source_components(source_root, result_relative)
@@ -257,18 +266,8 @@ def _parse_result_identity(source_root: Path, result_dir: Path) -> ResultIdentit
     else:
         report_path = None
     source_branch, source_commit, source_dirty_paths = _source_git_provenance(source_root)
-    run_manifest = result_dir / "run_manifest.json"
     if os.path.lexists(run_manifest):
         _ensure_regular(run_manifest, label="run manifest")
-        manifest_payload = load_json_file(run_manifest)
-        if not isinstance(manifest_payload, dict):
-            raise RetentionError("run manifest must be a JSON object")
-        manifest_identity = ExperimentIdentity.from_dict(manifest_payload)
-        if manifest_identity != run_identity:
-            raise RetentionError(
-                "run manifest identity does not match result-dir identity: "
-                f"{manifest_identity} != {run_identity}"
-            )
         _, run_manifest_sha256 = _sha256_file(run_manifest)
     else:
         run_manifest_sha256 = None
@@ -337,21 +336,13 @@ def _scan_source_tree(identity: ResultIdentity) -> tuple[tuple[ArchiveEntry, ...
         identity.source_root / EXPERIMENTS / identity.topic / RESULT,
         True,
     )
-    variant_parent = f"{EXPERIMENTS}/{identity.topic}/{RESULT}/{identity.variant}"
-    entries[variant_parent] = ArchiveEntry(
-        variant_parent,
-        identity.source_root / EXPERIMENTS / identity.topic / RESULT / identity.variant,
-        True,
-    )
-
     if identity.report_path is not None:
         report_archive = report_relative_path(
             ExperimentIdentity(identity.topic, identity.variant, identity.run_name)
         ).as_posix()
         report_parents = (
-            Path(EXPERIMENTS) / REPORT,
-            Path(EXPERIMENTS) / REPORT / identity.topic,
-            Path(EXPERIMENTS) / REPORT / identity.topic / identity.variant,
+            Path(EXPERIMENTS) / identity.topic,
+            Path(EXPERIMENTS) / identity.topic / REPORT,
         )
         for report_parent_path in report_parents:
             report_parent = report_parent_path.as_posix()
@@ -826,7 +817,6 @@ def save_result(identity: ResultIdentity, annex_root: Path) -> ArchiveResult:
         Path(EXPERIMENTS)
         / identity.topic
         / RESULT
-        / identity.variant
         / f"{identity.run_name}.tar.gz"
     )
     archive_path = annex_root / archive_relative
@@ -937,7 +927,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="append",
         required=True,
         type=Path,
-        help="Exactly one experiments/<topic>/result/<variant>/<run_name> directory.",
+        help="Exactly one experiments/<topic>/result/<run_name> directory.",
     )
     parser.add_argument(
         "--annex-repo",

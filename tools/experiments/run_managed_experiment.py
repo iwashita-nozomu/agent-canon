@@ -156,7 +156,7 @@ else:
         validate_segment,
     )
 
-DEFAULT_REQUIRED_EVAL_ARTIFACTS = ("summary.json", "cases.jsonl", "config.json")
+DEFAULT_REQUIRED_EVAL_ARTIFACTS = ("summary/summary.json", "summary/cases.jsonl", "config.json")
 CONFIG_SOURCE_SNAPSHOT_NAME = "config_source.yaml"
 COMMAND_MANIFEST_NAME = "command.json"
 ENVIRONMENT_MANIFEST_NAME = "environment.json"
@@ -1165,12 +1165,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--run-name",
-        help="Explicit run name. Defaults to <topic>_<variant>_<timestamp>.",
+        help="Explicit run name. Defaults to <topic>_<variant>_<timestamp>; result filesystem uses result/<run-name>.",
     )
     parser.add_argument(
         "--variant",
         required=True,
-        help="Required variant label used in the result/report/branch identity.",
+        help="Required variant label recorded in run metadata and used for selection; it is not a result directory component.",
     )
     parser.add_argument(
         "--registry",
@@ -1185,7 +1185,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--report-path",
-        help="Optional report path. Defaults to experiments/report/<topic>/<variant>/<run_name>.md.",
+        help="Optional report path. Defaults to the registry report_root/<run_name>.md.",
     )
     parser.add_argument(
         "--skip-report-init",
@@ -1195,7 +1195,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config-json",
         help=(
-            "Optional JSON object file to merge into result/<variant>/<run_name>/config.json. "
+            "Optional JSON object file to merge into result/<run_name>/config.json. "
             "The file must decode to a dictionary."
         ),
     )
@@ -1205,7 +1205,7 @@ def parse_args() -> argparse.Namespace:
         default=[],
         metavar="KEY=JSON",
         help=(
-            "Add one JSON-encoded config value to result/<variant>/<run_name>/config.json. "
+            "Add one JSON-encoded config value to result/<run_name>/config.json. "
             "Example: --config seed=0 --config enabled=true."
         ),
     )
@@ -1462,7 +1462,7 @@ def render_report_stub(context: RunContext) -> str:
 
 ## Results
 
-<!-- Fill in summary.json, cases.jsonl, and the main observations after the run. -->
+<!-- Fill in summary/summary.json, summary/cases.jsonl, and the main observations after the run. -->
 
 ## Reproducibility Record
 
@@ -1479,8 +1479,8 @@ def render_report_stub(context: RunContext) -> str:
 - `logs/startup.jsonl`
 - `logs/stdout.log`
 - `logs/stderr.log`
-- `summary.json`
-- `cases.jsonl`
+- `summary/summary.json`
+- `summary/cases.jsonl`
 
 ## Critical Review Notes
 
@@ -1799,10 +1799,10 @@ def validate_eval_artifact_patterns(patterns: list[str], key: str) -> list[str]:
         pattern_path = Path(pattern)
         if pattern_path.is_absolute():
             raise ValueError(
-                f"{key} must stay relative to result/<variant>/<run_name>: {pattern}"
+                f"{key} must stay relative to result/<run_name>: {pattern}"
             )
         if ".." in pattern_path.parts:
-            raise ValueError(f"{key} must not escape result/<variant>/<run_name>: {pattern}")
+            raise ValueError(f"{key} must not escape result/<run_name>: {pattern}")
     return patterns
 
 
@@ -2053,14 +2053,7 @@ def resolve_report_path(
             "report_root"
         ) or registry.defaults.get("report_root")
         if isinstance(registry_report_root, str):
-            return contained_path(
-                repo_root,
-                repo_root
-                / registry_report_root
-                / identity.topic
-                / identity.variant
-                / f"{identity.run_name}.md",
-            )
+            return contained_path(repo_root, repo_root / registry_report_root / f"{identity.run_name}.md")
     return contained_path(repo_root, repo_root / report_relative_path(identity))
 
 
@@ -2085,17 +2078,7 @@ def build_run_paths(
         if directory.exists() and not directory.is_dir():
             raise ExperimentIdentityError(f"{label} must be a directory: {directory}")
 
-    variant_root = result_root / identity.variant
-    if variant_root.is_symlink() or variant_root.resolve() != variant_root:
-        raise ExperimentIdentityError(
-            f"variant result root must not escape by symlink: {variant_root}"
-        )
-    if variant_root.exists() and not variant_root.is_dir():
-        raise ExperimentIdentityError(
-            f"variant result root must be a directory: {variant_root}"
-        )
-
-    result_dir = topic_dir / "result" / identity.variant / identity.run_name
+    result_dir = topic_dir / "result" / identity.run_name
     if result_dir.is_symlink() or result_dir.resolve() != result_dir:
         raise ExperimentIdentityError(
             f"result directory must not escape by symlink: {result_dir}"
