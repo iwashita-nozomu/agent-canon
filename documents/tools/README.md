@@ -198,7 +198,7 @@ second command manual.
 - `tools/ci/check_experiment_registry.py`
   - shared experiment registry contract の entrypoint と command を確認します。
 - `tools/ci/check_experiment_template.py`
-  - centralized template source を一時 parent-shaped repo へ copy し、`experiments/template-smoke/` の registry、path、Python compile、notebook structure を GPU 実行なしで確認します。source registry と canonical scaffold は変更しません。
+  - centralized template source を一時 parent-shaped repo へ copy し、`experiments/template-smoke/` の registry、flat result path、Python compile、summary/raw artifact structure を GPU 実行なしで確認します。source registry と canonical scaffold は変更しません。
 - `tools/validation/notebook_quality.py`
   - default notebook directories の `.ipynb` を、細かい test ではなく、説明付きで部分実行しやすい実用 demo として読めるか検査します。
   - Codex hook では changed notebook だけを見て、`assert`、`pytest`、`test_` 関数、保存済み error output、可視化 code 不在を block します。
@@ -226,6 +226,8 @@ second command manual.
   - Markdown 内の Mermaid fenced block を補正し、予約語 node id の衝突を避け、隣接 check を実行します。
 - `tools/docs/fix_markdown_docs.py`
   - conservatively な Markdown 整形を当てます。
+- `tools/docs/extract_docx.py`
+  - 標準ライブラリだけで、DOCXを検索用Markdown・raw ZIP member・manifest付きのreference bundleへ展開します。
 - `tools/docs/find_similar_documents.py`
   - document maintenance profile で重複・統合候補の文書を探します。
 - `tools/docs/find_redundant_designs.py`
@@ -366,7 +368,7 @@ bash tools/agent_tools/review_backlog_scan.sh \
 ```bash
 python3 tools/oop/python/readability.py --format markdown python tools tests
 python3 tools/oop/python/rule_inventory.py --format markdown
-python3 tools/oop/cpp/readability.py --format markdown cpp/include cpp/src cpp/tests cpp/experiments
+python3 tools/oop/cpp/readability.py --format markdown cpp/include cpp/src tests/cpp cpp/experiments
 python3 tools/oop/cpp/rule_inventory.py --format markdown
 ```
 
@@ -408,7 +410,7 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
 - `tools/bin/agent-canon python-algorithm-contract-check`
   - Python AST を一度 JSON として抽出し、Rust 側で `algorithm_module_protocol` module の literal `__all__`、standard public surface、callable `Algorithm`、nested ownership、concrete `Info` schema、protocol-only import、syntax diagnostics、fnmatch 方式の `--exclude` を検査します。text/JSON artifact と exit status は同じ canonical route から出力し、fixture は `tests/fixtures/python_algorithm_contract/`、CLI parity test は `rust/agent-canon/tests/python_algorithm_contract_cli.rs` にあります。
 - `tools/experiments/update_latest_result.py`
-  - `experiments/<topic>/result/<variant>/LATEST.json` と `LATEST.md` を更新し、選択した variant 内の最新 run、summary、manifest、visual report の入口を固定します。`python3 -m tools.experiments.update_latest_result experiments/<topic>/result --variant <variant>` のように variant を必ず指定します。
+  - `experiments/<topic>/result/LATEST.<variant>.json` と `LATEST.<variant>.md` を更新し、flat result root内で選択した variant metadata の最新 run、summary、manifest、visual report の入口を固定します。global `LATEST.json` fallbackは作りません。`python3 -m tools.experiments.update_latest_result experiments/<topic>/result --variant <variant>` のように variant を必ず指定します。
 - `tools/experiments/save_experiment_result_annex.py`
   - v2 manifest で identity を検証した 1 run を、決定的な 1 archive として clean な専用 git-annex worktree へ append-only で保存し、retention commit SHA を出します。
   - SHA256E key、full readback、symlink / Git LFS pointer / identity mismatch rejection、pre-commit rollback を fail-closed に検証します。push は行いません。

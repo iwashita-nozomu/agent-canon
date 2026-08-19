@@ -65,15 +65,14 @@ background task は再生成や上流探索を行いません。
 ## Experiment Copy Boundary
 
 `create_experiment_topic.py` は AgentCanon source 内で
-`templates/experiments/_template/`、
-`templates/documents/experiment/README.template.md`、および
-`templates/documents/experiment/experiment-provenance.template.toml` を読み、生成先だけを
+`templates/experiments/_template/` を唯一の copy source として読み、生成先だけを
 `experiments/<topic>/` に書き込みます。この source-owned operation は default consumer の
 bootstrap/runtime surface ではありません。
 
 managed runner の実行入口は常に生成後の `experiments/<topic>/run.py` です。`run.py` は
-orchestration だけを担当し、`case_model.py`、`case_execution.py`、`artifact_schema.py`、
-`artifact_io.py`、`visualization.py` が replaceable extension point です。
+orchestration、run schema、atomic publication を担当します。`cases.py` が case model・registry・
+worker・failure classification、`visualization.py` が topic renderer extension point を所有します。
+topic-produced outputs are divided between `result/<run-id>/raw/` and `result/<run-id>/summary/`.
 
 ## Consumer Migration Packet
 

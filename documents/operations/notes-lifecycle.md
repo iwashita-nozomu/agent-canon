@@ -8,12 +8,12 @@ upstream design README.md durable document index
 -->
 
 
-この文書は、`notes/` を使うほど充実する形に保つための正本です。
+この文書は、`documents/notes/` を使うほど充実する形に保つための正本です。
 action log、実験メモ、知識メモ、theme note、failure note を別々に持ちつつ、closeout ごとに昇格先を決めます。
 
 ## この文書の読み方
 
-- この文書は、`notes/` の実行中メモ、review/closeout 昇格、promotion
+- この文書は、`documents/notes/` の実行中メモ、review/closeout 昇格、promotion
   rules、最小 closeout questions、template を定めます。
 - 主な順路は、Purpose、Default Flow、Promotion Rules、
   Minimum Closeout Questions、Templates です。
@@ -31,21 +31,21 @@ action log、実験メモ、知識メモ、theme note、failure note を別々�
 
 ### 1. During Execution
 
-- 一挙手一投足は `notes/worktrees/` の action log に残します。
-- 実験 topic の結果要約は `notes/experiments/` に残します。
-- branch / worktree の入口整理は `notes/branches/` に残します。
+- 一挙手一投足は `documents/notes/worktrees/` の action log に残します。
+- 実験 topic の結果要約は `documents/notes/experiments/` に残します。
+- branch / worktree の入口整理は `documents/notes/branches/` に残します。
 
 ### 2. At Review / Closeout
 
 closeout 前に、action log と report を見て次のどれへ昇格するかを決めます。
 
-- `notes/knowledge/`
+- `documents/notes/knowledge/`
   - 何度も参照する短い横断知識
-- `notes/themes/`
+- `documents/notes/themes/`
   - 複数 run から得た topic-level synthesis
 - `memory/README.md` と `memory/records/*.md`
   - 同じ問題に再遭遇したときに検索して使う、owner ref 付きの self-contained knowledge
-- `notes/failures/`
+- `documents/notes/failures/`
   - 再発防止のために残す failure pattern
 - `documents/`
   - repo 正本として固定すべき rule
@@ -58,17 +58,17 @@ closeout 前に、action log と report を見て次のどれへ昇格するか�
 
 ## Promotion Rules
 
-### Promote To `notes/knowledge/`
+### Promote To `documents/notes/knowledge/`
 
 - 同じ command、path、environment rule、tool behavior を今後も参照しそう
 - 1 topic の短い practical memo に落とせる
 
-### Promote To `notes/themes/`
+### Promote To `documents/notes/themes/`
 
 - 複数 run、複数 experiment、複数文献をまたいで言える
 - `Known`, `Likely`, `Open`, `Worked`, `Did Not Work` で整理できる
 
-### Promote To `notes/failures/`
+### Promote To `documents/notes/failures/`
 
 - 同じ失敗を次回も踏みやすい
 - trigger と safe alternative が書ける
@@ -93,9 +93,9 @@ closeout ごとに最低限次を確認します。
 
 ## Templates
 
-- `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
-- `notes/branches/BRANCH_NOTE_TEMPLATE.md`
-- `notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md`
-- `notes/themes/THEME_NOTE_TEMPLATE.md`
+- `documents/notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
+- `documents/notes/branches/BRANCH_NOTE_TEMPLATE.md`
+- `documents/notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md`
+- `documents/notes/themes/THEME_NOTE_TEMPLATE.md`
 - `memory/records/<domain>--<problem-slug>.md`
-- `notes/failures/FAILURE_NOTE_TEMPLATE.md`
+- `documents/notes/failures/FAILURE_NOTE_TEMPLATE.md`

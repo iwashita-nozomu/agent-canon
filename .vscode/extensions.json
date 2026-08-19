@@ -5,7 +5,8 @@
     "ms-python.vscode-pylance",
     "ms-toolsai.jupyter",
     "ms-azuretools.vscode-docker",
-    "ms-vscode.cpptools",
+    "llvm-vs-code-extensions.vscode-clangd",
+    "xaver.clang-format",
     "ms-vscode.cmake-tools",
     "rust-lang.rust-analyzer",
     "tamasfe.even-better-toml"

@@ -413,7 +413,7 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<variant>/<run_name>
+      - python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<run_name>
         --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
       - python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir
         reports/agents/<run-id>
@@ -518,7 +518,7 @@ skill_families:
       conditional:
       - python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
       - python3 tools/agent_tools/generate_agent_runtime_dashboard.py
-      - git grep -n "<cause keywords>" -- issues memory notes/failures documents agents
+      - git grep -n "<cause keywords>" -- issues memory documents/notes/failures documents agents
       - python3 tools/agent_tools/issue_sync.py --root .
       - bash tools/agent_tools/run_repo_dependency_review.sh
       - python3 tools/agent_tools/check_dependency_headers.py --changed
@@ -1522,13 +1522,13 @@ skill_families:
       name: experiment-lifecycle
       description: "Use this skill when preparing, running, or validating experiments."
     tool_commands:
-      required: []
+      required:
+      - python3 tools/experiments/create_experiment_topic.py <topic>
       conditional:
-      - python3 -m tools.experiments.create_experiment_topic <topic>
       - python3 -m tools.ci.check_experiment_registry
       - python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant
         <variant> -- python3 experiments/<topic>/run.py
-      - python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<variant>/<run_name>
+      - python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<run_name>
         --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
       - python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>
       - python3 -m pytest tests/tools/test_run_managed_experiment.py -q
@@ -1554,12 +1554,12 @@ skill_families:
         - ["実験結果"]
         - ["実験", "結果"]
   - id: experiment-review
-    purpose: Review experiment topics for the managed runner route and run.py inner entrypoint, GPU/JAX environment ownership, artifact schemas, notebook explanations, and README run contracts.
+    purpose: Review experiment topics for the managed runner route and run.py inner entrypoint, GPU/JAX environment ownership, artifact schemas, visualization.py renderer, and README run contracts.
     canonical_doc: agents/skills/experiment-review.md
     shim: .agents/skills/experiment-review/SKILL.md
     discovery:
       name: experiment-review
-      description: "Use when reviewing experiment topics, run.py files, experiment registries, GPU/JAX environment ownership, notebook artifacts, or experiment README/report readiness."
+      description: "Use when reviewing experiment topics, run.py files, experiment registries, GPU/JAX environment ownership, visualization.py artifacts, or experiment README/report readiness."
     tool_commands:
       required: []
       conditional:
@@ -1572,7 +1572,7 @@ skill_families:
       - python3 tools/agent_tools/skill_tool_commands.py check
     routing:
       stage_policy: active
-      reason: experiment topic review, managed runner route, environment ownership, artifact schema, or notebook readiness is in scope
+      reason: experiment topic review, managed runner route, environment ownership, artifact schema, or visualization.py readiness is in scope
       triggers:
         - ["実験", "レビュー"]
         - ["実験", "review"]
@@ -1582,7 +1582,7 @@ skill_families:
         - ["run.py", "experiment"]
         - ["先取無効"]
         - ["preallocation", "experiment"]
-        - ["notebook", "artifact", "experiment"]
+        - ["visualization.py", "artifact", "experiment"]
   - id: gpu-execution
     purpose: Route GPU/CUDA/JAX/XLA/IREE execution through provider-independent full-UUID admission by default, with the managed ExperimentRunner adapter only for managed experiment lifecycle contracts.
     canonical_doc: agents/skills/gpu-execution.md

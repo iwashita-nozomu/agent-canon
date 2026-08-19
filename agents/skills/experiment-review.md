@@ -11,14 +11,14 @@ upstream design experiment-lifecycle.md experiment lifecycle workflow
 ## Purpose
 
 experiment topic を review し、managed runner route と topic `run.py` inner entrypoint、
-GPU/JAX 環境の所有境界、artifact / notebook / README の契約が崩れていないかを確認します。
+GPU/JAX 環境の所有境界、artifact / visualization.py renderer / README の契約が崩れていないかを確認します。
 
 ## Use When
 
-- `experiments/<topic>/run.py`、`config.yaml`、`visualize.ipynb`、README を review する
+- `experiments/<topic>/run.py`、`config.yaml`、`visualization.py`、README を review する
 - managed runner route、topic `run.py` inner entrypoint、topic 構築 tooling の責務が混同されていないか確認する
 - GPU preallocation、JAX platform、GPU visibility、worker 並列度の混入を確認する
-- 実験結果 artifact、notebook、registered command の整合を確認する
+- 実験結果 artifact、visualization.py renderer、registered command の整合を確認する
 
 ## Review Checklist
 
@@ -30,14 +30,12 @@ GPU/JAX 環境の所有境界、artifact / notebook / README の契約が崩れ�
   `EXPERIMENT_RUN_DIR` を尊重して同じ artifact schema を書く
 - topic code と checked-in config は GPU visibility、JAX platform、allocator、
   preallocation、`max_workers: 1`、単一 GPU 固定、serial throttle を持たない
-- topic が notebook 実行や worker subprocess を起動する場合、その subprocess は
+- topic が renderer 実行や worker subprocess を起動する場合、その subprocess は
   `os.environ.copy()` または標準継承で caller environment を引き継ぐ
-- run artifact は config snapshot、`summary.json`、`cases.jsonl`、case artifact、
-  `visualize_executed.ipynb` を区別する
-- `visualize.ipynb` は artifact reader であり、formal run launcher や config 正本に
+- run artifact は `summary/config_snapshot.json`、`summary/summary.json`、
+  `summary/cases.jsonl`、raw case artifact を区別する
+- `visualization.py` は artifact reader/renderer であり、formal run launcher や config 正本に
   なっていない
-- notebook の各可視化項目は、直前の Markdown cell に日本語で入力 artifact、
-  描く量、読み方を説明している
 
 ## Suggested Static Search
 
@@ -51,7 +49,7 @@ git grep -n -E "ExperimentRunner|EXPERIMENT_RUN_DIR|JAX_|XLA_|CUDA_VISIBLE|PREAL
 - `fix now`: managed runner の inner command が topic `run.py` を呼ばない、
   topic-side environment hard-code、child subprocess environment reset、
   missing registry command、artifact path outside run dir.
-- `follow-up`: README / notebook explanation gap, optional artifact schema gap,
+- `follow-up`: README / visualization.py renderer explanation gap, optional artifact schema gap,
   weak visualization coverage.
 - `no findings`: state the remaining unchecked surfaces, especially whether an
   actual formal run was intentionally skipped.

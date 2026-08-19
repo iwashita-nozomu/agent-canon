@@ -162,7 +162,8 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 "AGENTS.md",
                 ".codex/config.toml",
                 ".codex/agents",
-                "tools/agent-canon",
+                ".codex/hooks.json",
+                ".codex/hooks",
             },
         )
         for entry in active.values():
@@ -178,7 +179,8 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 "AGENTS.md": "vendor/agent-canon/ROOT_AGENTS.md",
                 ".codex/config.toml": "vendor/agent-canon/.codex/config.toml",
                 ".codex/agents": "vendor/agent-canon/.codex/agents",
-                "tools/agent-canon": "vendor/agent-canon/tools",
+                ".codex/hooks.json": "vendor/agent-canon/.codex/hooks.json",
+                ".codex/hooks": "vendor/agent-canon/.codex/hooks",
             }.items():
                 projection = root / path
                 self.assertTrue(projection.is_symlink(), path)
@@ -218,7 +220,9 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 resolution.public_tool_root,
                 (root / "tools" / "agent-canon").absolute(),
             )
-            self.assertNotEqual(resolution.current_repository_root, resolution.source_root)
+            self.assertNotEqual(
+                resolution.current_repository_root, resolution.source_root
+            )
 
     def test_tree_present_adds_checked_token_and_command(self) -> None:
         """Tree availability should be reported without relying on the host tool."""
@@ -333,7 +337,9 @@ class ParentRepoReadinessTest(unittest.TestCase):
             for entry in manifest.entries
             if entry.mode in {"removed_legacy", "standalone_only"}
         }
-        root_absent_paths = set(render_root_absent_paths(manifest.entries).splitlines())
+        root_absent_paths = set(
+            render_root_absent_paths(manifest.deletion_targets).splitlines()
+        )
         active_spec_paths = {
             line.split(":", 1)[0]
             for rendered in (
@@ -481,6 +487,22 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 "vendor/agent-canon/documents/runtime/shared-runtime-surfaces.toml:missing-manifest",
                 result.stdout,
             )
+
+    def test_project_design_readme_is_parent_owned(self) -> None:
+        """Project-owned design README paths are not standalone-only leaks."""
+        with self.temporary_directory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_parent_fixture(root)
+            self.write_file(
+                root,
+                "documents/design/README.md",
+                "project-owned design index\n",
+            )
+
+            result = self.run_checker(root, skip_submodule_check=True)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("PARENT_REPO_READINESS=pass", result.stdout)
 
     def test_plain_nested_clone_is_rejected_by_identity(self) -> None:
         """A plain nested clone fails through an observable OID mismatch."""

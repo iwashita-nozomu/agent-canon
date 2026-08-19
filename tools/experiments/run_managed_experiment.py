@@ -98,7 +98,9 @@ if __package__:
         identity_from_manifest,
         load_json_file,
         load_json_text,
+        raw_relative_path,
         report_relative_path,
+        result_relative_path,
         validate_segment,
     )
 else:
@@ -152,11 +154,17 @@ else:
         identity_from_manifest,
         load_json_file,
         load_json_text,
+        raw_relative_path,
         report_relative_path,
+        result_relative_path,
         validate_segment,
     )
 
-DEFAULT_REQUIRED_EVAL_ARTIFACTS = ("summary.json", "cases.jsonl", "config.json")
+DEFAULT_REQUIRED_EVAL_ARTIFACTS = (
+    "summary/summary.json",
+    "summary/cases.jsonl",
+    "config.json",
+)
 CONFIG_SOURCE_SNAPSHOT_NAME = "config_source.yaml"
 COMMAND_MANIFEST_NAME = "command.json"
 ENVIRONMENT_MANIFEST_NAME = "environment.json"
@@ -202,9 +210,7 @@ FILE_READ_CHUNK_BYTES = 1024 * 1024
 PREFLIGHT_FAILURE_EXIT_CODE = 2
 DURATION_ROUND_DIGITS = 3
 REGISTERED_COMMAND_KINDS = ("default", "formal")
-REVIEWED_W1_LINEAGE_ARTIFACT = (
-    "W1-IMPLEMENTATION-RECHECK-EF2DE34A-20260716-READONLY"
-)
+REVIEWED_W1_LINEAGE_ARTIFACT = "W1-IMPLEMENTATION-RECHECK-EF2DE34A-20260716-READONLY"
 REVIEWED_W1_LINEAGE_COMMIT = "b829286c6a1c9de15f260199a44556e4f90be459"
 REVIEWED_W1_LINEAGE_TREE = "551abfa0a6e89f4a9218fc4fc0706b3addd2a84e"
 REVIEWED_W1_SOURCE_BLOBS = {
@@ -228,6 +234,7 @@ SENSITIVE_ENV_KEY_PARTS = (
 EXCLUDED_SOURCE_SNAPSHOT_DIRS = frozenset(
     {
         ".git",
+        "raw",
         "result",
         "__pycache__",
         ".pytest_cache",
@@ -257,9 +264,10 @@ else:
 
 @dataclass(frozen=True)
 class RunPaths:
-    """Filesystem paths owned by one managed run."""
+    """Filesystem paths owned by one managed run identity."""
 
     result_dir: Path
+    raw_dir: Path
     log_dir: Path
     report_path: Path
     manifest_path: Path
@@ -321,19 +329,24 @@ class ReservationReceipt:
     """Record the exact empty paths reserved by one runner invocation."""
 
     result_dir: Path
+    raw_dir: Path
     report_path: Path
     report_content: str | None
     result_parent: Path
     result_parent_preexisted: bool
+    raw_parent: Path
+    raw_parent_preexisted: bool
     report_parent: Path
     report_parent_preexisted: bool
     token: str
     marker_path: Path
     result_inode: int
+    raw_inode: int
     marker_inode: int
     report_reserved: bool
     report_inode: int | None
     result_parent_inode: int
+    raw_parent_inode: int
     report_parent_inode: int | None
     identity: ExperimentIdentity
 
@@ -669,7 +682,9 @@ def _build_managed_run_request(
 
     request_path = context.paths.result_dir / "runtime" / MANAGED_RUN_REQUEST_FILENAME
     result_path = context.paths.result_dir / "runtime" / MANAGED_RUN_RESULT_FILENAME
-    lifecycle_path = context.paths.result_dir / "runtime" / MANAGED_RUN_LIFECYCLE_FILENAME
+    lifecycle_path = (
+        context.paths.result_dir / "runtime" / MANAGED_RUN_LIFECYCLE_FILENAME
+    )
     selected_uuids = tuple(plan.gpu_allocation.selected_ids)
     selected_gpu_ids = _provider_gpu_ids(selected_uuids)
     payload: dict[str, object] = {
@@ -719,9 +734,7 @@ def _build_managed_run_request(
             ),
             "agentcanon_output_directory": str(context.paths.result_dir),
             "agentcanon_lifecycle_artifact_path": str(
-                context.paths.result_dir
-                / "runtime"
-                / MANAGED_RUN_LIFECYCLE_FILENAME
+                context.paths.result_dir / "runtime" / MANAGED_RUN_LIFECYCLE_FILENAME
             ),
             "agentcanon_selected_uuids": selected_uuids,
         },
@@ -748,7 +761,11 @@ def _resolve_admitted_runner() -> str:
         MANAGED_RUN_EXECUTABLE,
     )
     resolved = shutil.which(configured)
-    if resolved is None and Path(configured).is_file() and os.access(configured, os.X_OK):
+    if (
+        resolved is None
+        and Path(configured).is_file()
+        and os.access(configured, os.X_OK)
+    ):
         resolved = str(Path(configured).resolve())
     if resolved is None:
         raise TypedPreflightFailure(
@@ -763,10 +780,18 @@ def _validate_admitted_result(
     result_path: Path,
     request_payload: Mapping[str, object],
     process_returncode: int,
-) -> tuple[ManagedRunExecutionResult, ManagedRunLifecycleEvidence, Mapping[str, object]]:
+) -> tuple[
+    ManagedRunExecutionResult, ManagedRunLifecycleEvidence, Mapping[str, object]
+]:
     try:
         result = load_json_file(result_path)
-    except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+    except (
+        FileNotFoundError,
+        OSError,
+        UnicodeError,
+        json.JSONDecodeError,
+        ValueError,
+    ) as exc:
         raise TypedPreflightFailure(
             "admitted_runner_result_corrupt",
             "experiment-runner-admitted result artifact is missing or invalid JSON",
@@ -848,7 +873,11 @@ def _validate_admitted_result(
     quiescence = result.get("quiescence")
     exit_record = result.get("exit")
     completions = result.get("completions")
-    if not isinstance(lifecycle, Mapping) or not isinstance(quiescence, Mapping) or not isinstance(exit_record, Mapping):
+    if (
+        not isinstance(lifecycle, Mapping)
+        or not isinstance(quiescence, Mapping)
+        or not isinstance(exit_record, Mapping)
+    ):
         raise TypedPreflightFailure(
             "admitted_runner_descendant_quiescence_unproven",
             "result must contain provider lifecycle and quiescence objects",
@@ -872,7 +901,9 @@ def _validate_admitted_result(
             )
         return value
 
-    def required_pid_sequence(mapping: Mapping[str, object], name: str) -> tuple[int, ...]:
+    def required_pid_sequence(
+        mapping: Mapping[str, object], name: str
+    ) -> tuple[int, ...]:
         value = mapping.get(name)
         if not isinstance(value, list):
             raise TypedPreflightFailure(
@@ -1060,12 +1091,17 @@ def _run_admitted_runner(
     lifecycle_path: Path,
     request_payload: Mapping[str, object],
     environment: Mapping[str, str],
-) -> tuple[ManagedRunExecutionResult, ManagedRunLifecycleEvidence, Mapping[str, object]]:
+) -> tuple[
+    ManagedRunExecutionResult, ManagedRunLifecycleEvidence, Mapping[str, object]
+]:
     """Invoke the fixed shell-free admitted-runner handshake."""
     executable = _resolve_admitted_runner()
     argv = [executable, "--request", str(request_path), "--result", str(result_path)]
     try:
-        with context.paths.stdout_log_path.open("ab") as stdout, context.paths.stderr_log_path.open("ab") as stderr:
+        with (
+            context.paths.stdout_log_path.open("ab") as stdout,
+            context.paths.stderr_log_path.open("ab") as stderr,
+        ):
             process = subprocess.Popen(
                 argv,
                 cwd=str(context.paths.result_dir / "source_snapshot"),
@@ -1117,11 +1153,15 @@ def _run_admitted_runner(
             ).encode("utf-8")
         ).hexdigest(),
         "process_returncode": process_returncode,
-        "worker_pid": lifecycle.child_process_ids[0] if lifecycle.child_process_ids else None,
+        "worker_pid": lifecycle.child_process_ids[0]
+        if lifecycle.child_process_ids
+        else None,
     }
     if isinstance(context_identity, ExperimentIdentity):
         receipt.update(context_identity.to_dict())
-    receipt_path = context.paths.result_dir.joinpath("runtime", MANAGED_RUN_RECEIPT_FILENAME)
+    receipt_path = context.paths.result_dir.joinpath(
+        "runtime", MANAGED_RUN_RECEIPT_FILENAME
+    )
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
     receipt_path.write_text(
         json.dumps(receipt, sort_keys=True, indent=2),
@@ -1165,12 +1205,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--run-name",
-        help="Explicit run name. Defaults to <topic>_<variant>_<timestamp>.",
+        help="Explicit run name. Defaults to <topic>_<variant>_<timestamp>; result filesystem uses result/<run-name>.",
     )
     parser.add_argument(
         "--variant",
         required=True,
-        help="Required variant label used in the result/report/branch identity.",
+        help="Required variant label recorded in run metadata and used for selection; it is not a result directory component.",
     )
     parser.add_argument(
         "--registry",
@@ -1185,7 +1225,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--report-path",
-        help="Optional report path. Defaults to experiments/report/<topic>/<variant>/<run_name>.md.",
+        help="Optional report path. Defaults to the registry report_root/<run_name>.md.",
     )
     parser.add_argument(
         "--skip-report-init",
@@ -1195,7 +1235,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config-json",
         help=(
-            "Optional JSON object file to merge into result/<variant>/<run_name>/config.json. "
+            "Optional JSON object file to merge into result/<run_name>/config.json. "
             "The file must decode to a dictionary."
         ),
     )
@@ -1205,7 +1245,7 @@ def parse_args() -> argparse.Namespace:
         default=[],
         metavar="KEY=JSON",
         help=(
-            "Add one JSON-encoded config value to result/<variant>/<run_name>/config.json. "
+            "Add one JSON-encoded config value to result/<run_name>/config.json. "
             "Example: --config seed=0 --config enabled=true."
         ),
     )
@@ -1213,8 +1253,8 @@ def parse_args() -> argparse.Namespace:
         "command",
         nargs=argparse.REMAINDER,
         help=(
-            "Command to run. Tokens may use {run_dir}, {run_name}, {report_path}, "
-            "{topic}, {variant}, "
+            "Command to run. Tokens may use {run_dir}, {raw_dir}, {run_name}, "
+            "{report_path}, {topic}, {variant}, "
             "{manifest_path}, {eval_manifest_path}, {config_path}, "
             "{config_source_path}, {startup_log_path}, {stdout_log_path}, "
             "or {stderr_log_path}."
@@ -1365,6 +1405,7 @@ def build_run_config(
         **context.identity.to_dict(),
         "paths": {
             "result_dir": str(context.paths.result_dir),
+            "raw_dir": str(context.paths.raw_dir),
             "log_dir": str(context.paths.log_dir),
             "report_path": str(context.paths.report_path),
             "run_manifest": str(context.paths.manifest_path),
@@ -1437,6 +1478,7 @@ def render_report_stub(context: RunContext) -> str:
 - Variant: {context.identity.variant}
 - Created At (UTC): {context.created_at}
 - Result Dir: {context.paths.result_dir}
+- Raw Dir: {context.paths.raw_dir}
 - Log Dir: {context.paths.log_dir}
 - Run Manifest: {context.paths.manifest_path}
 - Eval Manifest: {context.paths.eval_manifest_path}
@@ -1462,7 +1504,7 @@ def render_report_stub(context: RunContext) -> str:
 
 ## Results
 
-<!-- Fill in summary.json, cases.jsonl, and the main observations after the run. -->
+<!-- Fill in summary/summary.json, summary/cases.jsonl, and the main observations after the run. -->
 
 ## Reproducibility Record
 
@@ -1479,8 +1521,8 @@ def render_report_stub(context: RunContext) -> str:
 - `logs/startup.jsonl`
 - `logs/stdout.log`
 - `logs/stderr.log`
-- `summary.json`
-- `cases.jsonl`
+- `summary/summary.json`
+- `summary/cases.jsonl`
 
 ## Critical Review Notes
 
@@ -1497,6 +1539,11 @@ def build_manifest(context: RunContext, status: str) -> dict[str, object]:
         "repo_root": str(context.repo_root),
         "topic_dir": str(context.topic_dir),
         "result_dir": str(context.paths.result_dir),
+        "raw_dir": str(context.paths.raw_dir),
+        "raw_artifacts": {
+            "path": raw_relative_path(context.identity).as_posix(),
+            "retention": {"state": "unarchived"},
+        },
         "log_dir": str(context.paths.log_dir),
         "report_path": str(context.paths.report_path),
         "manifest_path": str(context.paths.manifest_path),
@@ -1627,7 +1674,9 @@ def git_status_path_text(status_line: str) -> str:
     return raw_path.strip('"')
 
 
-def dirty_source_files(repo_root: Path, status_short: list[str]) -> tuple[list[Path], list[str]]:
+def dirty_source_files(
+    repo_root: Path, status_short: list[str]
+) -> tuple[list[Path], list[str]]:
     """Return existing dirty files plus dirty entries without a readable file."""
     files: list[Path] = []
     missing_paths: list[str] = []
@@ -1658,7 +1707,9 @@ def command_source_files(command: list[str], repo_root: Path) -> list[Path]:
 
 def unique_paths(paths: list[Path]) -> list[Path]:
     """Return stable unique paths."""
-    return sorted(dict.fromkeys(path.resolve() for path in paths), key=lambda path: str(path))
+    return sorted(
+        dict.fromkeys(path.resolve() for path in paths), key=lambda path: str(path)
+    )
 
 
 def build_source_snapshot(context: RunContext) -> dict[str, object]:
@@ -1743,6 +1794,7 @@ def build_command_manifest(context: RunContext) -> dict[str, object]:
         "cwd": str(context.repo_root),
         "paths": {
             "result_dir": str(context.paths.result_dir),
+            "raw_dir": str(context.paths.raw_dir),
             "log_dir": str(context.paths.log_dir),
             "run_log": str(context.paths.log_path),
             "stdout_log": str(context.paths.stdout_log_path),
@@ -1799,10 +1851,10 @@ def validate_eval_artifact_patterns(patterns: list[str], key: str) -> list[str]:
         pattern_path = Path(pattern)
         if pattern_path.is_absolute():
             raise ValueError(
-                f"{key} must stay relative to result/<variant>/<run_name>: {pattern}"
+                f"{key} must stay relative to result/<run_name>: {pattern}"
             )
         if ".." in pattern_path.parts:
-            raise ValueError(f"{key} must not escape result/<variant>/<run_name>: {pattern}")
+            raise ValueError(f"{key} must not escape result/<run_name>: {pattern}")
     return patterns
 
 
@@ -1972,7 +2024,9 @@ def normalize_registered_command_kind(command_kind: str) -> str:
     normalized = LEGACY_REGISTERED_COMMAND_ALIASES.get(command_kind, command_kind)
     if normalized not in REGISTERED_COMMAND_KINDS:
         allowed = ", ".join(REGISTERED_COMMAND_KINDS)
-        raise ValueError(f"unsupported registered command {command_kind!r}; expected {allowed}")
+        raise ValueError(
+            f"unsupported registered command {command_kind!r}; expected {allowed}"
+        )
     return normalized
 
 
@@ -2054,12 +2108,7 @@ def resolve_report_path(
         ) or registry.defaults.get("report_root")
         if isinstance(registry_report_root, str):
             return contained_path(
-                repo_root,
-                repo_root
-                / registry_report_root
-                / identity.topic
-                / identity.variant
-                / f"{identity.run_name}.md",
+                repo_root, repo_root / registry_report_root / f"{identity.run_name}.md"
             )
     return contained_path(repo_root, repo_root / report_relative_path(identity))
 
@@ -2067,42 +2116,36 @@ def resolve_report_path(
 def build_run_paths(
     topic_dir: Path, identity: RunIdentity, report_path: Path
 ) -> RunPaths:
-    """Build filesystem paths after proving the canonical realpath boundary."""
+    """Derive result and raw paths from the canonical complete identity."""
     topic_dir = topic_dir.absolute()
-    if topic_dir.name != identity.topic or topic_dir.parent.name != "experiments":
+    repo_root = topic_dir.parent.parent
+    expected_topic_dir = (repo_root / "experiments" / identity.topic).absolute()
+    if topic_dir != expected_topic_dir:
         raise ExperimentIdentityError(
             "topic directory must be experiments/<topic> for the identity"
         )
     if topic_dir.is_symlink() or topic_dir.resolve() != topic_dir:
-        raise ExperimentIdentityError(f"topic directory must not escape by symlink: {topic_dir}")
+        raise ExperimentIdentityError(
+            f"topic directory must not escape by symlink: {topic_dir}"
+        )
     if not topic_dir.is_dir():
         raise ExperimentIdentityError(f"topic directory does not exist: {topic_dir}")
 
-    result_root = topic_dir / "result"
-    for label, directory in (("result root", result_root),):
+    result_dir = (repo_root / result_relative_path(identity)).absolute()
+    raw_dir = (repo_root / raw_relative_path(identity)).absolute()
+    for label, directory in (
+        ("result root", topic_dir / "result"),
+        ("result directory", result_dir),
+        ("raw directory", raw_dir),
+    ):
         if directory.is_symlink() or directory.resolve() != directory:
-            raise ExperimentIdentityError(f"{label} must not escape by symlink: {directory}")
+            raise ExperimentIdentityError(
+                f"{label} must not escape by symlink: {directory}"
+            )
         if directory.exists() and not directory.is_dir():
             raise ExperimentIdentityError(f"{label} must be a directory: {directory}")
 
-    variant_root = result_root / identity.variant
-    if variant_root.is_symlink() or variant_root.resolve() != variant_root:
-        raise ExperimentIdentityError(
-            f"variant result root must not escape by symlink: {variant_root}"
-        )
-    if variant_root.exists() and not variant_root.is_dir():
-        raise ExperimentIdentityError(
-            f"variant result root must be a directory: {variant_root}"
-        )
-
-    result_dir = topic_dir / "result" / identity.variant / identity.run_name
-    if result_dir.is_symlink() or result_dir.resolve() != result_dir:
-        raise ExperimentIdentityError(
-            f"result directory must not escape by symlink: {result_dir}"
-        )
-    expected_report_path = (
-        topic_dir.parent.parent / report_relative_path(identity)
-    ).absolute()
+    expected_report_path = (repo_root / report_relative_path(identity)).absolute()
     report_path = report_path.absolute()
     if report_path != expected_report_path:
         raise ExperimentIdentityError(
@@ -2110,11 +2153,14 @@ def build_run_paths(
             f"expected {expected_report_path}, got {report_path}"
         )
     if report_path.is_symlink() or report_path.resolve() != report_path:
-        raise ExperimentIdentityError(f"report path must not escape by symlink: {report_path}")
+        raise ExperimentIdentityError(
+            f"report path must not escape by symlink: {report_path}"
+        )
 
-    log_dir = result_dir / "logs"
+    log_dir = raw_dir / "logs"
     return RunPaths(
         result_dir=result_dir,
+        raw_dir=raw_dir,
         log_dir=log_dir,
         report_path=report_path,
         manifest_path=result_dir / "run_manifest.json",
@@ -2142,6 +2188,7 @@ def build_placeholders(
         "variant": identity.variant,
         "run_name": identity.run_name,
         "run_dir": str(paths.result_dir),
+        "raw_dir": str(paths.raw_dir),
         "log_dir": str(paths.log_dir),
         "report_path": str(paths.report_path),
         "manifest_path": str(paths.manifest_path),
@@ -2187,9 +2234,7 @@ def select_command(
                 "--use-registered-command requires experiments/registry.toml"
             )
         registered_kind = normalize_registered_command_kind(use_registered_command)
-        command = command_from_registry(
-            registry.entry, registered_kind, placeholders
-        )
+        command = command_from_registry(registry.entry, registered_kind, placeholders)
         return CommandSelection(
             command=command,
             source=f"registered:{registered_kind}",
@@ -2236,7 +2281,9 @@ def build_run_context(args: argparse.Namespace) -> RunContext:
         identity,
         args.report_path or "",
     )
-    expected_report_path = contained_path(repo_root, repo_root / report_relative_path(identity))
+    expected_report_path = contained_path(
+        repo_root, repo_root / report_relative_path(identity)
+    )
     if report_path != expected_report_path:
         raise ValueError(
             "report path must match complete identity: "
@@ -2286,6 +2333,7 @@ def write_initial_artifacts(
         "initialized",
         {
             "result_dir": str(context.paths.result_dir),
+            "raw_dir": str(context.paths.raw_dir),
             "command_manifest": str(context.paths.command_manifest_path),
             "environment_manifest": str(context.paths.environment_manifest_path),
             "source_snapshot": str(context.paths.source_snapshot_path),
@@ -2298,29 +2346,44 @@ def write_initial_artifacts(
 def reserve_run_paths(
     context: RunContext, skip_report_init: bool
 ) -> ReservationReceipt:
-    """Reserve the complete identity before writing any run artifacts.
-
-    The report existence check is intentionally before result-directory
-    reservation.  The later exclusive report create is the race gate; if it
-    loses, only this invocation's still-empty result directory is removed.
-    """
+    """Reserve result, raw, and optional report as one complete identity."""
     if context.paths.report_path.exists():
-        raise ValueError(f"report already exists for identity: {context.paths.report_path}")
+        raise ValueError(
+            f"report already exists for identity: {context.paths.report_path}"
+        )
     result_parent = context.paths.result_dir.parent
+    raw_parent = context.paths.raw_dir.parent
     result_parent_existed = result_parent.exists()
+    raw_parent_existed = raw_parent.exists()
     result_parent.mkdir(parents=True, exist_ok=True)
+    result_parent_inode = result_parent.stat().st_ino
     try:
         context.paths.result_dir.mkdir(exist_ok=False)
     except FileExistsError as exc:
         if not result_parent_existed:
-            try:
-                result_parent.rmdir()
-            except OSError:
-                pass
+            _remove_owned_empty_dir(result_parent, result_parent_inode)
         raise ValueError(
             f"result directory already exists for identity: {context.paths.result_dir}"
         ) from exc
     result_inode = context.paths.result_dir.stat().st_ino
+
+    try:
+        raw_parent.mkdir(parents=True, exist_ok=True)
+        raw_parent_inode = raw_parent.stat().st_ino
+        context.paths.raw_dir.mkdir(exist_ok=False)
+    except BaseException as exc:
+        _remove_owned_empty_dir(context.paths.result_dir, result_inode)
+        if not result_parent_existed:
+            _remove_owned_empty_dir(result_parent, result_parent_inode)
+        if raw_parent.exists() and not raw_parent_existed:
+            _remove_owned_empty_dir(raw_parent, raw_parent.stat().st_ino)
+        if isinstance(exc, FileExistsError):
+            raise ValueError(
+                f"raw directory already exists for identity: {context.paths.raw_dir}"
+            ) from exc
+        raise
+    raw_inode = context.paths.raw_dir.stat().st_ino
+
     token = secrets.token_hex(24)
     marker_path = context.paths.result_dir / RESERVATION_MARKER_NAME
     marker_payload = {
@@ -2328,6 +2391,7 @@ def reserve_run_paths(
         "state": "reserved",
         "token": token,
         "result_inode": result_inode,
+        "raw_inode": raw_inode,
         **context.identity.to_dict(),
     }
     try:
@@ -2338,27 +2402,36 @@ def reserve_run_paths(
             os.fsync(marker_file.fileno())
         marker_inode = marker_path.stat().st_ino
     except BaseException:
+        _remove_owned_empty_dir(context.paths.raw_dir, raw_inode)
         _remove_owned_empty_dir(context.paths.result_dir, result_inode)
+        if not raw_parent_existed:
+            _remove_owned_empty_dir(raw_parent, raw_parent_inode)
+        if not result_parent_existed:
+            _remove_owned_empty_dir(result_parent, result_parent_inode)
         raise
 
     report_parent = context.paths.report_path.parent
     report_parent_existed = report_parent.exists()
-    report_content: str | None = None
     receipt = ReservationReceipt(
         result_dir=context.paths.result_dir,
+        raw_dir=context.paths.raw_dir,
         report_path=context.paths.report_path,
         report_content=None,
         result_parent=result_parent,
         result_parent_preexisted=result_parent_existed,
+        raw_parent=raw_parent,
+        raw_parent_preexisted=raw_parent_existed,
         report_parent=report_parent,
         report_parent_preexisted=report_parent_existed,
         token=token,
         marker_path=marker_path,
         result_inode=result_inode,
+        raw_inode=raw_inode,
         marker_inode=marker_inode,
         report_reserved=False,
         report_inode=None,
-        result_parent_inode=result_parent.stat().st_ino,
+        result_parent_inode=result_parent_inode,
+        raw_parent_inode=raw_parent_inode,
         report_parent_inode=None,
         identity=context.identity,
     )
@@ -2414,13 +2487,20 @@ def _reservation_parent_matches(
 
 
 def _reservation_owner_matches(receipt: ReservationReceipt) -> bool:
-    """Verify token, identity, state, and inode ownership before cleanup."""
+    """Verify token, identity, and result/raw inode ownership before cleanup."""
     try:
         result_stat = receipt.result_dir.stat()
+        raw_stat = receipt.raw_dir.stat()
         marker_stat = receipt.marker_path.stat()
-        if receipt.result_dir.is_symlink() or receipt.marker_path.is_symlink():
+        if (
+            receipt.result_dir.is_symlink()
+            or receipt.raw_dir.is_symlink()
+            or receipt.marker_path.is_symlink()
+        ):
             return False
         if result_stat.st_ino != receipt.result_inode:
+            return False
+        if raw_stat.st_ino != receipt.raw_inode:
             return False
         if marker_stat.st_ino != receipt.marker_inode:
             return False
@@ -2432,6 +2512,7 @@ def _reservation_owner_matches(receipt: ReservationReceipt) -> bool:
             "state",
             "token",
             "result_inode",
+            "raw_inode",
             "identity",
         }:
             return False
@@ -2443,6 +2524,8 @@ def _reservation_owner_matches(receipt: ReservationReceipt) -> bool:
             return False
         if marker.get("result_inode") != receipt.result_inode:
             return False
+        if marker.get("raw_inode") != receipt.raw_inode:
+            return False
         if identity_from_manifest(marker) != receipt.identity:
             return False
     except (OSError, TypeError, ValueError, json.JSONDecodeError):
@@ -2451,26 +2534,30 @@ def _reservation_owner_matches(receipt: ReservationReceipt) -> bool:
 
 
 def rollback_empty_reservation(receipt: ReservationReceipt) -> bool:
-    """Remove only a receipt-owned empty result/report reservation."""
+    """Remove only a receipt-owned empty result/raw/report reservation."""
     if not _reservation_owner_matches(receipt):
         return False
-    if not _reservation_parent_matches(
-        receipt.result_parent,
-        receipt.result_parent_preexisted,
-        receipt.result_parent_inode,
+    for path, preexisted, inode in (
+        (
+            receipt.result_parent,
+            receipt.result_parent_preexisted,
+            receipt.result_parent_inode,
+        ),
+        (receipt.raw_parent, receipt.raw_parent_preexisted, receipt.raw_parent_inode),
+        (
+            receipt.report_parent,
+            receipt.report_parent_preexisted,
+            receipt.report_parent_inode,
+        ),
     ):
-        return False
-    if not _reservation_parent_matches(
-        receipt.report_parent,
-        receipt.report_parent_preexisted,
-        receipt.report_parent_inode,
-    ):
-        return False
+        if not _reservation_parent_matches(path, preexisted, inode):
+            return False
     try:
-        children = list(receipt.result_dir.iterdir())
+        result_children = list(receipt.result_dir.iterdir())
+        raw_children = list(receipt.raw_dir.iterdir())
     except OSError:
         return False
-    if children != [receipt.marker_path]:
+    if set(result_children) != {receipt.marker_path, receipt.raw_dir} or raw_children:
         return False
 
     if receipt.report_reserved:
@@ -2488,30 +2575,28 @@ def rollback_empty_reservation(receipt: ReservationReceipt) -> bool:
         ):
             return False
     try:
+        receipt.raw_dir.rmdir()
         receipt.marker_path.unlink()
         receipt.result_dir.rmdir()
+        if receipt.report_reserved:
+            receipt.report_path.unlink()
     except OSError:
         return False
-    if receipt.report_reserved:
-        try:
-            receipt.report_path.unlink()
-        except OSError:
-            return False
     for parent, preexisted, inode in (
         (
             receipt.report_parent,
             receipt.report_parent_preexisted,
             receipt.report_parent_inode,
         ),
+        (receipt.raw_parent, receipt.raw_parent_preexisted, receipt.raw_parent_inode),
         (
             receipt.result_parent,
             receipt.result_parent_preexisted,
             receipt.result_parent_inode,
         ),
     ):
-        if not preexisted:
-            if inode is not None:
-                _remove_owned_empty_dir(parent, inode)
+        if not preexisted and inode is not None:
+            _remove_owned_empty_dir(parent, inode)
     return True
 
 
@@ -2546,6 +2631,7 @@ def build_run_environment(context: RunContext) -> dict[str, str]:
             "EXPERIMENT_TOPIC": context.identity.topic,
             "EXPERIMENT_VARIANT": context.identity.variant,
             "EXPERIMENT_RUN_DIR": str(context.paths.result_dir),
+            "EXPERIMENT_RAW_DIR": str(context.paths.raw_dir),
             "EXPERIMENT_LOG_DIR": str(context.paths.log_dir),
             "EXPERIMENT_REPORT_PATH": str(context.paths.report_path),
             "EXPERIMENT_RUN_MANIFEST": str(context.paths.manifest_path),
@@ -2617,8 +2703,10 @@ def _config_bool(config: Mapping[str, object], key: str, default: bool) -> bool:
 
 def _config_chunks(config: Mapping[str, object], run_name: str) -> tuple[str, ...]:
     value = config.get("requested_chunks", [run_name])
-    if not isinstance(value, list) or not value or any(
-        not isinstance(item, str) or not item for item in value
+    if (
+        not isinstance(value, list)
+        or not value
+        or any(not isinstance(item, str) or not item for item in value)
     ):
         raise ValueError("requested_chunks must be a non-empty array of strings")
     return tuple(value)
@@ -2646,7 +2734,9 @@ def _resource_request_for_managed_run(
             "cpu_capability_discovery_unavailable",
             "managed run cannot declare an authoritative CPU set",
         ) from exc
-    if any(isinstance(cpu, bool) or not isinstance(cpu, int) for cpu in cpu_requested_set):
+    if any(
+        isinstance(cpu, bool) or not isinstance(cpu, int) for cpu in cpu_requested_set
+    ):
         raise ValueError("cpu_requested_set must contain integers")
     environment = build_run_environment(context)
     gpu_requested_count = _config_int(config, "gpu_requested_count", 0)
@@ -2677,9 +2767,7 @@ def _resource_request_for_managed_run(
         run_id=context.identity.run_name,
         cpu_requested_set=cpu_requested_set,
         gpu_requested_count=gpu_requested_count,
-        gpu_requested_memory_bytes=_config_int(
-            config, "gpu_requested_memory_bytes", 0
-        ),
+        gpu_requested_memory_bytes=_config_int(config, "gpu_requested_memory_bytes", 0),
         gpu_allocation_provenance=(
             CALLER_ALLOCATION_PROVENANCE if gpu_requested_count else ""
         ),
@@ -2737,7 +2825,11 @@ def execute_managed_run(
     """Compose the fixed owners around one admitted-runner CLI invocation."""
     request = _resource_request_for_managed_run(context, run_config)
     raw_config = run_config.get("config", {})
-    config = cast(Mapping[str, object], raw_config) if isinstance(raw_config, Mapping) else {}
+    config = (
+        cast(Mapping[str, object], raw_config)
+        if isinstance(raw_config, Mapping)
+        else {}
+    )
     source_paths = build_source_path_set(
         str(context.repo_root),
         context.identity.topic,
@@ -2938,7 +3030,8 @@ def execute_managed_run(
                 )
                 coverage_mig = MigEvidence(
                     parent_by_uuid={
-                        join.mig_uuid: join.parent_uuid for join in final_inventory.joins
+                        join.mig_uuid: join.parent_uuid
+                        for join in final_inventory.joins
                     },
                     executable_leaf_uuids=final_inventory.mig_uuids,
                     selected_physical_uuids=tuple(
@@ -3020,9 +3113,13 @@ def execute_managed_run(
                     plan_fingerprint="pending",
                     caller_allocated_ids=candidates,
                     candidate_ids=candidates,
-                    occupied_ids=tuple(sorted(set(occupied_final) | set(unknown_final))),
+                    occupied_ids=tuple(
+                        sorted(set(occupied_final) | set(unknown_final))
+                    ),
                     reserved_ids=(),
-                    eligible_ids=tuple(cast(tuple[str, ...], lock_readback["final_eligible_ids"])),
+                    eligible_ids=tuple(
+                        cast(tuple[str, ...], lock_readback["final_eligible_ids"])
+                    ),
                     selected_ids=selected,
                     reservation_ids=reservation_transaction.reservation_ids,
                     free_memory_bytes=dict(final_observation.free_memory_bytes),
@@ -3030,7 +3127,9 @@ def execute_managed_run(
                     process_identities=final_observation.process_identities,
                     allocation_id=reservation.evidence_fingerprint,
                     lock_root=request.lock_root,
-                    selection_order=tuple(cast(tuple[str, ...], lock_readback["final_eligible_ids"])),
+                    selection_order=tuple(
+                        cast(tuple[str, ...], lock_readback["final_eligible_ids"])
+                    ),
                     memory_bytes={
                         device.uuid: device.memory_bytes
                         for device in final_observation.gpu_devices
@@ -3238,25 +3337,27 @@ def execute_managed_run(
         outcome_exit_code = _execution_exit_code(execution_result)
     secondary_failures = tuple(
         ([lifecycle_failure] if lifecycle_failure is not None else [])
-        + (
-            release_failures
-            if primary_exception is not None
-            else release_failures[1:]
-        )
+        + (release_failures if primary_exception is not None else release_failures[1:])
     )
     if runner_invoked:
         lifecycle = runner_lifecycle
         lifecycle_quiescent = _lifecycle_quiescence_is_proven(lifecycle)
         coverage_descendants = DescendantRetentionEvidence(
-            child_process_ids=(lifecycle.child_process_ids if lifecycle is not None else ()),
-            process_group_ids=(lifecycle.process_group_ids if lifecycle is not None else ()),
+            child_process_ids=(
+                lifecycle.child_process_ids if lifecycle is not None else ()
+            ),
+            process_group_ids=(
+                lifecycle.process_group_ids if lifecycle is not None else ()
+            ),
             descendant_quiescence="PROVEN" if lifecycle_quiescent else "UNPROVEN",
             retained_gpu_process_uuids=(),
             release_blocked=not lifecycle_quiescent,
             fingerprint=_r5_evidence_fingerprint(
                 {
                     "runner_lifecycle": repr(lifecycle),
-                    "descendant_quiescence": "PROVEN" if lifecycle_quiescent else "UNPROVEN",
+                    "descendant_quiescence": "PROVEN"
+                    if lifecycle_quiescent
+                    else "UNPROVEN",
                     "release_blocked": not lifecycle_quiescent,
                 }
             ),

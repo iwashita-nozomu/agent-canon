@@ -65,7 +65,7 @@ struct、domain contract のない pass-through wrapper、`nullptr` runtime rout
 ## 実行例
 
 ```bash
-python3 tools/oop/cpp/readability.py --format markdown --include-snippets cpp/include cpp/src cpp/tests cpp/experiments
+python3 tools/oop/cpp/readability.py --format markdown --include-snippets cpp/include cpp/src tests/cpp cpp/experiments
 ```
 
 混在 source を 1 回で見たい場合は、shared Python entrypoint に `--language all` を渡します。

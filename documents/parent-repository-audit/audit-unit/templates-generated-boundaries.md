@@ -29,7 +29,7 @@ path が明示され、source と parent-specific evidence が分離される。
 
 ## Evidence Sources
 
-- `templates/`、`reports/`、`evidence/`、`memory/`、`notes/`、`.state/`
+- `templates/`、`reports/`、`evidence/`、`memory/`、`documents/notes/`、`.state/`
 - `documents/rule/README.md`
 - `document-canon-cleanup` の inventory result
 - `result-artifact-writeout` の artifact manifest

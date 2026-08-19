@@ -56,7 +56,7 @@ path_allowed() {
       [[ "$path" == AGENTS.md ]] && return 0
       [[ "$path" == .agents || "$path" == agents ]] && return 0
       [[ "$path" == .codex/* || "$path" == .github/* ]] && return 0
-      [[ "$path" == documents/* || "$path" == memory/* || "$path" == notes/* ]] && return 0
+      [[ "$path" == documents/* || "$path" == memory/* || "$path" == documents/notes/* ]] && return 0
       [[ "$path" == mcp || "$path" == tools || "$path" == tests/agent_tools/* || "$path" == tests/tools/* ]] && return 0
       return 1
       ;;

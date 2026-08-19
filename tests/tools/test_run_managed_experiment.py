@@ -63,8 +63,18 @@ SYNC_CONTEXT_SCRIPT = (
     / "experiments"
     / "sync_experiment_registry_context.py"
 )
-SCRIPT = Path(__file__).resolve().parents[2] / "tools" / "experiments" / "run_managed_experiment.py"
-CHECK_SCRIPT = Path(__file__).resolve().parents[2] / "tools" / "ci" / "check_experiment_registry.py"
+SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "tools"
+    / "experiments"
+    / "run_managed_experiment.py"
+)
+CHECK_SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "tools"
+    / "ci"
+    / "check_experiment_registry.py"
+)
 CANONICAL_ENTRYPOINT = "experiments/demo_topic/run.py"
 DEFAULT_INNER_COMMAND = (
     f"python3 {CANONICAL_ENTRYPOINT} --run-dir {{run_dir}} "
@@ -92,13 +102,16 @@ def create_fake_repo_dirs(repo_root: Path) -> None:
         / "result"
     ).mkdir(parents=True)
     (repo_root / "experiments" / "demo_topic" / "result").mkdir(parents=True)
+    (repo_root / "experiments" / "demo_topic" / "report").mkdir(parents=True)
     (repo_root / "experiments" / "report").mkdir(parents=True)
     (repo_root / "tools" / "experiments").mkdir(parents=True)
 
 
 def write_template_topic(repo_root: Path) -> None:
     """Write the fake template experiment topic."""
-    template_dir = repo_root / "vendor" / "agent-canon" / "templates" / "experiments" / "_template"
+    template_dir = (
+        repo_root / "vendor" / "agent-canon" / "templates" / "experiments" / "_template"
+    )
     (template_dir / "README.md").write_text(
         "# Experiment Topic Template\n\n"
         "registered command: `python3 -m tools.experiments.run_managed_experiment "
@@ -122,18 +135,16 @@ def write_template_topic(repo_root: Path) -> None:
         "# Result Directory\n",
         encoding="utf-8",
     )
-    document_template_dir = (
-        repo_root / "vendor" / "agent-canon" / "templates" / "documents" / "experiment"
-    )
-    document_template_dir.mkdir(parents=True, exist_ok=True)
-    (document_template_dir / "README.template.md").write_text(
-        "# Experiment Topic Template\n\n<topic>\n",
+    (template_dir / "provenance.toml").write_text(
+        '[experiment]\ntopic = "<topic>"\n',
         encoding="utf-8",
     )
-    (document_template_dir / "experiment-provenance.template.toml").write_text(
-        "[experiment]\ntopic = \"<topic>\"\n",
-        encoding="utf-8",
+    (template_dir / "visualization.py").write_text(
+        "# visualization\n", encoding="utf-8"
     )
+    (template_dir / "report" / ".gitkeep").parent.mkdir(parents=True, exist_ok=True)
+    (template_dir / "report" / ".gitkeep").write_text("", encoding="utf-8")
+    (template_dir / "result" / ".gitkeep").write_text("", encoding="utf-8")
 
 
 def write_demo_topic_base(repo_root: Path) -> None:
@@ -173,10 +184,10 @@ def write_demo_registry(repo_root: Path) -> None:
                 "",
                 "[defaults]",
                 'managed_runner = "tools/experiments/run_managed_experiment.py"',
-                'report_root = "experiments/report"',
+                'report_root = "experiments/demo_topic/report"',
                 'integration_branch = "main"',
                 'topic_template_dir = "vendor/agent-canon/templates/experiments/_template"',
-                'required_eval_artifacts = ["summary.json", "cases.jsonl"]',
+                'required_eval_artifacts = ["summary/summary.json", "summary/cases.jsonl"]',
                 "",
                 "[[topics]]",
                 'name = "demo_topic"',
@@ -185,7 +196,7 @@ def write_demo_registry(repo_root: Path) -> None:
                 'topic_readme = "experiments/demo_topic/README.md"',
                 f'canonical_entrypoint = "{CANONICAL_ENTRYPOINT}"',
                 'result_root = "experiments/demo_topic/result"',
-                'report_root = "experiments/report"',
+                'report_root = "experiments/demo_topic/report"',
                 'default_variant = "formal"',
                 f'default_inner_command = "{DEFAULT_INNER_COMMAND}"',
                 f'formal_inner_command = "{FORMAL_INNER_COMMAND}"',
@@ -205,9 +216,8 @@ def reservation_context(repo_root: Path, run_name: str = "run.a") -> RunContext:
         identity,
         repo_root
         / "experiments"
-        / "report"
         / identity.topic
-        / identity.variant
+        / "report"
         / f"{identity.run_name}.md",
     )
     return RunContext(
@@ -237,7 +247,15 @@ def init_fake_git_repo(repo_root: Path) -> None:
 def test_managed_runner_requires_variant_at_cli_boundary(tmp_path: Path) -> None:
     """Omitting variant fails before topic or result filesystem mutation."""
     result = subprocess.run(
-        [sys.executable, "-m", "tools.experiments.run_managed_experiment", "--topic", "demo_topic", "--", "true"],
+        [
+            sys.executable,
+            "-m",
+            "tools.experiments.run_managed_experiment",
+            "--topic",
+            "demo_topic",
+            "--",
+            "true",
+        ],
         cwd=Path(__file__).resolve().parents[2],
         check=False,
         capture_output=True,
@@ -253,7 +271,7 @@ def test_existing_report_fails_before_result_reservation(tmp_path: Path) -> None
     """An existing report blocks the run without creating a result directory."""
     repo_root = build_repo(tmp_path)
     context = reservation_context(repo_root)
-    context.paths.report_path.parent.mkdir(parents=True)
+    context.paths.report_path.parent.mkdir(parents=True, exist_ok=True)
     context.paths.report_path.write_text("existing\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="report already exists"):
@@ -283,6 +301,7 @@ def test_skip_report_init_rolls_back_result_without_report_parent(
     repo_root = build_repo(tmp_path)
     context = reservation_context(repo_root)
     report_parent = context.paths.report_path.parent
+    report_parent.rmdir()
     assert not report_parent.exists()
 
     receipt = reserve_run_paths(context, skip_report_init=True)
@@ -295,11 +314,11 @@ def test_skip_report_init_rolls_back_result_without_report_parent(
     assert (repo_root / "experiments" / "report").is_dir()
 
 
-@pytest.mark.parametrize("escaped_component", ("result", "variant"))
+@pytest.mark.parametrize("escaped_component", ("result",))
 def test_build_run_paths_rejects_symlinked_result_components(
     tmp_path: Path, escaped_component: str
 ) -> None:
-    """Reject a result or variant root that would redirect reservation writes."""
+    """Reject a result root that would redirect reservation writes."""
     repo_root = build_repo(tmp_path)
     identity = ExperimentIdentity("demo_topic", "smoke.v1", "run.a")
     topic_dir = repo_root / "experiments" / identity.topic
@@ -309,19 +328,14 @@ def test_build_run_paths_rejects_symlinked_result_components(
     if escaped_component == "result":
         result_root.rename(topic_dir / "result-real")
         result_root.symlink_to(outside, target_is_directory=True)
-    else:
-        variant_root = result_root / identity.variant
-        variant_root.symlink_to(outside, target_is_directory=True)
-
     with pytest.raises(ValueError, match="symlink"):
         build_run_paths(
             topic_dir,
             identity,
             repo_root
             / "experiments"
-            / "report"
             / identity.topic
-            / identity.variant
+            / "report"
             / f"{identity.run_name}.md",
         )
     assert not list(outside.iterdir())
@@ -331,6 +345,7 @@ def test_rollback_rejects_replaced_result_parent_inode(tmp_path: Path) -> None:
     """Do not remove a reservation when its newly-created result parent changed."""
     repo_root = build_repo(tmp_path)
     context = reservation_context(repo_root)
+    context.paths.result_dir.parent.rmdir()
     receipt = reserve_run_paths(context, skip_report_init=False)
     assert not receipt.result_parent_preexisted
 
@@ -347,6 +362,7 @@ def test_rollback_rejects_replaced_report_parent_inode(tmp_path: Path) -> None:
     """Do not remove a reservation when its newly-created report parent changed."""
     repo_root = build_repo(tmp_path)
     context = reservation_context(repo_root)
+    context.paths.report_path.parent.rmdir()
     receipt = reserve_run_paths(context, skip_report_init=False)
     assert not receipt.report_parent_preexisted
     assert receipt.report_parent_inode is not None
@@ -449,6 +465,7 @@ def test_rollback_preserves_reused_empty_result_directory(tmp_path: Path) -> Non
     context = reservation_context(repo_root)
     receipt = reserve_run_paths(context, skip_report_init=True)
     receipt.marker_path.unlink()
+    receipt.raw_dir.rmdir()
     receipt.result_dir.rmdir()
     replacement_sibling = receipt.result_dir.with_name("replacement-sibling")
     replacement_sibling.mkdir()
@@ -599,9 +616,7 @@ def make_observation(
         caller_allocated_ids=frozenset(device.uuid for device in devices),
         process_identities=processes,
         gpu_devices=devices,
-        free_memory_bytes={
-            device.uuid: device.free_memory_bytes for device in devices
-        },
+        free_memory_bytes={device.uuid: device.free_memory_bytes for device in devices},
         boot_id="boot-contract",
         container_visible_ids=frozenset(device.uuid for device in devices),
         observed_at=f"2026-07-16T00:00:{event_number:02d}Z",
@@ -724,9 +739,12 @@ def test_r5_admitted_environment_and_context_are_composition_only() -> None:
 def test_r5_admitted_environment_missing_composite_fails_closed() -> None:
     """The post-freeze environment refuses an unbound GPU allocation."""
     from tools.experiments.run_managed_experiment import build_admitted_environment
+
     uuid = "GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     plan = SimpleNamespace(
-        gpu_allocation=SimpleNamespace(selected_ids=(uuid,), admission_fingerprint=None),
+        gpu_allocation=SimpleNamespace(
+            selected_ids=(uuid,), admission_fingerprint=None
+        ),
         resources={"gpu": {"admission_fingerprint": None}},
         execution={"env": {}},
     )
@@ -786,7 +804,9 @@ def test_r5_runner_lifecycle_fingerprint_uses_protocol_projection() -> None:
     assert outcome.runner_lifecycle_fingerprint == expected
 
 
-def test_r5_admitted_runner_fake_cli_protocol(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_r5_admitted_runner_fake_cli_protocol(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The managed owner invokes the approved provider wire protocol exactly once."""
     from tools.experiments.run_managed_experiment import _run_admitted_runner
 
@@ -836,13 +856,19 @@ def test_r5_admitted_runner_fake_cli_protocol(tmp_path: Path, monkeypatch: pytes
     request_path.write_text(
         json.dumps(
             {
-                "identity": ExperimentIdentity("demo", "smoke", "run-1").to_dict()["identity"],
+                "identity": ExperimentIdentity("demo", "smoke", "run-1").to_dict()[
+                    "identity"
+                ],
                 "run_id": "run-1",
                 "schema": "agentcanon-managed-run/v1",
                 "fingerprint": "a" * 64,
                 "task": {"module": "experiments.demo_topic.run", "callable": "main"},
                 "cases": [{}],
-                "capacity": {"max_workers": 1, "host_memory_bytes": 0, "gpu_devices": []},
+                "capacity": {
+                    "max_workers": 1,
+                    "host_memory_bytes": 0,
+                    "gpu_devices": [],
+                },
                 "resource_estimate": {
                     "host_memory_bytes": 0,
                     "gpu_count": 0,
@@ -861,7 +887,9 @@ def test_r5_admitted_runner_fake_cli_protocol(tmp_path: Path, monkeypatch: pytes
         result_path=tmp_path / "result.json",
         lifecycle_path=tmp_path / "lifecycle.json",
         request_payload={
-            "identity": ExperimentIdentity("demo", "smoke", "run-1").to_dict()["identity"],
+            "identity": ExperimentIdentity("demo", "smoke", "run-1").to_dict()[
+                "identity"
+            ],
             "run_id": "run-1",
             "schema": "agentcanon-managed-run/v1",
             "fingerprint": "a" * 64,
@@ -880,7 +908,9 @@ def test_r5_provider_request_wire_fields_forward_opaque_gpu_identifiers() -> Non
 
     source = SCRIPT.read_text(encoding="utf-8")
     request_builder = source[
-        source.index("def _build_managed_run_request") : source.index("def _resolve_admitted_runner")
+        source.index("def _build_managed_run_request") : source.index(
+            "def _resolve_admitted_runner"
+        )
     ]
     assert '"schema": MANAGED_RUN_REQUEST_SCHEMA' in request_builder
     assert '"task":' in request_builder
@@ -899,14 +929,18 @@ def test_r5_provider_request_wire_fields_forward_opaque_gpu_identifiers() -> Non
         for line in request_builder.splitlines()
         if '"gpu_id": gpu_id' in line
     ) == ('"gpu_id": gpu_id,',)
-    assert "for uuid, gpu_id in zip(selected_uuids, selected_gpu_ids)" in request_builder
+    assert (
+        "for uuid, gpu_id in zip(selected_uuids, selected_gpu_ids)" in request_builder
+    )
 
 
 def test_r5_provider_identity_is_bound_to_request_and_environment_audit() -> None:
     """Bind the merged provider contract without changing the UUID ancestry route."""
     source = SCRIPT.read_text(encoding="utf-8")
     request_builder = source[
-        source.index("def _build_managed_run_request") : source.index("def _resolve_admitted_runner")
+        source.index("def _build_managed_run_request") : source.index(
+            "def _resolve_admitted_runner"
+        )
     ]
     identity = (
         "https://github.com/iwashita-nozomu/experiment-runner",
@@ -915,10 +949,13 @@ def test_r5_provider_identity_is_bound_to_request_and_environment_audit() -> Non
         "2de2b63aac3076e6aacdf1ff10b2c35a0235e835504aeff2db92a7750a720d85",
         "experiment-runner-admitted --request <path> --result <path>",
     )
-    assert '"agentcanon_provider_contract": _provider_contract_identity()' in request_builder
-    environment = (Path(__file__).resolve().parents[2] / "agent-canon-environment.toml").read_text(
-        encoding="utf-8"
+    assert (
+        '"agentcanon_provider_contract": _provider_contract_identity()'
+        in request_builder
     )
+    environment = (
+        Path(__file__).resolve().parents[2] / "agent-canon-environment.toml"
+    ).read_text(encoding="utf-8")
     for value in identity:
         assert value in environment
 
@@ -949,7 +986,9 @@ def _valid_provider_result(request_fingerprint: str) -> dict[str, object]:
     }
     return {
         "schema": "agentcanon-managed-run-result/v1",
-        "identity": ExperimentIdentity("demo", "smoke", "run-mismatch").to_dict()["identity"],
+        "identity": ExperimentIdentity("demo", "smoke", "run-mismatch").to_dict()[
+            "identity"
+        ],
         "request_fingerprint": request_fingerprint,
         "run_id": "run-mismatch",
         "status": "ok",
@@ -1008,7 +1047,9 @@ def test_r5_provider_result_mismatches_fail_closed(
         _validate_admitted_result(
             result_path,
             {
-                "identity": ExperimentIdentity("demo", "smoke", "run-mismatch").to_dict()["identity"],
+                "identity": ExperimentIdentity(
+                    "demo", "smoke", "run-mismatch"
+                ).to_dict()["identity"],
                 "schema": "agentcanon-managed-run/v1",
                 "run_id": "run-mismatch",
                 "fingerprint": request_fingerprint,
@@ -1099,7 +1140,9 @@ def test_r5_runner_lifecycle_capture_is_shell_free_and_import_free() -> None:
     """The composition root uses shell-free subprocess and has no local runner fallback."""
     source = SCRIPT.read_text(encoding="utf-8")
     admitted_runner_section = source[
-        source.index("def _resolve_admitted_runner") : source.index("def repo_root_from_script")
+        source.index("def _resolve_admitted_runner") : source.index(
+            "def repo_root_from_script"
+        )
     ]
     assert "shell=False" in source
     assert "--version" not in admitted_runner_section
@@ -1112,7 +1155,11 @@ def test_r5_runner_lifecycle_capture_is_shell_free_and_import_free() -> None:
 def test_public_alternate_gpu_routes_are_typed_or_managed() -> None:
     """Template and JIT entrypoints cannot launch GPU work beside the managed owner."""
     template_source = (
-        Path(__file__).resolve().parents[2] / "templates" / "experiments" / "_template" / "run.py"
+        Path(__file__).resolve().parents[2]
+        / "templates"
+        / "experiments"
+        / "_template"
+        / "run.py"
     ).read_text(encoding="utf-8")
     jit_source = (
         Path(__file__).resolve().parents[2]
@@ -1126,8 +1173,13 @@ def test_public_alternate_gpu_routes_are_typed_or_managed() -> None:
         / "experiments"
         / "execution_resource_plan.py"
     ).read_text(encoding="utf-8")
-    assert "managed_runner_required=tools/experiments/run_managed_experiment.py" in template_source
-    assert "gpu_route_blocked=canonical_managed_experiment_runner_required" in jit_source
+    assert (
+        "managed_runner_required=tools/experiments/run_managed_experiment.py"
+        in template_source
+    )
+    assert (
+        "gpu_route_blocked=canonical_managed_experiment_runner_required" in jit_source
+    )
     assert "gpu_structured_probe_unavailable" in planner_source
     assert "discover_injected_test_resources" not in planner_source
     assert '    "SnapshotResourceProbe",' not in planner_source
@@ -1271,7 +1323,10 @@ def test_public_gpu_discovery_fails_typed_when_structured_probe_is_missing(
         except TypedPreflightFailure as exc:
             assert exc.code == "gpu_structured_probe_unavailable"
         else:
-            raise AssertionError("GPU discovery unexpectedly succeeded without nvidia-smi")
+            raise AssertionError(
+                "GPU discovery unexpectedly succeeded without nvidia-smi"
+            )
+
 
 def test_check_experiment_registry_accepts_valid_registry(tmp_path: Path) -> None:
     """The registry checker should pass for the generated demo registry."""
@@ -1280,7 +1335,8 @@ def test_check_experiment_registry_accepts_valid_registry(tmp_path: Path) -> Non
     result = subprocess.run(
         [
             sys.executable,
-            "-m", "tools.ci.check_experiment_registry",
+            "-m",
+            "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1291,6 +1347,37 @@ def test_check_experiment_registry_accepts_valid_registry(tmp_path: Path) -> Non
 
     assert result.returncode == 0
     assert "OK: experiment registry is valid" in result.stdout
+
+
+def test_check_experiment_registry_rejects_double_topic_report_root(
+    tmp_path: Path,
+) -> None:
+    """The topic report root is exact and receives only the run name suffix."""
+    repo_root = build_repo(tmp_path)
+    registry_path = repo_root / "experiments" / "registry.toml"
+    registry_path.write_text(
+        registry_path.read_text(encoding="utf-8").replace(
+            'report_root = "experiments/demo_topic/report"',
+            'report_root = "experiments/demo_topic/report/demo_topic"',
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "tools.ci.check_experiment_registry",
+            "--repo-root",
+            str(repo_root),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "report_root must be experiments/demo_topic/report" in result.stdout
 
 
 def test_check_experiment_registry_reports_missing_required_field(
@@ -1307,7 +1394,8 @@ def test_check_experiment_registry_reports_missing_required_field(
     result = subprocess.run(
         [
             sys.executable,
-            "-m", "tools.ci.check_experiment_registry",
+            "-m",
+            "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1328,8 +1416,8 @@ def test_check_experiment_registry_reports_invalid_eval_artifact_item(
     registry_path = repo_root / "experiments" / "registry.toml"
     registry_path.write_text(
         registry_path.read_text(encoding="utf-8").replace(
-            'required_eval_artifacts = ["summary.json", "cases.jsonl"]',
-            'required_eval_artifacts = ["summary.json", ""]',
+            'required_eval_artifacts = ["summary/summary.json", "summary/cases.jsonl"]',
+            'required_eval_artifacts = ["summary/summary.json", ""]',
         ),
         encoding="utf-8",
     )
@@ -1337,7 +1425,8 @@ def test_check_experiment_registry_reports_invalid_eval_artifact_item(
     result = subprocess.run(
         [
             sys.executable,
-            "-m", "tools.ci.check_experiment_registry",
+            "-m",
+            "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1347,7 +1436,10 @@ def test_check_experiment_registry_reports_invalid_eval_artifact_item(
     )
 
     assert result.returncode == 1
-    assert "defaults: required_eval_artifacts[1] must be a non-empty string" in result.stdout
+    assert (
+        "defaults: required_eval_artifacts[1] must be a non-empty string"
+        in result.stdout
+    )
 
 
 def test_check_experiment_registry_accepts_valid_branch_topic(tmp_path: Path) -> None:
@@ -1377,8 +1469,8 @@ def test_check_experiment_registry_accepts_valid_branch_topic(tmp_path: Path) ->
         capture_output=True,
         text=True,
     )
-    (repo_root / "notes" / "branches").mkdir(parents=True)
-    (repo_root / "notes" / "branches" / "branch_only.md").write_text(
+    (repo_root / "documents" / "notes" / "branches").mkdir(parents=True)
+    (repo_root / "documents" / "notes" / "branches" / "branch_only.md").write_text(
         "# Branch Only\n",
         encoding="utf-8",
     )
@@ -1391,7 +1483,7 @@ def test_check_experiment_registry_accepts_valid_branch_topic(tmp_path: Path) ->
                 'name = "branch_only"',
                 'status = "active"',
                 'remote_branch = "experiment/branch-only"',
-                'primary_note = "notes/branches/branch_only.md"',
+                'primary_note = "documents/notes/branches/branch_only.md"',
                 "",
             ]
         ),
@@ -1401,7 +1493,8 @@ def test_check_experiment_registry_accepts_valid_branch_topic(tmp_path: Path) ->
     result = subprocess.run(
         [
             sys.executable,
-            "-m", "tools.ci.check_experiment_registry",
+            "-m",
+            "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1419,8 +1512,8 @@ def test_check_experiment_registry_rejects_duplicate_branch_topic_name(
 ) -> None:
     """The registry checker should reject duplicate names across topic tables."""
     repo_root = build_repo(tmp_path)
-    (repo_root / "notes" / "branches").mkdir(parents=True)
-    (repo_root / "notes" / "branches" / "demo_topic.md").write_text(
+    (repo_root / "documents" / "notes" / "branches").mkdir(parents=True)
+    (repo_root / "documents" / "notes" / "branches" / "demo_topic.md").write_text(
         "# Demo Topic Branch\n",
         encoding="utf-8",
     )
@@ -1433,7 +1526,7 @@ def test_check_experiment_registry_rejects_duplicate_branch_topic_name(
                 'name = "demo_topic"',
                 'status = "active"',
                 'remote_branch = "experiment/demo-topic"',
-                'primary_note = "notes/branches/demo_topic.md"',
+                'primary_note = "documents/notes/branches/demo_topic.md"',
                 "",
             ]
         ),
@@ -1443,7 +1536,8 @@ def test_check_experiment_registry_rejects_duplicate_branch_topic_name(
     result = subprocess.run(
         [
             sys.executable,
-            "-m", "tools.ci.check_experiment_registry",
+            "-m",
+            "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1497,7 +1591,8 @@ def test_check_experiment_registry_rejects_recursive_runner_command(
     result = subprocess.run(
         [
             sys.executable,
-            "-m", "tools.ci.check_experiment_registry",
+            "-m",
+            "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1528,7 +1623,8 @@ def test_check_experiment_registry_accepts_command_without_run_dir(
     result = subprocess.run(
         [
             sys.executable,
-            "-m", "tools.ci.check_experiment_registry",
+            "-m",
+            "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1556,7 +1652,8 @@ def test_check_experiment_registry_rejects_command_without_config_path(
     result = subprocess.run(
         [
             sys.executable,
-            "-m", "tools.ci.check_experiment_registry",
+            "-m",
+            "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1587,7 +1684,8 @@ def test_check_experiment_registry_rejects_non_topic_local_entrypoint(
     result = subprocess.run(
         [
             sys.executable,
-            "-m", "tools.ci.check_experiment_registry",
+            "-m",
+            "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1607,9 +1705,9 @@ def test_check_experiment_registry_rejects_reserved_eval_artifact_pattern(
     repo_root = build_repo(tmp_path)
     registry_path = repo_root / "experiments" / "registry.toml"
     registry_text = registry_path.read_text(encoding="utf-8").replace(
-        'required_eval_artifacts = ["summary.json", "cases.jsonl"]',
+        'required_eval_artifacts = ["summary/summary.json", "summary/cases.jsonl"]',
         (
-            'required_eval_artifacts = ["summary.json", "cases.jsonl", '
+            'required_eval_artifacts = ["summary/summary.json", "summary/cases.jsonl", '
             '"run.log", "logs/stdout.log"]'
         ),
     )
@@ -1618,7 +1716,8 @@ def test_check_experiment_registry_rejects_reserved_eval_artifact_pattern(
     result = subprocess.run(
         [
             sys.executable,
-            "-m", "tools.ci.check_experiment_registry",
+            "-m",
+            "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1640,7 +1739,7 @@ def test_create_experiment_topic_scaffolds_directory_and_registry(
     result = subprocess.run(
         [
             sys.executable,
-            "-m", "tools.experiments.create_experiment_topic",
+            "tools/experiments/create_experiment_topic.py",
             "--repo-root",
             str(repo_root),
             "--active-branch",
@@ -1667,6 +1766,7 @@ def test_create_experiment_topic_scaffolds_directory_and_registry(
     new_topic = next(
         topic for topic in registry_data["topics"] if topic["name"] == "new_topic"
     )
+    assert new_topic["report_root"] == "experiments/new_topic/report"
     assert "formal_inner_command" not in new_topic
     assert "EXPERIMENT_CONFIG_PATH" not in new_topic["default_inner_command"]
 
@@ -1691,7 +1791,7 @@ def test_sync_experiment_registry_context_updates_branch_scope_and_worktree(
             "--branch",
             "work/demo-topic-20260406",
             "--branch-note",
-            "notes/branches/demo_topic.md",
+            "documents/notes/branches/demo_topic.md",
             "--topic",
             "demo_topic",
         ],
@@ -1707,4 +1807,4 @@ def test_sync_experiment_registry_context_updates_branch_scope_and_worktree(
     assert 'active_branch = "work/demo-topic-20260406"' in registry_text
     assert 'active_worktree = ".worktrees/demo-topic"' in registry_text
     assert 'scope_file = ".worktrees/demo-topic/WORKTREE_SCOPE.md"' in registry_text
-    assert 'branch_note = "notes/branches/demo_topic.md"' in registry_text
+    assert 'branch_note = "documents/notes/branches/demo_topic.md"' in registry_text

@@ -171,7 +171,7 @@ path = "memory"
 kind = "dir"
 
 [[profile.required]]
-path = "notes"
+path = "documents/notes"
 kind = "dir"
 
 [[profile.required]]

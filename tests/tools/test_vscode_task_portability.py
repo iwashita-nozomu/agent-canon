@@ -4,7 +4,7 @@
 # contract test
 # responsibility Verifies VS Code commands resolve the canonical AgentCanon tool root in both layouts.
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared VS Code surface policy
-# upstream implementation ../../tools/lib/repo_paths.sh repository and AgentCanon tool-root resolver
+# upstream implementation ../../tools/agent_tools shared AgentCanon tool root
 # downstream implementation ../../.vscode/tasks.json shared validation task commands
 # @dependency-end
 
@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import tempfile
 import unittest
@@ -21,9 +20,6 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TASKS_JSON = PROJECT_ROOT / ".vscode" / "tasks.json"
 SETTINGS_JSON = PROJECT_ROOT / ".vscode" / "settings.json"
-REPO_PATHS = PROJECT_ROOT / "tools" / "lib" / "repo_paths.sh"
-
-
 def run_shell_command_in_workspace(workspace: Path, command: str) -> subprocess.CompletedProcess[str]:
     """Run one VS Code task command against a synthetic workspace."""
     return subprocess.run(
@@ -49,12 +45,6 @@ class VscodeTaskPortabilityTest(unittest.TestCase):
         """Write and chmod one executable Python stub."""
         self.write_exec(path, "#!/usr/bin/env python3\n" + text)
 
-    def install_repo_paths(self, workspace: Path) -> None:
-        """Install the current resolver in a synthetic workspace."""
-        target = workspace / "tools" / "lib" / "repo_paths.sh"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(REPO_PATHS, target)
-
     def task_commands(self) -> dict[str, str]:
         """Return task commands keyed by label."""
         tasks = json.loads(TASKS_JSON.read_text(encoding="utf-8"))
@@ -64,8 +54,9 @@ class VscodeTaskPortabilityTest(unittest.TestCase):
         """Shared settings and tasks must cover parent tool views without workspace files."""
         commands = self.task_commands()
         for label, command in commands.items():
-            self.assertIn("tools/lib/repo_paths.sh", command, label)
-            self.assertIn("agent_canon_tools_root", command, label)
+            self.assertIn("tools/agent-canon", command, label)
+            self.assertIn("CANON_TOOLS_ROOT", command, label)
+            self.assertNotIn("tools/lib/repo_paths.sh", command, label)
         settings = json.loads(SETTINGS_JSON.read_text(encoding="utf-8"))
         self.assertIn("./tools/agent-canon", settings["python.analysis.extraPaths"])
         self.assertIn("./tools/agent-canon/agent_tools", settings["python.analysis.extraPaths"])
@@ -76,7 +67,6 @@ class VscodeTaskPortabilityTest(unittest.TestCase):
         commands = self.task_commands()
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace = Path(tmp_dir)
-            self.install_repo_paths(workspace)
             self.write_exec(
                 workspace / "tools" / "bin" / "agent-canon",
                 '#!/usr/bin/env bash\necho DOCS_BIN=standalone',
@@ -117,7 +107,6 @@ class VscodeTaskPortabilityTest(unittest.TestCase):
         commands = self.task_commands()
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace = Path(tmp_dir)
-            self.install_repo_paths(workspace)
             self.write_exec(
                 workspace / "tools" / "agent-canon" / "bin" / "agent-canon",
                 '#!/usr/bin/env bash\necho DOCS_BIN=parent',

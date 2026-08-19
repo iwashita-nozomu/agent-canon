@@ -22,7 +22,7 @@ metric を固定し、algorithm / data movement / memory hierarchy / concurrency
 
 ## Use When
 
-- `cpp/src/`, `cpp/include/`, `cpp/tests/`, `cpp/experiments/` 配下を触る
+- `cpp/src/`, `cpp/include/`, `tests/cpp/`, `cpp/experiments/` 配下を触る
 - `cpp/CMakeLists.txt` や native build 設定を触る
 - public header、ABI、FFI、CLI binary の挙動を変える
 - C++ documentation / Docstring projection を触る
@@ -33,6 +33,12 @@ metric を固定し、algorithm / data movement / memory hierarchy / concurrency
 ## Required Checks
 
 - project-native configure / build / test evidence
+- When native static analysis is relevant and a CMake-generated database exists, use:
+  `python3 tools/static_analysis/cpp/static_analysis.py select-db --workspace-root <workspace-root> --build-dir <build-dir>`;
+  `python3 tools/static_analysis/cpp/static_analysis.py clangd-check --workspace-root <workspace-root> --source <source> --build-dir <build-dir>`;
+  and `python3 tools/static_analysis/cpp/static_analysis.py clang-tidy --workspace-root <workspace-root> --source <source> --build-dir <build-dir>`.
+  The build directory is explicit per module; the tool does not enumerate or add include paths,
+  compiler flags, or provider-specific diagnostics.
 - `ctest` があるならその結果
 - CMake project なら `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`、
   `cmake --build "$ROOT/build/cpp/<profile>" --parallel`、
@@ -61,7 +67,8 @@ policy owner ではなく、この Skill の evidence contract を解釈する�
 ## Target graph readback
 
 - `cpp/CMakeLists.txt` が単一の native project entry として `cpp/src`、`cpp/include`、
-  `cpp/tests`、`cpp/experiments` を同じ configure graph に接続します。
+  `${ROOT}/tests/cpp`、`cpp/experiments` を同じ configure graph に接続します。tests/cpp
+  は source/binary directory を明示した out-of-tree `add_subdirectory` で登録します。
 - `cpp-test-<name>` と `cpp-experiment-<name>` は `cpp-core` を consume し、
   `cpp-tests` と `cpp-experiments` は build grouping を提供します。
 - root anchor、build tree、install prefix は `$ROOT/cpp`、`$ROOT/build/cpp/<profile>`、
@@ -71,7 +78,7 @@ policy owner ではなく、この Skill の evidence contract を解釈する�
 ## Docstring projection route
 
 `agent_team.language_review_candidates` が native C/C++ implementation or test path（native suffix、
-`cpp/CMakeLists.txt`、`cpp/src/`、`cpp/include/`、`cpp/tests/`、`cpp/experiments/`、
+`cpp/CMakeLists.txt`、`cpp/src/`、`cpp/include/`、`tests/cpp/`、`cpp/experiments/`、
 `cpp/cmake/` marker）を含む
 changed surface に `cpp_reviewer` を候補として返した場合に、reviewer を起動します。
 convention/template documentation は同じ

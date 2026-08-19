@@ -243,7 +243,7 @@ decision が `approve` の場合に approval evidence になります。
 - 文書主体の整理が要る場合は `docs_workflow_steward`
 
 必須ルール:
-- 選択された route が必要とする場合だけ、`documents/`、`notes/`、`references/` と local library の sweep を行います
+- 選択された route が必要とする場合だけ、`documents/`、`documents/notes/`、`references/` と local library の sweep を行います
 - durable artifact route が選択された場合だけ、`user_request_contract.md`、`schedule.md`、`work_log.md` をその route の正本として更新します
 - repo-changing task の subagent は owner-critical operation、coordination/resumption、または selected unresolved risk がある場合だけ activate します
 - active runtime が explicit user request なしの subagent spawn を禁止する場合は、actual spawn の代わりに `SUBAGENT_AUTHORIZATION=required`、role、input packet、expected output、review gate を structured handoff message/tool result に固定します。coordination/resumption が既に durable bundle を選択している場合だけ、その bundle を使います。許可が出るまでその specialist review を完了扱いにしません
@@ -299,7 +299,7 @@ source bucket:
   - まだ決められない項目。silent assumption にせず deferred / escalated にする
 
 ルール:
-- 不明点はすぐユーザーへ戻さず、まず `documents/`、`memory/`、`notes/themes/`、`notes/guardrails/`、`notes/knowledge/`、`notes/failures/`、prior logs、local code / tests から解決を試みます
+- 不明点はすぐユーザーへ戻さず、まず `documents/`、`memory/`、`documents/notes/themes/`、`documents/notes/guardrails/`、`documents/notes/knowledge/`、`documents/notes/failures/`、prior logs、local code / tests から解決を試みます
 - 蓄積情報で user intent、scope、acceptance criteria を変えずに解決できる場合は、evidence path とともに `Resolved From Accumulated Context` へ記録します
 - durable user preference は、今回の request や repo evidence と結び付いたときだけ task requirement に昇格します
 - unknown は requirement として採用せず、resolution sweep 後に open question、deferred clause、または escalation として残します
