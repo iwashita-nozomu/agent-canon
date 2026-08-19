@@ -35,7 +35,7 @@ VENDOR_OUTSIDE_REPOSITORY = "agent_canon_source_root_vendor_outside_repository"
 ROOT_VIEW_OUTSIDE_REPOSITORY = "agent_canon_source_root_root_view_outside_repository"
 
 
-@dataclass(frozen=True)
+@dataclass
 class SourceRootFailure(ValueError):
     """Typed failure raised when source-root resolution is not deterministic."""
 
