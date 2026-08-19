@@ -9,6 +9,9 @@ on:
   push:
     branches:
       - fix/803-reference-dependency-edge
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
