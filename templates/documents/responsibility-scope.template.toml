@@ -81,6 +81,8 @@ paths = [
   "AGENTS.md",
   ".codex/config.toml",
   ".codex/agents/**",
+  "documents/notes",
+  "documents/notes/**",
   "tools/agent-canon/**",
 ]
 protecting_tools = [
@@ -145,7 +147,7 @@ paths = [
   "experiments/**",
   "evidence/**",
   "memory/**",
-  "notes/**",
+  "documents/notes/**",
   "references/**",
 ]
 protecting_tools = [

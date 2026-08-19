@@ -85,7 +85,7 @@
         "`cpp/cmake/`",
         "`cpp/src/`",
         "`cpp/include/`",
-        "`cpp/tests/`",
+        "`tests/cpp/` (out-of-tree project tests)",
         "`cpp/experiments/`",
         "C++ OOP checks",
         "`cmake -S \"$ROOT/cpp\" -B \"$ROOT/build/cpp/<profile>\" -DCMAKE_INSTALL_PREFIX=\"$ROOT/.state/cpp-install/<profile>\"`"

@@ -552,7 +552,7 @@ graph LR
     %% node kind=command id=command:issue-finding-report:conditional:0001 digest=739249e32c7e585633c7bef73e34b652d3f649db313b4da3f9e352f9a8458e68 order=1
     n_command_issue_finding_report_conditional_0001["python3 tools/agent_tools/generate_agent_runtime_dashboard.py (order=1; ref=739249e32c7e585633c7bef73e34b652d3f649db313b4da3f9e352f9a8458e68)"]
     %% node kind=command id=command:issue-finding-report:conditional:0002 digest=267dc70ce8567164cea1a47ce3b3bc8eca2cc75fcf374e28eb0b81f86c00a787 order=2
-    n_command_issue_finding_report_conditional_0002["git grep -n '<cause keywords>' -- issues memory notes/failures documents agents (order=2; ref=267dc70ce8567164cea1a47ce3b3bc8eca2cc75fcf374e28eb0b81f86c00a787)"]
+    n_command_issue_finding_report_conditional_0002["git grep -n '<cause keywords>' -- issues memory documents/notes/failures documents agents (order=2; ref=267dc70ce8567164cea1a47ce3b3bc8eca2cc75fcf374e28eb0b81f86c00a787)"]
     %% node kind=command id=command:issue-finding-report:conditional:0003 digest=507725598916f55f9cd0ad0dee921f443b694247d4057be7d23b169c74b37ffa order=3
     n_command_issue_finding_report_conditional_0003["python3 tools/agent_tools/issue_sync.py --root . (order=3; ref=507725598916f55f9cd0ad0dee921f443b694247d4057be7d23b169c74b37ffa)"]
     %% node kind=command id=command:issue-finding-report:conditional:0004 digest=1f994f80b9a46c1abd2eeda812d76e671ad7db1ef29ba12dea3526578e2acdac order=4

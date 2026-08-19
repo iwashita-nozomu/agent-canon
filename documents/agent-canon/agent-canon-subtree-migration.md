@@ -46,7 +46,7 @@ downstream implementation ../../tools/update_agent_canon.sh derived repo update 
   - `QUICK_START.md`
   - `documents/README.md`
   - `scripts/README.md`
-  - `notes/README.md`
+  - `documents/notes/README.md`
   - `docker/README.md`
 
 ## 所有境界
@@ -170,7 +170,7 @@ root 側は owner class ごとに薄い wrapper、symlink view、copy surface、
   - `documents/contracts/linux-wsl-host-requirements.md`
   - `documents/contracts/server-host-contract.md`
   - `documents/contracts/remote-execution-repo-contract.md`
-  - `docker/README.md`, `scripts/README.md`, `notes/README.md`, `.gitmodules`
+  - `docker/README.md`, `scripts/README.md`, `documents/notes/README.md`, `.gitmodules`
 - Project-owned durable state:
   - `goal.md`, project-specific notes, experiments, reports, and project-specific design docs
 

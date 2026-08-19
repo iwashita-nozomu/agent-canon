@@ -11,8 +11,8 @@ upstream design ../README.md notes lifecycle index
 このディレクトリには、`main` から辿れる形で残しておきたい実験メモを置きます。
 1 回の run に対応する一次 report は `experiments/report/` に置き、このディレクトリは複数 run をまたぐ要約、比較、知見整理に使います。
 
-研究の問い、比較設計、claim 更新は [agents/workflows/research-workflow.md](../../agents/workflows/research-workflow.md) を参照してください。
-準備、実装、静的チェック、実行、結果レポートの標準手順は [agents/workflows/experiment-workflow.md](../../agents/workflows/experiment-workflow.md) を参照してください。
+研究の問い、比較設計、claim 更新は [agents/workflows/research-workflow.md](../../../agents/workflows/research-workflow.md) を参照してください。
+準備、実装、静的チェック、実行、結果レポートの標準手順は [agents/workflows/experiment-workflow.md](../../../agents/workflows/experiment-workflow.md) を参照してください。
 批判的レビューの観点は AgentCanon standalone では
 `documents/experiments/experiment-critical-review.md`、template roots では
 `vendor/agent-canon/documents/experiments/experiment-critical-review.md` を参照してください。
@@ -64,6 +64,6 @@ upstream design ../README.md notes lifecycle index
 
 ## In-Worktree Drafting
 
-- worktree で実験を進める場合も、最終的に `main` に置くのと同じ `notes/experiments/<topic>.md` を意識して書きます。
-- 一挙手一投足は `notes/worktrees/` の action log に残し、この note には実験として意味のある条件変更と観測を要約します。
+- worktree で実験を進める場合も、最終的に `main` に置くのと同じ `documents/notes/experiments/<topic>.md` を意識して書きます。
+- 一挙手一投足は `documents/notes/worktrees/` の action log に残し、この note には実験として意味のある条件変更と観測を要約します。
 - 数式、比較対象、各改造の意図は worktree 側だけに閉じず、この note 側にも要約を残します。
