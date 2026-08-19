@@ -82,6 +82,12 @@ Each `[[surface]]` declares:
 - `local_override_allowed`: whether a parent may replace the view; and
 - `optional`: whether a lifecycle materializes the entry only when selected.
 
+The top-level `projection_forbidden_roots` set is a different contract. It
+declares AgentCanon standalone source roots that cannot be a projection target,
+projection source, legacy-cleanup path, repository state path, or update
+transition candidate. It does not make those paths root-absence entries and does
+not grant the synchronizer deletion ownership over parent content.
+
 The parser validates typed selection metadata and renders link specifications
 from this manifest. `link-root` and `check` do not maintain a second active-path
 list.
@@ -120,6 +126,72 @@ symlinks while preserving regular parent content. It no longer claims the
 parent `tests/` directory as AgentCanon state. A missing retired path is already
 at the fixed point.
 
+## Standalone Rust / Cargo Boundary
+
+The AgentCanon `rust/` tree owns standalone implementation, Cargo metadata,
+fixtures, and producer tests. The live manifest therefore declares
+`projection_forbidden_roots = ["rust"]`. Let `F` be every path equal to or below
+`rust`, `T` the manifest-owned parent target paths, `S` the AgentCanon source
+paths materialized by those entries, and `U` the update-transition candidates.
+The required invariant is:
+
+```text
+prefix_intersection(T ∪ S ∪ U, F) = ∅
+```
+
+The parser also rejects an ancestor entry such as a broad root projection that
+would contain `rust/`. Every renderer used by `sync_agent_canon.sh` loads and
+validates the same manifest before producing link, copy, regular, cleanup, or
+transition specifications, so no shell-local Rust allowlist exists. The
+`projection-forbidden-roots` readback command exposes the policy without adding
+it to the normalized runtime-surface snapshot.
+
+A parent checker classifies observed paths by topology and ownership rather than
+by a Rust-looking pathname alone:
+
+| Observed path | Classification | Required handling |
+| --- | --- | --- |
+| `vendor/agent-canon/rust/**` inside the exact source checkout | AgentCanon standalone source/test | Validate only in the AgentCanon owner repository |
+| parent-owned regular directory or file below `rust/**` | parent content or historical artifact | Do not infer projection and do not delete from AgentCanon sync |
+| generated copy below `rust/**` | regular parent-owned bytes unless explicit parent provenance says otherwise | Remove or retain only through a parent issue/PR |
+| symlink resolving into `vendor/agent-canon/rust/**` | unmanaged live projection edge | Fail the consumer structure check; never register it in the live manifest |
+| gitlink / submodule below `rust/**` | explicit parent dependency edge, not a live AgentCanon view | Keep under a parent-owned dependency contract or reject as an unmanaged projection |
+| absent path | desired live-projection fixed point | No cleanup pathspec or compatibility placeholder |
+
+Regular bytes cannot be identified as an AgentCanon projection from their path
+or content hash alone. In particular, a historical
+`rust/agent-canon/tests/python_algorithm_contract_cli.rs` in a consumer remains
+parent-owned even when its origin can be traced to an old AgentCanon-related
+change. The producer manifest must not claim it as `removed_legacy`,
+`standalone_only`, repository state, or an update transition.
+
+### Parent migration readback
+
+A parent repository that removes such a regular artifact does so on a separate
+parent issue branch. Before editing, read back both filesystem and index
+identity:
+
+```bash
+git ls-files -s -- rust/agent-canon
+git status --short -- rust/agent-canon
+test ! -L rust/agent-canon
+git submodule status -- rust/agent-canon 2>/dev/null || true
+git log --all --follow -- rust/agent-canon/tests/python_algorithm_contract_cli.rs
+```
+
+Mode `100644` or `100755` is a regular parent file, mode `120000` is a symlink,
+and mode `160000` is a gitlink. A regular-file removal must be staged and
+validated with the parent repository's own checks; `link-root` is not the
+migration command. The parent PR records the old index mode/blob, deletion
+diff, selected validation, and post-change absence.
+
+The standalone Rust gate remains
+`tools/ci/run_standalone_static_gate_unit.sh` in the AgentCanon source owner. A
+live parent's standard projection check does not add Cargo setup or this Rust
+gate merely because the pinned checkout contains `rust/`. GPU execution,
+runtime-alignment, and other live-parent command packets consume the declared
+root views and cannot broaden validation from source-tree presence alone.
+
 ## Editing Rule
 
 Edit AgentCanon behavior in an AgentCanon issue branch based on current
@@ -145,8 +217,13 @@ path only under the existing bounded stale-symlink rules.
 For AgentCanon source changes:
 
 ```bash
-python3 -m unittest -v tests/agent_tools/test_codex_projection_boundary.py
+python3 -m unittest -v \
+  tests/agent_tools/test_codex_projection_boundary.py \
+  tests/agent_tools/test_rust_projection_boundary.py
+python3 tools/agent_tools/surface_manifest.py --root . --prefix . \
+  projection-forbidden-roots
 python3 tools/agent_tools/surface_manifest.py --root . --prefix . check-doc
+bash tools/ci/run_standalone_static_gate_unit.sh rust
 ```
 
 For an initialized live parent integration:

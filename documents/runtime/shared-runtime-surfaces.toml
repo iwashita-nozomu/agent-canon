@@ -11,6 +11,10 @@ prefix = "vendor/agent-canon"
 integration_mode = "live-agent-canon"
 default_consumer = false
 selection = "explicit-opt-in"
+projection_forbidden_roots = ["rust"]
+
+# Rust/Cargo source and tests are AgentCanon standalone-only. This exclusion is
+# not a cleanup entry and grants no ownership over a parent's regular rust/ tree.
 
 # Codex reads these repository-scoped paths directly. The default static
 # consumer does not consult this manifest; an explicit live integration does.
