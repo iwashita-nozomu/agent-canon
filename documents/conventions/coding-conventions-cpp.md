@@ -22,18 +22,18 @@ layout と build tree の正本は [cpp-build-layout.md](../design/cpp-build-lay
 - 例外や分岐が多くなる設計は避けます。
 - 数値計算の安定性を意識し、前提条件をコメントで明示します。
 - template 既定の C++ 実装形態は header-only にします。
-- `cpp/CMakeLists.txt` を唯一の C++ project entrypoint にします。
-- `cpp/cmake/` は project-local helper module、`cpp/include/` は public header、
-  `cpp/src/` は production implementation、`tests/cpp/` は derived project の CTest source、
-  `cpp/experiments/` は native experiment source と target wiring に固定します。
-- parent root は language-neutral な入口として保ち、C++ command は `cpp` を
-  source anchor にして実行します。
+- root `CMakeLists.txt` を唯一の C++ project entrypoint にします。
+- root `cmake/` は project-local helper module、`include/` は public header、
+  `src/` は production implementation、`tests/cpp/` は derived project の CTest source、
+  `experiments/cpp/` は native experiment source と target wiring に固定します。
+- C++ command は repository root を source anchor にして実行します。
+- `cpp/` は production、test、experiment の compatibility surface として残しません。
 
 ## 1.1 Native project boundary
 
 | owner | path/state | evidence command |
 | --- | --- | --- |
-| project | `cpp/CMakeLists.txt` が `cpp/src`、`cpp/include`、`${ROOT}/tests/cpp`、`cpp/experiments` を同一 configure graph に登録する。tests/cpp は明示 binary directory 付き out-of-tree `add_subdirectory` を使う | `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>"` |
+| project | root `CMakeLists.txt` が `src/`、`include/`、`tests/cpp/`、任意の `experiments/cpp/` を同一 configure graph に登録する。consumer subtree は明示 binary directory 付き `add_subdirectory` を使う | `cmake -S "$ROOT" -B "$ROOT/build/cpp/<profile>"` |
 | production | `cpp-core` が public header と production source を提供する | `cmake --build "$ROOT/build/cpp/<profile>" --target cpp-core` |
 | tests | `cpp-test-<name>` が `cpp-core` を consume し、CTest が実行を所有する | `cmake --build "$ROOT/build/cpp/<profile>" --target cpp-tests`; `ctest --test-dir "$ROOT/build/cpp/<profile>"` |
 | experiments | `cpp-experiment-<name>` が `cpp-core` を consume し、build と run を分離する | `cmake --build "$ROOT/build/cpp/<profile>" --target cpp-experiments` |
@@ -45,10 +45,11 @@ owning repository に保持し、この project の test tree に複製しませ
 
 ## 禁止事項
 
-- `cpp/src/` は production translation unit の所有先です。header-only の `cpp-core` は
-  `cpp/include/` を中心に構成し、translation unit と artifact の選択は source/artifact
+- `src/` は production translation unit の所有先です。header-only の `cpp-core` は
+  `include/` を中心に構成し、translation unit と artifact の選択は source/artifact
   contract として設計記録へ残します。
 - in-source build を禁止します。`build/cpp/<profile>/` を使います。
+- root project から `cpp/CMakeLists.txt` へ forwarding する wrapper を禁止します。
 
 ## 2. 命名規則
 
@@ -62,10 +63,10 @@ owning repository に保持し、この project の test tree に複製しませ
 
 ## 3.5 Header-Only Rule
 
-- template 既定では C++ 実装を持ちません。派生 repo で C++ を追加する場合は `cpp/include/<project>/*.hpp` を既定にします。
+- template 既定では C++ 実装を持ちません。派生 repo で C++ を追加する場合は `include/<project>/*.hpp` を既定にします。
 - focused helper、policy class、FFI binding helper、shape/stride 変換、artifact loader helper は header-only にします。
-- `cpp/src/` に `.cc` / `.cpp` を置くのは、compile time、link time、ODR、外部 library 事情で header-only が不適切だと説明できる場合だけにします。
-- `cpp/src/` を使うときは、なぜ header-only では駄目かを設計文書か change note に残さなければなりません。
+- `src/` に `.cc` / `.cpp` を置くのは、compile time、link time、ODR、外部 library 事情で header-only が不適切だと説明できる場合だけにします。
+- `src/` を使うときは、なぜ header-only では駄目かを設計文書か change note に残さなければなりません。
 
 ## 4. コメント
 
@@ -95,10 +96,13 @@ design fact を再定義しません。
 
 ```bash
 python3 tools/agent_tools/check_hardcoded_numbers.py \
-  cpp/include cpp/src tests/cpp cpp/experiments \
+  include src tests/cpp experiments/cpp \
   --exclude vendor \
   --exclude reports
 ```
+
+存在しない optional path は checker の入力から除外して構いません。legacy `cpp/` path を
+fallback として追加してはいけません。
 
 ## 5. テスト
 
@@ -110,4 +114,4 @@ python3 tools/agent_tools/check_hardcoded_numbers.py \
 
 - 再利用する local install tree は `.state/cpp-install/<profile>/` に置きます。
 - optional な local `jax.export` artifact は project-local `.state/<project>/jax-export/<profile>/` のように用途名を含む path に置きます。
-- `docker/Dockerfile`、`pyproject.toml` の selected extras、`cpp/CMakeLists.txt`、`cpp/cmake/`、optional `jax/jaxlib` version、calling convention が変わったら、必要な extras を選択した container boundary で `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>"` から rebuild します。
+- `docker/Dockerfile`、`pyproject.toml` の selected extras、root `CMakeLists.txt`、`cmake/`、optional `jax/jaxlib` version、calling convention が変わったら、必要な extras を選択した container boundary で `cmake -S "$ROOT" -B "$ROOT/build/cpp/<profile>"` から rebuild します。
