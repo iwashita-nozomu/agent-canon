@@ -2,7 +2,7 @@
 name: research-workflow
 description: "Use when a task needs external research, comparison design, iterative implementation and runs, and explicit review decisions before claims are accepted."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"0163a42667cf89250ae2de7dfbb6ebf808e4cff0b244f7c21ca55e5b27c79d2d"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"4b991c5117560b1dff2e8bdc314533dee29a457e4337d15732a69a9342558993"} -->
 
 <!--
 @dependency-start

@@ -2,7 +2,7 @@
 name: dependency-analysis
 description: "Use when checking, validating, or diagnosing repository dependency manifests, expanding code/header/search dependencies into a change-impact packet, or preparing repair-planning and subagent handoff context before editing, review, or closeout."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"1f3a735e4f286e8e4ac1bd671546d011ae7f70488bfe935141fca38c6aa7b6ca"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"77640662b7b571af5ec87825afdd0910721e6bf49ed08bf388511cb8c5c410ca"} -->
 
 <!--
 @dependency-start
