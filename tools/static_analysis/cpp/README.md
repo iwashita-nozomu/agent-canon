@@ -15,7 +15,7 @@ project-native build/test commands.
 Default command:
 
 ```bash
-python3 tools/oop/cpp/readability.py --format markdown cpp/include cpp/src cpp/tests cpp/experiments
+python3 tools/oop/cpp/readability.py --format markdown cpp/include cpp/src tests/cpp cpp/experiments
 ```
 
 Native projects use `cpp/CMakeLists.txt` as the source anchor and add configure,
