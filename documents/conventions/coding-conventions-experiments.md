@@ -10,7 +10,7 @@ upstream design ../experiments/gpu-admission-r5-source-packet.md exact managed G
 -->
 
 
-この文書は、parent `experiments/` の managed run と、`cpp/experiments/` の native
+この文書は、parent `experiments/` の managed run と、`experiments/cpp/` の native
 C++ experiment target を、build、run、result、report の責務に分けて扱います。
 研究の問い、数式、比較対象、逐次改造の記録方法は `agents/workflows/research-workflow.md` を正本とします。
 準備、実装、静的チェック、実行、結果レポートの標準手順は `agents/workflows/experiment-workflow.md` を参照してください。
@@ -36,13 +36,13 @@ C++ experiment target を、build、run、result、report の責務に分けて�
 ## 2. ディレクトリ構成
 
 - managed experiment entrypoint は `experiments/<topic>/` に置きます。
-- native C++ experiment source と target wiring は `cpp/experiments/` に置きます。
+- native C++ experiment source と target wiring は `experiments/cpp/` に置きます。
 - topic ごとに `README.md`、`run.py`、`cases.py`、`config.yaml`、`visualize.ipynb`、`result/` を基準にします。
 - `experiments/<topic>/README.md` は、その topic の実験内容、問い、比較対象、標準コマンド、設定正本、可視化 notebook、出力 schema、run_name 規則を持つ正本 entrypoint です。
 - 新規 topic は実験名を固定し、`python3 -m tools.experiments.create_experiment_topic <topic>` を実行します。create tool が `experiments/<topic>/` の scaffold、`README.md`、`provenance.toml`、registry entry を一括配置します。その後、`run.py` の `main::main`、`cases.py`、`config.yaml`、`visualize.ipynb`、`README.md` の順で編集します。
 - 可視化は `experiments/<topic>/visualize.ipynb` の Jupyter notebook に置きます。notebook は結果確認と図表化の入口であり、正式 run の起動、細かな test、設定正本の置き場にしません。
 - topic の正本 entrypoint と smoke / formal command は `experiments/registry.toml` に集約します。
-- native target の project entrypoint は `cpp/CMakeLists.txt`、aggregate target は
+- native target の project entrypoint は root `CMakeLists.txt`、aggregate target は
   `cpp-experiments`、individual target は `cpp-experiment-<name>` に固定します。
 - managed run は exact `experiments/registry.toml` を必須 source membership として
   freeze します。registry 欠落を optional 扱いせず、別名 registry や live source
