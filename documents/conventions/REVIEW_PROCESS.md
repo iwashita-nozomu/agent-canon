@@ -46,10 +46,10 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 - C / C++ 差分の review
   - `cpp-review`
 - C++ project layout / CMake command の差分
-  - `cpp/CMakeLists.txt` を project entrypoint とする target graph の readback
-  - `cpp/include`、`cpp/src`、`tests/cpp`、`cpp/experiments` の owner readback。production
-    subtree に test compatibility path がないことを確認
-  - parent-root anchor `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>"` の command review
+  - root `CMakeLists.txt` を project entrypoint とする target graph の readback
+  - root `include/`、`src/`、`cmake/`、`tests/cpp/`、任意の `experiments/cpp/` の owner readback
+  - legacy `cpp/` production tree と forwarding wrapper がないことを確認
+  - root source anchor `cmake -S "$ROOT" -B "$ROOT/build/cpp/<profile>"` の command review
 - 大規模 refactor の review
   - `change-review`
   - `project_review`
@@ -86,7 +86,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
   - `python3 -m pytest tests/ -q --tb=short`
   - `python3 -m ruff check python tests --select D,E,F,I,UP --ignore E501`
 - C / C++ 差分を含む場合は、project-native configure / build / test evidence を追加します。
-  - CMake project なら `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`
+  - CMake project なら `cmake -S "$ROOT" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`
   - CMake project なら `cmake --build "$ROOT/build/cpp/<profile>" --parallel`
   - test target があれば `ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure`
   - install contract があれば `cmake --install "$ROOT/build/cpp/<profile>"`
