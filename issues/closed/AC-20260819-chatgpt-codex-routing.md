@@ -15,7 +15,8 @@ downstream implementation ../../tests/agent_tools/test_chatgpt_codex_routing.py 
 # [Routing skill] ChatGPT会話完結とCodex実行の判定を単一の境界にする
 
 issue_id: AC-20260819-chatgpt-codex-routing
-status: in_progress
+status: resolved
+resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/779
 source: user
 severity: S2
 problem: ChatGPT で完結する request と Codex workspace execution を必要とする request の判定が repository-only orchestration に埋め込まれ、独立した単調 predicate、有限 reason code、typed handoff を持たない。

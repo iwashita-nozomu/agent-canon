@@ -10,13 +10,14 @@ upstream design ../../agents/skills/issue-finding-report.md canonical issue-prod
 # [障害エスカレーション] AgentCanon起因問題をconsumer内で回避せず上流Issue化する
 
 issue_id: AC-20260819-agentcanon-defect-upstream-escalation
-status: in_progress
+status: resolved
+resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/786
 source: user
 severity: S2
 problem: 進行中のconsumer作業でAgentCanon起因の問題を確認しても、発生条件・発生箇所を固定して上流Issueへ送るadmission ruleとconsumer内回避実装の禁止境界がない。
 evidence: https://github.com/iwashita-nozomu/agent-canon/issues/784
 done: AgentCanon起因問題が再現条件とconfirmed occurrence locationを伴う上流Issueへ送られ、consumer Issueのscopeと終了条件を拡張せず、consumer内回避策を解決扱いしない。
-affected_surfaces: agents/skills/issue-finding-report.md, issues/open/AC-20260819-agentcanon-defect-upstream-escalation.md
+affected_surfaces: agents/skills/issue-finding-report.md, issues/closed/AC-20260819-agentcanon-defect-upstream-escalation.md
 edit_scope: owner-bounded
 required_action: canonical issue-production skillにdirect AgentCanon defect escalation packet、owner判定、upstream Issue作成、consumer scope分離、local workaround禁止を追加する。
 close_condition: canonical skillとdurable recordがPRでreview可能になり、current mainを取り込んだheadでrequired checksが成功する。
