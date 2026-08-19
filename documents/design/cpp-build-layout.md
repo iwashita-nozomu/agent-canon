@@ -76,15 +76,15 @@ write set）、`validation`（その判断を読み戻す検証）を記録す�
 | --- | --- | --- | --- | --- | --- |
 | `RDC-CXX` | `logical:documents/conventions/coding-conventions-cpp.md`: `1. 基本方針`, `3.5 Header-Only Rule`, `5. テスト`, `6. 再利用` | C++ layout/build source of truth → project root、header/source、reuse policy | `cpp/` を native source root とし、`cpp-core` の type selection は header-only/source/artifact contract で決める | `cpp/CMakeLists.txt`, `cpp/include/`, `cpp/src/`, `cpp-core` | C++ configure/build/install、header/install inventory、`D-TARGET-TYPE` claim check |
 | `RDC-PROJECT` | `logical:documents/conventions/coding-conventions-project.md`: `2. ディレクトリの考え方`, `4. 開発環境`, `4.6 Docker 更新時の扱い`, `4.7 Legacy Forwarder Migration Rule`, `5. テストとレビュー`, `6. 実験運用`, `9. Checker Contract Surface` | project convention → parent command and legacy-path migration | parent root は language-neutral、C++ project identity と profile cache は `cpp/` が所有し、旧入口から forward せず移行する | `CMakeLists.txt` removal、`README.md`, `QUICK_START.md`, `Makefile`, `docker/`, `P-*` | root wrapper count、stale `cmake -S .` scan、docs/command checks、responsibility scope |
-| `RDC-TEST-CONVENTION` | `logical:documents/conventions/coding-conventions-testing.md`: `2. 配置と分類`, `3. Unit Test Contract`, `4. 実行方法`, `5. 想定解と標準出力ログ` | test convention → individual executable/CTest ownership | test source は `cpp/tests`、各 executable は `cpp-core` を consume、CTest が execution owner、aggregate は build grouping のみ | `cpp/tests/CMakeLists.txt`, `cpp-test-<name>`, `cpp-tests`, `add_test` | configure graph target inventory、CTest list/run、individual-to-core link readback |
+| `RDC-TEST-CONVENTION` | `logical:documents/conventions/coding-conventions-testing.md`: `2. 配置と分類`, `3. Unit Test Contract`, `4. 実行方法`, `5. 想定解と標準出力ログ` | test convention → individual executable/CTest ownership | test source は `tests/cpp`、各 executable は `cpp-core` を consume、CTest が execution owner、aggregate は build grouping のみ | `tests/cpp/CMakeLists.txt`, `cpp-test-<name>`, `cpp-tests`, `add_test` | configure graph target inventory、CTest list/run、individual-to-core link readback |
 | `RDC-EXPERIMENT-CONVENTION` | `logical:documents/conventions/coding-conventions-experiments.md`: `2. ディレクトリ構成`, `3. 実行原則`, `3.1 設定 snapshot`, `3.2 Make target と実行入口`, `4. report と notes`, `5. branch 方針` | experiment convention → build/run/result separation | build は CMake target、run/config/result/evidence は既存 lifecycle、report、branch owner に分離する | `cpp/experiments/`, `cpp-experiment-<name>`, parent `experiments/` adapter/README | build-only no-run gate、managed run manifest、result root/evidence/retention readback |
 | `RDC-REVIEW-CONVENTION` | `logical:documents/conventions/REVIEW_PROCESS.md`: `変更前に固定すること`, `Review Family の選び方`, `実行チェック`, `Review Flow`, `エビデンス保存` | review policy → design completeness and implementation handoff | design-only pass は implementation evidence と未実行 check を分離し、C++/Docker/experiment profile を changed surface で選ぶ | review packet、`D-*`/`P-*` trace、next-phase write set | C++ review、profile matrix、docs/dependency checks、未実行項目の明示 |
 | `RDC-RUNTIME-SURFACES` | `logical:documents/runtime/SHARED_RUNTIME_SURFACES.md`: `Reader Map`, `Owner Classes`, `Manifest Contract`, `AgentCanon-Owned Symlink Views`, `Template-Owned Active Contracts`, `Project-Owned Durable State And Content`, `Documents Directory Ownership`, `Tests Directory Ownership`, `Editing Rule`, `Validation` | shared surface ownership → source/symlink/parent boundary | managed clone の AgentCanon source と parent の regular active contract を混同しない。`vendor/agent-canon` は clean pin/runtime projection、parent docs/CMake は parent-owned write set | clone `documents/design/cpp-build-layout.md`; parent `README.md`, `QUICK_START.md`, `docker/`, `cpp/*`; no root-view edit in this pass | `git status`/pin evidence、surface sync check when selected、positive ownership scan |
 | `RDC-RUNTIME-MATRIX` | `logical:documents/runtime/runtime-profiles-and-check-matrix.md`: `Profile Classes`, `Risk Classes`, `Validation Failure Response`, `Check Matrix`, `Closeout Rule` | runtime profile → validation route | C++、Docker、Experiment、AgentCanon docs/workflow の profile を activated surface として記録し、design-only では native execution を未実行とする | validation profile section、`D-VALIDATION`, parent projection gates | docs/dependency/structure claims、C++ profile commands、Docker/experiment checks in implementation phase |
 | `RDC-RULE` | `logical:documents/rule/README.md`: `読者の入口`, `所有境界` | document rule → location/language/canonical owner | design source は canonical `documents/design`、filename English、parent projection は owner surface を参照し二重 canon を作らない | this document、parent docs listed in `P-*` | docs checker、dependency header check、design index readback |
 | `RDC-DESIGN` | `logical:documents/design/README.md`: `現在の正本`, `追加の module 設計を置くとき`, `更新ルール`, `正本維持ルール` | design canon → source packet placement | この build layout は design canon の一つの replaceable unit。implementation source packet は次 phase に handoff する | `documents/design/cpp-build-layout.md` in managed clone | design docs check、dependency graph/claim check |
-| `RDC-STRUCTURE` | `logical:documents/structure/README.md`: `構成`; `logical:documents/structure/repo-structure-contract.toml`: `profile`, `required`, `forbidden`, `responsibility` records | structure contract → path ownership and positive readback | `cpp/CMakeLists.txt` が唯一の CMake source root、native ownership は `cpp/*`、parent root wrapper は 0 の target state | `D-PARENT-MIGRATION`, `cpp/*`, root cleanup, responsibility projection | `repo_structure_contract.py`, `responsibility_scope.py`, source-root inventory, `root_wrapper_count=0` |
-| `RDC-RESPONSIBILITY` | `parent:responsibility-scope.toml`: `scope` records for root project, `cpp`, `docker`, `experiments`, `vendor/agent-canon` | parent responsibility projection → owner routing | C++ native scope moves to `cpp/*`; Docker/experiments/docs remain their owning parent scopes; AgentCanon source remains managed clone | next-phase `parent:responsibility-scope.toml` update/readback, not changed now | `responsibility_scope.py --root .`, overlap/coverage report |
+| `RDC-STRUCTURE` | `logical:documents/structure/README.md`: `構成`; `logical:documents/structure/repo-structure-contract.toml`: `profile`, `required`, `forbidden`, `responsibility` records | structure contract → path ownership and positive readback | `cpp/CMakeLists.txt` が唯一の CMake source root、production/native ownership は `cpp/*`、project-specific tests は `tests/cpp/*`、parent root wrapper は 0 の target state | `D-PARENT-MIGRATION`, `cpp/*`, `tests/cpp/*`, root cleanup, responsibility projection | `repo_structure_contract.py`, `responsibility_scope.py`, source-root inventory, `root_wrapper_count=0` |
+| `RDC-RESPONSIBILITY` | `parent:responsibility-scope.toml`: `scope` records for root project, `cpp`, `docker`, `experiments`, `vendor/agent-canon` | parent responsibility projection → owner routing | C++ production/native scope moves to `cpp/*`; project-specific tests remain in `tests/cpp/*`; Docker/experiments/docs remain their owning parent scopes; AgentCanon source remains managed clone | next-phase `parent:responsibility-scope.toml` update/readback, not changed now | `responsibility_scope.py --root .`, overlap/coverage report |
 
 ### Canonical experiment、container、skill、workflow
 
@@ -97,7 +97,7 @@ write set）、`validation`（その判断を読み戻す検証）を記録す�
 | `RDC-RESULT-PERSISTENCE` | `logical:agents/skills/experiment-lifecycle.md`: `Canonical ownership`, `Lifecycle`; `logical:agents/skills/result-artifact-writeout.md`: `Contract`, `Reports and publication` | lifecycle/writeout owners → explicit annex retention | C++ target never archives directly; lifecycle owns run identity and explicit retention decisions while writeout owns concrete artifact identity/checksum/no-overwrite readback | `experiments/<topic>/result/<variant>/<run_name>/`, `save_experiment_result_annex.py` | lifecycle terminal-status/retention evidence and artifact manifest/checksum/readback |
 | `RDC-ARTIFACT-WRITEOUT` | `logical:agents/skills/result-artifact-writeout.md`: `Output Contract`, `Destination Rules`, `Required Shape`, `Closeout Tokens` | artifact writer → evidence shape | native result output is written below lifecycle-selected run directory and is not a build-tree artifact | runner result arguments and artifact manifest | result-artifact checker/manifest shape |
 | `RDC-EXPERIMENT-REVIEW` | `logical:agents/skills/experiment-review.md`: `Review Checklist`, `Findings Policy` | experiment review → executable/config/result review | review checks target source, registry adapter, config, evidence, and report as one trace without changing experiment protocol in design pass | `P-EXPERIMENT-*`, native source packet | experiment review findings and managed run evidence |
-| `RDC-CPP-REVIEW` | `logical:agents/skills/cpp-review.md`: `Use When`, `Required Checks`, `Core References`, `Expected Outcome`, `Mandatory Checklist` | C++ reviewer → native build/header/CTest evidence | project-native configure/build/test is implementation-phase evidence; this design phase records the route and does not claim execution | `cpp/CMakeLists.txt`, `cpp/include`, `cpp/tests`, target graph | configure/build/CTest, header/link/ownership review; `not_run` until implementation |
+| `RDC-CPP-REVIEW` | `logical:agents/skills/cpp-review.md`: `Use When`, `Required Checks`, `Core References`, `Expected Outcome`, `Mandatory Checklist` | C++ reviewer → native build/header/CTest evidence | project-native configure/build/test is implementation-phase evidence; this design phase records the route and does not claim execution | `cpp/CMakeLists.txt`, `cpp/include`, `tests/cpp`, target graph | configure/build/CTest, header/link/ownership review; `not_run` until implementation |
 | `RDC-REFACTOR-LOOP` | `logical:agents/skills/refactor-loop.md`: `Reader Map`, `Required Contract`, `Canonicalization-First Refactors`, `Dependency-Guided Repair Slice Loop`, `Refactor Orchestration Plan`, `Review Emphasis` | refactor skill → path mapping and behavior-preserving waves | preserve behavior/API/protocol; materialize dependency-expanded path map before W1; W0 design is the only write wave now | `D-*`, `P-*`, W0-W4 plan | dependency review, design claim check, wave-specific profile gates |
 | `RDC-STRUCTURE-SKILL` | `logical:agents/skills/structure-planning.md`: `Reader Map`, `Structure Contract`, `Default Sequence`, `Closeout Tokens` | structure skill → design document shape | table/record-first structure maps ownership, paths, transitions, and invalid interpretations; no prose-only closure claim | this document's structure contract and closure ledger | docs/structure closeout tokens |
 | `RDC-DEPENDENCY-SKILL` | `logical:agents/skills/dependency-analysis.md`: `Reader Map`, `Required Commands`, `Change Impact Packet`, `Interpretation` | dependency skill → edge/claim completeness | source packet records upstream/downstream edges and separates fresh graph evidence from stale/blocked graph evidence | closure ledger, dependency headers, design claim records | strict dependency review and design claim checker |
@@ -119,7 +119,7 @@ write set）、`validation`（その判断を読み戻す検証）を記録す�
 | `RDC-PARENT-QUICK` | `parent:QUICK_START.md`: `よく使うコマンド`, `実験の基本`, `環境の基本`, `終了時の整理` | quick-start → build/test/run/save sequence | expose configure/build/install/CTest, separate experiment build/run, and result save owner | `P-QUICK-START` | docs/command trace; no `cmake -S .` |
 | `RDC-PARENT-DOCKER` | `parent:docker/README.md`: `Primary Files`, `Runtime Pack`, `Standard Commands`, `Update Rule`; `parent:docker/check_build.sh`: pack parse/smoke command path; `parent:docker/packs/default.toml`: `[smoke].commands` | container pack → C++ smoke | container invokes parent anchor and consumes same profile output contract; Docker owns image/smoke, not native source | `P-DOCKER-README`, `P-DOCKER-CHECK`, `P-DOCKER-PACK` | Docker dependency validator, pack print/smoke, CMake/CTest smoke |
 | `RDC-PARENT-MAKE` | `parent:Makefile`: `check-matrix`, `docs-check`, `experiment-check`, `docker-build-check`, help/command target blocks | make wrapper → command projection | wrappers delegate to canonical CMake/lifecycle commands and do not create a second CMake project | `P-MAKE` | make dry-run/target smoke, command inventory |
-| `RDC-PARENT-SCOPE` | `parent:responsibility-scope.toml`: root/project, C++, Docker, experiments, AgentCanon `scope` records | scope registry → ownership/readback | native source owner is `cpp/*`; root docs/Docker/experiment result owners remain distinct; AgentCanon source is clone-owned | `P-RESPONSIBILITY-SCOPE` (next phase) | `responsibility_scope.py --root .`, ownership coverage/no overlap |
+| `RDC-PARENT-SCOPE` | `parent:responsibility-scope.toml`: root/project, C++, Docker, experiments, AgentCanon `scope` records | scope registry → ownership/readback | production/native source owner is `cpp/*`, project-specific C++ test owner is `tests/cpp/*`; root docs/Docker/experiment result owners remain distinct; AgentCanon source is clone-owned | `P-RESPONSIBILITY-SCOPE` (next phase) | `responsibility_scope.py --root .`, ownership coverage/no overlap |
 | `RDC-PARENT-CI` | `parent:.github/workflows/docker-build.yml`: path filters and Docker pack steps | CI projection → updated Docker smoke owner | CI keeps pack entry and inherits the updated script-owned CMake source root | `P-DOCKER-CI` | GitHub workflow checker and pack run |
 | `RDC-PARENT-DOC-INDEX` | `parent:documents/README.md`: design/convention navigation if present | document index → canonical design reader | link to the AgentCanon design source without copying shared canon into parent documents | next-phase docs projection if index requires change | docs/link/dependency checks |
 
@@ -189,15 +189,26 @@ parent:README.md=present
 | record | target state | owner |
 | --- | --- | --- |
 | `project_root` | `<parent>/cpp/` が唯一の C++ CMake project root になり、`project(<project> LANGUAGES CXX)` と共通 toolchain/compile feature を定義する | C++ build owner |
-| `entrypoint` | `<parent>/cpp/CMakeLists.txt` が `cpp/src`、`cpp/include`、`cpp/tests`、`cpp/experiments` を同じ configure graph に取り込む | C++ build owner |
+| `entrypoint` | `<parent>/cpp/CMakeLists.txt` が `cpp/src`、`cpp/include`、`tests/cpp`、`cpp/experiments` を同じ configure graph に取り込む。`tests/cpp` は source directory と binary directory を明示した out-of-tree `add_subdirectory` で登録する | C++ build owner |
 | `parent_root` | `<parent>/` は language-neutral な親入口として残り、C++ は `cpp` の explicit source directory を指定して起動する | parent project owner |
-| `test_project` | `cpp/tests` は親 project の test subdirectory として test executable と CTest registration を提供する | C++ test owner |
+| `test_project` | `<parent>/tests/cpp` は project-specific test source と CTest registration を所有し、`cpp/CMakeLists.txt` が `${ROOT}/tests/cpp` と `${ROOT}/build/cpp/<profile>/tests` を指定して同一 graph に登録する | derived project test owner |
 | `experiment_project` | `cpp/experiments` は親 project の experiment subdirectory として native executable/benchmark target と output contract を提供する | C++ experiment owner |
 | `shared_library` | production target は `cpp/include` の public header と `cpp/src` の implementation を一つの reusable target に束ね、tests/experiments はその target を link する | production owner |
 | `runtime_profiles` | `dev`、`docker-smoke`、および必要な compatibility profile は同じ `cmake -S cpp -B build/cpp/<profile>` 形式で再現する | runtime/build owner |
 
-この状態への移行により、tests と experiments は同一 configure、同一 compiler
-feature、同一 include/dependency target、同一 build cache を共有します。
+この状態により、project-specific tests と experiments は同一 configure graph、同一
+compiler feature、同一 include/dependency target、同一 build cache を共有します。
+test source は C++ production subtree (`cpp/src`, `cpp/include`) と分離され、AgentCanon
+自身の runtime/template test や cppdev の数値・数学・NN oracle test をこの repository に
+複製しません。
+
+### Test ownership decision record
+
+| operation | resulting state | completion evidence |
+| --- | --- | --- |
+| `cpp/CMakeLists.txt` から `${ROOT}/tests/cpp` を explicit binary directory 付き out-of-tree `add_subdirectory` で登録する | project-specific C++ adapter/integration tests は `tests/cpp` にのみ置かれ、production subtree に test compatibility path を作らない | CMake configure の source/binary directory readback と stale in-`cpp` test-path scan |
+| AgentCanon runtime/template tests と cppdev の numerical/mathematical/NN oracle tests の owner を各 repository に固定する | AgentCanon template は runtime tests を AgentCanon source tree の `tests/` に保持し、derived project は `tests/cpp` に必要な adapter/integration tests だけを持つ | dependency/ownership review に duplicate test inventory がなく、各 owner repository の test command が記録される |
+| test review/readability/routing markers を `tests/cpp` に投影する | `cpp_reviewer`、C++ readability、C++ runtime profile は `tests/cpp` を認識し、Python test route が C++ tests を誤って所有しない | `language_review_candidates` と route/checker focused tests、profile/readability command readback |
 
 ## Source、directory、owner
 
@@ -205,8 +216,8 @@ feature、同一 include/dependency target、同一 build cache を共有しま�
 | --- | --- | --- | --- |
 | `cpp/CMakeLists.txt` | project identity、C++ standard、global options、subdirectory order、install/export policy | C++ build owner | all C++ targets |
 | `cpp/src/` | production implementation、private translation unit、library source | production owner | `cpp` library target |
-| `cpp/include/` | public header、include namespace、ABI/API surface | header/API owner | production、tests、experiments、install |
-| `cpp/tests/` | test source、test target、CTest registration、test fixture wiring | test owner | `cpp-tests` aggregate |
+| `cpp/include/` | public header、include namespace、ABI/API surface | header/API owner | production、tests/cpp、experiments、install |
+| `tests/cpp/` | derived/project-specific test source、test target、CTest registration、test fixture wiring。AgentCanon runtime/template test と cppdev 数値・数学・NN oracle test は各 owner repository に置く | derived project test owner | `cpp-tests` aggregate |
 | `cpp/experiments/` | native experiment/benchmark source、target-specific runner、experiment output wiring | experiment owner | `cpp-experiments` aggregate |
 | `cpp/cmake/` | project-local Find/module/helper logic when the root file needs a reusable boundary | C++ build owner | `cpp/CMakeLists.txt` and subdirectories |
 | `build/cpp/<profile>/` | generated configure/build tree、compile database、test discovery、native binaries | CMake generator | developer/CI |
@@ -244,6 +255,31 @@ cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROO
 | install | `cmake --install "$ROOT/build/cpp/<profile>"` | 同じ configure cache の `.state/cpp-install/<profile>/` を更新する | public headers と production artifacts が install contract に従う |
 | experiment run | `"$ROOT/build/cpp/<profile>/bin/cpp-experiment-<name>" --run-name "$RUN_NAME" --config "$CONFIG" --result-root "$RESULT_ROOT"` | build 済み individual executable を lifecycle-owned result root へ実行する (`D-EXPERIMENT-LIFECYCLE`) | build と run が分離され、run evidence が `result/<variant>/<run_name>/` に残る |
 
+### Out-of-tree project-test registration
+
+`tests/cpp` は `cpp/` の production source subtree ではなく、derived project が所有する
+adapter/integration test source です。したがって `cpp/CMakeLists.txt` は source directory
+と binary directory を明示して登録します。
+
+```cmake
+get_filename_component(PROJECT_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." REALPATH)
+set(PROJECT_TEST_SOURCE_DIR "${PROJECT_ROOT}/tests/cpp")
+set(PROJECT_TEST_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/tests/cpp")
+if(EXISTS "${PROJECT_TEST_SOURCE_DIR}/CMakeLists.txt")
+  add_subdirectory(
+    "${PROJECT_TEST_SOURCE_DIR}"
+    "${PROJECT_TEST_BINARY_DIR}"
+  )
+endif()
+```
+
+`PROJECT_ROOT` は parent repository root を指す project-owned value とし、
+`CMAKE_CURRENT_LIST_DIR` から一意に解決します。相対一引数の
+`add_subdirectory(tests/cpp)`、in-`cpp` fallback、または in-source binary directory は
+許可しません。AgentCanon の runtime/template test は AgentCanon の `tests/` に、cppdev
+の numerical/mathematical/NN oracle test は cppdev に残し、derived project の
+`tests/cpp` へコピーしません。
+
 ### Target graph
 
 ```mermaid
@@ -265,10 +301,10 @@ Visualization selection: `context_question=exact consumer/provider ownership of 
 | inventory record | target-state definition | readback owner |
 | --- | --- | --- |
 | parent root project | parent root has no `CMakeLists.txt`, `project()`, or C++ wrapper definition | `D-PARENT-MIGRATION`, `P-ROOT-CMAKE-REMOVAL` |
-| native project entry | `cpp/CMakeLists.txt` is the single file containing the native `project()` entry and owns `cpp/src`, `cpp/include`, `cpp/tests`, and `cpp/experiments` | `D-PROJECT-ROOT` |
-| nested manifests | `cpp/tests/CMakeLists.txt` and `cpp/experiments/CMakeLists.txt` are permitted only as `add_subdirectory` manifests of the same project; they contain no `project()` and do not create a project root | `D-TEST-GRAPH`, `D-EXPERIMENT-GRAPH` |
-| CMake source-root inventory | project-entry inventory is exactly `{cpp/CMakeLists.txt}`; manifest inventory may additionally contain the two nested paths when their source/manifest exists | `D-PARENT-MIGRATION` |
-| native ownership inventory | every native `*.c`, `*.cc`, `*.cpp`, `*.cxx`, `*.h`, `*.hh`, `*.hpp`, `*.hxx` is under `cpp/*`; generated/vendor/workspace state is excluded from this ownership scan | `D-SOURCE-BOUNDARIES` |
+| native project entry | `cpp/CMakeLists.txt` is the single file containing the native `project()` entry and owns `cpp/src`, `cpp/include`, `tests/cpp`, and `cpp/experiments` | `D-PROJECT-ROOT` |
+| out-of-tree test manifest | `tests/cpp/CMakeLists.txt` is registered from `cpp/CMakeLists.txt` with explicit source and binary directories; it contains no `project()` and does not create a second project root | `D-TEST-GRAPH` |
+| CMake source-root inventory | project-entry inventory is exactly `{cpp/CMakeLists.txt}`; test/experiment manifests may additionally exist at `tests/cpp/CMakeLists.txt` and `cpp/experiments/CMakeLists.txt` | `D-PARENT-MIGRATION` |
+| native ownership inventory | production native `*.c`, `*.cc`, `*.cpp`, `*.cxx`, `*.h`, `*.hh`, `*.hpp`, `*.hxx` is under `cpp/*`; project-specific test source is under `tests/cpp/*`; generated/vendor/workspace state is excluded from this ownership scan | `D-SOURCE-BOUNDARIES` |
 | wrapper inventory | `root_wrapper_count=0`; parent commands invoke the `cpp` anchor directly or use a command wrapper that delegates to it without adding a CMake project | `D-COMMANDS`, `D-PARENT-MIGRATION` |
 
 Deterministic target-state readback:
@@ -281,14 +317,14 @@ printf "%s\n" "$project_entry_files" | sed "/^$/d" | sed "s#^#project_entry=#"
 root_cmake_files="$(find "$ROOT" -maxdepth 1 -type f -name CMakeLists.txt | sort)"
 printf "root_cmake_file_count=%s\n" "$(printf "%s\n" "$root_cmake_files" | sed "/^$/d" | wc -l | tr -d " ")"
 printf "root_wrapper_count=%s\n" "$(printf "%s\n" "$root_cmake_files" | sed "/^$/d" | wc -l | tr -d " ")"
-nested_project_entries="$(find "$ROOT/cpp/tests" "$ROOT/cpp/experiments" -type f -name CMakeLists.txt -exec grep -lE "^[[:space:]]*project[[:space:]]*\(" {} + 2>/dev/null | sort)"
+nested_project_entries="$(find "$ROOT/tests/cpp" "$ROOT/cpp/experiments" -type f -name CMakeLists.txt -exec grep -lE "^[[:space:]]*project[[:space:]]*\(" {} + 2>/dev/null | sort)"
 printf "nested_project_entry_count=%s\n" "$(printf "%s\n" "$nested_project_entries" | sed "/^$/d" | wc -l | tr -d " ")"
 printf "%s\n" "$nested_project_entries" | sed "/^$/d" | sed "s#^#nested_project_entry=#"
 printf "cmake_manifest_files:\n"
-find "$ROOT/cpp" -type f -name CMakeLists.txt 2>/dev/null | sort
-native_outside_cpp="$(find "$ROOT" -type f \( -name "*.c" -o -name "*.cc" -o -name "*.cpp" -o -name "*.cxx" -o -name "*.h" -o -name "*.hh" -o -name "*.hpp" -o -name "*.hxx" \) -not -path "$ROOT/cpp/*" -not -path "$ROOT/vendor/*" -not -path "$ROOT/build/*" -not -path "$ROOT/.state/*" -not -path "$ROOT/workspace/*" -not -path "$ROOT/.git/*" | sort)"
-printf "native_outside_cpp_count=%s\n" "$(printf "%s\n" "$native_outside_cpp" | sed "/^$/d" | wc -l | tr -d " ")"
-printf "%s\n" "$native_outside_cpp" | sed "/^$/d" | sed "s#^#native_outside_cpp=#"
+find "$ROOT/cpp" "$ROOT/tests/cpp" -type f -name CMakeLists.txt 2>/dev/null | sort
+native_outside_owners="$(find "$ROOT" -type f \( -name "*.c" -o -name "*.cc" -o -name "*.cpp" -o -name "*.cxx" -o -name "*.h" -o -name "*.hh" -o -name "*.hpp" -o -name "*.hxx" \) -not -path "$ROOT/cpp/*" -not -path "$ROOT/tests/cpp/*" -not -path "$ROOT/vendor/*" -not -path "$ROOT/build/*" -not -path "$ROOT/.state/*" -not -path "$ROOT/workspace/*" -not -path "$ROOT/.git/*" | sort)"
+printf "native_outside_owners_count=%s\n" "$(printf "%s\n" "$native_outside_owners" | sed "/^$/d" | wc -l | tr -d " ")"
+printf "%s\n" "$native_outside_owners" | sed "/^$/d" | sed "s#^#native_outside_owners=#"
 ```
 
 Target-state expected output:
@@ -301,10 +337,10 @@ root_wrapper_count=0
 nested_project_entry_count=0
 cmake_manifest_files:
 /workspace/project_template/cpp/CMakeLists.txt
-native_outside_cpp_count=0
+native_outside_owners_count=0
 ```
 
-The two nested manifest paths appear below `cmake_manifest_files:` only when their corresponding source/manifest exists; they never change the project-entry count. A nonzero root wrapper count or any native ownership output returns to `D-PARENT-MIGRATION` before implementation continues.
+The test and experiment manifest paths appear below `cmake_manifest_files:` only when their corresponding source/manifest exists; they never change the project-entry count. A nonzero root wrapper count, an in-`cpp` test path, or native ownership output outside `cpp/*` and `tests/cpp/*` returns to `D-PARENT-MIGRATION` before implementation continues.
 
 The graph is materialized only when the corresponding individual source or
 manifest exists. CTest registration is attached to each `cpp-test-<name>` node;
@@ -319,9 +355,9 @@ providers in this target-edge view.
 | `cpp/src/` に translation unit があり、installable/reusable library artifact が必要 | `STATIC` library | default production choice。`cpp-core` を compile/link artifact として生成し、install/export 対象にする |
 | `cpp/src/` に translation unit があり、object aggregation が product contract で明示され、standalone library artifact が不要 | `OBJECT` library | `cpp-core` object target を生成し、individual test/experiment executable が `cpp-core` target interface を link する |
 | `cpp/src/` に translation unit があり、shared ABI/runtime が product contract で明示される | `SHARED` library | explicit ABI decision、visibility、install/export contract と併せて `cpp-core` を生成する |
-| `cpp/src/`、`cpp/include/`、`cpp/tests/`、`cpp/experiments/` の全てに C++ source/target manifest がない | `INTERFACE` `cpp-core` は project default として生成 | header-only/template の configure graph を安定させ、individual test/experiment と aggregate は生成しない |
+| `cpp/src/`、`cpp/include/`、`tests/cpp/`、`cpp/experiments/` の全てに C++ source/target manifest がない | `INTERFACE` `cpp-core` は project default として生成 | header-only/template の configure graph を安定させ、individual test/experiment と aggregate は生成しない |
 
-`cpp/tests` は individual test source/manifest がある場合に configure graph に
+`tests/cpp` は individual test source/manifest がある場合に configure graph に
 入り (`D-TEST-GRAPH`)、各 `cpp-test-<name>` executable は
 `target_link_libraries(cpp-test-<name> PRIVATE cpp-core ...)` で `cpp-core` に
 接続します (`D-TEST-GRAPH`)。各 executable は
@@ -462,16 +498,20 @@ resolved.
 
 | surface | source owner | generated/projection role | transition record |
 | --- | --- | --- | --- |
-| `cpp/include/`, `cpp/src/`, `cpp/tests/`, `cpp/experiments/` | derived parent project | checked-in source | create the native project tree and move each source unit to its matching owner |
-| root `include/`, `src/`, `tests/cpp/` | current parent C++ surface | migration input | move source ownership into `cpp/` and update consumers in the same migration pass |
+| `cpp/include/`, `cpp/src/`, `cpp/experiments/` | derived parent project | checked-in production/native source | create the native project tree and place each production/native source unit under its matching owner |
+| `tests/cpp/` | derived parent project | checked-in project-specific adapter/integration tests | retain this path and register it out-of-tree from `cpp/CMakeLists.txt`; do not move it under `cpp/` |
+| root `include/`, `src/` | current parent C++ production surface | migration input | move production source ownership into `cpp/` and update consumers in the same migration pass |
 | root `cmake/` | current parent helper surface | migration input | move helpers used by the C++ project to `cpp/cmake/`; retain shared non-C++ helpers under their own owner |
 | root `CMakeLists.txt` | current parent C++ entrypoint | migration input | translate project settings/targets into `cpp/CMakeLists.txt`, then leave the parent root language-neutral |
 | root `experiments/` | derived project experiment system | Python managed runs/reports | keep the registry and managed runner route; native targets use `cpp/experiments/` |
 | `vendor/agent-canon`, `AGENTS.md`, `.codex/config.toml`, `tools/agent-canon` | AgentCanon | source checkout plus the three active parent views | preserve AgentCanon ownership; C++ migration does not edit or replace these surfaces; parent `agents/`, `.agents/`, `.codex/`, and other runtime directories remain parent-owned |
 | `build/`, `.state/` | generator/runner | generated state | create by commands, not as source inputs or source projections |
 
-The C++ source tree is a real source boundary under `cpp/`; source files and
-headers are not made canonical through symlinks to legacy root directories.
+The production C++ source tree is a real source boundary under `cpp/`; production
+source files and headers are not made canonical through symlinks to legacy root
+directories. Project-specific C++ tests remain a separate `tests/cpp/` source
+boundary and are registered out-of-tree; they are not made canonical through a
+path under `cpp/`.
 The three active AgentCanon views retain their existing symlink ownership and
 remain outside the C++ project graph. Other parent runtime directories and
 regular content are not AgentCanon projections.
@@ -492,7 +532,7 @@ passes. A partial individual-file update remains an open migration slice.
 | `cmake/` | `cpp/cmake/` or an explicitly named non-C++ owner | C++ build owner | configure with each helper consumer |
 | `include/` | `cpp/include/` | header/API owner | production compile + install tree inspection |
 | `src/` | `cpp/src/` | production owner | production target build |
-| `tests/cpp/` | `cpp/tests/` | test owner | `ctest --test-dir build/cpp/dev --output-on-failure` |
+| `tests/cpp/` | `tests/cpp/` | derived project test owner | `ctest --test-dir build/cpp/dev --output-on-failure` |
 | native benchmark/experiment sources introduced at parent root | `cpp/experiments/` | experiment owner | `cmake --build build/cpp/dev --target cpp-experiments` |
 | root `Makefile` C++ entrypoints (when added) | wrapper commands using `-S cpp` and `build/cpp/<profile>` | parent command owner | Make target dry-run/smoke |
 | `QUICK_START.md` and `README.md` C++ commands | `cmake -S cpp -B build/cpp/<profile>` command records | parent docs owner | docs check + command path review |
@@ -512,7 +552,7 @@ Every exact downstream file in this table is a parent namespace record, written 
 
 | trace id (`P-TRACE`) | exact downstream file | write set / target transition | forward design id | reverse readback |
 | --- | --- | --- | --- | --- |
-| `P-CXX-CONVENTIONS` | `parent:vendor/agent-canon/documents/conventions/coding-conventions-cpp.md` | replace root CMake/source paths and commands with `cpp/CMakeLists.txt`, `cpp/include`, `cpp/src`, target graph, and anchor command | `D-PROJECT-ROOT`, `D-SOURCE-OWNERS`, `D-COMMANDS` | convention text names `cmake -S "$ROOT/cpp"` and `cpp/*` ownership |
+| `P-CXX-CONVENTIONS` | `parent:vendor/agent-canon/documents/conventions/coding-conventions-cpp.md` | replace root CMake/source paths and commands with `cpp/CMakeLists.txt`, `cpp/include`, `cpp/src`, `tests/cpp`, target graph, and anchor command | `D-PROJECT-ROOT`, `D-SOURCE-OWNERS`, `D-COMMANDS` | convention text names `cmake -S "$ROOT/cpp"`, production `cpp/*` ownership, and project-test `tests/cpp/*` ownership |
 | `P-PROJECT-CONVENTIONS` | `parent:vendor/agent-canon/documents/conventions/coding-conventions-project.md` | update project-level C++ entrypoint, language-neutral parent root, profile paths, and downstream command owner | `D-PARENT-MIGRATION`, `D-GENERATED-PATHS` | project convention points to `cpp/CMakeLists.txt` and same-cache install |
 | `P-CMAKE-README` | `parent:cmake/README.md` | describe the migrated helper owner or retire the C++ root README together with root CMake removal | `D-SOURCE-BOUNDARIES`, `D-PARENT-MIGRATION` | no stale root CMake canonical-entry claim |
 | `P-SRC-README` | `parent:src/README.md` | move/replace source guidance with `cpp/src/` ownership and the production target trace | `D-SOURCE-OWNERS`, `D-SOURCE-BOUNDARIES` | source README maps every native source unit to `cpp/src/` |
@@ -526,7 +566,7 @@ Every exact downstream file in this table is a parent namespace record, written 
 | `P-EXPERIMENT-REGISTRY` | `parent:experiments/registry.toml` | register native topic/adaptor, config placeholder, result root, formal command, and evidence artifacts | `D-EXPERIMENT-LIFECYCLE`, `D-EXPERIMENT-GRAPH` | registry points to the native lifecycle adapter and `result/<variant>/<run_name>` |
 | `P-EXPERIMENT-ADAPTER` | `parent:experiments/<topic>/run.py` | invoke built `cpp-experiment-<topic>` with managed `run_name`, config snapshot, result root, and lifecycle evidence | `D-EXPERIMENT-LIFECYCLE`, `D-EXPERIMENT-GRAPH` | adapter command and `source_snapshot` point to the same native executable |
 | `P-EXPERIMENT-README` | `parent:experiments/<topic>/README.md` | document question, config source, build command, formal run command, result schema, run_name, and report route | `D-EXPERIMENT-LIFECYCLE` | README traces every run artifact and save-results route |
-| `P-RESPONSIBILITY-SCOPE` | `parent:responsibility-scope.toml` | project the native owner transition from root CMake/src/include/tests to `cpp/*`, while retaining parent Docker/docs/result and AgentCanon clone scopes | `D-SOURCE-BOUNDARIES`, `D-PARENT-MIGRATION` | `responsibility_scope.py --root .` reports `cpp/*` coverage without owner overlap |
+| `P-RESPONSIBILITY-SCOPE` | `parent:responsibility-scope.toml` | project the production/native owner transition from root CMake/src/include to `cpp/*`, retain `tests/cpp/*` as the project-test owner, and retain parent Docker/docs/result and AgentCanon clone scopes | `D-SOURCE-BOUNDARIES`, `D-PARENT-MIGRATION` | `responsibility_scope.py --root .` reports `cpp/*` and `tests/cpp/*` coverage without owner overlap |
 | `P-PARENT-DOC-INDEX` | `parent:documents/README.md` when its navigation references the C++ design | point the parent reader to the canonical design source and keep shared AgentCanon policy under `parent:vendor/agent-canon` | `D-RELATED-DOCUMENT-CLOSURE` | docs/link/dependency readback has one design canon and no copied shared policy |
 | `P-ROOT-CMAKE-REMOVAL` | `parent:CMakeLists.txt` | remove the parent root CMake entrypoint after `cpp/CMakeLists.txt` and all downstream projections pass | `D-PARENT-MIGRATION`, `D-SOURCE-BOUNDARIES` | `root_wrapper_count=0`; project-entry inventory contains only `cpp/CMakeLists.txt` |
 
@@ -558,7 +598,7 @@ the projection section and an exact reverse edge from that projection to its evi
 | `documents/runtime/runtime-profiles-and-check-matrix.json` | `D-VALIDATION`, `D-COMMANDS`, `D-TEST-GRAPH`, `D-EXPERIMENT-LIFECYCLE` → JSON pointers `/profiles[6]/activates`, `/check_matrix[8]/required_check` | machine profile/check matrix → `check_runtime_profile_inventory.py`, rendered-doc check, `RDC-RUNTIME-MATRIX` |
 | `documents/runtime/runtime-profiles-and-check-matrix.md` | `D-VALIDATION` → `#Profile Classes` C++ row, `#Check Matrix` C/C++ row | generated reader projection → `render_runtime_profile_inventory.py --check`, JSON mirror, `RDC-RUNTIME-MATRIX` |
 | `documents/structure/repo-structure-contract.toml` | `D-PARENT-MIGRATION`, `D-SOURCE-BOUNDARIES` → `profile.id=template_or_derived_repo` `allowed_top_level`, `profile.optional[path=cpp]` | positive top-level/path ownership → `repo_structure_contract.py`, `responsibility_scope.py`, `RDC-STRUCTURE` |
-| `documents/tools/README.md` | `D-SOURCE-OWNERS`, `D-VALIDATION` → `#Tool Detail Notes` C++ OOP command block | `cpp/include cpp/src cpp/tests cpp/experiments` command → tool inventory/readability evidence, `RDC-CXX`, `RDC-RUNTIME-MATRIX` |
+| `documents/tools/README.md` | `D-SOURCE-OWNERS`, `D-VALIDATION` → `#Tool Detail Notes` C++ OOP command block | `cpp/include cpp/src tests/cpp cpp/experiments` command → tool inventory/readability evidence, `RDC-CXX`, `RDC-RUNTIME-MATRIX` |
 | `documents/tools/oop/cpp/readability.md` | `D-SOURCE-OWNERS`, `D-VALIDATION` → `#実行例` | C++ OOP scan paths and build-evidence boundary → readability command/readback, `RDC-CXX`, `RDC-RUNTIME-MATRIX` |
 | `tools/docs/render_runtime_profile_inventory.py` | `D-VALIDATION` → `DEPENDENCY_HEADER`, `render_validation_failure_response`, `bridge_inventory_to_markdown` | JSON-to-Markdown generator output → `render_runtime_profile_inventory.py --check`, `RDC-RUNTIME-MATRIX` |
 | `tools/static_analysis/cpp/README.md` | `D-PROJECT-ROOT`, `D-SOURCE-OWNERS`, `D-TEST-GRAPH`, `D-EXPERIMENT-GRAPH`, `D-VALIDATION` → `#Default command` and native project evidence paragraph | readability plus configure/build/CTest/install/target evidence → static-analysis readback, `RDC-CXX`, `RDC-RUNTIME-MATRIX` |
@@ -567,8 +607,8 @@ The review repair adds two route-owner rows without replacing any of the 19 base
 
 | exact repair path | forward: design/runtime clause → route owner section/ref | reverse: route owner section/ref → evidence/readback |
 | --- | --- | --- |
-| `tools/agent_tools/agent_team.py` | `D-VALIDATION`, `D-PROJECT-ROOT`, runtime C++ activation set → `CPP_PATH_MARKERS`, `language_review_candidates` | `language_review_candidates(..., ("cpp/tests/...",))` returns `cpp_reviewer` → route check and `RDC-RUNTIME-MATRIX` |
-| `agents/skills/catalog.yaml` | `D-VALIDATION` and public skill projection contract → `skill_families[id=cpp-review].routing.triggers` | `route.py --prompt "cpp/tests ..."` returns `cpp-review` → catalog/runtime alignment and `D-VALIDATION` |
+| `tools/agent_tools/agent_team.py` | `D-VALIDATION`, `D-PROJECT-ROOT`, runtime C++ activation set → `CPP_PATH_MARKERS`, `language_review_candidates` | `language_review_candidates(..., ("tests/cpp/...",))` returns `cpp_reviewer` → route check and `RDC-RUNTIME-MATRIX` |
+| `agents/skills/catalog.yaml` | `D-VALIDATION` and public skill projection contract → `skill_families[id=cpp-review].routing.triggers` | `route.py --prompt "tests/cpp ..."` returns `cpp-review` → catalog/runtime alignment and `D-VALIDATION` |
 
 The catalog route repair also refreshes these generated projections from the
 same source snapshot. Their closure records generated headers, source counts,
@@ -586,7 +626,7 @@ coverage/graph/JSON digests, and final Mermaid readback as one evidence chain.
 | `T0` baseline | current parent root surfaces and existing command references | path map, owner map, and current root `CMakeLists.txt` evidence are recorded | structure/dependency inventory |
 | `T1` project root | C++ source units and CMake settings | `cpp/CMakeLists.txt` can configure the complete native graph | CMake configure |
 | `T2` production target | `cpp/include`, `cpp/src` | reusable production target and install rules exist | build/install |
-| `T3` test subproject | `cpp/tests` | CTest targets consume the production target in the same graph | ctest |
+| `T3` test subproject | `tests/cpp` | CTest targets consume the production target in the same graph through explicit out-of-tree registration | ctest |
 | `T4` experiment subproject | `cpp/experiments` | experiment targets consume the production target and write declared outputs | experiment target smoke |
 | `T5` parent command projection | README, QUICK_START, Make, Docker, pack, CI references | every parent entry invokes `cmake -S cpp -B build/cpp/<profile>` | docs/command/workflow checks |
 | `T6` root language-neutral state | migrated native sources and updated consumers | parent root no longer owns a C++ entrypoint; `cpp` is the native project boundary (`D-PARENT-MIGRATION`) | structure + profile validation |
@@ -600,13 +640,13 @@ records identify the first failing owner when a transition cannot advance.
 | contract record | design decision |
 | --- | --- |
 | `Behavior Contract` | native production behavior、public header/API semantics、CTest result semantics、experiment protocol semantics は移行前後で保持し、build entrypoint と source ownership だけを再編する |
-| `Allowed Structural Delta` | root CMake/source/test surface を `cpp/` project に移し、tests/experiments を同一 graph の subdirectory/aggregate target に接続し、parent command references を quoted `-S "$ROOT/cpp"` へ更新し、native run evidence を existing lifecycle/save-results owner へ接続する |
+| `Allowed Structural Delta` | root CMake/production source surface を `cpp/` project に移し、`tests/cpp` は同じ graph へ out-of-tree subdirectory として登録し、experiments を aggregate target に接続し、parent command references を quoted `-S "$ROOT/cpp"` へ更新し、native run evidence を existing lifecycle/save-results owner へ接続する |
 | `Forbidden Semantic Delta` | この pass では algorithm、public API、dependency version、compiler policy、Python managed experiment lifecycle、AgentCanon runtime surface を変更しない |
 | `Expected API` | `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`、`cmake --build ... --target cpp-tests`、`ctest --test-dir ...`、`cmake --build ... --target cpp-experiments`、same-cache `cmake --install ...`、individual native run、save-results publish を stable command surface にする (`D-COMMANDS`) |
-| `Current Responsibility Map` | root `CMakeLists.txt`/`cmake/`/`src/`/`include/`/`tests/cpp/` が C++ surface を分散所有し、parent `experiments/` は managed Python experiments を所有する |
-| `Target Responsibility Map` | `cpp/CMakeLists.txt` が project graph、`cpp/src`/`cpp/include` が production/API、`cpp/tests` が CTest、`cpp/experiments` が native experiment targets、parent `experiments/` が Python managed runs を所有する |
-| `Path Mapping` | `CMakeLists.txt → cpp/CMakeLists.txt`; `src → cpp/src`; `include → cpp/include`; `tests/cpp → cpp/tests`; native experiment sources → `cpp/experiments`; C++ helper `cmake → cpp/cmake` |
-| `Targets To Change` | `cpp/CMakeLists.txt:project-and-subdirectory-graph`; `cpp/src/:production-source-owner`; `cpp/include/:public-header-owner`; `cpp/tests/:test-target-and-CTest-owner`; `cpp/experiments/:native-experiment-target-owner`; parent command/docs/lifecycle surfaces listed in `D-PARENT-MIGRATION` |
+| `Current Responsibility Map` | root `CMakeLists.txt`/`cmake/`/`src/`/`include/` が production C++ surface を分散所有し、`tests/cpp/` は project-specific test owner として既に独立し、parent `experiments/` は managed Python experiments を所有する |
+| `Target Responsibility Map` | `cpp/CMakeLists.txt` が project graph、`cpp/src`/`cpp/include` が production/API、`tests/cpp` が derived project CTest、`cpp/experiments` が native experiment targets、parent `experiments/` が Python managed runs を所有する |
+| `Path Mapping` | `CMakeLists.txt → cpp/CMakeLists.txt`; `src → cpp/src`; `include → cpp/include`; `tests/cpp → tests/cpp` (out-of-tree registration); native experiment sources → `cpp/experiments`; C++ helper `cmake → cpp/cmake` |
+| `Targets To Change` | `cpp/CMakeLists.txt:project-and-subdirectory-graph`; `cpp/src/:production-source-owner`; `cpp/include/:public-header-owner`; `tests/cpp/:test-target-and-CTest-owner`; `cpp/experiments/:native-experiment-target-owner`; parent command/docs/lifecycle surfaces listed in `D-PARENT-MIGRATION` |
 | `Files To Remove Or Move` | parent root C++ entrypoint and legacy native source surfaces are moved/retired only in the parent implementation phase after their target traces are materialized under `cpp/` |
 
 ### Refactor orchestration plan
@@ -615,7 +655,7 @@ records identify the first failing owner when a transition cannot advance.
 | --- | --- | --- | --- | --- |
 | `W0-design` | this design contract | none | managed clone `documents/design/cpp-build-layout.md` | docs/dependency/design checks |
 | `W1-root` | `cpp/CMakeLists.txt` plus production source/header mapping | approved `W0-design` | parent `cpp/CMakeLists.txt`, `cpp/src/`, `cpp/include/`, project-local `cpp/cmake/` | configure/build/install |
-| `W2-tests` | `cpp/tests` target and CTest registration | `W1-root` | parent `cpp/tests/` | CTest |
+| `W2-tests` | `tests/cpp` target and CTest registration | `W1-root` | parent `tests/cpp/` | CTest |
 | `W2-experiments` | `cpp/experiments` target and output wiring | `W1-root` | parent `cpp/experiments/` | aggregate/individual experiment smoke |
 | `W3-projection` | parent command, docs, Docker pack, and CI path projection | `W1-root`, `W2-tests`, `W2-experiments` | parent `Makefile`, `README.md`, `QUICK_START.md`, `cmake/README.md`, `docker/`, `.github/workflows/docker-build.yml` | docs, Docker, workflow checks |
 | `W4-root-cleanup` | parent language-neutral root and stale path sweep | `W3-projection` | parent legacy root CMake/native paths and references | structure, dependency, C++ profile return gate |
@@ -630,7 +670,7 @@ parallel candidate です。`W3-projection` は両方の target names と comman
 | id | evidence/assumption | effect on implementation decision |
 | --- | --- | --- |
 | `E0` | parent checkout の現状では root `CMakeLists.txt` と root-based `cmake -S .` command references が存在する | user-requested language-neutral root は target state として扱い、`D-PARENT-MIGRATION` と `W4-root-cleanup` を必須にする |
-| `E1` | parent checkout には `cpp/`、`cpp/src`、`cpp/include`、`cpp/tests`、`cpp/experiments` がまだ materialize されておらず、legacy `src`、`include`、`tests/cpp` が存在する | W1 が source mapping の root slice になり、legacy path は reverse trace の対象になる |
+| `E1` | parent checkout には `cpp/`、`cpp/src`、`cpp/include`、`cpp/experiments` がまだ materialize されておらず、project-specific `tests/cpp` は独立 owner として存在する | W1 が production source mapping の root slice になり、tests/cpp は out-of-tree graph registration の対象になる |
 | `E2` | managed AgentCanon topic clone は `1261bd1554c8031cae514b2a2d543cc4221078fc` を base とする (`D-SOURCE-BOUNDARIES`) | design source と current parent pin を混同せず、親 pin/root projection をこの pass の write set から分離する |
 | `A0` | production target の stable implementation name は `cpp-core`、aggregate names は `cpp-tests`、`cpp-experiments`、`cpp-experiment-<name>` とする | target graph、commands、forward/reverse trace が同じ identifier を共有する |
 | `A1` | `<project>` は派生 project の CMake package/project identifier に置き換える | install package metadata は project-specific だが、source/target ownership は変わらない |
@@ -654,7 +694,7 @@ parallel candidate です。`W3-projection` は両方の target names と comman
 | `D-PROJECT-ROOT` | `cpp/CMakeLists.txt:project-and-subdirectory-graph` | configure source directory is `cpp` |
 | `D-TARGET-TYPE` | `cpp/CMakeLists.txt:cpp-core-type-selection` | source inventory/product contract selects exactly `INTERFACE`, `OBJECT`, `STATIC`, or `SHARED`; empty source state still yields only interface `cpp-core` |
 | `D-SOURCE-OWNERS` | `cpp/include/`, `cpp/src/` target source/include declarations | production build and install tree |
-| `D-TEST-GRAPH` | `cpp/tests/CMakeLists.txt:test-targets-and-ctest-registration` | CTest discovery and execution |
+| `D-TEST-GRAPH` | `tests/cpp/CMakeLists.txt:test-targets-and-ctest-registration` via `cpp/CMakeLists.txt:add_subdirectory` | CTest discovery and execution |
 | `D-EXPERIMENT-GRAPH` | `cpp/experiments/CMakeLists.txt:experiment-targets-and-output-contract` | aggregate/individual experiment target smoke |
 | `D-EXPERIMENT-LIFECYCLE` | lifecycle adapter plus native executable argument contract | build target exists without running; `run_name`, config, result root, evidence, save/publish remain existing owners |
 | `D-COMMANDS` | parent Make/Docker/README command records | command path and Docker smoke |
@@ -672,7 +712,7 @@ parallel candidate です。`W3-projection` は両方の target names と comman
 | `cpp/CMakeLists.txt` | `D-PROJECT-ROOT`, `D-COMMANDS` | Is the native project entered by `cmake -S cpp` and do all subdirectories share one graph? |
 | `cpp/CMakeLists.txt:cpp-core` | `D-TARGET-TYPE`, `D-OUTPUT-CONTRACT` | Does source/product evidence select the target type and place runtime/library/archive/install artifacts correctly? |
 | `cpp/src/` / `cpp/include/` | `D-SOURCE-OWNERS`, `D-GENERATED-PATHS` | Are source/header/install ownership and generated paths explicit? |
-| `cpp/tests/` | `D-TEST-GRAPH` | Does every test target consume the shared production target and register with CTest? |
+| `tests/cpp/` | `D-TEST-GRAPH` | Does every project-specific test target consume the shared production target and register with CTest? |
 | `cpp/experiments/` | `D-EXPERIMENT-GRAPH`, `D-GENERATED-PATHS` | Does each native experiment build from the project graph and write to its declared output root? |
 | experiment lifecycle adapter/result bundle | `D-EXPERIMENT-LIFECYCLE` | Are build, run, save, and report events owned by the correct existing surfaces? |
 | parent `Makefile`, `docker/`, `README.md`, `QUICK_START.md` | `D-COMMANDS`, `D-PARENT-MIGRATION` | Does every downstream command point to `cpp` and the profile-specific build tree? |
@@ -704,7 +744,7 @@ experiment-run="$ROOT/build/cpp/<profile>/bin/cpp-experiment-<name>" --run-name 
 docs=tools/bin/agent-canon docs check <touched-design-and-parent-docs>
 structure=repo_structure_contract.py + responsibility_scope.py
 review=cpp-review + project/repository integration review
-positive-readback=project-entry inventory exactly cpp/CMakeLists.txt; nested manifests only under cpp/tests or cpp/experiments and contain no project(); root wrapper count=0; native source ownership=cpp/*
+positive-readback=project-entry inventory exactly cpp/CMakeLists.txt; test manifest at tests/cpp and experiment manifest at cpp/experiments contain no project(); root wrapper count=0; production ownership=cpp/* and project-test ownership=tests/cpp/*
 fresh-graph=implementation-phase configure/build/CTest/target inventory; not claimed by design-only docs
 fresh-claims=design claim checker plus path/command/owner readback; implementation behavior claims remain pending
 ```

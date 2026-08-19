@@ -335,7 +335,7 @@ skill_families:
         - ["cpp/CMakeLists.txt"]
         - ["cpp/src"]
         - ["cpp/include"]
-        - ["cpp/tests"]
+        - ["tests/cpp"]
         - ["cpp/experiments"]
         - ["C++", "review"]
   - id: oop-readability-check

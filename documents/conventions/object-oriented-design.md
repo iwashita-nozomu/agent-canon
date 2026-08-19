@@ -75,7 +75,7 @@ class、module、file、directory の形を機械的に要求しません。OOP 
 - `cpp-tests` と `cpp-experiments` は consumer grouping を表し、production state や
   run/result publication を所有しません。
 - public header は `cpp/include/`、implementation は `cpp/src/`、CTest source は
-  `cpp/tests/`、native experiment source は `cpp/experiments/` に対応づけます。
+  `tests/cpp/`、native experiment source は `cpp/experiments/` に対応づけます。
 - target graph の dependency direction は consumer → provider (`test/experiment → cpp-core`)
   とし、external effect、run config、result retention は既存 lifecycle owner に接続します。
 
@@ -225,7 +225,7 @@ python3 tools/oop/python/rule_inventory.py
 C++ surface では次を baseline として使います。
 
 ```bash
-python3 tools/oop/cpp/readability.py cpp/include cpp/src cpp/tests cpp/experiments
+python3 tools/oop/cpp/readability.py cpp/include cpp/src tests/cpp cpp/experiments
 python3 tools/oop/cpp/rule_inventory.py
 ```
 

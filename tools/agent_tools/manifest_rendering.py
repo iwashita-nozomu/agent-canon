@@ -245,7 +245,7 @@ CPP_PATH_MARKERS = (
     "cpp/cmake/",
     "cpp/src/",
     "cpp/include/",
-    "cpp/tests/",
+    "tests/cpp/",
     "cpp/experiments/",
 )
 
@@ -846,7 +846,10 @@ def language_review_candidates(
     )
     has_python = any(
         normalized.startswith("python/")
-        or normalized.startswith("tests/")
+        or (
+            normalized.startswith("tests/")
+            and not normalized.startswith("tests/cpp/")
+        )
         or Path(normalized).suffix.lower() in PYTHON_SUFFIXES
         for normalized in normalized_paths
     )
