@@ -1,0 +1,238 @@
+name: Authoritatively finalize Issue 781 v2
+
+on:
+  push:
+    branches:
+      - fix/781-stop-template-agent-export
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: issue-781-authoritative-finalize
+  cancel-in-progress: true
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install focused validation dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pytest pyyaml tomli
+
+      - name: Remove one-time workflows before migration
+        run: rm -f .github/workflows/issue-781-*.yml
+
+      - name: Apply the responsibility migration exactly once
+        run: |
+          if [[ -f .github/scripts/issue_781_apply.py ]]; then
+            python3 .github/scripts/issue_781_apply.py
+          fi
+
+      - name: Preserve test dependency headers while removing obsolete cases
+        run: |
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import ast
+          import subprocess
+          from pathlib import Path
+
+          root = Path.cwd()
+          markers = (
+              "consumer-static",
+              "consumer_static",
+              "static-seed-consumer",
+              "static_seed_consumer",
+              "static_obligation",
+          )
+
+          def original(path: str) -> str:
+              result = subprocess.run(
+                  ["git", "show", f"origin/main:{path}"],
+                  check=True,
+                  capture_output=True,
+                  text=True,
+              )
+              return result.stdout
+
+          def rewrite(path: str) -> None:
+              source = original(path)
+              tree = ast.parse(source)
+              ranges: list[tuple[int, int]] = []
+              for node in ast.walk(tree):
+                  if not isinstance(
+                      node,
+                      (ast.FunctionDef, ast.AsyncFunctionDef, ast.Assign, ast.AnnAssign),
+                  ):
+                      continue
+                  segment = ast.get_source_segment(source, node) or ""
+                  lowered = segment.casefold()
+                  if any(marker in lowered for marker in markers):
+                      ranges.append((node.lineno, node.end_lineno or node.lineno))
+              ranges.sort()
+              merged: list[tuple[int, int]] = []
+              for start, end in ranges:
+                  if merged and start <= merged[-1][1] + 1:
+                      merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+                  else:
+                      merged.append((start, end))
+              lines = source.splitlines()
+              for start, end in reversed(merged):
+                  del lines[start - 1 : end]
+              forbidden_import_names = (
+                  "ConsumerStaticClauseProjection",
+                  "compose_consumer_static_clause",
+                  "STATIC_OBLIGATION",
+              )
+              lines = [
+                  line
+                  for line in lines
+                  if not any(name in line for name in forbidden_import_names)
+                  and not any(marker in line.casefold() for marker in markers)
+              ]
+              rendered = "\n".join(lines) + "\n"
+              ast.parse(rendered)
+              (root / path).write_text(rendered, encoding="utf-8")
+
+          rewrite("tests/agent_tools/test_model_profile_registry.py")
+          rewrite("tests/tools/test_check_bootstrap_docs.py")
+          PY
+
+      - name: Regenerate canonical live role views
+        run: python3 tools/agent_tools/model_profile_registry.py --root . --generate-role-views
+
+      - name: Materialize the sole final candidate
+        run: |
+          rm -f .github/scripts/issue_781_apply.py
+          git add -A
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --cached --quiet; then
+            git commit -m "fix: stop exporting Agent definitions to templates (#781)"
+          fi
+
+      - name: Compile changed Python owners
+        run: |
+          python3 -m py_compile \
+            tools/agent_tools/model_profile_registry.py \
+            tools/docs/check_bootstrap_docs.py
+
+      - name: Run focused responsibility tests
+        run: |
+          python3 -m pytest -q \
+            tests/agent_tools/test_template_agent_definition_boundary.py \
+            tests/agent_tools/test_model_profile_registry.py \
+            tests/tools/test_check_bootstrap_docs.py
+
+      - name: Validate generated role views
+        run: python3 tools/agent_tools/model_profile_registry.py --root . --check-role-views
+
+      - name: Validate runtime alignment
+        run: python3 tools/agent_tools/check_agent_runtime_alignment.py
+
+      - name: Validate workflow structure
+        run: python3 tools/ci/check_github_workflows.py
+
+      - name: Push the exact validated candidate
+        run: git push origin HEAD:fix/781-stop-template-agent-export
+
+      - name: Publish Issue, PR, and related-route evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          HEAD_SHA="$(git rev-parse HEAD)"
+          BASE_SHA="$(gh pr view 782 --json baseRefOid --jq .baseRefOid)"
+          git diff --name-status "${BASE_SHA}...${HEAD_SHA}" > /tmp/changed-scope.txt
+          cat > /tmp/issue-comment.md <<EOF
+          <!-- agent-canon:issue-781-template-agent-export-boundary:v1 head=${HEAD_SHA} -->
+          ## 実装完了・レビュー引き継ぎ
+
+          default template へ Agent 定義を export していた producer 側の責務違反を、branch \`fix/781-stop-template-agent-export\` / PR #782 で修正しました。
+
+          ### 根本原因と修正境界
+
+          旧構成は AgentCanon が role-specific TOML、profile/instruction projection、registration closure を template 用 payload として生成し、project_template を executable Agent inventory の consumer として扱っていました。その結果、Agent inventory の変更が template tree の変更へ伝播し、canonical owner と consumer の両方が同じ definition を保持していました。
+
+          今回の変更では、AgentCanon が live Agent definitions の唯一の owner であることを維持しつつ、default template distribution を 0 件に固定しました。
+
+          - template 向け allowlist/export contract/exporter/docs/tests を撤去
+          - consumer-only projection、source-neutral obligation fragments、template-only schema fields を撤去
+          - live role materializationだけを残して全 role view を canonical registry から再生成
+          - source-free bootstrap checkerから template Agent consumer modeを撤去
+          - static gate / tool catalog / docs から export route を撤去
+          - dedicated structural regressionで再流入を拒否
+
+          物理 Agent profile 数を \`N_profile\`、template Agent definition count を \`N_template\` とすると、変更後の invariant は \`N_template = 0\` です。論理 role 数や AgentCanon の profile 数が増減しても template payload は増えません。
+
+          ### Exact evidence
+
+          - baseline: \`${BASE_SHA}\`
+          - branch: \`fix/781-stop-template-agent-export\`
+          - head: \`${HEAD_SHA}\`
+          - PR: https://github.com/iwashita-nozomu/agent-canon/pull/782
+          - focused registry/bootstrap/boundary pytest — pass
+          - live role view generation/readback — pass
+          - runtime alignment — pass
+          - GitHub workflow structure — pass
+          - remaining verification: none
+
+          ### Changed scope
+
+          \`git diff --name-status ${BASE_SHA}...${HEAD_SHA}\`:
+
+          \`\`\`
+          $(cat /tmp/changed-scope.txt)
+          \`\`\`
+
+          project_template 側の対向修正は iwashita-nozomu/project_template#182 / PR #183 です。変更は review-ready です。
+          EOF
+
+          cat > /tmp/pr-body.md <<EOF
+          ## 概要
+
+          AgentCanon が default project template へ Agent definitions を配布していた責務違反を解消します。live Agent role/profile/Skill ownership は AgentCanon に保持し、template 向け executable definition export は廃止します。
+
+          ## 工学的境界
+
+          - AgentCanon: live role、prompt、profile、Skill binding、dispatch authority の owner
+          - project_template: project scaffold と project-scoped session settings の owner
+          - default template Agent definition count: 常に 0
+          - Agent inventory change による template diff: 0
+
+          ## Validation
+
+          - focused registry/bootstrap/boundary pytest
+          - generated live role view parity
+          - runtime alignment checker
+          - GitHub workflow structure checker
+
+          すべて exact head \`${HEAD_SHA}\` で pass。remaining verification はありません。
+
+          Closes #781
+          Related: iwashita-nozomu/project_template#182
+          EOF
+
+          gh issue comment 781 --body-file /tmp/issue-comment.md
+          gh issue edit 781 --remove-label "in progress" --add-label "ready for review"
+          gh pr edit 782 --body-file /tmp/pr-body.md
+          gh pr ready 782
+
+          cat > /tmp/related-comment.md <<EOF
+          ## Responsibility boundary update
+
+          #781 / PR #782 removes the default-template Agent-definition export route. Direct Luna / Skill-bound dispatch work in #775 must keep Agent definitions, profiles, and prompts in AgentCanon/runtime only; project_template is no longer an executable Agent-inventory consumer and must not receive role-specific TOML or registry snapshots. The template-side replacement is iwashita-nozomu/project_template#182 / PR #183.
+          EOF
+          gh issue comment 775 --body-file /tmp/related-comment.md
+          gh pr comment 776 --body-file /tmp/related-comment.md
