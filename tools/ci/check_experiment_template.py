@@ -241,11 +241,15 @@ def validate_generated_topic(parent_root: Path, registry_path: Path) -> None:
         topic_dir / "visualization.py",
         topic_dir / "config.yaml",
         topic_dir / "visualize.ipynb",
+        topic_dir / "raw" / ".gitignore",
         topic_dir / "result" / ".gitkeep",
     )
     missing = [str(path.relative_to(parent_root)) for path in required_files if not path.is_file()]
     if missing:
         raise RuntimeError(f"generated topic is missing required files: {', '.join(missing)}")
+    raw_ignore = (topic_dir / "raw" / ".gitignore").read_text(encoding="utf-8")
+    if raw_ignore != "*\n!.gitignore\n":
+        raise RuntimeError("generated raw/.gitignore does not enforce raw-only ignore")
 
     registry_text = registry_path.read_text(encoding="utf-8")
     if 'registry_identity = "template-smoke-parent"' not in registry_text:
@@ -349,6 +353,9 @@ def main() -> int:
         run_env["EXPERIMENT_RUN_MANIFEST"] = str(parent_root / "manifest.json")
         run_env["EXPERIMENT_VARIANT"] = VARIANT
         run_env["EXPERIMENT_RUN_DIR"] = str(incomplete_run_dir)
+        run_env["EXPERIMENT_RAW_DIR"] = str(
+            topic_dir / "raw" / VARIANT / "template-smoke-incomplete"
+        )
         incomplete_result = subprocess.run(
             [sys.executable, str(topic_dir / "run.py")],
             cwd=source_root,
@@ -364,7 +371,14 @@ def main() -> int:
         complete_template_fixture(topic_dir)
         run_dir = topic_dir / "result" / VARIANT / "template-smoke-run"
         run_env["EXPERIMENT_RUN_DIR"] = str(run_dir)
-        run_checked([sys.executable, str(topic_dir / "run.py")], cwd=source_root, env=run_env)
+        run_env["EXPERIMENT_RAW_DIR"] = str(
+            topic_dir / "raw" / VARIANT / "template-smoke-run"
+        )
+        run_checked(
+            [sys.executable, str(topic_dir / "run.py")],
+            cwd=source_root,
+            env=run_env,
+        )
         validate_generated_topic(parent_root, registry_path)
         run_checked(
             [

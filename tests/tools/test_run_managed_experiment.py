@@ -91,7 +91,17 @@ def create_fake_repo_dirs(repo_root: Path) -> None:
         / "_template"
         / "result"
     ).mkdir(parents=True)
+    (
+        repo_root
+        / "vendor"
+        / "agent-canon"
+        / "templates"
+        / "experiments"
+        / "_template"
+        / "raw"
+    ).mkdir()
     (repo_root / "experiments" / "demo_topic" / "result").mkdir(parents=True)
+    (repo_root / "experiments" / "demo_topic" / "raw").mkdir()
     (repo_root / "experiments" / "report").mkdir(parents=True)
     (repo_root / "tools" / "experiments").mkdir(parents=True)
 
@@ -120,6 +130,10 @@ def write_template_topic(repo_root: Path) -> None:
     )
     (template_dir / "result" / "README.md").write_text(
         "# Result Directory\n",
+        encoding="utf-8",
+    )
+    (template_dir / "raw" / ".gitignore").write_text(
+        "*\n!.gitignore\n",
         encoding="utf-8",
     )
     document_template_dir = (
@@ -1655,6 +1669,9 @@ def test_create_experiment_topic_scaffolds_directory_and_registry(
     assert result.returncode == 0
     topic_dir = repo_root / "experiments" / "new_topic"
     assert topic_dir.is_dir()
+    assert (topic_dir / "raw" / ".gitignore").read_text(encoding="utf-8") == (
+        "*\n!.gitignore\n"
+    )
     readme_text = (topic_dir / "README.md").read_text(encoding="utf-8")
     assert "# new_topic" in readme_text
     assert "<topic>" not in readme_text

@@ -413,8 +413,8 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<variant>/<run_name>
-        --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
+      - python3 -m tools.experiments.save_experiment_result_annex --raw-dir experiments/<topic>/raw/<variant>/<run_name>
+        --annex-repo "$EXPERIMENT_RAW_ANNEX_REPO"
       - python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir
         reports/agents/<run-id>
       - python3 tools/agent_tools/runtime_log_archive_git.py push
@@ -1528,8 +1528,8 @@ skill_families:
       - python3 -m tools.ci.check_experiment_registry
       - python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant
         <variant> -- python3 experiments/<topic>/run.py
-      - python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<variant>/<run_name>
-        --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
+      - python3 -m tools.experiments.save_experiment_result_annex --raw-dir experiments/<topic>/raw/<variant>/<run_name>
+        --annex-repo "$EXPERIMENT_RAW_ANNEX_REPO"
       - python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>
       - python3 -m pytest tests/tools/test_run_managed_experiment.py -q
       - agent-canon semantic-index discourse-relations --profile experiment-report
