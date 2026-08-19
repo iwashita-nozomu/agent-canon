@@ -14,114 +14,194 @@ downstream implementation ../../tools/agent_tools/check_convention_compliance.py
 
 # Shared Runtime Surfaces
 
-This document owns the named **`live-agent-canon` explicit opt-in integration**. It is not the
-normal template/bootstrap contract. The default consumer uses the static seed defined by
-`documents/contracts/static-seed-export.md`, owns those files directly, and does not consult this
-manifest, discover an AgentCanon source root, project runtime views, or maintain update state.
+This document owns the named **`live-agent-canon` explicit opt-in integration**.
+It does not make AgentCanon source, tools, tests, or update state part of every
+repository. A consumer selects this mode only when its Codex session must read
+AgentCanon-owned instructions, project configuration, custom agents, or hooks
+from an exact AgentCanon source pin.
 
-A repository selects this document only through a separately reviewed architecture decision that
-requires live AgentCanon behavior. Merely cloning a template, initializing a project, running CI,
-or building a product image is not selection evidence.
+The machine-readable source of truth is
+`documents/runtime/shared-runtime-surfaces.toml`. It records
+`integration_mode = "live-agent-canon"`, `default_consumer = false`, and
+`selection = "explicit-opt-in"`. The default static consumer remains a separate
+contract until its producer-side retirement is completed; it must not silently
+consume this live manifest.
 
 ## Selection Boundary
 
-| Mode | Default | Source requirement | Root behavior |
-| --- | --- | --- | --- |
-| Static seed consumer | yes | none after maintainer export | consumer-owned regular files; no projection or update state |
-| `live-agent-canon` integration | no | explicit AgentCanon source checkout | manifest-owned symlink views and optional transaction state |
+| Mode | AgentCanon checkout | Codex repository view |
+| --- | --- | --- |
+| Static consumer | not required | consumer-owned regular files under its own contract |
+| `live-agent-canon` | exact reviewed pin required before Codex activation | manifest-owned root symlinks |
 
-The machine-readable source of truth for the opt-in mode is
-`documents/runtime/shared-runtime-surfaces.toml`. It records
-`integration_mode = "live-agent-canon"`, `default_consumer = false`, and
-`selection = "explicit-opt-in"`. A default-consumer checker must reject those live surfaces rather
-than silently selecting this manifest.
+Normal product build, test, documentation, Docker, and CI commands remain
+parent-owned. They may validate the lexical view and exact gitlink without
+initializing the AgentCanon checkout. Loading AgentCanon custom agents and hooks
+requires the explicitly initialized exact pin; no background latest lookup,
+credential fallback, or updater is implied.
 
-The manifest parser validates these fields as typed selection metadata. The allowed combinations are
-`live-agent-canon` / `false` / `explicit-opt-in` for the live integration and
-`static-seed` / `true` / `default` for a source-free static consumer. Unknown integration or
-selection values, non-boolean `default_consumer`, and mismatched combinations fail closed.
-For compatibility with a historical `version = 1` manifest, omission of all three fields maps to
-the live triple above. This compatibility applies only when all three fields are absent; a partial
-set is invalid, and a non-v1 manifest must state the complete typed selection explicitly.
+## Runtime Reachability Model
 
-## Opt-in Source and Projection
+Let `D` be the paths Codex reads directly and `R(D)` the exact runtime
+dependencies named by those declarations. The live root view is:
 
-AgentCanon source is authoritative under `vendor/agent-canon/` only after the opt-in mode is
-selected. The root projection then contains only the instruction view `AGENTS.md`, the Codex
-runtime config bundle `.codex/config.toml` and `.codex/agents`, and the shared CLI/tool namespace
-`tools/agent-canon`. The update lifecycle may create optional transaction state under
-`.agent-canon/`.
+```text
+P = D ∪ R(D)
 
-Tests, notes, memory, evidence, editor, GitHub, and parent `.devcontainer/` paths are not mirrored
-shared surfaces. Parent-owned regular content at retired paths is preserved; only a stale symlink
-that still resolves into the selected AgentCanon source is eligible for removal during migration.
-Standalone AgentCanon may retain source-owned `.vscode` and `.devcontainer` content. That standalone
-ownership does not select live integration for a parent repository.
+D = {
+  AGENTS.md,
+  .codex/config.toml,
+  .codex/agents,
+  .codex/hooks.json
+}
 
-## Reader Map
+R(D) = {
+  .codex/hooks
+}
+```
 
-Use this document only after explicit selection. Read Projection Metadata and Manifest Contract to
-understand synchronization, then use Projection, Editing Rule, and Validation. For normal template
-creation or repository bootstrap, return to `documents/contracts/template-bootstrap.md` instead.
+`AGENTS.md` supplies the instruction chain. `.codex/config.toml` registers the
+project-scoped runtime and custom agents. `.codex/agents` contains the actual
+AgentCanon-owned standalone agent definitions. `.codex/hooks.json` declares the
+active lifecycle hooks, and `.codex/hooks` is their bounded entrypoint closure.
+
+The hook dispatcher resolves its physical source under the exact
+`vendor/agent-canon` checkout and imports implementation modules from that same
+pin. Therefore the root does not need a second alias for the AgentCanon tools
+tree.
 
 ## Projection Metadata
 
-| Projection kind | Root behavior | Edit source | Local override |
+Each `[[surface]]` declares:
+
+- `path`: root-relative view path;
+- `mode`: `symlink` for a runtime view or `repo_state` for lifecycle state;
+- `source`: path relative to the exact AgentCanon checkout;
+- `projection_producer`: owner of the bytes or state;
+- `projection_kind`: synchronization category;
+- `local_override_allowed`: whether a parent may replace the view; and
+- `optional`: whether a lifecycle materializes the entry only when selected.
+
+The top-level `projection_forbidden_roots` set is a different contract. It
+declares AgentCanon standalone source roots that cannot be a projection target,
+projection source, legacy-cleanup path, repository state path, or update
+transition candidate. It does not make those paths root-absence entries and does
+not grant the synchronizer deletion ownership over parent content.
+
+The parser validates typed selection metadata and renders link specifications
+from this manifest. `link-root` and `check` do not maintain a second active-path
+list.
+
+## Active Codex Projection
+
+| Root path | Mode | AgentCanon source | Reason |
 | --- | --- | --- | --- |
-| AgentCanon runtime surface | symlink view into `vendor/agent-canon/` | independent AgentCanon source clone | no |
-| AgentCanon source | explicitly selected source checkout | AgentCanon source | no |
-| Project-owned content | regular file or directory in the parent repository | parent repository | yes |
-| Update transaction state | optional records under `.agent-canon/` | selected update transaction | no |
-| Retired root view | absent; stale AgentCanon symlinks may be removed | none | parent regular content is preserved |
+| `AGENTS.md` | symlink | `ROOT_AGENTS.md` | Codex instruction discovery |
+| `.codex/config.toml` | symlink | `.codex/config.toml` | project configuration discovery |
+| `.codex/agents` | symlink | `.codex/agents` | project custom-agent discovery |
+| `.codex/hooks.json` | symlink | `.codex/hooks.json` | project hook discovery |
+| `.codex/hooks` | symlink | `.codex/hooks` | hook entrypoint dependency |
 
-## Manifest Contract
+`.agent-canon` is optional parent-owned lifecycle state produced by the update
+transaction. It is not a Codex discovery surface and is not evidence that the
+whole AgentCanon repository tree should be projected.
 
-Each `[[surface]]` in `shared-runtime-surfaces.toml` declares projection metadata:
+## Excluded Internal Trees
 
-- `path`: root-relative path of the view;
-- `mode`: `symlink` or `repo_state` for active surfaces;
-- `projection_producer`: the process or source family that produces the view;
-- `projection_kind`: synchronization behavior metadata;
-- `source`: optional AgentCanon-relative source path; and
-- `optional`: whether the path is materialized only by an explicit lifecycle.
+Codex does not discover generic AgentCanon `tools/**`, `tests/**`, documents,
+fixtures, or maintainer checkers merely because they exist in the source
+checkout. Those paths remain under the AgentCanon owner and are executed there
+when AgentCanon itself is changed.
 
-The top-level integration metadata is selection evidence for readers and focused tests. New
-manifests must provide all three fields; an unannotated `version = 1` manifest is the sole legacy
-exception and maps to the historical live selection, while partial metadata is rejected.
-`integration_mode` is an enum, `default_consumer` is a TOML boolean, and `selection` is an enum;
-`surface_manifest.py` exposes and validates all three fields on its typed manifest result. The
-`normalized-snapshot` output retains its existing v1 DTO for the Rust graph consumer, while sync
-spec commands require the typed `live-agent-canon` / `false` / `explicit-opt-in` contract. A
-static-seed manifest, including one containing a symlink entry, cannot produce or apply sync
-specifications.
-The `removed_legacy` group records paths that must not be materialized. The manifest contains no
-general path-owner fallback and no full-tree or all-tracked entry. `responsibility-scope.toml` remains
-the sole general owner/class source.
+Root `tools/` is a parent-owned regular container. The former
+`tools/agent-canon -> ../vendor/agent-canon/tools` alias is a retired migration
+path, not an active runtime surface. The canonical implementation remains under
+`vendor/agent-canon/tools/`, and a selected command may address that exact pin
+directly. Project-local automation must stay in project-owned paths, and
+project-local tests remain project-owned; neither tree is projected from
+AgentCanon.
 
-## Projection
+The `removed_legacy` list exists only to clean up known stale AgentCanon
+symlinks while preserving regular parent content. It no longer claims the
+parent `tests/` directory as AgentCanon state. A missing retired path is already
+at the fixed point.
 
-The active projection for the explicitly selected live mode is deliberately limited to:
+## Standalone Rust / Cargo Boundary
 
-| Root path | Mode | Source |
+The AgentCanon `rust/` tree owns standalone implementation, Cargo metadata,
+fixtures, and producer tests. The live manifest therefore declares
+`projection_forbidden_roots = ["rust"]`. Let `F` be every path equal to or below
+`rust`, `T` the manifest-owned parent target paths, `S` the AgentCanon source
+paths materialized by those entries, and `U` the update-transition candidates.
+The required invariant is:
+
+```text
+prefix_intersection(T ∪ S ∪ U, F) = ∅
+```
+
+The parser also rejects an ancestor entry such as a broad root projection that
+would contain `rust/`. Every renderer used by `sync_agent_canon.sh` loads and
+validates the same manifest before producing link, copy, regular, cleanup, or
+transition specifications, so no shell-local Rust allowlist exists. The
+`projection-forbidden-roots` readback command exposes the policy without adding
+it to the normalized runtime-surface snapshot.
+
+A parent checker classifies observed paths by topology and ownership rather than
+by a Rust-looking pathname alone:
+
+| Observed path | Classification | Required handling |
 | --- | --- | --- |
-| `AGENTS.md` | symlink | `ROOT_AGENTS.md` |
-| `.codex/config.toml` | symlink | `.codex/config.toml` |
-| `.codex/agents` | symlink | `.codex/agents` |
-| `tools/agent-canon` | symlink | `tools` |
-| `.agent-canon` | optional transaction state | update lifecycle |
+| `vendor/agent-canon/rust/**` inside the exact source checkout | AgentCanon standalone source/test | Validate only in the AgentCanon owner repository |
+| parent-owned regular directory or file below `rust/**` | parent content or historical artifact | Do not infer projection and do not delete from AgentCanon sync |
+| generated copy below `rust/**` | regular parent-owned bytes unless explicit parent provenance says otherwise | Remove or retain only through a parent issue/PR |
+| symlink resolving into `vendor/agent-canon/rust/**` | unmanaged live projection edge | Fail the consumer structure check; never register it in the live manifest |
+| gitlink / submodule below `rust/**` | explicit parent dependency edge, not a live AgentCanon view | Keep under a parent-owned dependency contract or reject as an unmanaged projection |
+| absent path | desired live-projection fixed point | No cleanup pathspec or compatibility placeholder |
 
-Root `tools/` is a parent-owned regular container; only its `agent-canon` child is shared in the
-opt-in mode. The standalone source owns `vendor/agent-canon/tools/`, and the parent view is
-`tools/agent-canon -> ../vendor/agent-canon/tools`. AgentCanon templates and documents remain in the
-source checkout and are not copied into parent root views. A regular parent file or directory at a
-retired path is left untouched.
+Regular bytes cannot be identified as an AgentCanon projection from their path
+or content hash alone. In particular, a historical
+`rust/agent-canon/tests/python_algorithm_contract_cli.rs` in a consumer remains
+parent-owned even when its origin can be traced to an old AgentCanon-related
+change. The producer manifest must not claim it as `removed_legacy`,
+`standalone_only`, repository state, or an update transition.
+
+### Parent migration readback
+
+A parent repository that removes such a regular artifact does so on a separate
+parent issue branch. Before editing, read back both filesystem and index
+identity:
+
+```bash
+git ls-files -s -- rust/agent-canon
+git status --short -- rust/agent-canon
+test ! -L rust/agent-canon
+git submodule status -- rust/agent-canon 2>/dev/null || true
+git log --all --follow -- rust/agent-canon/tests/python_algorithm_contract_cli.rs
+```
+
+Mode `100644` or `100755` is a regular parent file, mode `120000` is a symlink,
+and mode `160000` is a gitlink. A regular-file removal must be staged and
+validated with the parent repository's own checks; `link-root` is not the
+migration command. The parent PR records the old index mode/blob, deletion
+diff, selected validation, and post-change absence.
+
+The standalone Rust gate remains
+`tools/ci/run_standalone_static_gate_unit.sh` in the AgentCanon source owner. A
+live parent's standard projection check does not add Cargo setup or this Rust
+gate merely because the pinned checkout contains `rust/`. GPU execution,
+runtime-alignment, and other live-parent command packets consume the declared
+root views and cannot broaden validation from source-tree presence alone.
 
 ## Editing Rule
 
-Edit generic AgentCanon behavior in the managed topic clone described by
-`documents/rule/dependency-module-changes.md`; do not edit a vendored pin as a source branch. Edit
-parent-specific contracts and project content in the parent repository. Only a repository that has
-selected the live mode may repair root views through the source-root resolver:
+Edit AgentCanon behavior in an AgentCanon issue branch based on current
+AgentCanon `main`. Edit project product, build, tests, and local policy in the
+parent repository. A live consumer tracks only the exact source pin and the
+manifest-owned view edges; it does not copy or locally patch AgentCanon custom
+agent definitions.
+
+A repository that selected the live mode may repair its views through the
+source-root resolver:
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
@@ -129,23 +209,31 @@ AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent
     exec tools/sync_agent_canon.sh link-root
 ```
 
-`link-root` and `check` consume the manifest and do not maintain a second hard-coded list. They must
-preserve parent-owned regular content and may remove only stale symlinks for entries in the retired
-group. A missing path is created only after checking the manifest, source tree, and owner map.
-
-Project-local automation must stay in project-owned paths; the shared namespace does not absorb
-parent tools.
+`link-root` must preserve parent-owned regular content. It may remove a retired
+path only under the existing bounded stale-symlink rules.
 
 ## Validation
 
-Run these checks only for the explicitly selected live integration:
+For AgentCanon source changes:
 
 ```bash
-PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/agent_tools/surface_manifest.py check-doc
-PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
-PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/agent_tools/check_convention_compliance.py
+python3 -m unittest -v \
+  tests/agent_tools/test_codex_projection_boundary.py \
+  tests/agent_tools/test_rust_projection_boundary.py
+python3 tools/agent_tools/surface_manifest.py --root . --prefix . \
+  projection-forbidden-roots
+python3 tools/agent_tools/surface_manifest.py --root . --prefix . check-doc
+bash tools/ci/run_standalone_static_gate_unit.sh rust
 ```
 
-Default static consumers instead use the source-hidden consumer and bootstrap validation from the
-static seed contract. No live projection check is implied by a normal clone, bootstrap, test, docs,
-Docker, or CI operation.
+For an initialized live parent integration:
+
+```bash
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root \
+  exec tools/sync_agent_canon.sh check
+```
+
+A parent repository may additionally validate the tracked symlink modes and
+lexical targets while the submodule checkout is uninitialized. That structural
+check does not claim that Codex can load the target bytes until the exact pin is
+initialized.
