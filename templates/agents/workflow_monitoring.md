@@ -5,7 +5,9 @@ contract workflow
 responsibility Documents Workflow Monitoring for this repository.
 upstream design ../../agents/canonical/CODEX_WORKFLOW.md defines staged workflow and closeout gates
 upstream design ../../agents/workflows/agent-learning-workflow.md defines feedback and self-improvement capture
+upstream design ../../documents/runtime/task-contract-observation.md defines task contract observation schema and terminal coverage
 downstream implementation ../../tools/agent_tools/workflow_monitor.py appends canonical monitoring and measurement entries
+downstream implementation ../../tools/agent_tools/task_contract_observation.py validates and summarizes contract observations
 downstream implementation ../../tools/agent_tools/evaluate_agent_run.py evaluates monitoring evidence
 downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py predicts pre-edit rejection gates
 @dependency-end
@@ -31,6 +33,8 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
 ## Behavior Events（behavior event）
 
 <!-- 観測可能な agent behavior を retrospective prose ではなく structured event として記録します。`workflow_monitor.py --behavior-event "..."` を優先します。skill invocation、subagent lifecycle（サブエージェントのライフサイクル）、wave_id 付き stage/subagent routing、mid-task expansion、budget before/after、spawned/skipped role と理由、実装を gate する tool call、skill 使用時の EVAL_RUN_ID/EVAL_USED_SKILLS/EVAL_ACCUMULATED_REPORT、dependency/static-analysis、code checker、pre-edit rejection prediction、hook/tool feedback、protocol update、token efficiency、runtime feedback、subagent no-return investigation、static-analysis feedback、execution path、route efficiency、review decision、feedback action、subagent closeout、diff-check approval を必要 event family とします。実利用 feedback で skill/workflow/eval/memory を更新する場合は `workflow_monitor.py --runtime-feedback "source=user target=<skill-or-workflow> action=prompt_repair"` を使います。runtime_feedback=observed かつ action が no_op でなければ、closeout 前に下の Improvement Decisions を少なくとも 1 つ applied または recorded にします。 -->
+
+<!-- タスク中に契約、guardrail、warning、failure、rejection、conflict が実際に作動したら、手書きの要約ではなく `python3 tools/agent_tools/task_contract_observation.py --report-dir <run> --record "<key=value...>"` で `agent-canon.task-contract-observation.v1` event を追加します。contract_id、contract_source、phase、trigger、outcome、owner、evidence_ref、response を記録し、blocked/violated は同一 identity の次 sequence で satisfied または durable issue 付き deferred_with_issue へ閉じます。観測がなければ `contract_observation=none owner=manager reason=<slug>` を 1 行だけ記録します。closeout 前に同 tool を引数なしで実行し、`task_contract_observation_eval_status=pass`、`task_contract_observation_coverage=complete`、`task_contract_resolution=terminal`、`contract_archive_route=agent-canon-log:agent-reports` を生成させます。pass token を手書きして checker の代替にしません。raw prompt、hidden reasoning、secret、absolute local path は保存しません。 -->
 
 ## Actual Wave Events（実際の wave event）
 
