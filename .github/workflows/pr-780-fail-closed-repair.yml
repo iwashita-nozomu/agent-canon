@@ -1,0 +1,233 @@
+name: PR 780 fail-closed repair
+
+on:
+  push:
+    branches:
+      - fix/747-748-update-entrypoint-cdi
+    paths:
+      - .github/workflows/pr-780-fail-closed-repair.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/747-748-update-entrypoint-cdi
+          fetch-depth: 0
+      - name: Apply conservative Make admission repair
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          implementation = Path("tools/agent_tools/skill_tool_commands.py")
+          text = implementation.read_text(encoding="utf-8")
+          old = '''def explicit_make_targets(makefile: Path) -> frozenset[str]:
+              """Return literal target names without expanding Make syntax or includes."""
+              try:
+                  text = makefile.read_text(encoding="utf-8", errors="replace")
+              except OSError:
+                  return frozenset()
+
+              targets: set[str] = set()
+              for logical_line in _logical_makefile_lines(text):
+                  line = _strip_unescaped_comment(logical_line).strip()
+                  if not line or line.startswith(("define ", "endef")) or ":" not in line:
+                      continue
+                  left, right = line.split(":", maxsplit=1)
+                  # ``:=`` and ``::=`` are assignments, not target declarations.
+                  if right.lstrip().startswith(("=", ":=")):
+                      continue
+                  for token in left.split():
+                      if token and not any(marker in token for marker in ("$", "%")):
+                          targets.add(token.replace(r"\\#", "#"))
+              return frozenset(targets)
+          '''
+          new = '''def explicit_make_targets(makefile: Path) -> frozenset[str]:
+              """Return only unconditional top-level literal target declarations."""
+              try:
+                  text = makefile.read_text(encoding="utf-8", errors="replace")
+              except OSError:
+                  return frozenset()
+
+              targets: set[str] = set()
+              define_depth = 0
+              conditional_depth = 0
+              for logical_line in _logical_makefile_lines(text):
+                  line = _strip_unescaped_comment(logical_line).strip()
+                  if not line:
+                      continue
+
+                  words = line.split()
+                  directive_words = words
+                  while directive_words and directive_words[0] in {
+                      "export",
+                      "override",
+                      "private",
+                  }:
+                      directive_words = directive_words[1:]
+                  directive = directive_words[0] if directive_words else ""
+
+                  if define_depth:
+                      if directive == "define":
+                          define_depth += 1
+                      elif directive == "endef":
+                          define_depth -= 1
+                      continue
+                  if directive == "define":
+                      define_depth = 1
+                      continue
+                  if directive == "endef":
+                      return frozenset()
+
+                  if directive in {"ifeq", "ifneq", "ifdef", "ifndef"}:
+                      conditional_depth += 1
+                      continue
+                  if directive == "else":
+                      if conditional_depth == 0:
+                          return frozenset()
+                      continue
+                  if directive == "endif":
+                      if conditional_depth == 0:
+                          return frozenset()
+                      conditional_depth -= 1
+                      continue
+                  if conditional_depth or ":" not in line:
+                      continue
+
+                  left, right = line.split(":", maxsplit=1)
+                  # Reject every assignment spelling and directive-shaped line. A
+                  # colon in an assignment value is not evidence for a target.
+                  if "=" in left or right.lstrip().startswith(("=", ":=")):
+                      continue
+                  literal_targets = left.split()
+                  if (
+                      not literal_targets
+                      or literal_targets[0]
+                      in {
+                          "-include",
+                          "export",
+                          "include",
+                          "override",
+                          "private",
+                          "sinclude",
+                          "undefine",
+                          "unexport",
+                          "vpath",
+                      }
+                      or any(
+                          re.fullmatch(r"[A-Za-z0-9_.@/+,-]+", token) is None
+                          for token in literal_targets
+                      )
+                  ):
+                      continue
+                  targets.update(literal_targets)
+
+              if define_depth or conditional_depth:
+                  return frozenset()
+              return frozenset(targets)
+          '''
+          old = "\n".join(line[10:] if line.startswith("          ") else line for line in old.splitlines())
+          new = "\n".join(line[10:] if line.startswith("          ") else line for line in new.splitlines())
+          if old not in text:
+              raise SystemExit("implementation replacement anchor not found")
+          implementation.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          tests = Path("tests/agent_tools/test_skill_tool_commands_update_entrypoint.py")
+          text = tests.read_text(encoding="utf-8")
+          marker = '''    def test_resolution_never_evaluates_makefile_functions(self) -> None:
+          '''
+          addition = '''    def test_define_and_conditional_bodies_are_not_target_evidence(self) -> None:
+              with tempfile.TemporaryDirectory() as tmp_dir:
+                  root = Path(tmp_dir)
+                  (root / "Makefile").write_text(
+                      "define DOCUMENTED_ALIAS\\n"
+                      "agent-canon-ensure-latest:\\n"
+                      "\\t@true\\n"
+                      "endef\\n"
+                      "ifeq ($(ENABLE_AGENT_CANON_ALIAS),1)\\n"
+                      "agent-canon-latest:\\n"
+                      "\\t@true\\n"
+                      "endif\\n"
+                      "agent-canon-update-plan:\\n"
+                      "\\t@true\\n",
+                      encoding="utf-8",
+                  )
+
+                  self.assertTrue(make_target_is_explicit(root, "agent-canon-update-plan"))
+                  self.assertFalse(make_target_is_explicit(root, "agent-canon-latest"))
+                  self.assertFalse(
+                      make_target_is_explicit(root, "agent-canon-ensure-latest")
+                  )
+
+              def test_assignment_value_with_colon_is_not_target_evidence(self) -> None:
+                  with tempfile.TemporaryDirectory() as tmp_dir:
+                      root = Path(tmp_dir)
+                      (root / "Makefile").write_text(
+                          "DOCUMENTED_ALIAS = agent-canon-ensure-latest:\\n",
+                          encoding="utf-8",
+                      )
+
+                      self.assertFalse(
+                          make_target_is_explicit(root, "agent-canon-ensure-latest")
+                      )
+                      self.assertIn(
+                          "tools/update_agent_canon.sh latest",
+                          resolve_optional_agent_canon_make_alias(
+                              "make agent-canon-ensure-latest", root
+                          ),
+                      )
+
+          '''
+          addition = "\n".join(line[10:] if line.startswith("          ") else line for line in addition.splitlines())
+          if marker not in text:
+              raise SystemExit("test insertion anchor not found")
+          tests.write_text(text.replace(marker, addition + marker, 1), encoding="utf-8")
+
+          owner_doc = Path("agents/skills/agent-canon-update.md")
+          text = owner_doc.read_text(encoding="utf-8")
+          old_doc = (
+              "The detector reads text only: it does not execute Make, expand variables, load\n"
+              "dynamic target names, or evaluate parse-time functions. Any absent, dynamic, or\n"
+              "unreadable alias fails closed to the canonical owner command; the parent\n"
+          )
+          new_doc = (
+              "The detector reads text only: it does not execute Make, expand variables, load\n"
+              "dynamic target names, or evaluate parse-time functions. Variable-definition\n"
+              "bodies, assignment text, and unevaluated conditional branches are not target\n"
+              "evidence. Any absent, dynamic, conditional, or unreadable alias fails closed to\n"
+              "the canonical owner command; the parent\n"
+          )
+          if old_doc not in text:
+              raise SystemExit("owner document replacement anchor not found")
+          owner_doc.write_text(text.replace(old_doc, new_doc, 1), encoding="utf-8")
+
+          Path(".github/workflows/pr-780-fail-closed-repair.yml").unlink()
+          PY
+      - name: Run focused validation
+        run: |
+          python3 -m py_compile \
+            tools/agent_tools/skill_tool_commands.py \
+            tests/agent_tools/test_skill_tool_commands_update_entrypoint.py \
+            tests/agent_tools/test_gpu_execution_cdi_contract.py
+          python3 -m unittest \
+            tests.agent_tools.test_skill_tool_commands_update_entrypoint \
+            tests.agent_tools.test_gpu_execution_cdi_contract -v
+          git diff --check
+      - name: Commit repaired branch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            tools/agent_tools/skill_tool_commands.py \
+            tests/agent_tools/test_skill_tool_commands_update_entrypoint.py \
+            agents/skills/agent-canon-update.md \
+            .github/workflows/pr-780-fail-closed-repair.yml
+          git commit -m "fix: keep Make alias admission fail closed (#747)"
+          git push origin HEAD:fix/747-748-update-entrypoint-cdi
