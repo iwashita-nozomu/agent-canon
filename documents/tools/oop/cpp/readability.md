@@ -6,6 +6,7 @@ responsibility Documents C++ OOP readability checker behavior in Japanese.
 upstream implementation ../../../../tools/oop/cpp/readability.py C++ OOP readability checker
 upstream implementation ../../../../tools/oop/shared/readability_core.py shared typed-boundary evidence
 upstream design ../../../conventions/object-oriented-design.md OOP policy source
+upstream design ../../../design/cpp-build-layout.md canonical native project surface
 downstream design ../../tool-docs.toml one-to-one tool/document manifest
 @dependency-end
 -->
@@ -65,17 +66,27 @@ struct、domain contract のない pass-through wrapper、`nullptr` runtime rout
 ## 実行例
 
 ```bash
-python3 tools/oop/cpp/readability.py --format markdown --include-snippets cpp/include cpp/src tests/cpp cpp/experiments
+python3 tools/oop/cpp/readability.py \
+  --format markdown \
+  --include-snippets \
+  include src tests/cpp experiments/cpp
 ```
+
+存在しない optional path は入力から除外します。legacy `cpp/` tree を fallback として
+加えてはいけません。
 
 混在 source を 1 回で見たい場合は、shared Python entrypoint に `--language all` を渡します。
 この場合、file suffix で Python / C++ を自動選択します。
 
 ```bash
-python3 tools/oop/python/readability.py --language all --format markdown python tools cpp tests
+python3 tools/oop/python/readability.py \
+  --language all \
+  --format markdown \
+  python tools include src tests experiments
 ```
 
-この checker は build evidence ではありません。C++ 変更では project-native configure / build / test と併せて、OOP readability report を review 補助として扱います。
+この checker は build evidence ではありません。C++ 変更では root `CMakeLists.txt` からの
+project-native configure / build / test と併せて、OOP readability report を review 補助として扱います。
 既定の `OOP_READABILITY` は scalar threshold ではなく signal class で判定します。
 size / public surface / parameter count / complexity は boundary review signal として扱い、
 数値だけで分割を要求しません。`nullptr` routing、public state owner、不要 wrapper、
