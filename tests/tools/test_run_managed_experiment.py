@@ -1377,8 +1377,8 @@ def test_check_experiment_registry_accepts_valid_branch_topic(tmp_path: Path) ->
         capture_output=True,
         text=True,
     )
-    (repo_root / "notes" / "branches").mkdir(parents=True)
-    (repo_root / "notes" / "branches" / "branch_only.md").write_text(
+    (repo_root / "documents" / "notes" / "branches").mkdir(parents=True)
+    (repo_root / "documents" / "notes" / "branches" / "branch_only.md").write_text(
         "# Branch Only\n",
         encoding="utf-8",
     )
@@ -1419,8 +1419,8 @@ def test_check_experiment_registry_rejects_duplicate_branch_topic_name(
 ) -> None:
     """The registry checker should reject duplicate names across topic tables."""
     repo_root = build_repo(tmp_path)
-    (repo_root / "notes" / "branches").mkdir(parents=True)
-    (repo_root / "notes" / "branches" / "demo_topic.md").write_text(
+    (repo_root / "documents" / "notes" / "branches").mkdir(parents=True)
+    (repo_root / "documents" / "notes" / "branches" / "demo_topic.md").write_text(
         "# Demo Topic Branch\n",
         encoding="utf-8",
     )
