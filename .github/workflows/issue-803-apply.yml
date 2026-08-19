@@ -1,0 +1,323 @@
+# @dependency-start
+# contract workflow
+# responsibility Applies the Issue 803 relation-kind change atomically and removes itself before review.
+# upstream design ../../documents/design/dependency-manifest-design.md governs dependency relation semantics
+# @dependency-end
+name: issue-803-apply
+
+on:
+  push:
+    branches:
+      - fix/803-reference-dependency-edge
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/803-reference-dependency-edge
+          fetch-depth: 0
+
+      - name: Apply reference relation support
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          def replace_exact(path: str, old: str, new: str, expected: int = 1) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              actual = text.count(old)
+              if actual != expected:
+                  raise SystemExit(
+                      f"{path}: expected {expected} occurrence(s), found {actual}: {old!r}"
+                  )
+              target.write_text(text.replace(old, new), encoding="utf-8")
+
+          replace_exact(
+              "tools/agent_tools/check_dependency_header_format.sh",
+              '# downstream implementation ./check_dependency_graph.sh consumes validated manifest lines\n# @dependency-end',
+              '# downstream implementation ./check_dependency_graph.sh consumes validated manifest lines\n'
+              '# downstream implementation ../../tests/agent_tools/test_dependency_reference_edge.py verifies reference relation format acceptance\n'
+              '# @dependency-end',
+          )
+          replace_exact(
+              "tools/agent_tools/check_dependency_header_format.sh",
+              'if [[ "$kind" != "design" && "$kind" != "implementation" && "$kind" != "environment" ]]; then',
+              'if [[ "$kind" != "design" && "$kind" != "implementation" && "$kind" != "environment" && "$kind" != "reference" ]]; then',
+          )
+
+          replace_exact(
+              "tools/agent_tools/source_dependency_graph.py",
+              '# downstream implementation ../../tests/agent_tools/test_graph_client_source_projection.py validates no-runtime projections\n# @dependency-end',
+              '# downstream implementation ../../tests/agent_tools/test_graph_client_source_projection.py validates no-runtime projections\n'
+              '# downstream implementation ../../tests/agent_tools/test_dependency_reference_edge.py validates non-authoritative reference context\n'
+              '# @dependency-end',
+          )
+          replace_exact(
+              "tools/agent_tools/source_dependency_graph.py",
+              'DEPENDENCY_KINDS = frozenset({"design", "implementation", "environment"})',
+              'DEPENDENCY_KINDS = frozenset({"design", "implementation", "environment", "reference"})',
+          )
+          replace_exact(
+              "tools/agent_tools/source_dependency_graph.py",
+              'CONTEXT_KINDS = frozenset({"design", "implementation"})',
+              'CONTEXT_KINDS = frozenset({"design", "implementation", "reference"})',
+          )
+
+          replace_exact(
+              "rust/agent-canon/src/dependency_manifest.rs",
+              'pub(crate) fn capture_snapshot(\n',
+              'fn dependency_relation_kind_is_allowed(kind: &str) -> bool {\n'
+              '    matches!(\n'
+              '        kind,\n'
+              '        "design" | "implementation" | "environment" | "reference"\n'
+              '    )\n'
+              '}\n\n'
+              'pub(crate) fn capture_snapshot(\n',
+          )
+          replace_exact(
+              "rust/agent-canon/src/dependency_manifest.rs",
+              '            if !matches!(kind, "design" | "implementation" | "environment")\n'
+              '                || target.is_empty()\n',
+              '            if !dependency_relation_kind_is_allowed(kind) || target.is_empty()\n',
+          )
+          replace_exact(
+              "rust/agent-canon/src/dependency_manifest.rs",
+              '    use super::{\n        declaration_identity, diagnostic_identity_json, manifest_lines,\n',
+              '    use super::{\n        declaration_identity, dependency_relation_kind_is_allowed, diagnostic_identity_json,\n        manifest_lines,\n',
+          )
+          replace_exact(
+              "rust/agent-canon/src/dependency_manifest.rs",
+              '    #[test]\n    fn python_dependency_manifest_requires_line_comments() {\n',
+              '    #[test]\n'
+              '    fn dependency_relation_kinds_include_non_authoritative_reference() {\n'
+              '        for kind in ["design", "implementation", "environment", "reference"] {\n'
+              '            assert!(dependency_relation_kind_is_allowed(kind), "kind={kind}");\n'
+              '        }\n'
+              '        assert!(!dependency_relation_kind_is_allowed("test"));\n'
+              '    }\n\n'
+              '    #[test]\n'
+              '    fn python_dependency_manifest_requires_line_comments() {\n',
+          )
+
+          replace_exact(
+              "documents/design/dependency-manifest-design.md",
+              '- `kind` は `design`、`implementation`、`environment`',
+              '- `kind` は `design`、`implementation`、`environment`、`reference`',
+          )
+          replace_exact(
+              "documents/design/dependency-manifest-design.md",
+              '`test` は contract kind registry の file-level contract 分類であり、\n'
+              'dependency relation kind ではありません。依存 manifest の relation は\n'
+              '`design`、`implementation`、`environment` の3種に限定し、テストへの\n'
+              '依存も `downstream implementation` として宣言します。\n\n'
+              '`environment` は Docker、CI、requirements、lock、tool config、runtime assumption を表します。\n\n'
+              'Dependency relation はこの3種に限定します。`test`、`review`、`report`\n',
+              '`test` は contract kind registry の file-level contract 分類であり、\n'
+              'dependency relation kind ではありません。依存 manifest の relation は\n'
+              '`design`、`implementation`、`environment`、`reference` の4種に限定し、\n'
+              'テストへの依存も `downstream implementation` として宣言します。\n\n'
+              '`environment` は Docker、CI、requirements、lock、tool config、runtime assumption を表します。\n\n'
+              '`reference` は memo、実験 source record、または非権威の背景資料への引用を表します。\n'
+              '引用先は source-derived context の `evidence_paths` に含めますが、設計 owner、\n'
+              'contract parent、または `parent_paths` には昇格しません。仕様・規約・schema の\n'
+              '正本を指す場合は引き続き `design` を使います。\n\n'
+              'Dependency relation はこの4種に限定します。`test`、`review`、`report`\n',
+          )
+
+          test_path = Path("tests/agent_tools/test_dependency_reference_edge.py")
+          test_path.write_text(
+              textwrap.dedent(
+                  '''\
+                  """Focused tests for non-authoritative reference dependency relations."""
+
+                  # @dependency-start
+                  # contract test
+                  # responsibility Verifies reference relations are valid evidence without becoming design owners.
+                  # upstream implementation ../../tools/agent_tools/source_dependency_graph.py parses and projects reference relations
+                  # upstream implementation ../../tools/agent_tools/check_dependency_header_format.sh validates reference relation syntax and paths
+                  # @dependency-end
+
+                  from __future__ import annotations
+
+                  import subprocess
+                  import tempfile
+                  import textwrap
+                  import unittest
+                  from pathlib import Path
+
+                  from tools.agent_tools.source_dependency_graph import (
+                      SourceDependencyError,
+                      build_context_projection,
+                      parse_manifest_document,
+                  )
+
+                  REPO_ROOT = Path(__file__).resolve().parents[2]
+                  FORMAT_CHECKER = REPO_ROOT / "tools" / "agent_tools" / "check_dependency_header_format.sh"
+
+
+                  def write(path: Path, content: str) -> None:
+                      """Write one dedented UTF-8 fixture file."""
+                      path.parent.mkdir(parents=True, exist_ok=True)
+                      path.write_text(textwrap.dedent(content).lstrip(), encoding="utf-8")
+
+
+                  def manifest(declaration: str) -> str:
+                      """Return one valid file manifest containing the supplied relation."""
+                      return f"""\
+                      # @dependency-start
+                      # contract test
+                      # responsibility Exercises one dependency relation.
+                      # {declaration}
+                      # @dependency-end
+                      """
+
+
+                  class DependencyReferenceEdgeTest(unittest.TestCase):
+                      """Keep reference relations valid, bounded, and non-authoritative."""
+
+                      def test_reference_is_evidence_but_not_a_design_parent(self) -> None:
+                          with tempfile.TemporaryDirectory() as tmp_dir:
+                              root = Path(tmp_dir)
+                              write(root / "documents" / "notes" / "memo.md", "# Memo\n")
+                              write(
+                                  root / "documents" / "design" / "feature.md",
+                                  manifest(
+                                      "upstream reference ../notes/memo.md records decision context"
+                                  ),
+                              )
+
+                              document = parse_manifest_document(
+                                  root, "documents/design/feature.md", ()
+                              )
+                              self.assertEqual(len(document.edges), 1)
+                              self.assertEqual(document.edges[0].kind, "reference")
+                              self.assertEqual(
+                                  document.edges[0].target, "documents/notes/memo.md"
+                              )
+
+                              context = build_context_projection(
+                                  root, "documents/design/feature.md"
+                              )
+                              self.assertEqual(
+                                  context.evidence_paths,
+                                  (
+                                      "documents/design/feature.md",
+                                      "documents/notes/memo.md",
+                                  ),
+                              )
+                              self.assertEqual(context.parent_paths, ())
+
+                      def test_invalid_direction_kind_and_containment_still_fail_closed(self) -> None:
+                          cases = {
+                              "direction": "sideways reference memo.md reason",
+                              "kind": "upstream citation memo.md reason",
+                              "absolute": "upstream reference /memo.md reason",
+                              "escape": "upstream reference ../outside.md reason",
+                          }
+                          for name, declaration in cases.items():
+                              with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp_dir:
+                                  root = Path(tmp_dir)
+                                  write(root / "memo.md", "# Memo\n")
+                                  write(root / "source.md", manifest(declaration))
+                                  with self.assertRaises(SourceDependencyError):
+                                      parse_manifest_document(root, "source.md", ())
+
+                      def test_derived_root_checker_accepts_reference_and_rejects_missing_target(self) -> None:
+                          with tempfile.TemporaryDirectory() as tmp_dir:
+                              root = Path(tmp_dir)
+                              write(root / "documents" / "notes" / "memo.md", "# Memo\n")
+                              source = root / "source.md"
+                              write(
+                                  source,
+                                  manifest(
+                                      "upstream reference documents/notes/memo.md records memo context"
+                                  ),
+                              )
+
+                              accepted = subprocess.run(
+                                  [
+                                      "bash",
+                                      str(FORMAT_CHECKER),
+                                      "--root",
+                                      str(root),
+                                      "source.md",
+                                  ],
+                                  cwd=REPO_ROOT,
+                                  check=False,
+                                  capture_output=True,
+                                  text=True,
+                              )
+                              self.assertEqual(
+                                  accepted.returncode,
+                                  0,
+                                  accepted.stdout + accepted.stderr,
+                              )
+                              self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", accepted.stdout)
+
+                              write(
+                                  source,
+                                  manifest(
+                                      "upstream reference documents/notes/missing.md missing target"
+                                  ),
+                              )
+                              rejected = subprocess.run(
+                                  [
+                                      "bash",
+                                      str(FORMAT_CHECKER),
+                                      "--root",
+                                      str(root),
+                                      "source.md",
+                                  ],
+                                  cwd=REPO_ROOT,
+                                  check=False,
+                                  capture_output=True,
+                                  text=True,
+                              )
+                              self.assertNotEqual(rejected.returncode, 0)
+                              self.assertIn(
+                                  "dependency target does not exist",
+                                  rejected.stdout + rejected.stderr,
+                              )
+
+
+                  if __name__ == "__main__":
+                      unittest.main()
+                  '''
+              ),
+              encoding="utf-8",
+          )
+
+          Path(".github/workflows/issue-803-apply.yml").unlink()
+          PY
+
+      - name: Validate focused change
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          bash -n tools/agent_tools/check_dependency_header_format.sh
+          python3 -m py_compile \
+            tools/agent_tools/source_dependency_graph.py \
+            tests/agent_tools/test_dependency_reference_edge.py
+          python3 tests/agent_tools/test_dependency_reference_edge.py -v
+          cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check
+          cargo test --manifest-path rust/agent-canon/Cargo.toml \
+            dependency_relation_kinds_include_non_authoritative_reference
+          bash tools/agent_tools/check_dependency_header_format.sh --changed
+
+      - name: Commit the reviewed tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "agent-canon-validation"
+          git config user.email "agent-canon-validation@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: support reference dependency edges (#803)"
+          git push origin HEAD:fix/803-reference-dependency-edge
