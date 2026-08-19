@@ -74,8 +74,10 @@ class、module、file、directory の形を機械的に要求しません。OOP 
 - `cpp-test-<name>` と `cpp-experiment-<name>` は `cpp-core` を consume する consumer です。
 - `cpp-tests` と `cpp-experiments` は consumer grouping を表し、production state や
   run/result publication を所有しません。
-- public header は `cpp/include/`、implementation は `cpp/src/`、CTest source は
-  `tests/cpp/`、native experiment source は `cpp/experiments/` に対応づけます。
+- public header は root `include/`、implementation は root `src/`、CTest source は
+  `tests/cpp/`、native experiment source は `experiments/cpp/` に対応づけます。
+- root `CMakeLists.txt` が同一 target graph を所有し、legacy `cpp/` subtree や
+  forwarding wrapper は ownership boundary にしません。
 - target graph の dependency direction は consumer → provider (`test/experiment → cpp-core`)
   とし、external effect、run config、result retention は既存 lifecycle owner に接続します。
 
@@ -225,9 +227,12 @@ python3 tools/oop/python/rule_inventory.py
 C++ surface では次を baseline として使います。
 
 ```bash
-python3 tools/oop/cpp/readability.py cpp/include cpp/src tests/cpp cpp/experiments
+python3 tools/oop/cpp/readability.py include src tests/cpp experiments/cpp
 python3 tools/oop/cpp/rule_inventory.py
 ```
+
+存在しない optional source path は analyzer 入力から除外し、legacy `cpp/` path を
+fallback として追加しません。
 
 この tool は次の risk を検出します。
 
