@@ -32,7 +32,7 @@ for parent AgentCanon PR graph selection; unknown IDs fail selection.
 | docker-runtime | Docker runtime | root `docker/`, runtime packs | Dockerfile, image, pack, Jupyter, or container setup changes | no |
 | github-automation | GitHub automation | `.github/`, PR templates, Actions helpers | GitHub Actions, PR automation, or GitHub path-constrained copies change | no |
 | experiment | Experiment | `experiments/`, experiment registry, managed runner tools | Experiment topics, formal runs, result summaries, or research workflows change | no |
-| cpp | C++ | parent root remains language-neutral, `cpp/CMakeLists.txt` as the single native project entry, `cpp/cmake/`, `cpp/src/`, `cpp/include/`, `tests/cpp/` (out-of-tree project tests), `cpp/experiments/`, C++ OOP checks, `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"` | C or C++ code, build layout, or native artifacts change | no |
+| cpp | C++ | repository root owns the native project alongside other project entrypoints, root `CMakeLists.txt` as the single native project entry, root `cmake/`, root `src/`, root `include/`, `tests/cpp/` (derived product tests), `experiments/cpp/` (optional native experiment targets), C++ OOP checks, `cmake -S "$ROOT" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`, no `cpp/` production compatibility tree or forwarding CMake wrapper | C or C++ code, build layout, or native artifacts change | no |
 | memory-and-learning | Memory and learning | `memory/`, notes promotion, learning workflows | User asks to persist memory, feedback/retrospective is observed, or agent-learning is in scope | no |
 | maintenance | Maintenance | inventories, review backlog scan, improvement guide, catalog drift tools | AgentCanon maintenance, repo-wide audit, or scheduled cleanup work | yes |
 
@@ -116,7 +116,7 @@ Intent preservation routes:
 | Docker/devcontainer/runtime pack | `bash tools/docker_dependency_validator.sh`; `make docker-build-check` when build behavior changes |
 | GitHub workflow/PR | `python3 tools/ci/check_github_workflows.py`; relevant GitHub Actions evidence when available |
 | Experiments | `make experiment-check`; managed run evidence for formal experiment changes |
-| C/C++ | `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`; `cmake --build "$ROOT/build/cpp/<profile>" --parallel`; `ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure`; `cmake --install "$ROOT/build/cpp/<profile>"`; project-native C++ reviewer/checker evidence, including consumer-to-provider target readback |
+| C/C++ | `cmake -S "$ROOT" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`; `cmake --build "$ROOT/build/cpp/<profile>" --parallel`; `ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure`; `cmake --install "$ROOT/build/cpp/<profile>"`; project-native C++ reviewer/checker evidence, including consumer-to-provider target readback and legacy `cpp/` absence |
 | Memory/eval/hook logging | append-only artifact evidence and improvement guide/eval checks when prompts or logging fields change |
 
 ## Closeout Rule
