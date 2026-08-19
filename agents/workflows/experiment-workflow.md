@@ -80,7 +80,7 @@ python3 -m tools.experiments.create_experiment_topic <topic>
 - `Fairness Notes:`
   - 同じ case set、同じ timeout、同じ hardware、同じ seed policy、同じ allocator 方針をどこまで維持するか。
 - `Artifact Plan:`
-  - 実験ディレクトリ、`result/<variant>/<run_name>/` の出力先、`result/<variant>/<run_name>/logs/` のログ置き場、`experiments/report/<topic>/<variant>/<run_name>.md` の置き場、annex archive path を先に固定します。
+  - tracked compact evidence の `result/<variant>/<run_name>/`、bulky raw の `raw/<variant>/<run_name>/`、reader report、raw annex archive path を同じ `ExperimentIdentity` から先に固定します。
 - `Visualization Plan:`
   - 可視化 notebook を `experiments/<topic>/visualize.ipynb` に置き、読む result artifact と生成する figure / table を先に固定します。Notebook を formal run の起動手順や設定正本にしません。
 - `Naming Plan:`
@@ -107,20 +107,22 @@ python3 -m tools.experiments.create_experiment_topic <topic>
 
 - 実験コード
   - `experiments/<topic>/`
-- runtime 生成物
+- tracked compact review evidence
   - `experiments/<topic>/result/<variant>/<run_name>/`
-- run-local log
+- bulky raw artifact
+  - `experiments/<topic>/raw/<variant>/<run_name>/`
+- compact run-local log
   - `experiments/<topic>/result/<variant>/<run_name>/logs/`
 - 可視化 notebook
   - `experiments/<topic>/visualize.ipynb`
 - 1 回の実験 report
   - `experiments/report/<topic>/<variant>/<run_name>.md`
 - annex archive
-  - `experiments/<topic>/result/<variant>/<run_name>.tar.gz`
+  - `experiments/<topic>/raw/<variant>/<run_name>.tar.gz`
 - 複数 run をまたぐ要約や知見
-  - `notes/experiments/<topic>.md` または `notes/themes/`
+  - `documents/notes/experiments/<topic>.md` または `documents/notes/themes/`
 
-top-level の `reports/` は project-wide な review、automation、management report の置き場として扱い、topic ごとの experiment report の正本には使いません。`notes/experiments/` は run ごとの一次 report ではなく、横断的な要約の置き場として使います。
+top-level の `reports/` は project-wide な review、automation、management report の置き場として扱い、topic ごとの experiment report の正本には使いません。`documents/notes/experiments/` は run ごとの一次 report ではなく、横断的な要約の置き場として使います。
 
 準備段階で固定する命名は次です。
 
@@ -178,7 +180,9 @@ process 管理や GPU 割当は runner 側の責務であり、実験 script 側
 - `visualize.ipynb`
   - run artifact を読む可視化 notebook を置く。Notebook は説明と図表化を担い、正式 run の起動や test を担いません。
 - `result/`
-  - `result/<variant>/<run_name>/` ごとに JSON、JSONL、`logs/`、図を置く。
+  - tracked compact JSON、JSONL、manifest、small figure だけを置く。
+- `raw/`
+  - bulky output を `raw/<variant>/<run_name>/` に置き、summary/report を重複させない。
 
 `experiment_runner` を使う実験で、実験側が実装する対象は次の 5 点に絞ります。
 
@@ -202,7 +206,7 @@ process 管理や GPU 割当は runner 側の責務であり、実験 script 側
 - `result/<variant>/<run_name>/logs/` のログ置き場
 - `visualize.ipynb` の可視化入口
 - `experiments/report/<topic>/<variant>/<run_name>.md` の置き場
-- 関連する `notes/` を使う場合はその入口
+- 関連する `documents/notes/` を使う場合はその入口
 - run_name の形式
 
 `experiment_runner` を使う場合の入口は次です。
@@ -326,12 +330,12 @@ source checkout は `main` のまま保ち、保存対象は `result/<variant>/<
 
 ```bash
 python3 -m tools.experiments.save_experiment_result_annex \
-  --result-dir experiments/<topic>/result/<variant>/<run_name> \
-  --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
+  --raw-dir experiments/<topic>/raw/<variant>/<run_name> \
+  --annex-repo "$EXPERIMENT_RAW_ANNEX_REPO"
 ```
 
 この tool は `run_manifest.json` の source provenance と current source tree を記録し、
-`experiments/<topic>/result/<variant>/<run_name>.tar.gz` を append-only で一度だけ作成します。
+`experiments/<topic>/raw/<variant>/<run_name>.tar.gz` を append-only で一度だけ作成します。
 
 #### 4.4 long run のルール
 
@@ -405,7 +409,7 @@ carry-over のルールは次です。
 - 可視化 notebook は `experiments/<topic>/visualize.ipynb` に残し、run artifact を読む形にする
 - 1 回の実験 report は `experiments/report/<topic>/<variant>/<run_name>.md` に残す
 - formal run の生成物は `tools/experiments/save_experiment_result_annex.py` で専用 annex worktree に archive する
-- 複数 run をまたぐ知見だけを `notes/` へ持ち上げる
+- 複数 run をまたぐ知見だけを `documents/notes/` へ持ち上げる
 - partial run は診断用とし、正式な report の正本にしない
 
 ## 2.5 Log-Derived Prohibitions
@@ -446,7 +450,7 @@ repo と対応する worktree logs から抽出した再発防止事項を、実
 1. `experimenter`
    - 同じ protocol で fresh run を実行する。
 1. `experimenter`
-   - `summary.json`、`cases.jsonl`、draft report を生成する。`notes/` を使う場合は対応する experiment note も生成する。
+   - `summary.json`、`cases.jsonl`、draft report を生成する。`documents/notes/` を使う場合は対応する experiment note も生成する。
 1. `experiment_reviewer`
    - report と結果の読み方を批判的にレビューする。
    - [experiment-critical-review.md](../../documents/experiments/experiment-critical-review.md) を使って、math validity、evidence sufficiency、figure validity、overclaim を確認する。

@@ -3,20 +3,21 @@
 @dependency-start
 contract reference
 responsibility Documents Notes Hub for this repository.
-upstream design ../README.md notes lifecycle index
+upstream design ../../README.md repository entrypoint and operating context
+upstream design ../README.md document index and notes placement boundary
 @dependency-end
 -->
 
 
-`notes/` は、長く残したい知見、比較、要約、補助メモを置く場所です。
+`documents/notes/` は、長く残したい知見、比較、要約、補助メモを置く場所です。
 規約や設計の一次情報は `documents/` に残し、ここではそれに昇格させる前の知見や、run をまたいで残したい判断を扱います。
 
 ## この文書の読み方
 
-- この文書は、`notes/` のカテゴリ、置くもの、置かないもの、carry-over、growth、action log、書き方を説明します。
+- この文書は、`documents/notes/` のカテゴリ、置くもの、置かないもの、carry-over、growth、action log、書き方を説明します。
 - まずカテゴリで置き場所を選び、次に置くもの / 置かないもの、main carry-over、growth、action log、書き方を確認します。
 - run をまたいで残す知見、実験要約、guardrail、failure、例外 branch / worktree の記録先を選ぶときに読みます。
-- `notes/` は一次 policy の置き場ではなく、正本ルールや設計は `documents/` に残します。
+- `documents/notes/` は一次 policy の置き場ではなく、正本ルールや設計は `documents/` に残します。
 
 ## カテゴリ
 
@@ -55,18 +56,18 @@ upstream design ../README.md notes lifecycle index
 
 ## Main Carry-Over Rule
 
-- `main` に残したい要約、観測、判断のうち、規約、レビュー、実コードに属さないものは `notes/` に置きます。
-- worktree を削除する前に、残すべき `notes/` は `main` に commit 済み、または `main` に merge 済みでなければなりません。
-- `results/*` branch に raw 結果を残す場合でも、`main` から辿る要約 note は `notes/` 側へ持ち帰ります。
+- `main` に残したい要約、観測、判断のうち、規約、レビュー、実コードに属さないものは `documents/notes/` に置きます。
+- worktree を削除する前に、残すべき `documents/notes/` は `main` に commit 済み、または `main` に merge 済みでなければなりません。
+- `results/*` branch に raw 結果を残す場合でも、`main` から辿る要約 note は `documents/notes/` 側へ持ち帰ります。
 - `main` に持ち帰る実験結果は、完走した fresh run の最小 final JSON と要約 note に限ります。
-- partial run は診断材料として扱い、`notes/` の canonical result にはしません。
+- partial run は診断材料として扱い、`documents/notes/` の canonical result にはしません。
 
 ## Growth Rule
 
-- 実行中の局所ログは `notes/worktrees/` に残します。
-- closeout 時に、再利用知識は `notes/knowledge/`、topic synthesis は `notes/themes/`、再発防止は `notes/failures/` へ昇格させます。
+- 実行中の局所ログは `documents/notes/worktrees/` に残します。
+- closeout 時に、再利用知識は `documents/notes/knowledge/`、topic synthesis は `documents/notes/themes/`、再発防止は `documents/notes/failures/` へ昇格させます。
 - どこへ昇格させるか迷うときは `documents/operations/notes-lifecycle.md` を見ます。
-- `notes/` は「書き捨て」ではなく、closeout ごとに再編して太らせる前提です。
+- `documents/notes/` は「書き捨て」ではなく、closeout ごとに再編して太らせる前提です。
 - stable preference は対象の `AGENTS.md` または canonical owner へ直接昇格します。
 - 同じ問題に再遭遇したときに使う独立した知識だけを shared canon `memory/records/*.md` に残します。
   raw chat と時系列観測は runtime logs/evidence/issues/failures の owner に置きます。
@@ -74,7 +75,7 @@ upstream design ../README.md notes lifecycle index
 ## Action Log Rule
 
 - branch / worktree を例外運用する場合は、意味のある操作を 1 か所の append-only な note に逐次残します。
-- 既定の action log 置き場は `notes/worktrees/worktree_<topic>_YYYY-MM-DD.md` です。
+- 既定の action log 置き場は `documents/notes/worktrees/worktree_<topic>_YYYY-MM-DD.md` です。
 - scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断のような節目は必ず追記します。
 - worktree 内で下書きするときも、最終的に `main` に置くのと同じ相対パスへ書きます。
 
@@ -86,5 +87,5 @@ upstream design ../README.md notes lifecycle index
 - 自分の仮説や解釈は `Idea:`、`Interpretation:`、`Consideration:` で分けます。
 - 重要情報をリンク先に逃がしすぎません。
 - 一度 `main` に置いた過去の note 本文はむやみに書き換えません。補足が必要なら追記で対応します。
-- host 固有の Git mirror や bare repo hook は `notes/github-mirror-procedure.md` に残します。
+- host 固有の Git mirror や bare repo hook は `documents/notes/github-mirror-procedure.md` に残します。
 - 新しい note は category ごとの template から始めて構いません。

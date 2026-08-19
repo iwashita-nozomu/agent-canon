@@ -171,7 +171,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "tool_rejection_preflight.py responsibility_scope responsibility-scope.toml "
         "protecting tools\n"
     ),
-    "notes/guardrails/engineering_avoidances.md": (
+    "documents/notes/guardrails/engineering_avoidances.md": (
         "compatibility-preservation drift duplicate implementation canonical owner "
         "contract-complete implementation acceptance contract design_issue_blocker "
         "implementation shortcut\n"

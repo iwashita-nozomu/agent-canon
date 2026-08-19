@@ -49,7 +49,7 @@ def test_agent_canon_parent_sync_gate_ignores_symlink_source_changes() -> None:
     """Changes only under symlink source roots must skip root topology checks."""
     workspace = Path(__file__).resolve().parents[2]
     assert not agent_canon_parent_sync_gate_required(
-        ("agents/foo.md", "notes/knowledge/file.md"),
+        ("agents/foo.md", "documents/notes/knowledge/file.md"),
         workspace=workspace,
     )
 
@@ -101,7 +101,7 @@ def test_agent_canon_parent_sync_gate_accepts_non_trigger_dirty_workspace_state(
     """Unknown local changes should not trigger full parent sync."""
     workspace = Path(__file__).resolve().parents[2]
     assert not agent_canon_parent_sync_gate_required(
-        ("notes/knowledge/non_trigger_file.md", "vendor/notes/other.txt"),
+        ("documents/notes/knowledge/non_trigger_file.md", "vendor/notes/other.txt"),
         workspace=workspace,
     )
 
@@ -143,7 +143,7 @@ def test_agent_canon_parent_gitlink_integrity_fails_for_unreachable_target(monke
 def test_agent_canon_parent_sync_gate_internal_symlink_change_keeps_full_sync_and_integrity_false() -> None:
     """Internal source edits to symlink targets should not open full sync gate."""
     workspace = Path(__file__).resolve().parents[2]
-    changed_paths = ("agents/foo.md", "notes/knowledge/file.md")
+    changed_paths = ("agents/foo.md", "documents/notes/knowledge/file.md")
     assert not agent_canon_parent_sync_gate_required(changed_paths, workspace=workspace)
     _, new_hash = _gitlink_update_candidates(workspace)
     assert new_hash is None

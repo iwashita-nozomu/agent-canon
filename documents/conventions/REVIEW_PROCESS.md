@@ -47,7 +47,8 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
   - `cpp-review`
 - C++ project layout / CMake command の差分
   - `cpp/CMakeLists.txt` を project entrypoint とする target graph の readback
-  - `cpp/include`、`cpp/src`、`cpp/tests`、`cpp/experiments` の owner readback
+  - `cpp/include`、`cpp/src`、`tests/cpp`、`cpp/experiments` の owner readback。production
+    subtree に test compatibility path がないことを確認
   - parent-root anchor `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>"` の command review
 - 大規模 refactor の review
   - `change-review`
@@ -205,7 +206,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 
 - run 固有の intake、design、review、verification、retrospective は `reports/agents/<run-id>/` に置きます。
 - project-wide な分析や再利用する長文 report は `reports/` に置きます。
-- 一時メモや cross-run の補助知見は `notes/` に置きます。
+- 一時メモや cross-run の補助知見は `documents/notes/` に置きます。
 
 ## 禁止事項
 

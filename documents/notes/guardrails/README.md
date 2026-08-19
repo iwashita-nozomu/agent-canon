@@ -24,5 +24,5 @@ upstream design ../README.md notes lifecycle index
 ## ルール
 
 - `documents/` の正本規約を置き換えるものではなく、繰り返し参照する禁止事項の補助 note として使います。
-- 具体的な再発防止は `notes/failures/` へ、repo-wide な避けることはここへ置きます。
+- 具体的な再発防止は `documents/notes/failures/` へ、repo-wide な避けることはここへ置きます。
 - 実装上の avoid と運用上の avoid は混ぜすぎず、検索しやすい単位で分けます。

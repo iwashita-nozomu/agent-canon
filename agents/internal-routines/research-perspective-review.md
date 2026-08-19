@@ -15,7 +15,7 @@ upstream design ../canonical/skills.md skill canon registry
 ## Use When
 
 - benchmark protocol、artifact policy、reporting policy の大きな変更
-- `experiments/`、`experiments/report/`、`notes/experiments/` を含む repo-wide review
+- `experiments/`、`experiments/report/`、`documents/notes/experiments/` を含む repo-wide review
 - 研究 workflow、研究文書、比較設計の大きな整理
 - method 採否や報告方針を `main` に持ち帰る前の独立レビュー
 

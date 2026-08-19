@@ -186,7 +186,7 @@ def main() -> int:
         print(f"canonical_provenance_template={provenance_template}")
         print(f"topic_dir={topic_dir}")
         print(f"registry_path={registry_path}")
-        print("planned_topic_files=README.md,provenance.toml,run.py,cases.py,case_model.py,case_execution.py,artifact_schema.py,artifact_io.py,visualization.py,config.yaml,visualize.ipynb,result/.gitkeep")
+        print("planned_topic_files=README.md,provenance.toml,run.py,cases.py,case_model.py,case_execution.py,artifact_schema.py,artifact_io.py,visualization.py,config.yaml,visualize.ipynb,raw/.gitignore,result/.gitkeep")
         return 0
 
     if topic_dir.exists():

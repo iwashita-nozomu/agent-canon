@@ -60,8 +60,8 @@ Cross-Cutting Packet:
 - `agents/workflows/agent-learning-workflow.md`
 - `documents/runtime/runtime-profiles-and-check-matrix.md`
 - `documents/rule/dependency-module-changes.md`
-- `notes/guardrails/README.md`
-- `notes/guardrails/engineering_avoidances.md`
+- `documents/notes/guardrails/README.md`
+- `documents/notes/guardrails/engineering_avoidances.md`
 - `docker/README.md`
 
 ## Required Intake Sweep
@@ -155,13 +155,13 @@ slice を選ぶ場合は、coverage map に `covered_surfaces`、`deferred_surfa
 - `documents/`
 - `issues/`
 - `memory/`
-- `notes/knowledge/`
-- `notes/guardrails/`
-- `notes/failures/`
-- `notes/themes/`
-- `notes/branches/`
-- `notes/worktrees/`
-- `notes/experiments/`
+- `documents/notes/knowledge/`
+- `documents/notes/guardrails/`
+- `documents/notes/failures/`
+- `documents/notes/themes/`
+- `documents/notes/branches/`
+- `documents/notes/worktrees/`
+- `documents/notes/experiments/`
 - `references/`
 
 memory は固定 packet/read の対象にしません。owner/path、failure evidence、recurrence
@@ -562,7 +562,7 @@ checked and cited.
 
 - run 固有のメモは `reports/agents/<run-id>/`
 - repo-wide の恒久文書は `agents/` か `documents/`
-- 知見の蓄積は `notes/`
+- 知見の蓄積は `documents/notes/`
 - packet 出力は tree 順ではなく、`CROSS_CUTTING_DOCUMENT_PACKET`、`DESIGN_DOCUMENT_PACKET`、`IMPLEMENTATION_DOCUMENT_PACKET`、`WORKFLOW_SUBAGENT_PROMPT_PACKET` の順で handoff に使う
 
 ### 4. Run Bootstrap
@@ -871,7 +871,7 @@ environment, produce resources, or duplicate tests/gates.
 - evidence を確認済みの closeout では、`python3 tools/agent_tools/workflow_monitor.py --report-dir reports/agents/<run-id> --closeout-token-preset` で `evaluate_agent_run.py` が消費する standard behavior tokens を記録できます。この preset は記録 shortcut であり、canonical formatter/check、dependency review、diff-check approval、review finding resolution は個別 evidence として残します。
 - `tools/agent_tools/evaluate_agent_run.py --report-dir reports/agents/<run-id> --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write` が pass し、`closeout_gate.md` の `agent_evaluation_complete=yes` と `agent_evaluation.md` の `feedback_actions_resolved: yes` が揃ったら、agent behavior evaluation と feedback resolution を complete にする
 - `schedule.md` を TODO 正本として埋め、`work_log.md` に execution trail を残す
-- `notes/guardrails/engineering_avoidances.md` の log-derived avoid に当たる変更は、修正または reviewer escalation の対象にする
+- `documents/notes/guardrails/engineering_avoidances.md` の log-derived avoid に当たる変更は、修正または reviewer escalation の対象にする
 - user request が generic path の usable smoke を求める場合、generic path の producer / consumer evidence を completion evidence にする
 - JAX export / native runtime の generic path は、`jax.export` artifact producer と consumer/runtime evidence を completion evidence にする
 - 実験・性能改善では、planned comparison run、acceptance criteria、raw result、interpretation evidence を分けて示す

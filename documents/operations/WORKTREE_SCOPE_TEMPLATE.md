@@ -67,28 +67,28 @@ upstream design worktree-lifecycle.md worktree lifecycle policy
 - [documents/operations/worktree-lifecycle.md](worktree-lifecycle.md)
 - [documents/operations/notes-lifecycle.md](notes-lifecycle.md)
 - [documents/conventions/coding-conventions-project.md](../conventions/coding-conventions-project.md)
-- [notes/guardrails/README.md](../../notes/guardrails/README.md)
-- [notes/failures/README.md](../../notes/failures/README.md)
+- [documents/notes/guardrails/README.md](../../documents/notes/guardrails/README.md)
+- [documents/notes/failures/README.md](../../documents/notes/failures/README.md)
 - `documents/<relevant_rule>.md`
 - `agents/skills/<relevant_skill>.md`
-- `notes/<existing_context>.md`
+- `documents/notes/<existing_context>.md`
 - `reports/agents/<run-id>/<artifact>.md`
 - broad directory 名だけで済ませず、先に読む file を明記する
 
 ## Main Carry-Over Targets
 
-- `notes/worktrees/worktree_<topic>_YYYY-MM-DD.md`
-- `notes/experiments/<topic>.md`
-- `notes/experiments/results/<topic>_<date>.json`
-- `notes/branches/<branch_topic>.md`
+- `documents/notes/worktrees/worktree_<topic>_YYYY-MM-DD.md`
+- `documents/notes/experiments/<topic>.md`
+- `documents/notes/experiments/results/<topic>_<date>.json`
+- `documents/notes/branches/<branch_topic>.md`
 
 ## Working Notes During Execution
 
-- Action log path: `notes/worktrees/worktree_<topic>_YYYY-MM-DD.md`
-- Experiment memo path: `notes/experiments/<topic>.md`
-- Branch summary path: `notes/branches/<branch_topic>.md`
+- Action log path: `documents/notes/worktrees/worktree_<topic>_YYYY-MM-DD.md`
+- Experiment memo path: `documents/notes/experiments/<topic>.md`
+- Branch summary path: `documents/notes/branches/<branch_topic>.md`
 - User request contract path: `reports/agents/<run-id>/user_request_contract.md`
-- Note template: `notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
+- Note template: `documents/notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
 - Append command: `python3 tools/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"`
 - When contract path is concrete, the same append command also updates `reports/agents/<run-id>/work_log.md`.
 - worktree 内でも、最終配置と同じ相対パスで下書きする
@@ -109,4 +109,4 @@ upstream design worktree-lifecycle.md worktree lifecycle policy
 - 例: 変更した Markdown は `.markdownlint.json` を基準に確認する。
 - 例: scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断は action log に逐次追記する。各 entry には `request_clause_ids=` を入れる。
 - 例: closeout 前に `documents/operations/notes-lifecycle.md` を見て、knowledge/theme/failure へ昇格させる項目を決める。
-- 例: branch が複数 session 続く場合は `notes/branches/<branch_topic>.md` を維持する。
+- 例: branch が複数 session 続く場合は `documents/notes/branches/<branch_topic>.md` を維持する。

@@ -1,11 +1,11 @@
 # @dependency-start
 # contract test
-# responsibility Tests deterministic one-run git-annex result retention.
-# upstream design ../../documents/experiments/result-log-retention-and-visualization.md result retention policy
+# responsibility Tests deterministic one-run git-annex raw retention and compact evidence binding.
+# upstream design ../../documents/experiments/result-log-retention-and-visualization.md raw retention policy
 # upstream implementation ../../tools/experiments/save_experiment_result_annex.py helper under test
 # @dependency-end
 
-"""Tests for one-run git-annex experiment result retention."""
+"""Tests for one-run git-annex experiment raw retention."""
 
 # pyright: reportPrivateUsage=false, reportUntypedFunctionDecorator=false
 
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -24,12 +25,21 @@ import pytest
 from tools.experiments import save_experiment_result_annex as retention
 from tools.experiments.experiment_identity import ExperimentIdentity
 
-SCRIPT = Path(__file__).resolve().parents[2] / "tools" / "experiments" / "save_experiment_result_annex.py"
+SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "tools"
+    / "experiments"
+    / "save_experiment_result_annex.py"
+)
 GIT_ANNEX = shutil.which("git-annex")
-pytestmark = pytest.mark.skipif(GIT_ANNEX is None, reason="git-annex is required")
+requires_git_annex = pytest.mark.skipif(GIT_ANNEX is None, reason="git-annex is required")
 
 
-def run_git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+def run_git(
+    repo: Path,
+    *args: str,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
     """Run Git in a fixture repository."""
     return subprocess.run(
         ["git", *args],
@@ -40,38 +50,60 @@ def run_git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedP
     )
 
 
-def init_source(root: Path, *, report: bool = True) -> Path:
-    """Create a committed source repository with a non-empty result."""
-    result = root / "experiments" / "demo" / "result" / "formal" / "run-a"
-    (result / "logs").mkdir(parents=True)
-    (result / "run_manifest.json").write_text(
+def init_source(root: Path) -> Path:
+    """Create a committed source repository with compact result evidence and ignored raw."""
+    identity = ExperimentIdentity("demo", "formal", "run-a")
+    raw_dir = root / "experiments" / "demo" / "raw" / "formal" / "run-a"
+    result_dir = root / "experiments" / "demo" / "result" / "formal" / "run-a"
+    report_path = root / "experiments" / "report" / "demo" / "formal" / "run-a.md"
+    raw_dir.mkdir(parents=True)
+    result_dir.mkdir(parents=True)
+    report_path.parent.mkdir(parents=True)
+    (root / "experiments" / "demo" / "raw" / ".gitignore").write_text(
+        "*\n!.gitignore\n",
+        encoding="utf-8",
+    )
+    (raw_dir / "nested").mkdir()
+    (raw_dir / "samples.bin").write_bytes(b"\x00\x01raw-samples\n")
+    executable = raw_dir / "nested" / "collect.sh"
+    executable.write_text("#!/bin/sh\nprintf raw\n", encoding="utf-8")
+    executable.chmod(0o755)
+    (result_dir / "summary.json").write_text(
         json.dumps(
             {
-                **ExperimentIdentity("demo", "formal", "run-a").to_dict(),
-                "status": "ok",
+                "run_id": identity.run_name,
+                "status": "success",
+                "case_count": 1,
             },
             sort_keys=True,
         )
         + "\n",
         encoding="utf-8",
     )
-    (result / "summary.json").write_text('{"value":1}\n', encoding="utf-8")
-    script = result / "run.sh"
-    script.write_text("#!/bin/sh\nprintf ok\n", encoding="utf-8")
-    script.chmod(0o755)
-    (result / "logs" / "events.jsonl").write_text('{"event":1}\n', encoding="utf-8")
-    if report:
-        report_path = root / "experiments" / "report" / "demo" / "formal" / "run-a.md"
-        report_path.parent.mkdir(parents=True)
-        report_path.write_text("# run-a\n", encoding="utf-8")
+    (result_dir / "run_manifest.json").write_text(
+        json.dumps(
+            {
+                **identity.to_dict(),
+                "status": "completed",
+                "raw_artifacts": {
+                    "path": "experiments/demo/raw/formal/run-a",
+                    "retention": {"state": "unarchived"},
+                },
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    report_path.write_text("# compact reader report\n", encoding="utf-8")
     run_git(root, "init", "-q")
     run_git(root, "checkout", "-q", "-b", "main")
     run_git(root, "config", "user.name", "Annex Test")
     run_git(root, "config", "user.email", "annex-test@example.invalid")
     run_git(root, "add", "experiments")
-    run_git(root, "commit", "-qm", "source")
+    run_git(root, "commit", "-qm", "source evidence")
     (root / "source-dirty.txt").write_text("dirty\n", encoding="utf-8")
-    return result
+    return raw_dir
 
 
 def init_annex(root: Path) -> Path:
@@ -86,16 +118,20 @@ def init_annex(root: Path) -> Path:
     return root
 
 
-def run_save(source: Path, annex: Path, result_dir: Path) -> subprocess.CompletedProcess[str]:
-    """Invoke the public retention CLI."""
+def run_save(
+    source: Path,
+    annex: Path,
+    raw_dir: Path,
+) -> subprocess.CompletedProcess[str]:
+    """Invoke the public raw-only retention CLI."""
     return subprocess.run(
         [
             sys.executable,
             str(SCRIPT),
             "--source-repo-root",
             str(source),
-            "--result-dir",
-            str(result_dir),
+            "--raw-dir",
+            str(raw_dir),
             "--annex-repo",
             str(annex),
         ],
@@ -106,8 +142,8 @@ def run_save(source: Path, annex: Path, result_dir: Path) -> subprocess.Complete
 
 
 def archive_path(annex: Path) -> Path:
-    """Return the expected external archive path."""
-    return annex / "experiments" / "demo" / "result" / "formal" / "run-a.tar.gz"
+    """Return the expected external raw archive path."""
+    return annex / "experiments" / "demo" / "raw" / "formal" / "run-a.tar.gz"
 
 
 def archive_members(path: Path) -> list[tarfile.TarInfo]:
@@ -117,332 +153,359 @@ def archive_members(path: Path) -> list[tarfile.TarInfo]:
 
 
 def archive_manifest(path: Path) -> dict[str, object]:
-    """Read the internal canonical manifest."""
-    manifest_path = "experiments/demo/result/formal/run-a/annex_retention_manifest.json"
+    """Read the internal canonical retention manifest."""
+    member_path = "experiments/demo/raw/formal/run-a/annex_retention_manifest.json"
     with tarfile.open(path, "r:gz") as archive:
-        payload = archive.extractfile(manifest_path)
-        assert payload is not None
-        raw = payload.read()
-    assert raw.endswith(b"\n")
-    return json.loads(raw)
+        member = archive.getmember(member_path)
+        stream = archive.extractfile(member)
+        assert stream is not None
+        payload = json.loads(stream.read())
+    assert isinstance(payload, dict)
+    return payload
 
 
-def test_retains_layout_manifest_hashes_modes_and_clean_single_commit(tmp_path: Path) -> None:
-    """One run is archived completely and committed once on a clean normal branch."""
+def parse_source(root: Path, raw_dir: Path) -> retention.RawIdentity:
+    """Parse one fixture through the public identity boundary under test."""
+    return retention._parse_raw_identity(root.resolve(), raw_dir.absolute())
+
+
+def test_parse_and_archive_are_raw_only_without_git_annex(tmp_path: Path) -> None:
+    """Pure archive construction excludes compact result and reader report bytes."""
     source = tmp_path / "source"
-    annex = init_annex(tmp_path / "annex")
-    result = init_source(source)
-    before = run_git(annex, "rev-parse", "HEAD").stdout.strip()
-
-    completed = run_save(source, annex, result)
-
-    assert completed.returncode == 0, completed.stderr
-    assert "EXPERIMENT_RESULT_STATUS=complete" in completed.stdout
-    target = archive_path(annex)
-    assert target.is_symlink()
-    names = [member.name for member in archive_members(target)]
-    assert "experiments/demo/result/formal/run-a/run_manifest.json" in names
-    assert "experiments/demo/result/formal/run-a/logs/events.jsonl" in names
-    assert "experiments/report/demo/formal/run-a.md" in names
-    assert "experiments/demo/result/formal/run-a/annex_retention_manifest.json" in names
-    manifest = archive_manifest(target)
-    assert manifest["append_only"] is True
-    assert manifest["report"] == "experiments/report/demo/formal/run-a.md"
-    assert manifest["report_present"] is True
-    assert manifest["source"]["branch"] == "main"  # type: ignore[index]
-    assert manifest["source"]["dirty_paths"] == ["source-dirty.txt"]  # type: ignore[index]
-    assert manifest["source"]["run_manifest_sha256"]  # type: ignore[index]
-    assert ExperimentIdentity.from_dict(manifest) == ExperimentIdentity(
-        "demo", "formal", "run-a"
+    source.mkdir()
+    raw_dir = init_source(source)
+    raw = parse_source(source, raw_dir)
+    entries, source_files = retention._scan_source_tree(raw)
+    manifest_path = raw.raw_relative / retention.MANIFEST_NAME
+    entries = tuple(
+        sorted(
+            (*entries, retention.ArchiveEntry(manifest_path.as_posix(), None, False)),
+            key=lambda item: item.archive_path,
+        )
     )
-    records = {item["path"]: item for item in manifest["files"]}  # type: ignore[index]
-    assert records["experiments/demo/result/formal/run-a/run.sh"]["mode"] == "executable"
-    assert records["experiments/demo/result/formal/run-a/summary.json"]["sha256"] == hashlib.sha256(
-        (result / "summary.json").read_bytes()
+    archive_relative = Path("experiments/demo/raw/formal/run-a.tar.gz")
+    manifest_bytes = retention._manifest_bytes(
+        raw,
+        entries,
+        source_files,
+        archive_relative,
+    )
+    archive = tmp_path / "raw.tar.gz"
+    retention._write_archive(
+        archive,
+        entries,
+        source_files,
+        manifest_bytes,
+        manifest_path.as_posix(),
+    )
+    retention._read_archive(
+        archive,
+        entries,
+        source_files,
+        manifest_bytes,
+        manifest_path.as_posix(),
+    )
+    names = [member.name for member in archive_members(archive)]
+    assert "experiments/demo/raw/formal/run-a/samples.bin" in names
+    assert "experiments/demo/raw/formal/run-a/nested/collect.sh" in names
+    assert not any("/result/" in name for name in names)
+    assert not any("/report/" in name for name in names)
+    assert not any(name.endswith("summary.json") for name in names)
+    payload = archive_manifest(archive)
+    assert payload["schema"] == "git-annex-raw-retention/v1"
+    assert payload["raw"]["directory"] == "experiments/demo/raw/formal/run-a"
+    evidence = payload["tracked_result_evidence"]
+    assert evidence["summary"]["path"] == (
+        "experiments/demo/result/formal/run-a/summary.json"
+    )
+    assert evidence["run_manifest"]["path"] == (
+        "experiments/demo/result/formal/run-a/run_manifest.json"
+    )
+    for key in ("summary", "run_manifest"):
+        assert len(evidence[key]["sha256"]) == 64
+
+
+def test_raw_archive_bytes_are_deterministic_without_git_annex(tmp_path: Path) -> None:
+    """Stable PAX metadata and gzip headers make identical source bytes reproducible."""
+    source = tmp_path / "source"
+    source.mkdir()
+    raw_dir = init_source(source)
+    raw = parse_source(source, raw_dir)
+    entries, source_files = retention._scan_source_tree(raw)
+    manifest_path = raw.raw_relative / retention.MANIFEST_NAME
+    entries = tuple(
+        sorted(
+            (*entries, retention.ArchiveEntry(manifest_path.as_posix(), None, False)),
+            key=lambda item: item.archive_path,
+        )
+    )
+    archive_relative = Path("experiments/demo/raw/formal/run-a.tar.gz")
+    manifest_bytes = retention._manifest_bytes(
+        raw,
+        entries,
+        source_files,
+        archive_relative,
+    )
+    first = tmp_path / "first.tar.gz"
+    second = tmp_path / "second.tar.gz"
+    for path in (first, second):
+        retention._write_archive(
+            path,
+            entries,
+            source_files,
+            manifest_bytes,
+            manifest_path.as_posix(),
+        )
+    assert first.read_bytes() == second.read_bytes()
+    assert hashlib.sha256(first.read_bytes()).hexdigest() == hashlib.sha256(
+        second.read_bytes()
     ).hexdigest()
-    assert run_git(annex, "status", "--porcelain=v1", "--untracked-files=all").stdout == ""
-    head = run_git(annex, "rev-parse", "HEAD").stdout.strip()
-    assert head != before
-    assert run_git(annex, "rev-list", "--count", f"{before}..{head}").stdout.strip() == "1"
-    assert run_git(annex, "rev-parse", f"{head}^").stdout.strip() == before
-    assert run_git(annex, "branch", "--show-current").stdout.strip() == "main"
-    assert not any(
-        "experiment-results/" in line
-        for line in run_git(annex, "for-each-ref", "--format=%(refname)", "refs/").stdout.splitlines()
-    )
-    fsck = run_git(
-        annex,
-        "annex",
-        "fsck",
-        "--",
-        "experiments/demo/result/formal/run-a.tar.gz",
-    )
-    assert fsck.returncode == 0, fsck.stderr
+    for member in archive_members(first):
+        assert member.uid == 0
+        assert member.gid == 0
+        assert member.uname == ""
+        assert member.gname == ""
+        assert member.mtime == 0
+        assert member.pax_headers == {}
 
 
-def test_rejects_mismatched_run_manifest_identity_before_annex_mutation(
+def test_whole_result_cli_route_is_not_accepted(tmp_path: Path) -> None:
+    """The old result-tree input is removed rather than retained as an alias."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--raw-dir",
+            str(tmp_path / "raw"),
+            "--result-dir",
+            str(tmp_path / "result"),
+            "--annex-repo",
+            str(tmp_path / "annex"),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert "--raw-dir" in result.stderr
+    assert "unrecognized arguments: --result-dir" in result.stderr
+
+
+def test_raw_identity_rejects_manifest_path_or_state_mismatch(tmp_path: Path) -> None:
+    """The tracked run manifest is the exact identity-to-raw binding oracle."""
+    source = tmp_path / "source"
+    source.mkdir()
+    raw_dir = init_source(source)
+    manifest_path = source / "experiments/demo/result/formal/run-a/run_manifest.json"
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["raw_artifacts"]["path"] = "experiments/demo/raw/formal/other"
+    manifest_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    with pytest.raises(retention.RetentionError, match="must match source commit"):
+        parse_source(source, raw_dir)
+    run_git(source, "add", str(manifest_path.relative_to(source)))
+    run_git(source, "commit", "-qm", "mismatched binding")
+    with pytest.raises(retention.RetentionError, match="raw path does not match"):
+        parse_source(source, raw_dir)
+
+
+def test_raw_identity_rejects_untracked_summary(tmp_path: Path) -> None:
+    """Review evidence must be tracked and equal to the recorded source commit."""
+    source = tmp_path / "source"
+    source.mkdir()
+    raw_dir = init_source(source)
+    summary = source / "experiments/demo/result/formal/run-a/summary.json"
+    run_git(source, "rm", "--cached", str(summary.relative_to(source)))
+    summary.write_text('{"run_id":"run-a"}\n', encoding="utf-8")
+    with pytest.raises(retention.RetentionError, match="must be tracked"):
+        parse_source(source, raw_dir)
+
+
+def test_empty_symlink_special_lfs_and_reserved_raw_are_rejected(
     tmp_path: Path,
 ) -> None:
-    """The result path and canonical run-manifest identity must agree."""
+    """Every unsupported raw shape fails before annex mutation."""
     source = tmp_path / "source"
-    result = init_source(source)
-    (result / "run_manifest.json").write_text(
-        json.dumps(ExperimentIdentity("demo", "formal", "run-b").to_dict()) + "\n",
+    source.mkdir()
+    raw_dir = init_source(source)
+    raw = parse_source(source, raw_dir)
+    for child in sorted(raw_dir.rglob("*"), key=lambda item: len(item.parts), reverse=True):
+        if child.is_dir():
+            child.rmdir()
+        else:
+            child.unlink()
+    with pytest.raises(retention.RetentionError, match="raw directory is empty"):
+        retention._scan_source_tree(raw)
+
+    (raw_dir / "target").write_text("target\n", encoding="utf-8")
+    (raw_dir / "link").symlink_to("target")
+    with pytest.raises(retention.RetentionError, match="symlink"):
+        retention._scan_source_tree(raw)
+    (raw_dir / "link").unlink()
+
+    fifo = raw_dir / "fifo"
+    os.mkfifo(fifo)
+    with pytest.raises(retention.RetentionError, match="special file"):
+        retention._scan_source_tree(raw)
+    fifo.unlink()
+
+    (raw_dir / "target").write_text(
+        "version https://git-lfs.github.com/spec/v1\n"
+        "oid sha256:" + "a" * 64 + "\n"
+        "size 42\n",
         encoding="utf-8",
     )
-    annex = init_annex(tmp_path / "annex")
-    before = run_git(annex, "rev-parse", "HEAD").stdout.strip()
+    with pytest.raises(retention.RetentionError, match="Git-LFS pointer"):
+        retention._scan_source_tree(raw)
+    (raw_dir / "target").unlink()
 
-    completed = run_save(source, annex, result)
-
-    assert completed.returncode == 2
-    assert "identity does not match" in completed.stderr
-    assert run_git(annex, "rev-parse", "HEAD").stdout.strip() == before
-    assert run_git(annex, "status", "--porcelain=v1", "--untracked-files=all").stdout == ""
-    assert not (annex / "experiments").exists()
+    (raw_dir / retention.MANIFEST_NAME).write_text("reserved\n", encoding="utf-8")
+    with pytest.raises(retention.RetentionError, match="reserves"):
+        retention._scan_source_tree(raw)
 
 
-def test_report_absent_and_determinism(tmp_path: Path) -> None:
-    """Report omission is explicit and identical source runs produce identical bytes."""
+@requires_git_annex
+def test_public_save_archives_raw_only_and_binds_tracked_evidence(
+    tmp_path: Path,
+) -> None:
+    """The committed annex object contains raw bytes plus one binding manifest only."""
     source = tmp_path / "source"
-    result = init_source(source, report=False)
-    annex_one = init_annex(tmp_path / "annex-one")
-    annex_two = init_annex(tmp_path / "annex-two")
-    first = run_save(source, annex_one, result)
-    second = run_save(source, annex_two, result)
-    assert first.returncode == second.returncode == 0
-    first_bytes = archive_path(annex_one).read_bytes()
-    second_bytes = archive_path(annex_two).read_bytes()
-    assert first_bytes == second_bytes
-    manifest = archive_manifest(archive_path(annex_one))
-    assert manifest["report"] is None
-    assert manifest["report_present"] is False
-    assert "experiments/report/demo/formal/run-a.md" not in [
-        member.name for member in archive_members(archive_path(annex_one))
-    ]
-
-
-@pytest.mark.parametrize("kind", ["reserved", "lfs", "symlink"])
-def test_rejects_reserved_lfs_and_symlink_sources(tmp_path: Path, kind: str) -> None:
-    """Unsafe source entries fail before any annex mutation."""
-    source = tmp_path / "source"
-    result = init_source(source)
-    if kind == "reserved":
-        (result / retention.MANIFEST_NAME).write_text("collision\n", encoding="utf-8")
-    elif kind == "lfs":
-        (result / "pointer").write_text(
-            "version https://git-lfs.github.com/spec/v1\noid sha256:" + "a" * 64 + "\nsize 4\n",
-            encoding="utf-8",
-        )
-    else:
-        (result / "link").symlink_to(result / "summary.json")
+    source.mkdir()
+    raw_dir = init_source(source)
     annex = init_annex(tmp_path / "annex")
-    before = run_git(annex, "rev-parse", "HEAD").stdout.strip()
-    completed = run_save(source, annex, result)
-    assert completed.returncode == 2
-    assert run_git(annex, "rev-parse", "HEAD").stdout.strip() == before
-    assert run_git(annex, "status", "--porcelain=v1", "--untracked-files=all").stdout == ""
-    assert not (annex / "experiments").exists()
-
-
-@pytest.mark.parametrize("kind", ["result-dir", "report-parent"])
-def test_rejects_symlinked_input_components(tmp_path: Path, kind: str) -> None:
-    """Lexical result and report paths cannot escape validation through symlinks."""
-    source = tmp_path / "source"
-    result = init_source(source, report=kind != "report-parent")
-    if kind == "result-dir":
-        target = result.with_name("run-b")
-        result.rename(target)
-        result.symlink_to(target, target_is_directory=True)
-    else:
-        outside_report = tmp_path / "outside-report"
-        outside_report.mkdir()
-        (outside_report / "run-a.md").write_text("# outside\n", encoding="utf-8")
-        (source / "experiments" / "report").symlink_to(
-            outside_report, target_is_directory=True
-        )
-    annex = init_annex(tmp_path / "annex")
-    before = run_git(annex, "rev-parse", "HEAD").stdout.strip()
-    completed = run_save(source, annex, result)
-    assert completed.returncode == 2
-    assert "symlink" in completed.stderr
-    assert run_git(annex, "rev-parse", "HEAD").stdout.strip() == before
-    assert run_git(annex, "status", "--porcelain=v1", "--untracked-files=all").stdout == ""
-    assert not (annex / "experiments").exists()
-
-
-def test_rejects_effectively_empty_result(tmp_path: Path) -> None:
-    """A report cannot substitute for a result file."""
-    source = tmp_path / "source"
-    result = source / "experiments" / "demo" / "result" / "formal" / "run-a"
-    result.mkdir(parents=True)
-    report = source / "experiments" / "report"
-    report.mkdir(parents=True)
-    (report / "run-a.md").write_text("# report\n", encoding="utf-8")
-    run_git(source, "init", "-q")
-    run_git(source, "checkout", "-q", "-b", "main")
-    run_git(source, "config", "user.name", "Annex Test")
-    run_git(source, "config", "user.email", "annex-test@example.invalid")
-    run_git(source, "add", "experiments")
-    run_git(source, "commit", "-qm", "source")
-    annex = init_annex(tmp_path / "annex")
-    completed = run_save(source, annex, result)
-    assert completed.returncode == 2
-    assert "effectively empty" in completed.stderr
-
-
-def test_rejects_root_containment_and_collision(tmp_path: Path) -> None:
-    """Source/annex containment and append-only target collisions fail safely."""
-    source = tmp_path / "source"
-    result = init_source(source)
-    annex = init_annex(tmp_path / "annex")
-    first = run_save(source, annex, result)
-    assert first.returncode == 0, first.stderr
-    second = run_save(source, annex, result)
-    assert second.returncode == 2
-    assert "already exists" in second.stderr
-    nested_annex = source / "nested-annex"
-    nested_annex.mkdir()
-    assert run_save(source, nested_annex, result).returncode == 2
-
-
-def test_no_replace_race_keeps_existing_target_and_rolls_back(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A link race cannot replace an existing target or leave task state."""
-    source = tmp_path / "source"
-    result = init_source(source)
-    annex = init_annex(tmp_path / "annex")
-    identity = retention._parse_result_identity(source, result)
-    target = annex / "experiments" / "demo" / "result" / "formal" / "run-a.tar.gz"
-
-    def race(_temporary: Path, final: Path) -> None:
-        final.parent.mkdir(parents=True, exist_ok=True)
-        final.write_bytes(b"racing owner")
-        raise FileExistsError(final)
-
-    monkeypatch.setattr(retention, "_link_no_replace", race)
-    with pytest.raises(retention.RetentionError, match="run-a.tar.gz"):
-        retention.save_result(identity, annex)
-    assert target.read_bytes() == b"racing owner"
-    assert "run-a.tar.gz" in run_git(
-        annex, "status", "--porcelain=v1", "--untracked-files=all"
+    result = run_save(source, annex, raw_dir)
+    assert result.returncode == 0, result.stderr
+    assert "EXPERIMENT_RAW_STATUS=complete" in result.stdout
+    retained = archive_path(annex)
+    members = archive_members(retained)
+    names = [member.name for member in members]
+    assert not any("/result/" in name for name in names)
+    assert not any("/report/" in name for name in names)
+    assert not any(name.endswith("summary.json") for name in names)
+    manifest = archive_manifest(retained)
+    assert manifest["identity"] == {
+        "schema": "agentcanon.experiment-run-identity/v2",
+        "topic": "demo",
+        "variant": "formal",
+        "run_name": "run-a",
+    }
+    assert manifest["source"]["commit"] == run_git(
+        source, "rev-parse", "HEAD"
+    ).stdout.strip()
+    assert "source-dirty.txt" in manifest["source"]["dirty_paths"]
+    key = run_git(
+        annex,
+        "annex",
+        "lookupkey",
+        "--",
+        "experiments/demo/raw/formal/run-a.tar.gz",
+    ).stdout.strip()
+    assert key.startswith("SHA256E-")
+    assert not run_git(
+        annex,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
     ).stdout
 
 
-def test_bounded_precommit_rollback_and_postcommit_no_rewind(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Precommit failure rolls back owned paths; postcommit failure retains its commit."""
+@requires_git_annex
+def test_second_save_is_append_only_and_does_not_move_head(tmp_path: Path) -> None:
+    """An identity collision fails closed without replacing or recommitting bytes."""
     source = tmp_path / "source"
-    result = init_source(source)
+    source.mkdir()
+    raw_dir = init_source(source)
     annex = init_annex(tmp_path / "annex")
-    identity = retention._parse_result_identity(source, result)
-    baseline = run_git(annex, "rev-parse", "HEAD").stdout.strip()
+    first = run_save(source, annex, raw_dir)
+    assert first.returncode == 0, first.stderr
+    first_head = run_git(annex, "rev-parse", "HEAD").stdout.strip()
+    first_bytes = archive_path(annex).read_bytes()
+    second = run_save(source, annex, raw_dir)
+    assert second.returncode == 2
+    assert "archive target already exists" in second.stderr
+    assert run_git(annex, "rev-parse", "HEAD").stdout.strip() == first_head
+    assert archive_path(annex).read_bytes() == first_bytes
 
-    def fail_pre(*_args: object) -> str:
-        raise retention.RetentionError("precommit fsck failure")
 
-    monkeypatch.setattr(
-        retention,
-        "_verify_annex_content",
-        fail_pre,
-    )
-    with pytest.raises(retention.RetentionError, match="precommit fsck failure"):
-        retention.save_result(identity, annex)
-    assert run_git(annex, "rev-parse", "HEAD").stdout.strip() == baseline
-    assert run_git(annex, "status", "--porcelain=v1", "--untracked-files=all").stdout == ""
-    assert not (annex / "experiments").exists()
+@requires_git_annex
+def test_precommit_failure_rolls_back_owned_annex_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Before commit, the saver removes only its archive/index/attribute mutation."""
+    source = tmp_path / "source"
+    source.mkdir()
+    raw_dir = init_source(source)
+    annex = init_annex(tmp_path / "annex")
+    raw = parse_source(source, raw_dir)
+    head = run_git(annex, "rev-parse", "HEAD").stdout.strip()
 
-    monkeypatch.undo()
-    original_verify = retention._verify_annex_content
+    def fail_verification(*_args: object, **_kwargs: object) -> str:
+        raise retention.RetentionError("injected fsck failure")
+
+    monkeypatch.setattr(retention, "_verify_annex_content", fail_verification)
+    with pytest.raises(retention.RetentionError, match="injected fsck failure"):
+        retention.save_raw(raw, annex.resolve())
+    assert run_git(annex, "rev-parse", "HEAD").stdout.strip() == head
+    assert not archive_path(annex).exists()
+    assert not run_git(
+        annex,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+    ).stdout
+
+
+@requires_git_annex
+def test_postcommit_failure_retains_commit_without_rewind(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """After commit, verification failure reports the retained commit and never resets HEAD."""
+    source = tmp_path / "source"
+    source.mkdir()
+    raw_dir = init_source(source)
+    annex = init_annex(tmp_path / "annex")
+    raw = parse_source(source, raw_dir)
+    initial_head = run_git(annex, "rev-parse", "HEAD").stdout.strip()
+    original = retention._read_archive
     calls = 0
 
-    def fail_post(*args: object) -> str:
+    def fail_after_commit(*args: object, **kwargs: object) -> tuple[int, str]:
         nonlocal calls
         calls += 1
-        if calls == 1:
-            return original_verify(*args)  # type: ignore[arg-type]
-        raise retention.RetentionError("postcommit fsck failure")
+        if calls == 2:
+            raise retention.RetentionError("injected postcommit reread failure")
+        return original(*args, **kwargs)
 
-    monkeypatch.setattr(retention, "_verify_annex_content", fail_post)
+    monkeypatch.setattr(retention, "_read_archive", fail_after_commit)
     with pytest.raises(retention.RetentionError, match="retained commit"):
-        retention.save_result(identity, annex)
-    retained = run_git(annex, "rev-parse", "HEAD").stdout.strip()
-    assert retained != baseline
-    assert run_git(annex, "rev-parse", f"{retained}^").stdout.strip() == baseline
-    assert run_git(annex, "status", "--porcelain=v1", "--untracked-files=all").stdout == ""
+        retention.save_raw(raw, annex.resolve())
+    retained_head = run_git(annex, "rev-parse", "HEAD").stdout.strip()
+    assert retained_head != initial_head
+    assert run_git(annex, "rev-parse", f"{retained_head}^").stdout.strip() == initial_head
 
 
-def test_removed_branch_cli_is_not_available() -> None:
-    """The replacement CLI does not accept retired branch/push options."""
-    result = subprocess.run(
-        [sys.executable, str(SCRIPT), "--result-dir", "x", "--branch", "main"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode != 0
-    assert "unrecognized arguments" in result.stderr
-
-
-def test_annex_repo_environment_and_single_result_argument(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The environment fallback works and repeated result arguments remain invalid."""
-    source = tmp_path / "source"
-    result_dir = init_source(source)
-    annex = init_annex(tmp_path / "annex")
-    monkeypatch.setenv(retention.ANNEX_REPO_ENV, str(annex))
-    completed = subprocess.run(
-        [
-            sys.executable,
-            str(SCRIPT),
-            "--source-repo-root",
-            str(source),
-            "--result-dir",
-            str(result_dir),
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert completed.returncode == 0, completed.stderr
-
-    repeated = subprocess.run(
-        [
-            sys.executable,
-            str(SCRIPT),
-            "--source-repo-root",
-            str(source),
-            "--result-dir",
-            str(result_dir),
-            "--result-dir",
-            str(result_dir),
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert repeated.returncode != 0
-    assert "exactly one --result-dir" in repeated.stderr
-
-
-def test_rejects_non_regular_report_and_unexpected_store_directory(
+@requires_git_annex
+def test_full_fsck_runs_before_and_after_exactly_one_commit(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The conventional report and existing store topology remain bounded."""
+    """The existing fsck contract remains on both sides of the append-only commit."""
     source = tmp_path / "source"
-    result_dir = init_source(source, report=False)
-    report = source / "experiments" / "report" / "demo" / "formal" / "run-a.md"
-    report.parent.mkdir(parents=True, exist_ok=True)
-    report.symlink_to(result_dir / "summary.json")
+    source.mkdir()
+    raw_dir = init_source(source)
     annex = init_annex(tmp_path / "annex")
-    completed = run_save(source, annex, result_dir)
-    assert completed.returncode == 2
-    assert "symlink" in completed.stderr
+    raw = parse_source(source, raw_dir)
+    original = retention._annex
+    fsck_calls: list[tuple[str, ...]] = []
 
-    report.unlink()
-    unexpected = annex / "unrelated"
-    unexpected.mkdir()
-    completed = run_save(source, annex, result_dir)
-    assert completed.returncode == 2
-    assert "unexpected visible directory" in completed.stderr
+    def record_annex(repo: Path, args: list[str]) -> str:
+        if args and args[0] == "fsck":
+            fsck_calls.append(tuple(args))
+        return original(repo, args)
+
+    monkeypatch.setattr(retention, "_annex", record_annex)
+    result = retention.save_raw(raw, annex.resolve())
+    assert result.commit == run_git(annex, "rev-parse", "HEAD").stdout.strip()
+    assert len(fsck_calls) == 2
+    assert all("--" in call for call in fsck_calls)

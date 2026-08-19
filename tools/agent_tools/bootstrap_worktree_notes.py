@@ -105,8 +105,8 @@ def fill_scope_file(
             "- Next step after kickoff:",
             "refresh references and append the first execution log entry",
         ),
-        ("- `notes/worktrees/worktree_<topic>_YYYY-MM-DD.md`", f"`{action_log_rel}`"),
-        ("- `notes/branches/<branch_topic>.md`", f"`{branch_summary_rel}`"),
+        ("- `documents/notes/worktrees/worktree_<topic>_YYYY-MM-DD.md`", f"`{action_log_rel}`"),
+        ("- `documents/notes/branches/<branch_topic>.md`", f"`{branch_summary_rel}`"),
     )
     for prefix, replacement in replacements:
         lines = replace_scope_line(lines, prefix, replacement, force=force)
@@ -131,9 +131,9 @@ def _log_ensure_worktree(path: Path, *, branch: str, workspace_root: Path, purpo
             f"- Purpose: {purpose}",
             "- Current state: kickoff",
             "- Scope file: `WORKTREE_SCOPE.md`",
-            f"- Branch summary path: `notes/branches/{topic_slug(branch)}.md`",
+            f"- Branch summary path: `documents/notes/branches/{topic_slug(branch)}.md`",
             "- Main carry-over targets: "
-            f"`notes/worktrees/worktree_{topic_slug(branch)}_{today}.md`",
+            f"`documents/notes/worktrees/worktree_{topic_slug(branch)}_{today}.md`",
             "",
             "## Kickoff Record",
             "",
@@ -163,7 +163,7 @@ def _log_ensure_worktree(path: Path, *, branch: str, workspace_root: Path, purpo
             "## Quick References",
             "",
             "- `documents/...`",
-            "- `notes/...`",
+            "- `documents/notes/...`",
             "- `reports/...`",
         ]
     )
@@ -194,7 +194,7 @@ def ensure_branch_summary(path: Path, *, branch: str, action_log_rel: str, purpo
             "",
             "## Main Carry-Over Targets",
             "",
-            "- `notes/...`",
+            "- `documents/notes/...`",
             "- `documents/...`",
             "- `reports/...`",
         ]
@@ -211,8 +211,8 @@ def main() -> int:
     slug = topic_slug(branch)
     today = datetime.now().strftime("%Y-%m-%d")
 
-    action_log_rel = f"notes/worktrees/worktree_{slug}_{today}.md"
-    branch_summary_rel = f"notes/branches/{slug}.md"
+    action_log_rel = f"documents/notes/worktrees/worktree_{slug}_{today}.md"
+    branch_summary_rel = f"documents/notes/branches/{slug}.md"
     action_log_path = repo_root / action_log_rel
     branch_summary_path = repo_root / branch_summary_rel
     scope_path = workspace_root / "WORKTREE_SCOPE.md"

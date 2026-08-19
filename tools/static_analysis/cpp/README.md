@@ -53,5 +53,5 @@ before invocation.
 The existing readability aid remains available separately:
 
 ```bash
-python3 tools/oop/cpp/readability.py --format markdown cpp/include cpp/src cpp/tests cpp/experiments
+python3 tools/oop/cpp/readability.py --format markdown cpp/include cpp/src tests/cpp cpp/experiments
 ```
