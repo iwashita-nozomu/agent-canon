@@ -206,7 +206,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 
 - run 固有の intake、design、review、verification、retrospective は `reports/agents/<run-id>/` に置きます。
 - project-wide な分析や再利用する長文 report は `reports/` に置きます。
-- 一時メモや cross-run の補助知見は `notes/` に置きます。
+- 一時メモや cross-run の補助知見は `documents/notes/` に置きます。
 
 ## 禁止事項
 

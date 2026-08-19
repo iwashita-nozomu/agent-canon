@@ -261,7 +261,7 @@ DOC_OR_RUNTIME_PATH_MARKERS = (
     "agents/",
     "documents/",
     "memory/",
-    "notes/",
+    "documents/notes/",
     "tools/catalog.yaml",
 )
 

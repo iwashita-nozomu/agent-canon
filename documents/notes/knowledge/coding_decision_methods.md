@@ -4,7 +4,7 @@
 contract reference
 responsibility Documents Coding Decision Methods for this repository.
 upstream design README.md notes lifecycle index
-upstream design ../../documents/conventions/software-engineering-principles.md canonical AgentCanon engineering policy and decision precedence
+upstream design ../../conventions/software-engineering-principles.md canonical AgentCanon engineering policy and decision precedence
 @dependency-end
 -->
 
@@ -108,7 +108,7 @@ receipt、workflow をこの note から直接追加しません。current requi
 - `python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --task-id T1 --owner codex --workspace-root "$PWD"`
 - `python3 tools/agent_tools/task_close.py --report-dir <reports/agents/run-id>`
 - `documents/conventions/software-engineering-principles.md`
-- `notes/knowledge/`
+- `documents/notes/knowledge/`
 - `reports/agents/<run-id>/user_request_contract.md`
 - `reports/agents/<run-id>/closeout_gate.md`
 

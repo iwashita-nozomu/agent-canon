@@ -9,7 +9,7 @@ upstream design ../README.md notes lifecycle index
 
 
 このディレクトリには、active な worktree の kickoff から closeout までを追う action log と carry-over note を置きます。
-研究・実験改造の全体手順は [agents/workflows/research-workflow.md](../../agents/workflows/research-workflow.md) を参照してください。
+研究・実験改造の全体手順は [agents/workflows/research-workflow.md](../../../agents/workflows/research-workflow.md) を参照してください。
 
 ## Purpose
 
@@ -33,7 +33,7 @@ worktree を作った直後は、最低限次を残します。
 
 - branch 名、worktree path、purpose
 - `WORKTREE_SCOPE.md` の所在と main carry-over target
-- `notes/guardrails/README.md` と `notes/failures/README.md` を見たか、その中で今回 relevant な項目
+- `documents/notes/guardrails/README.md` と `documents/notes/failures/README.md` を見たか、その中で今回 relevant な項目
 - `git status --short --branch` と `git worktree list --porcelain` の確認結果
 - 今から最初にやる 1 手
 

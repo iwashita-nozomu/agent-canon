@@ -46,5 +46,5 @@ upstream design README.md notes lifecycle index
 ## Quick References
 
 - `documents/...`
-- `notes/...`
+- `documents/notes/...`
 - `reports/...`

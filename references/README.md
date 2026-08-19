@@ -20,7 +20,7 @@ Use `agents/workflows/workflow-references.md` for workflow-level bibliography
 and source notes. Put large external artifacts outside the tracked tree unless a
 task explicitly requires a small, redistributable reference file.
 
-Before adding a new source note, search the existing `references/`, `notes/`,
+Before adding a new source note, search the existing `references/`, `documents/notes/`,
 `documents/`, and topic reports for the same title, DOI, URL, or claim. Update
 or cite the existing note when one exists.
 

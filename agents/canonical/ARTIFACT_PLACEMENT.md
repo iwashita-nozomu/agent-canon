@@ -16,7 +16,7 @@ run ごとの一時 artifact と、repo に長く残す文書を分けて扱い�
 この文書は、run-local artifact、repo-wide 正本文書、cross-run に残す
 agent report の置き場を決めます。まず `置き場ルール` と `Task 中の拡張文書`
 で判断軸を確認し、具体的な保存先は `どこへ置くか` の
-`reports/agents/<run-id>/`、`documents/`、`agents/`、`notes/` を読み分けます。
+`reports/agents/<run-id>/`、`documents/`、`agents/`、`documents/notes/` を読み分けます。
 `Subagent と補助文書` と `禁止事項` は、task 固有メモを repo 正本へ
 昇格させる前の境界確認に使います。
 
@@ -25,7 +25,7 @@ agent report の置き場を決めます。まず `置き場ルール` と `Task
 - repo-wide の正本:
   - agent 運用は `agents/`
   - 一般ルールや workflow は `documents/`
-  - 再利用する知見や cross-run 要約は `notes/`
+  - 再利用する知見や cross-run 要約は `documents/notes/`
   - 開発環境は `docker/`
 - run-local の artifact:
   - `reports/agents/<run-id>/`
@@ -99,7 +99,7 @@ agent report の置き場を決めます。まず `置き場ルール` と `Task
   `reports/hooks/`, `reports/.cache/`, `reports/*.json`, `reports/*.patch`,
   `reports/*.txt` は `generated_artifact_guard.py` の対象です。必要なら
   producer を再実行します。知見を残す場合は report file ではなく、
-  `documents/` / `agents/` / `notes/` へ責務と dependency manifest 付きで
+  `documents/` / `agents/` / `documents/notes/` へ責務と dependency manifest 付きで
   昇格します。
 - predecessor record の filename は unit ID から一意に導出し、通常の run-local
   memo 名として再利用しません。`knowledge_graph` と
@@ -132,7 +132,7 @@ agent report の置き場を決めます。まず `置き場ルール` と `Task
 - Codex で再利用したい
 - runtime entrypoint には重複させたくない
 
-### `notes/`
+### `documents/notes/`
 
 対象:
 - cross-run の知見

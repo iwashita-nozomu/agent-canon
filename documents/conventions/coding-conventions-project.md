@@ -26,7 +26,7 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
 ## 2. ディレクトリの考え方
 
 - `documents/` は正本として扱います。
-- `notes/` は知見、比較メモ、補助整理です。
+- `documents/notes/` は知見、比較メモ、補助整理です。
 - `agents/` はエージェント運用の正本です。
 - `tools/` は shared automation の正本です。agent helper、CI / review / validation、container runner、experiment helper、Markdown helper はここに置きます。
 - `scripts/` は repo-local bootstrap の入口です。template 固有の初期化、slug 置換、bare remote 初期化だけをここに置きます。
@@ -57,7 +57,7 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
   `documents/conventions/common/05_docs.md` を正本にします。
 - Markdown を編集したら、対象の `.md` に formatter を適用し、その後で `tools/bin/agent-canon docs check` を通します。
 - 上の Markdown 運用は `documents/`、`tools/`、`scripts/`、`.github/`、root `README.md`、`QUICK_START.md` を含む正本文書に適用します。
-- 日付付きの途中報告、個別メモ、比較の試行錯誤は `notes/` に置きます。
+- 日付付きの途中報告、個別メモ、比較の試行錯誤は `documents/notes/` に置きます。
 - agent team の要約は `agents/README.md` に集約します。
 
 ## 4. 開発環境
@@ -151,7 +151,7 @@ cmake --install "$ROOT/build/cpp/<profile>"
   へ分離します。
 - 1 回の run は fresh 実行として扱います。
 - 正式結果は planned run と acceptance criteria が揃った実行から採用します。
-- 複数 run をまたぐ知見は `notes/experiments/` または `notes/themes/` に残します。
+- 複数 run をまたぐ知見は `documents/notes/experiments/` または `documents/notes/themes/` に残します。
 - topic ごとの report は canonical artifact placement に従って配置します。
 
 ## 7. branch 方針
@@ -159,7 +159,7 @@ cmake --install "$ROOT/build/cpp/<profile>"
 - 既定の統合先は `main` です。
 - branch 分割は短期レビュー、切り分け、保護 surface の調整に使います。
 - 短期 branch は、レビューや安全な切り分けが必要なときだけ使います。
-- 統合が済んだ branch は削除し、運用知識は `documents/` か `notes/` に吸収します。
+- 統合が済んだ branch は削除し、運用知識は `documents/` か `documents/notes/` に吸収します。
 
 ## 8. 規約文の書き方
 

@@ -2344,8 +2344,8 @@ class DependencyManifestToolTest(unittest.TestCase):
             "documents/operations/worktree-lifecycle.md",
             "memory/README.md",
             "memory/records",
-            "notes/README.md",
-            "notes/guardrails/engineering_avoidances.md",
+            "documents/notes/README.md",
+            "documents/notes/guardrails/engineering_avoidances.md",
         ]
 
         scan = run_tool(

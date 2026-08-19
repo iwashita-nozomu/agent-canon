@@ -93,7 +93,7 @@ GPU profile の admission semantics は `gpu-execution` に残します。
 - `.agents/skills/<skill>/SKILL.md` shim がない routine は `agents/internal-routines/` に置きます。AgentCanon public skill へ昇格するときだけ `agents/skills/` 文書、catalog entry、shim を同じ変更で追加します。Codex は `.agents/skills/` を自動探索するため、列挙 config は追加しません。
 - agent orchestration は public skill として先頭に出し、task 開始時に runtime が拾えるようにします。
 - subagent bootstrap は public skill として出し、repo-changing task の stage separation で使います。
-- carry-over の吸い上げは `notes/` と worktree log を正本にし、独立 public skill にはしません。
+- carry-over の吸い上げは `documents/notes/` と worktree log を正本にし、独立 public skill にはしません。
 - Internal / compatibility review docs の一覧と route は [internal-routines/README.md](../internal-routines/README.md) に集約します。
 
 ## Official System Skill Delegation

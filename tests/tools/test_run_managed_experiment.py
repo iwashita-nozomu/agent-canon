@@ -1391,7 +1391,7 @@ def test_check_experiment_registry_accepts_valid_branch_topic(tmp_path: Path) ->
                 'name = "branch_only"',
                 'status = "active"',
                 'remote_branch = "experiment/branch-only"',
-                'primary_note = "notes/branches/branch_only.md"',
+                'primary_note = "documents/notes/branches/branch_only.md"',
                 "",
             ]
         ),
@@ -1433,7 +1433,7 @@ def test_check_experiment_registry_rejects_duplicate_branch_topic_name(
                 'name = "demo_topic"',
                 'status = "active"',
                 'remote_branch = "experiment/demo-topic"',
-                'primary_note = "notes/branches/demo_topic.md"',
+                'primary_note = "documents/notes/branches/demo_topic.md"',
                 "",
             ]
         ),
@@ -1691,7 +1691,7 @@ def test_sync_experiment_registry_context_updates_branch_scope_and_worktree(
             "--branch",
             "work/demo-topic-20260406",
             "--branch-note",
-            "notes/branches/demo_topic.md",
+            "documents/notes/branches/demo_topic.md",
             "--topic",
             "demo_topic",
         ],
@@ -1707,4 +1707,4 @@ def test_sync_experiment_registry_context_updates_branch_scope_and_worktree(
     assert 'active_branch = "work/demo-topic-20260406"' in registry_text
     assert 'active_worktree = ".worktrees/demo-topic"' in registry_text
     assert 'scope_file = ".worktrees/demo-topic/WORKTREE_SCOPE.md"' in registry_text
-    assert 'branch_note = "notes/branches/demo_topic.md"' in registry_text
+    assert 'branch_note = "documents/notes/branches/demo_topic.md"' in registry_text
