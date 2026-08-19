@@ -486,9 +486,7 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             findings.append(finding)
         elif section == "runtime":
             runtime_env = values
-    if any(
-        item.partition("=")[0] == "AGENT_CANON_PYTHON_EXTRAS" for item in runtime_env
-    ):
+    if any(item.partition("=")[0] == "AGENT_CANON_PYTHON_EXTRAS" for item in runtime_env):
         findings.append(
             Finding(
                 "dependency_contract_violation",
@@ -669,10 +667,7 @@ def validate_standalone_docker_context(root: Path) -> list[Finding]:
                     "standalone-context-copy-dot-forbidden",
                 )
             )
-        if (
-            "image_vendor_root" in dockerfile_text
-            or "vendor/agent-canon" in dockerfile_text
-        ):
+        if "image_vendor_root" in dockerfile_text or "vendor/agent-canon" in dockerfile_text:
             findings.append(
                 Finding(
                     "dependency_contract_violation",
@@ -767,7 +762,9 @@ def load_devcontainer_json(
 
 def expected_post_create_command(*, parent_layout: bool) -> str:
     """Return the lifecycle command for standalone or parent-projected layouts."""
-    resolver = "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec"
+    resolver = (
+        "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec"
+    )
     entrypoint = (
         f"{resolver} .devcontainer/post-create-entrypoint.sh "
         "/workspace/${localWorkspaceFolderBasename}"
@@ -929,10 +926,7 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
                     f"{key}-expected:{expected_value}",
                 )
             )
-    if (
-        config.get("shutdownAction") != "stopCompose"
-        or config.get("overrideCommand") is not False
-    ):
+    if config.get("shutdownAction") != "stopCompose" or config.get("overrideCommand") is not False:
         findings.append(
             Finding(
                 "dependency_contract_violation",
@@ -945,9 +939,7 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
     if not orchestrator.is_file() or orchestrator.stat().st_mode & 0o111 == 0:
         findings.append(
             Finding(
-                "missing_file"
-                if not orchestrator.is_file()
-                else "dependency_contract_violation",
+                "missing_file" if not orchestrator.is_file() else "dependency_contract_violation",
                 orchestrator_relative,
                 "executable-profile-orchestrator-required",
             )
@@ -991,8 +983,7 @@ def is_managed_topic_root(root: Path) -> bool:
 def is_removed_legacy_topic_root(root: Path) -> bool:
     """Return True when the immediate parent directory is a removed legacy workspace root."""
     return (
-        root.parent.name.startswith("workspace-")
-        and root.parent.parent.name != "workspace"
+        root.parent.name.startswith("workspace-") and root.parent.parent.name != "workspace"
     )
 
 
@@ -1037,9 +1028,7 @@ def validate_generated_compose(
         except ValueError:
             relative = f"<generated-compose:{profile}>"
     if not compose_path.exists():
-        return [
-            Finding("missing_file", relative, f"{profile}-scenario-compose-required")
-        ]
+        return [Finding("missing_file", relative, f"{profile}-scenario-compose-required")]
     if yaml is None:
         return [Finding("invalid_manifest", relative, "yaml-parser-unavailable")]
     try:
@@ -1059,10 +1048,7 @@ def validate_generated_compose(
     expected_workspace_layout = (
         "managed-topic" if is_managed_topic_root(root) else "direct-repo"
     )
-    if (
-        is_removed_legacy_topic_root(root)
-        and expected_workspace_layout != "managed-topic"
-    ):
+    if is_removed_legacy_topic_root(root) and expected_workspace_layout != "managed-topic":
         return [
             Finding(
                 "dependency_contract_violation",
@@ -1100,9 +1086,7 @@ def validate_generated_compose(
                 "inconsistency", relative, f"working-dir:{service.get('working_dir')}"
             )
         )
-    expected_platform = (
-        pack.platform if pack is not None and pack.platform else "linux/amd64"
-    )
+    expected_platform = pack.platform if pack is not None and pack.platform else "linux/amd64"
     if service.get("platform") != expected_platform:
         findings.append(
             Finding(
@@ -1166,10 +1150,7 @@ def validate_generated_compose(
                 for name in ("PROJECT_UID", "PROJECT_GID"):
                     value = standalone_args.get(name)
                     pattern = r"[1-9][0-9]*" if name == "PROJECT_UID" else r"[0-9]+"
-                    if (
-                        not isinstance(value, str)
-                        or re.fullmatch(pattern, value) is None
-                    ):
+                    if not isinstance(value, str) or re.fullmatch(pattern, value) is None:
                         findings.append(
                             Finding(
                                 "dependency_contract_violation",
@@ -1226,9 +1207,7 @@ def validate_generated_compose(
         if environment is not None
         else ""
     )
-    optional_mounts = (
-        optional_mounts_value if isinstance(optional_mounts_value, str) else ""
-    )
+    optional_mounts = optional_mounts_value if isinstance(optional_mounts_value, str) else ""
     optional_tokens_list: list[str] = []
     if not isinstance(optional_mounts_value, str):
         findings.append(
@@ -1240,10 +1219,7 @@ def validate_generated_compose(
         )
     elif optional_mounts:
         optional_tokens_list = optional_mounts.split(",")
-        if any(
-            not token or token != token.strip() or re.search(r"\s", token)
-            for token in optional_tokens_list
-        ):
+        if any(not token or token != token.strip() or re.search(r"\s", token) for token in optional_tokens_list):
             findings.append(
                 Finding(
                     "dependency_contract_violation",
@@ -1325,9 +1301,7 @@ def validate_generated_compose(
         )
 
     repository_mounts = [
-        raw_volume
-        for raw_volume in volumes
-        if volume_fields(raw_volume)[1] == repo_target
+        raw_volume for raw_volume in volumes if volume_fields(raw_volume)[1] == repo_target
     ]
     if len(repository_mounts) != 1:
         findings.append(
@@ -1339,9 +1313,7 @@ def validate_generated_compose(
         )
     elif source_path(volume_fields(repository_mounts[0])[0]) != root:
         findings.append(
-            Finding(
-                "dependency_contract_violation", relative, "repository-mount-source"
-            )
+            Finding("dependency_contract_violation", relative, "repository-mount-source")
         )
     for raw_volume in volumes:
         source, target = volume_fields(raw_volume)
@@ -1363,10 +1335,9 @@ def validate_generated_compose(
             )
         )
     service_user = service.get("user")
-    service_user_valid = (
-        isinstance(service_user, str)
-        and re.fullmatch(r"[1-9][0-9]*:[0-9]+", service_user) is not None
-    )
+    service_user_valid = isinstance(service_user, str) and re.fullmatch(
+        r"[1-9][0-9]*:[0-9]+", service_user
+    ) is not None
     if not service_user_valid:
         findings.append(
             Finding(
@@ -1540,8 +1511,7 @@ def validate_generated_compose(
         zshrc_matches = [
             raw_volume
             for raw_volume in volumes
-            if volume_fields(raw_volume)[1]
-            in {
+            if volume_fields(raw_volume)[1] in {
                 f"{home_target}/.zshrc",
                 "/etc/project-template/zsh/.zshrc",
             }
@@ -1622,9 +1592,7 @@ def validate_generated_compose(
                 )
         for raw_volume in volumes:
             source, target = volume_fields(raw_volume)
-            if (source and "/root/" in source) or (
-                target and target.startswith("/root/")
-            ):
+            if (source and "/root/" in source) or (target and target.startswith("/root/")):
                 findings.append(
                     Finding(
                         "dependency_contract_violation",
@@ -1990,12 +1958,8 @@ def validate_generated_compose_scenarios(
                         "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(runtime_source),
                         "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(runtime_source),
                         "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
-                        "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(
-                            runtime_source / "shared-runtime-provision.json"
-                        ),
-                        "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(
-                            runtime_source / "shared-runtime-readback.json"
-                        ),
+                        "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(runtime_source / "shared-runtime-provision.json"),
+                        "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(runtime_source / "shared-runtime-readback.json"),
                     },
                 )
             )
@@ -2005,7 +1969,9 @@ def validate_generated_compose_scenarios(
             if profile == "gpu-admission":
                 gpu_pack_path = packs_dir / "gpu-admission.toml"
                 if gpu_pack_path.is_file():
-                    scenario_pack, gpu_pack_findings = load_pack(root, gpu_pack_path)
+                    scenario_pack, gpu_pack_findings = load_pack(
+                        root, gpu_pack_path
+                    )
                     findings.extend(gpu_pack_findings)
             environment = {
                 **base_environment,
@@ -2037,9 +2003,7 @@ def validate_generated_compose_scenarios(
                     scenario_pack,
                     profile=profile,
                     compose_path=compose_path,
-                    runtime_source=(
-                        runtime_source if profile == "gpu-admission" else None
-                    ),
+                    runtime_source=(runtime_source if profile == "gpu-admission" else None),
                 )
             )
     finally:
@@ -2048,20 +2012,14 @@ def validate_generated_compose_scenarios(
         )
         if not temporary_parent_existed and temporary_parent.is_dir():
             parent_receipt = boundary.resolve_parent_owned_path(
-                attestation,
-                temporary_parent,
-                "container-config-runtime-base-cleanup",
-                create=False,
+                attestation, temporary_parent, "container-config-runtime-base-cleanup", create=False
             )
             boundary.remove_empty_parent_owned_directory(
                 attestation, parent_receipt, "container-config-runtime-base-cleanup"
             )
         if not agent_canon_dir_existed and agent_canon_dir.is_dir():
             root_receipt = boundary.resolve_parent_owned_path(
-                attestation,
-                agent_canon_dir,
-                "container-config-agent-base-cleanup",
-                create=False,
+                attestation, agent_canon_dir, "container-config-agent-base-cleanup", create=False
             )
             boundary.remove_empty_parent_owned_directory(
                 attestation, root_receipt, "container-config-agent-base-cleanup"
@@ -2144,7 +2102,9 @@ def validate_devcontainer_pack_alignment(
     )
     if persisted_compose.exists():
         findings.extend(
-            validate_generated_compose(root, pack, compose_path=persisted_compose)
+            validate_generated_compose(
+                root, pack, compose_path=persisted_compose
+            )
         )
     profile_compose = root / ".agent-canon" / "gpu-admission-compose.generated.yml"
     if profile_compose.exists():
@@ -2217,7 +2177,9 @@ def validate_vscode(root: Path) -> list[Finding]:
                 findings.append(Finding("missing_file", path, "missing"))
             elif source_file.is_symlink():
                 findings.append(
-                    Finding("inconsistency", path, "source-file-must-be-regular")
+                    Finding(
+                        "inconsistency", path, "source-file-must-be-regular"
+                    )
                 )
         return findings
     if not root_vscode.is_dir():

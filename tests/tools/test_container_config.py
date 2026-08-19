@@ -228,13 +228,13 @@ def write_compose(
                 "services:",
                 "  workspace:",
                 "    platform: linux/amd64",
-                f'    user: "{os.getuid()}:{os.getgid()}"',
+                f"    user: \"{os.getuid()}:{os.getgid()}\"",
                 "    build:",
                 "      context: ..",
                 "      dockerfile: docker/Dockerfile",
                 "      args:",
-                f'        PROJECT_UID: "{os.getuid()}"',
-                f'        PROJECT_GID: "{os.getgid()}"',
+                f"        PROJECT_UID: \"{os.getuid()}\"",
+                f"        PROJECT_GID: \"{os.getgid()}\"",
                 f"    working_dir: {repo_target}",
                 "    volumes:",
                 *[f"      - {json.dumps(volume)}" for volume in volumes],
@@ -316,15 +316,11 @@ def test_topic_compose_semantics_pass(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_validator_does_not_require_dependency_module_change_in_parent_mode(
-    tmp_path: Path,
-) -> None:
+def test_validator_does_not_require_dependency_module_change_in_parent_mode(tmp_path: Path) -> None:
     """Parent layout skips dependency-module-change enforcement."""
     repo = write_topic_fixture(tmp_path)
     (repo / "vendor" / "agent-canon").mkdir(parents=True)
-    (
-        repo / "tools" / "agent-canon" / "agent_tools" / "dependency_module_change.py"
-    ).unlink()
+    (repo / "tools" / "agent-canon" / "agent_tools" / "dependency_module_change.py").unlink()
 
     result = run_validator(repo)
 
@@ -363,10 +359,7 @@ def test_gpu_admission_selector_isolated_from_default_selector() -> None:
     assert "features" not in profile
     assert "AGENT_CANON_RUNTIME_IDENTITY_MODE" not in default["initializeCommand"]
     assert "AGENT_CANON_RUNTIME_IDENTITY_MODE" not in profile["initializeCommand"]
-    assert (
-        load_container_config_module().validate_gpu_admission_selector(PROJECT_ROOT)
-        == []
-    )
+    assert load_container_config_module().validate_gpu_admission_selector(PROJECT_ROOT) == []
 
 
 def test_standalone_image_context_is_explicit_and_source_owned() -> None:
@@ -430,7 +423,8 @@ RUN image-install --workspace /opt/agent-canon --vendor-root /opt/agent-canon
     )
 
     details = {
-        finding.detail for finding in module.validate_standalone_docker_context(root)
+        finding.detail
+        for finding in module.validate_standalone_docker_context(root)
     }
     assert "standalone-context-copy-dot-forbidden" in details
     assert "standalone-context-allowlist-mismatch" in details
@@ -453,9 +447,7 @@ def test_post_create_uses_shared_lifecycle() -> None:
         assert "post-create-entrypoint.sh" in command
 
 
-def test_lifecycle_scripts_validate_selected_identity_and_workspace_writability() -> (
-    None
-):
+def test_lifecycle_scripts_validate_selected_identity_and_workspace_writability() -> None:
     """Lifecycle scripts own the project identity and write probe contract."""
     post_create = (PROJECT_ROOT / ".devcontainer/post-create.sh").read_text(
         encoding="utf-8"
@@ -471,22 +463,13 @@ def test_lifecycle_scripts_validate_selected_identity_and_workspace_writability(
         assert "workspace_write_probe" in script
         assert "mktemp" in script
         assert "workspace_write_dir" not in script
-        assert (
-            'trap \'if [ -n "${workspace_write_probe:-}" ]; then rm -f -- "$workspace_write_probe"; fi\' EXIT'
-            in script
-        )
+        assert "trap 'if [ -n \"${workspace_write_probe:-}\" ]; then rm -f -- \"$workspace_write_probe\"; fi' EXIT" in script
         assert 'printf \'%s\\n\' "project" >"$' in script
         assert 'cat "$workspace_write_probe"' in script
         assert 'rm -f -- "$workspace_write_probe"' in script
         assert ".agent-canon/identity-write" not in script
-    assert (
-        'workspace_write_probe="$(mktemp "$workspace/identity-write.XXXXXX")"'
-        in post_create
-    )
-    assert (
-        'workspace_write_probe="$(mktemp "$repo_root/identity-write.XXXXXX")"'
-        in post_attach
-    )
+    assert 'workspace_write_probe="$(mktemp "$workspace/identity-write.XXXXXX")"' in post_create
+    assert 'workspace_write_probe="$(mktemp "$repo_root/identity-write.XXXXXX")"' in post_attach
     assert post_create.index("image-verify") < post_create.index(
         'workspace_write_probe="$(mktemp "$workspace/identity-write.XXXXXX")"'
     )
@@ -496,9 +479,7 @@ def test_lifecycle_scripts_validate_selected_identity_and_workspace_writability(
 
 def test_parent_layout_accepts_any_devcontainer_json_object(tmp_path: Path) -> None:
     """Parent layout accepts valid JSON objects with no extra devcontainer contract checks."""
-    repo = write_topic_fixture(
-        tmp_path, topic_root=tmp_path / "workspace" / "parent-canonical"
-    )
+    repo = write_topic_fixture(tmp_path, topic_root=tmp_path / "workspace" / "parent-canonical")
     (repo / "vendor" / "agent-canon").mkdir(parents=True)
 
     default = {"name": "mutation", "postCreateCommand": PARENT_POST_CREATE_COMMAND}
@@ -606,9 +587,7 @@ def test_generated_compose_scenario_cleanup_preserves_source_snapshot(
         return subprocess.CompletedProcess(args, 0, "", "")
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
-    monkeypatch.setattr(
-        module, "validate_generated_compose", lambda *args, **kwargs: []
-    )
+    monkeypatch.setattr(module, "validate_generated_compose", lambda *args, **kwargs: [])
     assert module.validate_generated_compose_scenarios(repo, None) == []
     assert sentinel.read_bytes() == before
     assert agent_canon_tree_snapshot(repo) == before_tree
@@ -663,16 +642,10 @@ def generate_gpu_admission_compose(tmp_path: Path) -> tuple[Path, Path]:
             "HOME": str(tmp_path / "missing-home"),
             "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
             "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
-            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(
-                repo / ".agent-canon/runtime"
-            ),
+            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
             "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
-            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(
-                repo / ".agent-canon/runtime/shared-runtime-provision.json"
-            ),
-            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(
-                repo / ".agent-canon/runtime/shared-runtime-readback.json"
-            ),
+            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/gpu-admission-compose.generated.yml",
         },
         check=False,
@@ -716,9 +689,7 @@ def test_generator_rejects_untrusted_yaml_scalar_inputs(
     assert not output.exists()
 
 
-def test_default_project_identity_rejects_static_remote_user_override(
-    tmp_path: Path,
-) -> None:
+def test_default_project_identity_rejects_static_remote_user_override(tmp_path: Path) -> None:
     """Project identity leaves container and remote user selection to Compose."""
     repo = write_topic_fixture(tmp_path)
     config_path = repo / ".devcontainer/devcontainer.json"
@@ -729,9 +700,7 @@ def test_default_project_identity_rejects_static_remote_user_override(
     result = run_validator(repo)
 
     assert result.returncode == 1, result.stdout + result.stderr
-    assert (
-        "default-remoteUser-forbidden-compose-owned-project-identity" in result.stdout
-    )
+    assert "default-remoteUser-forbidden-compose-owned-project-identity" in result.stdout
 
 
 def test_default_project_identity_requires_update_remote_user_uid_false(
@@ -760,9 +729,7 @@ def test_legacy_topic_compose_root_is_rejected(tmp_path: Path) -> None:
     assert "legacy-workspace-root-direct-repo-rejected" in result.stdout
 
 
-def test_workspace_prefixed_topic_root_is_handled_as_managed_topic(
-    tmp_path: Path,
-) -> None:
+def test_workspace_prefixed_topic_root_is_handled_as_managed_topic(tmp_path: Path) -> None:
     """A canonical workspace/<workspace-*>/<repo> root is treated as managed-topic."""
     repo = write_topic_fixture(
         tmp_path,
@@ -776,9 +743,7 @@ def test_workspace_prefixed_topic_root_is_handled_as_managed_topic(
 
 def test_noncanonical_checkout_compose_root_is_direct_repo(tmp_path: Path) -> None:
     """The checker treats non-canonical path roots as direct-repo."""
-    repo = write_topic_fixture(
-        tmp_path, topic_root=tmp_path / "noncanonical" / "checkout"
-    )
+    repo = write_topic_fixture(tmp_path, topic_root=tmp_path / "noncanonical" / "checkout")
 
     result = run_validator(repo)
 
@@ -802,7 +767,9 @@ def test_compose_topic_root_mount_is_rejected(tmp_path: Path) -> None:
     compose = compose_path.read_text(encoding="utf-8")
     compose = compose.replace(
         json.dumps(str(repo.resolve())), json.dumps(str(repo.parent.resolve())), 1
-    ).replace(json.dumps(f"/workspace/{repo.name}"), json.dumps("/workspace"), 1)
+    ).replace(
+        json.dumps(f"/workspace/{repo.name}"), json.dumps("/workspace"), 1
+    )
     compose_path.write_text(compose, encoding="utf-8")
 
     result = run_validator(repo)
@@ -856,9 +823,7 @@ def test_generated_compose_rejects_malformed_build_args_without_crashing(
         f'        PROJECT_GID: "{os.getgid()}"\n'
     )
     replacement = "" if build_args_shape == "missing" else "      args: []\n"
-    compose_path.write_text(
-        compose.replace(build_args, replacement, 1), encoding="utf-8"
-    )
+    compose_path.write_text(compose.replace(build_args, replacement, 1), encoding="utf-8")
 
     module = load_container_config_module()
     findings = module.validate_generated_compose(repo, None)
@@ -937,7 +902,7 @@ def test_generator_projects_project_identity_and_exact_repository_mount(
     assert 'PROJECT_UID: "' in compose
     assert 'PROJECT_GID: "' in compose
     assert 'DEVCONTAINER_GPU_MODE: "disabled"' in compose
-    assert "DEPENDENCY_MODULE_CONTAINER_SOURCE:" in compose
+    assert 'DEPENDENCY_MODULE_CONTAINER_SOURCE:' in compose
     assert 'DEPENDENCY_MODULE_CONTAINER_TARGET: "/workspace/agent-canon"' in compose
     assert "DEVCONTAINER_GPU_REQUEST" not in compose
     assert "AGENT_CANON_RUNTIME_GID" not in compose
@@ -1026,16 +991,10 @@ def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
             "HOME": str(tmp_path / "missing-home"),
             "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
             "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
-            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(
-                repo / ".agent-canon/runtime"
-            ),
+            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
             "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
-            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(
-                repo / ".agent-canon/runtime/shared-runtime-provision.json"
-            ),
-            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(
-                repo / ".agent-canon/runtime/shared-runtime-readback.json"
-            ),
+            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/gpu-admission-compose.generated.yml",
         },
         check=False,
@@ -1070,8 +1029,8 @@ def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
             pack,
             profile="gpu-admission",
             compose_path=output_path,
-        )
-        == []
+    )
+    == []
     )
 
 
@@ -1091,16 +1050,10 @@ def test_gpu_admission_accepts_absent_or_explicit_pack_target(
             "HOME": str(tmp_path / "missing-home"),
             "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
             "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
-            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(
-                repo / ".agent-canon/runtime"
-            ),
+            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
             "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
-            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(
-                repo / ".agent-canon/runtime/shared-runtime-provision.json"
-            ),
-            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(
-                repo / ".agent-canon/runtime/shared-runtime-readback.json"
-            ),
+            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".devcontainer/gpu-admission-compose.generated.yml",
         },
         check=False,
@@ -1131,16 +1084,10 @@ def test_gpu_admission_rejects_unsafe_pack_target(tmp_path: Path) -> None:
             "HOME": str(tmp_path / "missing-home"),
             "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
             "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
-            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(
-                repo / ".agent-canon/runtime"
-            ),
+            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
             "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
-            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(
-                repo / ".agent-canon/runtime/shared-runtime-provision.json"
-            ),
-            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(
-                repo / ".agent-canon/runtime/shared-runtime-readback.json"
-            ),
+            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
         },
         check=False,
         capture_output=True,
@@ -1173,8 +1120,6 @@ def test_default_rejects_gpu_runtime_pack_target(tmp_path: Path) -> None:
 
     assert result.returncode == 1, result.stdout + result.stderr
     assert "default profile rejects GPU build target" in result.stderr
-
-
 @pytest.mark.parametrize(
     ("mutation", "expected_detail"),
     (
@@ -1224,7 +1169,7 @@ def test_gpu_admission_validator_rejects_group_add_projection(tmp_path: Path) ->
     repo, output_path = generate_gpu_admission_compose(tmp_path)
     compose = output_path.read_text(encoding="utf-8")
     compose = compose.replace(
-        "    gpus: all\n",
+        '    gpus: all\n',
         '    gpus: all\n    group_add:\n      - "1234"\n',
         1,
     )
@@ -1247,7 +1192,7 @@ def _docker_host_compose_fixture(tmp_path: Path) -> tuple[Path, Path]:
     )
     compose = compose.replace(
         f'      - type: bind\n        source: "{repo / ".agent-canon/runtime"}"',
-        "      - /var/run/docker.sock:/var/run/docker.sock\n"
+        '      - /var/run/docker.sock:/var/run/docker.sock\n'
         f'      - type: bind\n        source: "{repo / ".agent-canon/runtime"}"',
         1,
     )
@@ -1265,9 +1210,7 @@ def test_docker_host_validator_accepts_canonical_rw_bind(tmp_path: Path) -> None
         profile="gpu-admission",
         compose_path=output_path,
     )
-    assert not any(
-        finding.detail.startswith("docker-host-mount-") for finding in findings
-    )
+    assert not any(finding.detail.startswith("docker-host-mount-") for finding in findings)
 
 
 @pytest.mark.parametrize(
@@ -1414,7 +1357,8 @@ def test_default_generator_rejects_reserved_runtime_identity_env(
     repo = write_parent_generator_fixture(tmp_path)
     pack_path = repo / "docker/packs/default.toml"
     pack_path.write_text(
-        pack_path.read_text(encoding="utf-8") + f'env = ["{reserved_name}=4242"]\n',
+        pack_path.read_text(encoding="utf-8")
+        + f'env = ["{reserved_name}=4242"]\n',
         encoding="utf-8",
     )
 
@@ -1447,7 +1391,8 @@ def test_gpu_generator_rejects_reserved_runtime_identity_env(
     write_gpu_admission_pack(repo)
     pack_path = repo / "docker/packs/gpu-admission.toml"
     pack_path.write_text(
-        pack_path.read_text(encoding="utf-8") + f'env = ["{reserved_name}=4242"]\n',
+        pack_path.read_text(encoding="utf-8")
+        + f'env = ["{reserved_name}=4242"]\n',
         encoding="utf-8",
     )
 
@@ -1718,7 +1663,11 @@ def write_parent_generator_fixture(
     linked_data_roots_line = (
         "linked_data_roots = ["
         + ", ".join(
-            "{link = " + json.dumps(link) + ", target = " + json.dumps(target) + "}"
+            "{link = "
+            + json.dumps(link)
+            + ", target = "
+            + json.dumps(target)
+            + "}"
             for link, target in linked_data_roots
         )
         + "]"
@@ -1879,7 +1828,8 @@ def test_load_pack_requires_linked_data_profile_and_list_pair(tmp_path: Path) ->
     )
     empty_pack_path = repo / "docker/packs/default.toml"
     empty_pack_path.write_text(
-        empty_pack_path.read_text(encoding="utf-8") + "linked_data_roots = []\n",
+        empty_pack_path.read_text(encoding="utf-8")
+        + "linked_data_roots = []\n",
         encoding="utf-8",
     )
     pack, findings = module.load_pack(repo, empty_pack_path)
@@ -1993,7 +1943,7 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
     assert "AGENT_CANON_PYTHON_EXTRAS" not in compose
     assert 'AGENT_CANON_CODEX_SESSION_ROOT: "/home/project/.codex/sessions"' in compose
     assert f'user: "{os.getuid()}:{os.getgid()}"' in compose
-    assert "PROJECT_USER:" not in compose
+    assert 'PROJECT_USER:' not in compose
     assert f'PROJECT_UID: "{os.getuid()}"' in compose
     assert f'PROJECT_GID: "{os.getgid()}"' in compose
     assert 'command: /bin/zsh -lc "sleep infinity"' in compose
@@ -2135,9 +2085,7 @@ def test_generator_rejects_empty_selected_linked_data_roots(tmp_path: Path) -> N
     assert "non-empty linked_data_roots" in result.stderr
 
 
-def test_validator_requires_pack_for_selected_linked_data_profile(
-    tmp_path: Path,
-) -> None:
+def test_validator_requires_pack_for_selected_linked_data_profile(tmp_path: Path) -> None:
     """A generated linked profile cannot validate without its source pack."""
     repo = write_parent_generator_fixture(tmp_path)
     (repo / ".agent-canon").mkdir()
@@ -2164,9 +2112,7 @@ def test_validator_requires_pack_for_selected_linked_data_profile(
     )
     module = load_container_config_module()
     findings = module.validate_generated_compose(repo, None)
-    assert any(
-        "linked-data-roots-pack-required" in finding.detail for finding in findings
-    )
+    assert any("linked-data-roots-pack-required" in finding.detail for finding in findings)
 
 
 def test_parent_generator_resolves_symlink_host_zsh_directory(tmp_path: Path) -> None:
@@ -2286,9 +2232,7 @@ def test_parent_environment_symlinks_to_existing_sources_pass(tmp_path: Path) ->
     )
     source_dir = repo / "parent-config"
     write_file(source_dir, "parent-environment.sh", "export PROJECT_REGION=tokyo\n")
-    write_file(
-        source_dir, "parent-environment.toml", 'variables = ["PROJECT_REGION"]\n'
-    )
+    write_file(source_dir, "parent-environment.toml", 'variables = ["PROJECT_REGION"]\n')
     for name in ("parent-environment.sh", "parent-environment.toml"):
         view = repo / ".devcontainer" / name
         view.unlink()
@@ -2336,9 +2280,7 @@ def test_parent_environment_broken_symlink_does_not_block_default_generation(
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_generator_projects_zero_primary_gid_without_daemon_probe(
-    tmp_path: Path,
-) -> None:
+def test_generator_projects_zero_primary_gid_without_daemon_probe(tmp_path: Path) -> None:
     """The generator accepts numeric GID 0 while keeping the project account."""
     repo = write_parent_generator_fixture(tmp_path)
     identity_bin = tmp_path / "identity-bin"
@@ -2349,7 +2291,7 @@ def test_generator_projects_zero_primary_gid_without_daemon_probe(
         'case "${1:-}" in\n'
         '  -u) printf "1001\\n" ;;\n'
         '  -g) printf "0\\n" ;;\n'
-        "  *) exit 1 ;;\n"
+        '  *) exit 1 ;;\n'
         "esac\n",
         encoding="utf-8",
     )
@@ -2396,7 +2338,9 @@ def test_generator_never_invokes_docker_daemon_probe(
     marker = tmp_path / "docker-called"
     docker = sentinel_bin / "docker"
     docker.write_text(
-        f"#!/usr/bin/env bash\nprintf '%s\\n' called > {marker}\nexit 97\n",
+        "#!/usr/bin/env bash\n"
+        f"printf '%s\\n' called > {marker}\n"
+        "exit 97\n",
         encoding="utf-8",
     )
     docker.chmod(0o755)
@@ -2406,9 +2350,7 @@ def test_generator_never_invokes_docker_daemon_probe(
             {
                 "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
                 "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
-                "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(
-                    repo / ".agent-canon/runtime"
-                ),
+                "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
                 "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
                 "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(
                     repo / ".agent-canon/runtime/shared-runtime-provision.json"
@@ -2526,9 +2468,7 @@ def test_generator_rejects_public_project_user_override(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 1
-    assert (
-        "DEVCONTAINER_IDENTITY_ERROR=PROJECT_USER_OVERRIDE_FORBIDDEN" in result.stderr
-    )
+    assert "DEVCONTAINER_IDENTITY_ERROR=PROJECT_USER_OVERRIDE_FORBIDDEN" in result.stderr
 
 
 def test_generator_rejects_project_uid_or_gid_override(tmp_path: Path) -> None:
@@ -2547,10 +2487,7 @@ def test_generator_rejects_project_uid_or_gid_override(tmp_path: Path) -> None:
         )
 
         assert result.returncode == 1
-        assert (
-            "DEVCONTAINER_IDENTITY_ERROR=PROJECT_IDS_OVERRIDE_FORBIDDEN"
-            in result.stderr
-        )
+        assert "DEVCONTAINER_IDENTITY_ERROR=PROJECT_IDS_OVERRIDE_FORBIDDEN" in result.stderr
 
 
 def test_parent_validator_rejects_zero_uid(tmp_path: Path) -> None:
@@ -2582,7 +2519,9 @@ def test_parent_validator_rejects_zero_uid(tmp_path: Path) -> None:
     malformed = valid.replace(
         f'user: "{os.getuid()}:{os.getgid()}"',
         f'user: "0:{os.getgid()}"',
-    ).replace(f'PROJECT_UID: "{os.getuid()}"', 'PROJECT_UID: "0"')
+    ).replace(
+        f'PROJECT_UID: "{os.getuid()}"', 'PROJECT_UID: "0"'
+    )
     compose_path.write_text(malformed, encoding="utf-8")
     details = {
         finding.detail for finding in module.validate_generated_compose(repo, pack)
@@ -2613,13 +2552,11 @@ def test_parent_validator_accepts_zero_gid(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     compose_path = repo / ".agent-canon/docker-compose.generated.yml"
-    compose = (
-        compose_path.read_text(encoding="utf-8")
-        .replace(
-            f'user: "{os.getuid()}:{os.getgid()}"',
-            f'user: "{os.getuid()}:0"',
-        )
-        .replace(f'PROJECT_GID: "{os.getgid()}"', 'PROJECT_GID: "0"')
+    compose = compose_path.read_text(encoding="utf-8").replace(
+        f'user: "{os.getuid()}:{os.getgid()}"',
+        f'user: "{os.getuid()}:0"',
+    ).replace(
+        f'PROJECT_GID: "{os.getgid()}"', 'PROJECT_GID: "0"'
     )
     compose_path.write_text(compose, encoding="utf-8")
     module = load_container_config_module()
@@ -2649,13 +2586,11 @@ def test_parent_validator_rejects_malformed_gid(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     compose_path = repo / ".agent-canon/docker-compose.generated.yml"
-    compose = (
-        compose_path.read_text(encoding="utf-8")
-        .replace(
-            f'user: "{os.getuid()}:{os.getgid()}"',
-            f'user: "{os.getuid()}:-1"',
-        )
-        .replace(f'PROJECT_GID: "{os.getgid()}"', 'PROJECT_GID: "-1"')
+    compose = compose_path.read_text(encoding="utf-8").replace(
+        f'user: "{os.getuid()}:{os.getgid()}"',
+        f'user: "{os.getuid()}:-1"',
+    ).replace(
+        f'PROJECT_GID: "{os.getgid()}"', 'PROJECT_GID: "-1"'
     )
     compose_path.write_text(compose, encoding="utf-8")
     module = load_container_config_module()
@@ -2728,7 +2663,8 @@ def test_generator_rejects_pack_override_of_host_identity(
     repo = write_parent_generator_fixture(tmp_path)
     pack = repo / "docker/packs/default.toml"
     pack.write_text(
-        pack.read_text(encoding="utf-8") + f'\nenv = ["{identity_key}=pack-value"]\n',
+        pack.read_text(encoding="utf-8")
+        + f'\nenv = ["{identity_key}=pack-value"]\n',
         encoding="utf-8",
     )
     result = subprocess.run(
@@ -2744,9 +2680,7 @@ def test_generator_rejects_pack_override_of_host_identity(
     assert f"runtime.env cannot override reserved key: {identity_key}" in result.stderr
 
 
-def test_container_config_requires_executable_resolver_entrypoint(
-    tmp_path: Path,
-) -> None:
+def test_container_config_requires_executable_resolver_entrypoint(tmp_path: Path) -> None:
     """The public post-create resolver must remain executable in a fresh checkout."""
     repo = write_topic_fixture(tmp_path)
     entrypoint = repo / ".devcontainer/post-create-entrypoint.sh"
@@ -2881,10 +2815,7 @@ def test_validator_rejects_raw_runtime_mounts(tmp_path: Path) -> None:
     module = load_container_config_module()
     pack, findings = module.load_pack(repo, repo / "docker/packs/default.toml")
     assert pack is None
-    assert any(
-        "runtime.mounts-unsupported-use-optional-profile" in finding.detail
-        for finding in findings
-    )
+    assert any("runtime.mounts-unsupported-use-optional-profile" in finding.detail for finding in findings)
 
 
 def test_generator_rejects_delimiter_linked_target(tmp_path: Path) -> None:
@@ -3070,13 +3001,9 @@ def test_load_pack_rejects_image_owned_project_extras(tmp_path: Path) -> None:
     repo = write_parent_generator_fixture(tmp_path)
     pack_path = repo / "docker/packs/default.toml"
     pack_path.write_text(
-        pack_path.read_text(encoding="utf-8")
-        + 'dependency_extras = ["dev", "cuda12"]\n',
+        pack_path.read_text(encoding="utf-8") + 'dependency_extras = ["dev", "cuda12"]\n',
         encoding="utf-8",
     )
     pack, findings = module.load_pack(repo, pack_path)
     assert pack is None
-    assert any(
-        "dependency_extras-forbidden-image-owned" in finding.detail
-        for finding in findings
-    )
+    assert any("dependency_extras-forbidden-image-owned" in finding.detail for finding in findings)
