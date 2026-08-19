@@ -33,3 +33,5 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git commit -m "fix: stop exporting Agent definitions to templates (#781)"
           git push --force origin HEAD:fix/781-stop-template-agent-export
+
+# Triggered after the workflow and reviewed patch are both present on the branch.
