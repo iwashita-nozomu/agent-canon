@@ -43,15 +43,18 @@ JSONL and accumulated eval archive branch policy belong to
   and archived agent run reports live under
   `.agent-canon/log-archive/...` as defined by
   `documents/runtime/runtime-log-archive.md`.
-- `experiments/<topic>/result/<variant>/<run-id>/` stores raw experiment outputs, JSONL,
-  generated plots, HTML, SVG, HLO dumps, and machine-readable summaries.
-- `experiments/<topic>/result/<variant>/<run-id>/logs/` stores per-run stdout/stderr,
-  tool, checker, and diagnostic logs that are not the managed wrapper `run.log`.
-- `experiments/<topic>/result/<variant>/<run_name>.tar.gz` stores the
-  one-run compressed git-annex archive of formal experiment result/report
-  artifacts produced from the source checkout. The archive contains the result
-  tree, optional `experiments/report/<topic>/<variant>/<run_name>.md`, and its
-  canonical retention manifest.
+- `experiments/<topic>/result/<variant>/<run-id>/` stores tracked compact
+  review evidence: summaries, case records, manifests, small plots, and other
+  material required to review the claim without annex access.
+- `experiments/<topic>/result/<variant>/<run-id>/logs/` stores compact per-run
+  diagnostics that are intentionally retained for review.
+- `experiments/<topic>/raw/<variant>/<run-id>/` is the only source-side home for
+  bulky raw outputs, traces, dumps, and large generated data. Its contents are
+  ignored by Git through the topic-level `raw/.gitignore`.
+- `experiments/<topic>/raw/<variant>/<run_name>.tar.gz` stores the one-run
+  deterministic git-annex archive of that raw tree. The archive excludes
+  `summary.json` and reader reports; its retention manifest binds the archive
+  to tracked `summary.json` and `run_manifest.json` by repository path and SHA-256.
 - `experiments/<topic>/visualize.ipynb` stores the Jupyter notebook used to visualize
   run artifacts and regenerate figures/tables from `result/<variant>/<run-id>/`.
 - `experiments/report/<topic>/<variant>/<run-id>.md` stores the human-readable experiment report.
@@ -105,7 +108,7 @@ Canonical helper commands:
 python3 tools/data/jsonl_to_md.py <input.jsonl> <output.md>
 python3 tools/hlo/summarize_hlo_jsonl.py <hlo.jsonl> > summary.json
 python3 tools/experiments/html_artifact_access.py <report.html>
-python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<variant>/<run_name> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
+python3 -m tools.experiments.save_experiment_result_annex --raw-dir experiments/<topic>/raw/<variant>/<run_name> --annex-repo "$EXPERIMENT_RAW_ANNEX_REPO"
 python3 -m tools.experiments.update_latest_result experiments/<topic>/result --variant <variant>
 dot -V
 ```
@@ -130,11 +133,13 @@ directly from inside a container and tunneling to the container IP.
   task, archive it mechanically with `runtime_log_archive_git.py
   archive-agent-report`; do not create a hand-written duplicate report in the
   source tree.
-- For formal experiments, run from the source checkout and retain the generated
-  `experiments/<topic>/result/<variant>/<run_name>/` plus optional
-  `experiments/report/<topic>/<variant>/<run_name>.md` with
+- For formal experiments, commit the compact evidence under
+  `experiments/<topic>/result/<variant>/<run_name>/`, then retain only
+  `experiments/<topic>/raw/<variant>/<run_name>/` with
   `tools/experiments/save_experiment_result_annex.py` in the configured annex
-  worktree. The archive operation is append-only and has no remote-push mode.
+  worktree. The append-only archive manifest records the tracked summary and run
+  manifest path plus SHA-256; it has no compatibility route for whole-result
+  archives and no remote-push mode.
 
 ## Closeout Evidence
 

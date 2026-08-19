@@ -98,7 +98,9 @@ if __package__:
         identity_from_manifest,
         load_json_file,
         load_json_text,
+        raw_relative_path,
         report_relative_path,
+        result_relative_path,
         validate_segment,
     )
 else:
@@ -152,7 +154,9 @@ else:
         identity_from_manifest,
         load_json_file,
         load_json_text,
+        raw_relative_path,
         report_relative_path,
+        result_relative_path,
         validate_segment,
     )
 
@@ -228,6 +232,7 @@ SENSITIVE_ENV_KEY_PARTS = (
 EXCLUDED_SOURCE_SNAPSHOT_DIRS = frozenset(
     {
         ".git",
+        "raw",
         "result",
         "__pycache__",
         ".pytest_cache",
@@ -257,9 +262,10 @@ else:
 
 @dataclass(frozen=True)
 class RunPaths:
-    """Filesystem paths owned by one managed run."""
+    """Filesystem paths owned by one managed run identity."""
 
     result_dir: Path
+    raw_dir: Path
     log_dir: Path
     report_path: Path
     manifest_path: Path
@@ -321,19 +327,24 @@ class ReservationReceipt:
     """Record the exact empty paths reserved by one runner invocation."""
 
     result_dir: Path
+    raw_dir: Path
     report_path: Path
     report_content: str | None
     result_parent: Path
     result_parent_preexisted: bool
+    raw_parent: Path
+    raw_parent_preexisted: bool
     report_parent: Path
     report_parent_preexisted: bool
     token: str
     marker_path: Path
     result_inode: int
+    raw_inode: int
     marker_inode: int
     report_reserved: bool
     report_inode: int | None
     result_parent_inode: int
+    raw_parent_inode: int
     report_parent_inode: int | None
     identity: ExperimentIdentity
 
@@ -1213,8 +1224,8 @@ def parse_args() -> argparse.Namespace:
         "command",
         nargs=argparse.REMAINDER,
         help=(
-            "Command to run. Tokens may use {run_dir}, {run_name}, {report_path}, "
-            "{topic}, {variant}, "
+            "Command to run. Tokens may use {run_dir}, {raw_dir}, {run_name}, "
+            "{report_path}, {topic}, {variant}, "
             "{manifest_path}, {eval_manifest_path}, {config_path}, "
             "{config_source_path}, {startup_log_path}, {stdout_log_path}, "
             "or {stderr_log_path}."
@@ -1365,6 +1376,7 @@ def build_run_config(
         **context.identity.to_dict(),
         "paths": {
             "result_dir": str(context.paths.result_dir),
+            "raw_dir": str(context.paths.raw_dir),
             "log_dir": str(context.paths.log_dir),
             "report_path": str(context.paths.report_path),
             "run_manifest": str(context.paths.manifest_path),
@@ -1437,6 +1449,7 @@ def render_report_stub(context: RunContext) -> str:
 - Variant: {context.identity.variant}
 - Created At (UTC): {context.created_at}
 - Result Dir: {context.paths.result_dir}
+- Raw Dir: {context.paths.raw_dir}
 - Log Dir: {context.paths.log_dir}
 - Run Manifest: {context.paths.manifest_path}
 - Eval Manifest: {context.paths.eval_manifest_path}
@@ -1497,6 +1510,11 @@ def build_manifest(context: RunContext, status: str) -> dict[str, object]:
         "repo_root": str(context.repo_root),
         "topic_dir": str(context.topic_dir),
         "result_dir": str(context.paths.result_dir),
+        "raw_dir": str(context.paths.raw_dir),
+        "raw_artifacts": {
+            "path": raw_relative_path(context.identity).as_posix(),
+            "retention": {"state": "unarchived"},
+        },
         "log_dir": str(context.paths.log_dir),
         "report_path": str(context.paths.report_path),
         "manifest_path": str(context.paths.manifest_path),
@@ -1743,6 +1761,7 @@ def build_command_manifest(context: RunContext) -> dict[str, object]:
         "cwd": str(context.repo_root),
         "paths": {
             "result_dir": str(context.paths.result_dir),
+            "raw_dir": str(context.paths.raw_dir),
             "log_dir": str(context.paths.log_dir),
             "run_log": str(context.paths.log_path),
             "stdout_log": str(context.paths.stdout_log_path),
@@ -2067,42 +2086,39 @@ def resolve_report_path(
 def build_run_paths(
     topic_dir: Path, identity: RunIdentity, report_path: Path
 ) -> RunPaths:
-    """Build filesystem paths after proving the canonical realpath boundary."""
+    """Derive result and raw paths from the canonical complete identity."""
     topic_dir = topic_dir.absolute()
-    if topic_dir.name != identity.topic or topic_dir.parent.name != "experiments":
+    repo_root = topic_dir.parent.parent
+    expected_topic_dir = (repo_root / "experiments" / identity.topic).absolute()
+    if topic_dir != expected_topic_dir:
         raise ExperimentIdentityError(
             "topic directory must be experiments/<topic> for the identity"
         )
     if topic_dir.is_symlink() or topic_dir.resolve() != topic_dir:
-        raise ExperimentIdentityError(f"topic directory must not escape by symlink: {topic_dir}")
+        raise ExperimentIdentityError(
+            f"topic directory must not escape by symlink: {topic_dir}"
+        )
     if not topic_dir.is_dir():
         raise ExperimentIdentityError(f"topic directory does not exist: {topic_dir}")
 
-    result_root = topic_dir / "result"
-    for label, directory in (("result root", result_root),):
-        if directory.is_symlink() or directory.resolve() != directory:
-            raise ExperimentIdentityError(f"{label} must not escape by symlink: {directory}")
-        if directory.exists() and not directory.is_dir():
-            raise ExperimentIdentityError(f"{label} must be a directory: {directory}")
+    result_dir = (repo_root / result_relative_path(identity)).absolute()
+    raw_dir = (repo_root / raw_relative_path(identity)).absolute()
+    for kind, run_dir in (("result", result_dir), ("raw", raw_dir)):
+        root = topic_dir / kind
+        variant_root = root / identity.variant
+        for label, directory in (
+            (f"{kind} root", root),
+            (f"variant {kind} root", variant_root),
+            (f"{kind} directory", run_dir),
+        ):
+            if directory.is_symlink() or directory.resolve() != directory:
+                raise ExperimentIdentityError(
+                    f"{label} must not escape by symlink: {directory}"
+                )
+            if directory.exists() and not directory.is_dir():
+                raise ExperimentIdentityError(f"{label} must be a directory: {directory}")
 
-    variant_root = result_root / identity.variant
-    if variant_root.is_symlink() or variant_root.resolve() != variant_root:
-        raise ExperimentIdentityError(
-            f"variant result root must not escape by symlink: {variant_root}"
-        )
-    if variant_root.exists() and not variant_root.is_dir():
-        raise ExperimentIdentityError(
-            f"variant result root must be a directory: {variant_root}"
-        )
-
-    result_dir = topic_dir / "result" / identity.variant / identity.run_name
-    if result_dir.is_symlink() or result_dir.resolve() != result_dir:
-        raise ExperimentIdentityError(
-            f"result directory must not escape by symlink: {result_dir}"
-        )
-    expected_report_path = (
-        topic_dir.parent.parent / report_relative_path(identity)
-    ).absolute()
+    expected_report_path = (repo_root / report_relative_path(identity)).absolute()
     report_path = report_path.absolute()
     if report_path != expected_report_path:
         raise ExperimentIdentityError(
@@ -2110,11 +2126,14 @@ def build_run_paths(
             f"expected {expected_report_path}, got {report_path}"
         )
     if report_path.is_symlink() or report_path.resolve() != report_path:
-        raise ExperimentIdentityError(f"report path must not escape by symlink: {report_path}")
+        raise ExperimentIdentityError(
+            f"report path must not escape by symlink: {report_path}"
+        )
 
     log_dir = result_dir / "logs"
     return RunPaths(
         result_dir=result_dir,
+        raw_dir=raw_dir,
         log_dir=log_dir,
         report_path=report_path,
         manifest_path=result_dir / "run_manifest.json",
@@ -2142,6 +2161,7 @@ def build_placeholders(
         "variant": identity.variant,
         "run_name": identity.run_name,
         "run_dir": str(paths.result_dir),
+        "raw_dir": str(paths.raw_dir),
         "log_dir": str(paths.log_dir),
         "report_path": str(paths.report_path),
         "manifest_path": str(paths.manifest_path),
@@ -2286,6 +2306,7 @@ def write_initial_artifacts(
         "initialized",
         {
             "result_dir": str(context.paths.result_dir),
+            "raw_dir": str(context.paths.raw_dir),
             "command_manifest": str(context.paths.command_manifest_path),
             "environment_manifest": str(context.paths.environment_manifest_path),
             "source_snapshot": str(context.paths.source_snapshot_path),
@@ -2298,29 +2319,44 @@ def write_initial_artifacts(
 def reserve_run_paths(
     context: RunContext, skip_report_init: bool
 ) -> ReservationReceipt:
-    """Reserve the complete identity before writing any run artifacts.
-
-    The report existence check is intentionally before result-directory
-    reservation.  The later exclusive report create is the race gate; if it
-    loses, only this invocation's still-empty result directory is removed.
-    """
+    """Reserve result, raw, and optional report as one complete identity."""
     if context.paths.report_path.exists():
-        raise ValueError(f"report already exists for identity: {context.paths.report_path}")
+        raise ValueError(
+            f"report already exists for identity: {context.paths.report_path}"
+        )
     result_parent = context.paths.result_dir.parent
+    raw_parent = context.paths.raw_dir.parent
     result_parent_existed = result_parent.exists()
+    raw_parent_existed = raw_parent.exists()
     result_parent.mkdir(parents=True, exist_ok=True)
+    result_parent_inode = result_parent.stat().st_ino
     try:
         context.paths.result_dir.mkdir(exist_ok=False)
     except FileExistsError as exc:
         if not result_parent_existed:
-            try:
-                result_parent.rmdir()
-            except OSError:
-                pass
+            _remove_owned_empty_dir(result_parent, result_parent_inode)
         raise ValueError(
             f"result directory already exists for identity: {context.paths.result_dir}"
         ) from exc
     result_inode = context.paths.result_dir.stat().st_ino
+
+    try:
+        raw_parent.mkdir(parents=True, exist_ok=True)
+        raw_parent_inode = raw_parent.stat().st_ino
+        context.paths.raw_dir.mkdir(exist_ok=False)
+    except BaseException as exc:
+        _remove_owned_empty_dir(context.paths.result_dir, result_inode)
+        if not result_parent_existed:
+            _remove_owned_empty_dir(result_parent, result_parent_inode)
+        if raw_parent.exists() and not raw_parent_existed:
+            _remove_owned_empty_dir(raw_parent, raw_parent.stat().st_ino)
+        if isinstance(exc, FileExistsError):
+            raise ValueError(
+                f"raw directory already exists for identity: {context.paths.raw_dir}"
+            ) from exc
+        raise
+    raw_inode = context.paths.raw_dir.stat().st_ino
+
     token = secrets.token_hex(24)
     marker_path = context.paths.result_dir / RESERVATION_MARKER_NAME
     marker_payload = {
@@ -2328,6 +2364,7 @@ def reserve_run_paths(
         "state": "reserved",
         "token": token,
         "result_inode": result_inode,
+        "raw_inode": raw_inode,
         **context.identity.to_dict(),
     }
     try:
@@ -2338,27 +2375,36 @@ def reserve_run_paths(
             os.fsync(marker_file.fileno())
         marker_inode = marker_path.stat().st_ino
     except BaseException:
+        _remove_owned_empty_dir(context.paths.raw_dir, raw_inode)
         _remove_owned_empty_dir(context.paths.result_dir, result_inode)
+        if not raw_parent_existed:
+            _remove_owned_empty_dir(raw_parent, raw_parent_inode)
+        if not result_parent_existed:
+            _remove_owned_empty_dir(result_parent, result_parent_inode)
         raise
 
     report_parent = context.paths.report_path.parent
     report_parent_existed = report_parent.exists()
-    report_content: str | None = None
     receipt = ReservationReceipt(
         result_dir=context.paths.result_dir,
+        raw_dir=context.paths.raw_dir,
         report_path=context.paths.report_path,
         report_content=None,
         result_parent=result_parent,
         result_parent_preexisted=result_parent_existed,
+        raw_parent=raw_parent,
+        raw_parent_preexisted=raw_parent_existed,
         report_parent=report_parent,
         report_parent_preexisted=report_parent_existed,
         token=token,
         marker_path=marker_path,
         result_inode=result_inode,
+        raw_inode=raw_inode,
         marker_inode=marker_inode,
         report_reserved=False,
         report_inode=None,
-        result_parent_inode=result_parent.stat().st_ino,
+        result_parent_inode=result_parent_inode,
+        raw_parent_inode=raw_parent_inode,
         report_parent_inode=None,
         identity=context.identity,
     )
@@ -2414,13 +2460,20 @@ def _reservation_parent_matches(
 
 
 def _reservation_owner_matches(receipt: ReservationReceipt) -> bool:
-    """Verify token, identity, state, and inode ownership before cleanup."""
+    """Verify token, identity, and result/raw inode ownership before cleanup."""
     try:
         result_stat = receipt.result_dir.stat()
+        raw_stat = receipt.raw_dir.stat()
         marker_stat = receipt.marker_path.stat()
-        if receipt.result_dir.is_symlink() or receipt.marker_path.is_symlink():
+        if (
+            receipt.result_dir.is_symlink()
+            or receipt.raw_dir.is_symlink()
+            or receipt.marker_path.is_symlink()
+        ):
             return False
         if result_stat.st_ino != receipt.result_inode:
+            return False
+        if raw_stat.st_ino != receipt.raw_inode:
             return False
         if marker_stat.st_ino != receipt.marker_inode:
             return False
@@ -2432,6 +2485,7 @@ def _reservation_owner_matches(receipt: ReservationReceipt) -> bool:
             "state",
             "token",
             "result_inode",
+            "raw_inode",
             "identity",
         }:
             return False
@@ -2443,6 +2497,8 @@ def _reservation_owner_matches(receipt: ReservationReceipt) -> bool:
             return False
         if marker.get("result_inode") != receipt.result_inode:
             return False
+        if marker.get("raw_inode") != receipt.raw_inode:
+            return False
         if identity_from_manifest(marker) != receipt.identity:
             return False
     except (OSError, TypeError, ValueError, json.JSONDecodeError):
@@ -2451,26 +2507,30 @@ def _reservation_owner_matches(receipt: ReservationReceipt) -> bool:
 
 
 def rollback_empty_reservation(receipt: ReservationReceipt) -> bool:
-    """Remove only a receipt-owned empty result/report reservation."""
+    """Remove only a receipt-owned empty result/raw/report reservation."""
     if not _reservation_owner_matches(receipt):
         return False
-    if not _reservation_parent_matches(
-        receipt.result_parent,
-        receipt.result_parent_preexisted,
-        receipt.result_parent_inode,
+    for path, preexisted, inode in (
+        (
+            receipt.result_parent,
+            receipt.result_parent_preexisted,
+            receipt.result_parent_inode,
+        ),
+        (receipt.raw_parent, receipt.raw_parent_preexisted, receipt.raw_parent_inode),
+        (
+            receipt.report_parent,
+            receipt.report_parent_preexisted,
+            receipt.report_parent_inode,
+        ),
     ):
-        return False
-    if not _reservation_parent_matches(
-        receipt.report_parent,
-        receipt.report_parent_preexisted,
-        receipt.report_parent_inode,
-    ):
-        return False
+        if not _reservation_parent_matches(path, preexisted, inode):
+            return False
     try:
-        children = list(receipt.result_dir.iterdir())
+        result_children = list(receipt.result_dir.iterdir())
+        raw_children = list(receipt.raw_dir.iterdir())
     except OSError:
         return False
-    if children != [receipt.marker_path]:
+    if result_children != [receipt.marker_path] or raw_children:
         return False
 
     if receipt.report_reserved:
@@ -2488,30 +2548,28 @@ def rollback_empty_reservation(receipt: ReservationReceipt) -> bool:
         ):
             return False
     try:
+        receipt.raw_dir.rmdir()
         receipt.marker_path.unlink()
         receipt.result_dir.rmdir()
+        if receipt.report_reserved:
+            receipt.report_path.unlink()
     except OSError:
         return False
-    if receipt.report_reserved:
-        try:
-            receipt.report_path.unlink()
-        except OSError:
-            return False
     for parent, preexisted, inode in (
         (
             receipt.report_parent,
             receipt.report_parent_preexisted,
             receipt.report_parent_inode,
         ),
+        (receipt.raw_parent, receipt.raw_parent_preexisted, receipt.raw_parent_inode),
         (
             receipt.result_parent,
             receipt.result_parent_preexisted,
             receipt.result_parent_inode,
         ),
     ):
-        if not preexisted:
-            if inode is not None:
-                _remove_owned_empty_dir(parent, inode)
+        if not preexisted and inode is not None:
+            _remove_owned_empty_dir(parent, inode)
     return True
 
 
@@ -2546,6 +2604,7 @@ def build_run_environment(context: RunContext) -> dict[str, str]:
             "EXPERIMENT_TOPIC": context.identity.topic,
             "EXPERIMENT_VARIANT": context.identity.variant,
             "EXPERIMENT_RUN_DIR": str(context.paths.result_dir),
+            "EXPERIMENT_RAW_DIR": str(context.paths.raw_dir),
             "EXPERIMENT_LOG_DIR": str(context.paths.log_dir),
             "EXPERIMENT_REPORT_PATH": str(context.paths.report_path),
             "EXPERIMENT_RUN_MANIFEST": str(context.paths.manifest_path),

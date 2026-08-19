@@ -70,13 +70,18 @@ def registry_failure(error: BaseException, started_at: str) -> CaseResult:
     )
 
 
-def run_case_worker(case: CaseSpec, run_dir_text: str) -> CaseResult:
+def run_case_worker(
+    case: CaseSpec,
+    run_dir_text: str,
+    raw_dir_text: str,
+) -> CaseResult:
     """
     実行可能な domain case worker を実行し、typed success record を返します.
 
     Args:
         case: case identity と JSON-serializable parameter mapping。
-        run_dir_text: topic artifact ownership 用の absolute run directory。
+        run_dir_text: compact review evidence 用の absolute result directory。
+        raw_dir_text: bulky artifact 用の absolute raw directory。
 
     Returns:
         利用者が domain logic に置換できる具体的な numeric observation。
@@ -113,6 +118,7 @@ def run_case_worker(case: CaseSpec, run_dir_text: str) -> CaseResult:
             "case_id": case.case_id,
             "status": "success",
             "run_dir": run_dir_text,
+            "raw_dir": raw_dir_text,
             "case_parameters": dict(case.parameters),
             "observation": {
                 "count": len(numeric_values),
@@ -131,13 +137,18 @@ def run_case_worker(case: CaseSpec, run_dir_text: str) -> CaseResult:
     )
 
 
-def execute_case(case: CaseSpec, run_dir_text: str) -> CaseResult:
+def execute_case(
+    case: CaseSpec,
+    run_dir_text: str,
+    raw_dir_text: str,
+) -> CaseResult:
     """
     Case 一件を実行・計測し、failure semantics を保持します.
 
     Args:
         case: registry が選択した検証済み case specification。
-        run_dir_text: domain worker に渡す absolute run directory。
+        run_dir_text: domain worker に渡す compact result directory。
+        raw_dir_text: domain worker に渡す bulky raw directory。
 
     Returns:
         計測 duration を持つ terminal success または failed record。
@@ -148,7 +159,7 @@ def execute_case(case: CaseSpec, run_dir_text: str) -> CaseResult:
     started_at = utc_now()
     start_clock = time.perf_counter()
     try:
-        record = run_case_worker(case, run_dir_text)
+        record = run_case_worker(case, run_dir_text, raw_dir_text)
         return CaseResult(
             case_id=record.case_id,
             state=record.state,

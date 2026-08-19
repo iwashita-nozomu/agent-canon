@@ -411,8 +411,8 @@ EXPERIMENT_EXECUTION_SURFACE_GATE_TEMPLATES = (
         handoff=(
             "route planned edits through $experiment-lifecycle and $test-design; "
             "preserve the managed runner, registry checker, registry contract, "
-            "and compressed git-annex retention contract with lightweight registry and "
-            "runner validation evidence"
+            "and deterministic raw-only git-annex retention contract with lightweight "
+            "registry and runner validation evidence"
         ),
     ),
 )

@@ -120,8 +120,28 @@ class ExperimentIdentity:
 
 
 def result_relative_path(identity: ExperimentIdentity) -> Path:
-    """Return the canonical repository-relative result directory."""
+    """Return the canonical repository-relative compact result directory."""
     return Path("experiments") / identity.topic / "result" / identity.variant / identity.run_name
+
+
+def raw_relative_path(identity: ExperimentIdentity) -> Path:
+    """Return the canonical repository-relative bulky raw directory."""
+    return Path("experiments") / identity.topic / "raw" / identity.variant / identity.run_name
+
+
+def identity_from_raw_relative_path(path: Path) -> ExperimentIdentity:
+    """Invert one canonical raw path through the sole identity grammar owner."""
+    if path.is_absolute() or ".." in path.parts:
+        raise ExperimentIdentityError("raw path must be repository-relative and contained")
+    parts = path.parts
+    if len(parts) != 5 or parts[0] != "experiments" or parts[2] != "raw":
+        raise ExperimentIdentityError(
+            "raw path must be experiments/<topic>/raw/<variant>/<run_name>"
+        )
+    identity = ExperimentIdentity(parts[1], parts[3], parts[4])
+    if path != raw_relative_path(identity):
+        raise ExperimentIdentityError("raw path is not canonical for its identity")
+    return identity
 
 
 def report_relative_path(identity: ExperimentIdentity) -> Path:
@@ -158,8 +178,10 @@ __all__ = [
     "ExperimentIdentityError",
     "contained_path",
     "identity_from_manifest",
+    "identity_from_raw_relative_path",
     "load_json_file",
     "load_json_text",
+    "raw_relative_path",
     "report_relative_path",
     "result_relative_path",
     "validate_segment",

@@ -71,6 +71,22 @@ def resolve_run_dir() -> Path:
     return Path(raw_run_dir).resolve()
 
 
+def resolve_raw_dir() -> Path:
+    """
+    Resolve the canonical bulky raw directory supplied by the managed producer.
+
+    Returns:
+        この invocation が選択した absolute raw directory。
+
+    Raises:
+        RuntimeError: managed producer が raw directory を供給しない場合。
+    """
+    raw_raw_dir = os.environ.get("EXPERIMENT_RAW_DIR", "")
+    if not raw_raw_dir:
+        raise RuntimeError("managed_runner_required=explicit EXPERIMENT_RAW_DIR")
+    return Path(raw_raw_dir).resolve()
+
+
 def load_cases() -> tuple[CaseSpec, ...]:
     """
     実験の domain dependency を import せず topic-owned case registry を読み込みます.
@@ -155,7 +171,7 @@ def _run_acceptance(
     )
 
 
-def run_experiment(run_dir: Path) -> RunSummary:
+def run_experiment(run_dir: Path, raw_dir: Path) -> RunSummary:
     """
     一つの run を orchestration し、result set を atomic に公開します.
 
@@ -164,7 +180,8 @@ def run_experiment(run_dir: Path) -> RunSummary:
     visualization status がそろった場合だけ `success` にします。
 
     Args:
-        run_dir: この run identity のために caller が所有する result directory。
+        run_dir: この run identity のために caller が所有する compact result directory。
+        raw_dir: 同じ identity から導出される bulky raw artifact directory。
 
     Returns:
         `summary.json` にも書く typed aggregate summary。
@@ -174,6 +191,7 @@ def run_experiment(run_dir: Path) -> RunSummary:
         manifest artifact を生成します。
     """
     run_dir.mkdir(parents=True, exist_ok=True)
+    raw_dir.mkdir(parents=True, exist_ok=True)
     started_at = utc_now()
     template_dir = Path(__file__).resolve().parent
     completion = load_completion_provenance(template_dir)
@@ -186,7 +204,13 @@ def run_experiment(run_dir: Path) -> RunSummary:
             cases = ()
             records_list.append(registry_failure(error, started_at))
         for case in cases:
-            records_list.append(execute_case(case, str(run_dir.resolve())))
+            records_list.append(
+                execute_case(
+                    case,
+                    str(run_dir.resolve()),
+                    str(raw_dir.resolve()),
+                )
+            )
     records = tuple(records_list)
     write_case_records(run_dir, records)
     success_count, failed_count, blocked_count = _case_state_counts(records)
@@ -279,6 +303,8 @@ def require_managed_runner_route() -> None:
         )
     if not os.environ.get("EXPERIMENT_VARIANT", ""):
         raise RuntimeError("managed_runner_required=explicit EXPERIMENT_VARIANT")
+    if not os.environ.get("EXPERIMENT_RAW_DIR", ""):
+        raise RuntimeError("managed_runner_required=explicit EXPERIMENT_RAW_DIR")
 
 
 def main() -> int:
@@ -296,8 +322,10 @@ def main() -> int:
     """
     require_managed_runner_route()
     run_dir = resolve_run_dir()
-    summary = run_experiment(run_dir)
+    raw_dir = resolve_raw_dir()
+    summary = run_experiment(run_dir, raw_dir)
     print(f"run_dir={run_dir}")
+    print(f"raw_dir={raw_dir}")
     print(f"status={summary.status.value}")
     print(f"summary={run_dir / RESULT_SUMMARY_NAME}")
     return summary.exit_status

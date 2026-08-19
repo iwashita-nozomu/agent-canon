@@ -468,7 +468,7 @@ After a run, the save owner validates and retains the same result directory (`RD
 ```bash
 python3 -m tools.experiments.save_experiment_result_annex \
   --result-dir "$ROOT/experiments/$TOPIC/result/$VARIANT/$RUN_NAME" \
-  --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
+  --annex-repo "$EXPERIMENT_RAW_ANNEX_REPO"
 ```
 
 The retention evidence records `experiment_topic`, `experiment_variant`, `experiment_run_name`, `D-EXPERIMENT-LIFECYCLE`,
