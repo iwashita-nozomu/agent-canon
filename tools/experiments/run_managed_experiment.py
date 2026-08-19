@@ -160,7 +160,11 @@ else:
         validate_segment,
     )
 
-DEFAULT_REQUIRED_EVAL_ARTIFACTS = ("summary.json", "cases.jsonl", "config.json")
+DEFAULT_REQUIRED_EVAL_ARTIFACTS = (
+    "summary/summary.json",
+    "summary/cases.jsonl",
+    "config.json",
+)
 CONFIG_SOURCE_SNAPSHOT_NAME = "config_source.yaml"
 COMMAND_MANIFEST_NAME = "command.json"
 ENVIRONMENT_MANIFEST_NAME = "environment.json"
@@ -206,9 +210,7 @@ FILE_READ_CHUNK_BYTES = 1024 * 1024
 PREFLIGHT_FAILURE_EXIT_CODE = 2
 DURATION_ROUND_DIGITS = 3
 REGISTERED_COMMAND_KINDS = ("default", "formal")
-REVIEWED_W1_LINEAGE_ARTIFACT = (
-    "W1-IMPLEMENTATION-RECHECK-EF2DE34A-20260716-READONLY"
-)
+REVIEWED_W1_LINEAGE_ARTIFACT = "W1-IMPLEMENTATION-RECHECK-EF2DE34A-20260716-READONLY"
 REVIEWED_W1_LINEAGE_COMMIT = "b829286c6a1c9de15f260199a44556e4f90be459"
 REVIEWED_W1_LINEAGE_TREE = "551abfa0a6e89f4a9218fc4fc0706b3addd2a84e"
 REVIEWED_W1_SOURCE_BLOBS = {
@@ -680,7 +682,9 @@ def _build_managed_run_request(
 
     request_path = context.paths.result_dir / "runtime" / MANAGED_RUN_REQUEST_FILENAME
     result_path = context.paths.result_dir / "runtime" / MANAGED_RUN_RESULT_FILENAME
-    lifecycle_path = context.paths.result_dir / "runtime" / MANAGED_RUN_LIFECYCLE_FILENAME
+    lifecycle_path = (
+        context.paths.result_dir / "runtime" / MANAGED_RUN_LIFECYCLE_FILENAME
+    )
     selected_uuids = tuple(plan.gpu_allocation.selected_ids)
     selected_gpu_ids = _provider_gpu_ids(selected_uuids)
     payload: dict[str, object] = {
@@ -730,9 +734,7 @@ def _build_managed_run_request(
             ),
             "agentcanon_output_directory": str(context.paths.result_dir),
             "agentcanon_lifecycle_artifact_path": str(
-                context.paths.result_dir
-                / "runtime"
-                / MANAGED_RUN_LIFECYCLE_FILENAME
+                context.paths.result_dir / "runtime" / MANAGED_RUN_LIFECYCLE_FILENAME
             ),
             "agentcanon_selected_uuids": selected_uuids,
         },
@@ -759,7 +761,11 @@ def _resolve_admitted_runner() -> str:
         MANAGED_RUN_EXECUTABLE,
     )
     resolved = shutil.which(configured)
-    if resolved is None and Path(configured).is_file() and os.access(configured, os.X_OK):
+    if (
+        resolved is None
+        and Path(configured).is_file()
+        and os.access(configured, os.X_OK)
+    ):
         resolved = str(Path(configured).resolve())
     if resolved is None:
         raise TypedPreflightFailure(
@@ -774,10 +780,18 @@ def _validate_admitted_result(
     result_path: Path,
     request_payload: Mapping[str, object],
     process_returncode: int,
-) -> tuple[ManagedRunExecutionResult, ManagedRunLifecycleEvidence, Mapping[str, object]]:
+) -> tuple[
+    ManagedRunExecutionResult, ManagedRunLifecycleEvidence, Mapping[str, object]
+]:
     try:
         result = load_json_file(result_path)
-    except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+    except (
+        FileNotFoundError,
+        OSError,
+        UnicodeError,
+        json.JSONDecodeError,
+        ValueError,
+    ) as exc:
         raise TypedPreflightFailure(
             "admitted_runner_result_corrupt",
             "experiment-runner-admitted result artifact is missing or invalid JSON",
@@ -859,7 +873,11 @@ def _validate_admitted_result(
     quiescence = result.get("quiescence")
     exit_record = result.get("exit")
     completions = result.get("completions")
-    if not isinstance(lifecycle, Mapping) or not isinstance(quiescence, Mapping) or not isinstance(exit_record, Mapping):
+    if (
+        not isinstance(lifecycle, Mapping)
+        or not isinstance(quiescence, Mapping)
+        or not isinstance(exit_record, Mapping)
+    ):
         raise TypedPreflightFailure(
             "admitted_runner_descendant_quiescence_unproven",
             "result must contain provider lifecycle and quiescence objects",
@@ -883,7 +901,9 @@ def _validate_admitted_result(
             )
         return value
 
-    def required_pid_sequence(mapping: Mapping[str, object], name: str) -> tuple[int, ...]:
+    def required_pid_sequence(
+        mapping: Mapping[str, object], name: str
+    ) -> tuple[int, ...]:
         value = mapping.get(name)
         if not isinstance(value, list):
             raise TypedPreflightFailure(
@@ -1071,12 +1091,17 @@ def _run_admitted_runner(
     lifecycle_path: Path,
     request_payload: Mapping[str, object],
     environment: Mapping[str, str],
-) -> tuple[ManagedRunExecutionResult, ManagedRunLifecycleEvidence, Mapping[str, object]]:
+) -> tuple[
+    ManagedRunExecutionResult, ManagedRunLifecycleEvidence, Mapping[str, object]
+]:
     """Invoke the fixed shell-free admitted-runner handshake."""
     executable = _resolve_admitted_runner()
     argv = [executable, "--request", str(request_path), "--result", str(result_path)]
     try:
-        with context.paths.stdout_log_path.open("ab") as stdout, context.paths.stderr_log_path.open("ab") as stderr:
+        with (
+            context.paths.stdout_log_path.open("ab") as stdout,
+            context.paths.stderr_log_path.open("ab") as stderr,
+        ):
             process = subprocess.Popen(
                 argv,
                 cwd=str(context.paths.result_dir / "source_snapshot"),
@@ -1128,11 +1153,15 @@ def _run_admitted_runner(
             ).encode("utf-8")
         ).hexdigest(),
         "process_returncode": process_returncode,
-        "worker_pid": lifecycle.child_process_ids[0] if lifecycle.child_process_ids else None,
+        "worker_pid": lifecycle.child_process_ids[0]
+        if lifecycle.child_process_ids
+        else None,
     }
     if isinstance(context_identity, ExperimentIdentity):
         receipt.update(context_identity.to_dict())
-    receipt_path = context.paths.result_dir.joinpath("runtime", MANAGED_RUN_RECEIPT_FILENAME)
+    receipt_path = context.paths.result_dir.joinpath(
+        "runtime", MANAGED_RUN_RECEIPT_FILENAME
+    )
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
     receipt_path.write_text(
         json.dumps(receipt, sort_keys=True, indent=2),
@@ -1176,12 +1205,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--run-name",
-        help="Explicit run name. Defaults to <topic>_<variant>_<timestamp>.",
+        help="Explicit run name. Defaults to <topic>_<variant>_<timestamp>; result filesystem uses result/<run-name>.",
     )
     parser.add_argument(
         "--variant",
         required=True,
-        help="Required variant label used in the result/report/branch identity.",
+        help="Required variant label recorded in run metadata and used for selection; it is not a result directory component.",
     )
     parser.add_argument(
         "--registry",
@@ -1196,7 +1225,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--report-path",
-        help="Optional report path. Defaults to experiments/report/<topic>/<variant>/<run_name>.md.",
+        help="Optional report path. Defaults to the registry report_root/<run_name>.md.",
     )
     parser.add_argument(
         "--skip-report-init",
@@ -1206,7 +1235,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config-json",
         help=(
-            "Optional JSON object file to merge into result/<variant>/<run_name>/config.json. "
+            "Optional JSON object file to merge into result/<run_name>/config.json. "
             "The file must decode to a dictionary."
         ),
     )
@@ -1216,7 +1245,7 @@ def parse_args() -> argparse.Namespace:
         default=[],
         metavar="KEY=JSON",
         help=(
-            "Add one JSON-encoded config value to result/<variant>/<run_name>/config.json. "
+            "Add one JSON-encoded config value to result/<run_name>/config.json. "
             "Example: --config seed=0 --config enabled=true."
         ),
     )
@@ -1475,7 +1504,7 @@ def render_report_stub(context: RunContext) -> str:
 
 ## Results
 
-<!-- Fill in summary.json, cases.jsonl, and the main observations after the run. -->
+<!-- Fill in summary/summary.json, summary/cases.jsonl, and the main observations after the run. -->
 
 ## Reproducibility Record
 
@@ -1492,8 +1521,8 @@ def render_report_stub(context: RunContext) -> str:
 - `logs/startup.jsonl`
 - `logs/stdout.log`
 - `logs/stderr.log`
-- `summary.json`
-- `cases.jsonl`
+- `summary/summary.json`
+- `summary/cases.jsonl`
 
 ## Critical Review Notes
 
@@ -1645,7 +1674,9 @@ def git_status_path_text(status_line: str) -> str:
     return raw_path.strip('"')
 
 
-def dirty_source_files(repo_root: Path, status_short: list[str]) -> tuple[list[Path], list[str]]:
+def dirty_source_files(
+    repo_root: Path, status_short: list[str]
+) -> tuple[list[Path], list[str]]:
     """Return existing dirty files plus dirty entries without a readable file."""
     files: list[Path] = []
     missing_paths: list[str] = []
@@ -1676,7 +1707,9 @@ def command_source_files(command: list[str], repo_root: Path) -> list[Path]:
 
 def unique_paths(paths: list[Path]) -> list[Path]:
     """Return stable unique paths."""
-    return sorted(dict.fromkeys(path.resolve() for path in paths), key=lambda path: str(path))
+    return sorted(
+        dict.fromkeys(path.resolve() for path in paths), key=lambda path: str(path)
+    )
 
 
 def build_source_snapshot(context: RunContext) -> dict[str, object]:
@@ -1818,10 +1851,10 @@ def validate_eval_artifact_patterns(patterns: list[str], key: str) -> list[str]:
         pattern_path = Path(pattern)
         if pattern_path.is_absolute():
             raise ValueError(
-                f"{key} must stay relative to result/<variant>/<run_name>: {pattern}"
+                f"{key} must stay relative to result/<run_name>: {pattern}"
             )
         if ".." in pattern_path.parts:
-            raise ValueError(f"{key} must not escape result/<variant>/<run_name>: {pattern}")
+            raise ValueError(f"{key} must not escape result/<run_name>: {pattern}")
     return patterns
 
 
@@ -1991,7 +2024,9 @@ def normalize_registered_command_kind(command_kind: str) -> str:
     normalized = LEGACY_REGISTERED_COMMAND_ALIASES.get(command_kind, command_kind)
     if normalized not in REGISTERED_COMMAND_KINDS:
         allowed = ", ".join(REGISTERED_COMMAND_KINDS)
-        raise ValueError(f"unsupported registered command {command_kind!r}; expected {allowed}")
+        raise ValueError(
+            f"unsupported registered command {command_kind!r}; expected {allowed}"
+        )
     return normalized
 
 
@@ -2073,12 +2108,7 @@ def resolve_report_path(
         ) or registry.defaults.get("report_root")
         if isinstance(registry_report_root, str):
             return contained_path(
-                repo_root,
-                repo_root
-                / registry_report_root
-                / identity.topic
-                / identity.variant
-                / f"{identity.run_name}.md",
+                repo_root, repo_root / registry_report_root / f"{identity.run_name}.md"
             )
     return contained_path(repo_root, repo_root / report_relative_path(identity))
 
@@ -2103,20 +2133,17 @@ def build_run_paths(
 
     result_dir = (repo_root / result_relative_path(identity)).absolute()
     raw_dir = (repo_root / raw_relative_path(identity)).absolute()
-    for kind, run_dir in (("result", result_dir), ("raw", raw_dir)):
-        root = topic_dir / kind
-        variant_root = root / identity.variant
-        for label, directory in (
-            (f"{kind} root", root),
-            (f"variant {kind} root", variant_root),
-            (f"{kind} directory", run_dir),
-        ):
-            if directory.is_symlink() or directory.resolve() != directory:
-                raise ExperimentIdentityError(
-                    f"{label} must not escape by symlink: {directory}"
-                )
-            if directory.exists() and not directory.is_dir():
-                raise ExperimentIdentityError(f"{label} must be a directory: {directory}")
+    for label, directory in (
+        ("result root", topic_dir / "result"),
+        ("result directory", result_dir),
+        ("raw directory", raw_dir),
+    ):
+        if directory.is_symlink() or directory.resolve() != directory:
+            raise ExperimentIdentityError(
+                f"{label} must not escape by symlink: {directory}"
+            )
+        if directory.exists() and not directory.is_dir():
+            raise ExperimentIdentityError(f"{label} must be a directory: {directory}")
 
     expected_report_path = (repo_root / report_relative_path(identity)).absolute()
     report_path = report_path.absolute()
@@ -2130,7 +2157,7 @@ def build_run_paths(
             f"report path must not escape by symlink: {report_path}"
         )
 
-    log_dir = result_dir / "logs"
+    log_dir = raw_dir / "logs"
     return RunPaths(
         result_dir=result_dir,
         raw_dir=raw_dir,
@@ -2207,9 +2234,7 @@ def select_command(
                 "--use-registered-command requires experiments/registry.toml"
             )
         registered_kind = normalize_registered_command_kind(use_registered_command)
-        command = command_from_registry(
-            registry.entry, registered_kind, placeholders
-        )
+        command = command_from_registry(registry.entry, registered_kind, placeholders)
         return CommandSelection(
             command=command,
             source=f"registered:{registered_kind}",
@@ -2256,7 +2281,9 @@ def build_run_context(args: argparse.Namespace) -> RunContext:
         identity,
         args.report_path or "",
     )
-    expected_report_path = contained_path(repo_root, repo_root / report_relative_path(identity))
+    expected_report_path = contained_path(
+        repo_root, repo_root / report_relative_path(identity)
+    )
     if report_path != expected_report_path:
         raise ValueError(
             "report path must match complete identity: "
@@ -2530,7 +2557,7 @@ def rollback_empty_reservation(receipt: ReservationReceipt) -> bool:
         raw_children = list(receipt.raw_dir.iterdir())
     except OSError:
         return False
-    if result_children != [receipt.marker_path] or raw_children:
+    if set(result_children) != {receipt.marker_path, receipt.raw_dir} or raw_children:
         return False
 
     if receipt.report_reserved:
@@ -2676,8 +2703,10 @@ def _config_bool(config: Mapping[str, object], key: str, default: bool) -> bool:
 
 def _config_chunks(config: Mapping[str, object], run_name: str) -> tuple[str, ...]:
     value = config.get("requested_chunks", [run_name])
-    if not isinstance(value, list) or not value or any(
-        not isinstance(item, str) or not item for item in value
+    if (
+        not isinstance(value, list)
+        or not value
+        or any(not isinstance(item, str) or not item for item in value)
     ):
         raise ValueError("requested_chunks must be a non-empty array of strings")
     return tuple(value)
@@ -2705,7 +2734,9 @@ def _resource_request_for_managed_run(
             "cpu_capability_discovery_unavailable",
             "managed run cannot declare an authoritative CPU set",
         ) from exc
-    if any(isinstance(cpu, bool) or not isinstance(cpu, int) for cpu in cpu_requested_set):
+    if any(
+        isinstance(cpu, bool) or not isinstance(cpu, int) for cpu in cpu_requested_set
+    ):
         raise ValueError("cpu_requested_set must contain integers")
     environment = build_run_environment(context)
     gpu_requested_count = _config_int(config, "gpu_requested_count", 0)
@@ -2736,9 +2767,7 @@ def _resource_request_for_managed_run(
         run_id=context.identity.run_name,
         cpu_requested_set=cpu_requested_set,
         gpu_requested_count=gpu_requested_count,
-        gpu_requested_memory_bytes=_config_int(
-            config, "gpu_requested_memory_bytes", 0
-        ),
+        gpu_requested_memory_bytes=_config_int(config, "gpu_requested_memory_bytes", 0),
         gpu_allocation_provenance=(
             CALLER_ALLOCATION_PROVENANCE if gpu_requested_count else ""
         ),
@@ -2796,7 +2825,11 @@ def execute_managed_run(
     """Compose the fixed owners around one admitted-runner CLI invocation."""
     request = _resource_request_for_managed_run(context, run_config)
     raw_config = run_config.get("config", {})
-    config = cast(Mapping[str, object], raw_config) if isinstance(raw_config, Mapping) else {}
+    config = (
+        cast(Mapping[str, object], raw_config)
+        if isinstance(raw_config, Mapping)
+        else {}
+    )
     source_paths = build_source_path_set(
         str(context.repo_root),
         context.identity.topic,
@@ -2997,7 +3030,8 @@ def execute_managed_run(
                 )
                 coverage_mig = MigEvidence(
                     parent_by_uuid={
-                        join.mig_uuid: join.parent_uuid for join in final_inventory.joins
+                        join.mig_uuid: join.parent_uuid
+                        for join in final_inventory.joins
                     },
                     executable_leaf_uuids=final_inventory.mig_uuids,
                     selected_physical_uuids=tuple(
@@ -3079,9 +3113,13 @@ def execute_managed_run(
                     plan_fingerprint="pending",
                     caller_allocated_ids=candidates,
                     candidate_ids=candidates,
-                    occupied_ids=tuple(sorted(set(occupied_final) | set(unknown_final))),
+                    occupied_ids=tuple(
+                        sorted(set(occupied_final) | set(unknown_final))
+                    ),
                     reserved_ids=(),
-                    eligible_ids=tuple(cast(tuple[str, ...], lock_readback["final_eligible_ids"])),
+                    eligible_ids=tuple(
+                        cast(tuple[str, ...], lock_readback["final_eligible_ids"])
+                    ),
                     selected_ids=selected,
                     reservation_ids=reservation_transaction.reservation_ids,
                     free_memory_bytes=dict(final_observation.free_memory_bytes),
@@ -3089,7 +3127,9 @@ def execute_managed_run(
                     process_identities=final_observation.process_identities,
                     allocation_id=reservation.evidence_fingerprint,
                     lock_root=request.lock_root,
-                    selection_order=tuple(cast(tuple[str, ...], lock_readback["final_eligible_ids"])),
+                    selection_order=tuple(
+                        cast(tuple[str, ...], lock_readback["final_eligible_ids"])
+                    ),
                     memory_bytes={
                         device.uuid: device.memory_bytes
                         for device in final_observation.gpu_devices
@@ -3297,25 +3337,27 @@ def execute_managed_run(
         outcome_exit_code = _execution_exit_code(execution_result)
     secondary_failures = tuple(
         ([lifecycle_failure] if lifecycle_failure is not None else [])
-        + (
-            release_failures
-            if primary_exception is not None
-            else release_failures[1:]
-        )
+        + (release_failures if primary_exception is not None else release_failures[1:])
     )
     if runner_invoked:
         lifecycle = runner_lifecycle
         lifecycle_quiescent = _lifecycle_quiescence_is_proven(lifecycle)
         coverage_descendants = DescendantRetentionEvidence(
-            child_process_ids=(lifecycle.child_process_ids if lifecycle is not None else ()),
-            process_group_ids=(lifecycle.process_group_ids if lifecycle is not None else ()),
+            child_process_ids=(
+                lifecycle.child_process_ids if lifecycle is not None else ()
+            ),
+            process_group_ids=(
+                lifecycle.process_group_ids if lifecycle is not None else ()
+            ),
             descendant_quiescence="PROVEN" if lifecycle_quiescent else "UNPROVEN",
             retained_gpu_process_uuids=(),
             release_blocked=not lifecycle_quiescent,
             fingerprint=_r5_evidence_fingerprint(
                 {
                     "runner_lifecycle": repr(lifecycle),
-                    "descendant_quiescence": "PROVEN" if lifecycle_quiescent else "UNPROVEN",
+                    "descendant_quiescence": "PROVEN"
+                    if lifecycle_quiescent
+                    else "UNPROVEN",
                     "release_blocked": not lifecycle_quiescent,
                 }
             ),

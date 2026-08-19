@@ -94,8 +94,12 @@ class RustProjectionBoundaryTest(unittest.TestCase):
         snapshot = normalized_snapshot(manifest)
         self.assertEqual(snapshot["schema"], "agent-canon.surface-manifest.v1")
         self.assertNotIn("projection_forbidden_roots", snapshot)
-        root_absent = set(render_root_absent_paths(manifest.entries).splitlines())
-        self.assertFalse(any(path == "rust" or path.startswith("rust/") for path in root_absent))
+        root_absent = set(
+            render_root_absent_paths(manifest.deletion_targets).splitlines()
+        )
+        self.assertFalse(
+            any(path == "rust" or path.startswith("rust/") for path in root_absent)
+        )
 
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
@@ -116,7 +120,12 @@ class RustProjectionBoundaryTest(unittest.TestCase):
     def test_every_ownership_mode_rejects_a_rust_target(self) -> None:
         """Active, state, standalone, and cleanup modes cannot claim Rust paths."""
         cases = (
-            ("symlink", "agent-canon", "runtime_surface", 'source = "ROOT_AGENTS.md"\n'),
+            (
+                "symlink",
+                "agent-canon",
+                "runtime_surface",
+                'source = "ROOT_AGENTS.md"\n',
+            ),
             ("copy", "agent-canon", "runtime_surface", 'source = "ROOT_AGENTS.md"\n'),
             ("regular", "template", "shared_template", 'source = "ROOT_AGENTS.md"\n'),
             ("repo_state", "agent-canon-update", "transaction_state", ""),
@@ -205,10 +214,14 @@ class RustProjectionBoundaryTest(unittest.TestCase):
             root = Path(tmp_dir)
             artifact = root / "rust" / "agent-canon" / "tests" / "fixture.rs"
             artifact.parent.mkdir(parents=True)
-            artifact.write_text("// parent-owned historical artifact\n", encoding="utf-8")
+            artifact.write_text(
+                "// parent-owned historical artifact\n", encoding="utf-8"
+            )
             self.write_manifest(root, "")
             manifest = load_manifest(root, ".", "manifest.toml")
-            self.assertEqual(render_actionable_root_absent_paths(manifest.entries, root), "")
+            self.assertEqual(
+                render_actionable_root_absent_paths(manifest.entries, root), ""
+            )
             self.assertTrue(artifact.is_file())
             self.assertFalse(artifact.is_symlink())
 

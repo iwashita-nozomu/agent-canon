@@ -162,7 +162,8 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 "AGENTS.md",
                 ".codex/config.toml",
                 ".codex/agents",
-                "tools/agent-canon",
+                ".codex/hooks.json",
+                ".codex/hooks",
             },
         )
         for entry in active.values():
@@ -178,7 +179,8 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 "AGENTS.md": "vendor/agent-canon/ROOT_AGENTS.md",
                 ".codex/config.toml": "vendor/agent-canon/.codex/config.toml",
                 ".codex/agents": "vendor/agent-canon/.codex/agents",
-                "tools/agent-canon": "vendor/agent-canon/tools",
+                ".codex/hooks.json": "vendor/agent-canon/.codex/hooks.json",
+                ".codex/hooks": "vendor/agent-canon/.codex/hooks",
             }.items():
                 projection = root / path
                 self.assertTrue(projection.is_symlink(), path)
@@ -218,7 +220,9 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 resolution.public_tool_root,
                 (root / "tools" / "agent-canon").absolute(),
             )
-            self.assertNotEqual(resolution.current_repository_root, resolution.source_root)
+            self.assertNotEqual(
+                resolution.current_repository_root, resolution.source_root
+            )
 
     def test_tree_present_adds_checked_token_and_command(self) -> None:
         """Tree availability should be reported without relying on the host tool."""
@@ -333,7 +337,9 @@ class ParentRepoReadinessTest(unittest.TestCase):
             for entry in manifest.entries
             if entry.mode in {"removed_legacy", "standalone_only"}
         }
-        root_absent_paths = set(render_root_absent_paths(manifest.entries).splitlines())
+        root_absent_paths = set(
+            render_root_absent_paths(manifest.deletion_targets).splitlines()
+        )
         active_spec_paths = {
             line.split(":", 1)[0]
             for rendered in (

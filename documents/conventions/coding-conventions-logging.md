@@ -67,8 +67,8 @@ downstream design ../experiments/result-log-retention-and-visualization.md defin
   - `pytest.raw.txt`: 進捗や例外を含む生ログ
   - `pytest.jsonl`: JSON オブジェクトのみ（1 行 1 JSON）
   - `exit_code.txt`: 終了コード（数値のみ）
-- 実験や benchmark の raw result は `experiments/<topic>/result/<variant>/<run-id>/` に置き、
-  human-readable report は `experiments/report/<topic>/<variant>/<run-id>.md` に置きます。
+- 実験や benchmark の raw result は `experiments/<topic>/result/<run-id>/` に置き、
+  human-readable report は `experiments/<topic>/report/<run-id>.md` に置きます。
 - user-facing claim の根拠になる run は、raw log だけでなく `summary.json`、
   Markdown report、または compact JSONL summary を残します。
 

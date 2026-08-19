@@ -1,7 +1,7 @@
 # @dependency-start
 # contract template
 # responsibility Defines machine-readable experiment plan, resource, run, result, and reproducibility fields.
-# upstream design ./README.template.md reader-facing experiment contract.
+# upstream design ./README.md reader-facing experiment contract.
 # upstream design ../../../documents/design/experiment_runner.md managed experiment execution contract.
 # downstream implementation ../../../templates/experiments/_template/run.py produces the referenced run artifact.
 # @dependency-end
@@ -87,9 +87,9 @@ dirty_state = "clean"
 
 [input]
 config_path = "<config-path>"
-config_snapshot = "<result-path>/config_snapshot.json"
+config_snapshot = "<result-path>/summary/config_snapshot.json"
 seed_policy = "<seed-policy>"
-environment_snapshot = "<result-path>/environment.json"
+environment_snapshot = "<result-path>/summary/environment.json"
 
 [run]
 runner = "<managed-runner>"
@@ -101,10 +101,10 @@ exit_status = "<exit-status>"
 
 [result]
 path = "<result-path>"
-summary = "<result-path>/summary.json"
-cases = "<result-path>/cases.jsonl"
-manifest = "<result-path>/artifact-manifest.json"
-visualization_status = "<result-path>/visualization-status.json"
+summary = "<result-path>/summary/summary.json"
+cases = "<result-path>/summary/cases.jsonl"
+manifest = "<result-path>/summary/artifact-manifest.json"
+visualization_status = "<result-path>/summary/visualization-status.json"
 state = "incomplete"
 status = "incomplete"
 accepted_failure = false
@@ -122,10 +122,10 @@ conflict_intent = "<preserved-intent-or-none>"
 
 [reproducibility]
 readback_command = "<command>"
-required_artifacts = ["summary.json", "artifact-manifest.json"]
-required_case_artifact = "cases.jsonl"
-config_snapshot = "<result-path>/config_snapshot.json"
-environment_snapshot = "<result-path>/environment.json"
+required_artifacts = ["summary/summary.json", "summary/artifact-manifest.json"]
+required_case_artifact = "summary/cases.jsonl"
+config_snapshot = "<result-path>/summary/config_snapshot.json"
+environment_snapshot = "<result-path>/summary/environment.json"
 known_nondeterminism = "<none-or-description>"
 retention_owner = "<owner>"
 cleanup_policy = "<policy>"
