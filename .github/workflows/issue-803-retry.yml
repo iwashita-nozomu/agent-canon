@@ -1,0 +1,70 @@
+# @dependency-start
+# contract workflow
+# responsibility Replays the Issue 803 atomic patch with raw fixture source and removes both staging workflows.
+# upstream implementation ./issue-803-apply.yml provides the guarded patch program
+# @dependency-end
+name: issue-803-retry
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/803-reference-dependency-edge
+          fetch-depth: 0
+
+      - name: Replay patch with literal fixture escapes
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path(".github/workflows/issue-803-apply.yml")
+          source = workflow.read_text(encoding="utf-8")
+          marker = "          python3 <<'PY'\n"
+          start = source.index(marker) + len(marker)
+          end = source.index("\n          PY\n", start)
+          program = textwrap.dedent(source[start:end])
+          old = "textwrap.dedent(\n                  '''"
+          new = "textwrap.dedent(\n                  r'''"
+          if program.count(old) != 1:
+              raise SystemExit("fixture literal transform did not match exactly once")
+          program = program.replace(old, new, 1)
+          exec(compile(program, "issue-803-apply", "exec"), {"__name__": "__main__"})
+          Path(".github/workflows/issue-803-retry.yml").unlink()
+          PY
+
+      - name: Validate focused change
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          bash -n tools/agent_tools/check_dependency_header_format.sh
+          python3 -m py_compile \
+            tools/agent_tools/source_dependency_graph.py \
+            tests/agent_tools/test_dependency_reference_edge.py
+          python3 tests/agent_tools/test_dependency_reference_edge.py -v
+          cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check
+          cargo test --manifest-path rust/agent-canon/Cargo.toml \
+            dependency_relation_kinds_include_non_authoritative_reference
+          bash tools/agent_tools/check_dependency_header_format.sh --changed
+
+      - name: Commit the reviewed tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "agent-canon-validation"
+          git config user.email "agent-canon-validation@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: support reference dependency edges (#803)"
+          git push origin HEAD:fix/803-reference-dependency-edge
