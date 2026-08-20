@@ -2,7 +2,7 @@
 name: tool-finding-report
 description: "Use when running tools, checkers, hooks, static analysis, or structural analyzers to find problems, preserve raw and structured full finding artifacts, mechanically rank every finding, and produce a complete finding report for implementation or refactor planning; before/after impact is optional when explicitly requested."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"e1ae3c057524bf689f57ce2538d35c618f6b91cf68ddf770bd7e99ab66a831d0"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"8e1c1a525c0c361574a16676312a5a56f6dc99700df6c63201f929370cf5b497"} -->
 
 <!--
 @dependency-start

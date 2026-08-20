@@ -2,7 +2,7 @@
 name: report-writing
 description: "Use when drafting or revising reader-facing reports, decision briefs, experiment summaries, presentation narratives, PPT/storyboard plans, or slide-ready visual asset plans from tool, hook, eval, experiment, review, audit, or operational evidence; separates raw-result writeout from report narrative and applies the report quality checklist."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"3fb69d1b9d0e992ad19a26184a232e5cdfc7b71d4a687f7fe624548c67c27ee5"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"f78a7ee99d1edd3298235d7c9cfc63a5dfa45d9d99b3ad9448c681b2a15f39c7"} -->
 
 <!--
 @dependency-start

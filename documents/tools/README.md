@@ -189,6 +189,8 @@ second command manual.
     seed は `prose_reasoning_graph.py ingest|ingest-set` がそれぞれ所有します。
 - `tools/ci/run_in_repo_container.py`
   - repo workspace を mount した container command を実行します。
+- `tools/ci/run_gpu_container.sh`
+  - admitted full UUID/MIG environment を値付き `-e` で渡し、Docker GPU container を単一の `--gpus all` 経路で実行します。
 - `tools/ci/run_codex_in_repo_container.py`
   - nested Codex を canonical container 内で起動します。
 - `tools/ci/python_env_policy.py`

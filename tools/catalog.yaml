@@ -1163,6 +1163,27 @@ entries:
     tests:
       - tests/tools/test_container_config.py
 
+  - id: run-gpu-container
+    summary: Runs an admitted GPU container through the sole Docker --gpus all route with exact environment values.
+    path: tools/ci/run_gpu_container.sh
+    family: ci
+    role: runner
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: bash tools/ci/run_gpu_container.sh --image <image> --gpus all -- <argv...>
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/skills/gpu-execution.md
+      - documents/experiments/gpu-direct-command.md
+    tests:
+      - tests/tools/test_run_gpu_container.py
+
   - id: repository-topic-clone
     summary: Owns the generic workspace topic clone, branch reuse, origin/main merge, publication readback, and reconstructibility cleanup lifecycle.
     path: tools/agent_tools/repository_topic_clone.py
