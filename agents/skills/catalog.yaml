@@ -1594,6 +1594,7 @@ skill_families:
       required: []
       conditional:
       - python3 tools/experiments/run_gpu_command.py --gpu-count 1 --min-free-memory <bytes> -- <argv...>
+      - bash tools/ci/run_gpu_container.sh --image <image> --gpus all -- <argv...>
       - python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant <variant> -- <inner argv...>
       - python3 -m pytest tests/tools/test_run_gpu_command.py -q
       - python3 tools/agent_tools/route.py --prompt "<user request>" --format json

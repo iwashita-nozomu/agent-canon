@@ -10,7 +10,9 @@ downstream implementation ../../tools/experiments/execution_resource_plan.py can
 downstream implementation ../../tools/experiments/gpu_command_admission.py direct admission composition, immutable plan, exact environment, execution lifecycle, and release owner
 downstream implementation ../../tools/experiments/run_gpu_command.py shell-free direct-command CLI adapter
 downstream implementation ../../tools/experiments/run_managed_experiment.py optional managed provider adapter
+downstream implementation ../../tools/ci/run_gpu_container.sh sole Docker --gpus all injection adapter
 downstream contract ../../tests/tools/test_run_gpu_command.py fake NVIDIA, race, environment, lifecycle, and provider-independence acceptance tests
+downstream contract ../../tests/tools/test_run_gpu_container.py Docker argv and exact environment acceptance tests
 downstream design ../../agents/skills/gpu-execution.md route selection and operator workflow
 @dependency-end
 -->
@@ -128,6 +130,32 @@ XLA_PYTHON_CLIENT_USE_CUDA_HOST_ALLOCATOR=false
 `JAX_PLATFORMS=cuda` makes a missing JAX GPU backend fail instead of silently accepting a CPU
 backend. The adapter never converts UUIDs to integer indices. Sensitive inherited environment
 values are cryptographically bound in fingerprints without being written in plaintext.
+
+## Docker injection
+
+GPU selection and Docker device injection remain separate responsibilities. Direct admission
+selects and locks full physical/MIG UUIDs and materializes the six exact environment values
+above. Docker GPU execution has one route: invoke the repository-owned shell adapter inside the
+admitted child:
+
+```text
+bash tools/ci/run_gpu_container.sh \
+  --image <image> --gpus all -- <argv...>
+```
+
+The adapter requires `--gpus all`, requires all six exact variables, requires CUDA and NVIDIA
+visibility to match, and writes each value into the same `docker run` argv as `-e
+NAME=VALUE`. `--gpus all` controls device injection only; the exact admitted environment limits
+container compute visibility to the locked UUID set. The adapter does not discover GPUs,
+convert UUIDs to indices, widen visibility, or create another lock owner.
+
+Individual CDI/device arguments are not an alternate canonical route. Keeping one injection
+shape avoids environment-specific command branching while full UUID/MIG admission continues to
+provide the actual compute selection.
+
+The container imports JAX only after Docker starts and must observe
+`jax.default_backend() == "gpu"`. Exposing all devices without the admitted environment,
+omitting one of the six values, or accepting CPU fallback is not a successful GPU run.
 
 ## Child lifecycle and lock retention
 
