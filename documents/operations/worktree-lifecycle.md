@@ -4,12 +4,17 @@
 contract workflow
 responsibility Documents branch・worktree legacy cleanup for this repository.
 upstream design README.md durable document index
+upstream design orphan-lifecycle.md defines semantic orphan classification and fail-closed cleanup admission.
 @dependency-end
 -->
 
 
 この文書は、既存の stale worktree、古い `WORKTREE_SCOPE.md`、または過去の branch/action log を片付ける場合だけ参照します。
 新規 repo-changing task では追加の `git worktree`、separate worktree、integration worktree を作成・使用しません。既定運用は current checkout 上の branch / wave です。
+
+branch または worktree の削除可否は、先に [orphan-lifecycle.md](orphan-lifecycle.md) の canonical
+read-only inventory で分類します。経過日数、最終更新日時、stale という呼称だけでは cleanup を認可しません。
+この文書は分類後の既存 executor と legacy evidence の扱いを所有し、意味差分判定を再実装しません。
 
 ## 使う場面
 
@@ -20,6 +25,9 @@ upstream design README.md durable document index
 ## cleanup 前の確認
 
 - `main` と対象 branch が `origin` と同期しているか確認します。
+- `git fetch --prune origin main` 後の exact `refs/remotes/origin/main` を固定し、
+  `python3 tools/agent_tools/orphan_lifecycle.py inventory ...` の digest と candidate identity を残します。
+- `orphan_safe_to_remove` 以外、または cleanup blocker が一つでもある candidate は削除しません。
 - 新しい worktree は切りません。
 - current checkout で続けられる作業は current checkout の後続 wave に直列化します。
 - carry-over 先、runtime output directory、削除または保持する legacy note を先に決めます。
@@ -56,6 +64,9 @@ stale な worktree や古い scope を見つけた場合は、作業場所とし
 - runtime output は current checkout の run bundle または task 固有 output directory へ限定します。
 - closeout 前に `documents/operations/notes-lifecycle.md` を見て、action log から knowledge/theme/failure へ昇格させる項目を決めます。
 - file 構成変更を含む branch を閉じる前には、current checkout 上で `python3 tools/ci/check_merge_structure.py ...` を通します。
+- cleanup 前には digest-bound `authorize-cleanup` receipt、cleanup 後には exact command、result、
+  ref/path readback、保存先 main/successor、関連 Issue/PR comment locator を同じ trace に残します。
+- local branch に linked worktree がある場合、worktree を独立 resource として先に処理し、再 inventory するまで branch を削除しません。
 
 ## 閉じる前の確認
 
@@ -64,3 +75,4 @@ stale な worktree や古い scope を見つけた場合は、作業場所とし
 - 例外運用で得たルールを正本へ反映したか
 - `main` に持ち帰る note と最小 final JSON の置き場が決まっているか
 - legacy worktree を消したあとも `main` から関連 note と結果を辿れるか
+- inventory/admission digest と cleanup 前後の readback を関連 Issue/PR から辿れるか
