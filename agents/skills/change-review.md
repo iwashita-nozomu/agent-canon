@@ -47,6 +47,44 @@ Typical review misuse to reject:
 This skill records the selected clause and task-specific evidence; it does not reproduce the general
 policy or add a second principle trigger table.
 
+## Repeated Responsibility Review
+
+When the changed reachability contains two or more independently editable sites that appear to own
+the same responsibility, evaluate whether that responsibility needs one canonical owner or a stable
+shared abstraction. Let `S(R)` be the independently editable implementation sites for responsibility
+`R`; observing `|S(R)| >= 2` activates this assessment, but does not by itself create a finding or
+require extraction.
+
+Treat sites as the same responsibility only when evidence aligns on the material dimensions:
+
+- change reason;
+- semantic invariant or policy;
+- lifecycle or effect owner;
+- failure semantics;
+- caller contract.
+
+Textual similarity, shared syntax, or a repeated helper shape is not sufficient. Conversely, syntax
+may differ while the responsibility is still duplicated when the sites independently encode the
+same policy or invariant for the same callers and change reason.
+
+A repeated-responsibility finding is material only when evidence shows at least one concrete risk:
+
+- a change to `R` requires synchronized edits at multiple sites;
+- multiple sites act as independent authorities for the same invariant or policy;
+- the sites can drift independently and produce observably inconsistent behavior.
+
+Prefer the simplest disposition that preserves the contract: delegate to an existing canonical
+owner, extract a shared abstraction at a stable responsibility boundary that passes the canonical
+abstraction-admission test, or retain separate implementations with evidence that domain meaning,
+lifecycle, failure semantics, caller contracts, or change reasons differ. An abstraction that needs
+caller-specific flags, branches, or privileged reach-around is evidence that the boundary is not yet
+stable.
+
+Start from the diff and evidence-linked sibling implementations; do not require a repository-wide
+clone scan, a fixed rule-of-three threshold, a new checker, or a dedicated receipt. A material finding
+identifies the repeated sites, the shared responsibility dimensions, the synchronization/authority/
+drift risk, and the selected SEP-03 or SEP-08 clause that supports the decision.
+
 ## Code Comment Review
 
 Use [コメント規約](../../documents/conventions/common/03_comments.md) as the canonical meaning and
@@ -113,12 +151,13 @@ Do not duplicate a second SOLID-sensitive trigger table in this skill.
 
 1. Read base/head and the changed surface.
 2. Read the owning contract/design, the material engineering-principle clause, and targeted validation evidence.
-3. Review changed comments and comments adjacent to changed logic for required local rationale, stale assumptions, and same-diff synchronization under the canonical comment policy.
-4. When regression evidence changes, review its canonical invariant/owner, minimal witness, representation independence, duplicate truth, consolidation opportunity, and completion oracle before treating added test coverage as positive evidence.
-5. Report blocking correctness/safety/design findings before summary.
-6. Resolve current-scope findings in the current diff when possible.
-7. Escalate only durable residual work to the issue owner.
-8. State merge/acceptance readiness from unresolved blocking findings and required validation, not from issue-count, test-count, comment-count, or packet completeness.
+3. When the changed surface adds or changes a responsibility, inspect evidence-linked sibling implementations; if `|S(R)| >= 2`, evaluate canonical ownership, stable abstraction, or evidence-backed intentional separation.
+4. Review changed comments and comments adjacent to changed logic for required local rationale, stale assumptions, and same-diff synchronization under the canonical comment policy.
+5. When regression evidence changes, review its canonical invariant/owner, minimal witness, representation independence, duplicate truth, consolidation opportunity, and completion oracle before treating added test coverage as positive evidence.
+6. Report blocking correctness/safety/design findings before summary.
+7. Resolve current-scope findings in the current diff when possible.
+8. Escalate only durable residual work to the issue owner.
+9. State merge/acceptance readiness from unresolved blocking findings and required validation, not from issue-count, test-count, comment-count, or packet completeness.
 
 ## Conditional Cause Investigation Before Required Action
 
@@ -215,6 +254,7 @@ local patch returns to cause/scope analysis rather than opening a repair wave.
 
 1. `git diff --stat` と `git diff --name-only` で変更面を固定します。
 1. 破壊的変更、削除、rename、config 変更を先に見ます。
+1. 変更された責務ごとに evidence-linked sibling implementation を確認します。独立編集可能な同一責務が複数ある場合は、change reason、invariant/policy、lifecycle/effect owner、failure semantics、caller contract を照合し、canonical owner への委譲、安定した抽象化、または根拠ある分離を判定します。回数や textual similarity だけでは finding にしません。
 1. 変更された code comment と、その comment が説明する近傍 logic を対応付け、共通コメント規約の必要条件、正確性、同一差分での同期を確認します。comment density や自明な説明の有無は finding にしません。
 1. 変更面について、causal ambiguity または owner/fix/validation を変え得る
    alternative があるか判定します。該当する場合だけ cause-evidence note/receipt を作り、
