@@ -116,9 +116,9 @@ mcp_status=shell_alternate route
 mcp_status=not_applicable
 ```
 
-For goal-driven and self-growth tasks, `goal_loop.py` or the MCP `goal.loop_status` equivalent should control whether a task can close.
-
-If `NEXT_ACTION=run_next_iteration`, completion must fail. If `NEXT_ACTION=close_goal_loop`, completion may continue to the remaining closeout gates.
+For goal-driven and self-growth tasks that require durable lifecycle evidence,
+the run-bundle `schedule.md`, `work_log.md`, and validation evidence control
+whether a task can close. Open work or a recorded next action fails completion.
 
 ## P3: Self-growth
 

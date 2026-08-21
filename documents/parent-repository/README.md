@@ -95,7 +95,6 @@ Regular surface は親レポが ownership を持ち、親固有の責務や stat
 - `tools/`: 親固有toolを置ける実体directory。AgentCanon toolは直下へ複製しない。
 - `scripts/`: 親レポ固有の bootstrap と project slug 置換。
 - `python/`、`src/`、`include/`、`lib/`: 親レポの production implementation。
-- `goal.md`: 親レポ固有の current task state。AgentCanon view に戻さない。
 
 `.devcontainer/parent-environment.sh` と
 `.devcontainer/parent-environment.toml` は optional pair です。両方がない状態は

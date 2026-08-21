@@ -5,12 +5,12 @@ contract skill
 responsibility Owns the expected Dockerfile-to-image-to-test structure for repository environments.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
-upstream design ./gpu-execution.md canonical CDI device injection and exact GPU environment forwarding
+upstream design ./gpu-execution.md canonical Docker device injection and exact GPU environment forwarding
 downstream implementation ./dependency-design.md dependency placement under the expected structure
 downstream implementation ./environment-cleanup.md environment cleanup route
 downstream implementation ./devcontainer-exec.md targeted running-container execution boundary
 downstream implementation ../../tests/agent_tools/test_environment_skill_expected_structure.py expected-structure contract
-downstream implementation ../../tests/agent_tools/test_gpu_execution_cdi_contract.py GPU wiring documentation regression contract
+downstream implementation ../../tests/agent_tools/test_gpu_execution_docker_all_contract.py GPU wiring documentation regression contract
 @dependency-end
 -->
 
@@ -99,8 +99,10 @@ CIで同じimageとtest commandを再利用できる状態にします。
   canonical routeへ昇格させません。
 - GPU imageはdeviceなしでbuild可能にします。GPU backend/deviceを必要とする標準テストは、
   GPU runner上で`gpu-execution`のadmission後に同じimageを
-  `docker run --device nvidia.com/gpu=<qualified-device>`で起動し、同skillが固定したfull UUID
-  visibilityと6個のexact environment変数を`-e NAME`で渡して実行します。
+  `run_gpu_container.sh --image <image> -- <command...>`で起動します。callerはinjection方式を
+  選ばず、同skillのwrapperがDocker daemonのexact CDI inventoryから個別CDIまたは
+  `--gpus all`を内部選択し、full UUID visibilityと6個のexact environment値を同じrun argvへ
+  渡します。
 - Dockerfile、Dev Container、Compose、CI、READMEのimage targetとcommandを同じ変更でそろえます。
 - 既存のrunning Dev Container内でcommandが通ることをenvironment acceptanceにしません。
   previous mutable stateを排除したimage build/runがacceptance ownerです。
@@ -118,7 +120,7 @@ docker run --rm <runtime-wiring> <image> <canonical-full-test-command>
 - `container_config.py` はDockerfile、Dev Container、Compose、CIの静的なowner/target境界を検査します。
   completion evidenceは後続のimage buildと`docker run`による標準テスト一式です。
 - supported profileごとに上記を実行します。
-- GPU deviceを必要とするtestはGPU runner上で`gpu-execution`のCDI container smokeを実行し、
+- GPU deviceを必要とするtestはGPU runner上で`gpu-execution`のcontainer smokeを実行し、
   container内のfresh JAX importとGPU backendを確認します。
 - focused policy testで、Dockerfile外のdependency導入とDev Container/CIのalternate
   environment constructionを拒否します。

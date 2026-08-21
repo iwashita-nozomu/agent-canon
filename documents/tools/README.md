@@ -189,6 +189,8 @@ second command manual.
     seed は `prose_reasoning_graph.py ingest|ingest-set` がそれぞれ所有します。
 - `tools/ci/run_in_repo_container.py`
   - repo workspace を mount した container command を実行します。
+- `tools/ci/run_gpu_container.sh`
+  - admitted full UUID/MIG environment を値付き `-e` で渡し、Docker GPU container を単一の `--gpus all` 経路で実行します。
 - `tools/ci/run_codex_in_repo_container.py`
   - nested Codex を canonical container 内で起動します。
 - `tools/ci/python_env_policy.py`
@@ -270,14 +272,8 @@ second command manual.
 - `tools/sync_agent_canon.sh`
   - shared agent canon surface の drift check と再同期を行う source 側の低レベル入口です。parent では `tools/agent-canon/` view または source-root resolver から実体を解決します。通常の作業者は直接 `pull` せず、task 開始時の latest route、root view 修復の link-root route、resolver 経由の `check` を使います。
   - `pull`、`ensure-latest`、`link-root` などのmutating入口は、staging・checkout・submodule update・root-view mutationの前に同じcommit request evidenceをfail-closedで検証します。自動sync commitは固定identityと `AgentCanon-*` formal trailersを持ちます。
-  - `link-root` は symlink view と root copy surface を復元します。`goal.md` は repo-local state なので shared symlink に戻しません。
 - `tools/agent_tools/waterfall_gate_check.py`
   - `reports/agents/<run-id>/` の中間 waterfall gate が次段へ進める状態か確認します。
-- `tools/agent_tools/goal_loop.py`
-  - top-level `goal.md` の exit criteria を正本にし、達成まで iteration command を繰り返します。既定 criteria には依存解析、コード依存抽出、OOP/readability 解析、repo-wide 静的解析 / CI、objective 固有 evidence を含めます。
-  - 既定 Backlog は `B1` 単体だけではなく、prompt-to-artifact checklist、reuse / consolidation / deletion survey、cohesive implementation slice、task-relevant validation、`NEXT_ACTION=run_next_iteration` 継続判断までを 1 回目の iteration packet として持ちます。
-  - `goal_loop.py init` は default active items と non-default optional items を分けます。`Exit Criteria` と `Backlog` は機械 gate の対象で、`Optional Goal Item Catalog` は必要時に active section へ昇格する候補です。
-  - `goal_loop.py plan` は未完了の exit criteria / backlog を `Goal Work Breakdown` として `GW*` work unit へ展開します。implementation 前にこの行を run bundle `schedule.md` へ移し、bare objective から直接実装へ入らないようにします。
 - `tools/agent_tools/vector_search.py`
   - tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。
   - exact symbol / path / error message は `git grep` または直接 path 確認を使い、広い概念や既存 helper の再利用候補探索では `vector_search.py` を併用します。
@@ -372,8 +368,8 @@ python3 tools/oop/cpp/readability.py --format markdown cpp/include cpp/src tests
 python3 tools/oop/cpp/rule_inventory.py --format markdown
 ```
 
-- Codex `goals` feature
-  - `.codex/config.toml` で有効化する session goal view です。repo-owned durable state は `goal.md`、機械 gate は `goal_loop.py status` に置き、使い方は `agents/workflows/codex-goals-workflow.md` を正本にします。`/goal <objective>` を指定した task では、`goal_loop.py plan` の work breakdown と `/plan` の Goal Contract / evidence map を固定してから実装します。
+- Codex goal state
+  - session runtime state として扱い、repository へ mirror file を作りません。durable lifecycle evidence が必要な task は run bundle の `schedule.md`、`work_log.md`、validation evidence を直接更新します。
 - `tools/agent_tools/evaluate_skill_workflow_prompts.py`
   - skill / workflow prompt surface を `evidence/agent-evals/skill_workflow_prompt_eval.toml` の frozen eval で検査します。skill を使う run では `--accumulate --run-id <run-id> --skill-used <skill>` を付け、`.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に詳細結果を蓄積します。agent が読む場合は `--compact-out <path>.json` を併用し、stdout ではなく compact JSON の統計を読んでから必要な artifact へ drill down します。
   - hook event は PostToolUse で source repo の `.agent-canon/runtime-event-spool/` へ atomic no-replace publish し、archive Git や `ensure` を呼びません。明示 `runtime_log_archive_git.py sync` が nonblocking lock、1 回の ensure、snapshot/ingest/dedup/projection、commit/push/readback、verified finalize を所有します。hot path は `check-hook-hot-path` で archive context 構築前に検査します。eval report、Codex runtime summary、`reports/agents/` の agent run report と checkpoint 済み hook JSONL は `git@github.com:iwashita-nozomu/agent-canon-log.git` を `.agent-canon/log-archive/` に mount して蓄積します。branch / push 手順は `documents/runtime/runtime-log-archive.md` を正本にします。

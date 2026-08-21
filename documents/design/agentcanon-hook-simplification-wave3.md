@@ -313,7 +313,7 @@ The canonical tuple rows are fixed as follows; no row may be inferred from a nea
 | `helper_first_guard.py` | `tools/agent_tools/responsibility_scope.py` | `command-only:python3 tools/agent_tools/responsibility_scope.py --root .` |
 | `log_surface_inventory_guard.py` | `tools/agent_tools/log_surface_inventory.py` | `command-only:python3 tools/agent_tools/log_surface_inventory.py --root . --check` |
 | `notebook_quality_guard.py` | `tools/validation/notebook_quality.py` | `command-only:python3 tools/validation/notebook_quality.py` |
-| `goal_completion_guard.py` | `$codex-goals-workflow` | `skill-only:$codex-goals-workflow` |
+| `goal_completion_guard.py` | `$adaptive-improvement-loop` | `skill-only:$adaptive-improvement-loop` |
 | `codex_runtime_summary_logger.py` | `tools/agent_tools/export_codex_runtime_summary.py` | `command-only:python3 tools/agent_tools/export_codex_runtime_summary.py` |
 | `runtime_log_auto_sync.py` | `tools/agent_tools/runtime_log_archive_git.py` | `command-only:python3 tools/agent_tools/runtime_log_archive_git.py sync` |
 | `execution_resource_plan_projection_guard.py` | `tools/agent_tools/execution_resource_projection.py` | `import-only:tools.agent_tools.execution_resource_projection:validate_projection_bytes` |

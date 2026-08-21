@@ -35,7 +35,6 @@ upstream design ../canonical/skills.md skill canon registry
 ## Core References
 
 - `agents/workflows/adaptive-improvement-workflow.md`
-- `agents/workflows/goal-plan-implementation-loop.md`
 - `agents/workflows/research-workflow.md`
 - `agents/workflows/experiment-workflow.md`
 - `agents/workflows/implementation-waterfall-workflow.md`
@@ -44,13 +43,13 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Operating Rules
 
-- 最初に top-level `goal.md` を更新し、今回の `Objective`、`Exit Criteria`、`Backlog`、`Loop Log` を固定します。これを tool 追加や prompt 修正より後回しにせず、`python3 tools/agent_tools/goal_loop.py status --goal-file goal.md` で確認します。
-- user が goal-driven intent を示したが exact objective を渡していない場合は、parent が conservative な objective draft を `goal.md` に作り、`/goal` 確定前に read-only subagent fan-out、または explicit spawn authorization が無い session では許可待ち handoff plan で要求整理、repo survey、first-slice plan を確認します。
-- 各 iteration の開始前と closeout 前に `python3 tools/agent_tools/goal_loop.py status --goal-file goal.md` を見ます。`NEXT_ACTION=run_next_iteration` の間は次 backlog iteration へ進み、user-facing completion にしません。
+- 最初に今回の `Objective`、`Exit Criteria`、`Stop Budget`、`Improvement Backlog` を固定します。durable lifecycle evidence が必要な run では、work unit を run bundle の `schedule.md`、iteration result と next action を `work_log.md` に直接記録します。
+- user が goal-driven intent を示したが exact objective を渡していない場合は、parent が conservative な objective draft を作り、read-only subagent fan-out、または explicit spawn authorization が無い session では許可待ち handoff plan で要求整理、repo survey、first-slice plan を確認します。
+- 各 iteration の開始前と closeout 前に `schedule.md` の open work、`work_log.md` の next action、validation evidence を読み返します。open work がある間は次 backlog iteration へ進み、user-facing completion にしません。
 - outer loop は agile、repo に持ち帰る各 change pass は waterfall にします。
 - Goal-driven iteration では `plan -> implementation -> evidence -> next-action` の短い loop を使い、次 slice が実装可能になったら planning を止めて編集へ戻ります。
 - 1 iteration につき 1 extension、1 waterfall run-id、1 change pass、1 decision state にします。
-- iteration 数は進捗カウンタであり、終了条件ではありません。loop は backlog と exit criteria で継続判断し、明示的な `goal_status: achieved` なしに完了扱いしません。
+- iteration 数は進捗カウンタであり、終了条件ではありません。loop は backlog と exit criteria で継続判断し、達成 evidence なしに完了扱いしません。
 - `Improvement Backlog:` を持ち、次に試す候補を優先順で管理します。
 - skill を使う run では `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml --accumulate --run-id <run-id> --skill-used <skill>` を実行し、`EVAL_RUN_ID` と `EVAL_ACCUMULATED_REPORT` を evidence にします。
 - skill/workflow prompt を改善する場合は、変更前にテスト対象ごとの eval を `evidence/agent-evals/skill_workflow_prompt_eval.toml` に固定します。
@@ -66,7 +65,7 @@ upstream design ../canonical/skills.md skill canon registry
 - 2 つ目の extension に進む前に、直前 extension の selected `waterfall-gate-check`、selected review gate（final review は活性化された場合のみ）、`task-close`、commit / push を完了させます。
 - baseline、comparison target、fairness rule は iteration ごとに勝手にずらしません。
 - `report_rewrite_required`、`extra_validation_required`、`rerun_required`、`direction_rethink_required` が残る限り loop を閉じません。
-- `goal_loop.py status` が `NEXT_ACTION=run_next_iteration` を返す限り loop を閉じません。
+- open backlog、未達 exit criteria、または next action が残る限り loop を閉じません。
 - 改善を採用しないときも、`What We Learned:` を note に残します。
 
 ## Required Records
@@ -99,7 +98,7 @@ upstream design ../canonical/skills.md skill canon registry
 - `Two-Run Path Comparison:`
 - `Execution Path Efficiency Decision:`
 - `Agent Behavior Eval Result:`
-- `Goal Loop Status:`
+- `Iteration State Readback:`
 
 ## Boundary
 
@@ -113,12 +112,10 @@ The runtime discovery adapter delegates these required operating clauses to this
 
 1. Read `agents/skills/adaptive-improvement-loop.md`.
 1. Read `agents/workflows/adaptive-improvement-workflow.md`.
-1. Read `agents/workflows/goal-plan-implementation-loop.md`.
 1. Read `agents/workflows/research-workflow.md`.
 1. Read `agents/workflows/experiment-workflow.md`.
-1. If the user gives goal-driven intent without an exact objective, draft a conservative `goal.md` objective and use read-only pre-goal subagents before implementation when explicit spawn authorization exists. If authorization is absent, record the pre-goal handoff plan and `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` before requesting or waiting for authorization.
-1. Confirm MCP loop state with `goal.loop_status` when repo MCP tools are available; if it returns `NEXT_ACTION=run_next_iteration`, continue the next backlog iteration instead of treating the current iteration as completion.
-1. Before any implementation or tool addition, update top-level `goal.md` with the current Objective, Exit Criteria, Backlog, and Loop Log entry, then confirm it with `python3 tools/agent_tools/goal_loop.py status --goal-file goal.md`.
+1. If the user gives goal-driven intent without an exact objective, draft a conservative objective and use read-only pre-goal subagents before implementation when explicit spawn authorization exists. If authorization is absent, record the pre-goal handoff plan and `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` before requesting or waiting for authorization.
+1. When durable lifecycle evidence is required, record work units in run-bundle `schedule.md` and record iteration evidence plus next action in `work_log.md`; do not create a repository mirror of session goal state.
 1. For skill/workflow prompt tuning, freeze one eval per tested skill/workflow in `evidence/agent-evals/skill_workflow_prompt_eval.toml` before changing the prompt under test.
 1. Run `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml` before and after prompt repair.
 1. If the eval reports drift, repair the relevant skill/workflow prompt and rerun the same eval until `EVAL_STATUS=pass`.
@@ -137,7 +134,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Treat the iteration number as progress metadata, not as a completion condition; only explicit achieved criteria close the loop.
 1. Before moving to a second extension, finish the previous extension's selected waterfall gate checks, selected review gate (final review only when activated), `task-close`, commit, and push.
 1. Do not close the loop while `report_rewrite_required`, `extra_validation_required`, `rerun_required`, or `direction_rethink_required` remains.
-1. Do not close the loop while MCP `goal.loop_status` or `goal_loop.py status` reports `NEXT_ACTION=run_next_iteration`.
+1. Do not close the loop while `schedule.md` has open work, `work_log.md` records a next action, or required validation evidence remains incomplete.
 1. Whenever this run uses skills, run `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml --accumulate --run-id <run-id> --skill-used <skill>` and record `EVAL_RUN_ID` plus `EVAL_ACCUMULATED_REPORT`.
 1. Do not close a skill/workflow improvement loop while prompt eval drift remains; accumulated reports live under `.agent-canon/log-archive/eval-results/skill-workflow-prompt/` and must not be overwritten.
 1. Do not close an agent behavior improvement loop while behavior eval feedback actions remain open.

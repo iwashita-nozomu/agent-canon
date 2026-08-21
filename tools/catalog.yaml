@@ -1163,6 +1163,27 @@ entries:
     tests:
       - tests/tools/test_container_config.py
 
+  - id: run-gpu-container
+    summary: Runs an admitted GPU container through one entrypoint and internally selects exact CDI or --gpus all injection.
+    path: tools/ci/run_gpu_container.sh
+    family: ci
+    role: runner
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: bash tools/ci/run_gpu_container.sh --image <image> -- <argv...>
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/skills/gpu-execution.md
+      - documents/experiments/gpu-direct-command.md
+    tests:
+      - tests/tools/test_run_gpu_container.py
+
   - id: repository-topic-clone
     summary: Owns the generic workspace topic clone, branch reuse, origin/main merge, publication readback, and reconstructibility cleanup lifecycle.
     path: tools/agent_tools/repository_topic_clone.py
@@ -1924,24 +1945,6 @@ entries:
       - .agents/skills/codex-task-workflow/SKILL.md
     tests:
       - tests/agent_tools/test_tool_rejection_preflight.py
-
-  - id: goal-loop
-    summary: Manages goal.md exit criteria, backlog, and loop status.
-    path: tools/agent_tools/goal_loop.py
-    family: agent_tools
-    role: workflow
-    status: canonical
-    command: python3 tools/agent_tools/goal_loop.py
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/workflows/codex-goals-workflow.md
-    tests:
-      - tests/agent_tools/test_goal_loop.py
 
   - id: bootstrap-agent-run
     summary: Bootstraps a staged agent run bundle from a task request.
