@@ -209,7 +209,7 @@ expected_workflows = ["adaptive-improvement-loop"]
 expected_skills = ["adaptive-improvement-loop"]
 limit = 25
 prompt_templates = [
-  "run bundle の schedule と work log を見て {subject} の iteration を回して",
+  "run bundle の schedule と work log にある backlog を見て {subject} の iteration を回して",
   "{subject} の改善ループを backlog から次の iteration へ進めて",
   "adaptive-improvement-loop として {subject} の backlog と実行記録を更新しながら進めて",
   "{subject} は NEXT_ACTION を見て改善ループで続けて",
