@@ -8,10 +8,10 @@ problem: 正しさに関係する非自明な実装判断がコード近傍へ�
 evidence: documents/conventions/common/03_comments.md; documents/conventions/python/06_comments.md; documents/conventions/coding-conventions-house-style.md; agents/skills/comprehensive-development.md; agents/skills/change-review.md
 accepted evidence: https://github.com/iwashita-nozomu/agent-canon/issues/826; https://github.com/iwashita-nozomu/agent-canon/pull/827
 done: material decision の有限な comment predicate、最狭 owner への配置、同一差分での更新／削除、stale comment review が既存 owner 間で接続される。
-affected_surfaces: documents/conventions/common/03_comments.md; documents/conventions/python/06_comments.md; documents/conventions/coding-conventions-house-style.md; agents/skills/comprehensive-development.md; agents/skills/change-review.md; project_template/vendor/agent-canon pin
+affected_surfaces: documents/conventions/common/03_comments.md; documents/conventions/python/06_comments.md; documents/conventions/coding-conventions-house-style.md; agents/skills/comprehensive-development.md; agents/skills/change-review.md; issues/open/AC-20260821-decision-comments.md
 edit_scope: owner-bounded
-required_action: 共通コメント正本を decision-comment contract へ整理し、Python 表記、implementation、change review を従属させる。template は companion Issue で exact pin のみ更新する。
-close_condition: AgentCanon PR checks と template pin companion の必要な検証が完了し、Issue から branch、commit、PR、validation、remaining verification を追跡できる。
+required_action: 共通コメント正本を decision-comment contract へ整理し、Python 表記、implementation、change review を従属させる。
+close_condition: AgentCanon の required PR checks が pass し、Issue コメントから branch、commit、PR、validation、remaining verification を追跡できる。
 github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/826
 
 ## 目的
@@ -23,12 +23,13 @@ github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/826
 ## Baseline
 
 - AgentCanon: `main@173489b0f3cccdc93e54d3b4d2d0d278f2aa631d`
-- project template: `main@07cd68a230fb69c2cd9358de076250905750750c`
-- project template の `vendor/agent-canon` pin: `173489b0f3cccdc93e54d3b4d2d0d278f2aa631d`
+- project template inventory: `main@07cd68a230fb69c2cd9358de076250905750750c`
+- project template の inventory 時点 AgentCanon pin: `173489b0f3cccdc93e54d3b4d2d0d278f2aa631d`
 - implementation branch: `fix/826-decision-comments`
 - implementation commit: `c222fec129d9e13d4ff2ca5f8a19f03e6789ac21`
 - review PR: https://github.com/iwashita-nozomu/agent-canon/pull/827
-- template companion: https://github.com/iwashita-nozomu/project_template/issues/199
+
+project template は ownership と重複有無の確認対象として参照しましたが、本 Issue の変更対象・終了条件には含めません。
 
 ## Confirmed occurrence locations
 
@@ -83,11 +84,10 @@ needs_local_comment(decision)
 - Python 表記・`# 責務:` 入口: `documents/conventions/coding-conventions-house-style.md`
 - 実装時の適用: `agents/skills/comprehensive-development.md`
 - review 時の同期確認: `agents/skills/change-review.md`
-- project template: 規約を複製せず AgentCanon exact pin のみ更新
 
 ### コメントを残す代表条件
 
-- 仕様上の invariant、pre/postcondition、failure semantics
+- 仕様上の invariant、precondition、postcondition、failure semantics
 - 数式の導出、停止条件、誤差境界、tolerance、数値安定化
 - concurrency、ordering、atomicity、resource lifetime、cleanup
 - security、authority、data exposure、external protocol／runtime constraint
@@ -109,18 +109,21 @@ needs_local_comment(decision)
 
 ## 変更範囲
 
-### AgentCanon
-
 - 共通コメント規約を decision-comment contract へ整理します。
 - Python 固有規約とハウススタイルを共通正本へ従属させます。
 - implementation skill に、material かつ code から復元不能な判断を最狭 owner へ残す手順を追加します。
 - change review に、変更された comment の正確性と必要な局所理由の欠落を判定する有限ルールを追加します。
-- コメント数や行密度を数える checker は追加しません。既存 convention / review route で検証します。
+- 規範文の wiring は既存 `check_convention_compliance.py`、差分ごとの意味判定は既存 `change-review.md` へ接続します。
+- コメント数や行密度を数える checker は追加しません。
 
-### project template
+## Downstream boundary
 
-- companion Issue で AgentCanon candidate の exact gitlink pin だけを更新します。
-- comment policy、checker、skill の第二コピーを作りません。
+project template の exact AgentCanon pin 更新は、companion Issue https://github.com/iwashita-nozomu/project_template/issues/199 が所有します。
+
+- AgentCanon の policy / skill / checker を template へ複製しません。
+- pin 更新は upstream publication 後に行います。
+- companion Issue #199 は downstream consumer work であり、本 Issue #826 の review、merge、close を block しません。
+- #826 の終了条件へ template 側の branch、pin、validation を含めません。
 
 ## Non-goals
 
@@ -129,7 +132,8 @@ needs_local_comment(decision)
 - docstring 規約、API documentation、dependency header を全面再設計しません。
 - comment coverage metric、AST comment counter、lint quota を追加しません。
 - Issue / PR の履歴をコードへ複製しません。
-- 今回触れない production code の終了条件を追加しません。
+- project template の gitlink、AGENTS、Codex surface、production code を変更しません。
+- 今回触れない production code の cleanup や style 修正を終了条件に含めません。
 
 ## Acceptance criteria
 
@@ -141,13 +145,14 @@ needs_local_comment(decision)
 - [x] implementation skill が material decision の局所保存を明示する。
 - [x] change review が missing/stale/misleading comment を concrete correctness/maintenance impact に基づいて判定し、comment density を blocking condition にしない。
 - [x] 新しい comment-count checker、wrapper、registry を追加しない。
-- [ ] AgentCanon focused static/read validation と PR checks が pass する。
-- [ ] project template は companion Issue で exact AgentCanon candidate pin のみ更新し、独自 policy owner を持たない。
+- [x] 規範文が既存 convention verification route へ接続される。
+- [ ] AgentCanon required PR checks が final head で pass する。
 - [x] latest main 起点・Issue 番号入り branch で作業し、Issue コメントから branch、commit、PR、validation、remaining verification を追跡できる。
+- [x] downstream template pin を companion Issue へ分離し、#826 の終了条件に含めない。
 
 ## Current state
 
 - implementation: ready for review
-- validation: need verification
 - review PR: https://github.com/iwashita-nozomu/agent-canon/pull/827
-- template companion: https://github.com/iwashita-nozomu/project_template/issues/199
+- validation and final head: latest Issue comment を正本とする
+- downstream companion (non-blocking): https://github.com/iwashita-nozomu/project_template/issues/199
