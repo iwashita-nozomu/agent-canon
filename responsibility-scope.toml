@@ -271,7 +271,6 @@ paths = [
   "LICENSE",
   "PHILOSOPHY.md",
   "README.md",
-  "goal.md",
   "responsibility-scope.toml",
   "codex-cli-guide/**",
   "completion-first-review/**",

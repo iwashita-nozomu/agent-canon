@@ -1659,38 +1659,6 @@ class UpdateAgentCanonTest(unittest.TestCase):
             else:
                 shutil.copy2(child, destination, follow_symlinks=False)
 
-    def test_link_root_converts_shared_goal_symlink_to_repo_local_file(self) -> None:
-        """goal.md is repo-local state and must not be a shared canon symlink."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            clone_dir = root / "clone"
-            self.clone_repo(clone_dir)
-            goal_path = clone_dir / "goal.md"
-            if goal_path.exists() or goal_path.is_symlink():
-                goal_path.unlink()
-            os.symlink("vendor/agent-canon/goal.md", goal_path)
-
-            result = subprocess.run(
-                ["bash", "tools/sync_agent_canon.sh", "link-root"],
-                cwd=clone_dir,
-                check=False,
-                capture_output=True,
-                text=True,
-                env=authorized_test_env(),
-            )
-            check = subprocess.run(
-                ["bash", "tools/sync_agent_canon.sh", "check"],
-                cwd=clone_dir,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertFalse(goal_path.is_symlink())
-            self.assertIn("repo-local goal", goal_path.read_text(encoding="utf-8"))
-            self.assertEqual(check.returncode, 0, check.stderr)
-
     def test_plan_reports_snapshot_import_without_subtree_binary(self) -> None:
         """Plan should report the no-subtree route when git-subtree is unavailable."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -2356,13 +2324,6 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     'paths = [',
                     '  "documents/runtime/SHARED_RUNTIME_SURFACES.md",',
                     ']',
-                    '',
-                    '[[surface]]',
-                    'path = "goal.md"',
-                    'mode = "repo_state"',
-                    'projection_producer = "project"',
-                    'projection_kind = "durable_state"',
-                    'local_override_allowed = true',
                     '',
                 ]
             ),
@@ -3814,14 +3775,12 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("agent_canon_snapshot_alias=deprecated_use_link_root", result.stdout)
 
-    def test_link_root_keeps_goal_local_and_excludes_agentcanon_workflows(self) -> None:
-        """Link-root keeps local state and leaves AgentCanon workflows source-only."""
+    def test_link_root_excludes_agentcanon_workflows(self) -> None:
+        """Link-root leaves AgentCanon workflows source-only."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, _work_dir = self.make_agent_canon_remote(root)
             repo = self.make_superproject(root, bare_repo)
-            goal_path = repo / "goal.md"
-            os.symlink("vendor/agent-canon/goal.md", goal_path)
             workflow_root = repo / ".github" / "workflows"
             workflow_root.mkdir(parents=True, exist_ok=True)
             workflow_paths = {
@@ -3850,8 +3809,6 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertFalse(goal_path.is_symlink())
-            self.assertIn("repo-local goal", goal_path.read_text(encoding="utf-8"))
             self.assertFalse(
                 os.path.lexists(workflow_paths["agent-improvement-guide.yml"])
             )
@@ -4645,7 +4602,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 check=True,
             )
             subprocess.run(
-                ["git", "add", "AGENTS.md", ".github", ".vscode", "documents/README.md", "goal.md"],
+                ["git", "add", "AGENTS.md", ".github", ".vscode", "documents/README.md"],
                 cwd=repo,
                 check=True,
             )
@@ -4763,7 +4720,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 check=True,
             )
             subprocess.run(
-                ["git", "add", "AGENTS.md", ".github", ".vscode", "documents/README.md", "goal.md"],
+                ["git", "add", "AGENTS.md", ".github", ".vscode", "documents/README.md"],
                 cwd=repo,
                 check=True,
             )

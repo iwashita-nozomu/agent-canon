@@ -76,7 +76,6 @@ SKILL_KEYWORDS: dict[str, tuple[tuple[str, ...], ...]] = {
     ),
     "adaptive-improvement-loop": (
         ("adaptive-improvement-loop",),
-        ("goal.md", "backlog"),
         ("next_action", "iteration"),
         ("改善ループ",),
         ("backlog", "iteration"),
@@ -384,7 +383,7 @@ SKILL_KEYWORDS: dict[str, tuple[tuple[str, ...], ...]] = {
     ),
 }
 WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "adaptive-improvement-loop": ("goal.md", "next_action", "backlog", "iteration", "改善ループ"),
+    "adaptive-improvement-loop": ("next_action", "backlog", "iteration", "改善ループ"),
     "agent-canon-pr-workflow": (
         "agent-canon pr",
         "agent-canon-ensure-latest",

@@ -11,15 +11,17 @@ upstream design README.md workflow catalog
 この文書は、実験、外部調査、性能計測、チューニング、比較検証を回しながらコードを改善するための正本です。
 通常の feature 開発や repo-wide な恒久改修は [implementation-waterfall-workflow.md](implementation-waterfall-workflow.md) を使います。
 この文書は、それだけでは扱いにくい tuning / exploration / protocol refinement を、明示的な反復 loop として扱います。
-repo-level の長期 loop では top-level `goal.md` を正本にし、`python3 tools/agent_tools/goal_loop.py` で状態確認、iteration 実行、criteria 更新を行います。
-Codex `goals` feature が有効な runtime では [codex-goals-workflow.md](codex-goals-workflow.md) を overlay とし、Codex goals を `goal.md` の session view として同期します。
+repo-level の長期 loop で durable lifecycle evidence が必要な場合は、run bundle の
+`schedule.md` を work-unit 正本、`work_log.md` を iteration result と next-action の
+正本にします。Codex の goal は session runtime state に留め、repository に mirror
+file を作りません。
 
 ## この文書の読み方
 
 - この文書は、探索的改善、実験、調査、tuning、prompt / workflow repair を backlog-driven outer loop として回す workflow を所有します。
 - 前半は位置づけ、対象、基本ルール、canonical outer loop を扱い、後半は iteration backlog、decision states、roles、他 workflow との関係、close conditions を扱います。
 - loop owner は `## 3. 基本ルール` と `## 4. Canonical Outer Loop` から入り、各 extension の実装は `implementation-waterfall-workflow.md` に戻します。
-- chunked reading では、`goal.md`、backlog、decision state のどれを更新しているかを固定し、その節だけを開いて closeout 条件と照合します。
+- chunked reading では、`schedule.md` の backlog、`work_log.md` の decision state、validation evidence のどれを更新しているかを固定し、その節だけを開いて closeout 条件と照合します。
 
 ## 1. 位置づけ
 
@@ -44,14 +46,13 @@ outer loop は agile、inner change pass は waterfall です。
 
 ## 3. 基本ルール
 
-- 最初に top-level `goal.md` を更新し、今回の Objective、Exit Criteria、Backlog、Loop Log を固定します。これを tool 追加、prompt repair、workflow 編集より後回しにしてはいけません。
-- `goal_loop.py status` を iteration gate にします。`NEXT_ACTION=run_next_iteration` なら次 backlog item を選び、`NEXT_ACTION=close_goal_loop` になるまで completion report を出しません。
-- Codex `goals` feature が有効な場合でも、durable state は `goal.md` に置きます。Codex goals は `goal.md` と同じ Objective / Exit Criteria を表示する session view として扱い、食い違う場合は `goal.md` を正本にして修正します。
-- template repo では active `goal.md` は repo-local runtime state です。派生 repo の seed に混ぜないため tracked product state からは外し、必要なら `.gitignore` で ignored local state として保持します。
-- goal-driven intent があるが exact objective が無い場合は、parent が conservative な objective draft を `goal.md` に作り、`/goal` 確定前に read-only subagent、または explicit spawn authorization が無い session では許可待ち handoff plan で要求整理、repo survey、first-slice plan を確認します。
+- 最初に今回の Objective、Exit Criteria、Stop Budget、Improvement Backlog を固定します。durable lifecycle evidence が必要な場合は、backlog を run bundle の `schedule.md`、iteration result と next action を `work_log.md` に記録します。
+- `schedule.md` の open work、`work_log.md` の next action、未完了の validation evidence を iteration gate にします。いずれかが残る場合は次 backlog item を選び、completion report を出しません。
+- Codex goal view は session runtime state です。repository state の正本や write readiness gate にせず、durable state が必要な run では run bundle を直接更新します。
+- goal-driven intent があるが exact objective が無い場合は、parent が conservative な objective draft を作り、read-only subagent、または explicit spawn authorization が無い session では許可待ち handoff plan で要求整理、repo survey、first-slice plan を確認します。
 - 1 iteration では、狙いを 1 つの extension に絞ります。
 - ただし 1 iteration は単発の孤立修正ではありません。goal setup 直後の first iteration は、prompt-to-artifact checklist、reuse / consolidation / deletion survey、cohesive implementation slice、task-relevant validation、継続判断を同じ work packet として進めます。
-- iteration 番号は進捗記録であり、loop の終了条件ではありません。`goal_loop.py` の `--max-iterations` は単一実行の安全 cap に限り、repo-level loop の終了は exit criteria と明示 decision で決めます。
+- iteration 番号は進捗記録であり、loop の終了条件ではありません。単一実行の stop budget と repo-level loop の exit criteria / decision を分け、明示 evidence で終了を決めます。
 - 1 extension は、1 `Candidate Change:`、1 waterfall run-id、1 `Decision State:` に固定します。
 - 1 iteration で repo に持ち帰る code / docs / environment change は 1 つの waterfall pass として閉じます。
 - 2 つ目の extension に入る前に、直前 extension の selected `make waterfall-gate-check`、selected review gate（final review は活性化された場合のみ）、`task-close`、commit / push を終えます。
@@ -60,8 +61,8 @@ outer loop は agile、inner change pass は waterfall です。
 - `report_rewrite_required`、`extra_validation_required`、`rerun_required` が残る限り loop を閉じません。
 - tuning 中でも、既存コード再利用と既存 style の踏襲を優先します。
 - `backlog_continue` は次の extension へ進める decision state ですが、直前 extension の waterfall pass が close していない場合は次へ進みません。
-- `goal.md` を使う loop では、依存解析、コード依存抽出、OOP/readability 解析、数値ハードコード検証、repo-wide 静的解析 / CI、objective 固有 evidence を exit criteria から外しません。
-- `goal_loop.py mark` で criteria を done にする前に、対応する command output、report、run bundle artifact のいずれかを残します。
+- active profile が要求する依存解析、コード依存抽出、OOP/readability 解析、数値ハードコード検証、repo-wide 静的解析 / CI、objective 固有 evidence は exit criteria から外しません。
+- criteria を done にする前に、対応する command output、report、run bundle artifact のいずれかを残します。
 - skill を使う run では、`evaluate_skill_workflow_prompts.py --accumulate --run-id <run-id> --skill-used <skill>` を実行し、`.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に詳細 report を蓄積します。report file は `<eval_run_id>-<status>-<skill-slug>.md` で採番し、既存 report を上書きしません。
 - skill/workflow prompt 改善では、テスト対象ごとに skill/workflow eval を先に固定し、`evidence/agent-evals/skill_workflow_prompt_eval.toml` を正本にします。
 - prompt repair は eval の failure 行に紐づけ、同じ eval を rerun して `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0`、`EVAL_RUN_ID`、`EVAL_ACCUMULATED_REPORT` が揃うまで loop を閉じません。
@@ -75,11 +76,9 @@ outer loop は agile、inner change pass は waterfall です。
 
 ## 4. Canonical Outer Loop
 
-1. top-level `goal.md` に今回の Objective、Exit Criteria、Backlog、Loop Log を書く
-1. 改善 backlog を固定する
+1. 今回の Objective、Exit Criteria、Stop Budget、Improvement Backlog を固定する
+1. durable lifecycle evidence が必要な場合は work unit を `schedule.md`、iteration result と next action を `work_log.md` に記録する
 1. `Question:`、`Comparison Target:`、`Exit Criteria:`、`Stop Budget:` を決める
-1. repo-level loop の場合は `goal.md` を作成または更新し、`python3 tools/agent_tools/goal_loop.py status --goal-file goal.md` で parse 可能であることを確認する
-1. Codex `goals` feature が有効な場合は `codex features list | grep '^goals'` の結果を記録し、Codex goals view を `goal.md` と同じ Objective / Exit Criteria に揃える
 1. skill/workflow prompt 改善の場合は、各テスト対象の eval を `evidence/agent-evals/skill_workflow_prompt_eval.toml` に固定する
 1. `python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml` を baseline として実行する
 1. agent 行動改善の場合は、`evidence/agent-evals/agent_behavior_eval.toml` の behavior criteria と `workflow_monitoring.md` の required behavior event を固定する
@@ -99,9 +98,8 @@ outer loop は agile、inner change pass は waterfall です。
 1. eval drift があれば、対応する prompt repair を行い、同じ eval を rerun する
 1. prompt eval report が `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0` になるまで次 extension または closeout に進まない
 1. behavior eval feedback があれば、run artifact、workflow prompt、または behavior-event recording rule を修正し、`AGENT_EVALUATION_STATUS=pass` になるまで次 extension または closeout に進まない
-1. `goal.md` の exit criteria と backlog を evidence に合わせて更新する
-1. Codex goals view がある場合は `goal.md` と同じ完了状態に同期し、Codex goals だけで完了判定しない
-1. `goal_loop.py status` が `NEXT_ACTION=run_next_iteration` を返す場合は次 iteration へ進む
+1. `schedule.md` の exit criteria / backlog と `work_log.md` の next action を evidence に合わせて更新する
+1. open backlog、next action、または未完了 validation evidence がある場合は次 iteration へ進む
 1. waterfall pass の `task-close`、commit、push を終える
 1. backlog を更新し、次 extension へ進むか loop を閉じる
 

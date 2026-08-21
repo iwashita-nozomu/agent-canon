@@ -126,8 +126,7 @@ context, write authority, validation route, and review gate が揃ったもの�
 materialize し、authority-blocked or conditional work を予定行として先に積みません。
 catalog の `manager`、`explorer`、`execution_planner`、`plan_reviewer` は候補であり、
 owner-critical evidence がある場合だけ起動します。
-goal-driven task では、write-capable implementation subagent は `goal.md` が parseable で、Codex goal view が mirrored / queued され、Plan-mode evidence mapping が揃うまで起動しません。
-通常の repo-changing task で coding / implementation / patch / doc-edit work が scope に入る場合は、この goal-driven `goal.md` block を適用しません。semantic handoff が dependency-expanded scope、validation route、必要な owner-critical gate を閉じたら、launchable な write-capable implementer を起動または schedule します。read-only wave は setup evidence であり、実装を遅らせる固定 intake ではありません。
+goal-driven task でも repository mirror file を readiness gate にしません。semantic handoff、または選択された run bundle が dependency-expanded scope、validation route、必要な owner-critical gate を閉じたら、launchable な write-capable implementer を起動または schedule します。read-only wave は setup evidence であり、実装を遅らせる固定 intake ではありません。
 active runtime が explicit user request なしの `spawn_agent` を禁止する場合、read-only pre-goal wave も即座には起動せず、handoff packet、owner、expected output、`PRE_GOAL_SUBAGENT_AUTHORIZATION=required` を run bundle に残して許可待ちにします。
 command output の generated model/profile view と `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認します。implementation-executable handoff は semantic decision sufficiency が mechanism と validation route を閉じた場合だけ materialize し、post-completion gate は実際に選択された owner gate だけを続けます。
 subagent の model / reasoning は該当 `.codex/agents/*.toml` を先に読みます。
@@ -277,8 +276,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    only when its owner-critical evidence can change the next decision. The
    catalog `manager`, `requirements_organizer`, `explorer`, `execution_planner`,
    and `plan_reviewer` roles remain candidates until activated.
-1. For goal-driven tasks only, keep write-capable implementation subagents blocked until `goal.md` is parseable, the Codex goal view is mirrored or queued, and Plan-mode evidence mapping exists.
-1. For ordinary repo-changing coding, implementation, patch, or doc-edit work, do not apply the goal-driven `goal.md` block. After the structured handoff or, when selected, the run bundle and pre-handoff investigation packet derive dependency-expanded handoff scope, validation plan, and tool-rejection preflight evidence, launch or schedule the selected write-capable implementer; read-only waves are setup evidence, not a substitute for the implementation handoff. The parent remains orchestrator / integrator and does not become the default implementer.
+1. For goal-driven and ordinary repo-changing coding, implementation, patch, or doc-edit work, use the same readiness boundary. After the structured handoff or, when selected, the run bundle and pre-handoff investigation packet derive dependency-expanded handoff scope, validation plan, and tool-rejection preflight evidence, launch or schedule the selected write-capable implementer; do not wait for a repository mirror of session goal state. Read-only waves are setup evidence, not a substitute for the implementation handoff. The parent remains orchestrator / integrator and does not become the default implementer.
 1. If the active runtime requires explicit user authorization before `spawn_agent`, do not silently spawn even read-only pre-goal agents. Record the fan-out plan, handoff packets, and `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` in the run bundle, then wait for or request authorization.
 1. Use `--task-id` when the selected route needs catalog evidence; task-default
    specialists and review packs are candidates, not automatic work.
