@@ -1,7 +1,7 @@
 <!--
 @dependency-start
 contract reference
-responsibility 日常作業、branch、checklist、troubleshooting、legacy cleanup の文書入口。
+responsibility 日常作業、branch、PR、worktree、checklist、troubleshooting、legacy cleanup の文書入口。
 upstream design ../README.md documents 索引と正本境界。
 @dependency-end
 -->
@@ -14,6 +14,7 @@ upstream design ../README.md documents 索引と正本境界。
 ## 構成
 
 - `BRANCH_SCOPE.md`: branch と Git の作業境界。
+- `orphan-lifecycle.md`: branch・PR・worktree の意味差分 inventory、有限分類、cleanup admission の正本。
 - `FILE_CHECKLIST_OPERATIONS.md`: 作業別 checklist。
 - `TROUBLESHOOTING.md`: 障害対応の入口。
 - `WORKTREE_SCOPE_TEMPLATE.md`、`worktree-lifecycle.md`: worktree の記録とcleanup。
