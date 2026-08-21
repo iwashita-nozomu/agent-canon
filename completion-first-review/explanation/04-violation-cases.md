@@ -46,7 +46,7 @@ These cases should become fixtures under a future `evidence/agent-evals/negative
 | V013 | New tool added without reuse survey | Tool sprawl | Tool catalog requires alternatives and why-new-tool fields |
 | V014 | ROOT_AGENTS gets detailed rules duplicated from canonical docs | Entry point becomes bloated and inconsistent | Entry point budget and duplicate-rule scan |
 | V015 | Workflow says “must” but no verifier exists | Normative prose is unenforced | Normative rule requires verifier or explicit non-verifiable rationale |
-| V016 | Goal loop uses ignored local `goal.md` but no snapshot | Reviewers cannot inspect goal contract | Goal snapshot required in run bundle |
+| V016 | Goal-driven run keeps progress only in session state | Reviewers cannot inspect progress after resumption | Work units and iteration results are required in the selected run bundle |
 | V017 | Execution path comparison only records `execution_path=preferred` | Trace sequence not compared | Run path comparison validates event sequence and cost |
 | V018 | Review finding is marked resolved without fix evidence | Review becomes self-attested | Finding ID maps to fix evidence path and latest diff ref |
 | V019 | PR checklist says not affected without scope reason | Human checkbox hides missing validation | PR evidence matrix generated from closeout profile |

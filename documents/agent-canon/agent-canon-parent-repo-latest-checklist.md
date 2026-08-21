@@ -42,7 +42,7 @@ failure routes, and the legacy compatibility appendix for non-submodule repos.
 | `documents/runtime/SHARED_RUNTIME_SURFACES.md`, `documents/runtime/shared-runtime-surfaces.toml` | shared surface policy and machine manifest | AgentCanon | source-root resolver `check-convention` |
 | `.agent-canon/update-state.toml` | parent-local AgentCanon update TODO boundary | parent repo | `python3 tools/agent_tools/agent_canon_update_todos.py status` |
 | `documents/README.md`, template bootstrap / host / server contract docs | parent repo active contracts | template or derived repo | regular file, not root symlink |
-| `goal.md`, project notes, experiments, reports | repo-local durable state and generated evidence | parent repo | must not be restored from AgentCanon |
+| project notes, experiments, reports | repo-local durable state and generated evidence | parent repo | must not be restored from AgentCanon |
 
 ## Latest-State Checklist
 

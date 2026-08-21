@@ -44,15 +44,14 @@ downstream design ./hooks/hook_dispatcher.py RETIRED_HOOK_ROUTES assigns former 
 - plan mode や permissions のような mode は session 単位です。official Codex CLI では `/plan`、`/model`、`/permissions` を使います
 - runtime が `/agent` を提供する場合は inventory 確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます
 - 最初の作業 update では `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言します
-- `/goal <objective>` を使う task では、`agents/workflows/codex-goals-workflow.md` の Goal-Specified Plan-Mode Entry に従い、`/goal` 設定後に `/plan` で contract と evidence map を固定してから実装します
+- `/goal <objective>` を使う task でも goal は session runtime state に留め、repository へ mirror file を作りません。durable lifecycle evidence が必要な場合は run bundle の `schedule.md` / `work_log.md` を使います
 - token 消費を見直す場合は `agents/workflows/token-efficient-codex-workflow.md` を overlay とし、既存 session / role metric から重複 fan-out、再読、過大 tool output を特定します。task 名や見積もり規模から profile / agent mode を先に固定しません
 
 ## Goal And Plan Mode
 
 - stable な goal 機能は Codex runtime の既定を使い、project config で feature flag を再列挙しません。
 - TUI の user-facing command surface は `/goal`, `/goal <objective>`, `/goal pause`, `/goal resume`, `/goal clear` です。
-- `/goal` は session view です。repo-owned durable state は top-level `goal.md`、機械 gate は `tools/agent_tools/goal_loop.py status` に置きます。
-- template repo の active `goal.md` は runtime state であり、派生 repo seed に混入させません。tracked product state に入れず、必要なら `.gitignore` で ignored local file として保持します。
+- `/goal` は session runtime state です。repository-owned durable state が必要な run は `schedule.md`、`work_log.md`、validation evidence を正本にします。
 - goal-driven task では `/goal <objective>` の直後に `/plan <goal-driven task summary>` を使い、Plan-mode output に `Goal Contract`、`Exit Criteria Mapping`、`Source Packet`、`Reuse Survey`、`Execution Slices`、`Budget Policy` を出します。
 - pre-goal subagent fan-out は active runtime の authorization に従います。明示許可がある場合は read-only wave を起動し、無い場合は `PRE_GOAL_SUBAGENT_AUTHORIZATION=required` と handoff packet を artifact に残します。
 - 上記が揃うまで implementation、subagent write handoff、closeout は開始しません。

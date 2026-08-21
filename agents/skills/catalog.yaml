@@ -1676,7 +1676,6 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent_tools/goal_loop.py status --goal-file goal.md
       - python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml
       - python3 tools/agent_tools/workflow_monitor.py --report-dir <run> --runtime-feedback
         "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op>"
@@ -1698,7 +1697,6 @@ skill_families:
       reason: backlog-driven iterative experiment, tuning, or code improvement loop is in scope
       triggers:
         - ["adaptive-improvement-loop"]
-        - ["goal.md"]
         - ["next_action"]
         - ["backlog"]
         - ["iteration"]

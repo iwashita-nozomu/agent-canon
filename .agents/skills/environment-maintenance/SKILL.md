@@ -2,7 +2,7 @@
 name: environment-maintenance
 description: "Use when touching Docker, CI, dependencies, runtime compatibility, or repository-level development environment instructions."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"27417f1d4465e9d1f48965e6e0c5546f12bb69d6619107b6368c9670749b82e9"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"38d2e0c0b2575e78147533f6e1df6fd2bb3f41d8c9e7e88b3740ecead74ccc9c"} -->
 
 <!--
 @dependency-start

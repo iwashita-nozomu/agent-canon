@@ -229,7 +229,7 @@ The following should fail strict or self-growth completion:
 6. `memory changed` without AgentCanon commit/push and superproject pin evidence.
 7. `schedule.md` exists but has no work units.
 8. `review approved` but fix-now findings remain open.
-9. `goal.md` says active but completion is emitted.
+9. `schedule.md` or `work_log.md` still records open work but completion is emitted.
 10. `debug` experiment run supports a durable claim.
 
 ## Minimum closeout artifacts by profile

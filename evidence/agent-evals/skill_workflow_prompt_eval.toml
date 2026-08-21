@@ -1089,13 +1089,13 @@ id = "adaptive-improvement-loop-skill-shim"
 target = ".agents/skills/adaptive-improvement-loop/SKILL.md"
 canonical_target = "agents/skills/adaptive-improvement-loop.md"
 kind = "skill"
-description = "The discoverable Codex skill must route iterative improvement through goal.md and prompt evals."
+description = "The discoverable Codex skill must route durable iterative state through run-bundle evidence and prompt evals."
 
 [[evals.checklist]]
 id = "AIL-SHIM-1"
 critical = true
-description = "Mentions the top-level goal contract and goal loop tool."
-required_regex = ["goal\\.md", "goal_loop\\.py"]
+description = "Uses run-bundle schedule, work log, and validation evidence when durable lifecycle state is required."
+required_regex = ["schedule\\.md", "work_log\\.md", "validation evidence"]
 
 [[evals.checklist]]
 id = "AIL-SHIM-2"
@@ -1124,8 +1124,8 @@ required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "pro
 [[evals.checklist]]
 id = "AIL-SHIM-5"
 critical = true
-description = "Uses goal_loop.py as the mechanical iteration gate."
-required_regex = ["goal_loop\\.py", "NEXT_ACTION=run_next_iteration"]
+description = "Uses open work, next action, and validation evidence as the iteration gate."
+required_regex = ["open work", "next action", "validation evidence"]
 
 [[evals]]
 id = "adaptive-improvement-loop-human-skill"
@@ -1136,8 +1136,8 @@ description = "The human skill canon must explain eval-driven prompt repair for 
 [[evals.checklist]]
 id = "AIL-HUMAN-1"
 critical = true
-description = "Requires goal.md and goal_loop.py for repo-level loops."
-required_regex = ["goal\\.md", "goal_loop\\.py"]
+description = "Requires run-bundle schedule and work log for durable repo-level loops."
+required_regex = ["schedule\\.md", "work_log\\.md", "validation evidence"]
 
 [[evals.checklist]]
 id = "AIL-HUMAN-2"
@@ -1166,8 +1166,8 @@ required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "pro
 [[evals.checklist]]
 id = "AIL-HUMAN-5"
 critical = true
-description = "Requires goal_loop.py to keep iterations mechanical."
-required_regex = ["goal_loop\\.py", "NEXT_ACTION=run_next_iteration", "Goal Loop Status"]
+description = "Requires explicit iteration-state readback to keep iterations mechanical."
+required_regex = ["open backlog", "next action", "Iteration State Readback"]
 
 [[evals.checklist]]
 id = "AIL-HUMAN-6"
@@ -1220,8 +1220,8 @@ required_regex = ["runtime_feedback=observed", "workflow_monitor\\.py --runtime-
 [[evals.checklist]]
 id = "AIL-WF-5"
 critical = true
-description = "Requires goal_loop.py to decide whether to continue or close."
-required_regex = ["goal_loop\\.py", "NEXT_ACTION=run_next_iteration", "NEXT_ACTION=close_goal_loop"]
+description = "Uses schedule, work log, and validation evidence to decide whether to continue or close."
+required_regex = ["schedule\\.md", "work_log\\.md", "validation evidence", "次 iteration"]
 
 [[evals.checklist]]
 id = "AIL-WF-7"
@@ -1232,8 +1232,8 @@ required_regex = ["duplicate eval IDs", "duplicate explicit targets", "same targ
 [[evals.checklist]]
 id = "AIL-WF-6"
 critical = true
-description = "Treats Codex goals as a session view, not the durable goal source."
-required_regex = ["Codex `goals`", "goal\\.md", "session view"]
+description = "Treats Codex goal state as session runtime state rather than a repository mirror."
+required_regex = ["session runtime state", "repository", "mirror"]
 
 [[evals.checklist]]
 id = "AIL-WF-8"
@@ -1485,54 +1485,6 @@ description = "Requires the structural scope-plan command and output fields."
 required_regex = ["python-structure-hash-scope-plan", "Change Impact Packet", "impact_blocks", "scope_candidates", "selected_scope", "repair_batches"]
 
 [[evals]]
-id = "codex-goals-workflow"
-target = "agents/workflows/codex-goals-workflow.md"
-kind = "workflow"
-description = "The Codex goals workflow must bind the feature to goal.md and goal_loop.py status."
-
-[[evals.checklist]]
-id = "CODEX-GOALS-1"
-critical = true
-description = "Defines the role split between goal.md, Codex goals, and goal_loop.py."
-required_regex = ["goal\\.md", "Codex `goals`", "goal_loop\\.py", "repo-local state", "vendor/agent-canon/goal\\.md"]
-
-[[evals.checklist]]
-id = "CODEX-GOALS-2"
-critical = true
-description = "Requires feature and goal loop status commands."
-required_regex = ["codex features list", "goal_loop\\.py status"]
-
-[[evals.checklist]]
-id = "CODEX-GOALS-3"
-critical = true
-description = "Blocks closeout while goal_loop.py or goal.md says to continue."
-required_regex = ["NEXT_ACTION=run_next_iteration", "NEXT_ACTION=close_goal_loop", "not complete"]
-
-[[evals.checklist]]
-id = "CODEX-GOALS-4"
-critical = true
-description = "Requires goal-specified tasks to enter Plan mode before implementation."
-required_regex = ["Goal-Specified Plan-Mode Entry", "/goal <objective>", "/plan <goal-driven task summary>", "Goal Contract", "Exit Criteria Mapping", "Goal Work Breakdown", "goal_loop\\.py plan", "Reuse Survey"]
-
-[[evals.checklist]]
-id = "CODEX-GOALS-5"
-critical = true
-description = "Documents the supported TUI goal command surface and status ownership."
-required_regex = ["/goal pause", "/goal resume", "/goal clear", "budget-limited", "user or system controlled"]
-
-[[evals.checklist]]
-id = "CODEX-GOALS-6"
-critical = true
-description = "Prevents Goal setup from collapsing the first iteration into one isolated edit."
-required_regex = ["first-iteration packet", "prompt-to-artifact checklist", "reuse / consolidation / deletion survey", "one isolated edit"]
-
-[[evals.checklist]]
-id = "CODEX-GOALS-7"
-critical = true
-description = "Separates default active goal items from optional non-default catalog items."
-required_regex = ["default active goal items", "non-default optional goal", "Optional Goal Item Catalog", "Exit Criteria", "Backlog"]
-
-[[evals]]
 id = "token-efficient-codex-workflow"
 target = "agents/workflows/token-efficient-codex-workflow.md"
 kind = "workflow"
@@ -1657,14 +1609,14 @@ required_regex = ["Token Observation And Adaptive Materialization", "Runtime evi
 [[evals.checklist]]
 id = "CODEX-WF-GOALS-1"
 critical = true
-description = "Mentions the goals feature preflight and durable goal source."
-required_regex = ["Codex Goals Feature Preflight", "codex features list", "goal\\.md", "goal_loop\\.py"]
+description = "Keeps goal state in the session and routes durable progress to run-bundle evidence."
+required_regex = ["Codex Goal Session State", "session runtime state", "schedule\\.md", "work_log\\.md", "validation evidence"]
 
 [[evals.checklist]]
 id = "CODEX-WF-GOALS-2"
 critical = true
-description = "Requires Plan-mode contract output for user-specified goals."
-required_regex = ["/goal <objective>", "/plan <goal-driven task summary>", "Goal Contract", "Exit Criteria Mapping", "Goal Work Breakdown", "Execution Slices"]
+description = "Requires goal-driven plans to share objective, acceptance criteria, and work breakdown with execution evidence."
+required_regex = ["objective", "acceptance criteria", "work breakdown", "semantic handoff"]
 
 [[evals]]
 id = "oop-readability-external-repo-route"

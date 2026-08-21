@@ -232,7 +232,6 @@ class RepoStructureContractTest(unittest.TestCase):
             "AGENTS.md",
             ".gitmodules",
             "documents/README.md",
-            "goal.md",
             "responsibility-scope.toml",
         ]:
             self.write_file(root, file_path, f"{file_path}\n")

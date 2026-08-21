@@ -2,7 +2,7 @@
 name: comprehensive-development
 description: "Use when a repo-wide task spans code, docs, tools, workflows, and runtime surfaces and needs explicit subagent routing."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"301c9050b80a5e9791729adb12a93c045f754759cbe692aafa485c36de3d9dec"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"11c3351f9388ba6c0feb806431eee71e1eff1dd743e54d557d01ecd5cc987268"} -->
 
 <!--
 @dependency-start

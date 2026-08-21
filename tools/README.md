@@ -440,7 +440,6 @@ submodule 化済み repo では `plan` が `already_current_submodule` / `submod
 - `agent_tools/waterfall_gate_check.py`
 - `agent_tools/evaluate_agent_run.py`
 - `agent_tools/compare_agent_run_paths.py`
-- `agent_tools/goal_loop.py`
 - `agent_tools/evaluate_skill_workflow_prompts.py`
 - `agent_tools/evaluate_report_quality.py`
 - `agent_tools/check_convention_compliance.py`
@@ -792,48 +791,6 @@ explicit edit / verification list. A grep hit alone is not enough: each listed
 surface should say whether it is AgentCanon-owned source, template/root local
 state, a synced copy, a symlink view, a GitHub path-constraint copy, or a
 project-owned artifact.
-
-## Goal Loop Tool
-
-`goal_loop.py` manages a top-level `goal.md` contract and repeats a command until explicit exit criteria are checked and `goal_status: achieved` is set.
-The default `goal.md` and `goal_loop.py init` include mandatory criteria for dependency review, code dependency extraction, OOP/readability analysis, repo-wide static analysis or CI, and objective-specific evidence.
-The default Backlog is an initial first-iteration packet, not a single tiny TODO.
-It requires a prompt-to-artifact checklist, reuse / consolidation / deletion survey,
-one cohesive implementation slice, task-relevant validation, and immediate continuation
-when `NEXT_ACTION=run_next_iteration` remains.
-`goal_loop.py init` also writes an `Optional Goal Item Catalog`.
-Those catalog entries are non-default: they are visible for humans and agents,
-but they do not block closeout or become `GW*` work units until copied into
-`Exit Criteria` or `Backlog` for the current objective.
-Goal setup also records `pr_mutation_authority`. The default is
-`inspect_and_prepare_only`; use `github_pr_automation_when_green` when the user
-wants GitHub PR automation to merge after checks pass. This
-mode does not authorize local Codex to bypass checks, dismiss reviews, or hide
-merge evidence.
-
-```bash
-python3 tools/agent_tools/goal_loop.py status --goal-file goal.md
-python3 tools/agent_tools/goal_loop.py plan --goal-file goal.md \
-  --report-out reports/agents/<run-id>/goal_work_breakdown.md
-python3 tools/agent_tools/goal_loop.py run --goal-file goal.md -- <iteration-command>
-python3 tools/agent_tools/goal_loop.py init --goal-file goal.md \
-  --objective "<objective>" \
-  --pr-mutation-authority github_pr_automation_when_green
-python3 tools/agent_tools/goal_loop.py mark --goal-file goal.md --criterion G5 --done
-```
-
-Use the loop for long-running improvement work where closeout must be blocked until the goal contract is mechanically complete.
-Before implementation, run `goal_loop.py plan` and copy every open `GW*` row into the run bundle `schedule.md`; this prevents starting from a bare objective with no explicit work units.
-Do not collapse the first iteration to one isolated edit when the objective names multiple surfaces.
-Select a coherent slice that can move the checklist, survey, implementation, and validation backlog items together.
-For efficiency, follow `agents/workflows/goal-plan-implementation-loop.md`: plan only the next implementation-ready slice, implement it, record evidence, refresh `NEXT_ACTION`, and continue immediately when the loop still has open work.
-Do not mark criteria done from intent alone; each checked item needs a report, command output, or run bundle artifact.
-When the next open item is blocked by an external event, such as an unmerged
-upstream PR, set `goal_status: blocked` and record the blocker in the Loop Log.
-`goal_loop.py status` then reports `NEXT_ACTION=wait_for_unblock` instead of
-asking the agent to rerun the same iteration. Use `goal_status: stopped` only
-when the goal is intentionally abandoned without achievement; it reports
-`NEXT_ACTION=stop_goal_loop`.
 
 ## Skill And Workflow Prompt Evals
 

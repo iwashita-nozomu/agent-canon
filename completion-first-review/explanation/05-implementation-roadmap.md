@@ -101,8 +101,8 @@ Add:
 Acceptance:
 
 - MCP pass, fail, alternate route, and not-applicable are distinct,
-- goal-driven task cannot close while `NEXT_ACTION=run_next_iteration`,
-- ignored/local `goal.md` has a reviewable run-bundle snapshot,
+- goal-driven task cannot close while run-bundle work or a next action remains,
+- durable goal-driven progress has reviewable `schedule.md` and `work_log.md` evidence,
 - repeated MCP failure can become self-growth feedback.
 
 ## Sprint 6: Self-growth manifest and replay
