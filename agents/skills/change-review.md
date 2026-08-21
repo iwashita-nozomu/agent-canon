@@ -8,6 +8,7 @@ upstream design ../../documents/rule/README.md document rule canon
 upstream design ../../documents/design/README.md design canon reader route
 upstream design ../../documents/design/responsibility-rationale.md durable finding and OOP-review activation rationale
 upstream design ../../documents/conventions/software-engineering-principles.md contract-first review precedence and evidence model
+upstream design ../../documents/conventions/common/03_comments.md decision-comment review policy
 upstream design ../../issues/README.md durable issue and GitHub mirror policy
 upstream design ../internal-routines/design-implementation-correspondence.md forward/reverse design correspondence and drift block route
 @dependency-end
@@ -45,6 +46,28 @@ Typical review misuse to reject:
 
 This skill records the selected clause and task-specific evidence; it does not reproduce the general
 policy or add a second principle trigger table.
+
+## Code Comment Review
+
+Use [コメント規約](../../documents/conventions/common/03_comments.md) as the canonical meaning and
+lifecycle owner. Review changed comments and comments adjacent to changed logic; do not perform a
+repository-wide comment-density audit merely because code changed.
+
+A comment finding is blocking only when evidence shows one of the following concrete failures:
+
+- a stale or misleading comment states an invariant, assumption, ordering, numerical condition,
+  authority boundary, external constraint, or failure semantic that the current implementation no
+  longer preserves;
+- a material correctness, safety, numerical-validity, ordering/lifetime, external-contract, or
+  compatibility decision cannot be recovered from names, types, structure, or canonical code and
+  lacks the local rationale needed to avoid a plausible incorrect maintenance change;
+- the diff changes logic covered by a decision comment but leaves the comment unsynchronized.
+
+Issue/PR text does not substitute for local rationale needed at the code owner. Conversely, missing
+comments on obvious assignments, branches, loops, simple properties, stubs, or self-explanatory
+helpers are not findings. Comment count, line density, preferred wording, or a demand to restate the
+implementation are non-blocking style preferences. Do not add a comment-count checker or checklist
+receipt; tie every material finding to the concrete invariant and reachable maintenance failure.
 
 ## Finding model
 
@@ -90,11 +113,12 @@ Do not duplicate a second SOLID-sensitive trigger table in this skill.
 
 1. Read base/head and the changed surface.
 2. Read the owning contract/design, the material engineering-principle clause, and targeted validation evidence.
-3. When regression evidence changes, review its canonical invariant/owner, minimal witness, representation independence, duplicate truth, consolidation opportunity, and completion oracle before treating added test coverage as positive evidence.
-4. Report blocking correctness/safety/design findings before summary.
-5. Resolve current-scope findings in the current diff when possible.
-6. Escalate only durable residual work to the issue owner.
-7. State merge/acceptance readiness from unresolved blocking findings and required validation, not from issue-count, test-count, or packet completeness.
+3. Review changed comments and comments adjacent to changed logic for required local rationale, stale assumptions, and same-diff synchronization under the canonical comment policy.
+4. When regression evidence changes, review its canonical invariant/owner, minimal witness, representation independence, duplicate truth, consolidation opportunity, and completion oracle before treating added test coverage as positive evidence.
+5. Report blocking correctness/safety/design findings before summary.
+6. Resolve current-scope findings in the current diff when possible.
+7. Escalate only durable residual work to the issue owner.
+8. State merge/acceptance readiness from unresolved blocking findings and required validation, not from issue-count, test-count, comment-count, or packet completeness.
 
 ## Conditional Cause Investigation Before Required Action
 
@@ -191,6 +215,7 @@ local patch returns to cause/scope analysis rather than opening a repair wave.
 
 1. `git diff --stat` と `git diff --name-only` で変更面を固定します。
 1. 破壊的変更、削除、rename、config 変更を先に見ます。
+1. 変更された code comment と、その comment が説明する近傍 logic を対応付け、共通コメント規約の必要条件、正確性、同一差分での同期を確認します。comment density や自明な説明の有無は finding にしません。
 1. 変更面について、causal ambiguity または owner/fix/validation を変え得る
    alternative があるか判定します。該当する場合だけ cause-evidence note/receipt を作り、
    incoming callers/entrypoints、owning mechanism/state/guards、downstream
@@ -217,4 +242,4 @@ local patch returns to cause/scope analysis rather than opening a repair wave.
 
 ## Boundary
 
-A review does not invent extra gates, tests, reports, principle checklists, or durable lifecycle records merely to make its schema complete. Existing canonical validation and publication owners remain authoritative.
+A review does not invent extra gates, tests, reports, principle checklists, comment-density checks, or durable lifecycle records merely to make its schema complete. Existing canonical validation and publication owners remain authoritative.
