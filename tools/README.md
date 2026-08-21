@@ -369,7 +369,7 @@ findings for resilient test planning.
   - `vendor_skill_adapters.py` は `vendor/skills/manifest.toml` を検査し、enabled third-party skill を `.agents/skills/` の runtime adapter symlink として露出します。GitHub 由来の skill は `provider`、`upstream` owner、`vendor/skills/<provider>/<skill-id>/` source path の一致も検査します。
 - `ci/`
   - repo check、container runner、server readiness、fresh clone acceptance
-  - `run_gpu_container.sh` はadmitted full UUID/MIG environmentを値付き`-e`で渡し、Docker GPU childを単一の`--gpus all`経路で実行します。
+  - `run_gpu_container.sh` はadmitted full UUID/MIG environmentを値付き`-e`で渡し、Docker GPU childを一つの入口からexact CDIまたは`--gpus all`を内部選択して実行します。
   - `python_env_policy.py` は host/container を判定し、container でだけ canonical `.venv` を許可します。
   - `check_github_workflows.py` は GitHub Actions checkout / permissions / concurrency、PR template evidence を検査します。
   - `container_config.py` は standalone AgentCanon では repo-local Docker absence を許容し、template / derived repo では repo-local `docker/Dockerfile` / `docker/packs/*.toml` と AgentCanon-owned `.devcontainer/` の静的整合を検査します。
@@ -929,8 +929,8 @@ For OOP readability, keep the mechanical report as the source of truth and use `
   contract for canonical Docker image contents.
 - `tools/ci/run_container_pack.py --print-only` previews direct
   `docker/Dockerfile` defaults; `--pack <path>` selects an optional project pack.
-- `tools/ci/run_gpu_container.sh --image <image> --gpus all -- <argv...>` is the
-  sole Docker GPU injection route. It requires the six admitted GPU/JAX values
+- `tools/ci/run_gpu_container.sh --image <image> -- <argv...>` is the
+  sole Docker GPU public entrypoint with internal injection selection. It requires the six admitted GPU/JAX values
   and passes them explicitly to `docker run`.
 - `tools/ci/run_codex_in_repo_container.py` resolves its default profile from
   AgentCanon-owned `tools/ci/codex-container-profiles.toml`; `--profiles <path>`

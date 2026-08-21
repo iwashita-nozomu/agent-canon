@@ -10,9 +10,9 @@ downstream implementation ../../tools/experiments/execution_resource_plan.py can
 downstream implementation ../../tools/experiments/gpu_command_admission.py direct admission composition, immutable plan, exact environment, execution lifecycle, and release owner
 downstream implementation ../../tools/experiments/run_gpu_command.py shell-free direct-command CLI adapter
 downstream implementation ../../tools/experiments/run_managed_experiment.py optional managed provider adapter
-downstream implementation ../../tools/ci/run_gpu_container.sh sole Docker --gpus all injection adapter
+downstream implementation ../../tools/ci/run_gpu_container.sh single-entry Docker injection adapter with internal CDI/all selection
 downstream contract ../../tests/tools/test_run_gpu_command.py fake NVIDIA, race, environment, lifecycle, and provider-independence acceptance tests
-downstream contract ../../tests/tools/test_run_gpu_container.py Docker argv and exact environment acceptance tests
+downstream contract ../../tests/tools/test_run_gpu_container.py Docker argv, route selection, and exact environment acceptance tests
 downstream design ../../agents/skills/gpu-execution.md route selection and operator workflow
 @dependency-end
 -->
@@ -69,17 +69,13 @@ strict nvidia-smi -L
 Let $L(T)$ be the executable leaves of strict topology $T$. Admission requires
 
 $$
-
 C \subseteq L(T_0) \cap L(T_{lock})
-
 $$
 
 and defines
 
 $$
-
 E = \{u \in C \mid state_0(u)=FREE \land free_0(u) \ge m\}.
-
 $$
 
 The reservation must produce a set $R \subseteq E$ with $|R|=k$, one unique full UUID lock
@@ -87,9 +83,7 @@ identity and reservation identity per selected unit. Immediately before launch, 
 $u \in R$ must still satisfy
 
 $$
-
 state_{lock}(u)=FREE \land free_{lock}(u) \ge m.
-
 $$
 
 Any BUSY, UNKNOWN, missing, topology-changed, visibility-changed, memory-insufficient, lock-busy,
@@ -135,27 +129,44 @@ values are cryptographically bound in fingerprints without being written in plai
 
 GPU selection and Docker device injection remain separate responsibilities. Direct admission
 selects and locks full physical/MIG UUIDs and materializes the six exact environment values
-above. Docker GPU execution has one route: invoke the repository-owned shell adapter inside the
-admitted child:
+above. Docker GPU execution exposes one public invocation shape:
 
 ```text
 bash tools/ci/run_gpu_container.sh \
-  --image <image> --gpus all -- <argv...>
+  --image <image> [--name <name>] -- <argv...>
 ```
 
-The adapter requires `--gpus all`, requires all six exact variables, requires CUDA and NVIDIA
-visibility to match, and writes each value into the same `docker run` argv as `-e
-NAME=VALUE`. `--gpus all` controls device injection only; the exact admitted environment limits
-container compute visibility to the locked UUID set. The adapter does not discover GPUs,
-convert UUIDs to indices, widen visibility, or create another lock owner.
+The caller does not provide `--gpus`, `--device`, a CDI qualified name, or a runtime selector.
+The adapter validates the exact admitted environment first, then reads the connected Docker
+daemon's CDI inventory from `docker info` `DiscoveredDevices`. It does not treat the client
+host's CDI files or a local `nvidia-ctk` process as authority for a potentially remote Docker
+daemon.
 
-Individual CDI/device arguments are not an alternate canonical route. Keeping one injection
-shape avoids environment-specific command branching while full UUID/MIG admission continues to
-provide the actual compute selection.
+For ordered selected set $U=(u_1,\ldots,u_k)$, define the exact CDI request set
+
+$$
+D(U)=\{\texttt{nvidia.com/gpu=}u_i \mid 1 \le i \le k\}.
+$$
+
+The adapter uses individual CDI injection only when every member of $D(U)$ is present in the
+daemon-discovered CDI inventory. It then emits one `--device` argument per selected identity in
+the same order. If the inventory exposes only `nvidia.com/gpu=all`, exposes index names only,
+contains a partial exact mapping, lacks the `DiscoveredDevices` field, or cannot be read, the
+adapter chooses the established `--gpus all` injection route instead.
+
+This is a capability decision inside one adapter, not a caller policy branch. The adapter never
+converts a UUID to an index, never mixes partial CDI and all injection, and never retries a failed
+workload with the other route. Capability observation is read-only; exactly one `docker run`
+starts the workload.
+
+In both branches, each of the six exact admitted values is serialized into the same `docker run`
+argv as `-e NAME=VALUE`. Device injection supplies container device/library access; the admitted
+environment narrows compute visibility to the locked full UUID/MIG set. Exposing all devices
+without the admitted environment, omitting one value, or accepting CPU fallback is not a
+successful GPU run.
 
 The container imports JAX only after Docker starts and must observe
-`jax.default_backend() == "gpu"`. Exposing all devices without the admitted environment,
-omitting one of the six values, or accepting CPU fallback is not a successful GPU run.
+`jax.default_backend() == "gpu"`.
 
 ## Child lifecycle and lock retention
 
@@ -195,6 +206,7 @@ Provider-independent fake tests:
 
 ```text
 python3 -m pytest tests/tools/test_run_gpu_command.py -q
+python3 -m pytest tests/tools/test_run_gpu_container.py -q
 ```
 
 A real GPU JAX smoke must import JAX only inside the admitted child:
@@ -204,6 +216,18 @@ python3 tools/experiments/run_gpu_command.py \
   --gpu-count 1 \
   --min-free-memory 2147483648 \
   -- python3 -c \
+  'import jax; assert jax.default_backend() == "gpu"; print(jax.devices())'
+```
+
+A real Docker GPU smoke uses the same public wrapper invocation on both CDI-capable and all-only
+hosts:
+
+```text
+python3 tools/experiments/run_gpu_command.py \
+  --gpu-count 1 \
+  --min-free-memory 2147483648 \
+  -- bash tools/ci/run_gpu_container.sh \
+  --image <canonical-image> -- python3 -c \
   'import jax; assert jax.default_backend() == "gpu"; print(jax.devices())'
 ```
 
