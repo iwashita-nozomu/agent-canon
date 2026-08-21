@@ -1,12 +1,12 @@
 # [コードコメント] 非自明な実装判断をコード近傍へ残し、変更時に同期する
 
 issue_id: AC-20260821-decision-comments
-status: in_progress
+status: open
 source: user
 severity: S2
 problem: 正しさに関係する非自明な実装判断がコード近傍へ保存・同期される条件が、コメント正本と実装・レビュー経路の間で閉じていない。
 evidence: documents/conventions/common/03_comments.md; documents/conventions/python/06_comments.md; documents/conventions/coding-conventions-house-style.md; agents/skills/comprehensive-development.md; agents/skills/change-review.md
-accepted evidence: https://github.com/iwashita-nozomu/agent-canon/issues/826
+accepted evidence: https://github.com/iwashita-nozomu/agent-canon/issues/826; https://github.com/iwashita-nozomu/agent-canon/pull/827
 done: material decision の有限な comment predicate、最狭 owner への配置、同一差分での更新／削除、stale comment review が既存 owner 間で接続される。
 affected_surfaces: documents/conventions/common/03_comments.md; documents/conventions/python/06_comments.md; documents/conventions/coding-conventions-house-style.md; agents/skills/comprehensive-development.md; agents/skills/change-review.md; project_template/vendor/agent-canon pin
 edit_scope: owner-bounded
@@ -26,6 +26,9 @@ github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/826
 - project template: `main@07cd68a230fb69c2cd9358de076250905750750c`
 - project template の `vendor/agent-canon` pin: `173489b0f3cccdc93e54d3b4d2d0d278f2aa631d`
 - implementation branch: `fix/826-decision-comments`
+- implementation commit: `c222fec129d9e13d4ff2ca5f8a19f03e6789ac21`
+- review PR: https://github.com/iwashita-nozomu/agent-canon/pull/827
+- template companion: https://github.com/iwashita-nozomu/project_template/issues/199
 
 ## Confirmed occurrence locations
 
@@ -130,20 +133,21 @@ needs_local_comment(decision)
 
 ## Acceptance criteria
 
-- [ ] 共通正本に `needs_local_comment` と同等の有限な意味判定が記載される。
-- [ ] correctness / safety / 数理 / ordering-lifetime / external contract / compatibility の代表条件が扱われる。
-- [ ] comment が `why / invariant / assumption / failure` を優先し、逐語説明・quota・長文複製を禁止する。
-- [ ] logic 変更時に comment を同じ差分で更新／削除し、stale comment を defect として扱う。
-- [ ] Python 固有規約とハウススタイルが共通正本を再実装せず参照する。
-- [ ] implementation skill が material decision の局所保存を明示する。
-- [ ] change review が missing/stale/misleading comment を concrete correctness/maintenance impact に基づいて判定し、comment density を blocking condition にしない。
-- [ ] 新しい comment-count checker、wrapper、registry を追加しない。
+- [x] 共通正本に `needs_local_comment` と同等の有限な意味判定が記載される。
+- [x] correctness / safety / 数理 / ordering-lifetime / external contract / compatibility の代表条件が扱われる。
+- [x] comment が `why / invariant / assumption / failure` を優先し、逐語説明・quota・長文複製を禁止する。
+- [x] logic 変更時に comment を同じ差分で更新／削除し、stale comment を defect として扱う。
+- [x] Python 固有規約とハウススタイルが共通正本を再実装せず参照する。
+- [x] implementation skill が material decision の局所保存を明示する。
+- [x] change review が missing/stale/misleading comment を concrete correctness/maintenance impact に基づいて判定し、comment density を blocking condition にしない。
+- [x] 新しい comment-count checker、wrapper、registry を追加しない。
 - [ ] AgentCanon focused static/read validation と PR checks が pass する。
 - [ ] project template は companion Issue で exact AgentCanon candidate pin のみ更新し、独自 policy owner を持たない。
-- [ ] latest main 起点・Issue 番号入り branch で作業し、Issue コメントから branch、commit、PR、validation、remaining verification を追跡できる。
+- [x] latest main 起点・Issue 番号入り branch で作業し、Issue コメントから branch、commit、PR、validation、remaining verification を追跡できる。
 
 ## Current state
 
-- implementation: in progress
-- validation: pending
-- template companion: AgentCanon candidate commit 確定後に起票
+- implementation: ready for review
+- validation: need verification
+- review PR: https://github.com/iwashita-nozomu/agent-canon/pull/827
+- template companion: https://github.com/iwashita-nozomu/project_template/issues/199
