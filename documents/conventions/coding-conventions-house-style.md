@@ -3,6 +3,7 @@
 contract policy
 responsibility Documents ハウススタイル規約 for this repository.
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ./common/03_comments.md owns decision-comment meaning and lifecycle
 downstream design ./object-oriented-design.md expands OOP policy for class and Protocol decisions
 @dependency-end
 -->
@@ -14,13 +15,13 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 
 ## この文書の読み方
 
-この文書は、公開境界、定義順序、責務 comment、入力検証、型契約、OOP 判断、compatibility drift、duplicate implementation、canonical owner、refactor、JAX trace、正本文書 language の house style をまとめます。まず要約で全体規約を確認し、実装時は規約の適用範囲、module entry、公開 API、型、エラー処理、文書運用へ進みます。禁止事項と例外は、既存 code と conflict したときの判断に使います。
+この文書は、公開境界、定義順序、責務・判断 comment、入力検証、型契約、OOP 判断、compatibility drift、duplicate implementation、canonical owner、refactor、JAX trace、正本文書 language の house style をまとめます。まず要約で全体規約を確認し、実装時は規約の適用範囲、module entry、公開 API、型、エラー処理、文書運用へ進みます。禁止事項と例外は、既存 code と conflict したときの判断に使います。
 
 ## 要約
 
 - 公開境界はモジュール docstring、`__all__`、先頭 `_` の命名で明示します。
 - コードファイル内の定義は、公開契約、公開入口、内部補助関数の読者順序で並べます。
-- 非自明な関数と重要な処理塊には `# 責務:` コメントを付け、1 関数 1 責務を守ります。
+- コメントの意味と lifecycle は [コメント規約](./common/03_comments.md) を正本とし、非自明な関数境界では `# 責務:` を使います。
 - 入力検証、shape/dtype 正規化、例外送出は境界で先に行います。
 - 型契約は `TypeAlias`、`Protocol`、型付き dataclass で表現し、`Any` と `cast` に逃げません。
 - class、dataclass、`Protocol`、composition、継承の判断は [オブジェクト指向設計方針](./object-oriented-design.md) に従います。
@@ -56,7 +57,9 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
   従う内部補助関数の読者順序で揃えなければなりません。
 - 単一公開入口に従う内部補助関数は、その公開入口の直後に置かなければなりません。
 - 複数入口で共有する内部補助関数は、公開入口群の直後に置かなければなりません。
-- 非自明な関数、メソッド、内部補助関数の直前には `# 責務:` コメントを 1 行で置くことを必須にします。
+- コメントの意味判定、配置、変更時の同期、禁止事項は [コメント規約](./common/03_comments.md) を正本とします。
+- 名前、型、配置から責務を安全に復元できない関数、メソッド、内部補助関数の直前には、担当する判断、変換、状態遷移、境界を `# 責務:` コメント 1 行で示すことを必須にします。
+- 正しさに関係する実装判断がコードから復元できない場合は、共通コメント規約に従い、その判断を所有する最も狭い箇所へ不変条件または理由を残さなければなりません。
 - 1 つの関数が複数段階の責務を持つことを禁止します。判定、変換、保存、通知を同時に抱え込んではなりません。
 - `util`、`helper`、`misc`、`tmp`、`data` のような責務が読めない名前を公開 API に使うことを禁止します。
 
@@ -140,7 +143,7 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 
 - package `__init__.py` 以外での star import を禁止します。
 - 型注釈のない公開関数を禁止します。
-- 非自明な関数に `# 責務:` コメントがない状態を禁止します。
+- 共通コメント規約が要求する責務コメントまたは判断コメントを欠く状態を禁止します。
 - 境界検証を後回しにして深い内部で失敗させることを禁止します。
 - 正本文書に backup、proposal、dated report、run 固有メモを混ぜることを禁止します。
 - 文書で `原則`、`望ましい`、`できれば`、`必要なら` を必須条件や禁止条件の代わりに使うことを禁止します。
@@ -149,6 +152,6 @@ downstream design ./object-oriented-design.md expands OOP policy for class and P
 
 ## 例外
 
-- `Protocol` のメソッド宣言、`@overload` の stub、dunder method、単純な property は `# 責務:` コメントを省略して構いません。
+- `Protocol` のメソッド宣言、`@overload` の stub、dunder method、単純な property は、共通コメント規約の判断を隠さない場合に `# 責務:` コメントを省略して構いません。
 - serialization 境界、multiprocessing 境界、外部ライブラリ interop では `Any` や `cast` を最小限に許可します。ただし runtime 検証または前段の正規化を先に書かなければなりません。
 - CLI entrypoint と運用スクリプトの人間向け表示では `print` を許可します。ただし library module へ漏らしてはなりません。

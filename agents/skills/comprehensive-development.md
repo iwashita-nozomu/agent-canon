@@ -9,6 +9,7 @@ upstream design ../agents_config.json permanent team role ownership and write po
 upstream design ../canonical/CODEX_SUBAGENTS.md Codex subagent inventory and activation contract
 upstream design ../internal-routines/design-implementation-correspondence.md cross-surface design-to-implementation correspondence route
 upstream design ../../documents/conventions/software-engineering-principles.md contract-first decision precedence and responsibility-boundary policy
+upstream design ../../documents/conventions/common/03_comments.md material decision-comment policy
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic action and verification-owner allocation
 upstream design ../../documents/design/entrypoint-owner-map.md root entrypoint responsibility migration boundary
 @dependency-end
@@ -65,6 +66,14 @@ material な mechanism decision は、既存の task packet / design trace に�
 | alternatives | 少なくとも現実に競合した候補、棄却理由、cost / risk / compatibility trade-off |
 | oracle | contract を判定できる test、static property、proof、measurement、readback |
 
+material な decision のうち、正しさに関係する理由を名前、型、構造から復元できず、現実的な変更で
+invariant を壊し得るものは、[コメント規約](../../documents/conventions/common/03_comments.md) に従い、
+その判断を所有する最も狭い安定した code location へ局所コメントを残します。コメントには必要な
+`invariant / assumption` と理由、必要なら failure または禁止する alternative だけを簡潔に書きます。
+Issue、PR、task packet、design trace は task の追跡 evidence ですが、将来の変更に必要な局所理由の
+代替にはしません。実装を変更した差分では関連コメントを同じ差分で更新または削除し、evidence table
+や処理の逐語説明をコードへ複製しません。
+
 数式や外部文献は、判断がそれを必要とするときだけ使います。単純な rename や明示された定数置換へ
 形式的 proof を追加する必要はありません。一方、algorithm の停止、numerical tolerance、近似誤差、
 concurrency ordering、resource capacity、performance claim、reliability boundary を material に変える場合、
@@ -117,6 +126,7 @@ verified completion に昇格させず remaining verification として残しま
 - `agents/canonical/CODEX_SUBAGENTS.md`
 - `agents/COMMUNICATION_PROTOCOL.md`
 - `documents/conventions/software-engineering-principles.md`
+- `documents/conventions/common/03_comments.md`
 - `documents/design/semantic-responsibility-contract.md`
 
 ## Standard Bundle
@@ -134,6 +144,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 1. family を `Comprehensive Development` に固定します。
 1. current requirement と owning contract を読み、material な engineering principle clause、canonical owner、forbidden interpretation を固定します。
 1. material な mechanism decision について、contract、owner、mechanism、basis、alternatives、oracle を既存 task packet / design trace に接続します。
+1. material かつ code から理由を復元できない decision は、共通コメント規約に従って最も狭い安定 owner の近傍へ残し、変更された既存コメントも同じ差分で同期します。
 1. regression / fixture / mock を追加する場合は、canonical invariant、minimal counterexample、existing oracle への統合可能性、representation independence、duplicate truth、旧 regression の consolidation、completion oracle を先に確認します。
 1. `agents/task_catalog.yaml` の `comprehensive_development` family から `spawn_budget`、`role_topology`、`roles`、`subagent_prompt` を読みます。
 1. `agents/agents_config.json` で permanent team role ownership、required output、write policy を確認します。
@@ -141,7 +152,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 1. run bundle を作り、`workflow=<family>`, `skills=<...>`, `review=<...>` と catalog / config 由来の route を宣言します。
 1. `agents/COMMUNICATION_PROTOCOL.md` の fresh context capsule と bounded source packet を使って、stage ごとに subagent handoff を作ります。
 1. write-capable work は approved design trace から導いた bounded slice に限定し、親が integration order と validation rerun を管理します。
-1. closeout では `project_reviewer` を integration gate として使い、canonical contract、selected principle clause、implementation basis、catalog / config / inventory と実 diff の同期を確認します。
+1. closeout では `project_reviewer` を integration gate として使い、canonical contract、selected principle clause、implementation basis、コメントの同期、catalog / config / inventory と実 diff の整合を確認します。
 
 ## Parent-Managed Write Scope
 
