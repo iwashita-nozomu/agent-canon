@@ -1184,6 +1184,25 @@ entries:
     tests:
       - tests/tools/test_run_gpu_container.py
 
+  - id: orphan-lifecycle
+    summary: Inventories semantic branch, PR-head, and worktree lifecycle state and authorizes exact cleanup candidates without performing mutation.
+    path: tools/agent_tools/orphan_lifecycle.py
+    family: agent_tools
+    role: inventory
+    status: canonical
+    audience: agent
+    placement: workflow_helper
+    command: python3 tools/agent_tools/orphan_lifecycle.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/operations/orphan-lifecycle.md
+      - documents/operations/worktree-lifecycle.md
+    tests:
+      - tests/agent_tools/test_orphan_lifecycle.py
+
   - id: repository-topic-clone
     summary: Owns the generic workspace topic clone, branch reuse, origin/main merge, publication readback, and reconstructibility cleanup lifecycle.
     path: tools/agent_tools/repository_topic_clone.py
