@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - refactor/775-luna-team-communication
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
