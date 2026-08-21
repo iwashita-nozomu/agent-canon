@@ -2,7 +2,7 @@
 name: dependency-module-change
 description: "Use when a dependency source change, topic branch clone, or reconstructibility-based clone cleanup is required."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"76d56b4d5ab36692a18687c811b4fe616129ff1f16f3dbe3fe345b98d067c628"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"718e7c4e714889ba2170feb22a89cd5ee66e5a085dfe921c51560b2709337c8d"} -->
 
 <!--
 @dependency-start

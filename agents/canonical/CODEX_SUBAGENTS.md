@@ -5,6 +5,7 @@ responsibility Documents Codex Subagents for this repository.
 upstream design ../task_catalog.yaml task routing catalog
 upstream design ../agents_config.json permanent team role ownership and artifact policy
 upstream design ../skills/agent-orchestration.md canonical validation trust boundary owner
+upstream design ../skills/direct-luna-communication.md bounded direct Luna communication and runtime acknowledgement
 upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md empirical evaluation packet and report contract
 upstream design ../../documents/design/request-intent-and-update-relation.md compact reuse, parallel handoff, and cleanup projection
 downstream design CODEX_WORKFLOW.md workflow consumes subagent routing contract
@@ -56,6 +57,7 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
 
 - role profile/instruction は `agents/model_profiles.toml` を優先し、
   `.codex/agents/*.toml` は generated readback として扱います
+- logical role、selected Skills、execution profile、authority は別々に選びます。Luna profile は `$direct-luna-communication` の bounded packet で direct child として起動し、role-specific alias を physical team identity や capacity 根拠にしません
 - permanent team ownership、artifact output、write policy は `agents/agents_config.json` を優先します
 - subagent registration と runtime budget は `.codex/config.toml` を優先し、
   role model / reasoning は `agents/model_profiles.toml` を優先します
@@ -576,6 +578,11 @@ Activation Conditions:
 
 ## Permanent Team To Codex Mapping
 
+この表は logical responsibility と capability route の対応です。Luna-backed
+rows は role 名の custom-agent alias を物理 team member として起動せず、選択済み
+role / Skills / authority を `$direct-luna-communication` packet に載せます。
+`terra`、`spark_worker`、`skill_evaluator` は能力差があるため独立 route のままです。
+
 | Permanent Team Role | Codex Subagent / Parent Role |
 | ------------------- | ---------------------------- |
 | `manager` | parent + `requirements_organizer` |
@@ -743,6 +750,8 @@ Activation Conditions:
 ## Codex Model Settings
 
 `agents/model_profiles.toml` が canonical typed profile authority です。
+`agents/execution_topology.json` は logical role と physical execution profile の
+分離、および direct-Luna default を所有します。
 `tools/agent_tools/model_profile_registry.py` は closed generated views として
 `.codex/agents/*.toml` と `agents/agents_config.json` を materialize します。
 generated views は projection digest / readback surfaces であり、手動で編集しては

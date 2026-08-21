@@ -6209,6 +6209,22 @@
       "surface": "tool"
     },
     {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 94,
+      "path": "tools/agent_tools/direct_luna_dispatch.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "key_value_literal",
+      "field": "<dynamic>",
+      "line": 41,
+      "path": "tools/agent_tools/direct_luna_dispatch.py",
+      "surface": "tool"
+    },
+    {
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ACTIVE_ROLES",
@@ -19700,7 +19716,23 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "GPU_CONTAINER_ERROR",
-      "line": 22,
+      "line": 23,
+      "path": "tools/ci/run_gpu_container.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "GPU_CONTAINER_INJECTION",
+      "line": 116,
+      "path": "tools/ci/run_gpu_container.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "GPU_CONTAINER_INJECTION_REASON",
+      "line": 117,
       "path": "tools/ci/run_gpu_container.sh",
       "surface": "tool"
     },
@@ -24713,6 +24745,7 @@
     ".agents/skills/dependency-design/SKILL.md",
     ".agents/skills/dependency-module-change/SKILL.md",
     ".agents/skills/devcontainer-exec/SKILL.md",
+    ".agents/skills/direct-luna-communication/SKILL.md",
     ".agents/skills/document-canon-cleanup/SKILL.md",
     ".agents/skills/environment-cleanup/SKILL.md",
     ".agents/skills/environment-maintenance/SKILL.md",
@@ -24780,6 +24813,7 @@
     "agents/skills/dependency-design.md",
     "agents/skills/dependency-module-change.md",
     "agents/skills/devcontainer-exec.md",
+    "agents/skills/direct-luna-communication.md",
     "agents/skills/document-canon-cleanup.md",
     "agents/skills/environment-cleanup.md",
     "agents/skills/environment-maintenance.md",
@@ -24896,6 +24930,7 @@
     "tools/agent_tools/cpp_template_to_lean.py",
     "tools/agent_tools/dependency_module_change.py",
     "tools/agent_tools/devcontainer_dependencies.py",
+    "tools/agent_tools/direct_luna_dispatch.py",
     "tools/agent_tools/doc_start.py",
     "tools/agent_tools/eval_accumulation_check.py",
     "tools/agent_tools/eval_manifest_paths.py",

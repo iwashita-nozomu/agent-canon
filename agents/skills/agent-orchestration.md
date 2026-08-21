@@ -14,6 +14,7 @@ upstream design ../../documents/design/request-intent-and-update-relation.md com
 downstream implementation ../../tools/agent_tools/check_execution_time_aware_orchestration.py execution contract checker
 downstream implementation ../../tools/agent_tools/skill_route_catalog.py derives canonical invocation order
 downstream implementation ../../tools/agent_tools/skill_dependency_map.py validates and projects the dependency graph
+downstream design ./direct-luna-communication.md owns bounded direct-Luna packet exchange and runtime acknowledgement
 @dependency-end
 -->
 
@@ -91,14 +92,16 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 - `agents/canonical/CLI_ENTRYPOINTS.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
 - `agents/skills/skill-dependencies.yaml`
+- `agents/skills/direct-luna-communication.md`
 
 ## Decision Order
 
 Canonical model/profile selection and ToolCall materialization belong to the
-registry/materializer owners, not `route.py`. Sol remains parent; Luna owns
-ambiguous design, causal repair, graph-owned cross-owner integration, and
-review; Spark is the fixed implementation owner; `gpt-5.4-mini` is
-skill-evaluator-only. Decision sufficiency is semantic: execution may start
+registry/materializer owners, not `route.py`. Sol remains parent. When a
+selected logical role uses a Luna profile, compose that role, its selected
+Skills, authority, and bounded task packet through `direct-luna-communication`;
+do not turn the logical role name into the physical team or capacity identity.
+Terra, Spark, and `gpt-5.4-mini` remain capability-specific routes. Decision sufficiency is semantic: execution may start
 when owner, replaceable unit, implementation mechanism, validation route, and
 the unresolved branch that could change one of those decisions are explicit.
 No artifact shape, digest, count, or fixed stage sequence is a substitute for
@@ -619,6 +622,7 @@ task id が分かる場合は、task catalog 側の family を正本にします
 ## Codex Implementation Routing
 
 - implementation が scope に入るときだけ routing を出します
+- selected execution profile が Luna の場合は、logical role、selected Skills、reasoning effort、authority、bounded paths、expected output、validation route を `direct_luna_handoff_packet_v1` に合成し、`$direct-luna-communication` で `model="gpt-5.6-luna"`、`fork_turns="none"` の direct child を起動します。effective model / effort の一致前に work を admit せず、unavailable / hidden / mismatch を legacy role alias や別 model へ fallback しません。
 - `bootstrap_agent_run.py` の output で `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認してから route します
 - prompt/config drift を含む task では、routing 決定後の詳細 diff を `prompt_config_reviewer` に監査させ、親が chat 文脈だけで共有 policy surface を広く書き換えません
 - coding / implementation / patch / doc-edit work を求める repo-changing task は、read-only survey / review role だけで完了扱いにしません。surface route seed、responsibility search、reuse survey、stale-surface scan、dependency expansion、validation plan、tool-rejection preflight から handoff scope を作ったら、追加の read-only wave より先に selected write-capable implementer を起動または schedule します。parent は実装者ではなく orchestrator / integrator として、handoff packet、起動、追加指示、統合、review / validation gate を所有します。
@@ -632,6 +636,9 @@ task id が分かる場合は、task catalog 側の family を正本にします
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
 1. Read `agents/skills/agent-orchestration.md` as the sole policy owner.
+1. When the selected execution profile is Luna, read
+   `agents/skills/direct-luna-communication.md` and use its bounded packet,
+   effective-runtime readback, and typed blocker contract.
 1. Consume the owner-produced semantic decision-sufficiency record referenced by
    the active route packet. A structured handoff or tool result is sufficient;
    use a durable packet reference only for coordination or resumption.

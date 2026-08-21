@@ -1,0 +1,31 @@
+{
+  "schema_id": "skill_bound_execution_topology_v1",
+  "version": 1,
+  "logical_role_owner": "agents/agents_config.json",
+  "skill_owner": "agents/skills",
+  "profile_binding_owner": "agents/model_profiles.toml#role_profile_bindings",
+  "authority_owner": "logical role write_policy plus the current parent handoff packet",
+  "communication_skill": "direct-luna-communication",
+  "default_subagent": {
+    "model": "gpt-5.6-luna",
+    "dispatch_mode": "direct_model_override",
+    "fork_turns": "none",
+    "effective_runtime_readback": "required",
+    "unavailable_policy": "typed_blocker_no_fallback",
+    "continuation_policy": "active_child_update_or_fresh_bounded_spawn",
+    "resume_policy": "unverified_native_resume_forbidden"
+  },
+  "physical_execution_profiles": [
+    {"id": "luna_reasoning_high", "model": "gpt-5.6-luna", "reasoning_effort": "high", "authority_class": "read-only"},
+    {"id": "luna_implementation_xhigh", "model": "gpt-5.6-luna", "reasoning_effort": "xhigh", "authority_class": "parent-assigned-workspace-write"},
+    {"id": "luna_ship_xhigh", "model": "gpt-5.6-luna", "reasoning_effort": "xhigh", "authority_class": "read-only-terminal-gate"},
+    {"id": "terra_cross_cutting_read_only", "model": "gpt-5.6-terra", "reasoning_effort": "high", "authority_class": "read-only-specialist"},
+    {"id": "spark_implementation_low", "model": "gpt-5.3-codex-spark", "reasoning_effort": "low", "authority_class": "fixed-packet-workspace-write"},
+    {"id": "mini_skill_evaluator_medium", "model": "gpt-5.4-mini", "reasoning_effort": "medium", "authority_class": "read-only-evaluation"}
+  ],
+  "projection_policy": {
+    "role_specific_custom_agent_aliases": "compatibility views only; never physical team inventory",
+    "new_logical_role_may_add_physical_profile": false,
+    "capacity_basis": "active decision-relevant work, not registered role count"
+  }
+}
