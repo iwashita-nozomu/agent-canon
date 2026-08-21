@@ -6,6 +6,7 @@ upstream design ../../runtime/SHARED_RUNTIME_SURFACES.md shared documents owners
 downstream design ../coding-conventions-house-style.md projects Python responsibility-comment syntax
 downstream design ../../../agents/skills/comprehensive-development.md applies material decision comments during implementation
 downstream design ../../../agents/skills/change-review.md reviews decision-comment lifecycle
+downstream implementation ../../../tools/agent_tools/check_convention_compliance.py verifies convention wiring
 @dependency-end
 -->
 
@@ -66,6 +67,12 @@ needs_local_comment(decision)
 - コメントが説明する logic、式、順序、境界、failure semantics を変更した場合は、同じ差分でコメントを更新または削除することを必須にします。
 - 現在の実装と異なる stale comment、誤った前提を示す misleading comment は欠陥として扱います。
 - コメントを削除すると判断根拠が失われる場合は、削除前に名前、型、構造、canonical document、または新しい局所コメントへ根拠を移さなければなりません。
+
+## 検証
+
+- 規約文書と実装・review 経路の wiring は `python3 tools/agent_tools/check_convention_compliance.py --root . --format json` で検証します。
+- 個々の差分に必要な判断コメントの有無、正確性、同一差分での同期は `agents/skills/change-review.md` の concrete invariant / reachable maintenance failure 判定で検証します。
+- comment count、行密度、逐語説明の数を機械判定する checker は追加しません。
 
 ## 禁止事項
 
