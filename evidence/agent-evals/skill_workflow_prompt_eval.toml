@@ -2163,6 +2163,12 @@ id = "PR-OPS-SEMANTIC-1"
 critical = true
 required_regex = ["single-candidate fast path", "base/head/diff/check/authority", "dependency evidence"]
 
+[[evals.checklist]]
+id = "PR-OPS-ISSUE-IDENTITY-1"
+critical = true
+description = "Requires repository-qualified Issue identity across progress, handoff, publication, and readback."
+required_regex = ["Repository-qualified Issue identity", "owner/repository#number", "issue_repository", "issue_number", "issue_ref", "issue_url", "consumer_issue_ref", "upstream_issue_ref", "Do not emit a bare"]
+
 [[evals]]
 id = "task-routing-canonical-state"
 target = "agents/skills/task-routing.md"

@@ -7,6 +7,7 @@ responsibility Documents issue-finding-report for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design agent-log-analysis.md structured runtime evidence analysis workflow
 upstream design subagent-bootstrap.md multi-agent partition and handoff workflow
+upstream design pr-processing.md repository-qualified Issue identity and publication boundary
 upstream design ../../issues/README.md durable AgentCanon operational issue schema
 upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py emits structured log evidence
 upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py resolves accumulated log archive state
@@ -70,7 +71,7 @@ establish ownership.
 Before changing the consumer repository, freeze this packet:
 
 ```text
-consumer_task: <repository and Issue/PR/task reference>
+consumer_task: <owner/repository#number, qualified PR, or task reference>
 agentcanon_snapshot: <vendored pin, source commit, or immutable runtime identity>
 failure_condition: <minimal precondition plus command/action that reproduces the failure>
 expected_behavior: <owner contract or invariant>
@@ -78,11 +79,14 @@ actual_behavior: <observed result>
 occurrence_locations: <confirmed AgentCanon and cross-surface endpoint records>
 duplicate_search: <durable issue search and result>
 consumer_scope_disposition: <blocked|deferred|independent-work-remains>
-upstream_issue: <existing or newly created durable AgentCanon Issue>
+upstream_issue: <owner/repository#number for the existing or newly created durable AgentCanon Issue>
 ```
 
 Apply these rules:
 
+1. Consume `pr-processing`'s repository-qualified Issue identity. Keep consumer
+   and upstream Issue repositories explicit in every finding packet, progress
+   update, publication comment, and closeout readback.
 1. Identify the minimal failure condition and the exact AgentCanon snapshot or
    pin before proposing a fix.
 1. Use the Confirmed Occurrence Location Contract below. For a cross-repository
