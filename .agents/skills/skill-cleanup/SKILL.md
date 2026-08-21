@@ -2,7 +2,7 @@
 name: skill-cleanup
 description: "Use when canonical skill docs, catalog, dependency DAG, routes, tool commands, generated shims, host config, graph, or readback must be cleaned as one unit."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"4eb6892f2f645f522d09b1091cc60c9fdbb58008936e2bfefa7f79b09d79dce6"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"fddf804aa07e92abdb221c55b8225cedb0d37e86debafab2a28b9263bf456b43"} -->
 
 <!--
 @dependency-start

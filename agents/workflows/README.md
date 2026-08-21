@@ -28,7 +28,7 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 - directory layout、directory README ownership、root view、または responsibility-scope map を変える refactor では `$structure-refactor` と `$refactor-loop` を併用し、recursive README graph、Directory Responsibility Map、`scope_delta`、reader / navigation delta を先に固定します。
 - 考察、原因仮説、修正箇所の妥当性検証が必要な task では `hypothesis-validation-workflow.md` を overlay として追加し、code dependency と header dependency を別々に抜いてから実装へ進みます。
 - workflow family の選択は `agents/TASK_WORKFLOWS.md`、Codex の標準実行順は `agents/canonical/CODEX_WORKFLOW.md` を正本にします。
-- Codex `goals` feature を使う task では `codex-goals-workflow.md` を overlay とし、`goal.md` を durable source of truth、Codex goals を session view、`goal_loop.py status` を機械 gate として扱います。
+- Codex goal は session runtime state とし、repository に mirror file を作りません。durable lifecycle evidence が必要な task は run bundle の `schedule.md`、`work_log.md`、validation evidence を使います。
 - user が `/goal <objective>` または goal-driven task を指定した task では、同 overlay の Autonomous Goal Draft と Pre-Goal Subagent Authorization And Fan-Out に従い、必要なら parent が goal draft を作り、`/goal` 確定前に read-only subagent または許可待ち handoff plan で要求整理、repo survey、first-slice plan を固めます。`/goal` 設定後に `/plan` で Goal Contract、Exit Criteria Mapping、Source Packet、Reuse Survey、Execution Slices、Budget Policy を固定してから実装します。
 - token 消費を抑えたい task では `token-efficient-codex-workflow.md` を overlay とし、observed session / role evidence を使って、現在の decision に必要な child / specialist を adaptive に materialize します。
 
@@ -53,8 +53,6 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 
 - 原因考察、仮説、修正箇所の妥当性検証を実装前に固定する
   - `agents/workflows/hypothesis-validation-workflow.md`
-- Codex `goals` feature と repo-owned `goal.md` を同期して使う
-  - `agents/workflows/codex-goals-workflow.md`
 - token 消費を抑えつつ必要な gate を維持する
   - `agents/workflows/token-efficient-codex-workflow.md`
 - README、guide、workflow、migration、specification など file responsibility が一般説明 prose の文書
@@ -100,8 +98,6 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
   - 大規模 refactor の設計見直し、OOP 的な責務境界方針、静的解析 score gate
 - `hypothesis-validation-workflow.md`
   - code dependency と header dependency を別々に抽出し、仮説と修正箇所妥当性を検証してから実装する overlay
-- `codex-goals-workflow.md`
-  - Codex goals feature、top-level `goal.md`、Plan-mode entry、`goal_loop.py status` の責務境界と同期手順
 - `token-efficient-codex-workflow.md`
   - observed session / role evidence と現在の decision に応じた adaptive materialization
 

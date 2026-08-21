@@ -109,7 +109,7 @@ positive_fixture: V001_positive
 
 - Represents: goal loop says continue but task emits completion.
 - Should fail when: goal status blocks completion.
-- Positive case: `NEXT_ACTION=close_goal_loop` and remaining gates pass.
+- Positive case: no open work or next action remains and the remaining gates pass.
 
 ### [ ] VF-013: debug run claim fixture
 

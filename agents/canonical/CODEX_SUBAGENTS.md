@@ -530,8 +530,8 @@ Candidate pre-goal roles:
   constraints, and Exit Criteria from the user request and durable repo notes.
 - `explorer`: inspect repo docs, prior notes, dependency surfaces, existing
   tools, and reuse candidates that affect the goal.
-- `execution_planner`: group open `GW*` rows into the next cohesive slice after
-  `goal_loop.py plan` exists.
+- `execution_planner`: group the open work in the selected handoff or run-bundle
+  `schedule.md` into the next cohesive slice.
 - `plan_reviewer`: verify that the complete responsibility unit is checkable;
   checkpoints remain nonblocking observations outside rollback and micro-slice
   gates.
@@ -542,14 +542,12 @@ separation requires them.
 
 Activation Conditions:
 
-- These pre-goal agents are read-only for draft checking. If the user explicitly
-  requested a repo edit and the goal has already been mirrored into `goal.md`,
-  the write-capable route can proceed.
-- Write-capable `worker` / `spark_worker` instances start after `goal.md` is
-  parseable, the Codex goal view is mirrored or queued, and the Plan-mode output
-  contains evidence mapping.
-- This goal readiness rule applies to goal-driven tasks. Ordinary repo-changing
-  tasks with explicit implementation delegation use a structured handoff with
+- These pre-goal agents are read-only for draft checking. A write-capable route
+  proceeds after the user-authorized repository change has a structured handoff
+  with objective, owner boundary, implementation mechanism, and evidence map.
+- Write-capable `worker` / `spark_worker` instances do not wait for a repository
+  mirror of session goal state.
+- Goal-driven and ordinary repo-changing tasks use a structured handoff with
   bounded `allowed_paths`, write scope, validation plan, and tool-rejection
   preflight before the selected write-capable implementer. Use a run bundle when
   coordination or resumption requires durable lifecycle evidence.
@@ -557,11 +555,11 @@ Activation Conditions:
   `intake` stage only when that wave is owner-critical. If selected, add or defer
   `explorer`, `execution_planner`, and `plan_reviewer` as evidence-gated dynamic
   roles; catalog listing alone does not create a wave.
-- Handoffs must include `agents/workflows/codex-goals-workflow.md`,
-  `agents/workflows/goal-plan-implementation-loop.md`, the candidate `goal.md`
-  or goal artifact, and `team_manifest.yaml` lifecycle policy.
-- Use `goal_loop.py plan` to hand the next unchecked work units to
-  `execution_planner` instead of summarizing a large `goal.md` by chat.
+- Handoffs include the objective and evidence map directly. When a run bundle is
+  selected, pass `schedule.md`, `work_log.md`, and `team_manifest.yaml`
+  lifecycle policy to the next role.
+- Hand the next unchecked `schedule.md` work units to `execution_planner`
+  instead of reconstructing durable progress from chat.
 
 ## Codex Command Surface
 

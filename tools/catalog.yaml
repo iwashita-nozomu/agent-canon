@@ -1164,14 +1164,14 @@ entries:
       - tests/tools/test_container_config.py
 
   - id: run-gpu-container
-    summary: Runs an admitted GPU container through the sole Docker --gpus all route with exact environment values.
+    summary: Runs an admitted GPU container through one entrypoint and internally selects exact CDI or --gpus all injection.
     path: tools/ci/run_gpu_container.sh
     family: ci
     role: runner
     status: canonical
     audience: skill
     placement: skill_helper
-    command: bash tools/ci/run_gpu_container.sh --image <image> --gpus all -- <argv...>
+    command: bash tools/ci/run_gpu_container.sh --image <image> -- <argv...>
     writes: true
     default_wiring:
       ci: false
@@ -1945,24 +1945,6 @@ entries:
       - .agents/skills/codex-task-workflow/SKILL.md
     tests:
       - tests/agent_tools/test_tool_rejection_preflight.py
-
-  - id: goal-loop
-    summary: Manages goal.md exit criteria, backlog, and loop status.
-    path: tools/agent_tools/goal_loop.py
-    family: agent_tools
-    role: workflow
-    status: canonical
-    command: python3 tools/agent_tools/goal_loop.py
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/workflows/codex-goals-workflow.md
-    tests:
-      - tests/agent_tools/test_goal_loop.py
 
   - id: bootstrap-agent-run
     summary: Bootstraps a staged agent run bundle from a task request.

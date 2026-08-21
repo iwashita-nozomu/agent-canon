@@ -278,27 +278,16 @@ runtime contract、config surface の判断が未確定なら、実装吸収で�
 fallback、wrapper、helper、branch、alternate route、test relaxation、docs
 overwrite、implementation shortcut は Design Integrity Gate の外側です。
 
-### Codex Goals Feature Preflight
+### Codex Goal Session State
 
-Codex `goals` feature が有効な runtime では、`agents/workflows/codex-goals-workflow.md` を overlay として読みます。
-
-```bash
-codex features list | grep '^goals'
-python3 tools/agent_tools/goal_loop.py status --goal-file goal.md
-python3 tools/agent_tools/goal_loop.py plan --goal-file goal.md \
-  --report-out reports/agents/<run-id>/goal_work_breakdown.md
-```
+Codex の goal は session runtime state として使い、repository に mirror file を作りません。
 
 - stable な goal 機能は Codex runtime の既定を使い、shared config に feature flag を重ねません。
-- `goal.md` は durable source of truth、Codex goals は session view、`goal_loop.py status` は機械 gate です。
-- `goal.md` は repo-local state として管理します。
-- user が goal-driven intent を示したが exact `/goal <objective>` を渡していない場合は、parent が target-state-complete Objective を作り、`goal.md` に先に固定します。intake draft は read-only discovery として扱い、edit authorization は target-state-complete Objective の固定後に開始します。
-- repo-changing goal task では、coordination、resumption、または選択された workflow が durable lifecycle evidence を要求する場合だけ run bundle を materialize します。その他は semantic handoff または tool result で owner、replaceable unit、mechanism、validation route、unresolved branch を満たします。goal の role / intake stage と catalog specialist は候補であり、owner-critical decision または distinct unresolved claim/risk が次の判断を変える場合だけ wave を materialize します。write-capable implementation subagent は、goal route が選択された場合に限り `/goal` mirror、parseable `goal.md`、Plan-mode evidence mapping を確認して起動します。
-- user が `/goal <objective>` または goal-driven task を指定した場合は、`/goal` を session view に設定した直後に `/plan <goal-driven task summary>` へ入り、Plan-mode output が `Goal Contract`、`Exit Criteria Mapping`、`Goal Work Breakdown`、`Source Packet`、`Reuse Survey`、`Execution Slices`、`Budget Policy` を含む状態で実装へ進みます。
-- `Goal Work Breakdown` は `goal_loop.py plan` の `GW*` rows を run bundle `schedule.md` へ移したものです。実装は objective と work breakdown の両方に基づけます。
-- goal-driven task では、Codex goals と対応する `goal.md` Objective / Exit Criteria / Backlog / Loop Log を更新します。
-- `goal_loop.py status` が `NEXT_ACTION=run_next_iteration` を返す場合は、次 iteration の plan / execution へ進みます。
-- Codex goals と `goal.md` が食い違う場合は、repo-owned `goal.md` を正本にして session goal view を修正してから実装へ戻ります。
+- user が goal-driven intent を示したが exact objective を渡していない場合は、parent が target-state-complete Objective を組み立てます。intake draft は read-only discovery として扱い、edit authorization は target-state-complete Objective と implementation handoff の固定後に開始します。
+- coordination、resumption、または選択された workflow が durable lifecycle evidence を要求する場合だけ run bundle を materialize し、work unit と iteration state は `schedule.md`、実行結果と next action は `work_log.md`、acceptance は validation evidence に記録します。
+- run bundle を選択しない task は semantic handoff または tool result で owner、replaceable unit、mechanism、validation route、unresolved branch を満たします。session goal の存在は write authorization、implementation readiness、closeout の追加 gate にしません。
+- user が goal-driven task を指定した場合、session goal と実装計画は同じ objective と acceptance criteria を参照します。durable evidence が必要な場合は、その work breakdown を run bundle の `schedule.md` へ直接記録します。
+- iteration の継続は `schedule.md` の open work、`work_log.md` の next action、未完了の validation evidence から判断します。session goal はその判断を表示できますが、repository state の正本にはしません。
 
 ### Token Observation And Adaptive Materialization
 

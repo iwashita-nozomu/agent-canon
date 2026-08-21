@@ -11,9 +11,9 @@ upstream design experiment-lifecycle.md managed experiment artifact boundary
 downstream design ./environment-maintenance.md consumes canonical Docker device and exact environment forwarding
 downstream implementation ../../tools/experiments/run_gpu_command.py provider-independent direct-command CLI
 downstream implementation ../../tools/experiments/run_managed_experiment.py optional managed provider adapter
-downstream implementation ../../tools/ci/run_gpu_container.sh Docker all-only injection adapter
+downstream implementation ../../tools/ci/run_gpu_container.sh single-entry Docker injection adapter with internal CDI/all selection
 downstream implementation ../../.agents/skills/gpu-execution/SKILL.md Codex discovery shim
-downstream implementation ../../tests/agent_tools/test_gpu_execution_docker_all_contract.py all-only Docker documentation regression contract
+downstream implementation ../../tests/agent_tools/test_gpu_execution_docker_all_contract.py single-entry Docker documentation regression contract
 upstream environment ../../agent-canon-environment.toml audited managed ExperimentRunner provider identity and runtime item
 @dependency-end
 -->
@@ -117,23 +117,32 @@ JAX は admitted child 内で初めて import します。`JAX_PLATFORMS=cuda` �
 
 ## Docker GPU wiring
 
-admitted child が Docker container を起動する経路は一つだけです。raw `docker run`や個別CDI
-分岐を作らず、常にrepository-owned shell adapterを使います。
+admitted child が Docker container を起動する public 経路は一つだけです。caller は
+`--gpus`、`--device`、CDI qualified device、runtime mode を選ばず、常に
+repository-owned shell adapter を同じ形で呼びます。
 
 ```text
 python3 tools/experiments/run_gpu_command.py \
   --gpu-count 1 --min-free-memory <bytes> -- \
   bash tools/ci/run_gpu_container.sh \
-    --image <canonical-image> --gpus all -- <argv...>
+    --image <canonical-image> -- <argv...>
 ```
 
-shell adapterは6変数の存在とCUDA/NVIDIA visibility一致を起動前に確認し、Docker argvへ
-`-e NAME=VALUE`として値ごと明示します。`--gpus`未指定、`all`以外、欠落env、相違visibilityは
-preflight failureです。
+shell adapter は6変数の存在、CUDA/NVIDIA visibility一致、full UUID/MIG identityを
+Docker起動前に確認します。その後、接続先Docker daemonが`docker info`の
+`DiscoveredDevices`として公開するCDI inventoryだけをread-onlyで観測します。client hostの
+CDI specや`nvidia-ctk`を別のauthorityにしません。
 
-`--gpus all`はinjectionだけを担当します。実際のcompute visibilityはadmissionがlockしたfull
-UUID/MIG listを`CUDA_VISIBLE_DEVICES`と`NVIDIA_VISIBLE_DEVICES`へ入れて制限します。integer
-index、UUID prefix、個別CDI、legacy runtime hook、runtime detector、cgroup bypassは使いません。
+selected identityの全てについてexact `nvidia.com/gpu=<full UUID/MIG>` がdaemon inventoryに
+存在する場合だけ、同じ順序の個別`--device`引数を構成します。exact mappingが一つでも欠ける、
+`nvidia.com/gpu=all`しかない、index名しかない、またはinventory fieldを読めない場合は、同じ
+entrypointの内部で既存の`--gpus all` injectionを選びます。UUIDをinteger indexへ推測変換せず、
+partial CDIとall injectionを混在させません。
+
+どちらのinjectionでも6個の値を同じ`docker run` argvへ`-e NAME=VALUE`として明示します。
+device injectionはcontainerへdevice/libraryを渡す機構、admitted environmentはlock済みcompute
+setへvisibilityを狭める機構として分離します。capability判定後のworkload `docker run`は一度だけ
+実行し、失敗後に別injection方式で再実行しません。
 
 JAX は host 側や既存 container state で先に import せず、上記 exact environment を受けた
 新規 container child 内で初めて import します。container 内で `jax.default_backend()` が
@@ -187,7 +196,7 @@ Docker 実機 smoke:
 python3 tools/experiments/run_gpu_command.py \
   --gpu-count 1 --min-free-memory 2147483648 -- \
   bash tools/ci/run_gpu_container.sh \
-    --image <canonical-image> --gpus all -- \
+    --image <canonical-image> -- \
     python3 -c 'import jax; assert jax.default_backend() == "gpu"; print(jax.devices())'
 ```
 
@@ -201,5 +210,6 @@ smoke は実機 GPU pass ではありません。
 ## Closeout
 
 closeout は選択した route、candidate/selected full UUID、plan/admission/environment fingerprint、
-`--gpus all` injection、start/end、raw exit、stdout/stderr hash、descendant quiescence、release
-evidence、targeted tests、managed regression、`gpu_validation_blocker` を参照します。
+内部選択した`individual-cdi`または`gpus-all` injection、選択理由、start/end、raw exit、
+stdout/stderr hash、descendant quiescence、release evidence、targeted tests、managed regression、
+`gpu_validation_blocker`を参照します。

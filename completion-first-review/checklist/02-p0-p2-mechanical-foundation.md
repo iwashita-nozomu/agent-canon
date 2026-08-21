@@ -129,17 +129,17 @@ This checklist starts only after P-1 has at least a draft Definition of Done and
 - Problem: MCP alternate route can become ad hoc shell work.
 - Acceptance: alternate route command is allowed by profile and evidence is recorded.
 
-### [ ] P2-003: goal loop controls completion
+### [ ] P2-003: iteration state controls completion
 
-- Target: `goal_loop.py`, closeout profile.
-- Problem: task can close while goal loop still says continue.
-- Acceptance: `NEXT_ACTION=run_next_iteration` fails self-growth completion.
+- Target: run-bundle schedule, work log, and closeout profile.
+- Problem: task can close while open work or a next action remains.
+- Acceptance: open `schedule.md` work or `work_log.md` next action fails self-growth completion.
 
-### [ ] P2-004: goal snapshot
+### [ ] P2-004: reviewable iteration evidence
 
 - Target: run bundle.
-- Problem: local or ignored `goal.md` is not reviewable.
-- Acceptance: goal-driven tasks include `goal_status.md` and `goal_work_breakdown.md` in the run bundle.
+- Problem: session-only progress is not reviewable after resumption.
+- Acceptance: durable goal-driven tasks record work units in `schedule.md` and iteration results in `work_log.md`.
 
 ### [ ] P2-005: MCP capability catalog
 

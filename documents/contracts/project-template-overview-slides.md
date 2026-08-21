@@ -63,8 +63,8 @@ downstream design ./README.md document index links this slide deck
 ## 6. Codex Runtime
 
 - `.codex/config.toml` is the repo-shared Codex config surface.
-- Hooks verify MCP inventory and goal-loop startup context.
-- `goal.md` is repo-local durable goal state.
+- Hooks verify selected runtime inventory and safety context.
+- Codex goal state remains session-local; durable progress uses run-bundle schedule, work log, and validation evidence when required.
 - Subagents are governed by runtime limits, explicit user permission, and run-bundle lifecycle policy.
 
 ## 7. Workflow Discipline
