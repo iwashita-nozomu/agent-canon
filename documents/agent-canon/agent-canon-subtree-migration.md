@@ -172,7 +172,7 @@ root 側は owner class ごとに薄い wrapper、symlink view、copy surface、
   - `documents/contracts/remote-execution-repo-contract.md`
   - `docker/README.md`, `scripts/README.md`, `documents/notes/README.md`, `.gitmodules`
 - Project-owned durable state:
-  - `goal.md`, project-specific notes, experiments, reports, and project-specific design docs
+  - project-specific notes, experiments, reports, and project-specific design docs
 
 重要:
 - `vendor/agent-canon/AGENTS.md` は standalone AgentCanon repo 用 entrypoint として扱い、template root runtime は root `AGENTS.md` symlink view から入ります

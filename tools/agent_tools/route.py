@@ -290,14 +290,6 @@ AREA_DATA: tuple[AreaData, ...] = (
         ),
     ),
     (
-        "goal",
-        "goal loop",
-        "Limit goal machinery to explicit goal-driven tasks.",
-        "route_goal_loop",
-        ("python3 tools/agent_tools/goal_loop.py status",),
-        ("goal_contract_router.py", "goal-lite"),
-    ),
-    (
         "runtime",
         "runtime capability",
         "Hide Codex or CLI examples when unavailable.",

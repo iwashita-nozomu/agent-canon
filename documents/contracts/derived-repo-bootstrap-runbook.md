@@ -38,7 +38,7 @@ AgentCanon-owned active root surfaces are sourced from `vendor/agent-canon/`:
 `AGENTS.md`, `.codex/config.toml`, and `tools/agent-canon`; optional transaction
 state may live under `.agent-canon/`. `.agents/`, `agents/`, `.codex/agents/`,
 `.devcontainer/`, `.vscode/`, GitHub paths, project implementation, experiments,
-reports, scripts, runtime data, and `goal.md` remain parent-owned regular content.
+reports, scripts, and runtime data remain parent-owned regular content.
 
 ## Failure Triage
 

@@ -116,7 +116,6 @@ paths = [
   "docker/**",
   "documents/**",
   "examples/**",
-  "goal.md",
   "pyproject.toml",
   "pyrightconfig.json",
   "python/**",

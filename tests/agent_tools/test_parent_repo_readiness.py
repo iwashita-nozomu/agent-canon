@@ -676,7 +676,6 @@ class ParentRepoReadinessTest(unittest.TestCase):
             "QUICK_START.md": "quick start\n",
             "Makefile": "ci:\n\t@true\n",
             ".gitmodules": '[submodule "vendor/agent-canon"]\n\tpath = vendor/agent-canon\n\turl = https://github.com/iwashita-nozomu/agent-canon.git\n',
-            "goal.md": "goal\n",
             "documents/README.md": "documents\n",
             "responsibility-scope.toml": 'catalog_kind = "agent_canon_responsibility_scope"\n',
             ".agent-canon/update-state.toml": 'tasks_applied_through = "fixture"\n',

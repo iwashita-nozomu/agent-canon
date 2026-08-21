@@ -1946,24 +1946,6 @@ entries:
     tests:
       - tests/agent_tools/test_tool_rejection_preflight.py
 
-  - id: goal-loop
-    summary: Manages goal.md exit criteria, backlog, and loop status.
-    path: tools/agent_tools/goal_loop.py
-    family: agent_tools
-    role: workflow
-    status: canonical
-    command: python3 tools/agent_tools/goal_loop.py
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/workflows/codex-goals-workflow.md
-    tests:
-      - tests/agent_tools/test_goal_loop.py
-
   - id: bootstrap-agent-run
     summary: Bootstraps a staged agent run bundle from a task request.
     path: tools/agent_tools/bootstrap_agent_run.py
