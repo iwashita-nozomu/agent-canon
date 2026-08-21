@@ -226,6 +226,10 @@ skill_dependencies:
     required_prerequisites: []
     routing_candidates:
     - agent-log-analysis
+    - dependency-analysis
+    - responsibility-cleanup
+    - subagent-bootstrap
+    - pr-processing
     - result-artifact-writeout
     - report-writing
     successors: []
