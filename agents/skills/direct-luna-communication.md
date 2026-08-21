@@ -1,4 +1,16 @@
 # Direct Luna Communication
+<!--
+@dependency-start
+contract skill
+responsibility Owns bounded packet exchange and effective-runtime acknowledgement for direct Luna subagents.
+upstream design ./agent-orchestration.md selects the logical role, Skill set, execution profile, and authority.
+upstream design ./subagent-bootstrap.md owns launch readiness and lifecycle handoff.
+upstream design ../canonical/CODEX_SUBAGENTS.md owns capacity and logical-role lifecycle policy.
+downstream implementation ../../tools/agent_tools/direct_luna_dispatch.py validates packets and runtime evidence.
+downstream implementation ../../tests/tools/test_direct_luna_dispatch.py validates packet and readback invariants.
+downstream implementation ../../tests/tools/test_direct_luna_topology.py validates profile-level topology.
+@dependency-end
+-->
 
 ## Purpose
 

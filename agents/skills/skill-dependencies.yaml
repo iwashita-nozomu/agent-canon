@@ -17,11 +17,13 @@ skill_dependencies:
     - task-routing
     - codex-task-workflow
     - subagent-bootstrap
+    - direct-luna-communication
     - dependency-analysis
     successors:
     - task-routing
     - codex-task-workflow
     - subagent-bootstrap
+    - direct-luna-communication
     - dependency-analysis
     order_constraints:
     - before: agent-orchestration
@@ -94,11 +96,23 @@ skill_dependencies:
     - agent-orchestration
     - codex-task-workflow
     - result-artifact-writeout
-    successors: []
+    successors:
+    - direct-luna-communication
     order_constraints: []
     parallel_independent:
     - result-artifact-writeout
     - runtime-log-repair
+  direct-luna-communication:
+    responsibility_group: orchestration
+    required_prerequisites:
+    - agent-orchestration
+    - subagent-bootstrap
+    routing_candidates:
+    - agent-orchestration
+    - subagent-bootstrap
+    successors: []
+    order_constraints: []
+    parallel_independent: []
   change-review:
     responsibility_group: review
     required_prerequisites: []

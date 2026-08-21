@@ -7,6 +7,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../COMMUNICATION_PROTOCOL.md defines pre-edit tool rejection handoff fields
 upstream design ../internal-routines/subagent-startup.md owns the canonical private subagent startup route
 upstream design ../internal-routines/design-implementation-correspondence.md clause fingerprint and implementation handoff correspondence route
+upstream design ./direct-luna-communication.md direct Luna packet exchange and acknowledgement
 @dependency-end
 -->
 
@@ -54,6 +55,7 @@ config policy の第二の正本にはしません。
 - `agents/TASK_WORKFLOWS.md`
 - `agents/COMMUNICATION_PROTOCOL.md`
 - `agents/canonical/CODEX_SUBAGENTS.md`
+- `agents/skills/direct-luna-communication.md`
 - `agents/internal-routines/subagent-startup.md`
 - `tools/agent_tools/bootstrap_agent_run.py`
 
@@ -260,6 +262,9 @@ The runtime discovery adapter delegates these required operating clauses to this
 
 1. Read `agents/skills/subagent-bootstrap.md`.
 1. Read `agents/canonical/CODEX_SUBAGENTS.md`.
+1. Read `agents/skills/direct-luna-communication.md` when the selected execution
+   profile is Luna, and require its effective model / effort readback before
+   admitting work.
 1. Read `agents/internal-routines/subagent-startup.md` before preparing
    subagent-only startup or internal skill route handoffs. The canonical private
    startup route is `agents/internal-routines/subagent-startup.md`; historical
@@ -295,7 +300,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    Review and edit handoffs include `team_manifest.yaml`
    `run.default_quality_check_policy`.
 1. Require `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker`; `worker` is the default. Select `spark_worker` only when the parent packet supplies `--select-agent-type implementer=spark_worker:<evidence>`, and require the selection in `SUBAGENT_AGENT_TYPE_SELECTIONS` and `team_manifest.yaml`.
-1. Read the corresponding `.codex/agents/<role>.toml` before choosing model / reasoning for a spawned role.
+1. Resolve logical role, selected Skills, execution profile, and authority as separate fields. When the selected profile is Luna, use `$direct-luna-communication` with a direct `gpt-5.6-luna` override and do not require or select a role-specific physical alias. Read `.codex/agents/<role>.toml` only when a capability-specific or compatibility route explicitly selects that executable view.
 1. Before assigning read-only exploration, run the canonical checker, router, semantic index, or dashboard when one owns the question. Use subagents to interpret ambiguous structured tool artifacts or independently review non-tool-covered judgment, not to repeat deterministic tool checks by reading the same documents.
 1. For repo inventory, tool drift survey, machine-report summarization, and experiment/log execution, use the ordinary `gpt-5.6-luna/high` roles when they are independent verification or bounded execution that does not delay the implementation critical path. Reserve `gpt-5.4-mini/medium` for the fresh, read-only, artifact-only `skill_evaluator` in explicit T14 `skill_evaluation`; it is absent from permanent team roles.
 1. For static validation triage, diff-local Python / C++ review, bounded review, report traceability, and checklist-style review gates, select one accountable `gpt-5.6-luna/high` review role for the active decision; use `gpt-5.6-luna/xhigh` only for `ship_reviewer` findings.

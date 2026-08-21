@@ -243,6 +243,28 @@ skill_families:
         - ["サブエージェント"]
         - ["subagent"]
         - ["multi-agent"]
+  - id: direct-luna-communication
+    purpose: Exchange a bounded typed packet with a directly selected Luna subagent and verify its effective runtime identity.
+    canonical_doc: agents/skills/direct-luna-communication.md
+    shim: .agents/skills/direct-luna-communication/SKILL.md
+    discovery:
+      name: direct-luna-communication
+      description: "Use after orchestration selects a Luna execution profile and needs bounded context, explicit authority, effective model/effort readback, and typed handback without a role-specific physical alias."
+    tool_commands:
+      required: []
+      conditional: []
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: deferred
+      reason: logical role, Skill set, Luna profile, and authority must be selected before direct communication
+      triggers:
+        - ["direct luna"]
+        - ["gpt-5.6-luna", "subagent"]
+        - ["luna", "fork_turns"]
+        - ["luna", "effective model"]
+        - ["luna", "model override"]
   - id: change-review
     purpose: Review diffs for regressions, missing validation, and stale docs.
     canonical_doc: agents/skills/change-review.md
