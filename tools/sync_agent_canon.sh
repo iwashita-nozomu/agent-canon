@@ -10,6 +10,7 @@
 # upstream implementation ./agent_tools/surface_manifest.py renders projection and update-transition specs
 # downstream implementation ../tests/tools/test_update_agent_canon.py verifies sync/update behavior
 # downstream implementation ../tests/tools/test_update_agent_canon_surface_migration.py verifies bounded migration
+# downstream implementation ../tests/tools/test_sync_agent_canon_applied_identity.py verifies applied receipt identity
 # @dependency-end
 set -euo pipefail
 export GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"
@@ -1511,6 +1512,78 @@ submodule_remote_branch_for_head() {
   done < <(git -C "$ROOT_DIR/$PREFIX" ls-remote --heads origin 2>/dev/null || true)
 
   return 1
+}
+
+submodule_applied_identity() {
+  local requested_branch="$1"
+  local requested_remote="$2"
+  local expected_sha="$3"
+  local applied_branch=""
+  local configured_remote=""
+  local configured_merge=""
+  local configured_branch=""
+  local applied_remote_branch=""
+  local applied_upstream=""
+  local applied_head=""
+  local applied_upstream_sha=""
+
+  applied_branch="$(
+    git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true
+  )"
+  if [ -z "$applied_branch" ]; then
+    echo "agent_canon_latest_submodule_applied_identity_error=detached_head" >&2
+    return 1
+  fi
+  configured_remote="$(
+    git -C "$ROOT_DIR/$PREFIX" config --get "branch.$applied_branch.remote" 2>/dev/null || true
+  )"
+  configured_merge="$(
+    git -C "$ROOT_DIR/$PREFIX" config --get "branch.$applied_branch.merge" 2>/dev/null || true
+  )"
+  case "$configured_merge" in
+    refs/heads/*) configured_branch="${configured_merge#refs/heads/}" ;;
+  esac
+  applied_remote_branch="$configured_remote/$configured_branch"
+  applied_upstream="$(
+    git -C "$ROOT_DIR/$PREFIX" for-each-ref --format='%(upstream:short)' \
+      "refs/heads/$applied_branch" 2>/dev/null || true
+  )"
+  applied_head="$(
+    git -C "$ROOT_DIR/$PREFIX" rev-parse --verify "HEAD^{commit}" 2>/dev/null || true
+  )"
+  applied_upstream_sha="$(
+    git -C "$ROOT_DIR/$PREFIX" rev-parse --verify "$applied_upstream^{commit}" 2>/dev/null || true
+  )"
+
+  if [ "$applied_branch" != "$requested_branch" ] \
+    || [ "$configured_remote" != "$requested_remote" ] \
+    || [ "$configured_branch" != "$requested_branch" ] \
+    || [ "$applied_upstream" != "$requested_remote/$requested_branch" ] \
+    || [ "$applied_head" != "$expected_sha" ] \
+    || [ "$applied_upstream_sha" != "$expected_sha" ]; then
+    echo "agent_canon_latest_submodule_applied_identity_error=readback_mismatch" >&2
+    printf 'agent_canon_latest_submodule_applied_identity_expected_remote_branch=%q\n' \
+      "$requested_remote/$requested_branch" >&2
+    printf 'agent_canon_latest_submodule_applied_identity_expected_sha=%q\n' \
+      "$expected_sha" >&2
+    printf 'agent_canon_latest_submodule_applied_identity_branch=%q\n' \
+      "$applied_branch" >&2
+    printf 'agent_canon_latest_submodule_applied_identity_remote=%q\n' \
+      "${configured_remote:-<unset>}" >&2
+    printf 'agent_canon_latest_submodule_applied_identity_merge=%q\n' \
+      "${configured_merge:-<unset>}" >&2
+    printf 'agent_canon_latest_submodule_applied_identity_upstream=%q\n' \
+      "${applied_upstream:-<unset>}" >&2
+    printf 'agent_canon_latest_submodule_applied_identity_head=%q\n' \
+      "${applied_head:-<unavailable>}" >&2
+    printf 'agent_canon_latest_submodule_applied_identity_upstream_sha=%q\n' \
+      "${applied_upstream_sha:-<unavailable>}" >&2
+    return 1
+  fi
+
+  printf '%s\t%s\t%s\t%s\t%s\n' \
+    "$applied_branch" "$applied_remote_branch" "$applied_upstream" \
+    "$applied_head" "$applied_upstream_sha"
 }
 
 build_link_specs() {
@@ -3025,7 +3098,8 @@ cmd_ensure_latest() {
     local staged_pin="" stage0_rc=0 main_ref_state="" main_collision_path=""
     local materialization_result_tree=""
     local index_entry="" staged_mode="" staged_sha="" staged_stage="" staged_path=""
-    local applied_head="" applied_status=""
+    local applied_identity="" applied_branch="" applied_remote_branch=""
+    local applied_upstream="" applied_head="" applied_upstream_sha="" applied_status=""
     local update_state="" materialization_rc=0
     local materialization_result_tree_rc=0 materialization_collision_rc=0
 
@@ -3072,7 +3146,6 @@ cmd_ensure_latest() {
       current_branch="main"
       worktree_commit="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
     fi
-    submodule_remote_branch="$(submodule_remote_branch_for_head "$worktree_commit" || true)"
     remote_sha="$(require_remote_branch_sha "$remote_url" "$branch")"
     git -C "$ROOT_DIR/$PREFIX" fetch --no-write-fetch-head origin \
       "refs/heads/$branch:refs/remotes/origin/$branch" >/dev/null
@@ -3089,13 +3162,8 @@ cmd_ensure_latest() {
     echo "agent_canon_latest_submodule_local_state_checked=yes"
     echo "agent_canon_latest_submodule_local_state_source=$PREFIX"
     echo "agent_canon_latest_submodule_worktree_status=$([ -n "$submodule_status" ] && echo dirty || echo clean)"
-    echo "agent_canon_latest_branch=$current_branch"
-    echo "agent_canon_latest_submodule_branch=$current_branch"
     echo "agent_canon_latest_submodule_history_state=$history_state"
     echo "agent_canon_latest_acceptance_predicate=materialization_merge_conflict_or_unpreservable_materialization_collision"
-    if [ -n "$submodule_remote_branch" ]; then
-      echo "agent_canon_latest_remote_branch=origin/$submodule_remote_branch"
-    fi
     echo "agent_canon_local_submodule=$local_commit"
     echo "agent_canon_worktree_submodule=$worktree_commit"
     echo "agent_canon_remote=$remote_sha"
@@ -3143,6 +3211,7 @@ cmd_ensure_latest() {
       ensure_surface_sync_safe
     fi
     if [ "$update_state" = "deferred_branch_pr" ]; then
+      submodule_remote_branch="$(submodule_remote_branch_for_head "$worktree_commit" || true)"
       materialize_submodule_remote_branch \
         "$worktree_commit" "$remote_sha" "$branch" "$materialization_result_tree" \
         || materialization_rc=$?
@@ -3150,6 +3219,11 @@ cmd_ensure_latest() {
       applied_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
       applied_status="$(git -C "$ROOT_DIR/$PREFIX" status --porcelain=v1 --untracked-files=all)"
       echo "agent_canon_latest=deferred_branch_pr"
+      echo "agent_canon_latest_branch=$current_branch"
+      echo "agent_canon_latest_submodule_branch=$current_branch"
+      if [ -n "$submodule_remote_branch" ]; then
+        echo "agent_canon_latest_remote_branch=origin/$submodule_remote_branch"
+      fi
       echo "agent_canon_latest_submodule_applied_head=$applied_head"
       echo "agent_canon_latest_submodule_applied_upstream=origin/$branch"
       echo "agent_canon_latest_submodule_applied_status=$([ -n "$applied_status" ] && echo dirty_preserved || echo clean)"
@@ -3160,6 +3234,11 @@ cmd_ensure_latest() {
       "$worktree_commit" "$remote_sha" "$branch" "$materialization_result_tree" \
       || materialization_rc=$?
     [ "$materialization_rc" -eq 0 ] || return "$materialization_rc"
+    applied_identity="$(
+      submodule_applied_identity "$branch" origin "$remote_sha"
+    )" || die "submodule '$PREFIX' applied identity readback did not match requested origin/$branch"
+    IFS="$(printf '\t')" read -r applied_branch applied_remote_branch applied_upstream \
+      applied_head applied_upstream_sha <<<"$applied_identity"
     git -C "$ROOT_DIR" add -A -- "$PREFIX"
     index_entry="$(git -C "$ROOT_DIR" ls-files --stage -- "$PREFIX")"
     read -r staged_mode staged_sha staged_stage staged_path <<<"$index_entry"
@@ -3168,22 +3247,20 @@ cmd_ensure_latest() {
       || [ "$staged_path" != "$PREFIX" ]; then
       die "submodule '$PREFIX' update did not produce the expected stage-0 gitlink"
     fi
-    applied_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
     applied_status="$(git -C "$ROOT_DIR/$PREFIX" status --porcelain=v1 --untracked-files=all)"
     [ "$applied_head" = "$staged_sha" ] \
       || die "submodule '$PREFIX' staged-pin readback failed"
     echo "agent_canon_latest=$update_state"
+    echo "agent_canon_latest_branch=$applied_branch"
+    echo "agent_canon_latest_submodule_branch=$applied_branch"
+    echo "agent_canon_latest_remote_branch=$applied_remote_branch"
     echo "agent_canon_latest_submodule_origin_main=$origin_sha"
-    if [ -n "$submodule_remote_branch" ]; then
-      echo "agent_canon_latest_submodule_applied_branch=$submodule_remote_branch"
-      echo "agent_canon_latest_submodule_applied_remote_branch=origin/$submodule_remote_branch"
-    else
-      echo "agent_canon_latest_submodule_applied_branch=$branch"
-      echo "agent_canon_latest_submodule_applied_remote_branch=origin/$branch"
-    fi
+    echo "agent_canon_latest_submodule_applied_branch=$applied_branch"
+    echo "agent_canon_latest_submodule_applied_remote_branch=$applied_remote_branch"
     echo "agent_canon_latest_submodule_applied_head=$applied_head"
     echo "agent_canon_latest_submodule_staged_pin=$staged_sha"
-    echo "agent_canon_latest_submodule_applied_upstream=origin/${submodule_remote_branch:-$branch}"
+    echo "agent_canon_latest_submodule_applied_upstream=$applied_upstream"
+    echo "agent_canon_latest_submodule_applied_upstream_sha=$applied_upstream_sha"
     echo "agent_canon_latest_submodule_applied_status=$([ -n "$applied_status" ] && echo dirty_preserved || echo clean)"
 
     if [ "$update_state" = "already_current_submodule" ]; then
