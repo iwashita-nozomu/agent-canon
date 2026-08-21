@@ -99,8 +99,10 @@ CIで同じimageとtest commandを再利用できる状態にします。
   canonical routeへ昇格させません。
 - GPU imageはdeviceなしでbuild可能にします。GPU backend/deviceを必要とする標準テストは、
   GPU runner上で`gpu-execution`のadmission後に同じimageを
-  `run_gpu_container.sh --gpus all`で起動し、
-  同skillが固定したfull UUID visibilityと6個のexact environment値を同じrun argvへ渡します。
+  `run_gpu_container.sh --image <image> -- <command...>`で起動します。callerはinjection方式を
+  選ばず、同skillのwrapperがDocker daemonのexact CDI inventoryから個別CDIまたは
+  `--gpus all`を内部選択し、full UUID visibilityと6個のexact environment値を同じrun argvへ
+  渡します。
 - Dockerfile、Dev Container、Compose、CI、READMEのimage targetとcommandを同じ変更でそろえます。
 - 既存のrunning Dev Container内でcommandが通ることをenvironment acceptanceにしません。
   previous mutable stateを排除したimage build/runがacceptance ownerです。

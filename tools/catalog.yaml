@@ -1164,14 +1164,14 @@ entries:
       - tests/tools/test_container_config.py
 
   - id: run-gpu-container
-    summary: Runs an admitted GPU container through the sole Docker --gpus all route with exact environment values.
+    summary: Runs an admitted GPU container through one entrypoint and internally selects exact CDI or --gpus all injection.
     path: tools/ci/run_gpu_container.sh
     family: ci
     role: runner
     status: canonical
     audience: skill
     placement: skill_helper
-    command: bash tools/ci/run_gpu_container.sh --image <image> --gpus all -- <argv...>
+    command: bash tools/ci/run_gpu_container.sh --image <image> -- <argv...>
     writes: true
     default_wiring:
       ci: false
