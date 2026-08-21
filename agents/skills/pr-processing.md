@@ -62,6 +62,24 @@ Code/doc repair remains owned by the changed surface. This skill consumes the re
 
 Before merge/ready/close/update, read fresh remote state and confirm authority. After the write, read back the PR/issue state. These write controls apply in both single and queue modes.
 
+## Repository-qualified Issue identity
+
+Before reading, writing, linking, deferring, or reporting an Issue, resolve the
+Issue repository and number from fresh remote state. The canonical textual
+identity is `owner/repository#number`.
+
+- Use the repository-qualified identity in agent-produced progress updates,
+  handoff packets, Issue/PR comments and bodies, status reports, closeout, and
+  durable evidence. Do not emit a bare `#number` as the Issue identity.
+- Record `issue_repository`, `issue_number`, and `issue_ref`; when a remote
+  Issue exists, also record its `issue_url`. A URL may accompany the qualified
+  identity but does not replace these typed fields.
+- In cross-repository work, keep `consumer_issue_ref` and
+  `upstream_issue_ref` separate. Do not infer either repository from the
+  current checkout, a nearby PR number, or the last Issue mentioned in chat.
+- Confirm that the Issue number exists in the named repository before a write.
+  Use the same qualified identity in the post-write readback.
+
 ## GitHub Issue status lifecycle delegation
 
 When an explicit request or repository policy requires status label mutation on a linked Issue, invoke the private `_github-status-lifecycle` runtime skill inside this publication boundary.
