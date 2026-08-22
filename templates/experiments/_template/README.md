@@ -12,10 +12,11 @@ downstream implementation ../../../tools/experiments/create_experiment_topic.py 
 
 # <Experiment topic>
 
-この文書は、実験の問い、仮説、比較対象、受入条件、資源選定、結果 provenance を一つの
-topic contract に固定します。実験コードの共通 scaffold はこの directory の `run.py`、
-`cases.py`、`visualization.py` を利用し、topic 固有の algorithm と renderer はこの topic 内で
-実装します。
+この文書は、実験の問い、仮説、比較対象、topic 固有の評価・観測、資源選定、結果 provenance を一つの
+topic record に整理します。評価指標、比較方法、研究上の成功判断は topic / research owner が定義し、
+共通 scaffold は run identity、artifact path、terminal / failure state、provenance / readback の運用だけを
+提供します。実験コードの共通 scaffold はこの directory の `run.py`、`cases.py`、
+`visualization.py` を利用し、topic 固有の algorithm と renderer はこの topic 内で実装します。
 
 ## Reader Map
 
@@ -27,7 +28,7 @@ topic contract に固定します。実験コードの共通 scaffold はこの 
 - `run.py`: managed runner の入口、case 集約、schema、atomic publication、manifest readback。
 - `cases.py`: `CaseSpec`、`CaseResult`、case registry、worker、failure classification。
 - `visualization.py`: 可視化 status と topic 固有 renderer の唯一の拡張点。既定では notebook を生成しない。
-- `config.yaml`: completion gate と実験設定。
+- `config.yaml`: topic 固有の実験設定。
 - `report/`: 人間向けの report 出力領域。
 - `result/`: run ごとの機械生成結果領域。大規模な保持物は契約に従って annex へ移送する。
 
@@ -74,13 +75,19 @@ fallback を作成しません。case worker へ渡す出力先は `EXPERIMENT_R
 解決した `raw/` です。summary の各 file は atomic replacement と readback digest を通して
 公開します。
 
-## 完了条件
+## 評価と lifecycle の境界
 
-- `config.yaml` と `provenance.toml` の completion gate が完全に解決している。
-- `cases.py` の全 case が terminal state (`success`、`failed`、`blocked`) を持つ。
-- success は non-empty observation、zero exit status、summary/manifest の readback を持つ。
-- failed/blocked/incomplete は failure class、evidence、close condition を保持する。
-- 実行前に比較対象、metric、stopping rule、必要十分な oracle、resource の根拠を固定する。
+- metric、比較対象、observation、stopping rule、研究上の成功判断は topic / research owner が
+  必要な範囲で `README.md`、`provenance.toml`、`config.yaml` に定義する。
+- `success`、`failed`、`blocked`、`incomplete` は実行の terminal / failure state であり、
+  研究上の結論を表さない。
+- exit status と artifact readback は実行・証跡の observation として記録し、それだけから
+  研究上の成功を判定しない。
+- 共通 lifecycle は run identity、`result/<run-id>/raw/` / `summary/` の path、
+  source/config/environment provenance、実在する artifact の role/checksum/readback、
+  failure evidence を記録する。
+- artifact は選択した producer / protocol が生成すると宣言したものだけを要求し、producer が
+  宣言していない observation、metric、filename を全 topic に課さない。
 
 ## 可視化
 
