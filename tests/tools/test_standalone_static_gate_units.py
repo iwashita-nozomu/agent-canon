@@ -4,7 +4,7 @@
 # upstream implementation ../../tools/agent_tools/classify_path_risk.py canonical selector and unit mapping
 # upstream implementation ../../tools/ci/run_standalone_static_gate_unit.sh unit executor
 # upstream implementation ../../tools/ci/check_agent_canon_pr.sh manual full-confidence aggregate
-# upstream implementation ../../.github/workflows/agent-canon-static-gates.yml remote selected-unit jobs
+# upstream implementation ../../.github/workflows/agent-canon-static-gates.yml remote selected-unit shared runtime
 # @dependency-end
 
 from __future__ import annotations
