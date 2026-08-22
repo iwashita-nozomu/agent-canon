@@ -14,20 +14,28 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
-import os
 import re
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import cast
+from typing import IO, cast
 
 if __package__:
-    from .workspace_scope import resolve_report_root, schedule_wave_row
+    from .workspace_scope import (
+        resolve_report_root,
+        resolve_runtime_artifact_path,
+        schedule_wave_row,
+    )
 else:
-    from workspace_scope import resolve_report_root, schedule_wave_row
+    from workspace_scope import (  # type: ignore[no-redef]
+        resolve_report_root,
+        resolve_runtime_artifact_path,
+        schedule_wave_row,
+    )
 from mid_task_user_input_policy import (
     MID_TASK_CLASSIFICATION_ACTIONS,
     MID_TASK_CLASSIFICATION_SCOPE_STATUS,
@@ -43,25 +51,6 @@ from mid_task_user_input_policy import (
 from update_lifecycle_contract import TRANSACTION_STATES
 from work_log import MONITOR_PASSTHROUGH_FIELDS, append_ledger_event
 
-try:
-    from .parent_root_side_effects import (
-        ParentOwnedFileHandle,
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
-    )
-except ImportError:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentOwnedFileHandle,
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
-    )
-
 DECISION_KEYS = (
     "skill_improvement_decision",
     "config_improvement_decision",
@@ -71,24 +60,9 @@ DECISION_KEYS = (
 DECISION_VALUES = {"applied", "recorded", "not_applicable", "pending"}
 
 
-def _parent_path(path: Path, purpose: str, *, create: bool) -> Path:
-    """Authenticate a monitoring path before any lock or file mutation."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            f"{purpose}: explicit parent root is required",
-        )
-    parent = Path(configured)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
-    )
-    boundary = ParentRootSideEffectBoundary()
-    if create:
-        boundary.ensure_parent_owned_directory(attestation, path.parent, purpose)
-    return boundary.resolve_parent_owned_path(
-        attestation, path, purpose, create=False
-    ).physical_path
+def _runtime_path(path: Path, runtime_root: Path | str | None = None) -> Path:
+    """Resolve one monitoring artifact through the external runtime boundary."""
+    return resolve_runtime_artifact_path(path, runtime_root=runtime_root)
 TOOL_WARNING_REQUIRED_KEYS = (
     "warning_id",
     "source_tool",
@@ -319,49 +293,36 @@ MONITORING_LEGACY_KEYS = {
 
 
 @contextmanager
-def locked_monitoring_artifact(path: Path) -> Iterator[ParentOwnedFileHandle]:
-    """Hold an exclusive lock while updating the monitoring artifact."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            "workflow-monitoring: explicit parent root is required",
-        )
-    parent = Path(configured)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(
-            cwd=parent, explicit_root=parent, purpose="workflow-monitoring"
-        )
-    )
-    boundary = ParentRootSideEffectBoundary()
-    with boundary.open_parent_owned_file(
-        attestation, path, "workflow-monitoring", create=True, mode="a+"
-    ) as handle:
-        handle.seek(0)
-        yield handle
+def locked_monitoring_artifact(
+    path: Path,
+    runtime_root: Path | str | None = None,
+) -> Iterator[IO[str]]:
+    """Hold an exclusive lock while updating an external monitoring artifact."""
+    target = _runtime_path(path, runtime_root)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("a+", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            handle.seek(0)
+            yield handle
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 @contextmanager
-def locked_existing_artifact(path: Path) -> Iterator[ParentOwnedFileHandle]:
+def locked_existing_artifact(
+    path: Path,
+    runtime_root: Path | str | None = None,
+) -> Iterator[IO[str]]:
     """Hold an exclusive lock while updating an existing artifact."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            "workflow-monitoring: explicit parent root is required",
-        )
-    parent = Path(configured)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(
-            cwd=parent, explicit_root=parent, purpose="workflow-monitoring"
-        )
-    )
-    boundary = ParentRootSideEffectBoundary()
-    with boundary.open_parent_owned_file(
-        attestation, path, "workflow-monitoring", create=False, mode="r+"
-    ) as handle:
-        handle.seek(0)
-        yield handle
+    target = _runtime_path(path, runtime_root)
+    with target.open("r+", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            handle.seek(0)
+            yield handle
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -371,10 +332,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     target = parser.add_mutually_exclusive_group(required=True)
     target.add_argument("--report-dir", help="Explicit run bundle directory.")
-    target.add_argument("--run-id", help="Run id under reports/agents/.")
+    target.add_argument("--run-id", help="Run id under the external reports/agents root.")
     parser.add_argument(
         "--report-root",
-        help="Optional report root. Defaults to <workspace-root>/reports/agents.",
+        help="Optional external report root. Defaults below --runtime-root.",
+    )
+    parser.add_argument(
+        "--runtime-root",
+        help="Explicit external runtime root; defaults to AGENT_CANON_RUNTIME_ROOT.",
     )
     parser.add_argument(
         "--workspace-root",
@@ -568,9 +533,15 @@ def resolve_report_dir(args: argparse.Namespace) -> Path:
     """Resolve the target run bundle directory."""
     workspace_root = Path(str(args.workspace_root)).resolve()
     if args.report_dir:
-        return Path(str(args.report_dir)).resolve()
-    # The configured parent is a write boundary, not a report-root override.
-    return (resolve_report_root(args.report_root, workspace_root) / str(args.run_id)).resolve()
+        return _runtime_path(Path(str(args.report_dir)).resolve(), args.runtime_root)
+    return (
+        resolve_report_root(
+            args.report_root,
+            workspace_root,
+            runtime_root=args.runtime_root,
+        )
+        / str(args.run_id)
+    ).resolve()
 
 
 def timestamp_prefix(timestamp: str) -> str:
@@ -1022,12 +993,13 @@ def mid_task_behavior_event(row: dict[str, str]) -> str:
 def append_mid_task_schedule_rows(
     report_dir: Path,
     rows: tuple[dict[str, str], ...],
+    runtime_root: Path | str | None = None,
 ) -> None:
     """Append mid-task user input rows to schedule.md."""
     if not rows:
         return
     schedule_path = report_dir / "schedule.md"
-    with locked_existing_artifact(schedule_path) as handle:
+    with locked_existing_artifact(schedule_path, runtime_root) as handle:
         lines = handle.read().splitlines()
         insert_entries(
             lines,
@@ -1056,6 +1028,7 @@ def markdown_wave_id(line: str) -> str:
 def upsert_subagent_wave_schedule_rows(
     report_dir: Path,
     rows: tuple[dict[str, str], ...],
+    runtime_root: Path | str | None = None,
 ) -> None:
     """Insert or replace actual subagent wave rows in schedule.md."""
     if not rows:
@@ -1063,7 +1036,7 @@ def upsert_subagent_wave_schedule_rows(
     schedule_path = report_dir / "schedule.md"
     desired = {row["wave_id"]: schedule_wave_row(row) for row in rows}
     replaced: set[str] = set()
-    with locked_existing_artifact(schedule_path) as handle:
+    with locked_existing_artifact(schedule_path, runtime_root) as handle:
         lines = handle.read().splitlines()
         ensure_section(lines, "## Agent Wave Ledger")
         start, end = section_bounds(lines, "## Agent Wave Ledger")
@@ -1348,10 +1321,11 @@ def append_wave_schedule_rows(
     report_dir: Path,
     mid_task_rows: tuple[dict[str, str], ...],
     subagent_wave_rows: tuple[dict[str, str], ...],
+    runtime_root: Path | str | None = None,
 ) -> None:
     """Update schedule.md with every monitor-owned wave row."""
-    append_mid_task_schedule_rows(report_dir, mid_task_rows)
-    upsert_subagent_wave_schedule_rows(report_dir, subagent_wave_rows)
+    append_mid_task_schedule_rows(report_dir, mid_task_rows, runtime_root)
+    upsert_subagent_wave_schedule_rows(report_dir, subagent_wave_rows, runtime_root)
 
 
 def lifecycle_monitoring_record(
@@ -1467,20 +1441,31 @@ def append_monitoring_sections(
 def append_monitoring(
     report_dir: Path,
     entries: MonitoringEntries = EMPTY_MONITORING_ENTRIES,
+    *,
+    runtime_root: Path | str | None = None,
     **legacy_entries: object,
 ) -> Path:
     """Append monitoring evidence and return the artifact path."""
     active_entries = entries_from_legacy(legacy_entries) if legacy_entries else entries
-    _parent_path(report_dir / "workflow_monitoring.md", "workflow-monitoring", create=True)
+    _runtime_path(report_dir / "workflow_monitoring.md", runtime_root).parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
     for semantic_event in active_entries.semantic_events:
         append_ledger_event(
             report_dir,
             semantic_event_record(semantic_event, report_dir),
+            runtime_root=runtime_root,
         )
     mid_task_rows, subagent_wave_rows = normalized_wave_rows(active_entries)
-    append_wave_schedule_rows(report_dir, mid_task_rows, subagent_wave_rows)
-    path = report_dir / "workflow_monitoring.md"
-    with locked_monitoring_artifact(path) as handle:
+    append_wave_schedule_rows(
+        report_dir,
+        mid_task_rows,
+        subagent_wave_rows,
+        runtime_root,
+    )
+    path = _runtime_path(report_dir / "workflow_monitoring.md", runtime_root)
+    with locked_monitoring_artifact(path, runtime_root) as handle:
         text = handle.read()
         if not text.strip():
             text = default_monitoring_text(report_dir)
@@ -1497,13 +1482,18 @@ def append_monitoring(
     return path
 
 
-def emit_behavior_projection(report_dir: Path, event: dict[str, object]) -> MonitorProjectionResult:
+def emit_behavior_projection(
+    report_dir: Path,
+    event: dict[str, object],
+    runtime_root: Path | str | None = None,
+) -> MonitorProjectionResult:
     """Project one already-assembled event without writing the canonical JSONL artifact."""
     try:
         encoded = json.dumps(event, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
         path = append_monitoring(
             report_dir,
             MonitoringEntries(behavior_events=(f"behavior_event_json={encoded}",)),
+            runtime_root=runtime_root,
         )
         return MonitorProjectionResult("spooled", path)
     except Exception as exc:
@@ -1534,6 +1524,7 @@ def main() -> int:
             decisions=decisions,
             timestamp=str(args.timestamp),
         ),
+        runtime_root=args.runtime_root,
     )
     print(f"WORKFLOW_MONITORING={path}")
     return 0

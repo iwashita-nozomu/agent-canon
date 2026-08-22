@@ -22,20 +22,16 @@ from typing import TypeAlias, cast
 import yaml
 
 try:
-    from .parent_root_side_effects import (
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
+    from .runtime_artifacts import (
+        RUNTIME_ROOT_ENV,
+        RuntimeRootRequired,
+        runtime_artifact_boundary,
     )
 except ImportError:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
+    from runtime_artifacts import (  # type: ignore[no-redef]
+        RUNTIME_ROOT_ENV,
+        RuntimeRootRequired,
+        runtime_artifact_boundary,
     )
 
 AUTHORITY_FILE_NAME = "task_authority.yaml"
@@ -55,20 +51,53 @@ AuthorityPayload: TypeAlias = dict[str, object]
 AuthorityEntry: TypeAlias = dict[str, object]
 
 
-def _write_parent_file(path: Path, data: bytes, purpose: str) -> None:
-    """Publish authority evidence through the selected parent root."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if configured:
-        parent = Path(configured).resolve(strict=True)
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
-        )
-        ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, data, purpose)
-        return
-    raise ParentRootSideEffectError(
-        ParentRootReject.HANDOFF_INVALID,
-        f"{purpose}: explicit parent root is required for publication",
-    )
+def _runtime_path(path: Path, runtime_root: Path | str | None = None) -> Path:
+    """Resolve authority state below the external runtime boundary."""
+    source = Path(__file__).resolve().parents[2]
+    configured = runtime_root or os.environ.get(RUNTIME_ROOT_ENV, "").strip() or None
+    if configured is None:
+        candidate = Path(path)
+        if not candidate.is_absolute():
+            raise RuntimeRootRequired(
+                f"explicit external runtime root required for authority path: {candidate}"
+            )
+        resolved = candidate.resolve(strict=False)
+        if source == resolved or source in resolved.parents:
+            raise RuntimeRootRequired(
+                f"authority path resolves into AgentCanon source: {resolved}"
+            )
+        return resolved
+    return runtime_artifact_boundary(source, configured).resolve(path)
+
+
+def _report_root(root: Path, runtime_root: Path | str | None = None) -> Path:
+    """Resolve the external reports root without importing team configuration."""
+    configured = runtime_root or os.environ.get(RUNTIME_ROOT_ENV, "").strip() or None
+    if configured is None:
+        # Keep the historical read-only lookup usable for callers that pass a
+        # concrete external project root.  AgentCanon itself and its children
+        # never receive this compatibility path; writes still require an
+        # explicit runtime root or an absolute artifact capability.
+        candidate = root.resolve()
+        source = Path(__file__).resolve().parents[2]
+        if candidate == source or source in candidate.parents:
+            raise RuntimeRootRequired(
+                f"explicit external runtime root required; set {RUNTIME_ROOT_ENV}"
+            )
+        return candidate / "reports" / "agents"
+    source = Path(__file__).resolve().parents[2]
+    return runtime_artifact_boundary(source, configured).resolve(Path("reports") / "agents")
+
+
+def _runtime_write(
+    path: Path,
+    data: bytes,
+    runtime_root: Path | str | None = None,
+) -> None:
+    """Write one authority artifact only after external-boundary validation."""
+    target = _runtime_path(path, runtime_root)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(data)
 
 
 @dataclass(frozen=True)
@@ -151,12 +180,16 @@ def hash_baseline_bytes(payload: bytes) -> bytes:
     return (hashlib.sha256(payload).hexdigest() + "\n").encode("ascii")
 
 
-def write_hash_baseline(path: Path, baseline_path: Path) -> None:
+def write_hash_baseline(
+    path: Path,
+    baseline_path: Path,
+    runtime_root: Path | str | None = None,
+) -> None:
     """Write a hash baseline sidecar for a runtime authority file."""
-    _write_parent_file(
+    _runtime_write(
         baseline_path,
         hash_baseline_bytes(path.read_bytes()),
-        "task-authority-baseline",
+        runtime_root,
     )
 
 
@@ -168,41 +201,60 @@ def path_changed_from_baseline(path: Path, baseline_path: Path) -> bool:
     return bool(expected) and file_sha256(path) != expected
 
 
-def write_task_authority_baselines(report_dir: Path, report_root: Path) -> None:
+def write_task_authority_baselines(
+    report_dir: Path,
+    report_root: Path,
+    runtime_root: Path | str | None = None,
+) -> None:
     """Materialize ownership baselines for the active pointer and run authority."""
-    active_pointer = report_root / ACTIVE_RUN_POINTER.name
+    active_pointer = _runtime_path(report_root / ACTIVE_RUN_POINTER.name, runtime_root)
     if active_pointer.is_file():
         write_hash_baseline(
             active_pointer,
             report_root / ACTIVE_RUN_BASELINE_POINTER.name,
+            runtime_root,
         )
     authority_path = report_dir / AUTHORITY_FILE_NAME
     if authority_path.is_file():
-        write_hash_baseline(authority_path, authority_baseline_path(authority_path))
+        write_hash_baseline(
+            authority_path,
+            authority_baseline_path(authority_path),
+            runtime_root,
+        )
 
 
-def find_authority_path(root: Path) -> Path | None:
+def find_authority_path(
+    root: Path,
+    runtime_root: Path | str | None = None,
+) -> Path | None:
     """Find the explicitly request-local authority file for the current run."""
     override = os.environ.get(AUTHORITY_ENV, "").strip()
     if override:
         path = Path(override)
-        return path if path.is_absolute() else (root / path)
-    pointer = root / ACTIVE_RUN_POINTER
+        return _runtime_path(path if path.is_absolute() else root / path, runtime_root)
+    report_root = _report_root(root, runtime_root)
+    pointer = _runtime_path(report_root / ACTIVE_RUN_POINTER.name, runtime_root)
     if pointer.is_file():
         active = pointer.read_text(encoding="utf-8").strip()
         if active:
             run_dir = Path(active)
             if not run_dir.is_absolute():
-                run_dir = root / run_dir
-            candidate = run_dir / AUTHORITY_FILE_NAME
+                if run_dir.as_posix().startswith("reports/agents/"):
+                    run_dir = root / run_dir
+                else:
+                    run_dir = report_root / run_dir
+            candidate = _runtime_path(run_dir / AUTHORITY_FILE_NAME, runtime_root)
             if candidate.is_file():
                 return candidate
     return None
 
 
-def load_task_authority(root: Path) -> TaskAuthority | None:
+def load_task_authority(
+    root: Path,
+    runtime_root: Path | str | None = None,
+) -> TaskAuthority | None:
     """Load task authority when it exists."""
-    path = find_authority_path(root)
+    path = find_authority_path(root, runtime_root)
     if path is None or not path.is_file():
         return None
     return TaskAuthority(path=path.resolve(), payload=load_yaml_mapping(path))
