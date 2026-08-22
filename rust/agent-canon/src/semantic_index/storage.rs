@@ -11,6 +11,9 @@ use super::args::{
     DiscourseRelationsArgs, NaturalRelationsArgs, SimilarArgs, SimilarKind, ThinDocsArgs,
 };
 use super::model::{blob_to_vector, hex_hash, vector_to_blob, IndexedNode, TextNode};
+use crate::runtime_boundary::{
+    resolve_runtime_root, runtime_root_is_explicit, validate_external_target,
+};
 use rusqlite::{params, Connection};
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -74,6 +77,14 @@ pub(super) fn temporary_db_identity() -> String {
     run_id()
 }
 
+pub(super) fn validate_analysis_db(root: &Path, db: &Path) -> Result<(), String> {
+    let runtime_root = resolve_runtime_root(root)?;
+    if cfg!(test) && !runtime_root_is_explicit() {
+        return Ok(());
+    }
+    validate_external_target(root, &runtime_root, db, "semantic-index database").map(|_| ())
+}
+
 fn unix_millis() -> u128 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -86,6 +97,7 @@ fn run_id() -> String {
 }
 
 pub(super) fn persist_pairs(args: &SimilarArgs, pairs: &[SimilarPairRow]) -> Result<(), String> {
+    validate_analysis_db(&args.root, &args.db)?;
     let write_db = prepare_existing_write_db(&args.db)?;
     let conn = open_cache_connection(&write_db)?;
     init_schema(&conn)?;
@@ -133,6 +145,7 @@ pub(super) fn persist_thin_docs(
     args: &ThinDocsArgs,
     candidates: &[ThinDocRow],
 ) -> Result<(), String> {
+    validate_analysis_db(&args.root, &args.db)?;
     let write_db = prepare_existing_write_db(&args.db)?;
     let conn = open_cache_connection(&write_db)?;
     init_schema(&conn)?;
@@ -193,6 +206,7 @@ pub(super) fn persist_natural_relations(
     args: &NaturalRelationsArgs,
     relations: &[NaturalRelationRow],
 ) -> Result<(), String> {
+    validate_analysis_db(&args.root, &args.db)?;
     let write_db = prepare_existing_write_db(&args.db)?;
     let conn = open_cache_connection(&write_db)?;
     init_schema(&conn)?;
@@ -247,6 +261,7 @@ pub(super) fn persist_discourse_relations(
     args: &DiscourseRelationsArgs,
     relations: &[DiscourseRelationRow],
 ) -> Result<(), String> {
+    validate_analysis_db(&args.root, &args.db)?;
     let write_db = prepare_existing_write_db(&args.db)?;
     let conn = open_cache_connection(&write_db)?;
     init_schema(&conn)?;

@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import os
 import re
 import shlex
 import sys
@@ -22,17 +23,28 @@ from pathlib import Path
 from textwrap import indent
 from typing import TypeAlias
 
+# Direct invocation must not turn the source checkout into a Python cache.
+os.environ.setdefault("PYTHONDONTWRITEBYTECODE", "1")
+
 try:
     from tools.agent_tools.runtime_artifacts import (
+        RuntimeArtifactBoundary,
         RuntimeArtifactError,
+        RuntimeRootRequired,
+        RUNTIME_ROOT_ENV,
         runtime_artifact_boundary,
     )
 except ImportError:  # pragma: no cover - direct script invocation.
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from tools.agent_tools.runtime_artifacts import (  # type: ignore[no-redef]
+        RuntimeArtifactBoundary,
         RuntimeArtifactError,
+        RuntimeRootRequired,
+        RUNTIME_ROOT_ENV,
         runtime_artifact_boundary,
     )
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 TARGET_EXTENSIONS = {
     "lean": "lean",
@@ -134,7 +146,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Identifier for the theorem stub.",
     )
-    parser.add_argument("--out-dir", help="Optional directory for scaffold artifacts.")
+    parser.add_argument(
+        "--out-dir",
+        help=(
+            "Output directory, resolved below --runtime-root (or "
+            f"{RUNTIME_ROOT_ENV}). It must not be inside the source checkout."
+        ),
+    )
     parser.add_argument(
         "--runtime-root",
         help=(
@@ -722,6 +740,33 @@ def build_library_trace_module(plan: FormalProofPlan) -> str:
     )
 
 
+def resolve_output_dir(
+    output_dir: Path | str,
+    runtime_root: Path | str | None,
+    *,
+    source_root: Path = PROJECT_ROOT,
+) -> tuple[Path, RuntimeArtifactBoundary]:
+    """Resolve a scaffold destination through the external artifact boundary.
+
+    ``formal_proof.py`` is a planner, but ``--out-dir`` is a mutating option:
+    it creates theorem/query/trace files.  Keep that mutation on the same
+    capability used by the runtime and reject both an omitted root and a
+    source-local destination before creating any directory.
+    """
+    configured_runtime_root = runtime_root or os.environ.get(RUNTIME_ROOT_ENV)
+    if configured_runtime_root is None or not str(configured_runtime_root).strip():
+        raise RuntimeRootRequired(
+            f"explicit runtime root required for --out-dir; pass --runtime-root "
+            f"or set {RUNTIME_ROOT_ENV}"
+        )
+    boundary: RuntimeArtifactBoundary = runtime_artifact_boundary(
+        source_root, configured_runtime_root, create=True
+    )
+    destination = boundary.resolve(output_dir)
+    boundary.ensure_directory(destination.relative_to(boundary.root))
+    return destination, boundary
+
+
 def write_outputs(
     plan: FormalProofPlan,
     out_dir: Path,
@@ -729,7 +774,7 @@ def write_outputs(
     runtime_root: str | None = None,
 ) -> FormalProofPlan:
     """Write JSON, Markdown, query, and theorem-stub artifacts."""
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir, boundary = resolve_output_dir(out_dir, runtime_root)
     safe_name = normalize_identifier(name)
     stub_path = out_dir / f"{safe_name}.{TARGET_EXTENSIONS[plan.target]}"
     trace_module_path = out_dir / f"{safe_name}_proof_trace.py"
@@ -754,20 +799,29 @@ def write_outputs(
             runtime_root,
         ),
     )
-    stub_path.write_text(build_stub(plan.target, name, written_plan), encoding="utf-8")
-    trace_module_path.write_text(build_library_trace_module(written_plan), encoding="utf-8")
-    (out_dir / "formal_proof_plan.json").write_text(
+    boundary.atomic_write_text(
+        stub_path.relative_to(boundary.root),
+        build_stub(plan.target, name, written_plan),
+    )
+    boundary.atomic_write_text(
+        trace_module_path.relative_to(boundary.root),
+        build_library_trace_module(written_plan),
+    )
+    boundary.atomic_write_text(
+        (out_dir / "formal_proof_plan.json").relative_to(boundary.root),
         json.dumps(asdict(written_plan), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
     )
-    (out_dir / "formal_proof_plan.md").write_text(render_markdown(written_plan), encoding="utf-8")
-    (out_dir / "existing_proof_queries.txt").write_text(
+    boundary.atomic_write_text(
+        (out_dir / "formal_proof_plan.md").relative_to(boundary.root),
+        render_markdown(written_plan),
+    )
+    boundary.atomic_write_text(
+        (out_dir / "existing_proof_queries.txt").relative_to(boundary.root),
         "\n".join(written_plan.existing_proof_queries) + "\n",
-        encoding="utf-8",
     )
-    (out_dir / "literature_queries.txt").write_text(
+    boundary.atomic_write_text(
+        (out_dir / "literature_queries.txt").relative_to(boundary.root),
         "\n".join(written_plan.literature_queries) + "\n",
-        encoding="utf-8",
     )
     return written_plan
 
@@ -824,7 +878,10 @@ def main() -> int:
         runtime_root=runtime_root,
     )
     if args.out_dir:
-        plan = write_outputs(plan, Path(args.out_dir), name, runtime_root)
+        try:
+            plan = write_outputs(plan, Path(args.out_dir), name, runtime_root)
+        except RuntimeArtifactError as exc:
+            parser.error(f"runtime_root_error: {exc}")
 
     if args.format == "json":
         print(json.dumps(asdict(plan), indent=2, sort_keys=True))

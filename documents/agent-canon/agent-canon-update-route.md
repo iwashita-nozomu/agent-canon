@@ -1,303 +1,54 @@
 <!--
 @dependency-start
 contract reference
-responsibility Owns the canonical AgentCanon source-to-parent update transaction and namespace boundaries.
-upstream design ../../agents/skills/agent-orchestration.md owns Decision Sufficiency policy.
-upstream design ../../agents/skills/structure-refactor.md owns final-structure-first scope formation.
-upstream design ../rule/repository-topic-clone.md owns generic repository topic clone lifecycle.
-upstream design ../rule/dependency-module-changes.md owns generic dependency source-clone and clean-projection policy.
-upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns lifecycle schemas and transition guards.
-downstream implementation ../../tools/update_agent_canon.sh executes source rebind, queue/frontier, and parent-projection guards.
-downstream implementation ../../tools/agent_tools/publication_integrator.py owns source publication CAS/readback.
-downstream implementation ../../tools/agent_tools/github_publish.py adapts immutable GitHub PR topology.
-downstream design ../../agents/workflows/agent-canon-pr-workflow.md owns source PR operations.
-downstream design ../../agents/workflows/pr-queue-cleanup-workflow.md owns projection and cleanup ordering.
+responsibility Defines the standalone AgentCanon source update boundary.
+upstream design ../../documents/runtime/bootstrap-runtime.md owns the explicit control/runtime lifecycle.
+upstream design ../../agents/workflows/agent-canon-pr-workflow.md owns source branch and PR publication.
+upstream implementation ../../bootstrap.sh owns installation, validation, and cleanup.
 @dependency-end
 -->
 
-# AgentCanon Update Route
+# AgentCanon update route
 
-## Front Door And Reader Map
+AgentCanon is one standalone source repository. A parent project uses an
+ignored qualified development clone under `workspace/agent-canondevelop/` and
+consumes a merged AgentCanon `main` revision through its own workflow. This
+route does not create or update a vendor checkout, Git submodule, root
+projection, source symlink, or copied policy surface.
 
-`tools/update_agent_canon.sh` is the single user entrypoint. Read this document
-for route meaning and `tools/agent_tools/update_lifecycle_contract.py` for exact
-machine schemas. Skills, README files, CI adapters, and parent views link here;
-they do not restate the transaction.
+## Source update
 
-## Auto-Commit Provenance Boundary
+1. Qualify the owning Issue as `iwashita-nozomu/agent-canon#<number>` and read
+   the current remote `main`, open PRs, and the source clone state.
+2. Create or reuse one Issue-qualified source branch in the ignored development
+   clone. Keep unrelated dirty paths intact.
+3. Read the owner and dependency-expanded callers before editing. Implement the
+   contract-complete source change and keep dependency headers/catalogs aligned.
+4. Run focused tests and the changed runtime profile. Runtime cache, reports,
+   evals, Cargo output, SQLite state, and temporary files belong below the
+   explicit runtime root, never in the source checkout.
+5. Commit and publish the source branch, open/update the qualified AgentCanon
+   PR, process review/CI, merge it, and fetch/read back the resulting `main`
+   revision before changing a parent project.
 
-Every mutating route that can stage, checkout, update a submodule, mutate a root
-view, park eval logs, or create an automatic sync commit must validate the
-Git authority/reason fields selected by operation risk and the additional
-`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>` input before
-the first mutation. The evidence digest is the SHA-256 of the exact bytes of
-the user request record or canonical workflow authorization packet. Missing,
-uppercase, malformed, or fallback evidence is rejected; there is no actor or
-authority compatibility input. Update wrappers use the destructive pair;
-normal branch/worktree creation uses the creation pair; force-create or
-ref-overwrite uses both pairs.
+## Runtime and publication boundaries
 
-AgentCanon source の
-`tools/sync_agent_canon.sh::commit_sync_paths_if_needed` が automatic sync
-commit を所有します。template / derived parent の root adapter は
-`agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` へ委譲し、
-full-sync 実装や root tool copy を所有しません。legacy full copy は既知 transition
-identity に一致するときだけ migration evidence として扱います。
+Runtime sessions use the top-level `bootstrap.sh` documented in
+[`bootstrap-runtime.md`](../runtime/bootstrap-runtime.md). It owns the
+explicit control and runtime roots, while source publication remains an
+ordinary standalone Git topic branch and pull request. The source checkout is
+never a vendor checkout, submodule worktree, root projection, or source
+symlink.
 
-Source implementation always sets Author and Committer to
-`AgentCanon Sync Automation <agent-canon-sync@automation.invalid>` and emits
-formal `AgentCanon-*` trailers for the automation actor, validated authority
-source, destructive authority, request evidence, remote, update method, and
-prefix. The trailers must remain readable by `git interpret-trailers --parse`.
+For a source update, use the repository-topic-clone owner to create or reuse
+the qualified clone and branch, run the source checks, then use the PR
+processing owner to publish and merge the pull request. A parent repository
+does not import a pin or run a source synchronization wrapper after merge.
 
-The parent repository has two distinct AgentCanon states. Parent pin/root
-projection is ready only when `vendor/agent-canon` is clean on named `main` and
-its worktree `HEAD` equals the staged index gitlink. Source editing is owned by
-a named branch in the generic repository topic clone at
-`workspace/<topic>/<repository>`; `main` is only the topic-creation starting
-point. Repository kind is applied after clone preparation as an update or
-dependency policy decorator. A specialized adapter mismatch removes that
-decorator only and returns the operation to the generic clone owner.
+## Evidence and closeout
 
-The `latest` update-target branch is not a topic identity; reuse the requested
-topic owner or use `AGENT_CANON_TOPIC_SLUG` when an explicit topic is needed.
-
-For any dependency source edit, apply the generic lifecycle in
-`documents/rule/repository-topic-clone.md`, then the dependency decorator in
-`documents/rule/dependency-module-changes.md`. Publish from the managed source
-clone and project a clean vendor pin after integration.
-
-## Update Materialization Acceptance
-
-The local-state block predicate for `plan`, `latest`, `apply`, and
-`merge-main-into-current` is exactly:
-
-```text
-block := materialization_merge_conflict(
-           existing_unresolved_index or virtual_merge_result_conflict
-         )
-      or unpreservable_materialization_collision(
-           local_materialized_paths intersect exact_update_write_set
-         )
-```
-
-`exact_update_write_set` is empty when the current commit already contains the
-remote commit. Otherwise Git computes a virtual merge result with
-`merge-tree --write-tree`; the write set is every path whose tree entry differs
-between current `HEAD` and that result tree. This includes destinations produced
-by Git's rename handling without a second handwritten rename heuristic. An
-existing unresolved index or a conflict reported while producing the virtual
-result is the independently typed `materialization_merge_conflict` blocker.
-
-Equal paths and file/directory prefix collisions are unpreservable.
-`local_materialized_paths` is the union of tracked worktree modifications,
-staged changes, conflicted paths, ordinary untracked paths, and ignored
-untracked paths. Ignored status changes visibility, not whether Git could
-overwrite the materialized path.
-
-A named branch, `ahead` or `diverged` history, parent/worktree pin difference,
-and dirty worktree or update-surface status are state evidence, not blockers.
-The updater leaves non-colliding local materialized paths in place and uses the
-normal Git merge and review flow for committed branch differences. This route
-has no clean-tree hard requirement, dirty-path count baseline, stash/reset
-transaction, or compatibility materialization route. Parent pin/root projection
-eligibility remains the separate clean-`main` contract after source publication.
-
-## Parent Stage-0 Detached-Pin Acceptance
-
-The parent index stage-0 mode-`160000` record for `vendor/agent-canon` is the
-pin authority for a parent update. `HEAD:vendor/agent-canon` is a diagnostic
-identity only; a staged parent pin may intentionally differ from the parent
-commit. A clean detached checkout is therefore accepted when its worktree
-`HEAD` equals that stage-0 object id.
-
-For the default `main` update, `plan` and `latest` use this state matrix:
-
-| State | Route | Operation |
-| --- | --- | --- |
-| detached, dirty or `HEAD !=` stage-0 pin | typed detached hold | preserve checkout; no attach |
-| detached exact pin, `main` absent/equal/strict ancestor | `submodule_detached_parent_pin` | create/switch `main`, or switch plus `merge --ff-only` |
-| detached exact pin, `main` descendant/divergent or checked out elsewhere | typed detached hold | preserve refs and worktrees |
-| remote URL, ls-remote, isolated probe object, or probe cleanup failure | typed remote/probe hold | print complete facts and return non-zero before frontier; retain failed-cleanup evidence |
-| local `origin/main` absent | attach prerequisite | retain plan readiness; attach fetches and readbacks it transactionally |
-| local `origin/main` unrelated to or ahead of selected remote | `submodule_origin_main_mismatch` | preserve refs and return non-zero before frontier |
-| attach rollback or transaction cleanup fails | typed rollback/cleanup hold plus transaction directory | no restored-state claim; preserve evidence for recovery |
-
-Remote `main` advancing by itself is not a blocker. During `plan`, the route
-resolves S1, fetches that SHA into a parent-owned disposable probe with a
-read-only alternates link to the source object database, then resolves S2. A
-descendant S2 is fetched and selected when coherent; a repeatedly changing
-remote keeps the first complete snapshot and records the race. The source
-refs, objects, `FETCH_HEAD`, and worktree are bytewise unchanged. Plan never
-fetches the source repository or writes its tracking refs.
-
-Before attachment the route repeats remote resolution and fetches `origin/main`
-immediately before branch mutation. Missing local tracking is a prerequisite;
-an unrelated or rewound tracking ref is a typed hold. Attachment is a narrow
-transaction: it captures HEAD, main/tracking refs and config, `FETCH_HEAD`,
-objects, status, and worktrees; injected upstream/readback or fetch failures
-restore those exact values with old-value guards and emit rollback evidence. A
-rollback or transaction-evidence cleanup failure is itself a typed hold: the
-transaction directory remains addressable and the route does not claim restored
-state or silently discard its evidence.
-Normal operation never uses reset, stash, force ref updates, clone fallback, or
-a second materialization heuristic. Afterward it proves clean named `main`,
-`HEAD ==` stage-0 pin, and upstream `origin/main`; only then does the existing
-materialization owner handle the update write set.
-
-Plan probe cleanup is also fail-closed. A successfully removed probe reports an
-empty probe path; a removal failure reports a typed cleanup hold and retains the
-parent-owned probe path for recovery. Complete plan output renders stage-0,
-remote, tracking, and materialization facts from their named state owners so an
-invalid gitlink record cannot shift fields into the remote section.
-
-## Owner Namespace
-
-| Surface | Canonical location | Responsibility |
-| --- | --- | --- |
-| source contract | `tools/agent_tools/update_lifecycle_contract.py` | schemas, identities, guards, receipt materializers |
-| source implementation | clone-root `tools/`, `agents/`, `documents/`, `.github/`, `.codex/`, `evidence/`, `tests/`, `rust/` | reviewed product source |
-| runtime state | `.agent-canon/update-lifecycle/state/` | resumable transaction pointer and typed GitHub/source-publication packets; never source canon |
-| generated evidence | `reports/agents/<run-id>/` and `.agent-canon/update-lifecycle/evidence/` | immutable receipts, timings, review and readback evidence |
-| projection queue | `.agent-canon/update-lifecycle/projection-queue/` | accepted QueueReceipt and pending/accepted DependencyFrontier |
-| parent projection | parent `vendor/agent-canon` gitlink and the active root views `AGENTS.md`, `.codex/config.toml`, `tools/agent-canon` | downstream view after frontier acceptance only; regular parent paths are preserved |
-
-Unknown shared state is outside the task-owned namespace and remains unchanged.
-There is no legacy subtree, snapshot, wrapper, or alternate owner route.
-
-## Authoritative Transaction
-
-1. Import the owner-produced `DecisionSufficiencyPacket`. When every plausible
-   `h in H` selects the same owner/edit/validation tuple, begin execution and
-   reject additional zero-value investigation.
-1. Consume the final-structure-first contract from
-   `agents/skills/structure-refactor.md#Pre-Task Structure Repair Contract` to
-   fix the target owner graph and namespace. Once that graph is coherent,
-   implementation is the immediate main transition; no update-specific survey,
-   precautionary preflight, or intermediate validation step may intervene.
-1. Implement the complete source mechanisms and generated views under that
-   fixed graph. `UpdateTransaction` and `Snapshot` record resumable progress;
-   preparation or generation labels are internal state, not separate route
-   gates. Resume at `first_missing_checkpoint`, and return a passed same-input
-   receipt with replay timing.
-1. Validate the completed source transaction afterward: G1 proves source
-   correctness once, and G2 consumes G1 to prove generated completeness once.
-1. Before candidate freeze, read `origin/main` and materialize the immutable
-   `SourceMainRebindReceipt`. Append, without mutating it:
-   `CandidateFreezeReceipt -> CandidateReviewReceipt -> CandidateCasReceipt`.
-1. G3 binds immutable remote/base/head/fork/permission identity and the exact
-   candidate/tree for merge authority. `PullRequestLifecycle` carries PR
-   Essence, reviews, and contributor diff through draft/ready/review/closed/
-   conflict states. Only verified-true permission permits publication.
-1. Merge the source PR by expected-old CAS. Authoritative PR readback keeps the
-   post-merge base ref separate from the merge-parent commit/tree and requires
-   that merge-parent identity to equal the rebind/CAS base. A distinct
-   source-main publication readback follows. Ordinary push, PR create/update,
-   and checks consume the current user task, verified remote/permission/topology,
-   and exact identities/readback; packet/G3 evidence is optional enrichment for
-   those operations. Merge remains G3-bound, and post-publication checks may
-   additionally consume same-binding G5 evidence.
-   Standalone `github_publish.py push` without a packet is reversible branch
-   transport only: verified remote identity/permission, named current branch,
-   captured local `HEAD`/tree, exact SHA refspec, remote `ls-remote` readback,
-   and push-spanning local identity invariance. It does not generate or claim
-   G1/G2/G3 or PR lifecycle evidence. Packet-bound push may additionally check
-   its sealed candidate identity as optional enrichment. PR create/update and
-   check readback consume the current user task, verified
-   remote/permission/topology, and exact head/base identities; merge remains
-   sealed G3-bound.
-1. Enqueue exactly one accepted `QueueReceipt` keyed by
-   `(source_namespace,candidate_sha,tree_sha,input_digest,
-   publication_merge_sha,publication_merge_tree)`. Create a pending
-   `DependencyFrontier` with ordered oracle `#388 -> #389 -> current`.
-   The post-readback state machine materializes
-   `source-publication-ready.json`; the existing `latest` entry consumes it and
-   internally appends queue, frontier acceptance, and G4 evidence.
-1. Accept the frontier only when source-main equals the authoritative
-   publication merge commit/tree, QueueReceipt is accepted, and all predecessor
-   publication evidence is present and ordered. The reviewed candidate remains
-   the immutable PR head identity and is not substituted for the merge result.
-   Pending/failed frontier records prohibit parent work.
-1. G4 permits one parent pin/root projection. Parent-owned validation and
-   remote CI run once, then G5 proves exact remote publication readback. Parent
-   consumers trust G1-G3 receipts and do not repeat those invariants.
-1. After G5, materialize DurableHandback, close every descendant, release every
-   reservation, clean only task-owned temp/cache, prove unknown shared state
-   unchanged, pass G6, and execute the canonical terminal `close_agent`
-   ToolCall token.
-
-Identity mismatch or closed-head conflict creates an explicitly linked
-successor; it never mutates the old transaction. Retry is driven by typed state,
-not elapsed time, line count, read count, retry count, or check count.
-
-## Canonical Six Boundaries
-
-| Gate | Owner invariant | Downstream trust |
-| --- | --- | --- |
-| G1 | source correctness | G2/publication eligibility consume receipt |
-| G2 | generated completeness | G3 consumes the owner-produced receipt |
-| G3 | PR identity, permission, review, CAS | source merge and queue consume receipt |
-| G4 | accepted frontier and parent projection integrity | parent publication consumes receipt |
-| G5 | exact remote publication readback | cleanup may begin |
-| G6 | handback, descendants, reservations, cleanup, close token | terminal auditor consumes receipt |
-
-Each invariant has one canonical gate. Downstream tools validate receipt
-identity and ordering only; they do not rerun the owned check.
-
-## Command Responsibilities
-
-| Entry | Responsibility |
-| --- | --- |
-| `tools/update_agent_canon.sh plan` | read-only route and local-state evidence, including stage-0 detached-pin eligibility, remote/tracking readback facts, the update materialization predicate, and exact collision result |
-| `tools/update_agent_canon.sh latest` | standalone source-main rebind; in a parent, collision-safe named topic merge or accepted-frontier projection after publication |
-| `tools/update_agent_canon.sh apply` | apply the accepted projection while preserving non-colliding local paths in place |
-| `tools/update_agent_canon.sh merge-main-into-current` | merge remote main into the current named source branch under the update materialization predicate |
-| `tools/ci/check_agent_canon_pr.sh` | consume G1, run the one source PR gate, then invoke the G2 owner |
-| `tools/ci/check_agent_canon_pr.py` | materialize/replay G2 from the ordered passing generated-completeness checks |
-| `tools/ci/check_agent_canon_latest.sh` | consume G4-G5 without a second source-main check |
-
-## Centralized Template Parent Follow-Up
-
-When a source update changes centralized template owners under source-root
-`templates/`, the parent follow-up packet is incomplete until it records all
-of the following:
-
-- parent-integration `git rm templates` after confirming that the tracked
-  entry is the former `templates -> vendor/agent-canon/templates` symlink,
-  while preserving `vendor/agent-canon/templates/` and any parent-owned
-  regular `templates/` directory;
-- deletion of parent `experiments/_template/`;
-- deletion of only the `_template` entry in the parent project registry;
-- deletion of parent docs/tests that only exercise that removed scaffold; and
-- preservation of parent-owned regular `.github` content without regenerating
-  AgentCanon GitHub targets into the parent root.
-
-The parent registry remains project-owned. AgentCanon source validation uses a
-temporary parent-shaped registry fixture and never mutates a source or parent
-registry during the template smoke check.
-
-## Failure And Cleanup Semantics
-
-- Unknown or false push permission: refuse mutation.
-- Rebind/freeze/review/CAS predecessor mismatch: fail the current transaction;
-  changed identity requires a successor.
-- Duplicate or reordered `#388/#389/current` evidence: refuse frontier
-  acceptance.
-- Parent projection before accepted frontier: fail closed.
-- Local uncommitted path colliding with the exact update write set: preserve the
-  checkout and refuse materialization with the colliding path.
-- Existing or newly produced unresolved merge conflict: preserve the merge state
-  for explicit resolution and refuse further materialization.
-- Remote readback mismatch: no cleanup; retry the same identity only when the
-  failure is typed transient.
-- Link-root/check coverage is explicitly limited to the current parent checkoutの
-  pin/root projection readiness; do not use them to assert remote branch
-  ownership, other-workspace clone status, or PR lifecycle invariants.
-- Completed-but-open or unknown descendant, reservation leak, malformed token,
-  or cleanup before G5: G6 failure.
-- Cleanup deletes only enumerated task-owned paths after readback. Unknown
-  shared state must have equal before/after digests and unchanged evidence.
-
-## Source-Publication Parent Handoff
-
-The sole cross-namespace artifact is the validated source-projection packet. `tools/agent_tools/source_projection_handoff.py` materializes or validates it and writes it through the attested parent boundary. `tools/update_agent_canon.sh` binds lifecycle state to the explicit parent root and derives QueueReceipt, DependencyFrontier, the current transaction marker, and G4 there. A current standalone source checkout may execute that same front door against an older parent root, so repair does not require manual gitlink staging. Fresh-clone acceptance passes only the packet and forbids copying derived receipts. The complete state machine, replay rules, command route, and failure semantics are owned by [Source Publication to Parent Projection Handoff](source-publication-parent-handoff.md).
+The update record names the source branch/commit, qualified Issue/PR, selected
+validation, runtime root, and cleanup readback. A source-invariant check must
+show the source tree unchanged after status/plan inspection. Task-owned Docker
+resources and runtime directories are removed by exact identity; global Codex
+state and pre-existing resources are not touched.

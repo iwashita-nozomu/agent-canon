@@ -13,6 +13,9 @@ use crate::dependency_manifest::{
     validate_producer_identity, write_snapshot_jsonl, DependencyDeclaration, ManifestSnapshot,
     ProducerIdentity, SnapshotRequest, SourceIdentity, SourceSpan, SurfaceRelation,
 };
+use crate::runtime_boundary::{
+    resolve_runtime_root, resolve_runtime_root_at, stable_source_key, validate_external_target,
+};
 use crate::structured_analysis::{initialize_graph_schema, validate_graph_connection};
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 use serde_json::{json, Map, Value};
@@ -168,6 +171,7 @@ impl std::fmt::Display for GraphError {
 #[derive(Debug, Clone)]
 struct GraphArgs {
     root: PathBuf,
+    runtime_root: Option<PathBuf>,
     profile: String,
     format: String,
     surface_manifest_producer: Option<PathBuf>,
@@ -202,8 +206,10 @@ struct GraphStaging {
 }
 
 impl GraphStaging {
-    fn create(operation_id: &str) -> Result<Self, GraphError> {
-        let host_temp = std::env::temp_dir()
+    fn create(operation_id: &str, runtime_root: &Path) -> Result<Self, GraphError> {
+        let host_temp = runtime_root.join("tmp");
+        fs::create_dir_all(&host_temp).map_err(|error| GraphError::Io(error.to_string()))?;
+        let host_temp = host_temp
             .canonicalize()
             .map_err(|error| GraphError::Io(error.to_string()))?;
         let root = host_temp.join(format!("agent-canon-graph-{operation_id}"));
@@ -1964,6 +1970,7 @@ fn collect_build_material(
     surface_manifest_producer: Option<&Path>,
     surface_manifest: Option<&Path>,
     producer_identity: Option<&ProducerIdentity>,
+    runtime_root: Option<&Path>,
 ) -> Result<BuildMaterial, GraphError> {
     let (producer, identity) =
         resolve_graph_producer(root, surface_manifest_producer, producer_identity)?;
@@ -1974,6 +1981,7 @@ fn collect_build_material(
         Some(&producer),
         surface_manifest,
         Some(&identity),
+        runtime_root,
     )
 }
 
@@ -2006,7 +2014,16 @@ fn collect_build_material_with_mode(
     surface_manifest_producer: Option<&Path>,
     surface_manifest: Option<&Path>,
     producer_identity: Option<&ProducerIdentity>,
+    requested_runtime_root: Option<&Path>,
 ) -> Result<BuildMaterial, GraphError> {
+    let runtime_root = match requested_runtime_root {
+        Some(requested) => resolve_runtime_root_at(root, Some(requested)),
+        None => resolve_runtime_root(root),
+    }
+    .map_err(GraphError::Validation)?;
+    let graph_root = runtime_root.join("graph").join(stable_source_key(root));
+    validate_external_target(root, &runtime_root, &graph_root, "graph runtime directory")
+        .map_err(GraphError::Validation)?;
     let runtime_evidence = load_optional_runtime_evidence_snapshot(root)?;
     let producer_identity = producer_identity.cloned();
     if producer_identity.is_some() != surface_manifest_producer.is_some() {
@@ -2023,15 +2040,14 @@ fn collect_build_material_with_mode(
     let snapshot_request = SnapshotRequest {
         root: root.to_path_buf(),
         profile: "parent".to_string(),
-        output_jsonl: root.join(".agent-canon/knowledge-graph/source_snapshot.jsonl"),
+        output_jsonl: graph_root.join("source_snapshot.jsonl"),
         surface_manifest_producer: surface_manifest_producer.map(Path::to_path_buf),
         surface_manifest: surface_manifest.map(Path::to_path_buf),
         producer_identity: producer_identity.clone(),
     };
     let snapshot = capture_snapshot(&snapshot_request)
         .map_err(|error| GraphError::Validation(error.to_string()))?;
-    fs::create_dir_all(root.join(".agent-canon/knowledge-graph"))
-        .map_err(|error| GraphError::Io(error.to_string()))?;
+    fs::create_dir_all(&graph_root).map_err(|error| GraphError::Io(error.to_string()))?;
     let mut snapshot_file = File::create(&snapshot_request.output_jsonl)
         .map_err(|error| GraphError::Io(error.to_string()))?;
     write_snapshot_jsonl(&snapshot, &mut snapshot_file)
@@ -2087,7 +2103,7 @@ fn collect_build_material_with_mode(
     let producer_artifacts = capture_runtime_dashboard(runtime_evidence.as_ref());
     Ok(BuildMaterial {
         root: root.to_path_buf(),
-        graph_root: root.join(".agent-canon/knowledge-graph"),
+        graph_root,
         profile: profile.to_string(),
         snapshot,
         runtime_evidence,
@@ -2182,11 +2198,7 @@ fn runtime_metadata_matches(
     )
 }
 
-fn canonical_published_graph_path(root: &Path) -> Result<PathBuf, GraphError> {
-    let canonical_root = root
-        .canonicalize()
-        .map_err(|error| GraphError::Io(error.to_string()))?;
-    let graph_root = canonical_root.join(".agent-canon/knowledge-graph");
+fn canonical_published_graph_path(graph_root: &Path) -> Result<PathBuf, GraphError> {
     let canonical_graph_root = graph_root
         .canonicalize()
         .map_err(|error| GraphError::Io(error.to_string()))?;
@@ -2473,7 +2485,12 @@ fn build_graph_staging(
 
 fn materialize_graph_store(material: &BuildMaterial) -> Result<GraphIntegrationRecord, GraphError> {
     let operation_id = graph_operation_id(material);
-    let staging = GraphStaging::create(&operation_id)?;
+    let runtime_root = material
+        .graph_root
+        .parent()
+        .and_then(Path::parent)
+        .ok_or_else(|| GraphError::Validation("graph runtime root is invalid".to_string()))?;
+    let staging = GraphStaging::create(&operation_id, runtime_root)?;
     if staging.root.starts_with(&material.root) {
         return Err(GraphError::Validation(
             "graph staging path is inside the source repository".to_string(),
@@ -2495,7 +2512,7 @@ fn materialize_graph_store(material: &BuildMaterial) -> Result<GraphIntegrationR
         &staged_bytes,
         &staged_sha256,
     )?;
-    let readback = open_db(&material.root)?;
+    let readback = open_db_at(&material.graph_root)?;
     validate_graph_connection(&readback)
         .map_err(|error| GraphError::Validation(error.to_string()))?;
     let runtime_metadata_match =
@@ -2521,6 +2538,7 @@ fn materialize_graph_store(material: &BuildMaterial) -> Result<GraphIntegrationR
 fn parse_args(args: &[String]) -> Result<GraphArgs, GraphError> {
     let mut result = GraphArgs {
         root: PathBuf::from("."),
+        runtime_root: None,
         profile: "default".to_string(),
         format: "text".to_string(),
         surface_manifest_producer: None,
@@ -2544,6 +2562,7 @@ fn parse_args(args: &[String]) -> Result<GraphArgs, GraphError> {
         };
         match flag {
             "--root" => result.root = PathBuf::from(value(&mut index)?),
+            "--runtime-root" => result.runtime_root = Some(PathBuf::from(value(&mut index)?)),
             "--profile" => result.profile = value(&mut index)?,
             "--format" => result.format = value(&mut index)?,
             "--surface-manifest-producer" => {
@@ -2570,7 +2589,7 @@ fn parse_args(args: &[String]) -> Result<GraphArgs, GraphError> {
             "--token" => result.token = Some(value(&mut index)?),
             "--help" | "-h" => {
                 return Err(GraphError::Usage(
-                    "graph <build|status|query|context> [--root PATH] [--format json] [--surface-manifest-producer PATH] [--surface-manifest PATH] [--surface-manifest-producer-identity JSON]".to_string(),
+                    "graph <build|status|query|context> [--root PATH] [--runtime-root PATH] [--format json] [--surface-manifest-producer PATH] [--surface-manifest PATH] [--surface-manifest-producer-identity JSON]".to_string(),
                 ))
             }
             unknown => return Err(GraphError::Usage(format!("unknown graph option {unknown}"))),
@@ -2583,8 +2602,24 @@ fn parse_args(args: &[String]) -> Result<GraphArgs, GraphError> {
     Ok(result)
 }
 
-fn open_db(root: &Path) -> Result<Connection, GraphError> {
-    let path = canonical_published_graph_path(root)?;
+fn graph_root_for_args(args: &GraphArgs) -> Result<PathBuf, GraphError> {
+    let root = args
+        .root
+        .canonicalize()
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    let runtime_root = match args.runtime_root.as_deref() {
+        Some(requested) => resolve_runtime_root_at(&root, Some(requested)),
+        None => resolve_runtime_root(&root),
+    }
+    .map_err(GraphError::Validation)?;
+    let graph_root = runtime_root.join("graph").join(stable_source_key(&root));
+    validate_external_target(&root, &runtime_root, &graph_root, "graph runtime directory")
+        .map_err(GraphError::Validation)?;
+    Ok(graph_root)
+}
+
+fn open_db_at(graph_root: &Path) -> Result<Connection, GraphError> {
+    let path = canonical_published_graph_path(graph_root)?;
     let uri = sqlite_immutable_uri(&path)?;
     Connection::open_with_flags(
         uri,
@@ -2593,8 +2628,8 @@ fn open_db(root: &Path) -> Result<Connection, GraphError> {
     .map_err(|error| GraphError::Unavailable(error.to_string()))
 }
 
-fn load_graph_records(root: &Path) -> Result<(Vec<Value>, Vec<Value>), GraphError> {
-    let connection = open_db(root)?;
+fn load_graph_records(graph_root: &Path) -> Result<(Vec<Value>, Vec<Value>), GraphError> {
+    let connection = open_db_at(graph_root)?;
     let mut nodes = Vec::new();
     let mut statement = connection
         .prepare("SELECT payload_json FROM nodes ORDER BY id")
@@ -3044,7 +3079,8 @@ fn read_graph_status(args: &GraphArgs) -> Result<Value, GraphError> {
         args.surface_manifest_producer.as_deref(),
         args.producer_identity.as_ref(),
     )?;
-    let connection = open_db(&root)?;
+    let graph_root = graph_root_for_args(args)?;
+    let connection = open_db_at(&graph_root)?;
     let keys = [
         "integration_record",
         "runtime_event_materialization",
@@ -3132,7 +3168,7 @@ fn read_graph_status(args: &GraphArgs) -> Result<Value, GraphError> {
         Some("source_completeness_incomplete".to_string())
     };
     Ok(
-        json!({"schema":"agent-canon.graph.status.v1","command":"status","status":status,"profile":args.profile,"root":root,"db_path":root.join(".agent-canon/knowledge-graph/graph.sqlite"),"input_fingerprint":persisted.input_fingerprint,"graph_fingerprint":integration.get("graph_fingerprint"),"integration_record":integration,"unresolved_count":unresolved_count,"ambiguous_count":ambiguous_count,"uncovered_count":uncovered_count,"probe_reason":probe_reason,"reason":reason,"exit_code":if fresh {0} else {2}}),
+        json!({"schema":"agent-canon.graph.status.v1","command":"status","status":status,"profile":args.profile,"root":root,"db_path":graph_root.join("graph.sqlite"),"input_fingerprint":persisted.input_fingerprint,"graph_fingerprint":integration.get("graph_fingerprint"),"integration_record":integration,"unresolved_count":unresolved_count,"ambiguous_count":ambiguous_count,"uncovered_count":uncovered_count,"probe_reason":probe_reason,"reason":reason,"exit_code":if fresh {0} else {2}}),
     )
 }
 
@@ -3185,7 +3221,8 @@ fn query_graph(args: &GraphArgs) -> Result<Value, GraphError> {
         .root
         .canonicalize()
         .map_err(|error| GraphError::Io(error.to_string()))?;
-    let (all_nodes, all_facts) = load_graph_records(&root)?;
+    let graph_root = graph_root_for_args(args)?;
+    let (all_nodes, all_facts) = load_graph_records(&graph_root)?;
     let nodes = all_nodes
         .into_iter()
         .filter(|value| {
@@ -3216,11 +3253,8 @@ fn context_graph(args: &GraphArgs) -> Result<Value, GraphError> {
             json!({"schema":"agent-canon.graph.context.v1","command":"context","status":status["status"],"profile":args.profile,"root":args.root,"claim_path":args.path,"token":args.token,"items":[],"dependency_witnesses":[],"reason":status["reason"],"exit_code":2}),
         );
     }
-    let root = args
-        .root
-        .canonicalize()
-        .map_err(|error| GraphError::Io(error.to_string()))?;
-    let (nodes, facts) = load_graph_records(&root)?;
+    let graph_root = graph_root_for_args(args)?;
+    let (nodes, facts) = load_graph_records(&graph_root)?;
     let path = args.path.clone().unwrap_or_default();
     let node = nodes
         .iter()
@@ -3292,6 +3326,7 @@ fn build_graph_with_failure(args: &GraphArgs) -> Result<Value, GraphError> {
         args.surface_manifest_producer.as_deref(),
         args.surface_manifest.as_deref(),
         args.producer_identity.as_ref(),
+        args.runtime_root.as_deref(),
     )?;
     let integration = materialize_graph_store(&material)?;
     let (unresolved_count, ambiguous_count, uncovered_count) =
@@ -3345,7 +3380,7 @@ pub(crate) fn run(args: &[String]) -> i32 {
         "query" => query_graph(&parsed),
         "context" => context_graph(&parsed),
         "help" | "--help" | "-h" => {
-            eprintln!("graph <build|status|query|context> [--root PATH] [--format json]");
+            eprintln!("graph <build|status|query|context> [--root PATH] [--runtime-root PATH] [--format json]");
             return 2;
         }
         _ => Err(GraphError::Usage(format!(
@@ -3703,6 +3738,7 @@ mod tests {
         let producer_identity = current_producer_identity(root).expect("fixture producer identity");
         GraphArgs {
             root: root.to_path_buf(),
+            runtime_root: None,
             profile: "default".to_string(),
             format: "json".to_string(),
             surface_manifest_producer: Some(PathBuf::from(&producer_identity.producer_path)),
@@ -3717,16 +3753,34 @@ mod tests {
         }
     }
 
+    fn test_graph_root(root: &Path) -> PathBuf {
+        resolve_runtime_root_at(root, None)
+            .expect("test runtime root")
+            .join("graph")
+            .join(stable_source_key(root))
+    }
+
+    fn test_graph_db(root: &Path) -> PathBuf {
+        test_graph_root(root).join("graph.sqlite")
+    }
+
     #[test]
     fn graph_storage_realization_stages_outside_repository_and_reads_immutable_publication() {
         let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
         let fixture = graph_fixture();
         let root = fixture.root.canonicalize().expect("canonical fixture root");
-        let material =
-            collect_build_material(&root, "default", None, None, None).expect("build material");
+        let material = collect_build_material(&root, "default", None, None, None, None)
+            .expect("build material");
         let operation_id = graph_operation_id(&material);
-        let staging = GraphStaging::create(&operation_id).expect("exclusive local staging");
-        let host_temp = std::env::temp_dir()
+        let runtime_root = material
+            .graph_root
+            .parent()
+            .and_then(Path::parent)
+            .expect("test runtime root");
+        let staging =
+            GraphStaging::create(&operation_id, runtime_root).expect("exclusive local staging");
+        let host_temp = runtime_root
+            .join("tmp")
             .canonicalize()
             .expect("canonical host temp");
 
@@ -3758,7 +3812,8 @@ mod tests {
 
         assert_eq!(fs::read(&published).expect("published bytes"), staged_bytes);
         assert!(!publication_temp.exists());
-        let canonical = canonical_published_graph_path(&material.root).expect("canonical graph");
+        let canonical =
+            canonical_published_graph_path(&material.graph_root).expect("canonical graph");
         let immutable_uri = sqlite_immutable_uri(&canonical).expect("immutable URI");
         assert!(immutable_uri.starts_with("file:"));
         assert!(immutable_uri.ends_with("?immutable=1"));
@@ -3767,7 +3822,7 @@ mod tests {
                 .expect("reserved path encoding"),
             "file:/graph%20storage%3F%23%25.sqlite?immutable=1"
         );
-        let readback = open_db(&material.root).expect("immutable graph readback");
+        let readback = open_db_at(&material.graph_root).expect("immutable graph readback");
         validate_graph_connection(&readback).expect("published graph contract");
         assert_eq!(
             metadata(&readback, "integration_record").expect("integration metadata"),
@@ -3782,7 +3837,7 @@ mod tests {
             std::os::unix::fs::symlink(&staging.database, &published)
                 .expect("published graph symlink");
             assert!(matches!(
-                open_db(&material.root),
+                open_db_at(&material.graph_root),
                 Err(GraphError::Validation(_))
             ));
         }
@@ -3792,7 +3847,7 @@ mod tests {
     fn graph_storage_realization_pre_rename_failures_preserve_old_and_unrelated_temps() {
         let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
         let fixture = graph_fixture();
-        let graph_root = fixture.root.join(".agent-canon/knowledge-graph");
+        let graph_root = test_graph_root(&fixture.root);
         fs::create_dir_all(&graph_root).expect("graph root");
         let graph_root = graph_root.canonicalize().expect("canonical graph root");
         let published = graph_root.join("graph.sqlite");
@@ -3854,12 +3909,7 @@ mod tests {
         let build = build_graph_with_failure(&args).expect("graph build");
         assert_eq!(build["status"], "fresh");
 
-        let connection = Connection::open(
-            fixture
-                .root
-                .join(".agent-canon/knowledge-graph/graph.sqlite"),
-        )
-        .expect("persisted graph");
+        let connection = Connection::open(test_graph_db(&fixture.root)).expect("persisted graph");
         let mut statement = connection
             .prepare("SELECT key FROM metadata WHERE key LIKE 'runtime_%' ORDER BY key")
             .expect("runtime metadata query");
@@ -3900,9 +3950,7 @@ mod tests {
             .unwrap_or(false));
         assert_eq!(probe.profile, "default");
 
-        let graph_path = fixture
-            .root
-            .join(".agent-canon/knowledge-graph/graph.sqlite");
+        let graph_path = test_graph_db(&fixture.root);
         let persisted_graph = fs::read(&graph_path).expect("persisted graph bytes");
         let persisted_artifact = fs::read(&fixture.artifact).expect("artifact bytes");
         let persisted_receipt = fs::read(&fixture.receipt).expect("receipt bytes");
@@ -3941,12 +3989,8 @@ mod tests {
         assert_eq!(build["integration_record"]["runtime_evidence"], Value::Null);
         assert_eq!(build["producer_artifacts"], json!([]));
 
-        let connection = Connection::open(
-            fixture
-                .root
-                .join(".agent-canon/knowledge-graph/graph.sqlite"),
-        )
-        .expect("persisted source-only graph");
+        let connection =
+            Connection::open(test_graph_db(&fixture.root)).expect("persisted source-only graph");
         for key in [
             "runtime_event_materialization",
             "runtime_event_artifact",
@@ -4128,9 +4172,7 @@ mod tests {
 
         let legacy = graph_fixture();
         build_graph_with_failure(&graph_args(&legacy.root)).expect("legacy setup build");
-        let db = legacy
-            .root
-            .join(".agent-canon/knowledge-graph/graph.sqlite");
+        let db = test_graph_db(&legacy.root);
         let connection = Connection::open(&db).expect("legacy database");
         let integration_text: String = connection
             .query_row(
@@ -4242,8 +4284,7 @@ mod tests {
         query_args.push("--all".to_string());
         assert_eq!(run(&query_args), 0);
 
-        let connection = Connection::open(root.join(".agent-canon/knowledge-graph/graph.sqlite"))
-            .expect("published graph database");
+        let connection = Connection::open(test_graph_db(&root)).expect("published graph database");
         let stored_identity =
             metadata(&connection, "producer_identity").expect("identity metadata");
         let stored_identity =
@@ -4295,12 +4336,8 @@ mod tests {
 
         let build = build_graph_with_failure(&graph_args(&fixture.root)).expect("graph build");
         assert_eq!(build["status"], "incomplete");
-        let connection = Connection::open(
-            fixture
-                .root
-                .join(".agent-canon/knowledge-graph/graph.sqlite"),
-        )
-        .expect("published graph database");
+        let connection =
+            Connection::open(test_graph_db(&fixture.root)).expect("published graph database");
         let (rule, target_node_id, severity, payload_json): (String, String, String, String) =
             connection
                 .query_row(
@@ -4528,9 +4565,7 @@ mod tests {
         let fixture = graph_fixture();
         let args = graph_args(&fixture.root);
         build_graph_with_failure(&args).expect("graph build");
-        let db = fixture
-            .root
-            .join(".agent-canon/knowledge-graph/graph.sqlite");
+        let db = test_graph_db(&fixture.root);
         let connection = Connection::open(&db).expect("graph database");
         connection
             .execute(

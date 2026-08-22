@@ -2,14 +2,13 @@
 
 <!--
 @dependency-start
-contract runtime
+contract agent-runtime
 responsibility Defines task-local contract observation, terminal coverage, and durable archive routing.
 upstream design runtime-log-archive.md external AgentCanon log archive ownership
 upstream design ../../templates/agents/workflow_monitoring.md run-local behavior evidence
 upstream design ../../evidence/agent-evals/agent_behavior_eval.toml behavior scoring contract
-upstream design ../../../project_template/AGENTS.md template self-contained and offline validation boundary
 downstream implementation ../../tools/agent_tools/task_contract_observation.py records and evaluates observations
-downstream test ../../tests/agent_tools/test_task_contract_observation.py verifies schema and transition invariants
+downstream implementation ../../tests/agent_tools/test_task_contract_observation.py verifies schema and transition invariants
 @dependency-end
 -->
 
@@ -250,7 +249,7 @@ The source-to-snapshot mapping remains in the append-only source
 copy the same event into source control. The existing closeout archive
 readback remains the publication authority.
 
-## Project Template Compatibility
+## Source-Free Parent Boundary
 
 `project_template` requires tracked project files to remain readable and
 validatable without a network call, parent checkout, or secret. Therefore
@@ -259,13 +258,10 @@ contract observation has two separated stages:
 1. local collection and evaluation operate on the run bundle only;
 2. durable synchronization is an explicit online runtime or maintainer action.
 
-A template or derived repository that vendors AgentCanon uses the vendored
-entrypoint:
-
-```bash
-python3 vendor/agent-canon/tools/agent_tools/task_contract_observation.py \
-  --report-dir reports/agents/<run-id> ...
-```
+A source-free parent does not vendor AgentCanon and does not name this internal
+collector. When collection is selected, the standalone AgentCanon checkout
+runs it through `bootstrap.sh tool run` or the argv-only container `exec`
+route. Parent project validation remains independent of that runtime.
 
 Offline validation must not claim archive publication. It may report the local
 evaluation status and retain the run bundle until the mounted archive becomes

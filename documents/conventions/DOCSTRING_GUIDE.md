@@ -2,7 +2,6 @@
 @dependency-start
 contract policy
 responsibility Defines the language-neutral semantic Docstring contract, its canonical template skeleton, and its language projection trace.
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../rule/README.md document filename, placement, and language rules
 upstream design ../design/cpp-build-layout.md selects derived-repo native C++ target identities and build layout
 upstream design ../../agents/skills/catalog.yaml selects the OOP/type-design capability owner

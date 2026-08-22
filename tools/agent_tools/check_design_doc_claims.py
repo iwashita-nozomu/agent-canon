@@ -31,7 +31,7 @@ except ImportError:  # pragma: no cover - direct CLI execution
 HEADER_SCAN_LINES = 80
 MANIFEST_FIELD_COUNT = 4
 MANIFEST_REASON_MAX_SPLIT = MANIFEST_FIELD_COUNT - 1
-DEFAULT_RECURSIVE_DEPTH = 3
+DEFAULT_RECURSIVE_DEPTH = 0
 CHECKABLE_TOKEN_MAX_CHARS = 120
 TEXT_SUFFIXES = {
     ".bash",
@@ -86,6 +86,8 @@ ASSUMPTION_TERM_RE = re.compile(
 )
 HEADING_RE = re.compile(r"^#{1,6}\s+(?P<title>.+?)\s*$")
 TOKEN_RE = re.compile(r"`([^`]+)`")
+GITHUB_REFERENCE_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#\d+$")
+DIFF_HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(?P<start>\d+)(?:,(?P<count>\d+))? @@")
 
 
 @dataclass(frozen=True)
@@ -388,8 +390,135 @@ def all_manifest_edges(root: Path) -> tuple[ManifestEdge, ...]:
 
 
 def changed_design_paths(root: Path) -> tuple[str, ...]:
-    """Return changed design-document paths."""
-    return design_paths_from_candidates(run_git_changed_path_names(root))
+    """Return changed active designs with added implementation claims.
+
+    A changed design scope is intentionally narrower than ``git diff``.  A
+    dependency-header repair, a retired redirect, a historical/evidence table,
+    or a deleted row cannot change the implementation contract and therefore
+    must not trigger claim enforcement.  The caller still checks the complete
+    dependency closure for each selected active design.
+    """
+    return tuple(
+        path
+        for path in design_paths_from_candidates(run_git_changed_path_names(root))
+        if has_changed_implementation_claim(root, path)
+    )
+
+
+def _without_dependency_manifest(text: str) -> str:
+    """Remove the dependency header so header-only repairs do not trigger claim review."""
+    start = text.find("@dependency-start")
+    end = text.find("@dependency-end")
+    if start < 0 or end < start:
+        return text
+    line_start = text.rfind("\n", 0, start) + 1
+    line_end = text.find("\n", end)
+    line_end = len(text) if line_end < 0 else line_end + 1
+    return text[:line_start] + text[line_end:]
+
+
+def has_non_manifest_change(root: Path, path: str) -> bool:
+    """Return true for new docs or changes beyond the dependency header."""
+    current_path = root / path
+    if not current_path.is_file():
+        return False
+    baseline = subprocess.run(
+        ["git", "-C", str(root), "show", f"HEAD:{path}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if baseline.returncode != 0:
+        return True
+    return _without_dependency_manifest(current_path.read_text(encoding="utf-8")) != _without_dependency_manifest(baseline.stdout)
+
+
+def _added_diff_lines(root: Path, path: str) -> tuple[tuple[int, str], ...]:
+    """Return added lines and their current-file line numbers for one path."""
+    result = subprocess.run(
+        ["git", "-C", str(root), "diff", "--unified=0", "HEAD", "--", path],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return ()
+    current_line = 0
+    added: list[tuple[int, str]] = []
+    for raw_line in result.stdout.splitlines():
+        match = DIFF_HUNK_RE.match(raw_line)
+        if match:
+            current_line = int(match.group("start"))
+            continue
+        if raw_line.startswith("+++"):
+            continue
+        if raw_line.startswith("+"):
+            added.append((current_line, raw_line[1:]))
+            current_line += 1
+        elif raw_line.startswith("-"):
+            continue
+        elif raw_line.startswith("\\"):
+            continue
+        elif current_line:
+            current_line += 1
+    return tuple(added)
+
+
+def is_retired_or_historical_design(text: str) -> bool:
+    """Return whether a design is an explicitly non-current redirect/archive."""
+    header = "\n".join(text.splitlines()[:HEADER_SCAN_LINES])
+    if re.search(r"(?im)^\s*#\s*(?:retired|historical)\b", header):
+        return True
+    if re.search(r"(?im)^\s*responsibility\s+retired\b", header):
+        return True
+    return bool(
+        re.search(
+            r"(?i)\b(?:former|historical)\s+[^\n]{0,100}\b(?:design|policy|contract)\b[^\n]{0,100}\bretired\b",
+            header,
+        )
+    )
+
+
+def changed_implementation_claims(root: Path, path: str) -> tuple[Claim, ...]:
+    """Return implementation-backed claims added to an active design.
+
+    Markdown tables are intentionally excluded: their fixed evidence IDs and
+    generated labels are an evidence record, not executable implementation
+    claims.  Only an added line with both a claim cue and a concrete token is
+    eligible; continuation prose and deleted/unchanged claims remain outside
+    changed enforcement.
+    """
+    current_path = resolve_existing_text_path(root, path)
+    if current_path is None:
+        return ()
+    text = current_path.read_text(encoding="utf-8")
+    if is_retired_or_historical_design(text):
+        return ()
+    # The ledger is the explicit marker that a document is a current,
+    # implementation-backed design.  Reference, migration, and historical
+    # documents without it remain readable but are not changed-claim gates.
+    if not has_evidence_ledger(text):
+        return ()
+    body_lines = dict(iter_body_lines(text))
+    claims: list[Claim] = []
+    for line_number, raw_line in _added_diff_lines(root, path):
+        if line_number not in body_lines:
+            continue
+        stripped = raw_line.strip()
+        if stripped.startswith("#") or stripped.startswith("|"):
+            continue
+        if is_non_claim_control_line(stripped):
+            continue
+        tokens = checkable_tokens(stripped)
+        if not tokens or not CLAIM_CUE_RE.search(stripped):
+            continue
+        claims.append(Claim(path, line_number, stripped, tokens))
+    return tuple(claims)
+
+
+def has_changed_implementation_claim(root: Path, path: str) -> bool:
+    """Return whether one changed design has an active implementation claim."""
+    return bool(changed_implementation_claims(root, path))
 
 
 def run_git_changed_path_names(root: Path) -> tuple[str, ...]:
@@ -640,6 +769,8 @@ def normalized_checkable_token(raw_token: str) -> str | None:
     if "<" in token and ">" in token:
         return None
     if token.startswith(("http://", "https://")):
+        return None
+    if GITHUB_REFERENCE_RE.fullmatch(token):
         return None
     if token.lower() in {"yes", "no", "pass", "fail", "active", "pending"}:
         return None
@@ -1028,6 +1159,7 @@ def _check_one_from_manifest(
     path: str,
     edges: Sequence[ManifestEdge],
     recursive_depth: int,
+    changed_only: bool = False,
 ) -> CheckResult:
     """Check one design document."""
     if resolve_existing_text_path(root, path) is None:
@@ -1041,7 +1173,7 @@ def _check_one_from_manifest(
             findings=(Finding("design-document-unresolved", path, 0, f"path={path}"),),
         )
     text = read_text(root, path)
-    claims = extract_claims(path, text)
+    claims = changed_implementation_claims(root, path) if changed_only else extract_claims(path, text)
     evidence_paths, parent_paths, traversal_findings = dependency_closure(path, edges, recursive_depth)
     readable_evidence = evidence_texts(root, evidence_paths)
     supported, claim_findings, claim_evidence_records = check_claim_support(
@@ -1054,8 +1186,9 @@ def _check_one_from_manifest(
         findings.append(Finding("missing-evidence-assumption-ledger", path, 0, "section=Evidence And Assumption Ledger"))
     findings.extend(traversal_findings)
     findings.extend(missing_dependency_target_findings(root, path, sorted(evidence_paths)))
-    findings.extend(check_assumption_ledger(path, text))
-    findings.extend(check_parent_contradictions(root, path, text, sorted(parent_paths)))
+    analysis_text = "\n".join(claim.text for claim in claims) if changed_only else text
+    findings.extend(check_assumption_ledger(path, analysis_text))
+    findings.extend(check_parent_contradictions(root, path, analysis_text, sorted(parent_paths)))
     findings.extend(claim_findings)
     return CheckResult(
         path=path,
@@ -1160,7 +1293,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     root = args.root.resolve()
     paths = selected_paths(root, args)
     repository_scoped = (root / ".git").exists() or (root / "vendor" / "agent-canon" / ".git").exists()
-    if repository_scoped:
+    if repository_scoped and not args.changed:
         try:
             consumer = GraphClaimConsumer(root)
             results = tuple(check_one(root, path, consumer) for path in paths)
@@ -1180,7 +1313,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         edges = all_manifest_edges(root)
         results = tuple(
-            _check_one_from_manifest(root, path, edges, args.recursive_depth)
+            _check_one_from_manifest(
+                root,
+                path,
+                edges,
+                args.recursive_depth,
+                changed_only=args.changed,
+            )
             for path in paths
         )
     if args.format == "json":

@@ -4,7 +4,6 @@ contract design
 responsibility Defines the approved Python module-boundary target for AgentTeam runtime orchestration.
 upstream design README.md design index and evidence-ledger policy
 upstream design dependency-manifest-design.md dependency graph and claim-evidence contract
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared AgentCanon surface ownership
 upstream design ../../agents/COMMUNICATION_PROTOCOL.md active-design packet and caller readback contract
 upstream design ../../agents/canonical/CODEX_WORKFLOW.md workflow and repository-changing gate
 downstream implementation ../../tools/agent_tools/agent_team.py facade and public-surface source

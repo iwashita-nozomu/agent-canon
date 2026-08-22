@@ -67,18 +67,18 @@ worktree の作成と carry-over の流れは [worktree-lifecycle.md](worktree-l
 - 複数の差分単位を一つの PR に載せる判断は、同じ設計意図と同じレビュー判断で
   扱える場合に限ります。独立して main に入れられる差分単位は、merge 前に別
   PR または別 commit に分けます。
-- AgentCanon source 変更と template / derived repo の submodule pin、root view
-  変更は、source merge 後の parent PR / commit として分けます。
+- AgentCanon source 変更と parent project の tracked changes は、source merge/readback
+  後も別 PR / commit として分けます。親には submodule pin や root view を作りません。
 
 ### Commit Correctness Contract
 
 Git 上の code が正しく動くとは、fresh checkout の tracked tree から選択した
 validation route を同じ entrypoint で再実行できることを指します。
 
-- commit は Git 上の runnable unit です。`git checkout <commit>` と submodule 初期化で得られる tracked tree だけで、選択した validation route が再実行できる状態にします。
+- commit は Git 上の runnable unit です。`git checkout <commit>` で得られる tracked tree と、明示された external runtime/source clone だけで、選択した validation route が再実行できる状態にします。
 - validation が読んだ source、config、schema、fixture、文書、tool entrypoint は、その commit の tracked tree に含めます。ignored / generated runtime output は artifact、cache、log、result のどれかに分類して evidence に残します。
 - code 変更では、file-level の code dependency scan と、言語 tool が対応する関数 / public entrypoint 単位の call-site evidence を commit evidence に含めます。Python では `python3 tools/agent_tools/helper_function_inventory.py --changed --all-functions --format json` を関数単位 evidence に使います。
-- commit evidence には branch、commit SHA、submodule SHA、validation command、validation 対象 path、残った dirty / untracked path の分類を含めます。
+- commit evidence には branch、commit SHA、source clone SHA/PR readback（該当時）、validation command、validation 対象 path、残った dirty / untracked path の分類を含めます。
 - `WORKTREE_SCOPE.md` を更新した場合は、早い段階で commit します。
 - push 前に、その branch で必須の test / lint / document check を実行します。
 - 初回 push と PR 作成は `python3 tools/agent_tools/github_publish.py publish-pr --user-task "<current user task>" --repo <owner/name> --title "<title>" --body-file <body.md>` を使います。branch push だけなら `github_publish.py push` を使います。

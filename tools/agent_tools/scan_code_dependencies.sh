@@ -14,13 +14,14 @@ CHANGED=0
 PRINT_UNRESOLVED=0
 PATHS_FILE=""
 ANALYSIS_JSON=""
+RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT:-}"
 LEXICAL_ONLY=0
 declare -a INPUT_PATHS=()
 
 usage() {
   cat <<'EOF'
 Usage:
-  scan_code_dependencies.sh [--root DIR] [--changed] [--print-unresolved] [--paths-file FILE] [--analysis-json FILE] [--lexical-only] [paths...]
+  scan_code_dependencies.sh [--root DIR] [--runtime-root DIR] [--changed] [--print-unresolved] [--paths-file FILE] [--analysis-json FILE] [--lexical-only] [paths...]
 
 Delegates normal code dependency extraction to the canonical LSP scan-legacy
 report.  The lexical compatibility extractor is available only with
@@ -60,6 +61,11 @@ while [[ $# -gt 0 ]]; do
       ANALYSIS_JSON="$2"
       shift 2
       ;;
+    --runtime-root)
+      [[ $# -ge 2 ]] || { echo "scan_code_dependencies.sh: --runtime-root requires a value" >&2; exit 2; }
+      RUNTIME_ROOT="$2"
+      shift 2
+      ;;
     --lexical-only)
       LEXICAL_ONLY=1
       shift
@@ -94,7 +100,10 @@ fi
 lsp_args=("$TOOL_DIR/lsp_code_analysis.py" scan-legacy --root "$ROOT_DIR")
 [[ "$PRINT_UNRESOLVED" -eq 1 ]] && lsp_args+=(--print-unresolved)
 [[ "$LEXICAL_ONLY" -eq 1 ]] && lsp_args+=(--lexical-only)
-[[ -n "$ANALYSIS_JSON" ]] && lsp_args+=(--analysis-json "$ANALYSIS_JSON")
+if [[ -n "$ANALYSIS_JSON" ]]; then
+  [[ -n "$RUNTIME_ROOT" ]] || { echo "scan_code_dependencies.sh: --runtime-root is required with --analysis-json" >&2; exit 2; }
+  lsp_args+=(--runtime-root "$RUNTIME_ROOT" --analysis-json "$ANALYSIS_JSON")
+fi
 if [[ "$CHANGED" -eq 1 && ${#INPUT_PATHS[@]} -eq 0 ]]; then
   lsp_args+=(--changed)
 elif [[ -n "$PATHS_FILE" ]]; then

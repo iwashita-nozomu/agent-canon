@@ -45,9 +45,7 @@ DEFAULT_CONSUMER_FORBIDDEN_MARKERS = (
     "agent_canon_source_root",
     "agent-canon-update",
     "agent-canon-latest-check",
-    "sync_agent_canon",
-    "update_agent_canon",
-    "make agent-canon-ensure-latest",
+    "agent-canon-ensure-latest",
     "git submodule",
     ".gitmodules",
 )
@@ -69,7 +67,6 @@ CANONICAL_SOURCE_REPOSITORY = "iwashita-nozomu/agent-canon"
 STATIC_SEED_FORBIDDEN_PATHS = (
     Path(".agent-canon"),
     Path(".gitmodules"),
-    Path("documents/runtime/shared-runtime-surfaces.toml"),
     Path("tools/agent-canon"),
     Path("vendor/agent-canon"),
 )
@@ -86,9 +83,7 @@ STATIC_SEED_FORBIDDEN_CONTENT = tuple(
         "http://",
         "https://",
         "import agent_tools",
-        "sync_agent_canon",
         "tools/agent-canon",
-        "update_agent_canon",
         "vendor/agent-canon",
     )
 )

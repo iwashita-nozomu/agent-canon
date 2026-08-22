@@ -3,7 +3,6 @@
 contract reference
 responsibility Documents AgentCanon dependency-related tools, external runtime tools, and license evidence.
 upstream design README.md tool documentation placement policy
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../runtime/runtime-profiles-and-check-matrix.md runtime profile and validation routing
 upstream design ../../CONTAINER_OPERATIONS.md devcontainer and Docker ownership boundary
 upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
@@ -83,9 +82,8 @@ table as stale and rerun the verification policy when any of these events occur:
   container base changes;
 - AgentCanon starts distributing a compiled binary, container image, packaged
   archive, or bundled model artifact;
-- a PR changes `.devcontainer/post-create.sh`, `agent-canon-environment.toml`,
-  `tools/rebuild_agent_tools.sh`, or
-  `rust/agent-canon/Cargo.toml`;
+- a PR changes `bootstrap/container/Dockerfile`,
+  `bootstrap/container/dependencies.toml`, or `rust/agent-canon/Cargo.toml`;
 - an upstream license, model card, distro package copyright file, or package
   metadata source is unavailable, inconsistent, or moved.
 

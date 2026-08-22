@@ -1,8 +1,8 @@
 ---
 name: devcontainer-exec
-description: "Use when an existing Dev Container needs targeted execution or validation through devcontainer exec, including a zsh shell, while preserving exact output and exit evidence."
+description: "Use only when an explicitly selected existing project Dev Container needs a targeted command through devcontainer exec; AgentCanon's shared tools and LSPs use agent-canon-bootstrap, and project tests use the project Docker/test runner."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"6fbb7314d01179e02f9648171ecd92f71cff3e3599d429ad1d2be8a0653a1551"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"bde71b0e4587709aec46725687dfcdba20e61c770c21c801e41ad0efe3885e81"} -->
 
 <!--
 @dependency-start

@@ -1,10 +1,10 @@
 # @dependency-start
 # contract test
-# responsibility Verifies dependency graph scratch and publication stay in the selected parent.
+# responsibility Verifies dependency graph scratch and publication stay in the external runtime.
 # upstream implementation ../../tools/agent_tools/check_dependency_graph.sh owns graph scratch and TSV publication.
 # @dependency-end
 
-"""Focused parent-boundary tests for the dependency graph shell entrypoint."""
+"""Focused external-runtime tests for the dependency graph shell entrypoint."""
 
 from __future__ import annotations
 
@@ -56,9 +56,11 @@ def _parent_fixture(tmp_path: Path) -> tuple[Path, Path]:
 
 def test_graph_uses_selected_parent_for_temp_and_output(tmp_path: Path) -> None:
     parent, source = _parent_fixture(tmp_path)
-    output = parent / "reports" / "dependency.tsv"
+    runtime = tmp_path / "runtime"
+    output = runtime / "reports" / "dependency.tsv"
     environment = os.environ.copy()
-    environment["AGENT_CANON_PARENT_ROOT"] = str(parent)
+    environment["AGENT_CANON_RUNTIME_ROOT"] = str(runtime)
+    environment["AGENT_CANON_CONTROL_PARENT_ROOT"] = str(tmp_path)
 
     result = subprocess.run(
         ("bash", str(SCRIPT), "--root", str(source), "--graph-tsv", str(output)),
@@ -72,15 +74,16 @@ def test_graph_uses_selected_parent_for_temp_and_output(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert output.read_text(encoding="utf-8") == "direction\tkind\tsource\ttarget\n"
     assert not (source / ".agent-canon").exists()
-    temp_root = parent / ".agent-canon" / "tmp"
-    assert not temp_root.exists() or not any(temp_root.iterdir())
+    temp_root = runtime / "tmp" / "dependency-graph"
+    assert not temp_root.exists() or not any(temp_root.glob("run.*"))
 
 
 def test_graph_rejects_output_outside_selected_parent(tmp_path: Path) -> None:
     parent, source = _parent_fixture(tmp_path)
     output = source / "dependency.tsv"
     environment = os.environ.copy()
-    environment["AGENT_CANON_PARENT_ROOT"] = str(parent)
+    environment["AGENT_CANON_RUNTIME_ROOT"] = str(tmp_path / "runtime")
+    environment["AGENT_CANON_CONTROL_PARENT_ROOT"] = str(tmp_path)
 
     result = subprocess.run(
         ("bash", str(SCRIPT), "--root", str(source), "--graph-tsv", str(output)),
@@ -92,7 +95,7 @@ def test_graph_rejects_output_outside_selected_parent(tmp_path: Path) -> None:
     )
 
     assert result.returncode != 0
-    assert "PARENT_ROOT_SIDE_EFFECT_ERROR" in result.stderr
+    assert "runtime boundary invalid" in result.stderr
     assert not output.exists()
-    temp_root = parent / ".agent-canon" / "tmp"
-    assert not temp_root.exists() or not any(temp_root.iterdir())
+    temp_root = tmp_path / "runtime" / "tmp" / "dependency-graph"
+    assert not temp_root.exists() or not any(temp_root.glob("run.*"))

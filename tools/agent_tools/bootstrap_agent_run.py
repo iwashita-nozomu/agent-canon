@@ -522,7 +522,7 @@ def emit_bootstrap_output(
     public_layout = getattr(repository_roots, "layout", None)
     if public_layout is None:
         raise RuntimeError("runtime_roots_invalid:layout_missing")
-    print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-update-plan")
+    print("AGENT_CANON_PREFLIGHT_COMMAND=bash bootstrap.sh --help")
     print(f"AGENT_CANON_PREFLIGHT_STATUS={preflight.status}")
     print(f"AGENT_CANON_PREFLIGHT_REASON={preflight.reason}")
     print(f"AGENT_CANON_PREFLIGHT_NEXT={preflight.next_step}")
@@ -892,6 +892,32 @@ def publish_prepared_run(
 
 def main() -> int:
     """Run the bootstrap command."""
+    # Source resolution itself uses the external runtime boundary.  Parse only
+    # that capability before loading source-owned config so an unrelated
+    # caller TMPDIR cannot be mistaken for this run's artifact root.
+    runtime_parser = argparse.ArgumentParser(add_help=False)
+    runtime_parser.add_argument("--runtime-root")
+    runtime_args, _ = runtime_parser.parse_known_args()
+    selected_runtime = (
+        runtime_args.runtime_root
+        or os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
+    )
+    if selected_runtime:
+        os.environ["AGENT_CANON_RUNTIME_ROOT"] = selected_runtime
+        for name in (
+            "TMPDIR",
+            "TEMP",
+            "TMP",
+            "XDG_CACHE_HOME",
+            "PYTHONPYCACHEPREFIX",
+            "AGENT_CANON_TOOLS_HOME",
+            "CARGO_HOME",
+            "CARGO_TARGET_DIR",
+            "AGENT_CANON_CLI_TARGET_DIR",
+            "RUSTUP_HOME",
+            "ELAN_HOME",
+        ):
+            os.environ.pop(name, None)
     try:
         source_resolution = resolve_agent_canon_source_root(Path(__file__).resolve())
         source_root = source_resolution.source_root

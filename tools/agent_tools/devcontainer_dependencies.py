@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract implementation
-# responsibility Owns the typed declarative devcontainer dependency model, merge, plan, and receipt installer.
-# upstream design ../../documents/design/devcontainer/parent-dependency-manifest-followup.md parent-first merge and lifecycle order
-# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md typed project-extra ownership
+# responsibility Owns the typed declarative dependency plan, merge, and image receipt installer.
+# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md bootstrap manifest and image lifecycle
+# upstream design ../../CONTAINER_OPERATIONS.md shared tool-runtime and project execution boundary
 # upstream design ../../CONTAINER_OPERATIONS.md image versus mounted tool boundary
-# downstream environment ../../.devcontainer/dependencies.toml AgentCanon shared developer/agent records
-# downstream implementation ../../.devcontainer/post-create.sh read-only image verification
+# downstream environment ../../bootstrap/container/dependencies.toml AgentCanon shared tool records
+# downstream implementation ../../bootstrap/container/Dockerfile image installation and receipt verification
 # downstream implementation ../../tools/docker_dependency_validator.sh no-install validation route
 # downstream implementation ../../tests/agent_tools/test_devcontainer_dependencies.py focused model and security tests
 # @dependency-end
-"""Declarative, typed devcontainer dependency planning and installation.
+"""Compatibility implementation for the typed shared dependency planner.
 
 The image owns fixed Python and manifest-selected Agent/Codex capabilities. The
-legacy editable project-extra API remains available to explicit callers, while
-the active post-create and runner lifecycle performs read-only image verification.
+legacy module name remains importable for existing integrations, but new
+callers must use :mod:`dependency_plan`; no Dev Container lifecycle is owned by
+this module.
 """
 
 from __future__ import annotations
@@ -55,6 +56,7 @@ try:
         ensure_parent_owned_directory,
         resolve_parent_owned_path,
     )
+    from .runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
 except ImportError:  # direct script execution
     from parent_root_side_effects import (  # type: ignore[no-redef]
         ParentRootAttestationReceipt,
@@ -66,6 +68,10 @@ except ImportError:  # direct script execution
         ensure_parent_owned_directory,
         resolve_parent_owned_path,
     )
+    from runtime_artifacts import (  # type: ignore[no-redef]
+        RuntimeArtifactBoundary,
+        RuntimeArtifactError,
+    )
 
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
@@ -76,7 +82,11 @@ except ModuleNotFoundError:  # pragma: no cover - covered with a subprocess test
     import tomli as tomllib  # type: ignore[no-redef]
 
 
-SCHEMA = "agent-canon.devcontainer-dependencies"
+# This schema is intentionally neutral: dependency planning belongs to the
+# bootstrap-owned tool image, not to a project's editor/developer-container
+# integration.  Keep the old Python module importable below, but do not expose
+# its historical name in manifests or receipts.
+SCHEMA = "agent-canon.tool-dependencies"
 SCHEMA_VERSION = 2
 METHODS = frozenset(
     {
@@ -109,7 +119,8 @@ CANONICAL_RUST_SOURCE_FILES = (
     "src/migration_audit.rs", "src/python_algorithm_contract.rs",
     "src/python_module_groups.rs", "src/python_structure_hash.rs",
     "src/python_structure_hash_impact.rs", "src/python_structure_hash_report.rs",
-    "src/python_structure_hash_scope_plan.rs", "src/rust_migration_plan.rs",
+    "src/python_structure_hash_scope_plan.rs", "src/runtime_boundary.rs",
+    "src/rust_migration_plan.rs",
     "src/semantic_index/args.rs", "src/semantic_index/cli.rs",
     "src/semantic_index/embedding.rs", "src/semantic_index/eval.rs",
     "src/semantic_index/mod.rs", "src/semantic_index/model.rs",
@@ -119,7 +130,7 @@ CANONICAL_RUST_SOURCE_FILES = (
     "src/semantic_index/tests.rs", "src/structured_analysis.rs",
     "src/test_design.rs", "tests/python_algorithm_contract_cli.rs",
 )
-CANONICAL_RUST_SOURCE_SHA256 = "6084cc155d0166cb06e661a07cae7a0630c34df21ee7e9d4c6816d875ec5d15c"
+CANONICAL_RUST_SOURCE_SHA256 = "15529a055d4d1b259708fb01a420605c4cc3f2b2b732b2f9e0318504f85b8975"
 CANONICAL_CARGO_LOCK_SHA256 = "060b8825843b14b12bebb9da095503f4ec7f68a77934e595c082957cb1f72638"
 CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 APT_PACKAGE_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]*$")
@@ -177,7 +188,7 @@ NPM_TRUSTED_BIN_ROOTS = {
 }
 STRUCTURAL_BINDING_OUTPUT_PREFIX = "agent-canon.executable-binding.structural.v1"
 IMAGE_DEPENDENCIES_ROOT = Path("/usr/local/share/agent-canon/image-dependencies")
-IMAGE_PLAN_SCHEMA = "agent-canon.devcontainer-image-dependencies"
+IMAGE_PLAN_SCHEMA = "agent-canon.image-dependencies"
 IMAGE_PLAN_SCHEMA_VERSION = 1
 IMAGE_INSTALL_METHODS = frozenset(
     {
@@ -208,25 +219,24 @@ def _parent_attestation(workspace: Path, purpose: str) -> ParentRootAttestationR
 
 
 def _parent_temp_root(workspace: Path, purpose: str) -> Path:
-    """Return a parent-owned temporary directory for one dependency operation."""
-    # A few pure installer adapters are exercised with a lexical workspace
-    # placeholder by their unit fixtures.  Keep that fixture write parent-local
-    # without manufacturing a repository outside the selected boundary.
-    if not workspace.exists():
-        workspace = workspace.parent
-    attestation = _parent_attestation(workspace, f"dependency-{purpose}")
-    try:
-        receipt = resolve_parent_owned_path(
-            attestation, Path(".agent-canon") / "tmp" / "devcontainer" / purpose,
-            f"dependency-{purpose}", create=False,
-        )
-    except ParentRootSideEffectError as exc:
+    """Return the explicitly selected external runtime scratch directory."""
+    configured = os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
+    if not configured:
         raise DependencyError(
-            f"parent-root-path:{exc.reject.value}:{exc.detail}"
+            f"dependency-{purpose}: runtime_root_required"
+        )
+    source = workspace if workspace.exists() else workspace.parent
+    try:
+        boundary = RuntimeArtifactBoundary.for_source(
+            source.resolve(), Path(configured), create=True
+        )
+        target = boundary.resolve(Path("tmp") / "dependencies" / purpose)
+        target.mkdir(parents=True, exist_ok=True, mode=0o700)
+    except (OSError, RuntimeArtifactError, ValueError) as exc:
+        raise DependencyError(
+            f"dependency-{purpose}: runtime_root_invalid:{exc}"
         ) from exc
-    return ensure_parent_owned_directory(
-        attestation, receipt.physical_path, f"dependency-{purpose}"
-    ).physical_path
+    return target
 
 
 class DependencyError(ValueError):
@@ -271,7 +281,6 @@ class CommandProvenance:
     method: str | None = None
     record_id: str | None = None
     privileged_requested: bool = False
-    owner_root: str | None = None
 
 
 @dataclass(frozen=True)
@@ -287,10 +296,8 @@ class NetworkOperation:
     allow_network: bool
 
 
-_COMMAND_PHASES = frozenset({"image-install", "image-verify", "post-create"})
-_COMMAND_OWNERS = frozenset(
-    {"image-installer", "typed-verifier", "shared-post-create", "parent-hook"}
-)
+_COMMAND_PHASES = frozenset({"image-install", "image-verify"})
+_COMMAND_OWNERS = frozenset({"image-installer", "typed-verifier"})
 _COMMAND_SHELLS = frozenset(
     {"bash", "dash", "fish", "ksh", "sh", "tcsh", "zsh"}
 )
@@ -304,7 +311,7 @@ _COMMAND_INTERPRETERS = {
     "ruby": {"--version", "-v", "--help"},
 }
 _COMMAND_OPERATION_METHODS = {
-    "verify-apt-package": frozenset({"apt-package"}),
+    "verify-apt-package": frozenset({"apt-package", "apt-repository"}),
     "verify-apt-executable-owner": frozenset({"apt-package", "apt-repository"}),
     "verify-apt-repository-key": frozenset({"apt-repository"}),
     "verify-npm-package": frozenset({"npm-global"}),
@@ -333,60 +340,6 @@ _NETWORK_OPERATION_METHODS = {
     "download-release-asset": "release-asset",
     "download-packages-index": "apt-repository",
 }
-
-
-def _command_owner_root(context: CommandProvenance) -> Path:
-    """Resolve the canonical source root used for owner-path checks."""
-    root = Path(context.owner_root) if context.owner_root is not None else Path(__file__).resolve().parents[2]
-    try:
-        resolved = root.resolve(strict=True)
-        if not resolved.is_dir():
-            raise NotADirectoryError(str(resolved))
-        return resolved
-    except OSError as exc:
-        raise _command_failure(
-            CommandCapability.UNKNOWN,
-            "command owner root is not a resolved directory",
-            (),
-            context,
-        ) from exc
-
-
-def _require_canonical_owned_file(
-    path_value: str,
-    *,
-    owner_root: Path,
-    relative: str,
-    context: CommandProvenance,
-) -> None:
-    """Require an exact canonical, non-symlink regular file under owner root."""
-    path = Path(path_value)
-    expected = owner_root / relative
-    if not path.is_absolute() or path.is_symlink() or not path.is_file():
-        raise _command_failure(
-            CommandCapability.UNKNOWN,
-            f"owned command path is not a non-symlink regular file: {path}",
-            (path_value,),
-            context,
-        )
-    try:
-        resolved = path.resolve(strict=True)
-        expected_resolved = expected.resolve(strict=True)
-        resolved.relative_to(owner_root)
-    except (OSError, ValueError) as exc:
-        raise _command_failure(
-            CommandCapability.UNKNOWN,
-            f"owned command path is outside its canonical owner root: {path}",
-            (path_value,),
-            context,
-        ) from exc
-    if resolved != expected_resolved:
-        raise _command_failure(
-            CommandCapability.UNKNOWN,
-            f"owned command path is not canonical: {path}",
-            (path_value,),
-            context,
-        )
 
 
 def _command_failure(
@@ -421,26 +374,6 @@ def _command_shape_capabilities(
     args = list(argv[1:])
     capabilities: set[CommandCapability] = {CommandCapability.ARGV}
 
-    if (
-        executable == "bash"
-        and context.owner in {"shared-post-create", "parent-hook"}
-    ):
-        if context.owner == "shared-post-create" and len(argv) == 2:
-            _require_canonical_owned_file(
-                argv[1],
-                owner_root=_command_owner_root(context),
-                relative=".devcontainer/post-create.sh",
-                context=context,
-            )
-        else:
-            raise _command_failure(
-                CommandCapability.SHELL_EVALUATION,
-                "parent hook shell dispatch is a separate owner edge",
-                argv,
-                context,
-            )
-        capabilities.add(CommandCapability.READ_ONLY_QUERY)
-        return capabilities
     if executable in _COMMAND_SHELLS:
         raise _command_failure(
             CommandCapability.SHELL_EVALUATION,
@@ -463,21 +396,6 @@ def _command_shape_capabilities(
             context,
         )
     if executable in _COMMAND_INTERPRETERS:
-        if (
-            executable in {"python", "python3"}
-            and context.owner == "shared-post-create"
-            and len(argv) >= 3
-            and Path(argv[1]).name == "devcontainer_dependencies.py"
-            and argv[2] == "image-verify"
-        ):
-            _require_canonical_owned_file(
-                argv[1],
-                owner_root=_command_owner_root(context),
-                relative="tools/agent_tools/devcontainer_dependencies.py",
-                context=context,
-            )
-            capabilities.add(CommandCapability.READ_ONLY_QUERY)
-            return capabilities
         if not _command_is_identity_probe(argv, executable):
             capability = (
                 CommandCapability.DYNAMIC_INTERPRETER
@@ -622,8 +540,6 @@ def classify_command(
         raise _command_failure(CommandCapability.UNKNOWN, "image-install requires image-installer ownership", argv, context)
     if context.phase == "image-verify" and context.owner != "typed-verifier":
         raise _command_failure(CommandCapability.UNKNOWN, "image-verify requires typed-verifier ownership", argv, context)
-    if context.phase == "post-create" and context.owner not in {"shared-post-create", "parent-hook"}:
-        raise _command_failure(CommandCapability.UNKNOWN, "post-create requires shared or parent-hook ownership", argv, context)
     if context.method is not None and context.method not in {item.value for item in Method}:
         raise _command_failure(CommandCapability.UNKNOWN, "method is not a closed dependency method", argv, context)
     expected_methods = _COMMAND_OPERATION_METHODS.get(context.operation)
@@ -662,7 +578,7 @@ def classify_command(
 
     if context.privileged_requested:
         capabilities.add(CommandCapability.PRIVILEGE_ESCALATION)
-    if context.phase in {"image-verify", "post-create"}:
+    if context.phase == "image-verify":
         denied = capabilities & {
             CommandCapability.SHELL_EVALUATION,
             CommandCapability.DYNAMIC_INTERPRETER,
@@ -695,104 +611,6 @@ def classify_command(
         )
         raise _command_failure(capability, f"{capability.value} is not allowed in image-install", normalized, context)
     return frozenset(capabilities)
-
-
-@dataclass(frozen=True)
-class PostCreateGraphNode:
-    """One observed shared post-create graph edge."""
-
-    kind: str
-    value: tuple[str, ...]
-    owner: str = "shared-post-create"
-    operation: str = "post-create-readback"
-
-
-@dataclass(frozen=True)
-class PostCreateExecutionGraph:
-    """Typed execution graph recorded by the post-create shell harness."""
-
-    nodes: tuple[PostCreateGraphNode, ...]
-    parent_hook_path: str | None = None
-    parent_hook_exit_status: int | None = None
-
-    def external_commands(self) -> tuple[PostCreateGraphNode, ...]:
-        """Return external command edges in observation order."""
-        return tuple(node for node in self.nodes if node.kind == "external")
-
-
-def build_post_create_execution_graph(
-    commands: Sequence[Sequence[str]],
-    *,
-    builtins: Sequence[str] = (),
-    redirections: Sequence[str] = (),
-    owner_root: Path | str | None = None,
-    parent_root: Path | str | None = None,
-    parent_hook_path: str | None = None,
-    parent_hook_exit_status: int | None = None,
-) -> PostCreateExecutionGraph:
-    """Classify a recorded shell trace without inspecting shell source text."""
-    nodes: list[PostCreateGraphNode] = []
-    for argv in commands:
-        normalized = tuple(argv)
-        classify_command(
-            normalized,
-            context=CommandProvenance(
-                phase="post-create",
-                owner="shared-post-create",
-                operation="post-create-readback",
-                method=None,
-                privileged_requested=False,
-                owner_root=str(owner_root) if owner_root is not None else None,
-            ),
-        )
-        nodes.append(PostCreateGraphNode("external", normalized))
-    nodes.extend(
-        PostCreateGraphNode("builtin", (name,)) for name in builtins
-    )
-    nodes.extend(
-        PostCreateGraphNode("redirection", (value,)) for value in redirections
-    )
-    if parent_hook_path is not None:
-        hook = Path(parent_hook_path)
-        selected_parent_root = (
-            Path(parent_root)
-            if parent_root is not None
-            else Path(owner_root)
-            if owner_root is not None
-            else Path(__file__).resolve().parents[2]
-        )
-        try:
-            selected_parent_root = selected_parent_root.resolve(strict=True)
-            expected_hook = selected_parent_root / ".devcontainer" / "post-create-parent.sh"
-            expected_hook_resolved = expected_hook.resolve(strict=True)
-            hook_resolved = hook.resolve(strict=True)
-            hook_resolved.relative_to(selected_parent_root)
-        except (OSError, ValueError) as exc:
-            raise DependencyError(
-                "command-boundary-unknown: parent hook path is outside its owner root"
-            ) from exc
-        if (
-            not hook.is_absolute()
-            or hook.is_symlink()
-            or not hook.is_file()
-            or hook_resolved != expected_hook_resolved
-        ):
-            raise DependencyError(
-                "command-boundary-unknown: parent hook path is not the canonical non-symlink regular file"
-            )
-        nodes.append(
-            PostCreateGraphNode(
-                "parent-hook",
-                (parent_hook_path, str(parent_hook_exit_status or 0)),
-                owner="parent-hook",
-                operation="parent-hook-dispatch",
-            )
-        )
-    return PostCreateExecutionGraph(
-        tuple(nodes),
-        parent_hook_path=parent_hook_path,
-        parent_hook_exit_status=parent_hook_exit_status,
-    )
 
 
 def check_python_source_safety(source: str | Path) -> tuple[CommandBoundaryFinding, ...]:
@@ -2127,9 +1945,14 @@ def load_manifest(source: ManifestSource) -> LoadedManifest:
         raise DependencyError(f"manifest not found: {path}") from exc
     except (tomllib.TOMLDecodeError, OSError) as exc:
         raise DependencyError(f"cannot parse manifest {path}: {exc}") from exc
-    if not isinstance(raw, dict) or set(raw) - {"schema", "schema_version", "records"}:
+    if not isinstance(raw, dict) or set(raw) - {
+        "schema",
+        "schema_version",
+        "records",
+        "container",
+    }:
         unknown = (
-            sorted(set(raw) - {"schema", "schema_version", "records"})
+            sorted(set(raw) - {"schema", "schema_version", "records", "container"})
             if isinstance(raw, dict)
             else []
         )
@@ -2138,6 +1961,22 @@ def load_manifest(source: ManifestSource) -> LoadedManifest:
         raise DependencyError(
             f"{path}: schema must be {SCHEMA!r} version {SCHEMA_VERSION}"
         )
+    container = raw.get("container")
+    if container is not None:
+        if not isinstance(container, dict) or set(container) - {
+            "platform",
+            "uid",
+            "gid",
+        }:
+            raise DependencyError(
+                f"{path}: container must contain only platform, uid, and gid"
+            )
+        if container.get("platform") != "linux/amd64":
+            raise DependencyError(f"{path}: container.platform must be linux/amd64")
+        for field in ("uid", "gid"):
+            value = container.get(field)
+            if type(value) is not int or value <= 0:
+                raise DependencyError(f"{path}: container.{field} must be a positive integer")
     records = raw.get("records")
     if not isinstance(records, list):
         raise DependencyError(f"{path}: records must be an array of tables")
@@ -2173,43 +2012,28 @@ def _require_file_candidate_agreement(
 
 
 def manifest_sources(
-    workspace: Path, vendor_root: Path | None = None
+    workspace: Path,
+    manifest: Path | None = None,
 ) -> tuple[ManifestSource, ...]:
-    """Resolve parent-first manifest sources with structural roles."""
+    """Resolve dependency manifests, optionally from one explicit standalone path.
+
+    ``manifest`` is the image/bootstrap API.  Supplying it is deliberately
+    exclusive: no parent overlay, vendor checkout, or historical editor
+    configuration is consulted.  When omitted, the standalone bootstrap
+    manifest is the only discovered source.
+    """
     workspace = workspace.resolve()
-    vendor = (vendor_root or workspace / "vendor" / "agent-canon").resolve()
-    parent_path = workspace / ".devcontainer" / "dependencies.toml"
-    vendor_path = vendor / ".devcontainer" / "dependencies.toml"
-    if vendor_root is None and not vendor_path.is_file() and parent_path.is_file():
-        # A standalone source root has the canonical manifest at its workspace
-        # path.  Preserve that role when resolving receipts from a fresh root.
-        vendor = workspace
-        vendor_path = parent_path
-    if vendor == workspace and parent_path == vendor_path:
-        return (
-            (ManifestSource(vendor_path, ManifestRole.CANONICAL),)
-            if vendor_path.is_file()
-            else ()
-        )
-    sources: list[ManifestSource] = []
-    if parent_path.is_file():
-        sources.append(ManifestSource(parent_path, ManifestRole.PARENT_OVERLAY))
-    if vendor_path.is_file():
-        projection_path = (
-            workspace / "tools" / "agent-canon" / ".devcontainer" / "dependencies.toml"
-        )
-        duplicate_candidates = tuple(
-            path for path in (vendor_path, projection_path) if path.is_file()
-        )
-        _require_file_candidate_agreement(
-            duplicate_candidates,
-            description="canonical AgentCanon dependency manifest sources",
-        )
-    if vendor_path.is_file() and vendor_path.resolve() not in {
-        source.path for source in sources
-    }:
-        sources.append(ManifestSource(vendor_path, ManifestRole.CANONICAL))
-    return tuple(sources)
+    if manifest is not None:
+        explicit = manifest.resolve()
+        if not explicit.is_file():
+            raise DependencyError(f"manifest not found: {explicit}")
+        return (ManifestSource(explicit, ManifestRole.CANONICAL),)
+    bootstrap_path = workspace / "bootstrap" / "container" / "dependencies.toml"
+    return (
+        (ManifestSource(bootstrap_path, ManifestRole.CANONICAL),)
+        if bootstrap_path.is_file()
+        else ()
+    )
 
 
 def _merge_optional_scalar(
@@ -2410,11 +2234,19 @@ def build_plan(
     )
 
 
-def load_plan(workspace: Path, vendor_root: Path | None = None) -> DependencyPlan:
-    """Load, merge, and fully validate the plan for a workspace."""
-    sources = manifest_sources(workspace, vendor_root)
+def load_plan(
+    workspace: Path,
+    *,
+    manifest: Path | None = None,
+) -> DependencyPlan:
+    """Load, merge, and fully validate a dependency plan.
+
+    ``manifest`` provides a standalone input for image builds and avoids
+    coupling the installer to a repository's historical editor configuration.
+    """
+    sources = manifest_sources(workspace, manifest)
     if not sources:
-        raise DependencyError("no devcontainer dependency manifest found")
+        raise DependencyError("no AgentCanon tool dependency manifest found")
     return build_plan(tuple(load_manifest(source) for source in sources))
 
 
@@ -2892,7 +2724,7 @@ def image_verify_plan(
 
 @dataclass(frozen=True)
 class BoundaryFinding:
-    """One typed Docker/parent/devcontainer ownership finding."""
+    """One typed shared image/runtime ownership finding."""
 
     category: str
     path: str
@@ -2901,7 +2733,8 @@ class BoundaryFinding:
     def render(self) -> str:
         """Render one stable machine-readable finding."""
         return (
-            f"DEVCONTAINER_BOUNDARY_FINDING={self.category}:{self.path}:{self.detail}"
+            f"AGENT_CANON_RUNTIME_BOUNDARY_FINDING={self.category}:"
+            f"{self.path}:{self.detail}"
         )
 
 
@@ -2916,15 +2749,10 @@ class EnvironmentBoundaryReport:
 
 @dataclass(frozen=True)
 class EnvironmentBoundaryModel:
-    """Typed ownership model for one parent or standalone AgentCanon root."""
+    """Typed ownership model for the standalone bootstrap tool runtime."""
 
     workspace: Path
-    vendor_root: Path
-
-    @property
-    def standalone(self) -> bool:
-        """Return whether the validated root is standalone AgentCanon."""
-        return self.workspace.resolve() == self.vendor_root.resolve()
+    source_root: Path
 
     def _require(
         self,
@@ -2944,226 +2772,32 @@ class EnvironmentBoundaryModel:
             findings.append(BoundaryFinding(category, relative, "not-executable"))
         return path
 
-    def _optional(
-        self,
-        checked: list[str],
-        relative: str,
-        *,
-        executable: bool = False,
-    ) -> Path | None:
-        """Record an optional parent-owned path when it is present."""
-        path = self.workspace / relative
-        checked.append(relative)
-        if not path.is_file():
-            return None
-        if executable and not os.access(path, os.X_OK):
-            # Optional does not mean unvalidated: a present hook must remain
-            # executable before the resolver can dispatch it.
-            return path
-        return path
-
-    @staticmethod
-    def _tokens(path: Path) -> tuple[tuple[str, tuple[str, ...]], ...]:
-        """Parse Dockerfile instructions without matching install strings."""
-        logical: list[str] = []
-        pending = ""
-        for raw_line in path.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if pending:
-                pending += " " + line
-            else:
-                pending = line
-            if pending.endswith("\\"):
-                pending = pending[:-1].rstrip()
-                continue
-            logical.append(pending)
-            pending = ""
-        if pending:
-            logical.append(pending)
-        result: list[tuple[str, tuple[str, ...]]] = []
-        for line in logical:
-            keyword, _, arguments = line.partition(" ")
-            try:
-                tokens = tuple(shlex.split(arguments, comments=True, posix=True))
-            except ValueError as exc:
-                raise DependencyError(
-                    f"{path}: malformed Dockerfile instruction: {exc}"
-                ) from exc
-            result.append((keyword.upper(), tokens))
-        return tuple(result)
-
-    @staticmethod
-    def _installed_apt_packages(
-        instructions: Sequence[tuple[str, tuple[str, ...]]],
-    ) -> frozenset[str]:
-        packages: set[str] = set()
-        for keyword, tokens in instructions:
-            if keyword != "RUN":
-                continue
-            for index, token in enumerate(tokens):
-                if token not in {"install", "apt-get", "apt"}:
-                    continue
-                if token in {"apt-get", "apt"}:
-                    continue
-                start = index + 1
-                while start < len(tokens) and tokens[start].startswith("-"):
-                    start += 1
-                for package in tokens[start:]:
-                    if package in {"&&", ";", "\\"} or package.startswith("-"):
-                        continue
-                    packages.add(package)
-                break
-        return frozenset(packages)
-
-    def _resolve_agent_canon_root_path(self, relative: str) -> Path:
-        """Resolve one source-relative path across active AgentCanon tool roots."""
-        relative_path = PurePosixPath(relative)
-        if relative_path.is_absolute() or ".." in relative_path.parts:
-            raise DependencyError(
-                f"invalid AgentCanon source-relative path: {relative}"
-            )
-        source_path = self.vendor_root.joinpath(*relative_path.parts)
-        candidates = [source_path]
-        if (
-            not self.standalone
-            and relative_path.parts
-            and relative_path.parts[0] == "tools"
-        ):
-            candidates.append(
-                self.workspace
-                / "tools"
-                / "agent-canon"
-                / Path(*relative_path.parts[1:])
-            )
-        active_candidates = tuple(
-            candidate for candidate in candidates if candidate.is_file()
-        )
-        _require_file_candidate_agreement(
-            active_candidates,
-            description=f"AgentCanon source path {relative}",
-        )
-        return active_candidates[0] if active_candidates else source_path
-
-    def _check_parent_container(
+    def _check_bootstrap_runtime(
         self, findings: list[BoundaryFinding], checked: list[str]
     ) -> None:
-        self._require(findings, checked, "README.md", "parent")
-        self._require(findings, checked, "docker/README.md", "docker")
-        dockerfile = self._require(findings, checked, "docker/Dockerfile", "docker")
-        self._require(findings, checked, "pyproject.toml", "python")
-        dockerignore = self._require(findings, checked, ".dockerignore", "docker")
-        gitignore = self._require(findings, checked, ".gitignore", "python")
-        if dockerignore is not None:
-            ignored = frozenset(
-                line.strip()
-                for line in dockerignore.read_text(encoding="utf-8").splitlines()
-                if line.strip() and not line.lstrip().startswith("#")
-            )
-            for entry in ("vendor/agent-canon", ".git", ".state"):
-                if entry not in ignored:
-                    findings.append(
-                        BoundaryFinding(
-                            "docker", str(dockerignore), f"missing-ignore:{entry}"
-                        )
-                    )
-        if gitignore is not None:
-            ignored = gitignore.read_text(encoding="utf-8")
-            for entry in (".venv/", "venv/"):
-                if entry not in ignored:
-                    findings.append(
-                        BoundaryFinding(
-                            "python", str(gitignore), f"missing-ignore:{entry}"
-                        )
-                    )
-        if dockerfile is not None:
-            try:
-                instructions = self._tokens(dockerfile)
-            except DependencyError as exc:
-                findings.append(BoundaryFinding("docker", str(dockerfile), str(exc)))
-            else:
-                for keyword, tokens in instructions:
-                    if keyword != "RUN":
-                        continue
-                    if "pip" in tokens and "-r" in tokens:
-                        findings.append(
-                            BoundaryFinding(
-                                "docker",
-                                str(dockerfile),
-                                "must-not-install-workspace-requirements",
-                            )
-                        )
-    def _check_parent_devcontainer(
-        self, findings: list[BoundaryFinding], checked: list[str]
-    ) -> None:
-        config = self._require(
-            findings, checked, ".devcontainer/devcontainer.json", "parent"
-        )
-        if config is None:
-            return
-        try:
-            payload = json.loads(config.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            findings.append(
-                BoundaryFinding("parent", str(config), f"invalid-json:{exc}")
-            )
-            return
-        if not isinstance(payload, dict):
-            findings.append(
-                BoundaryFinding("parent", str(config), "json-root-must-be-object")
-            )
-            return
-
-    def validate(self) -> EnvironmentBoundaryReport:
-        """Validate typed ownership coverage without running project commands."""
-        findings: list[BoundaryFinding] = []
-        checked: list[str] = []
-        vendor_prefix = (
-            self.vendor_root.relative_to(self.workspace).as_posix()
-            if not self.standalone
-            else "."
-        )
-        for relative in (
-            f"{vendor_prefix}/.devcontainer/dependencies.toml"
-            if not self.standalone
-            else ".devcontainer/dependencies.toml",
-            f"{vendor_prefix}/.devcontainer/post-create.sh"
-            if not self.standalone
-            else ".devcontainer/post-create.sh",
-            f"{vendor_prefix}/tools/agent_tools/devcontainer_dependencies.py"
-            if not self.standalone
-            else "tools/agent_tools/devcontainer_dependencies.py",
-            f"{vendor_prefix}/CONTAINER_OPERATIONS.md"
-            if not self.standalone
-            else "CONTAINER_OPERATIONS.md",
+        """Validate the bootstrap-owned image/runtime surface."""
+        for relative, executable in (
+            ("bootstrap.sh", True),
+            ("bootstrap/container/dependencies.toml", False),
+            ("bootstrap/container/Dockerfile", False),
+            ("bootstrap/container/entrypoint.sh", True),
+            ("tools/agent_tools/dependency_plan.py", False),
+            ("tools/agent_tools/bootstrap_runtime.py", False),
+            ("tools/agent_tools/runtime_artifacts.py", False),
+            ("CONTAINER_OPERATIONS.md", False),
         ):
-            category = (
-                "environment"
-                if relative.endswith("CONTAINER_OPERATIONS.md")
-                else "shared-post-create"
-            )
             self._require(
                 findings,
                 checked,
                 relative,
-                category,
-                executable=relative.endswith(".sh"),
+                "bootstrap-runtime",
+                executable=executable,
             )
-        rulebook = self.vendor_root / "CONTAINER_OPERATIONS.md"
-        if (
-            rulebook.is_file()
-            and "Product Image And Mounted Tool Boundary"
-            not in rulebook.read_text(encoding="utf-8")
-        ):
-            findings.append(
-                BoundaryFinding(
-                    "environment", str(rulebook), "missing-product-mounted-boundary"
-                )
-            )
-        if not self.standalone:
-            self._check_parent_devcontainer(findings, checked)
-            self._check_parent_container(findings, checked)
+    def validate(self) -> EnvironmentBoundaryReport:
+        """Validate typed ownership coverage without running project commands."""
+        findings: list[BoundaryFinding] = []
+        checked: list[str] = []
+        self._check_bootstrap_runtime(findings, checked)
         return EnvironmentBoundaryReport(
             status="fail" if findings else "pass",
             findings=tuple(findings),
@@ -3351,7 +2985,7 @@ class Installer:
         command = tuple(str(item) for item in argv)
         executable = _command_basename(command[0]) if command else ""
         args = command[1:]
-        if phase in {"image-verify", "post-create"}:
+        if phase == "image-verify":
             if executable == "dpkg-query" and args[:1] == ("--show",):
                 return "verify-apt-package"
             if executable == "dpkg-query" and args[:1] == ("--listfiles",):
@@ -3636,7 +3270,7 @@ class Installer:
         """Return planned actions without network, package, or filesystem installs."""
         by_id = plan.by_id()
         return {
-            "schema": "agent-canon.devcontainer-dependency-dry-run",
+            "schema": "agent-canon.tool-dependency-dry-run",
             "plan_fingerprint": plan.fingerprint,
             "order": list(plan.order),
             "actions": [
@@ -3747,6 +3381,7 @@ class Installer:
                         workspace=workspace,
                         expected_source_identity=self._receipt_source_identity(receipt),
                         strict_executables=True,
+                        allow_network=False,
                     )
                     if _executable_binding_names(record):
                         if self._executable_bindings(
@@ -3766,7 +3401,10 @@ class Installer:
             try:
                 self.install_record(record, workspace=workspace, repair=repair)
                 source_identity = self.verify(
-                    record, workspace=workspace, strict_executables=True
+                    record,
+                    workspace=workspace,
+                    strict_executables=True,
+                    allow_network=False,
                 )
                 if active_source:
                     # There is no reusable receipt for an active mounted
@@ -3838,7 +3476,7 @@ class Installer:
         ):
             return False
         return (
-            payload.get("schema") == "agent-canon.devcontainer-dependency-receipt"
+            payload.get("schema") == "agent-canon.tool-dependency-receipt"
             and payload.get("record_id") == record.id
             and payload.get("status") == "pass"
             and payload.get("owner") == "image-installer"
@@ -3943,7 +3581,7 @@ class Installer:
         ):
             source_identity = record.source_identity
         payload = {
-            "schema": "agent-canon.devcontainer-dependency-receipt",
+            "schema": "agent-canon.tool-dependency-receipt",
             "status": "pass",
             "owner": "image-installer",
             "phase": "image-install",
@@ -4484,13 +4122,19 @@ class Installer:
             [
                 "/usr/bin/dpkg-query",
                 "--show",
-                "--showformat=${Status}\\t${Version}\\t${Package}\\\\n",
+                "--showformat=${Status}\\t${Version}\\t${Package}\\n",
                 record.package,
             ],
             workspace=workspace,
         )
         fields = result.stdout.strip().split("\t")
-        if fields != ["install ok installed", record.version, record.package]:
+        package_name = fields[2].partition(":")[0] if len(fields) == 3 else ""
+        if (
+            len(fields) != 3
+            or fields[0] != "install ok installed"
+            or fields[1] != record.version
+            or package_name != record.package
+        ):
             raise DependencyError(
                 f"{record.id}: dpkg package/version/owned state mismatch"
             )
@@ -4572,9 +4216,14 @@ class Installer:
             f"{record.repository_suite} {components}\n"
         )
 
-    @staticmethod
+    def _temporary_parent(self, workspace: Path, purpose: str) -> Path:
+        """Keep image-build scratch ephemeral without requiring a Git checkout."""
+        if self._image_owned:
+            return Path("/tmp")
+        return _parent_temp_root(workspace, purpose)
+
     def _verify_repository_packages_digest(
-        record: DependencyRecord, *, workspace: Path | None = None
+        self, record: DependencyRecord, *, workspace: Path | None = None
     ) -> None:
         """Verify a pinned Packages index before accepting an apt repository."""
         expected = record.repository_packages_sha256
@@ -4583,7 +4232,7 @@ class Installer:
         url = _repository_packages_url(record)
         with tempfile.NamedTemporaryFile(
             prefix=f"agent-canon-{record.id}-packages-",
-            dir=_parent_temp_root(workspace or Path.cwd(), "apt-packages"),
+            dir=self._temporary_parent(workspace or Path.cwd(), "apt-packages"),
             delete=False,
         ) as stream:
             temporary = Path(stream.name)
@@ -4788,26 +4437,8 @@ class Installer:
 
     def _cargo_source(self, record: DependencyRecord, workspace: Path) -> Path:
         workspace_root = workspace.resolve()
-        standalone_source = workspace_root / record.source
-        vendor_root = workspace_root / "vendor" / "agent-canon"
-        # A vendored AgentCanon checkout is the canonical source in a derived
-        # parent. Resolve it before considering the standalone layout so a
-        # stale parent-root copy cannot win merely because it exists.
-        source_projection = workspace_root.parent / "agent-canon-source" / record.source
-        source_projection_is_dir = source_projection.is_dir()
-        if source_projection_is_dir:
-            source = source_projection.resolve()
-        elif vendor_root.is_dir():
-            source = (vendor_root / record.source).resolve()
-        else:
-            source = standalone_source.resolve()
-        allowed_roots = [workspace_root]
-        if source_projection_is_dir:
-            allowed_roots.append(source_projection.parent.parent.resolve())
-        if not any(
-            os.path.commonpath((str(root), str(source))) == str(root)
-            for root in allowed_roots
-        ):
+        source = (workspace_root / record.source).resolve()
+        if os.path.commonpath((str(workspace_root), str(source))) != str(workspace_root):
             raise DependencyError(f"{record.id}: cargo source escapes workspace")
         if not source.is_dir():
             raise DependencyError(f"{record.id}: cargo source is missing: {source}")
@@ -4972,7 +4603,7 @@ class Installer:
         assert record.key_fingerprint is not None
         with tempfile.TemporaryDirectory(
             prefix=f"agent-canon-{record.id}-",
-            dir=_parent_temp_root(workspace, "apt-repository"),
+            dir=self._temporary_parent(workspace, "apt-repository"),
         ) as temporary:
             root = Path(temporary)
             raw_key = root / "key.raw"
@@ -5094,7 +4725,7 @@ class Installer:
         )
         with tempfile.TemporaryDirectory(
             prefix=f"agent-canon-{record.id}-",
-            dir=_parent_temp_root(workspace or Path.cwd(), "release-asset"),
+            dir=self._temporary_parent(workspace or Path.cwd(), "release-asset"),
         ) as temporary:
             root = Path(temporary)
             archive = root / asset
@@ -5252,15 +4883,16 @@ def _repository_package_filename(record: DependencyRecord) -> str:
 
 def resolve_verified_executable(
     workspace: Path,
-    vendor_root: Path | None,
     receipts: Path,
     record_id: str,
     executable: str,
+    *,
+    manifest: Path | None = None,
 ) -> VerifiedExecutable:
     """Resolve a receipt-bound executable after strict live verification."""
     if not executable or Path(executable).name != executable:
         raise DependencyError(f"requested executable must be one command name: {executable!r}")
-    plan = load_plan(workspace, vendor_root)
+    plan = load_plan(workspace, manifest=manifest)
     record = plan.by_id().get(record_id)
     if record is None:
         raise DependencyError(f"dependency record is not present: {record_id}")
@@ -5277,7 +4909,7 @@ def resolve_verified_executable(
     binding = bindings.get(executable) if isinstance(bindings, dict) else None
     expected_bindings = set(_executable_binding_names(record))
     if (
-        payload.get("schema") != "agent-canon.devcontainer-dependency-receipt"
+        payload.get("schema") != "agent-canon.tool-dependency-receipt"
         or payload.get("status") != "pass"
         or payload.get("record_id") != record_id
         or payload.get("manifest_version") != record.version
@@ -5343,8 +4975,9 @@ def resolve_verified_executable(
 
 def _cli_plan(args: argparse.Namespace) -> DependencyPlan:
     workspace = Path(args.workspace).resolve()
-    vendor_root = Path(args.vendor_root).resolve() if args.vendor_root else None
-    return load_plan(workspace, vendor_root)
+    manifest_value = getattr(args, "manifest", None)
+    manifest = Path(manifest_value).resolve() if manifest_value else None
+    return load_plan(workspace, manifest=manifest)
 
 
 def install_plan(
@@ -5376,7 +5009,13 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--workspace", default=".")
-    parser.add_argument("--vendor-root")
+    parser.add_argument(
+        "--manifest",
+        help=(
+            "one explicit bootstrap dependency manifest; when supplied, "
+            "automatic discovery is disabled"
+        ),
+    )
     parser.add_argument("--receipts")
     parser.add_argument(
         "--final-binary-dir",
@@ -5411,12 +5050,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             payload = {"status": "pass", "extras": list(installed)}
         elif args.command == "boundary":
             workspace = Path(args.workspace).resolve()
-            vendor_root = (
-                Path(args.vendor_root).resolve()
-                if args.vendor_root
-                else workspace / "vendor" / "agent-canon"
-            )
-            report = EnvironmentBoundaryModel(workspace, vendor_root).validate()
+            report = EnvironmentBoundaryModel(workspace, workspace).validate()
             payload = {
                 "status": report.status,
                 "checked": list(report.checked),
@@ -5505,29 +5139,29 @@ def main(argv: Sequence[str] | None = None) -> int:
                     )
                 )
             else:
-                print("DEVCONTAINER_IMAGE_VERIFY=rebuild-required", file=sys.stderr)
-        print(f"DEVCONTAINER_DEPENDENCY_ERROR={exc}", file=sys.stderr)
+                print("AGENT_CANON_IMAGE_VERIFY=rebuild-required", file=sys.stderr)
+        print(f"AGENT_CANON_TOOL_DEPENDENCY_ERROR={exc}", file=sys.stderr)
         return 1
     if args.format == "json":
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
-        print(f"DEVCONTAINER_DEPENDENCY={payload.get('status', 'pass')}")
+        print(f"AGENT_CANON_TOOL_DEPENDENCY={payload.get('status', 'pass')}")
         if args.command == "image-install":
-            print("DEVCONTAINER_IMAGE_INSTALL=pass")
+            print("AGENT_CANON_IMAGE_INSTALL=pass")
         if args.command == "image-verify":
-            print("DEVCONTAINER_IMAGE_VERIFY=pass")
+            print("AGENT_CANON_IMAGE_VERIFY=pass")
         if args.command == "boundary":
             for finding in payload.get("findings", []):
                 print(
-                    "DEVCONTAINER_BOUNDARY_FINDING="
+                    "AGENT_CANON_RUNTIME_BOUNDARY_FINDING="
                     f"{finding['category']}:{finding['path']}:{finding['detail']}"
                 )
         if "sources" in payload:
-            print("DEVCONTAINER_DEPENDENCY_SOURCES=" + ",".join(payload["sources"]))
+            print("AGENT_CANON_TOOL_DEPENDENCY_SOURCES=" + ",".join(payload["sources"]))
         if "order" in payload:
-            print("DEVCONTAINER_DEPENDENCY_ORDER=" + ",".join(payload["order"]))
+            print("AGENT_CANON_TOOL_DEPENDENCY_ORDER=" + ",".join(payload["order"]))
         if "completed" in payload:
-            print("DEVCONTAINER_DEPENDENCY_COMPLETED=" + ",".join(payload["completed"]))
+            print("AGENT_CANON_TOOL_DEPENDENCY_COMPLETED=" + ",".join(payload["completed"]))
     return exit_status
 
 

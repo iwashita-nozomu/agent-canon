@@ -9,11 +9,13 @@
 // downstream implementation ../../../rust/agent-canon/src/main.rs routes structured-analysis commands
 // @dependency-end
 
+use crate::runtime_boundary::{
+    resolve_runtime_root_at, runtime_root_is_explicit, stable_source_key, validate_external_target,
+};
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
-use std::env;
 use std::fs;
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
@@ -121,6 +123,7 @@ struct DirectoryResponsibility {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct InventoryArgs {
     root: PathBuf,
+    runtime_root: Option<PathBuf>,
     json_out: Option<PathBuf>,
     markdown_out: Option<PathBuf>,
     fail_on_findings: bool,
@@ -128,12 +131,14 @@ struct InventoryArgs {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ImportArgs {
+    runtime_root: Option<PathBuf>,
     db: PathBuf,
     json: PathBuf,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct AnalyzeArgs {
+    runtime_root: Option<PathBuf>,
     db: PathBuf,
     diagnostics_db: PathBuf,
     profile: String,
@@ -142,6 +147,7 @@ struct AnalyzeArgs {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct BuildArgs {
     root: PathBuf,
+    runtime_root: Option<PathBuf>,
     profile: String,
     out_dir: Option<PathBuf>,
 }
@@ -227,7 +233,7 @@ pub fn run(args: &[String]) -> i32 {
 
 fn print_usage() {
     eprintln!(
-        "usage: agent-canon structured-analysis build --root <repo-root> [--profile name] [--out-dir path] | analyze --db <prose_graph.sqlite> --diagnostics-db <diagnostics.sqlite> [--profile name] | graph-contract [--db <graph.sqlite>] [--format text|json] | document-inventory --root <repo-root> [--json-out path] [--markdown-out path] [--fail-on-findings] | import-document-inventory --db <graph.sqlite> --json <inventory.json>"
+        "usage: agent-canon structured-analysis build --root <repo-root> [--runtime-root path] [--profile name] [--out-dir path] | analyze [--runtime-root path] --db <prose_graph.sqlite> --diagnostics-db <diagnostics.sqlite> [--profile name] | graph-contract [--db <graph.sqlite>] [--format text|json] | document-inventory --root <repo-root> [--runtime-root path] [--json-out path] [--markdown-out path] [--fail-on-findings] | import-document-inventory [--runtime-root path] --db <graph.sqlite> --json <inventory.json>"
     );
 }
 
@@ -240,6 +246,11 @@ fn run_analyze(args: &[String]) -> i32 {
             return 2;
         }
     };
+    if let Err(error) = validate_analyze_paths(&parsed) {
+        eprintln!("STRUCTURED_ANALYSIS_ANALYZE=fail");
+        eprintln!("STRUCTURED_ANALYSIS_FINDING=runtime-boundary:{error}");
+        return 1;
+    }
     let summary =
         match analyze_structured_analysis_db(&parsed.db, &parsed.diagnostics_db, &parsed.profile) {
             Ok(value) => value,
@@ -390,6 +401,17 @@ fn run_document_inventory(args: &[String]) -> i32 {
     };
 
     if let Some(path) = &parsed.json_out {
+        let source_root = fs::canonicalize(&parsed.root)
+            .map_err(|error| format!("canonicalize source root: {error}"));
+        let runtime_root = source_root
+            .and_then(|root| resolve_runtime_root_at(&root, parsed.runtime_root.as_deref()));
+        if let Err(error) = runtime_root.and_then(|runtime| {
+            validate_external_target(&parsed.root, &runtime, path, "document inventory JSON")
+        }) {
+            eprintln!("STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY=fail");
+            eprintln!("STRUCTURED_ANALYSIS_FINDING=runtime-boundary:{error}");
+            return 1;
+        }
         if let Err(error) = write_file(path, &render_json(&report)) {
             eprintln!("STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY=fail");
             eprintln!("STRUCTURED_ANALYSIS_FINDING=write-json:{error}");
@@ -397,6 +419,17 @@ fn run_document_inventory(args: &[String]) -> i32 {
         }
     }
     if let Some(path) = &parsed.markdown_out {
+        let source_root = fs::canonicalize(&parsed.root)
+            .map_err(|error| format!("canonicalize source root: {error}"));
+        let runtime_root = source_root
+            .and_then(|root| resolve_runtime_root_at(&root, parsed.runtime_root.as_deref()));
+        if let Err(error) = runtime_root.and_then(|runtime| {
+            validate_external_target(&parsed.root, &runtime, path, "document inventory markdown")
+        }) {
+            eprintln!("STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY=fail");
+            eprintln!("STRUCTURED_ANALYSIS_FINDING=runtime-boundary:{error}");
+            return 1;
+        }
         if let Err(error) = write_file(path, &render_markdown(&report)) {
             eprintln!("STRUCTURED_ANALYSIS_DOCUMENT_INVENTORY=fail");
             eprintln!("STRUCTURED_ANALYSIS_FINDING=write-markdown:{error}");
@@ -442,6 +475,11 @@ fn run_import_document_inventory(args: &[String]) -> i32 {
             return 2;
         }
     };
+    if let Err(error) = validate_import_paths(&parsed) {
+        eprintln!("STRUCTURED_ANALYSIS_IMPORT_DOCUMENT_INVENTORY=fail");
+        eprintln!("STRUCTURED_ANALYSIS_FINDING=runtime-boundary:{error}");
+        return 1;
+    }
     let text = match fs::read_to_string(&parsed.json) {
         Ok(value) => value,
         Err(error) => {
@@ -499,12 +537,17 @@ fn run_import_document_inventory(args: &[String]) -> i32 {
 }
 
 fn parse_analyze_args(args: &[String]) -> Result<AnalyzeArgs, String> {
+    let mut runtime_root = None;
     let mut db = None;
     let mut diagnostics_db = None;
     let mut profile = "manual".to_string();
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
+            "--runtime-root" => {
+                runtime_root = Some(next_path(args, index, "--runtime-root")?);
+                index += 2;
+            }
             "--db" => {
                 db = Some(next_path(args, index, "--db")?);
                 index += 2;
@@ -527,14 +570,37 @@ fn parse_analyze_args(args: &[String]) -> Result<AnalyzeArgs, String> {
         return Err("--profile must not be empty".to_string());
     }
     Ok(AnalyzeArgs {
+        runtime_root,
         db: db.ok_or_else(|| "--db is required".to_string())?,
         diagnostics_db: diagnostics_db.ok_or_else(|| "--diagnostics-db is required".to_string())?,
         profile,
     })
 }
 
+fn validate_analyze_paths(args: &AnalyzeArgs) -> Result<(), String> {
+    let source = std::env::current_dir().map_err(|error| error.to_string())?;
+    let runtime = resolve_runtime_root_at(&source, args.runtime_root.as_deref())?;
+    if cfg!(test) && !runtime_root_is_explicit() && args.runtime_root.is_none() {
+        return Ok(());
+    }
+    validate_external_target(
+        &source,
+        &runtime,
+        &args.db,
+        "structured-analysis source database",
+    )?;
+    validate_external_target(
+        &source,
+        &runtime,
+        &args.diagnostics_db,
+        "structured-analysis diagnostics database",
+    )?;
+    Ok(())
+}
+
 fn parse_build_args(args: &[String]) -> Result<BuildArgs, String> {
     let mut root = PathBuf::from(".");
+    let mut runtime_root = None;
     let mut profile = "manual".to_string();
     let mut out_dir = None;
     let mut index = 0;
@@ -542,6 +608,10 @@ fn parse_build_args(args: &[String]) -> Result<BuildArgs, String> {
         match args[index].as_str() {
             "--root" => {
                 root = next_path(args, index, "--root")?;
+                index += 2;
+            }
+            "--runtime-root" => {
+                runtime_root = Some(next_path(args, index, "--runtime-root")?);
                 index += 2;
             }
             "--profile" => {
@@ -563,6 +633,7 @@ fn parse_build_args(args: &[String]) -> Result<BuildArgs, String> {
     }
     Ok(BuildArgs {
         root,
+        runtime_root,
         profile,
         out_dir,
     })
@@ -596,6 +667,7 @@ fn parse_graph_contract_args(args: &[String]) -> Result<GraphContractArgs, Strin
 
 fn parse_inventory_args(args: &[String]) -> Result<InventoryArgs, String> {
     let mut root = PathBuf::from(".");
+    let mut runtime_root = None;
     let mut json_out = None;
     let mut markdown_out = None;
     let mut fail_on_findings = false;
@@ -604,6 +676,10 @@ fn parse_inventory_args(args: &[String]) -> Result<InventoryArgs, String> {
         match args[index].as_str() {
             "--root" => {
                 root = next_path(args, index, "--root")?;
+                index += 2;
+            }
+            "--runtime-root" => {
+                runtime_root = Some(next_path(args, index, "--runtime-root")?);
                 index += 2;
             }
             "--json-out" => {
@@ -623,6 +699,7 @@ fn parse_inventory_args(args: &[String]) -> Result<InventoryArgs, String> {
     }
     Ok(InventoryArgs {
         root,
+        runtime_root,
         json_out,
         markdown_out,
         fail_on_findings,
@@ -630,11 +707,16 @@ fn parse_inventory_args(args: &[String]) -> Result<InventoryArgs, String> {
 }
 
 fn parse_import_args(args: &[String]) -> Result<ImportArgs, String> {
+    let mut runtime_root = None;
     let mut db = None;
     let mut json = None;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
+            "--runtime-root" => {
+                runtime_root = Some(next_path(args, index, "--runtime-root")?);
+                index += 2;
+            }
             "--db" => {
                 db = Some(next_path(args, index, "--db")?);
                 index += 2;
@@ -647,9 +729,25 @@ fn parse_import_args(args: &[String]) -> Result<ImportArgs, String> {
         }
     }
     Ok(ImportArgs {
+        runtime_root,
         db: db.ok_or_else(|| "--db is required".to_string())?,
         json: json.ok_or_else(|| "--json is required".to_string())?,
     })
+}
+
+fn validate_import_paths(args: &ImportArgs) -> Result<(), String> {
+    let source = std::env::current_dir().map_err(|error| error.to_string())?;
+    let runtime = resolve_runtime_root_at(&source, args.runtime_root.as_deref())?;
+    if cfg!(test) && !runtime_root_is_explicit() && args.runtime_root.is_none() {
+        return Ok(());
+    }
+    validate_external_target(
+        &source,
+        &runtime,
+        &args.db,
+        "structured-analysis graph database",
+    )?;
+    Ok(())
 }
 
 fn next_path(args: &[String], index: usize, name: &str) -> Result<PathBuf, String> {
@@ -661,8 +759,29 @@ fn next_path(args: &[String], index: usize, name: &str) -> Result<PathBuf, Strin
 fn build_structured_analysis_cache(parsed: &BuildArgs) -> Result<BuildResult, String> {
     let root = fs::canonicalize(&parsed.root)
         .map_err(|error| format!("canonicalize {}: {error}", parsed.root.display()))?;
-    let cache_dir = default_cache_dir(&root, &parsed.profile)?;
+    let runtime_root = resolve_runtime_root_at(&root, parsed.runtime_root.as_deref())?;
+    let cache_dir = runtime_root
+        .join("structured-analysis")
+        .join(stable_source_key(&root))
+        .join(format!(
+            "{}-current",
+            sanitize_path_segment(&parsed.profile)
+        ));
     let report_dir = parsed.out_dir.clone().unwrap_or_else(|| cache_dir.clone());
+    validate_external_target(
+        &root,
+        &runtime_root,
+        &cache_dir,
+        "structured-analysis cache",
+    )?;
+    if runtime_root_is_explicit() || !cfg!(test) {
+        validate_external_target(
+            &root,
+            &runtime_root,
+            &report_dir,
+            "structured-analysis report",
+        )?;
+    }
     fs::create_dir_all(&cache_dir)
         .map_err(|error| format!("create-dir {}: {error}", cache_dir.display()))?;
     fs::create_dir_all(&report_dir)
@@ -2198,32 +2317,6 @@ fn render_graph_contract_json(db: Option<&Path>, findings: &[GraphContractFindin
     .expect("graph contract JSON should serialize")
 }
 
-fn default_cache_dir(root: &Path, profile: &str) -> Result<PathBuf, String> {
-    let base = env::var_os("AGENT_CANON_STRUCTURED_ANALYSIS_HOME")
-        .filter(|value| !value.is_empty())
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            env::var_os("HOME")
-                .map(PathBuf::from)
-                .unwrap_or_else(|| PathBuf::from("."))
-                .join(".cache")
-                .join("agent-canon")
-                .join("structured-analysis")
-        });
-    let repo_name = root
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("workspace");
-    let repo_id = format!(
-        "{}-{}",
-        sanitize_path_segment(repo_name),
-        short_hash(&root.to_string_lossy(), 12)?
-    );
-    Ok(base
-        .join(repo_id)
-        .join(format!("{}-current", sanitize_path_segment(profile))))
-}
-
 fn ensure_analysis_document(connection: &Connection, root: &Path) -> rusqlite::Result<String> {
     let document_id = "doc:analysis".to_string();
     connection.execute(
@@ -3523,6 +3616,7 @@ mod tests {
 
         let result = build_structured_analysis_cache(&BuildArgs {
             root: root.clone(),
+            runtime_root: None,
             profile: "test".to_string(),
             out_dir: Some(out_dir.clone()),
         })
@@ -3599,6 +3693,7 @@ mod tests {
 
         let result = build_structured_analysis_cache(&BuildArgs {
             root: root.clone(),
+            runtime_root: None,
             profile: "test".to_string(),
             out_dir: Some(out_dir.clone()),
         })
@@ -3655,6 +3750,7 @@ mod tests {
 
         let result = build_structured_analysis_cache(&BuildArgs {
             root: root.clone(),
+            runtime_root: None,
             profile: "test".to_string(),
             out_dir: Some(out_dir.clone()),
         })

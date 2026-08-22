@@ -41,6 +41,27 @@ from pathlib import Path
 from types import TracebackType
 from typing import TextIO, cast
 
+try:
+    from .runtime_artifacts import (
+        RuntimeArtifactBoundary,
+        RuntimeArtifactError,
+        RuntimePathEscape,
+        RuntimeRootRequired,
+        RuntimeSymlinkEscape,
+        SourceLocalArtifact,
+        runtime_artifact_boundary,
+    )
+except ImportError:  # pragma: no cover - direct script execution
+    from runtime_artifacts import (  # type: ignore[no-redef]
+        RuntimeArtifactBoundary,
+        RuntimeArtifactError,
+        RuntimePathEscape,
+        RuntimeRootRequired,
+        RuntimeSymlinkEscape,
+        SourceLocalArtifact,
+        runtime_artifact_boundary,
+    )
+
 SCHEMA_REQUEST = "agent-canon.parent-root-attestation-request.v1"
 SCHEMA_RECEIPT = "agent-canon.parent-root-attestation-receipt.v1"
 SCHEMA_HANDOFF = "agent-canon.child-handoff.v1"
@@ -75,6 +96,11 @@ class ParentRootReject(str, Enum):
     ROOT_RACE_DETECTED = "root_race_detected"
     HANDOFF_INVALID = "handoff_invalid"
     UNSUPPORTED_PLATFORM = "unsupported_platform"
+    RUNTIME_ROOT_REQUIRED = "runtime_root_required"
+    RUNTIME_ROOT_UNATTESTED = "runtime_root_unattested"
+    RUNTIME_ROOT_INVALID = "runtime_root_invalid"
+    RUNTIME_PATH_ESCAPE = "runtime_path_escape"
+    RUNTIME_SYMLINK_ESCAPE = "runtime_symlink_escape"
 
 
 class ParentRootSideEffectError(RuntimeError):
@@ -402,6 +428,43 @@ def _identity(path: Path) -> tuple[int, int]:
         raise ParentRootSideEffectError(ParentRootReject.ROOT_MISSING,
                                         f"cannot stat {path}: {exc}") from exc
     return info.st_dev, info.st_ino
+
+
+def _runtime_boundary_for_child(
+    source_root: Path, environment: Mapping[str, str]
+) -> RuntimeArtifactBoundary | None:
+    """Validate the optional external runtime capability for a child.
+
+    ``ParentRootSideEffectBoundary`` authenticates intentional repository
+    mutations.  Runtime/cache/tmp output is a different authority and must
+    never be admitted by treating an arbitrary environment path as a parent
+    path.  A child may use the external boundary only when the caller has
+    supplied both the root and the identity readback emitted by
+    ``root_capability_environment``.
+    """
+    configured = environment.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
+    if not configured:
+        return None
+    try:
+        boundary = runtime_artifact_boundary(source_root, configured, create=False)
+    except RuntimeRootRequired as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.RUNTIME_ROOT_REQUIRED, str(exc)
+        ) from exc
+    except RuntimeSymlinkEscape as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.RUNTIME_SYMLINK_ESCAPE, str(exc)
+        ) from exc
+    except (SourceLocalArtifact, RuntimePathEscape) as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.RUNTIME_PATH_ESCAPE, str(exc)
+        ) from exc
+    except RuntimeArtifactError as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.RUNTIME_ROOT_INVALID, str(exc)
+        ) from exc
+
+    return boundary
 
 
 def _write_all(fd: int, data: bytes) -> None:
@@ -1863,7 +1926,13 @@ class ParentRootSideEffectBoundary:
         finally:
             handle.close()
 
-    def atomic_publish(self, receipt: ParentOwnedPathReceipt, data: bytes) -> ParentOwnedPathReceipt:
+    def atomic_publish(
+        self,
+        receipt: ParentOwnedPathReceipt,
+        data: bytes,
+        *,
+        mode: int = 0o600,
+    ) -> ParentOwnedPathReceipt:
         """Publish with same-directory O_EXCL temp, fsync, renameat, and identity checks."""
         if sys.platform != "linux":
             raise ParentRootSideEffectError(ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform)
@@ -1888,7 +1957,7 @@ class ParentRootSideEffectBoundary:
         temp_fd = -1
         primary_error: Exception | None = None
         try:
-            temp_fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600, dir_fd=parent_fd)
+            temp_fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, mode, dir_fd=parent_fd)
             _write_all(temp_fd, data)
             os.fsync(temp_fd)
             os.close(temp_fd)
@@ -3168,12 +3237,42 @@ class ParentRootSideEffectBoundary:
         *,
         issue_handoff: bool = True,
     ) -> dict[str, str]:
-        """Bind persistent child state and temporary state to the parent."""
+        """Bind child state to either the parent or an attested runtime root.
+
+        The historical parent-local route remains the default for callers
+        that intentionally mutate the parent checkout.  CI/tool-runtime
+        callers may opt into the external route by supplying a complete
+        runtime capability.  The two routes are deliberately disjoint: an
+        external path is never checked or created through the parent-owned
+        capability, and an arbitrary ``TMPDIR`` without a runtime root is
+        still rejected.
+        """
         env = dict(os.environ if base_env is None else base_env)
         root = attestation.parent_root
-        default_tmp = root / ".agent-canon" / "tmp"
-        default_cache = root / ".agent-canon" / "cache"
-        default_target = default_cache / "cargo-target"
+        # For a parent integration, runtime may live under the authenticated
+        # parent control root; it only has to be outside the selected source
+        # checkout.  Standalone AgentCanon has no separate source binding and
+        # therefore keeps the parent root as its source boundary.
+        # A control-plane caller may analyze a separate project checkout.  In
+        # that case the authenticated parent root is intentionally not the
+        # source boundary for runtime artifacts; the caller supplies the
+        # explicit source root in the inherited environment.  Keep the
+        # parent-root fallback for ordinary parent-owned commands.
+        runtime_source_value = env.get("AGENT_CANON_SOURCE_ROOT", "").strip()
+        runtime_source = (
+            Path(runtime_source_value).expanduser()
+            if runtime_source_value
+            else (attestation.source_root or root)
+        )
+        runtime_boundary = _runtime_boundary_for_child(runtime_source, env)
+        if runtime_boundary is not None:
+            default_tmp = runtime_boundary.root / "tmp"
+            default_cache = runtime_boundary.root / "cache"
+            default_target = default_cache / "cargo-target"
+        else:
+            default_tmp = root / ".agent-canon" / "tmp"
+            default_cache = root / ".agent-canon" / "cache"
+            default_target = default_cache / "cargo-target"
 
         def parent_local_value(name: str, default: Path) -> Path:
             """Validate one environment path without creating anything."""
@@ -3182,24 +3281,48 @@ class ParentRootSideEffectBoundary:
             physical, _ = _physical_in_root(root, candidate, allow_missing=True)
             return physical
 
-        # Validate every override before creating any of the parent-local
-        # directories.  In particular, a late invalid value must not leave
-        # earlier defaults behind as an observable partial side effect.
+        def runtime_value(name: str, default: Path) -> Path:
+            """Validate one runtime path without using parent capabilities."""
+            if runtime_boundary is None:  # pragma: no cover - caller branch
+                return parent_local_value(name, default)
+            value = env.get(name)
+            candidate = Path(value) if value else default
+            try:
+                return runtime_boundary.resolve(candidate)
+            except RuntimeSymlinkEscape as exc:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.RUNTIME_SYMLINK_ESCAPE, str(exc)
+                ) from exc
+            except (SourceLocalArtifact, RuntimePathEscape) as exc:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.RUNTIME_PATH_ESCAPE, str(exc)
+                ) from exc
+            except RuntimeArtifactError as exc:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.RUNTIME_ROOT_INVALID, str(exc)
+                ) from exc
+
+        value = runtime_value if runtime_boundary is not None else parent_local_value
+
+        # Validate every override before creating any directory.  A late
+        # invalid value must not leave an observable partial side effect.
         paths = {
-            "TMPDIR": parent_local_value("TMPDIR", default_tmp),
-            "TEMP": parent_local_value("TEMP", default_tmp),
-            "TMP": parent_local_value("TMP", default_tmp),
-            "XDG_CACHE_HOME": parent_local_value("XDG_CACHE_HOME", default_cache),
-            "PYTHONPYCACHEPREFIX": parent_local_value(
+            "TMPDIR": value("TMPDIR", default_tmp),
+            "TEMP": value("TEMP", default_tmp),
+            "TMP": value("TMP", default_tmp),
+            "XDG_CACHE_HOME": value("XDG_CACHE_HOME", default_cache),
+            "PYTHONPYCACHEPREFIX": value(
                 "PYTHONPYCACHEPREFIX", default_cache / "pycache"
             ),
-            "AGENT_CANON_TOOLS_HOME": parent_local_value(
-                "AGENT_CANON_TOOLS_HOME", root / ".agent-canon" / "tools"
+            "AGENT_CANON_TOOLS_HOME": value(
+                "AGENT_CANON_TOOLS_HOME",
+                (runtime_boundary.root / "tools") if runtime_boundary is not None
+                else root / ".agent-canon" / "tools",
             ),
-            "CARGO_HOME": parent_local_value("CARGO_HOME", default_cache / "cargo-home"),
+            "CARGO_HOME": value("CARGO_HOME", default_cache / "cargo-home"),
         }
-        target_a = parent_local_value("CARGO_TARGET_DIR", default_target)
-        target_b = parent_local_value("AGENT_CANON_CLI_TARGET_DIR", default_target)
+        target_a = value("CARGO_TARGET_DIR", default_target)
+        target_b = value("AGENT_CANON_CLI_TARGET_DIR", default_target)
         if env.get("CARGO_TARGET_DIR") and env.get("AGENT_CANON_CLI_TARGET_DIR") and target_a != target_b:
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_MISMATCH, "target_alias_mismatch"
@@ -3207,12 +3330,29 @@ class ParentRootSideEffectBoundary:
         target = target_a if env.get("CARGO_TARGET_DIR") else target_b
         paths["CARGO_TARGET_DIR"] = target
         paths["AGENT_CANON_CLI_TARGET_DIR"] = target
-        for key, path in paths.items():
-            capability = self.ensure_parent_owned_directory(attestation, path, f"child-{key}")
-            env[key] = str(capability.physical_path)
+        if runtime_boundary is not None:
+            for key, path in paths.items():
+                try:
+                    env[key] = str(runtime_boundary.ensure_directory(path))
+                except RuntimeSymlinkEscape as exc:
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.RUNTIME_SYMLINK_ESCAPE, str(exc)
+                    ) from exc
+                except RuntimeArtifactError as exc:
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.RUNTIME_ROOT_INVALID, str(exc)
+                    ) from exc
+            env["AGENT_CANON_RUNTIME_ROOT"] = str(runtime_boundary.root)
+            observed = runtime_boundary.root.stat()
+            env["AGENT_CANON_RUNTIME_ROOT_DEV"] = str(observed.st_dev)
+            env["AGENT_CANON_RUNTIME_ROOT_INO"] = str(observed.st_ino)
+        else:
+            for key, path in paths.items():
+                capability = self.ensure_parent_owned_directory(attestation, path, f"child-{key}")
+                env[key] = str(capability.physical_path)
         env["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(root)
         env["AGENT_CANON_PARENT_ROOT"] = str(root)
-        env["AGENT_CANON_SOURCE_ROOT"] = str(attestation.source_root or root)
+        env["AGENT_CANON_SOURCE_ROOT"] = str(runtime_source)
         env["AGENT_CANON_ROOT"] = env["AGENT_CANON_SOURCE_ROOT"]
         env["AGENT_CANON_PARENT_ROOT_DEV"] = str(attestation.parent_dev)
         env["AGENT_CANON_PARENT_ROOT_INO"] = str(attestation.parent_ino)

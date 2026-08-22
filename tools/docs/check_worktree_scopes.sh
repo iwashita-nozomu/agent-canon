@@ -6,6 +6,10 @@
 # @dependency-end
 
 set -euo pipefail
+# This checker only inspects the AgentCanon checkout containing this script.
+# It must not inherit a caller's parent-repository cwd or create Python cache
+# files while resolving the external report destination.
+export PYTHONDONTWRITEBYTECODE=1
 # Check each git worktree for WORKTREE_SCOPE.md and report.  Runtime output is
 # external by construction; missing or unsafe roots fail before enumeration.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -39,13 +43,22 @@ PY
 } )"
 OUT="${RUN_DIR}/worktree_scope_report.txt"
 echo "Worktree scope check" > "$OUT"
-git worktree list --porcelain | awk '/worktree /{print $2}' | while read -r wt; do
-  echo "Worktree: $wt" >> "$OUT"
-  if [ -f "$wt/WORKTREE_SCOPE.md" ]; then
-    echo "  OK: WORKTREE_SCOPE.md present" >> "$OUT"
-  else
-    echo "  MISSING: WORKTREE_SCOPE.md" >> "$OUT"
-  fi
-done
+WORKTREE_LIST="$(git -C "$ROOT_DIR" worktree list --porcelain)" || {
+  echo "worktree_scope_error: unable to enumerate AgentCanon worktrees" >&2
+  exit 1
+}
+while IFS= read -r line; do
+  case "$line" in
+    "worktree "*)
+      wt="${line#worktree }"
+      echo "Worktree: $wt" >> "$OUT"
+      if [ -f "$wt/WORKTREE_SCOPE.md" ]; then
+        echo "  OK: WORKTREE_SCOPE.md present" >> "$OUT"
+      else
+        echo "  MISSING: WORKTREE_SCOPE.md" >> "$OUT"
+      fi
+      ;;
+  esac
+done <<< "$WORKTREE_LIST"
 echo "Report written to $OUT"
 cat "$OUT"

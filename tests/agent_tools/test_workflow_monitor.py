@@ -27,6 +27,7 @@ from parent_root_side_effects import (  # noqa: E402
     ParentRootReject,
     ParentRootSideEffectError,
 )
+from runtime_artifacts import RuntimeSymlinkEscape  # noqa: E402
 
 MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
@@ -138,20 +139,18 @@ class WorkflowMonitorTest(unittest.TestCase):
         module = load_monitor_module()
         entries_type = getattr(module, "MonitoringEntries")
         append_monitoring = getattr(module, "append_monitoring")
-        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT / ".agent-canon") as tmp_dir:
+        with tempfile.TemporaryDirectory(prefix="agent-canon-workflow-monitor-") as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             report_dir.mkdir(parents=True)
             prepared = "prepared-monitoring-prefix\n"
             (report_dir / "workflow_monitoring.md").write_text(
                 prepared, encoding="utf-8"
             )
-            with mock.patch.dict(
-                os.environ, {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}
-            ):
-                append_monitoring(
-                    report_dir,
-                    entries_type(signals=("source=post-move",)),
-                )
+            append_monitoring(
+                report_dir,
+                entries_type(signals=("source=post-move",)),
+                runtime_root=Path(tmp_dir),
+            )
             text = (report_dir / "workflow_monitoring.md").read_text(
                 encoding="utf-8"
             )
@@ -1190,11 +1189,9 @@ def test_monitor_atomic_open_rejects_parent_path_replacement() -> None:
         replaced.symlink_to(outside, target_is_directory=True)
         module = load_monitor_module()
         target = replaced / "workflow_monitoring.md"
-        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}):
-            with unittest.TestCase().assertRaises(ParentRootSideEffectError) as rejected:
-                with module.locked_monitoring_artifact(target):
-                    pass
-        assert rejected.exception.reject is ParentRootReject.SYMLINK_ESCAPE
+        with unittest.TestCase().assertRaises(RuntimeSymlinkEscape) as rejected:
+            with module.locked_monitoring_artifact(target, runtime_root=root):
+                pass
         assert not (outside / "workflow_monitoring.md").exists()
 
 

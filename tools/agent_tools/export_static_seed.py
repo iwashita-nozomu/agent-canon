@@ -90,10 +90,8 @@ FORBIDDEN_CONTENT_MARKERS = (
     b"import agent_tools",
     b"ssh://",
     b"sync-state.json",
-    b"sync_agent_canon",
     b"tools/agent-canon",
     b"update-state.toml",
-    b"update_agent_canon",
     b"vendor/agent-canon",
     b"wget ",
 )

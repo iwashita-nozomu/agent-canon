@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import os
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -39,27 +39,12 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
 from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
-from parent_root_side_effects import (
-    ParentRootAttestationRequest,
-    ParentRootReject,
-    ParentRootSideEffectBoundary,
-    ParentRootSideEffectError,
-    attest_parent_root,
-)
 from runtime_log_paths import agent_canon_root, eval_results_dir
+from runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary
 
 DEFAULT_MANIFEST = eval_manifest_path("workflow_selection_eval.toml")
 DEFAULT_RESULTS_FAMILY = "workflow-selection"
 RUN_ID_DIGEST_LENGTH = 10
-
-
-def _parent_write(path: Path, data: bytes, purpose: str) -> None:
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
-    ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, data, purpose)
 
 
 @dataclass(frozen=True)
@@ -137,6 +122,11 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
+    parser.add_argument(
+        "--runtime-root",
+        type=Path,
+        help="Explicit external runtime root for reports; required when writing output.",
+    )
     parser.add_argument("--manifest", default=DEFAULT_MANIFEST)
     parser.add_argument("--report-out", default="")
     parser.add_argument("--accumulate", action="store_true")
@@ -508,21 +498,33 @@ def display_path(root: Path, path: Path) -> str:
         return path.as_posix()
 
 
-def write_report(path: Path, bundle: WorkflowSelectionBundle) -> Path:
+def write_report(
+    path: Path,
+    bundle: WorkflowSelectionBundle,
+    runtime_root: Path | str | None = None,
+) -> Path:
     """Write a report path, avoiding accidental overwrite."""
     if path.exists():
         path = path.with_name(f"{path.stem}-{bundle.run_id}{path.suffix}")
-    _parent_write(path, render_report(bundle).encode("utf-8"), "workflow-selection-evaluation")
-    return path
+    boundary = runtime_artifact_boundary(bundle.root, runtime_root)
+    return boundary.atomic_write_text(path, render_report(bundle))
 
 
-def resolve_results_dir(root: Path, value: str) -> Path:
+def resolve_results_dir(
+    root: Path,
+    value: str,
+    runtime_root: Path | str | None = None,
+) -> Path:
     """Resolve the CLI results directory or the default archive location."""
     stripped = value.strip()
     if stripped:
         path = Path(stripped)
-        return path if path.is_absolute() else root / path
-    return eval_results_dir(agent_canon_root(root), DEFAULT_RESULTS_FAMILY)
+        if path.is_absolute():
+            return path
+        if runtime_root is not None:
+            return runtime_artifact_boundary(root, runtime_root).resolve(path)
+        return root / path
+    return eval_results_dir(agent_canon_root(root), DEFAULT_RESULTS_FAMILY, runtime_root)
 
 
 def accumulated_report_path(results_dir: Path, bundle: WorkflowSelectionBundle) -> Path:
@@ -534,14 +536,26 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run workflow selection evals."""
     args = build_parser().parse_args(argv)
     bundle = evaluate(args.root, Path(args.manifest), requested_run_id=str(args.run_id))
+    boundary = (
+        runtime_artifact_boundary(args.root, args.runtime_root)
+        if args.report_out or args.accumulate
+        else None
+    )
     report_paths: list[Path] = []
     if args.report_out:
-        report_paths.append(write_report(Path(args.report_out), bundle))
+        assert boundary is not None
+        report_paths.append(write_report(Path(args.report_out), bundle, boundary.root))
     if args.accumulate:
         report_paths.append(
             write_report(
-                accumulated_report_path(resolve_results_dir(bundle.root, str(args.results_dir)), bundle),
+                accumulated_report_path(
+                    resolve_results_dir(
+                        bundle.root, str(args.results_dir), boundary.root  # type: ignore[union-attr]
+                    ),
+                    bundle,
+                ),
                 bundle,
+                boundary.root if boundary is not None else None,
             )
         )
     print(f"WORKFLOW_SELECTION_EVAL_RUN_ID={bundle.run_id}")
@@ -562,4 +576,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except RuntimeArtifactError as exc:
+        print(f"evaluate_workflow_selection.py: runtime_root_required: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc

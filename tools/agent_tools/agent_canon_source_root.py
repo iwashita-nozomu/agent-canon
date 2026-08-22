@@ -25,14 +25,11 @@ except ImportError:  # direct script execution
     import parent_root_side_effects as _parent_boundary  # type: ignore[no-redef]
 
 LAYOUT_STANDALONE = "standalone"
-LAYOUT_VENDORED = "vendored"
-LAYOUT_OVERRIDE = "override"
+LAYOUT_EXTERNAL = "external"
 SOURCE_ROOT_OVERRIDE_ENV = "AGENT_CANON_SOURCE_ROOT"
 CANON_ROOT_OVERRIDE_ENV = "AGENT_CANON_ROOT"
 SOURCE_PREFIX_ENV = "AGENT_CANON_PREFIX"
 
-VENDOR_OUTSIDE_REPOSITORY = "agent_canon_source_root_vendor_outside_repository"
-ROOT_VIEW_OUTSIDE_REPOSITORY = "agent_canon_source_root_root_view_outside_repository"
 
 
 @dataclass
@@ -78,7 +75,7 @@ class RepositoryRoots:
 
     def __post_init__(self) -> None:
         """Canonicalize roots and reject an invalid source/report boundary."""
-        if self.layout not in {LAYOUT_STANDALONE, LAYOUT_VENDORED, LAYOUT_OVERRIDE}:
+        if self.layout not in {LAYOUT_STANDALONE, LAYOUT_EXTERNAL}:
             raise SourceRootFailure(
                 "runtime_roots_invalid",
                 f"unknown AgentCanon layout: {self.layout}",
@@ -212,11 +209,6 @@ def _run_subcommand(resolution: RootResolution, command: Sequence[str]) -> int:
 def _source_prefix(resolution: RootResolution) -> str:
     """Return the source path expected by delegated root-aware commands."""
     command_root = _find_current_repository_root(resolution.source_root)
-    if not _is_within(resolution.source_root, command_root):
-        raise SourceRootFailure(
-            "agent_canon_source_root_prefix_outside_repository",
-            f"Source root is outside delegated repository root: {resolution.source_root}",
-        )
     relative = resolution.source_root.relative_to(command_root).as_posix()
     return relative or "."
 
@@ -245,27 +237,11 @@ def run(
 
 
 def _find_current_repository_root(raw_root: Path) -> Path:
-    """Find the active parent root, including calls from its AgentCanon submodule."""
+    """Find the Git root of the checkout that owns ``raw_root``."""
     start = raw_root if raw_root.is_absolute() else raw_root.resolve()
     for candidate in (start, *start.parents):
         if (candidate / ".git").exists():
-            repository_root = candidate.resolve()
-            if (
-                repository_root.name == "agent-canon"
-                and repository_root.parent.name == "vendor"
-            ):
-                parent_root = repository_root.parents[1]
-                expected_source = parent_root / "vendor" / "agent-canon"
-                try:
-                    is_parent_layout = (
-                        (parent_root / ".git").exists()
-                        and expected_source.resolve() == repository_root
-                    )
-                except (OSError, RuntimeError):
-                    is_parent_layout = False
-                if is_parent_layout:
-                    return parent_root.resolve()
-            return repository_root
+            return candidate.resolve()
     return start.resolve()
 
 
@@ -318,9 +294,9 @@ def _explicit_resolution(raw_root: Path, source: Path, canon: Path) -> RootResol
     return RootResolution(
         current_repository_root=current_root,
         source_root=source,
-        layout=LAYOUT_OVERRIDE,
+        layout=LAYOUT_EXTERNAL,
         canon_root=canon,
-        public_tool_root=current_root / "tools" / "agent-canon",
+        public_tool_root=source / "tools" / "agent-canon",
     )
 
 
@@ -329,11 +305,10 @@ def _explicit_override(raw_root: Path) -> RootResolution | None:
     canon_override = os.environ.get(CANON_ROOT_OVERRIDE_ENV, "").strip()
     if not source_override and not canon_override:
         return None
-    if not source_override or not canon_override:
-        raise SourceRootFailure(
-            "agent_canon_source_root_override_incomplete",
-            "AGENT_CANON_SOURCE_ROOT and AGENT_CANON_ROOT must be supplied together",
-        )
+    if not source_override:
+        source_override = canon_override
+    if not canon_override:
+        canon_override = source_override
     source_root = Path(source_override).expanduser()
     canon_root = Path(canon_override).expanduser()
     return _explicit_resolution(raw_root, source_root, canon_root)
@@ -361,61 +336,23 @@ def resolve_agent_canon_source_root(
         return explicit
 
     current_repository_root = _find_current_repository_root(raw_root)
-    vendor_root = current_repository_root / "vendor" / "agent-canon"
-    vendor_source_root = _resolve_path(
-        vendor_root,
-        failure_code=VENDOR_OUTSIDE_REPOSITORY,
-        root=current_repository_root,
-    )
-    root_view = current_repository_root / "agents"
-    _resolve_path(
-        root_view,
-        failure_code=ROOT_VIEW_OUTSIDE_REPOSITORY,
-        root=current_repository_root,
-    )
-
     standalone_catalog = current_repository_root / "agents" / "skills" / "catalog.yaml"
-    vendor_catalog = vendor_source_root / "agents" / "skills" / "catalog.yaml"
     has_standalone = _has_catalog(current_repository_root)
-    has_vendor = _has_catalog(vendor_source_root)
 
-    if not has_standalone and not has_vendor:
+    if not has_standalone:
         raise SourceRootFailure(
             "agent_canon_source_root_missing",
             (
-                f"No AgentCanon catalog found from current_repository_root={current_repository_root}"
-                f" (standalone: {current_repository_root}, vendored: {vendor_source_root})"
+                f"No AgentCanon catalog found at current_repository_root={current_repository_root}; "
+                "select an external checkout with AGENT_CANON_SOURCE_ROOT"
             ),
         )
-
-    if has_standalone and has_vendor:
-        if _same_canonical_entity(standalone_catalog, vendor_catalog):
-            return RootResolution(
-                current_repository_root=current_repository_root,
-                source_root=vendor_source_root,
-                layout=LAYOUT_VENDORED,
-                canon_root=vendor_source_root,
-                public_tool_root=current_repository_root / "tools" / "agent-canon",
-            )
-        candidate_labels = (
-            f"{LAYOUT_STANDALONE}:{current_repository_root}",
-            f"{LAYOUT_VENDORED}:{vendor_source_root}",
-        )
-        raise SourceRootFailure(
-            "agent_canon_source_root_ambiguous",
-            " | ".join(candidate_labels),
-        )
-
-    layout = LAYOUT_STANDALONE if has_standalone else LAYOUT_VENDORED
-    source_root = current_repository_root if has_standalone else vendor_source_root
     return RootResolution(
         current_repository_root=current_repository_root,
-        source_root=source_root,
-        layout=layout,
-        canon_root=source_root,
-        public_tool_root=current_repository_root / "tools" / "agent-canon"
-        if layout == LAYOUT_VENDORED
-        else source_root / "tools" / "agent-canon",
+        source_root=current_repository_root,
+        layout=LAYOUT_STANDALONE,
+        canon_root=current_repository_root,
+        public_tool_root=current_repository_root / "tools" / "agent-canon",
     )
 
 

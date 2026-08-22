@@ -26,48 +26,37 @@ for parent AgentCanon PR graph selection; unknown IDs fail selection.
 
 | Profile ID | Profile | Activates | Required when | Strict dependency graph |
 | --- | --- | --- | --- | --- |
-| base-project | Base project | `README.md`, `QUICK_START.md`, `documents/README.md`, project code and tests | Every template or derived repo | no |
-| agent-runtime | Agent runtime | `AGENTS.md`, `.codex/config.toml`, `tools/agent-canon`, project-owned `agents/`, `.agents/`, `.codex/`, and `tools/` remain separate | An agent performs or reviews repo work | no |
-| devcontainer | Devcontainer | `.devcontainer/`, shared post-create helpers | VS Code devcontainer or agent ergonomics are used | no |
-| docker-runtime | Docker runtime | root `docker/`, runtime packs | Dockerfile, image, pack, Jupyter, or container setup changes | no |
-| github-automation | GitHub automation | `.github/`, PR templates, Actions helpers | GitHub Actions, PR automation, or GitHub path-constrained copies change | no |
-| experiment | Experiment | `experiments/`, experiment registry, managed runner tools | Experiment topics, formal runs, result summaries, or research workflows change | no |
-| cpp | C++ | parent root remains language-neutral, `cpp/CMakeLists.txt` as the single native project entry, `cpp/cmake/`, `cpp/src/`, `cpp/include/`, `tests/cpp/` (out-of-tree project tests), `cpp/experiments/`, C++ OOP checks, `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"` | C or C++ code, build layout, or native artifacts change | no |
-| memory-and-learning | Memory and learning | `memory/`, notes promotion, learning workflows | User asks to persist memory, feedback/retrospective is observed, or agent-learning is in scope | no |
-| maintenance | Maintenance | inventories, review backlog scan, improvement guide, catalog drift tools | AgentCanon maintenance, repo-wide audit, or scheduled cleanup work | yes |
+| bootstrap | Bootstrap | `bootstrap.sh`, `bootstrap/`, lifecycle parser and state | AgentCanon installation, start/stop, target, or lifecycle state changes | no |
+| tool-runtime | Tool runtime | Python/Rust tool dispatch, catalog, LSP | Shared AgentCanon analysis tools or language servers change | no |
+| container | Container | Dockerfile, entrypoint, manifest limits | The shared AgentCanon tool image or container contract changes | no |
+| mount-generation | Mount generation | target registry, generations, rollback | Target admission, mount generation, rollback, or concurrent lifecycle changes | no |
+| codex-surfaces | Codex surfaces | isolated skills, agents, hooks, runtime-local `CODEX_HOME` | Codex preparation, isolated runtime configuration, or owned-link cleanup changes | no |
+| eval-archive | Eval archive | eval producer, external spool, archive Git adapter | Eval collection, source-unchanged evidence, or agent-canon-log publication changes | no |
+| docs | Docs | README, guides, runtime contracts | User-facing AgentCanon command, owner, migration, or runtime documentation changes | no |
+| source | Source | policy, workflow, skills, canonical tools | AgentCanon source policy, workflow, skill, hook, or canonical tool changes | yes |
+| project | Project | project Docker, project test runner, project GPU | A parent project execution environment changes; never for AgentCanon internal tests | no |
 
-Compatibility surfaces such as legacy subtree routes may remain documented, but
-only under the matching compatibility profile. They are not the default path for
-GitHub/submodule-first repositories.
+Profiles may be combined, but every changed path must have one owner and one
+primary check route. Do not select `project` merely because a tool was invoked
+against a project target.
 
 
 ## Risk Classes
 
 | Risk | Examples | Required validation |
 | --- | --- | --- |
-| Routine docs | Link/text edits in project-local docs with no source contract change | docs check for touched docs and changed-file dependency header checks |
-| Focused code | Narrow Python or shell edit with local tests | changed-file dependency checks, targeted tests, ruff/pyright when Python changes |
-| Profile change | Docker, GitHub, experiment, C++, devcontainer, MCP, or memory surface change | profile-specific checker plus targeted tests |
-| Shared canon | `vendor/agent-canon/`, root shared views, skills, workflows, hooks, tools | `make agent-canon-pr-check` or equivalent AgentCanon PR gate |
-| Large delivery | repo-wide rewrite, workflow redesign, broad policy change, or user-requested comprehensive run | run bundle, dependency review, focused and full validation gates, independent review |
+| boundary | new mount, path default, write location, credential route | source before/after fingerprint, resolved paths, negative escape test |
+| compatibility | CLI rename, catalog entry, execution-plane change | schema-v2 parity fixture for argv/cwd/streams/exit/signal/writes |
+| lifecycle | install/start/stop/gc/uninstall, image/container ownership | exact IDs, labels, limits, health and absence readback |
+| concurrency | target add, rollback, task admission | lock trace, active count, candidate/old generation evidence |
+| archive | collect/sync, branch, push, readback | local spool, remote ref/tree/blob digest, duplicate/conflict result |
+| docs | user route, owner, migration, issue reference | link/header check and clean command examples |
 
-Static analysis and reading evidence are the primary validation evidence for
-AgentCanon tasks. `make ci` remains the full local confidence gate, but it is
-not the default or only acceptable evidence for every owner-bounded change. Use
-operation checks, smoke runs, full CI, long test suites, benchmarks, experiments,
-and other broad execution as supplemental evidence when runtime behavior,
-integration risk, or unresolved static/read findings require them. The selected
-validation must match the changed paths, owner surface, and risk class, and the
-PR or run bundle must state why that set is sufficient.
-Prompt-only or prose-only edits use the surface-specific docs, prompt, eval,
-and dependency checks selected by the active profile; they do not automatically
-escalate to full `make ci`.
-Pydocstyle is an explicit Docstring review route, not a shared correctness
-requirement. The shared gate does not invoke or block on pydocstyle; active
-profile validation owners remain authoritative for their selected checks.
-An unavailable pydocstyle tool or its diagnostics fail only the explicit
-review command.
-AgentCanon development prompt and accumulated eval producers belong to the standalone static-gates owner; derived shared gates do not invoke them or apply their diagnostics to parent-owned documents.
+If a focused command is unavailable in a fresh checkout, report the missing
+owner/route; do not create a fallback that writes into source. Use one task
+temporary directory outside the source checkout and one shared tool image at
+most. Track any image/container created for validation and remove that exact
+resource after evidence is captured.
 
 ## Validation Failure Response
 
@@ -112,12 +101,13 @@ Intent preservation routes:
 | Markdown docs only | `tools/bin/agent-canon docs check`; changed-file dependency header checks |
 | Python code/tests | targeted `pytest`; `python3 -m pyright`; `python3 -m ruff check ...` |
 | AgentCanon docs/workflows/skills/tools/hooks | `make agent-canon-pr-check`; shared-surface sync; workflow/PR checks; strict dependency review as the dependency-header/graph judgment owner; standalone-source tool_drift coverage once; docs check; generated-artifact guard; standalone-source prompt/accumulated evals remain in the existing static-gates owner; derived shared gates exclude AgentCanon development prompt/accumulated eval producers and parent-owned diagnostics; standalone shared gates remain the existing static-gates owner and add no repository-wide project-quality job; derived parent workflows expose the canonical project-quality owner marker and `make ci` command; job names are not an authority; no repository-wide project-quality runner is added to the shared gate |
-| Root shared views or submodule pin | source-root resolver `exec tools/sync_agent_canon.sh check`; `git submodule status vendor/agent-canon` evidence |
-| Docker/devcontainer/runtime pack | `bash tools/docker_dependency_validator.sh`; `make docker-build-check` when build behavior changes |
-| GitHub workflow/PR | `python3 tools/ci/check_github_workflows.py`; relevant GitHub Actions evidence when available |
-| Experiments | `make experiment-check`; managed run evidence for formal experiment changes |
-| C/C++ | `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`; `cmake --build "$ROOT/build/cpp/<profile>" --parallel`; `ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure`; `cmake --install "$ROOT/build/cpp/<profile>"`; project-native C++ reviewer/checker evidence, including consumer-to-provider target readback |
-| Memory/eval/hook logging | append-only artifact evidence and improvement guide/eval checks when prompts or logging fields change |
+| Root bootstrap or runtime lifecycle | `install -> start -> target add -> status -> codex prepare -> tool/exec`; `eval collect -> eval sync` or an explicit pending receipt; `stop -> gc -> uninstall -> resource absence readback` |
+| Python/Rust tool runtime or LSP | targeted tool-dispatch and runtime-artifact tests; schema-v2 parity evidence for argv/cwd/streams/exit/signal/writes |
+| Docker image or shared container | container contract tests; one labeled shared image build when Docker is available; non-root, read-only source, bounded resource and LSP readback |
+| Target mount or generation | target registry and generation tests; lock, active-task, candidate-health, rollback and atomic-switch evidence |
+| Codex isolated surfaces | bootstrap Codex tests and manifest readback; runtime-local `CODEX_HOME` isolation; collision and foreign-link negative cases |
+| Eval collection or archive publication | runtime artifact/archive tests; local bare-remote E2E; source unchanged, pending spool, branch and remote readback evidence |
+| Project execution environment | project-owned Dockerfile and `test/testrunner.sh`; project test/GPU evidence; never AgentCanon internal test knowledge |
 
 ## Closeout Rule
 

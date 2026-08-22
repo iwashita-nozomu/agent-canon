@@ -5,7 +5,7 @@
 # upstream design ../../documents/runtime/task-contract-observation.md defines the collection flow
 # upstream implementation ./task_contract_observation_core.py owns schema and transitions
 # upstream implementation ./workflow_monitor.py owns locked monitoring append
-# downstream data ../../evidence/agent-evals/agent_behavior_eval.toml requires coverage
+# downstream design ../../evidence/agent-evals/agent_behavior_eval.toml requires coverage
 # downstream implementation ../../tests/agent_tools/test_task_contract_observation.py tests it
 # @dependency-end
 """Record and score task-local contract observations."""

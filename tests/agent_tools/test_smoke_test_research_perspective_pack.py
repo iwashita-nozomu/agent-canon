@@ -8,18 +8,18 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import subprocess
 import sys
 import tempfile
 import unittest
 import os
 from pathlib import Path
+from typing import Iterator
 from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP_SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
-TEST_PARENT_ROOT = PROJECT_ROOT.parents[2]
-TEST_TEMP_ROOT = TEST_PARENT_ROOT / ".agent-canon" / "tmp"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 import smoke_test_research_perspective_pack as smoke  # noqa: E402
 from parent_root_side_effects import (  # noqa: E402
@@ -29,13 +29,55 @@ from parent_root_side_effects import (  # noqa: E402
 )
 
 
+@contextmanager
+def temporary_smoke_runtime() -> Iterator[tuple[Path, Path, Path]]:
+    """Allocate parent, workspace, and report state outside the source tree."""
+    with tempfile.TemporaryDirectory(prefix="agent-canon-research-smoke-") as tmp_dir:
+        runtime_root = Path(tmp_dir)
+        workspace_root = runtime_root / "workspace"
+        report_root = runtime_root / "reports"
+        (runtime_root / "tmp").mkdir()
+        (runtime_root / "pycache").mkdir()
+        workspace_root.mkdir()
+        report_root.mkdir()
+        (workspace_root / ".codex").mkdir()
+        (workspace_root / ".codex" / "config.toml").write_bytes(
+            (PROJECT_ROOT / ".codex" / "config.toml").read_bytes()
+        )
+        subprocess.run(
+            ["git", "init", "--quiet", str(runtime_root)], check=True
+        )
+        subprocess.run(
+            ["git", "-C", str(runtime_root), "config", "user.email", "agent-canon-test@example.invalid"],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(runtime_root), "config", "user.name", "AgentCanon test"],
+            check=True,
+        )
+        yield runtime_root, workspace_root, report_root
+
+
+def smoke_environment(runtime_root: Path) -> dict[str, str]:
+    """Route child-process caches and temporary files outside AgentCanon source."""
+    return {
+        **os.environ,
+        "AGENT_CANON_PARENT_ROOT": str(runtime_root),
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPYCACHEPREFIX": str(runtime_root / "pycache"),
+        "TMPDIR": str(runtime_root / "tmp"),
+        "TEMP": str(runtime_root / "tmp"),
+        "TMP": str(runtime_root / "tmp"),
+        "AGENT_CANON_ACTIVE_REPOSITORY_ROOT": str(runtime_root),
+    }
+
+
 class ResearchPerspectivePackSmokeTest(unittest.TestCase):
     """Verify that the smoke-test helper exits successfully."""
 
     def test_run_bundle_includes_document_flow_review_artifact(self) -> None:
         """The always-on bundle should create the document flow review artifact."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
+        with temporary_smoke_runtime() as (runtime_root, workspace_root, report_root):
             run_id = "test-document-flow-review"
             result = subprocess.run(
                 [
@@ -50,10 +92,10 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     "--report-root",
                     str(report_root),
                     "--workspace-root",
-                    str(PROJECT_ROOT),
+                    str(workspace_root),
                 ],
                 cwd=PROJECT_ROOT,
-                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
+                env=smoke_environment(runtime_root),
                 check=False,
                 capture_output=True,
                 text=True,
@@ -69,8 +111,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
 
     def test_run_bundle_starts_with_locked_completion_gate(self) -> None:
         """Fresh bundles should lock user-facing completion until verifier/auditor closeout."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
+        with temporary_smoke_runtime() as (runtime_root, workspace_root, report_root):
             run_id = "test-closeout-gate"
             result = subprocess.run(
                 [
@@ -85,10 +126,10 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     "--report-root",
                     str(report_root),
                     "--workspace-root",
-                    str(PROJECT_ROOT),
+                    str(workspace_root),
                 ],
                 cwd=PROJECT_ROOT,
-                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
+                env=smoke_environment(runtime_root),
                 check=False,
                 capture_output=True,
                 text=True,
@@ -107,7 +148,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
             self.assertIn("- repo_wide_dependency_tools_complete: no", closeout_text)
             self.assertIn("- repo_wide_static_analysis_complete: no", closeout_text)
             self.assertIn("- review_findings_integrated: no", closeout_text)
-            self.assertIn("- post_fix_full_review_complete: no", closeout_text)
+            self.assertIn("- focused_recheck_complete: not_applicable", closeout_text)
             self.assertIn("- canonical_tree_head_complete: no", closeout_text)
             self.assertIn("- agent_evaluation_complete: no", closeout_text)
             self.assertIn("- verifier_status: pending", closeout_text)
@@ -115,8 +156,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
 
     def test_run_bundle_can_enable_academic_writing_reviewers(self) -> None:
         """Academic writing reviewers should create their review artifacts when enabled."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
+        with temporary_smoke_runtime() as (runtime_root, workspace_root, report_root):
             run_id = "test-academic-writing-reviewers"
             result = subprocess.run(
                 [
@@ -131,7 +171,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     "--report-root",
                     str(report_root),
                     "--workspace-root",
-                    str(PROJECT_ROOT),
+                    str(workspace_root),
                     "--enable",
                     "citation_evidence_reviewer",
                     "--enable",
@@ -140,7 +180,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     "logic_gap_reviewer",
                 ],
                 cwd=PROJECT_ROOT,
-                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
+                env=smoke_environment(runtime_root),
                 check=False,
                 capture_output=True,
                 text=True,
@@ -157,8 +197,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
 
     def test_task_id_t10_expands_paper_reviewers(self) -> None:
         """Academic-paper task bootstrap should include paper-specific reviewers."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
+        with temporary_smoke_runtime() as (runtime_root, workspace_root, report_root):
             run_id = "test-task-id-t10"
             result = subprocess.run(
                 [
@@ -175,10 +214,10 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     "--report-root",
                     str(report_root),
                     "--workspace-root",
-                    str(PROJECT_ROOT),
+                    str(workspace_root),
                 ],
                 cwd=PROJECT_ROOT,
-                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
+                env=smoke_environment(runtime_root),
                 check=False,
                 capture_output=True,
                 text=True,
@@ -195,8 +234,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
 
     def test_task_id_expands_default_research_reviewers(self) -> None:
         """Task-id bootstrap should expand default research reviewers and review packs."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
+        with temporary_smoke_runtime() as (runtime_root, workspace_root, report_root):
             run_id = "test-task-id-t4"
             result = subprocess.run(
                 [
@@ -213,10 +251,10 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     "--report-root",
                     str(report_root),
                     "--workspace-root",
-                    str(PROJECT_ROOT),
+                    str(workspace_root),
                 ],
                 cwd=PROJECT_ROOT,
-                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
+                env=smoke_environment(runtime_root),
                 check=False,
                 capture_output=True,
                 text=True,
@@ -238,8 +276,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
 
     def test_run_bundle_can_enable_full_research_perspective_pack(self) -> None:
         """Named optional review packs should expand to all pack specialists."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
+        with temporary_smoke_runtime() as (runtime_root, workspace_root, report_root):
             run_id = "test-full-research-perspective-pack"
             result = subprocess.run(
                 [
@@ -254,12 +291,12 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     "--report-root",
                     str(report_root),
                     "--workspace-root",
-                    str(PROJECT_ROOT),
+                    str(workspace_root),
                     "--enable",
                     "research_perspective_review",
                 ],
                 cwd=PROJECT_ROOT,
-                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
+                env=smoke_environment(runtime_root),
                 check=False,
                 capture_output=True,
                 text=True,
@@ -277,8 +314,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
 
     def test_run_bundle_can_enable_cpp_reviewer(self) -> None:
         """C++ reviewer should create its review artifact when enabled."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
+        with temporary_smoke_runtime() as (runtime_root, workspace_root, report_root):
             run_id = "test-cpp-reviewer"
             result = subprocess.run(
                 [
@@ -293,12 +329,12 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     "--report-root",
                     str(report_root),
                     "--workspace-root",
-                    str(PROJECT_ROOT),
+                    str(workspace_root),
                     "--enable",
                     "cpp_reviewer",
                 ],
                 cwd=PROJECT_ROOT,
-                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
+                env=smoke_environment(runtime_root),
                 check=False,
                 capture_output=True,
                 text=True,
@@ -314,11 +350,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
         self,
     ) -> None:
         """Changed-path hints should expose a C++ review candidate without activation."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            report_root = Path(tmp_dir) / "reports"
-            workspace_root.mkdir(parents=True, exist_ok=True)
-            report_root.mkdir(parents=True, exist_ok=True)
+        with temporary_smoke_runtime() as (runtime_root, workspace_root, report_root):
             (workspace_root / ".codex").mkdir(parents=True, exist_ok=True)
             (workspace_root / ".codex" / "config.toml").write_bytes(
                 (PROJECT_ROOT / ".codex" / "config.toml").read_bytes()
@@ -347,7 +379,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     "include/example.hpp",
                 ],
                 cwd=PROJECT_ROOT,
-                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
+                env=smoke_environment(runtime_root),
                 check=False,
                 capture_output=True,
                 text=True,
@@ -362,7 +394,17 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
 
 def test_cleanup_parent_error_is_reported() -> None:
     """A temporary-report cleanup failure is surfaced and chains the primary error."""
-    parent_root = PROJECT_ROOT
+    runtime = tempfile.TemporaryDirectory(prefix="agent-canon-research-cleanup-")
+    parent_root = Path(runtime.name)
+    subprocess.run(["git", "init", "--quiet", str(parent_root)], check=True)
+    subprocess.run(
+        ["git", "-C", str(parent_root), "config", "user.email", "agent-canon-test@example.invalid"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(parent_root), "config", "user.name", "AgentCanon test"],
+        check=True,
+    )
     created: list[tuple[ParentRootSideEffectBoundary, object, object]] = []
     original_create = ParentRootSideEffectBoundary.create_parent_owned_temp_directory
     original_remove = ParentRootSideEffectBoundary.remove_parent_owned_tree
@@ -398,6 +440,7 @@ def test_cleanup_parent_error_is_reported() -> None:
         finally:
             for boundary, attestation, receipt in created:
                 original_remove(boundary, attestation, receipt, "test-cleanup")
+            runtime.cleanup()
 
 
 def test_run_bundle_can_enable_full_research_perspective_pack() -> None:

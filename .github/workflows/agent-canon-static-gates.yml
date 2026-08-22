@@ -19,6 +19,13 @@ on:
 permissions:
   contents: read
 
+env:
+  # Static checks treat the checkout as a read-only source.  Each job gets an
+  # explicit external Git control root and runtime root under the runner's
+  # task-owned temporary directory.
+  AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
+  AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/../workspace/agent-canon-runtime/${{ github.job }}
+
 concurrency:
   group: agent-canon-static-gates-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
@@ -38,7 +45,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: false
           persist-credentials: false
       - name: Select validation units from trusted PR diff
         id: select
@@ -60,12 +66,17 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: false
           persist-credentials: false
-      - name: Install Rust gate components
-        run: rustup component add rustfmt clippy
+      - name: Start shared tool runtime
+        run: |
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" install
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
       - name: Run Rust static unit
-        run: bash tools/ci/run_standalone_static_gate_unit.sh rust
+        run: ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" exec --root "${GITHUB_WORKSPACE}" -- bash /usr/local/share/agent-canon/runtime/tools/ci/run_standalone_static_gate_unit.sh rust
+      - name: Release shared tool runtime
+        if: always()
+        run: ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" uninstall || true
 
   contracts-static:
     needs: select-static-units
@@ -76,16 +87,17 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: false
           persist-credentials: false
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install contract gate dependencies
-        run: python3 -m pip install --upgrade pyyaml tomli packaging
+      - name: Start shared tool runtime
+        run: |
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" install
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
       - name: Run contract static unit
-        run: bash tools/ci/run_standalone_static_gate_unit.sh contracts
+        run: ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" exec --root "${GITHUB_WORKSPACE}" -- bash /usr/local/share/agent-canon/runtime/tools/ci/run_standalone_static_gate_unit.sh contracts
+      - name: Release shared tool runtime
+        if: always()
+        run: ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" uninstall || true
 
   eval-static:
     needs: select-static-units
@@ -96,16 +108,17 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: false
           persist-credentials: false
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install eval gate dependencies
-        run: python3 -m pip install --upgrade pyyaml tomli packaging
+      - name: Start shared tool runtime
+        run: |
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" install
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
       - name: Run eval static unit
-        run: bash tools/ci/run_standalone_static_gate_unit.sh eval
+        run: ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" exec --root "${GITHUB_WORKSPACE}" -- bash /usr/local/share/agent-canon/runtime/tools/ci/run_standalone_static_gate_unit.sh eval
+      - name: Release shared tool runtime
+        if: always()
+        run: ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" uninstall || true
 
   workflow-container-static:
     needs: select-static-units
@@ -116,16 +129,17 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: false
           persist-credentials: false
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install workflow gate dependencies
-        run: python3 -m pip install --upgrade pyyaml tomli packaging pytest
+      - name: Start shared tool runtime
+        run: |
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" install
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
       - name: Run workflow and container static unit
-        run: bash tools/ci/run_standalone_static_gate_unit.sh workflow-container
+        run: ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" exec --root "${GITHUB_WORKSPACE}" -- bash /usr/local/share/agent-canon/runtime/tools/ci/run_standalone_static_gate_unit.sh workflow-container
+      - name: Release shared tool runtime
+        if: always()
+        run: ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" uninstall || true
 
   static-gates:
     if: always()
@@ -174,27 +188,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: false
           persist-credentials: false
-      - name: Checkout AgentCanon submodule for manual full gate
+      - name: Start shared tool runtime for manual full gate
         if: github.event_name == 'workflow_dispatch'
-        env:
-          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
-      - name: Setup Python for manual full gate
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install manual full-gate dependencies
-        if: github.event_name == 'workflow_dispatch'
-        run: python3 -m pip install --upgrade pyyaml tomli packaging pytest
-      - name: Install Rust components for manual full gate
-        if: github.event_name == 'workflow_dispatch'
-        run: rustup component add rustfmt clippy
+        run: |
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" install
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
       - name: Run manual full gate
         if: github.event_name == 'workflow_dispatch'
-        env:
-          AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}
-        run: bash tools/ci/check_agent_canon_pr.sh
+        run: |
+          for unit in rust contracts eval workflow-container; do
+            ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+              exec --root "${GITHUB_WORKSPACE}" -- bash \
+              /usr/local/share/agent-canon/runtime/tools/ci/run_standalone_static_gate_unit.sh "${unit}"
+          done
+      - name: Release manual full-gate runtime
+        if: always() && github.event_name == 'workflow_dispatch'
+        run: ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" uninstall || true

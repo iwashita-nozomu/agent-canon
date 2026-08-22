@@ -2,7 +2,6 @@
 @dependency-start
 contract policy
 responsibility Documents プロジェクト全体の運用規約 for this repository.
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../contracts/github-first-module-and-devcontainer-policy.md GitHub-first module and devcontainer boundary policy
 upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
 downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates legacy forwarder warning policy
@@ -31,7 +30,7 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
 - `tools/` は shared automation の正本です。agent helper、CI / review / validation、container runner、experiment helper、Markdown helper はここに置きます。
 - `scripts/` は repo-local bootstrap の入口です。template 固有の初期化、slug 置換、bare remote 初期化だけをここに置きます。
 - `docker/` は template / project の runtime image、build library、dependency pack の定義です。
-- `.devcontainer/` は AgentCanon-owned shared runtime ergonomics です。Codex、agent 用 npm / Node、GitHub CLI / `gh`、auth mount、attach status はここで扱います。
+- `bootstrap.sh` / `bootstrap/` は AgentCanon-owned shared Python/Rust/LSP tool runtime の正本です。親の `.devcontainer/` は存在する場合も project-owned で、AgentCanon runtime の installer/fallback ではありません。
 - `experiments/` は Python managed experiment の registry、run、result、report の正本です。
 - `cpp/` は native C++ production project の正本です。`cpp/CMakeLists.txt` が project
   entrypoint、`cpp/src/`、`cpp/include/`、`cpp/experiments/` が production/native target
@@ -62,9 +61,9 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
 
 ## 4. 開発環境
 
-- 共通実行環境が必要な場合は、`CONTAINER_OPERATIONS.md` を正本として repo-local `docker/` と AgentCanon-owned `.devcontainer/` の責務を分けます。
-- Python 依存を追加する場合は、親 `pyproject.toml` の optional extras と親 image build の image-owned dependency lifecycle / readback を契約の基準にします。固定 OS/Python capability、親が必要とする project dependencies、Node/npm は image が所有し、Node/npm は digest-pinned official Node OCI provider から image build 時に `/usr/local` へ copy します。Agent/Codex tools は typed `.devcontainer/dependencies.toml` から image build で導入します。post-create は `image-verify` と container runtime readback だけを実行します。
-- `docker/Dockerfile`、`pyproject.toml`、または `.devcontainer/` を更新した変更では、`python3 tools/ci/container_config.py` と対象 container validation を実行します。
+- 共通実行環境が必要な場合は、AgentCanon の `documents/runtime/bootstrap-runtime.md` と `bootstrap.sh`、親の `docker/` / test entrypoint の責務を分けます。
+- Python 依存を追加する場合は、親 `pyproject.toml` の optional extras と親 image build の image-owned dependency lifecycle / readback を契約の基準にします。Agent/Codex tools は AgentCanon の `bootstrap/` manifest から shared image build 時に導入します。post-create や source checkout は dependency installer ではありません。
+- `docker/Dockerfile`、`pyproject.toml`、`bootstrap/`、または親 `.devcontainer/` を更新した変更では、対応する container contract checker と対象 image/runtime validation を実行します。
 - 開発環境の更新では、必要な README と運用文書も同じ変更で更新します。
 - Python を使う場合でも、repo 全体の入口は language-neutral に保ちます。
 - canonical container の safe-directory は shared post-create が mounted workspace の実体を検証して管理します。image build や host runtime で repository-specific な登録スクリプトを呼び出しません。
@@ -76,13 +75,13 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
 
 - repo-wide に使う環境依存ツールの導入提案では、`templates/agents/environment_change_proposal.md` を使って理由、影響範囲、validation、rollback を記録します。
 - host-global install 由来の要件は、必要時に `CONTAINER_OPERATIONS.md` または `docker/` の運用境界へ反映します。
-- repo-wide に必要な Python tool は、`pyproject.toml` の selected extras と、親が必要とする場合は image build の project-dependency lifecycle / readback contract に反映します。Agent/Codex tools は typed `.devcontainer/dependencies.toml` manifest が所有し、image build で fixed OS/Python/native capability、digest-pinned Node provider、manifest tools、親 project dependencies を準備します。post-create から editable install、pip setup、package mutation を呼び出しません。
+- repo-wide に必要な Python tool は、`pyproject.toml` の selected extras と、親が必要とする場合は image build の project-dependency lifecycle / readback contract に反映します。Agent/Codex tools は AgentCanon `bootstrap/` manifest が所有し、shared image build で fixed OS/Python/native capability を準備します。post-create から editable install、pip setup、package mutation を呼び出しません。
 - CI でも使う tool は手元だけの補助 install に留めず、共有運用手順へ反映してから利用します。
 - 1 回限りの調査や個人補助にとどまる tool は、repo 正本へ追加する前に container 実行、checked-in script、既存依存での代替可否を確認します。
 - 導入提案では、少なくとも次を明記します。
   - 何の workflow を支えるのか
   - host / Docker / CI のどこを更新するのか
-  - `docker/Dockerfile`、`pyproject.toml`、`.devcontainer/` の更新要否
+  - `docker/Dockerfile`、`pyproject.toml`、`bootstrap/`、親 `.devcontainer/` の更新要否
   - どのコマンドで validate するのか
   - 不採用または撤回するときの rollback 手順
 
@@ -90,9 +89,9 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
 
 - `docker/Dockerfile` を更新する変更では、依存追加の有無にかかわらず `README.md`、`QUICK_START.md`、関連する `documents/` の command や説明も同じ変更で見直します。
 - Docker 変更で新しい tool を同梱する場合は、その tool の用途、呼び出し入口、不要になったときの削除方針を文書へ残します。
-- Docker 変更で agent convenience tool が必要になった場合は、`CONTAINER_OPERATIONS.md` の devcontainer boundary に従って AgentCanon-owned `.devcontainer/Dockerfile` と typed manifest を更新します。`post-create.sh` は image-verify/readback surface として保ちます。
+- Docker 変更で AgentCanon tool が必要になった場合は、`documents/runtime/bootstrap-runtime.md` に従って AgentCanon の `bootstrap/` image manifest と shared runtime を更新します。親 `.devcontainer/` は image-verify/readback 以外の AgentCanon installer になりません。
 - Docker runtime の project 正本は `docker/Dockerfile` とし、`docker/packs/*.toml` と Python execution rules は存在するときだけ project-owned override として使います。nested-Codex の既定 profile は AgentCanon source の `tools/ci/codex-container-profiles.toml` が所有します。
-- Docker runtime、optional runtime pack、devcontainer 生成導線を変えた場合は `python3 tools/ci/container_config.py` を通し、存在する project surface と `.devcontainer/` の所有境界を確認します。
+- Docker runtime、optional runtime pack、または親 devcontainer 導線を変えた場合は対応 checker を通し、存在する project surface と AgentCanon shared runtime の所有境界を確認します。
 - main server host の path、mount、builder 前提は `documents/contracts/server-host-contract.md` と `templates/documents/server_runtime_layout.template.toml` を正本にし、実行経路を都度記録して共有します。
 - C++ の canonical project entrypoint は `cpp/CMakeLists.txt` です。parent root は
   language-neutral に保ち、C++ は explicit な `cpp` source directory から configure します。

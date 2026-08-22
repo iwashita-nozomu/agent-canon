@@ -461,7 +461,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         reference = build_reference(args)
         path = write_reference(root, args.output_dir, reference, args.force)
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, ParentRootSideEffectError) as exc:
         print(f"REFERENCE_MATERIALIZE_ERROR={exc}", file=sys.stderr)
         print("REFERENCE_MATERIALIZE=fail")
         return 1

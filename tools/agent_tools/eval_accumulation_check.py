@@ -7,6 +7,7 @@
 # upstream design ../../documents/runtime/runtime-log-archive.md eval and hook result archive contract
 # upstream design ../../documents/runtime/runtime-log-archive-migration.md legacy in-tree result migration contract
 # upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
+# upstream implementation ./runtime_artifacts.py owns the external artifact boundary
 # upstream implementation ./prompt_capture.py owns prompt secret redaction patterns
 # upstream design ../../tools/README.md tool entrypoint index
 # upstream design ../../documents/tools/README.md user-facing tool index
@@ -19,7 +20,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
@@ -37,18 +37,15 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest  # noqa: E402
-from parent_root_side_effects import (  # noqa: E402
-    ParentRootAttestationRequest,
-    ParentRootReject,
-    ParentRootSideEffectBoundary,
-    ParentRootSideEffectError,
-    attest_parent_root,
-)
 from prompt_capture import redact_sensitive_text  # noqa: E402
 from runtime_log_paths import (  # noqa: E402
     eval_result_search_dirs,
     hook_result_search_dirs,
     mounted_log_archive_root,
+)
+from runtime_artifacts import (  # noqa: E402
+    RuntimeArtifactError,
+    runtime_artifact_boundary,
 )
 
 HOOK_REQUIRED_FIELDS = (
@@ -65,20 +62,6 @@ PROMPT_CAPTURE_STATUSES = frozenset({"present", "missing"})
 PROMPT_FINGERPRINT_RE = re.compile(r"^[0-9a-f]{16}$")
 
 
-def _parent_write(path: Path, data: bytes, purpose: str) -> None:
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            f"{purpose}: explicit parent root is required",
-        )
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
-    )
-    ParentRootSideEffectBoundary().write_parent_owned_file(
-        attestation, path, data, purpose
-    )
 PROMPT_CAPTURE_CAUSE_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
 BEHAVIOR_HINT_FIELDS = frozenset(
     {
@@ -159,7 +142,7 @@ class EvalAccumulationReport:
 
 def is_mounted_archive_path(path_label: str) -> bool:
     """Return whether a finding path points at the mounted external archive."""
-    return path_label.startswith(".agent-canon/log-archive/")
+    return "archive/agent-canon-log/" in Path(path_label).as_posix()
 
 
 def is_warning_finding(finding: Finding) -> bool:
@@ -168,7 +151,8 @@ def is_warning_finding(finding: Finding) -> bool:
         return True
     return (
         finding.detail == "missing-eval-run-id"
-        and finding.path.startswith(".agent-canon/log-archive/eval-results/legacy-import/")
+        and "archive/agent-canon-log/eval-results/legacy-import/"
+        in Path(finding.path).as_posix()
     ) or (
         finding.check == "behavior_event"
         and finding.detail == "legacy-behavior-schema"
@@ -195,6 +179,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument(
+        "--runtime-root",
+        type=Path,
+        help="Explicit external runtime root containing eval and hook archives.",
+    )
+    parser.add_argument(
         "--family-registry",
         default=DEFAULT_FAMILY_REGISTRY.as_posix(),
         help="TOML registry that declares accumulated eval result families.",
@@ -209,11 +198,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def agent_canon_root(root: Path) -> Path:
-    """Return AgentCanon source root for standalone or parent invocation."""
-    vendored = root / "vendor" / "agent-canon"
-    if (vendored / "agents" / "evals" / "README.md").is_file():
-        return vendored
-    return root
+    """Return the explicitly selected AgentCanon source checkout."""
+    return root.resolve()
 
 
 def relative(root: Path, path: Path) -> str:
@@ -247,7 +233,7 @@ def ignored_path_findings(root: Path, paths: Sequence[Path]) -> list[Finding]:
 def intentionally_ignored_archive_path(path: Path) -> bool:
     """Return whether the path is inside the mounted external log archive."""
     parts = path.parts
-    return ".agent-canon" in parts and "log-archive" in parts
+    return "archive" in parts and "agent-canon-log" in parts
 
 
 def _nonnegative_int(value: object) -> bool:
@@ -716,7 +702,11 @@ def eval_family_findings(
     return len(reports), findings
 
 
-def validate(root: Path, family_registry: str = DEFAULT_FAMILY_REGISTRY.as_posix()) -> EvalAccumulationReport:
+def validate(
+    root: Path,
+    family_registry: str = DEFAULT_FAMILY_REGISTRY.as_posix(),
+    runtime_root: Path | str | None = None,
+) -> EvalAccumulationReport:
     """Validate accumulated eval results."""
     requested_root = root.resolve()
     canon_root = agent_canon_root(requested_root)
@@ -724,13 +714,13 @@ def validate(root: Path, family_registry: str = DEFAULT_FAMILY_REGISTRY.as_posix
     findings: list[Finding] = []
     hook_files, hook_entries, hook_legacy_missing_namespace, hook_findings = hook_result_findings(
         canon_root,
-        hook_result_search_dirs(requested_root, canon_root),
+        hook_result_search_dirs(requested_root, canon_root, runtime_root),
     )
-    archive_mounted = mounted_log_archive_root(canon_root).is_dir()
+    archive_mounted = mounted_log_archive_root(canon_root, runtime_root).is_dir()
     eval_report_counts: dict[str, int] = {}
     findings.extend(hook_findings)
     for contract in contracts:
-        results_dirs = eval_result_search_dirs(canon_root, contract.family_id)
+        results_dirs = eval_result_search_dirs(canon_root, contract.family_id, runtime_root)
         report_count, family_findings = eval_family_findings(
             canon_root,
             contract,
@@ -820,14 +810,17 @@ def compact_summary(report: EvalAccumulationReport) -> dict[str, object]:
     }
 
 
-def write_compact_summary(path: Path, report: EvalAccumulationReport) -> None:
+def write_compact_summary(
+    source_root: Path,
+    path: Path,
+    report: EvalAccumulationReport,
+    runtime_root: Path | str | None = None,
+) -> Path:
     """Write a bounded JSON summary for agent consumption."""
-    _parent_write(
+    boundary = runtime_artifact_boundary(source_root, runtime_root)
+    return boundary.atomic_write_text(
         path,
-        (json.dumps(compact_summary(report), indent=2, sort_keys=True) + "\n").encode(
-            "utf-8"
-        ),
-        "eval-accumulation-summary",
+        json.dumps(compact_summary(report), indent=2, sort_keys=True) + "\n",
     )
 
 
@@ -871,9 +864,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run the eval accumulation checker."""
     args = build_parser().parse_args(argv)
     try:
-        report = validate(args.root, str(args.family_registry))
+        report = validate(args.root, str(args.family_registry), args.runtime_root)
     except RuntimeError as error:
-        if "AgentCanon log archive root is required" not in str(error):
+        if "AgentCanon log archive root is required" not in str(error) and not isinstance(
+            error, RuntimeArtifactError
+        ):
             raise
         if args.format == "json":
             print(
@@ -882,7 +877,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         "status": "error",
                         "error_code": "log_archive_required",
                         "message": str(error),
-                        "next_action": "mount .agent-canon/log-archive or set AGENT_CANON_HOOK_ARCHIVE_DIR",
+                        "next_action": "pass --runtime-root or set AGENT_CANON_RUNTIME_ROOT",
                     },
                     indent=2,
                     sort_keys=True,
@@ -892,10 +887,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("EVAL_ACCUMULATION=error")
             print("EVAL_ACCUMULATION_ERROR_CODE=log_archive_required")
             print(f"EVAL_ACCUMULATION_ERROR={error}")
-            print("NEXT_ACTION=mount_.agent-canon/log-archive_or_set_AGENT_CANON_HOOK_ARCHIVE_DIR")
+            print("NEXT_ACTION=pass_--runtime-root_or_set_AGENT_CANON_RUNTIME_ROOT")
         return 1
     if args.compact_out is not None:
-        write_compact_summary(args.compact_out, report)
+        write_compact_summary(args.root, args.compact_out, report, args.runtime_root)
     if args.format == "json":
         print(render_json(report))
     else:

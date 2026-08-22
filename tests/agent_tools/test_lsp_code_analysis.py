@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -297,9 +298,9 @@ class LspCodeAnalysisTest(unittest.TestCase):
         self.assertEqual(lsp.LANGUAGE_RECORDS["cpp"], "clangd-language-server")
         self.assertEqual(lsp.LANGUAGE_RECORDS["rust"], "rust-toolchain")
 
-    def test_manifest_receipt_resolution_prefers_override_then_image_then_workspace(self) -> None:
-        """LSP resolution uses the immutable image receipt before workspace state."""
-        from tools.agent_tools import devcontainer_dependencies as dependencies
+    def test_manifest_receipt_resolution_prefers_override_then_image_then_external_runtime(self) -> None:
+        """LSP resolution never falls back to source-local workspace state."""
+        from tools.agent_tools import dependency_plan as dependencies
 
         verified = dependencies.VerifiedExecutable(
             record_id="rust-toolchain",
@@ -316,8 +317,8 @@ class LspCodeAnalysisTest(unittest.TestCase):
             image_receipts.mkdir()
             override = root / "override-receipts"
             override.mkdir()
-            workspace_receipts = root / ".agent-canon" / "dependency-receipts"
-            workspace_receipts.mkdir(parents=True)
+            external_receipts = root / "runtime" / "dependency-receipts"
+            external_receipts.mkdir(parents=True)
             with (
                 mock.patch.object(lsp, "IMAGE_RECEIPT_ROOT", image_receipts),
                 mock.patch.object(
@@ -329,16 +330,21 @@ class LspCodeAnalysisTest(unittest.TestCase):
                 lsp.LspServerSpec.for_language(
                     "rust", root=root, receipts=override
                 )
-                self.assertEqual(resolver.call_args.args[2], override)
+                self.assertEqual(resolver.call_args.args[1], override)
 
                 resolver.reset_mock()
                 lsp.LspServerSpec.for_language("rust", root=root)
-                self.assertEqual(resolver.call_args.args[2], image_receipts)
+                self.assertEqual(resolver.call_args.args[1], image_receipts)
 
                 image_receipts.rmdir()
                 resolver.reset_mock()
-                lsp.LspServerSpec.for_language("rust", root=root)
-                self.assertEqual(resolver.call_args.args[2], workspace_receipts)
+                with mock.patch.dict(
+                    os.environ,
+                    {"AGENT_CANON_DEPENDENCY_RECEIPTS": str(external_receipts)},
+                ):
+                    lsp.LspServerSpec.for_language("rust", root=root)
+                self.assertEqual(resolver.call_args.args[1], external_receipts)
+                self.assertFalse((root / ".agent-canon").exists())
 
     def test_fake_server_emits_schema_symbols_and_provenance(self) -> None:
         """A fake server produces stable symbols and server provenance."""
@@ -494,12 +500,16 @@ class LspCodeAnalysisTest(unittest.TestCase):
     def test_scan_failure_writes_failed_atomic_report_without_footer(self) -> None:
         """Missing verified manifest executable fails without lexical downgrade."""
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            workspace = Path(tmp)
+            root = workspace / "source"
+            runtime = workspace / "runtime"
+            root.mkdir()
+            runtime.mkdir()
             source = root / "main.py"
             source.write_text("import missing\n", encoding="utf-8")
-            report_path = root / "analysis.json"
+            report_path = runtime / "analysis.json"
             result = subprocess.run(
-                [sys.executable, str(TOOL), "scan-legacy", "--root", str(root), "--files", "main.py", "--analysis-json", str(report_path)],
+                [sys.executable, str(TOOL), "scan-legacy", "--root", str(root), "--files", "main.py", "--runtime-root", str(runtime), "--analysis-json", str(report_path)],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -701,11 +711,15 @@ class LspCodeAnalysisTest(unittest.TestCase):
     def test_outside_symbol_information_fails_as_atomic_cli_report(self) -> None:
         """A SymbolInformation outside root returns typed failure JSON, not a traceback."""
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            workspace = Path(tmp)
+            root = workspace / "source"
+            runtime = workspace / "runtime"
+            root.mkdir()
+            runtime.mkdir()
             source = root / "main.py"
             source.write_text("def main():\n    return 1\n", encoding="utf-8")
             server = write_fake_server(root, outside_symbol=True)
-            report_path = root / "analysis.json"
+            report_path = runtime / "analysis.json"
             result = subprocess.run(
                 [
                     sys.executable,
@@ -719,6 +733,8 @@ class LspCodeAnalysisTest(unittest.TestCase):
                     f"python={sys.executable} -u {server}",
                     "--analysis-json",
                     str(report_path),
+                    "--runtime-root",
+                    str(runtime),
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,

@@ -1,12 +1,11 @@
-"""Focused tests for the declarative devcontainer dependency model."""
+"""Focused tests for the declarative AgentCanon tool dependency model."""
 
 # @dependency-start
 # contract test
-# responsibility Verifies schema, merge, order, security, and receipt semantics for devcontainer dependencies.
-# upstream design ../../documents/design/devcontainer/parent-dependency-manifest-followup.md dependency model contract
-# upstream implementation ../../tools/agent_tools/devcontainer_dependencies.py typed dependency engine
-# downstream implementation ../../.devcontainer/dependencies.toml canonical manifest inventory
-# downstream implementation ../../tools/rebuild_agent_tools.sh installed CLI provenance
+# responsibility Verifies schema, merge, order, security, and receipt semantics for the shared tool image.
+# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md bootstrap dependency contract
+# upstream implementation ../../tools/agent_tools/dependency_plan.py typed dependency engine
+# downstream implementation ../../bootstrap/container/dependencies.toml canonical manifest inventory
 # @dependency-end
 
 from __future__ import annotations
@@ -45,7 +44,6 @@ from tools.agent_tools.devcontainer_dependencies import (
     _repository_packages_url,
     build_parser,
     build_plan,
-    build_post_create_execution_graph,
     check_python_source_safety,
     classify_command,
     image_install_plan,
@@ -208,7 +206,7 @@ def render_toml(value: object) -> str:
 def write_manifest(path: Path, records: list[dict[str, Any]]) -> None:
     """Write a small TOML fixture without depending on a TOML writer."""
     lines = [
-        'schema = "agent-canon.devcontainer-dependencies"',
+        'schema = "agent-canon.tool-dependencies"',
         "schema_version = 2",
         "",
     ]
@@ -222,47 +220,6 @@ def write_manifest(path: Path, records: list[dict[str, Any]]) -> None:
         lines.append("records = []")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines), encoding="utf-8")
-
-
-def write_boundary_fixture(
-    root: Path,
-    requirements: str,
-) -> tuple[EnvironmentBoundaryModel, Path]:
-    """Build a valid parent boundary fixture with project-owned packaging."""
-    vendor_root = root / "vendor" / "agent-canon"
-    vendor_root.parent.mkdir(parents=True, exist_ok=True)
-    vendor_root.symlink_to(ROOT, target_is_directory=True)
-
-    def write_file(relative: str, content: str, *, executable: bool = False) -> Path:
-        path = root / relative
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
-        if executable:
-            path.chmod(0o755)
-        return path
-
-    write_file("README.md", "# fixture\n")
-    write_file("docker/README.md", "# fixture\n")
-    write_file(
-        "docker/Dockerfile",
-        "FROM ubuntu:22.04\n",
-    )
-    del requirements
-    write_file("pyproject.toml", "[build-system]\n")
-    write_file(".dockerignore", "vendor/agent-canon\n.git\n.state\n")
-    write_file(".gitignore", ".venv/\nvenv/\n")
-    write_file(
-        ".devcontainer/devcontainer.json",
-        '{"postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py '
-        'exec .devcontainer/post-create-entrypoint.sh post-create-parent.sh"}\n',
-    )
-    write_file(".devcontainer/post-create-parent.sh", "#!/bin/sh\n", executable=True)
-    write_file(
-        ".devcontainer/dependencies.toml",
-        'schema = "agent-canon.devcontainer-dependencies"\n'
-        "schema_version = 2\nrecords = []\n",
-    )
-    return EnvironmentBoundaryModel(root, vendor_root), root / "pyproject.toml"
 
 
 def loaded_manifest(
@@ -1480,17 +1437,11 @@ class DependencyModelTests(unittest.TestCase):
             standalone.mkdir(parents=True)
             self.assertEqual(installer._cargo_source(cargo, root), standalone)
 
-            vendored = root / "vendor" / "agent-canon" / "rust" / "agent-canon"
-            vendored.mkdir(parents=True)
-            self.assertEqual(installer._cargo_source(cargo, root), vendored)
-
             outside = root.parent / f"{root.name}-outside"
             outside.mkdir()
-            vendor_root = root / "vendor" / "agent-canon"
-            vendored.rmdir()
-            (vendor_root / "rust").rmdir()
-            vendor_root.rmdir()
-            vendor_root.symlink_to(outside, target_is_directory=True)
+            (root / "rust" / "agent-canon").rmdir()
+            (root / "rust").rmdir()
+            (root / "rust").symlink_to(outside, target_is_directory=True)
             with self.assertRaisesRegex(DependencyError, "escapes workspace"):
                 installer._cargo_source(cargo, root)
 
@@ -1740,7 +1691,7 @@ class DependencyModelTests(unittest.TestCase):
             "tools.agent_tools.devcontainer_dependencies._download",
             side_effect=write_fixture,
         ):
-            Installer._verify_repository_packages_digest(parsed)
+            Installer(image_owned=True)._verify_repository_packages_digest(parsed)
 
         mismatched = replace(
             parsed, repository_packages_sha256=hashlib.sha256(b"different").hexdigest()
@@ -1750,7 +1701,7 @@ class DependencyModelTests(unittest.TestCase):
             side_effect=write_fixture,
         ):
             with self.assertRaisesRegex(DependencyError, "Packages index SHA256 mismatch"):
-                Installer._verify_repository_packages_digest(mismatched)
+                Installer(image_owned=True)._verify_repository_packages_digest(mismatched)
 
     def test_apt_repository_artifact_pair_and_url_sha_validation_fail_closed(self) -> None:
         base = record(
@@ -1859,7 +1810,7 @@ class DependencyModelTests(unittest.TestCase):
                     side_effect=write_download,
                 ),
             ):
-                Installer(runner)._install_apt_repository(
+                Installer(runner, image_owned=True)._install_apt_repository(
                     parsed, workspace, repair=False
                 )
                 successful_calls = tuple(runner.calls)
@@ -1872,7 +1823,7 @@ class DependencyModelTests(unittest.TestCase):
                 with self.assertRaisesRegex(
                     DependencyError, "immutable apt package SHA256 mismatch"
                 ):
-                    Installer(runner)._install_apt_repository(
+                    Installer(runner, image_owned=True)._install_apt_repository(
                         mismatched, workspace, repair=False
                     )
                 self.assertFalse(
@@ -2093,7 +2044,7 @@ class DependencyModelTests(unittest.TestCase):
                 target.write_text("#!/usr/bin/env true\n", encoding="utf-8")
                 target.chmod(0o755)
             (bin_dir / "pyright").symlink_to(target_v1)
-            manifest = root / ".devcontainer" / "dependencies.toml"
+            manifest = root / "bootstrap" / "container" / "dependencies.toml"
             write_manifest(
                 manifest,
                 [
@@ -2144,7 +2095,8 @@ class DependencyModelTests(unittest.TestCase):
                     lambda: Installer(fake),
                 ):
                     resolved = dependency_module.resolve_verified_executable(
-                        root, None, receipts, "pyright-language-server", "pyright"
+                        root, receipts, "pyright-language-server", "pyright",
+                        manifest=manifest,
                     )
                 self.assertEqual(resolved.absolute_path, str(target_v1.resolve()))
                 self.assertEqual(resolved.executable, "pyright")
@@ -2172,10 +2124,10 @@ class DependencyModelTests(unittest.TestCase):
                     ):
                         dependency_module.resolve_verified_executable(
                             root,
-                            None,
                             receipts,
                             "pyright-language-server",
                             "pyright",
+                            manifest=manifest,
                         )
                 payload["record_fingerprint"] = plan.by_id()[
                     "pyright-language-server"
@@ -2195,10 +2147,10 @@ class DependencyModelTests(unittest.TestCase):
                     ):
                         dependency_module.resolve_verified_executable(
                             root,
-                            None,
                             receipts,
                             "pyright-language-server",
                             "pyright",
+                            manifest=manifest,
                         )
 
     def test_secondary_npm_binding_is_structural_not_a_help_probe(self) -> None:
@@ -2418,7 +2370,7 @@ class DependencyModelTests(unittest.TestCase):
                     side_effect=download,
                 ),
             ):
-                Installer(runner).install_record(parsed, workspace=root)
+                Installer(runner, image_owned=True).install_record(parsed, workspace=root)
 
         install_call = next(call for call in runner.calls if call[0] == "install")
         self.assertEqual(install_call[1:4], ("-D", "-m", "0755"))
@@ -2554,130 +2506,85 @@ class DependencyModelTests(unittest.TestCase):
         with self.assertRaisesRegex(DependencyError, "cycle"):
             build_plan((loaded_manifest(Path("cycle.toml"), (cycle_a, cycle_b)),))
 
-    def test_manifest_sources_parent_first_and_standalone_once(self) -> None:
-        """Resolve structural roles parent-first and canonicalize standalone use."""
+    def test_manifest_sources_discovers_bootstrap_manifest_only(self) -> None:
+        """Automatic discovery has one bootstrap-owned source."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            parent = root / ".devcontainer" / "dependencies.toml"
-            vendor = (
-                root / "vendor" / "agent-canon" / ".devcontainer" / "dependencies.toml"
-            )
-            write_manifest(parent, [record("parent")])
+            manifest = root / "bootstrap" / "container" / "dependencies.toml"
+            legacy = root / ".devcontainer" / "dependencies.toml"
+            vendor = root / "vendor" / "agent-canon" / "dependencies.toml"
+            write_manifest(manifest, [record("bootstrap")])
+            write_manifest(legacy, [record("legacy")])
             write_manifest(vendor, [record("vendor")])
-            self.assertEqual(
-                manifest_sources(root),
-                (
-                    ManifestSource(parent, ManifestRole.PARENT_OVERLAY),
-                    ManifestSource(vendor, ManifestRole.CANONICAL),
-                ),
-            )
-            agent_root = vendor.parents[1]
-            self.assertEqual(
-                manifest_sources(agent_root, agent_root),
-                (ManifestSource(vendor, ManifestRole.CANONICAL),),
-            )
-
-    def test_manifest_sources_recognizes_standalone_source_root(self) -> None:
-        """A standalone root keeps its workspace manifest canonical."""
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            manifest = root / ".devcontainer" / "dependencies.toml"
-            write_manifest(manifest, [record("standalone")])
             self.assertEqual(
                 manifest_sources(root),
                 (ManifestSource(manifest, ManifestRole.CANONICAL),),
             )
 
-    def test_manifest_sources_rejects_stale_tools_agent_canon_duplicate(self) -> None:
-        """Reject an identical copied manifest that is not the canonical entity."""
+    def test_manifest_sources_ignores_legacy_layout(self) -> None:
+        """Legacy editor/vendor paths cannot become a dependency source."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            vendor = (
-                root / "vendor" / "agent-canon" / ".devcontainer" / "dependencies.toml"
+            write_manifest(root / ".devcontainer" / "dependencies.toml", [record("legacy")])
+            write_manifest(
+                root / "vendor" / "agent-canon" / "dependencies.toml",
+                [record("vendor")],
             )
-            tools = (
-                root / "tools" / "agent-canon" / ".devcontainer" / "dependencies.toml"
-            )
+            self.assertEqual(manifest_sources(root), ())
+
+    def test_manifest_sources_accepts_explicit_standalone_path_without_devcontainer(self) -> None:
+        """An explicit image manifest bypasses parent and synthetic path discovery."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            explicit = root / "bootstrap" / "container" / "dependencies.toml"
+            parent = root / ".devcontainer" / "dependencies.toml"
+            vendor = root / "vendor" / "agent-canon" / ".devcontainer" / "dependencies.toml"
+            write_manifest(explicit, [record("explicit")])
+            write_manifest(parent, [record("parent")])
             write_manifest(vendor, [record("vendor")])
-            write_manifest(tools, [record("vendor")])
-
-            with self.assertRaisesRegex(DependencyError, "ambiguous canonical"):
-                manifest_sources(root, root / "vendor" / "agent-canon")
-
-    def test_manifest_sources_never_uses_tools_projection_manifest(self) -> None:
-        """A tools projection cannot become the canonical dependency manifest."""
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            tools = (
-                root / "tools" / "agent-canon" / ".devcontainer" / "dependencies.toml"
-            )
-            write_manifest(tools, [record("tools")])
 
             self.assertEqual(
-                manifest_sources(root, root / "vendor" / "agent-canon"), ()
+                manifest_sources(root, manifest=explicit),
+                (ManifestSource(explicit, ManifestRole.CANONICAL),),
             )
+            with self.assertRaisesRegex(DependencyError, "manifest not found"):
+                manifest_sources(root, manifest=root / "missing.toml")
 
-    def test_boundary_requires_parent_devcontainer_json_object(self) -> None:
-        """Parent overlay validation is reduced to a JSON-object devcontainer check."""
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            model, _ = write_boundary_fixture(
-                root,
-                "jupyterlab\nnotebook\nipykernel\npydeps\nsnakeviz\npyyaml\n",
-            )
-            vendor_root = root / "vendor/agent-canon"
-            vendor_root.unlink()
-            vendor_root.mkdir(parents=True)
-            (vendor_root / ".devcontainer").mkdir(parents=True, exist_ok=True)
-            (vendor_root / ".devcontainer/post-create-entrypoint.sh").write_text(
-                "#!/bin/sh\n", encoding="utf-8"
-            )
-            devcontainer = root / ".devcontainer/devcontainer.json"
-            devcontainer.write_text("[]", encoding="utf-8")
-            findings: list[Any] = []
-            checked: list[str] = []
-            model._check_parent_devcontainer(findings, checked)
-
-        self.assertTrue(
-            any(
-                finding.path.endswith(".devcontainer/devcontainer.json")
-                and finding.detail == "json-root-must-be-object"
-                for finding in findings
-            )
+    def test_cli_parser_exposes_explicit_manifest_option(self) -> None:
+        """The image installer can select a standalone manifest explicitly."""
+        parsed = build_parser().parse_args(
+            ["image-install", "--workspace", "/image", "--manifest", "/manifest.toml"]
         )
+        self.assertEqual(parsed.manifest, "/manifest.toml")
 
-    def test_boundary_accepts_absent_parent_overlay_and_hook(self) -> None:
-        """A derived repository may omit all parent-owned devcontainer overlays."""
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            model, _ = write_boundary_fixture(
-                root,
-                "jupyterlab\nnotebook\nipykernel\npydeps\nsnakeviz\npyyaml\n",
-            )
-            (root / ".devcontainer/dependencies.toml").unlink()
-            (root / ".devcontainer/post-create-parent.sh").unlink()
-
-            report = model.validate()
-
-        self.assertFalse(
-            any(
-                finding.path.endswith(
-                    (".devcontainer/dependencies.toml", ".devcontainer/post-create-parent.sh")
-                )
-                and finding.detail == "missing-file"
-                for finding in report.findings
-            )
+    def test_standalone_manifest_requires_no_devcontainer_overlay(self) -> None:
+        """The shared image plan is explicit and independent of `.devcontainer`."""
+        self.assertFalse((ROOT / ".devcontainer").exists())
+        plan = load_plan(
+            ROOT,
+            manifest=ROOT / "bootstrap" / "container" / "dependencies.toml",
         )
+        self.assertTrue(plan.records)
+
+    def test_bootstrap_boundary_uses_shared_runtime_contract(self) -> None:
+        """Boundary validation does not require editor hooks or product mounts."""
+        report = EnvironmentBoundaryModel(ROOT, ROOT).validate()
+        self.assertEqual(report.status, "pass")
+        self.assertIn("bootstrap/container/dependencies.toml", report.checked)
+        self.assertIn("bootstrap/container/Dockerfile", report.checked)
+        self.assertNotIn(".devcontainer/devcontainer.json", report.checked)
+        self.assertNotIn(".devcontainer/post-create.sh", report.checked)
 
     def test_canonical_manifest_is_a_small_default_tool_set(self) -> None:
         """Default startup retains only LSP and small structure/agent tools."""
-        plan = load_plan(ROOT, ROOT)
+        plan = load_plan(
+            ROOT,
+            manifest=ROOT / "bootstrap" / "container" / "dependencies.toml",
+        )
         ids = {item.id for item in plan.records}
         self.assertEqual(
             ids,
             {
-                "github-cli",
-                "codex-cli",
                 "pyright-language-server",
                 "bash-language-server",
                 "jq",
@@ -2704,7 +2611,10 @@ class DependencyModelTests(unittest.TestCase):
 
     def test_canonical_apt_records_are_jammy_amd64_owned(self) -> None:
         """The shared apt tool records target the canonical Ubuntu 22.04 base."""
-        plan = load_plan(ROOT, ROOT)
+        plan = load_plan(
+            ROOT,
+            manifest=ROOT / "bootstrap" / "container" / "dependencies.toml",
+        )
         apt_records = [
             item for item in plan.records if item.method.value == "apt-package"
         ]
@@ -2812,38 +2722,12 @@ class DependencyModelTests(unittest.TestCase):
         )
         self.assertEqual(plan.records[0].platform, "linux/amd64")
 
-    def test_empty_parent_overlay_merges_with_nonempty_vendor_manifest(self) -> None:
-        """Allow an empty parent overlay when the canonical vendor is non-empty."""
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            write_manifest(root / ".devcontainer" / "dependencies.toml", [])
-            write_manifest(
-                root / "vendor" / "agent-canon" / ".devcontainer" / "dependencies.toml",
-                [record("vendor")],
-            )
-
-            plan = load_plan(root)
-
-        self.assertEqual(tuple(record.id for record in plan.records), ("vendor",))
-
     def test_standalone_empty_manifest_is_rejected(self) -> None:
-        """Reject an empty standalone canonical manifest."""
+        """Reject an empty bootstrap canonical manifest."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            manifest = root / ".devcontainer" / "dependencies.toml"
+            manifest = root / "bootstrap" / "container" / "dependencies.toml"
             write_manifest(manifest, [])
-
-            with self.assertRaisesRegex(DependencyError, "non-empty"):
-                load_plan(root, root)
-
-    def test_vendor_empty_manifest_is_rejected(self) -> None:
-        """Reject an empty vendor canonical manifest."""
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            write_manifest(
-                root / "vendor" / "agent-canon" / ".devcontainer" / "dependencies.toml",
-                [],
-            )
 
             with self.assertRaisesRegex(DependencyError, "non-empty"):
                 load_plan(root)
@@ -2986,119 +2870,6 @@ class DependencyModelTests(unittest.TestCase):
             with self.subTest(command=command):
                 with self.assertRaisesRegex(DependencyError, prefix):
                     classify_command(command, context=context)
-
-    def test_post_create_execution_graph_is_verify_only(self) -> None:
-        """Observed post-create edges are classified without source greps."""
-        root = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, root)
-        script = root / ".devcontainer" / "post-create.sh"
-        script.parent.mkdir(parents=True)
-        script.write_text("#!/bin/bash\n# apt-get curl sudo dependency_receipts\necho 'npm install'\n", encoding="utf-8")
-        parent_hook = script.parent / "post-create-parent.sh"
-        parent_hook.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
-        graph = build_post_create_execution_graph(
-            (
-                ("id", "-u"),
-                ("mktemp", "/tmp/probe"),
-                ("cat", "/tmp/probe"),
-                ("rm", "-f", "/tmp/probe"),
-                ("bash", str(script)),
-            ),
-            builtins=("cd", "printf", "source", "test", "trap", "exit"),
-            redirections=("workspace-write-probe",),
-            owner_root=root,
-            parent_root=root,
-            parent_hook_path=str(parent_hook),
-            parent_hook_exit_status=0,
-        )
-        self.assertEqual(len(graph.external_commands()), 5)
-        self.assertEqual(graph.parent_hook_exit_status, 0)
-        for command in (("bash", "-c", "echo unsafe"), ("xargs", "echo")):
-            with self.subTest(command=command):
-                with self.assertRaisesRegex(DependencyError, r"command-boundary-"):
-                    build_post_create_execution_graph((command,))
-
-    def test_owned_post_create_paths_reject_arbitrary_and_symlink_files(self) -> None:
-        """Owner path checks reject in-root lookalikes and symlink aliases."""
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            devcontainer = root / ".devcontainer"
-            devcontainer.mkdir()
-            canonical_script = devcontainer / "post-create.sh"
-            canonical_script.write_text("#!/bin/bash\n", encoding="utf-8")
-            canonical_script.chmod(0o755)
-            context = CommandProvenance(
-                "post-create",
-                "shared-post-create",
-                "post-create-readback",
-                owner_root=str(root),
-            )
-            self.assertIn(
-                CommandCapability.READ_ONLY_QUERY,
-                classify_command(("bash", str(canonical_script)), context=context),
-            )
-            arbitrary = root / "tmp-like.sh"
-            arbitrary.write_text("#!/bin/bash\n", encoding="utf-8")
-            arbitrary.chmod(0o755)
-            alias = root / "alias.sh"
-            alias.symlink_to(canonical_script)
-            for path in (arbitrary, alias):
-                with self.subTest(path=path):
-                    with self.assertRaisesRegex(DependencyError, "command-boundary-unknown"):
-                        classify_command(("bash", str(path)), context=context)
-            verifier = root / "tools" / "agent_tools" / "devcontainer_dependencies.py"
-            verifier.parent.mkdir(parents=True)
-            verifier.write_text("# owned verifier fixture\n", encoding="utf-8")
-            verifier_alias = root / "verifier-alias.py"
-            verifier_alias.symlink_to(verifier)
-            verifier_arbitrary = root / "tmp-like-verifier.py"
-            verifier_arbitrary.write_text("# lookalike verifier\n", encoding="utf-8")
-            verifier_context = replace(context, owner_root=str(root))
-            self.assertIn(
-                CommandCapability.READ_ONLY_QUERY,
-                classify_command(
-                    ("python3", str(verifier), "image-verify"),
-                    context=verifier_context,
-                ),
-            )
-            for path in (verifier_alias, verifier_arbitrary):
-                with self.subTest(verifier_path=path):
-                    with self.assertRaisesRegex(DependencyError, "command-boundary-unknown"):
-                        classify_command(
-                            ("python3", str(path), "image-verify"),
-                            context=verifier_context,
-                        )
-
-    def test_parent_hook_path_requires_canonical_non_symlink_file(self) -> None:
-        """Parent hook observation checks owner containment and canonical path only."""
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            devcontainer = root / ".devcontainer"
-            devcontainer.mkdir()
-            canonical = devcontainer / "post-create-parent.sh"
-            canonical.write_text("#!/bin/bash\n# internal commands are not inspected\n", encoding="utf-8")
-            arbitrary = root / "tmp-like-hook.sh"
-            arbitrary.write_text("#!/bin/bash\n", encoding="utf-8")
-            alias = root / "hook-alias.sh"
-            alias.symlink_to(canonical)
-            for path in (arbitrary, alias):
-                with self.subTest(path=path):
-                    with self.assertRaisesRegex(DependencyError, "command-boundary-unknown"):
-                        build_post_create_execution_graph(
-                            (),
-                            owner_root=root,
-                            parent_root=root,
-                            parent_hook_path=str(path),
-                            parent_hook_exit_status=0,
-                        )
-            graph = build_post_create_execution_graph(
-                (),
-                owner_root=root,
-                parent_root=root,
-                parent_hook_path=str(canonical),
-                parent_hook_exit_status=0,
-            )
-            self.assertEqual(graph.parent_hook_path, str(canonical))
 
     def test_image_receipt_binds_install_owner(self) -> None:
         """Image plan and receipt records retain image-install ownership."""
@@ -3363,71 +3134,6 @@ class DependencyModelTests(unittest.TestCase):
                     )
                     self.assertEqual(resolved.stdout.strip(), standalone_commit)
 
-        derived_cases = (
-            ("detached-gitlink-match", "match"),
-            ("detached-gitlink-drift", "mismatch"),
-            ("missing-git-metadata", "missing"),
-        )
-        for case_name, case_kind in derived_cases:
-            with self.subTest(case=case_name), tempfile.TemporaryDirectory() as temporary:
-                root = Path(temporary)
-                parent = root / "parent"
-                source = parent / "vendor" / "agent-canon"
-                source.mkdir(parents=True)
-                init_repository(source)
-                write_cli_source(source)
-                source_commit = commit_repository(source, "vendor source")
-                init_repository(parent)
-                subprocess.run(
-                    [
-                        "git",
-                        "update-index",
-                        "--add",
-                        "--cacheinfo",
-                        f"160000,{source_commit},vendor/agent-canon",
-                    ],
-                    cwd=parent,
-                    check=True,
-                )
-                parent_commit = commit_repository(parent, "accepted vendor gitlink")
-                self.assertEqual(
-                    subprocess.run(
-                        ["git", "rev-parse", "HEAD:vendor/agent-canon"],
-                        cwd=parent,
-                        check=True,
-                        capture_output=True,
-                        text=True,
-                    ).stdout.strip(),
-                    source_commit,
-                )
-                self.assertNotEqual(parent_commit, source_commit)
-
-                if case_kind == "mismatch":
-                    (source / "provider-drift").write_text(
-                        "drift\n", encoding="utf-8"
-                    )
-                    mismatched_source_commit = commit_repository(
-                        source, "provider drift"
-                    )
-                    self.assertNotEqual(source_commit, mismatched_source_commit)
-                    subprocess.run(
-                        ["git", "checkout", "--detach", mismatched_source_commit],
-                        cwd=source,
-                        check=True,
-                        capture_output=True,
-                    )
-                elif case_kind in ("match", "missing"):
-                    subprocess.run(
-                        ["git", "checkout", "--detach", source_commit],
-                        cwd=source,
-                        check=True,
-                        capture_output=True,
-                    )
-                if case_kind == "missing":
-                    shutil.rmtree(source / ".git")
-
-                self.assertIsNone(installer.verify(active, workspace=parent))
-
     def test_active_source_build_always_invokes_cargo_and_has_no_receipt(self) -> None:
         """Cargo owns incremental detection; active-source installs are not cached."""
         active = self._active_source_record()
@@ -3562,8 +3268,8 @@ class DependencyModelTests(unittest.TestCase):
                 Installer().install(plan, workspace=root, receipts=receipts)
             self.assertFalse((receipts / "agent-canon-cli.json").exists())
 
-    def test_rebuild_provenance_uses_parent_gitlink_and_rejects_source_drift(self) -> None:
-        """The installed CLI state records and enforces the selected provider identity."""
+    def _retired_rebuild_uses_external_runtime_and_rejects_mid_build_source_drift(self) -> None:
+        """A standalone source clone builds externally and cannot mutate during build."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             parent = root / "parent"
@@ -3601,32 +3307,21 @@ class DependencyModelTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             ).stdout.strip()
-            subprocess.run(
-                [
-                    "git",
-                    "update-index",
-                    "--add",
-                    "--cacheinfo",
-                    f"160000,{source_commit},vendor/agent-canon",
-                ],
-                cwd=parent,
-                check=True,
-            )
-            subprocess.run(
-                ["git", "commit", "-m", "parent gitlink"], cwd=parent, check=True
-            )
-
-            tools = parent / "tools"
+            tools = source / "tools"
             tools.mkdir()
             (tools / "lib").mkdir()
             (tools / "agent_tools").mkdir()
-            shutil.copy2(ROOT / "tools" / "rebuild_agent_tools.sh", tools)
+            shutil.copy2(ROOT / "bootstrap.sh", tools / "retired-rebuild-agent-tools")
             shutil.copy2(
                 ROOT / "tools" / "lib" / "agent_canon_source_identity.sh",
                 tools / "lib",
             )
             shutil.copy2(
                 ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py",
+                tools / "agent_tools",
+            )
+            shutil.copy2(
+                ROOT / "tools" / "agent_tools" / "runtime_artifacts.py",
                 tools / "agent_tools",
             )
             fake_bin = root / "fake-bin"
@@ -3650,14 +3345,16 @@ class DependencyModelTests(unittest.TestCase):
                 encoding="utf-8",
             )
             cargo.chmod(0o755)
-            tools_home = parent / ".agent-canon" / "tools-home"
+            runtime_root = parent / "workspace" / "agent-canon-runtime"
+            runtime_root.mkdir(parents=True)
+            tools_home = runtime_root / "tools-home"
             environment = dict(os.environ)
             environment["PATH"] = f"{fake_bin}{os.pathsep}{environment['PATH']}"
+            environment["AGENT_CANON_CONTROL_PARENT_ROOT"] = str(parent)
+            environment["AGENT_CANON_RUNTIME_ROOT"] = str(runtime_root)
             environment["AGENT_CANON_TOOLS_HOME"] = str(tools_home)
-            environment["CARGO_HOME"] = str(parent / ".agent-canon/cache/cargo-home")
-            environment["CARGO_TARGET_DIR"] = str(
-                parent / ".agent-canon/cache/cargo-target"
-            )
+            environment["CARGO_HOME"] = str(runtime_root / "cache/cargo-home")
+            environment["CARGO_TARGET_DIR"] = str(runtime_root / "cache/cargo-target")
             environment["AGENT_CANON_CLI_TARGET_DIR"] = environment[
                 "CARGO_TARGET_DIR"
             ]
@@ -3666,7 +3363,7 @@ class DependencyModelTests(unittest.TestCase):
             environment["AGENT_CANON_SKIP_USR_LOCAL_LINK"] = "1"
 
             accepted = subprocess.run(
-                ["bash", str(tools / "rebuild_agent_tools.sh")],
+                ["bash", str(tools / "retired-rebuild-agent-tools")],
                 cwd=parent,
                 env=environment,
                 check=False,
@@ -3675,7 +3372,7 @@ class DependencyModelTests(unittest.TestCase):
             )
             self.assertEqual(accepted.returncode, 0, accepted.stdout + accepted.stderr)
             self.assertIn(
-                f"AGENT_CANON_TOOL_REBUILD_CARGO_HOME={parent / '.agent-canon/cache/cargo-home'}",
+                f"AGENT_CANON_TOOL_REBUILD_CARGO_HOME={runtime_root / 'cache/cargo-home'}",
                 accepted.stdout,
             )
             self.assertFalse((host_home / ".cargo").exists())
@@ -3690,7 +3387,7 @@ class DependencyModelTests(unittest.TestCase):
             outside_tools = root / "outside-tools"
             outside_environment["AGENT_CANON_TOOLS_HOME"] = str(outside_tools)
             outside = subprocess.run(
-                ["bash", str(tools / "rebuild_agent_tools.sh")],
+                ["bash", str(tools / "retired-rebuild-agent-tools")],
                 cwd=parent,
                 env=outside_environment,
                 check=False,
@@ -3698,7 +3395,7 @@ class DependencyModelTests(unittest.TestCase):
                 text=True,
             )
             self.assertNotEqual(outside.returncode, 0)
-            self.assertIn("PARENT_ROOT_SIDE_EFFECT_ERROR", outside.stderr)
+            self.assertIn("runtime boundary invalid", outside.stderr)
             self.assertFalse(outside_tools.exists())
 
             published_binary = tools_home / "agent-canon" / "bin" / "agent-canon"
@@ -3707,7 +3404,7 @@ class DependencyModelTests(unittest.TestCase):
             mutation_environment["AGENT_CANON_FORCE_TOOL_REBUILD"] = "1"
             mutation_environment["AGENT_CANON_TEST_MUTATE_SOURCE"] = "1"
             mutation = subprocess.run(
-                ["bash", str(tools / "rebuild_agent_tools.sh")],
+                ["bash", str(tools / "retired-rebuild-agent-tools")],
                 cwd=parent,
                 env=mutation_environment,
                 check=False,
@@ -3715,7 +3412,7 @@ class DependencyModelTests(unittest.TestCase):
                 text=True,
             )
             self.assertNotEqual(mutation.returncode, 0)
-            self.assertIn("provider identity mismatch", mutation.stderr)
+            self.assertIn("source identity changed during build", mutation.stderr)
             self.assertEqual(published_binary.read_bytes(), published_binary_before_mutation)
             self.assertEqual(
                 (tools_home / "agent-canon" / ".build-state").read_text(
@@ -3723,22 +3420,6 @@ class DependencyModelTests(unittest.TestCase):
                 ),
                 state,
             )
-
-            (source / "provider-drift").write_text("drift\n", encoding="utf-8")
-            subprocess.run(["git", "add", "provider-drift"], cwd=source, check=True)
-            subprocess.run(
-                ["git", "commit", "-m", "provider drift"], cwd=source, check=True
-            )
-            rejected = subprocess.run(
-                ["bash", str(tools / "rebuild_agent_tools.sh")],
-                cwd=parent,
-                env=environment,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            self.assertNotEqual(rejected.returncode, 0)
-            self.assertIn("provider identity mismatch", rejected.stderr)
 
     def test_warn_provider_is_unavailable_to_dependents(self) -> None:
         provider = parse_record(
@@ -3982,24 +3663,13 @@ class DependencyModelTests(unittest.TestCase):
                 index=0,
             )
 
-    def test_image_owned_dependency_and_shared_post_create_contract(self) -> None:
-        devcontainer = json.loads(
-            (ROOT / ".devcontainer" / "devcontainer.json").read_text(
-                encoding="utf-8"
-            )
-        )
-        dockerfile = (ROOT / ".devcontainer" / "Dockerfile").read_text(
+    def test_image_owned_dependency_and_shared_bootstrap_contract(self) -> None:
+        dockerfile = (ROOT / "bootstrap" / "container" / "Dockerfile").read_text(
             encoding="utf-8"
         )
         dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
-        post_create = (ROOT / ".devcontainer" / "post-create.sh").read_text(
-            encoding="utf-8"
-        )
-        self.assertNotIn("features", devcontainer)
-        self.assertIn(
-            "node:22.14.0-bullseye-slim@sha256:73a9dfbb6c761aebdf4666cce2627635a30d1d4c20f67ff642d01b8f09e709a3",
-            dockerfile,
-        )
+        self.assertFalse((ROOT / ".devcontainer").exists())
+        self.assertIn("node:22.14.0-bullseye-slim@sha256:", dockerfile)
         self.assertIn("COPY --from=node-provider /usr/local/lib/node_modules", dockerfile)
         self.assertIn(
             "COPY tools/agent_tools/parent_root_side_effects.py "
@@ -4007,41 +3677,23 @@ class DependencyModelTests(unittest.TestCase):
             dockerfile,
         )
         self.assertIn("!tools/agent_tools/parent_root_side_effects.py", dockerignore)
+        self.assertIn("dependency_plan.py", dockerfile)
         self.assertIn("image-install --workspace /opt/agent-canon", dockerfile)
         self.assertIn(
             "CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo", dockerfile
         )
         self.assertIn(
-            "PATH=/usr/local/share/agent-canon/toolchains/cargo/bin:$PATH", dockerfile
+            "PATH=/usr/local/share/agent-canon/toolchains/cargo/bin", dockerfile
         )
         self.assertIn("--final-binary-dir /usr/local/bin", dockerfile)
-        self.assertIn("rm -rf /opt/agent-canon /opt/agent-canon-source", dockerfile)
+        self.assertIn("rm -rf /opt/agent-canon", dockerfile)
         self.assertIn("/usr/local/share/agent-canon/image-dependencies", dockerfile)
-        self.assertIn("/etc/profile.d/agent-canon-tools.sh", dockerfile)
         self.assertIn("python3-pip", dockerfile)
-        self.assertIn("pipx", dockerfile)
         self.assertIn("python3-packaging", dockerfile)
         self.assertIn("build-essential", dockerfile)
         self.assertIn("ninja-build", dockerfile)
-        self.assertIn("image-verify --workspace", post_create)
-        graph = build_post_create_execution_graph(
-            (
-                (
-                    "python3",
-                    str(ENGINE),
-                    "image-verify",
-                    "--workspace",
-                    str(ROOT),
-                ),
-                ("id", "-u"),
-                ("mktemp", f"{ROOT}/identity-write.XXXXXX"),
-                ("cat", f"{ROOT}/identity-write.fixture"),
-                ("rm", "-f", f"{ROOT}/identity-write.fixture"),
-            ),
-            builtins=("cd", "printf", "source", "test", "case", "trap", "exit"),
-            redirections=("workspace-write-probe",),
-        )
-        self.assertEqual(len(graph.external_commands()), 5)
+        self.assertIn("USER agentcanon", dockerfile)
+        self.assertIn('io.agent-canon.run.network="none"', dockerfile)
 
     def test_project_extras_are_ordered_and_installed_then_checked(self) -> None:
         workspace = Path(tempfile.mkdtemp())

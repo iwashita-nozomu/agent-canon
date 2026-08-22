@@ -19,14 +19,14 @@ repository structure contract と responsibility scope の別々の関係を読�
 
 ## Owner Responsibility
 
-`structure-refactor` が親 repository の root、directory、README、submodule 境界を
+`structure-refactor` が親 repository の root、directory、README、external source-clone 境界を
 所有します。`responsibility-scope.toml` が一般 path owner/class の唯一の source であり、
 `repo_structure_contract.py` は required/optional path の existence/kind だけを判定します。
 
 ## Invariant
 
 structure contract の required path が存在し、kind が一致し、path escape がない。
-submodule 内部は親 tree に混ぜず、generated report を source structure と誤認しない。
+external source clone 内部は親 tree に混ぜず、generated report を source structure と誤認しない。
 一般 path の owner/class と audit-unit selection を別の path map として重複保存しない。
 
 ## Evidence Sources

@@ -97,6 +97,9 @@ class CodexHooksTest(unittest.TestCase):
                     **os.environ,
                     **(extra_env or {}),
                     "AGENT_CANON_HOOK_SOURCE_ROOT": temp_dir,
+                    "AGENT_CANON_RUNTIME_ROOT": (
+                        extra_env or {}
+                    ).get("AGENT_CANON_RUNTIME_ROOT", str(Path(temp_dir).parent / "hook-runtime")),
                 },
             )
 
@@ -120,6 +123,29 @@ class CodexHooksTest(unittest.TestCase):
     ) -> subprocess.CompletedProcess[str]:
         """Run one hook against an isolated fixture root and return its readback."""
         raw_payload = payload if isinstance(payload, str) else json.dumps(payload)
+        parent = root.parent
+        if not (parent / ".git").exists():
+            subprocess.run(["git", "init", "-q", str(parent)], check=True)
+            subprocess.run(
+                ["git", "-C", str(parent), "remote", "add", "origin", "https://example.invalid/fixture.git"],
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(parent),
+                    "-c",
+                    "user.name=fixture",
+                    "-c",
+                    "user.email=fixture@example.invalid",
+                    "commit",
+                    "--allow-empty",
+                    "-qm",
+                    "init",
+                ],
+                check=True,
+            )
         return subprocess.run(
             [sys.executable, str(HOOK_DISPATCHER), event],
             cwd=PROJECT_ROOT,
@@ -131,6 +157,15 @@ class CodexHooksTest(unittest.TestCase):
                 **os.environ,
                 **(extra_env or {}),
                 "AGENT_CANON_HOOK_SOURCE_ROOT": str(root),
+                "AGENT_CANON_PARENT_ROOT": (
+                    extra_env or {}
+                ).get("AGENT_CANON_PARENT_ROOT", str(parent)),
+                "AGENT_CANON_ACTIVE_REPOSITORY_ROOT": (
+                    extra_env or {}
+                ).get("AGENT_CANON_ACTIVE_REPOSITORY_ROOT", str(parent)),
+                "AGENT_CANON_RUNTIME_ROOT": (
+                    extra_env or {}
+                ).get("AGENT_CANON_RUNTIME_ROOT", str(parent)),
             },
         )
 
@@ -151,9 +186,16 @@ class CodexHooksTest(unittest.TestCase):
             "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR",
             "AGENT_CANON_SOURCE_ROOT",
             "AGENT_CANON_ROOT",
+            "AGENT_CANON_RUNTIME_ROOT",
+            "AGENT_CANON_PARENT_ROOT",
+            "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
         ):
             env.pop(key, None)
         env.update(extra_env or {})
+        env.setdefault(
+            "AGENT_CANON_RUNTIME_ROOT",
+            str(cwd.parent / f".{cwd.name}-runtime"),
+        )
         return subprocess.run(
             [sys.executable, str(HOOK_DISPATCHER), event],
             cwd=cwd,
@@ -165,9 +207,17 @@ class CodexHooksTest(unittest.TestCase):
         )
 
     @staticmethod
-    def _spooled_event(root: Path, pattern: str = ".agent-canon/**/*.json") -> dict[str, object]:
+    def _spooled_event(root: Path, pattern: str = "**/*.json") -> dict[str, object]:
         """Read the one isolated hook event emitted by a fixture invocation."""
         paths = list(root.glob(pattern))
+        if not paths:
+            for runtime_root in (
+                root.parent,
+                root.parent / f".{root.name}-runtime",
+            ):
+                paths = list(runtime_root.glob(pattern))
+                if paths:
+                    break
         if len(paths) != 1:
             raise AssertionError(f"expected one spooled event, found {paths}")
         return cast("dict[str, object]", json.loads(paths[0].read_text(encoding="utf-8")))
@@ -176,7 +226,8 @@ class CodexHooksTest(unittest.TestCase):
         """Projection follows the explicit target, while no target remains spool-only."""
         payload = {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"}
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
+            root = Path(tmp_dir) / "source"
+            root.mkdir()
             pointer_target = root / "reports" / "agents" / "pointer-run"
             pointer_target.parent.mkdir(parents=True)
             (pointer_target.parent / ".active_run").write_text("pointer-run\n", encoding="utf-8")
@@ -197,7 +248,8 @@ class CodexHooksTest(unittest.TestCase):
             self.assertFalse((root / "workflow_monitoring.md").exists())
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
+            root = Path(tmp_dir) / "source"
+            root.mkdir()
             self._run_hook_in_root(root, "UserPromptSubmit", payload)
 
             event = self._spooled_event(root)
@@ -208,7 +260,8 @@ class CodexHooksTest(unittest.TestCase):
         """An active run pointer selects the run bundle relative to its pointer."""
         payload = {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"}
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
+            root = Path(tmp_dir) / "source"
+            root.mkdir()
             pointer = root / "reports" / "agents" / ".active_run"
             pointer.parent.mkdir(parents=True)
             pointer.write_text("pointer-run\n", encoding="utf-8")
@@ -225,7 +278,8 @@ class CodexHooksTest(unittest.TestCase):
         """Standalone AgentCanon may resolve its local active-run pointer."""
         payload = {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"}
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
+            root = Path(tmp_dir) / "source"
+            root.mkdir()
             target = root / "reports" / "agents" / "standalone-run"
             target.mkdir(parents=True)
             (root / ".active_run").write_text(
@@ -245,7 +299,8 @@ class CodexHooksTest(unittest.TestCase):
         cases = ("missing-run", "../escape", "/absolute/escape", "symlink-escape")
         for declared in cases:
             with self.subTest(declared=declared), tempfile.TemporaryDirectory() as tmp_dir:
-                root = Path(tmp_dir)
+                root = Path(tmp_dir) / "source"
+                root.mkdir()
                 report_root = root / "reports" / "agents"
                 report_root.mkdir(parents=True)
                 outside = root / "outside"
@@ -290,9 +345,10 @@ class CodexHooksTest(unittest.TestCase):
         """A failed source-root resolution disables report projection as typed state."""
         payload = {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"}
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            spool = root / "spool"
-            report = root / "authority-report"
+            root = Path(tmp_dir) / "source"
+            root.mkdir()
+            spool = root.parent / f"{root.name}-spool"
+            report = root.parent / f"{root.name}-authority-report"
             report.mkdir()
 
             self._run_hook_in_layout(
@@ -302,42 +358,12 @@ class CodexHooksTest(unittest.TestCase):
                 extra_env={
                     "AGENT_CANON_HOOK_EVENT_SPOOL_DIR": str(spool),
                     "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(report),
+                    "AGENT_CANON_RUNTIME_ROOT": str(root.parent),
                 },
             )
 
-            event = self._spooled_event(spool, "**/*.json")
-            self.assertEqual(event["workflow_monitor_report_dir"], "")
+            self.assertFalse(list(spool.glob("**/*.json")))
             self.assertFalse((report / "workflow_monitoring.md").exists())
-
-    def test_derived_submodule_cwd_uses_parent_active_root(self) -> None:
-        """A real vendored layout resolves the parent without the hook override."""
-        payload = {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"}
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            parent = Path(tmp_dir) / "parent"
-            source = parent / "vendor" / "agent-canon"
-            catalog = source / "agents" / "skills" / "catalog.yaml"
-            (parent / ".git").mkdir(parents=True)
-            source.mkdir(parents=True)
-            (source / ".git").write_text(
-                "gitdir: ../../.git/modules/vendor/agent-canon\n",
-                encoding="utf-8",
-            )
-            catalog.parent.mkdir(parents=True)
-            catalog.write_text("skills: []\n", encoding="utf-8")
-            report = parent / "reports" / "agents" / "derived-run"
-            report.mkdir(parents=True)
-            (report.parent / ".active_run").write_text(
-                "derived-run\n",
-                encoding="utf-8",
-            )
-
-            self._run_hook_in_layout(source, "UserPromptSubmit", payload)
-
-            event = self._spooled_event(parent)
-            self.assertEqual(event["root"], str(parent))
-            self.assertEqual(event["workflow_monitor_report_dir"], str(report))
-            self.assertTrue((report / "workflow_monitoring.md").is_file())
-            self.assertFalse((source / ".agent-canon").exists())
 
     def _run_shared_checkout_guard(
         self, command: str, *, extra_env: dict[str, str] | None = None
@@ -917,119 +943,6 @@ class CodexHooksTest(unittest.TestCase):
                 self.assertIsNone(
                     self._run_shared_checkout_guard(f"{creation} {destructive} {command}")
                 )
-
-    def test_shared_checkout_guard_protects_agent_canon_update_wrappers(self) -> None:
-        """Update wrappers require destructive authority, not branch/worktree creation authority."""
-        approved = (
-            "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
-            "AGENT_CANON_BRANCH_WORKTREE_REASON=approved-update "
-            "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
-            "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved-update"
-        )
-        commands = [
-            "bash tools/update_agent_canon.sh latest",
-            "tools/update_agent_canon.sh latest",
-            "./tools/update_agent_canon.sh apply",
-            "bash tools/update_agent_canon.sh apply",
-            "bash tools/update_agent_canon.sh merge-main-into-current",
-            "bash tools/sync_agent_canon.sh ensure-latest",
-            "./tools/sync_agent_canon.sh ensure-latest",
-            "bash --rcfile /tmp/agent-canon-test-rc tools/update_agent_canon.sh latest",
-            "bash -o pipefail tools/update_agent_canon.sh latest",
-            "exec ./tools/update_agent_canon.sh latest",
-            "exec -- ./tools/sync_agent_canon.sh ensure-latest",
-            "exec -a agent-canon ./tools/update_agent_canon.sh apply",
-            "exec -a canon -c ./tools/update_agent_canon.sh latest",
-            "exec -a canon -l ./tools/sync_agent_canon.sh ensure-latest",
-            "exec -c ./tools/sync_agent_canon.sh ensure-latest",
-            "exec -l ./tools/update_agent_canon.sh merge-main-into-current",
-            "make agent-canon-ensure-latest",
-            "make agent-canon-latest",
-            "make agent-canon-update",
-        ]
-        for command in commands:
-            with self.subTest(command=command):
-                payload = self._run_shared_checkout_guard(command)
-                self.assertIsNotNone(payload)
-                assert payload is not None
-                reason = cast("str", payload["reason"])
-                self.assertIn("DESTRUCTIVE_GIT_GUARD=block", reason)
-                self.assertNotIn("BRANCH_WORKTREE_CREATION_GUARD=block", reason)
-                self.assertEqual(
-                    payload["next_action"],
-                    "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
-                )
-                self.assertIsNotNone(
-                    self._run_shared_checkout_guard(
-                        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
-                        "AGENT_CANON_BRANCH_WORKTREE_REASON=creation-only "
-                        f"{command}"
-                    )
-                )
-                self.assertIsNone(
-                    self._run_shared_checkout_guard(
-                        "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
-                        "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved-update "
-                        f"{command}"
-                    )
-                )
-                self.assertIsNone(self._run_shared_checkout_guard(f"{approved} {command}"))
-
-    def test_removed_dirty_preservation_wrapper_is_absent_from_active_surfaces(self) -> None:
-        """The deleted stash-based update wrapper must not remain discoverable."""
-        obsolete = "merge-main-into-current-" + "preserve-dirty"
-        active_surfaces = (
-            PROJECT_ROOT / "tools" / "agent_tools" / "hook_safety.py",
-            PROJECT_ROOT / "tools" / "update_agent_canon.sh",
-            PROJECT_ROOT / "tools" / "README.md",
-            PROJECT_ROOT / "documents" / "tools" / "README.md",
-            PROJECT_ROOT / "documents" / "agent-canon" / "agent-canon-subtree-migration.md",
-        )
-        for surface in active_surfaces:
-            with self.subTest(surface=surface.relative_to(PROJECT_ROOT)):
-                self.assertNotIn(obsolete, surface.read_text(encoding="utf-8"))
-
-    def test_shared_checkout_guard_wrapper_authority_does_not_leak(self) -> None:
-        """Prior segments and ambient variables never authorize an update wrapper."""
-        approved = (
-            "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
-            "AGENT_CANON_BRANCH_WORKTREE_REASON=approved-update "
-            "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
-            "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved-update"
-        )
-        commands = (
-            "exec ./tools/update_agent_canon.sh latest",
-            "exec -- ./tools/sync_agent_canon.sh ensure-latest",
-            "exec -a canon -c ./tools/update_agent_canon.sh latest",
-            "exec -a canon -l ./tools/sync_agent_canon.sh ensure-latest",
-        )
-        for command in commands:
-            with self.subTest(command=command):
-                self.assertIsNotNone(
-                    self._run_shared_checkout_guard(
-                        command,
-                        extra_env={
-                            "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "user_request",
-                            "AGENT_CANON_BRANCH_WORKTREE_REASON": "ambient",
-                            "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
-                            "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "ambient",
-                        },
-                    )
-                )
-                self.assertIsNotNone(self._run_shared_checkout_guard(f"{approved}; {command}"))
-                self.assertIsNotNone(self._run_shared_checkout_guard(f"export {approved}; {command}"))
-                self.assertIsNotNone(
-                    self._run_shared_checkout_guard(
-                        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request " + command
-                    )
-                )
-                self.assertIsNone(self._run_shared_checkout_guard(f"{approved} {command}"))
-
-        self.assertIsNone(
-            self._run_shared_checkout_guard(
-                f"{approved} bash -o pipefail tools/update_agent_canon.sh latest"
-            )
-        )
 
     def test_shared_checkout_guard_blocks_generic_branch_worktree_mutation(self) -> None:
         """Only explicit branch/worktree read-only allowlists stay quiet."""

@@ -214,7 +214,6 @@ struct SurfaceManifestEntry {
 struct SurfaceManifestSnapshot {
     prefix: String,
     entries: Vec<SurfaceManifestEntry>,
-    requires_parent_gitlink: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -232,36 +231,11 @@ struct SourceCandidate {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct GitlinkAuthority {
-    path: String,
-    staged_oid: String,
-    submodule_head: String,
-    submodule_root: PathBuf,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum GitlinkIndexState {
-    Missing,
-    NonGitlinkMode { mode: String },
-    Conflict { stage: String },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ManifestError {
     Io(String),
     Git(String),
     Transport(String),
     SurfaceManifest(String),
-    Gitlink(String),
-    GitlinkIndexState {
-        path: String,
-        state: GitlinkIndexState,
-    },
-    GitlinkHeadMismatch {
-        path: String,
-        staged_oid: String,
-        head_oid: String,
-    },
     SnapshotInconsistent(String),
 }
 
@@ -272,29 +246,7 @@ impl fmt::Display for ManifestError {
             | Self::Git(message)
             | Self::Transport(message)
             | Self::SurfaceManifest(message)
-            | Self::Gitlink(message)
             | Self::SnapshotInconsistent(message) => formatter.write_str(message),
-            Self::GitlinkIndexState { path, state } => match state {
-                GitlinkIndexState::Missing => {
-                    write!(formatter, "gitlink_index_state: path={path} state=missing")
-                }
-                GitlinkIndexState::NonGitlinkMode { mode } => write!(
-                    formatter,
-                    "gitlink_index_state: path={path} state=non-160000 mode={mode}"
-                ),
-                GitlinkIndexState::Conflict { stage } => write!(
-                    formatter,
-                    "gitlink_index_state: path={path} state=conflict stage={stage}"
-                ),
-            },
-            Self::GitlinkHeadMismatch {
-                path,
-                staged_oid,
-                head_oid,
-            } => write!(
-                formatter,
-                "gitlink_head_mismatch: path={path} staged_oid={staged_oid} submodule_head={head_oid}"
-            ),
         }
     }
 }
@@ -392,16 +344,7 @@ pub(crate) fn validate_persisted_producer_identity(
 
 pub(crate) fn current_producer_identity(root: &Path) -> Result<ProducerIdentity, ManifestError> {
     let root = fs::canonicalize(root).map_err(|error| ManifestError::Io(error.to_string()))?;
-    let vendored_root = root.join("vendor/agent-canon");
-    let source_root = if vendored_root
-        .join("tools/agent_tools/surface_manifest.py")
-        .is_file()
-    {
-        vendored_root
-    } else {
-        root.clone()
-    };
-    let source_root = fs::canonicalize(&source_root)
+    let source_root = fs::canonicalize(&root)
         .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?;
     let producer_path = fs::canonicalize(source_root.join("tools/agent_tools/surface_manifest.py"))
         .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?;
@@ -444,21 +387,6 @@ fn git_text(root: &Path, args: &[&str]) -> Result<String, ManifestError> {
         ));
     }
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-}
-
-fn git_bytes_owned(root: &Path, args: &[String]) -> Result<Vec<u8>, ManifestError> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(args)
-        .output()
-        .map_err(|error| ManifestError::Git(error.to_string()))?;
-    if !output.status.success() {
-        return Err(ManifestError::Git(
-            String::from_utf8_lossy(&output.stderr).trim().to_string(),
-        ));
-    }
-    Ok(output.stdout)
 }
 
 fn required_json_object<'a>(
@@ -517,10 +445,7 @@ fn require_exact_json_keys(
     Ok(())
 }
 
-fn surface_manifest_script(
-    root: &Path,
-    producer: Option<&Path>,
-) -> Result<(PathBuf, bool), ManifestError> {
+fn surface_manifest_script(root: &Path, producer: Option<&Path>) -> Result<PathBuf, ManifestError> {
     if let Some(producer) = producer {
         let metadata = fs::metadata(producer).map_err(|error| {
             ManifestError::SurfaceManifest(format!(
@@ -532,18 +457,11 @@ fn surface_manifest_script(
                 "surface_manifest_snapshot: producer is not a regular file".to_string(),
             ));
         }
-        return Ok((
-            producer.to_path_buf(),
-            root.join("vendor/agent-canon").is_dir(),
-        ));
-    }
-    let parent_script = root.join("vendor/agent-canon/tools/agent_tools/surface_manifest.py");
-    if parent_script.is_file() {
-        return Ok((parent_script, true));
+        return Ok(producer.to_path_buf());
     }
     let standalone_script = root.join("tools/agent_tools/surface_manifest.py");
     if standalone_script.is_file() {
-        return Ok((standalone_script, false));
+        return Ok(standalone_script);
     }
     Err(ManifestError::SurfaceManifest(
         "surface_manifest_snapshot: canonical Python producer is missing".to_string(),
@@ -555,7 +473,7 @@ fn load_surface_manifest_snapshot(
     producer: Option<&Path>,
     manifest: Option<&Path>,
 ) -> Result<SurfaceManifestSnapshot, ManifestError> {
-    let (script, requires_parent_gitlink) = surface_manifest_script(root, producer)?;
+    let script = surface_manifest_script(root, producer)?;
     let output = Command::new("python3")
         .arg(script)
         .args([
@@ -566,7 +484,7 @@ fn load_surface_manifest_snapshot(
                 )
             })?,
             "--prefix",
-            "vendor/agent-canon",
+            ".",
             "--manifest",
             manifest
                 .unwrap_or_else(|| Path::new(DEFAULT_SURFACE_MANIFEST))
@@ -658,11 +576,7 @@ fn load_surface_manifest_snapshot(
             optional: required_json_bool(entry, "optional", &owner)?,
         });
     }
-    Ok(SurfaceManifestSnapshot {
-        prefix,
-        entries,
-        requires_parent_gitlink,
-    })
+    Ok(SurfaceManifestSnapshot { prefix, entries })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -933,28 +847,11 @@ fn manifest_repo_state_entry<'a>(
     selected
 }
 
-fn manifest_repo_state_target<'a>(
-    manifest: &'a SurfaceManifestSnapshot,
-    authority: Option<&GitlinkAuthority>,
-    relative: &str,
-) -> Option<&'a SurfaceManifestEntry> {
-    let canonical_locator = authority
-        .and_then(|value| {
-            relative
-                .strip_prefix(&value.path)
-                .and_then(|suffix| suffix.strip_prefix('/'))
-        })
-        .unwrap_or(relative);
-    manifest_repo_state_entry(manifest, canonical_locator)
-}
-
 fn source_candidate_is_explicitly_excluded(
     candidate: &SourceCandidate,
     manifest: &SurfaceManifestSnapshot,
 ) -> bool {
     source_path_is_explicitly_excluded(&candidate.relative)
-        || (candidate.locator_kind == "submodule-path"
-            && source_path_is_explicitly_excluded(&candidate.canonical_locator))
         || manifest_repo_state_entry(manifest, &candidate.canonical_locator).is_some()
 }
 
@@ -996,172 +893,6 @@ fn git_visible_paths(root: &Path) -> Result<Vec<String>, ManifestError> {
     paths.sort();
     paths.dedup();
     Ok(paths)
-}
-
-fn staged_gitlink(root: &Path, prefix: &str) -> Result<String, ManifestError> {
-    let bytes = git_bytes(root, &["ls-files", "--stage", "-z"])?;
-    let mut found = None;
-    for record in bytes
-        .split(|byte| *byte == 0)
-        .filter(|record| !record.is_empty())
-    {
-        let (metadata, path) = split_tab_record(record).ok_or_else(|| {
-            ManifestError::Gitlink("gitlink index record is malformed".to_string())
-        })?;
-        let fields = metadata.split(|byte| *byte == b' ').collect::<Vec<_>>();
-        if fields.len() != 3 {
-            return Err(ManifestError::Gitlink(
-                "gitlink index metadata is malformed".to_string(),
-            ));
-        }
-        if path != prefix.as_bytes() {
-            continue;
-        }
-        let stage = String::from_utf8_lossy(fields[2]).to_string();
-        if stage != "0" {
-            return Err(ManifestError::GitlinkIndexState {
-                path: prefix.to_string(),
-                state: GitlinkIndexState::Conflict { stage },
-            });
-        }
-        if fields[0] != b"160000" {
-            return Err(ManifestError::GitlinkIndexState {
-                path: prefix.to_string(),
-                state: GitlinkIndexState::NonGitlinkMode {
-                    mode: String::from_utf8_lossy(fields[0]).to_string(),
-                },
-            });
-        }
-        {
-            let oid = String::from_utf8(fields[1].to_vec()).map_err(|error| {
-                ManifestError::Gitlink(format!("gitlink index OID is not UTF-8: {error}"))
-            })?;
-            if found.replace(oid).is_some() {
-                return Err(ManifestError::Gitlink(
-                    "gitlink index contains duplicate path".to_string(),
-                ));
-            }
-        }
-    }
-    found.ok_or_else(|| ManifestError::GitlinkIndexState {
-        path: prefix.to_string(),
-        state: GitlinkIndexState::Missing,
-    })
-}
-
-fn gitlink_authority(
-    root: &Path,
-    manifest: &SurfaceManifestSnapshot,
-) -> Result<Option<GitlinkAuthority>, ManifestError> {
-    if !manifest.requires_parent_gitlink {
-        return Ok(None);
-    }
-    let staged_oid = staged_gitlink(root, &manifest.prefix)?;
-    let submodule_root = root.join(&manifest.prefix);
-    let submodule_head = git_text(&submodule_root, &["rev-parse", "--verify", "HEAD"])
-        .map_err(|error| ManifestError::Gitlink(format!("submodule HEAD unavailable: {error}")))?;
-    if staged_oid != submodule_head {
-        return Err(ManifestError::GitlinkHeadMismatch {
-            path: manifest.prefix.clone(),
-            staged_oid,
-            head_oid: submodule_head,
-        });
-    }
-    Ok(Some(GitlinkAuthority {
-        path: manifest.prefix.clone(),
-        staged_oid,
-        submodule_head,
-        submodule_root,
-    }))
-}
-
-fn split_tab_record(record: &[u8]) -> Option<(&[u8], &[u8])> {
-    let index = record.iter().position(|byte| *byte == b'\t')?;
-    Some((&record[..index], &record[index + 1..]))
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct PinnedGitEntry {
-    relative: String,
-    mode: String,
-    object_type: String,
-    object_id: String,
-}
-
-fn pinned_git_entries(authority: &GitlinkAuthority) -> Result<Vec<PinnedGitEntry>, ManifestError> {
-    let args = vec![
-        "ls-tree".to_string(),
-        "--full-tree".to_string(),
-        "-r".to_string(),
-        "-t".to_string(),
-        "-z".to_string(),
-        authority.staged_oid.clone(),
-    ];
-    let bytes = git_bytes_owned(&authority.submodule_root, &args).map_err(|error| {
-        ManifestError::Gitlink(format!("pinned submodule tree unavailable: {error}"))
-    })?;
-    let mut entries = Vec::new();
-    for record in bytes
-        .split(|byte| *byte == 0)
-        .filter(|record| !record.is_empty())
-    {
-        let (metadata, path) = split_tab_record(record).ok_or_else(|| {
-            ManifestError::Gitlink("pinned submodule tree record is malformed".to_string())
-        })?;
-        let fields = metadata.split(|byte| *byte == b' ').collect::<Vec<_>>();
-        if fields.len() != 3 {
-            return Err(ManifestError::Gitlink(
-                "pinned submodule tree metadata is malformed".to_string(),
-            ));
-        }
-        let relative = String::from_utf8(path.to_vec()).map_err(|error| {
-            ManifestError::Gitlink(format!("pinned submodule path is not UTF-8: {error}"))
-        })?;
-        let mode = String::from_utf8(fields[0].to_vec()).map_err(|error| {
-            ManifestError::Gitlink(format!("pinned submodule mode is not UTF-8: {error}"))
-        })?;
-        let object_type = String::from_utf8(fields[1].to_vec()).map_err(|error| {
-            ManifestError::Gitlink(format!(
-                "pinned submodule object type is not UTF-8: {error}"
-            ))
-        })?;
-        let object_id = String::from_utf8(fields[2].to_vec()).map_err(|error| {
-            ManifestError::Gitlink(format!("pinned submodule object OID is not UTF-8: {error}"))
-        })?;
-        if !matches!(object_type.as_str(), "blob" | "tree") {
-            return Err(ManifestError::Gitlink(format!(
-                "pinned submodule object type is unsupported: {object_type}"
-            )));
-        }
-        entries.push(PinnedGitEntry {
-            relative,
-            mode,
-            object_type,
-            object_id,
-        });
-    }
-    entries.sort_by(|left, right| left.relative.cmp(&right.relative));
-    Ok(entries)
-}
-
-fn pinned_git_object_bytes(
-    authority: &GitlinkAuthority,
-    entry: &PinnedGitEntry,
-) -> Result<Vec<u8>, ManifestError> {
-    if entry.object_type == "tree" {
-        return Ok(Vec::new());
-    }
-    let args = vec![
-        "cat-file".to_string(),
-        "blob".to_string(),
-        entry.object_id.clone(),
-    ];
-    git_bytes_owned(&authority.submodule_root, &args).map_err(|error| {
-        ManifestError::Gitlink(format!(
-            "pinned submodule object unavailable for {}: {error}",
-            entry.relative
-        ))
-    })
 }
 
 struct SourcePathRead {
@@ -1267,11 +998,8 @@ fn source_candidates(
     root: &Path,
     manifest: &SurfaceManifestSnapshot,
     git_head: &str,
-    authority: Option<&GitlinkAuthority>,
 ) -> Result<Vec<SourceCandidate>, ManifestError> {
-    let authority_id = authority
-        .map(|value| format!("parent-gitlink:160000:{}:{}", value.path, value.staged_oid))
-        .unwrap_or_else(|| format!("standalone-git:{git_head}"));
+    let authority_id = format!("standalone-git:{git_head}");
     let mut candidates = Vec::new();
     for relative in git_visible_paths(root)? {
         let source = read_source_path(root, &relative)?;
@@ -1291,44 +1019,6 @@ fn source_candidates(
             submodule_commit: String::new(),
         });
     }
-    let Some(authority) = authority else {
-        candidates.sort_by(|left, right| left.relative.cmp(&right.relative));
-        return Ok(candidates);
-    };
-    let root_candidate = SourceCandidate {
-        relative: authority.path.clone(),
-        authority_id: authority_id.clone(),
-        canonical_locator: authority.path.clone(),
-        locator_kind: "gitlink".to_string(),
-        path_role: "gitlink".to_string(),
-        file_mode: "160000".to_string(),
-        exists: true,
-        bytes: authority.staged_oid.as_bytes().to_vec(),
-        git_blob_or_gitlink: authority.staged_oid.clone(),
-        submodule_commit: authority.submodule_head.clone(),
-    };
-    candidates.push(root_candidate);
-    for entry in pinned_git_entries(authority)? {
-        let bytes = pinned_git_object_bytes(authority, &entry)?;
-        let relative = format!("{}/{}", authority.path, entry.relative);
-        let path_role = if entry.object_type == "tree" {
-            "submodule-tree"
-        } else {
-            "source"
-        };
-        candidates.push(SourceCandidate {
-            relative,
-            authority_id: authority_id.clone(),
-            canonical_locator: entry.relative,
-            locator_kind: "submodule-path".to_string(),
-            path_role: path_role.to_string(),
-            file_mode: entry.mode,
-            exists: true,
-            bytes,
-            git_blob_or_gitlink: entry.object_id,
-            submodule_commit: authority.submodule_head.clone(),
-        });
-    }
     candidates.sort_by(|left, right| left.relative.cmp(&right.relative));
     for pair in candidates.windows(2) {
         if pair[0].relative == pair[1].relative {
@@ -1345,7 +1035,6 @@ fn source_candidates(
 fn surface_target_path(
     manifest: &SurfaceManifestSnapshot,
     entry: &SurfaceManifestEntry,
-    authority: Option<&GitlinkAuthority>,
 ) -> Result<Option<String>, ManifestError> {
     if entry.source.is_empty() || !matches!(entry.mode.as_str(), "symlink" | "copy") {
         return Ok(None);
@@ -1357,17 +1046,12 @@ fn surface_target_path(
             entry.path
         ))
     })?;
-    if let Some(authority) = authority {
-        Ok(Some(format!("{}/{}", authority.path, normalized)))
-    } else {
-        let _ = manifest;
-        Ok(Some(normalized))
-    }
+    let _ = manifest;
+    Ok(Some(normalized))
 }
 
 fn canonicalize_surface_path(
     manifest: &SurfaceManifestSnapshot,
-    authority: Option<&GitlinkAuthority>,
     relative: &str,
 ) -> Result<String, ManifestError> {
     let mut selected: Option<(&SurfaceManifestEntry, &str)> = None;
@@ -1392,12 +1076,7 @@ fn canonicalize_surface_path(
         }
     }
     if let Some((entry, suffix)) = selected {
-        let source = if let Some(authority) = authority {
-            format!("{}/{}", authority.path, entry.source)
-        } else {
-            entry.source.clone()
-        };
-        let joined = format!("{source}{suffix}");
+        let joined = format!("{}{suffix}", entry.source);
         return normalize_relative(Path::new(&joined)).map_err(|error| {
             ManifestError::SurfaceManifest(format!(
                 "surface_manifest_snapshot: projected path is invalid: {joined}: {error:?}"
@@ -1409,7 +1088,6 @@ fn canonicalize_surface_path(
 
 fn manifest_surface_relations(
     manifest: &SurfaceManifestSnapshot,
-    authority: Option<&GitlinkAuthority>,
     identities: &[SourceIdentity],
     excluded: &BTreeSet<String>,
     snapshot_id: &str,
@@ -1420,7 +1098,7 @@ fn manifest_surface_relations(
         .collect::<BTreeMap<_, _>>();
     let mut relations = Vec::new();
     for entry in &manifest.entries {
-        let Some(target_path) = surface_target_path(manifest, entry, authority)? else {
+        let Some(target_path) = surface_target_path(manifest, entry)? else {
             continue;
         };
         if excluded.contains(&entry.path) || excluded.contains(&target_path) {
@@ -1470,17 +1148,9 @@ fn exclusion_metadata(
     }
 }
 
-fn path_is_gitlink_authority_boundary(
-    authority: Option<&GitlinkAuthority>,
-    relative: &str,
-) -> bool {
-    authority.is_some_and(|value| path_is_surface_or_descendant(relative, &value.path))
-}
-
 fn source_status_bytes(
     root: &Path,
     manifest: &SurfaceManifestSnapshot,
-    authority: Option<&GitlinkAuthority>,
 ) -> Result<Vec<u8>, ManifestError> {
     let raw = git_bytes(root, &["status", "--porcelain=v1", "--untracked-files=all"])?;
     let mut filtered = Vec::new();
@@ -1500,7 +1170,6 @@ fn source_status_bytes(
             .collect::<Vec<_>>();
         if paths.iter().all(|path| {
             source_path_is_explicitly_excluded(path)
-                || path_is_gitlink_authority_boundary(authority, path)
                 || manifest_repo_state_entry(manifest, path).is_some()
         }) {
             continue;
@@ -1601,10 +1270,9 @@ pub(crate) fn probe_snapshot_identity(
     let root = fs::canonicalize(root).map_err(|error| ManifestError::Io(error.to_string()))?;
     let surface_manifest = load_surface_manifest_snapshot(&root, producer, manifest)?;
     let head = git_text(&root, &["rev-parse", "--verify", "HEAD"])?;
-    let authority = gitlink_authority(&root, &surface_manifest)?;
-    let candidates = source_candidates(&root, &surface_manifest, &head, authority.as_ref())?;
+    let candidates = source_candidates(&root, &surface_manifest, &head)?;
     let source_fingerprint = source_fingerprint_for_candidates(&candidates, &surface_manifest)?;
-    let status = source_status_bytes(&root, &surface_manifest, authority.as_ref())?;
+    let status = source_status_bytes(&root, &surface_manifest)?;
     let index_hash = hash_bytes(&git_bytes(&root, &["ls-files", "--stage", "-z"])?);
     let status_hash = hash_bytes(&status);
     let _capture_hash = snapshot_capture_hash(
@@ -1645,8 +1313,7 @@ pub(crate) fn capture_snapshot(
         request.surface_manifest.as_deref(),
     )?;
     let git_head = git_text(&root, &["rev-parse", "--verify", "HEAD"])?;
-    let authority = gitlink_authority(&root, &surface_manifest)?;
-    let candidates = source_candidates(&root, &surface_manifest, &git_head, authority.as_ref())?;
+    let candidates = source_candidates(&root, &surface_manifest, &git_head)?;
     let candidate_paths = candidates
         .iter()
         .map(|candidate| candidate.relative.clone())
@@ -1654,7 +1321,7 @@ pub(crate) fn capture_snapshot(
     let source_fingerprint_before =
         source_fingerprint_for_candidates(&candidates, &surface_manifest)?;
     let index_hash = hash_bytes(&git_bytes(&root, &["ls-files", "--stage", "-z"])?);
-    let status_bytes = source_status_bytes(&root, &surface_manifest, authority.as_ref())?;
+    let status_bytes = source_status_bytes(&root, &surface_manifest)?;
     let status_hash = hash_bytes(&status_bytes);
     let captured_before_hash = snapshot_capture_hash(
         &request.profile,
@@ -1746,14 +1413,6 @@ pub(crate) fn capture_snapshot(
             });
             continue;
         }
-        if authority.is_some()
-            && surface_manifest.entries.iter().any(|entry| {
-                entry.path == relative.as_str() && matches!(entry.mode.as_str(), "symlink" | "copy")
-            })
-        {
-            // Parent root views are projections; parse their pinned canonical source once.
-            continue;
-        }
         if source_path_is_historical_dependency_record(relative) {
             continue;
         }
@@ -1816,17 +1475,10 @@ pub(crate) fn capture_snapshot(
             let (resolved, attestation_key, canonical_target) =
                 match resolve_source_relative_target(relative, target) {
                     Ok(target_path) => {
-                        let canonical_target_path = canonicalize_surface_path(
-                            &surface_manifest,
-                            authority.as_ref(),
-                            &target_path,
-                        )?;
-                        if manifest_repo_state_target(
-                            &surface_manifest,
-                            authority.as_ref(),
-                            &canonical_target_path,
-                        )
-                        .is_some()
+                        let canonical_target_path =
+                            canonicalize_surface_path(&surface_manifest, &target_path)?;
+                        if manifest_repo_state_entry(&surface_manifest, &canonical_target_path)
+                            .is_some()
                         {
                             (None, "surface-manifest-repo-state", canonical_target_path)
                         } else {
@@ -1886,13 +1538,7 @@ pub(crate) fn capture_snapshot(
         }
     }
     let git_head_after = git_text(&root, &["rev-parse", "--verify", "HEAD"])?;
-    let authority_after = gitlink_authority(&root, &surface_manifest)?;
-    let candidates_after = source_candidates(
-        &root,
-        &surface_manifest,
-        &git_head_after,
-        authority_after.as_ref(),
-    )?;
+    let candidates_after = source_candidates(&root, &surface_manifest, &git_head_after)?;
     let candidate_paths_after = candidates_after
         .iter()
         .map(|candidate| candidate.relative.clone())
@@ -1900,7 +1546,7 @@ pub(crate) fn capture_snapshot(
     let source_fingerprint_after =
         source_fingerprint_for_candidates(&candidates_after, &surface_manifest)?;
     let index_hash_after = hash_bytes(&git_bytes(&root, &["ls-files", "--stage", "-z"])?);
-    let status_after = source_status_bytes(&root, &surface_manifest, authority_after.as_ref())?;
+    let status_after = source_status_bytes(&root, &surface_manifest)?;
     let captured_after_hash = snapshot_capture_hash(
         &request.profile,
         &git_head_after,
@@ -1915,7 +1561,6 @@ pub(crate) fn capture_snapshot(
     }
     let surface_relations = manifest_surface_relations(
         &surface_manifest,
-        authority.as_ref(),
         &source_identities,
         &excluded_set,
         &snapshot_id,
@@ -1930,10 +1575,7 @@ pub(crate) fn capture_snapshot(
             git_worktree_dirty: !dirty_paths.is_empty(),
             git_status_hash: status_hash,
             dirty_paths,
-            agentcanon_pin: authority
-                .as_ref()
-                .map(|value| value.staged_oid.clone())
-                .unwrap_or_default(),
+            agentcanon_pin: String::new(),
             schema_version: SNAPSHOT_SCHEMA_VERSION.to_string(),
             tool_version: "agent-canon.graph.v1".to_string(),
             profile: request.profile.clone(),
@@ -2069,17 +1711,8 @@ mod tests {
         assert!(source_path_is_historical_dependency_record(
             "issues/closed/AC-20260612-wave-activation-launcher-gap.md"
         ));
-        assert!(source_path_is_historical_dependency_record(
-            "vendor/agent-canon/issues/closed/AC-20260612-wave-activation-launcher-gap.md"
-        ));
         assert!(!source_path_is_historical_dependency_record(
             "issues/open/AC-20260612-active-finding.md"
-        ));
-        assert!(!source_path_is_historical_dependency_record(
-            "vendor/agent-canon/issues/open/AC-20260612-active-finding.md"
-        ));
-        assert!(!source_path_is_historical_dependency_record(
-            "vendor/agent-canon/issues/archive/closed.md"
         ));
     }
 

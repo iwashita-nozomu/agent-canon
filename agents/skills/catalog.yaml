@@ -12,6 +12,21 @@ version: 1
 # downstream implementation ../../tests/agent_tools/test_route.py tests canonical visualization capability routing
 # @dependency-end
 
+# Runtime tool dispatch is deliberately a namespaced route. Skill entries may
+# continue to document their normal command, while the shared container uses
+# ``agent-canon tool run <catalog-id> -- <args...>`` when a v2 parity record is
+# available. This mapping is descriptive only; it does not create flat
+# executables or silently replace a legacy command.
+tool_runtime:
+  schema_version: 2
+  catalog: tools/catalog.yaml
+  command: agent-canon tool run <catalog-id> -- <args...>
+  execution: bootstrap exec typed request into the shared tool container
+  environment: exact allowlist only; AGENT_CANON_* wildcard inheritance is forbidden
+  parity_fields: [argv, cwd, stdin, stdout, stderr, exit, signal, written_paths]
+  parity_policy: verified-only
+  legacy_policy: retain-until-parity
+
 skill_families:
   # Public user-facing skill ids use plain hyphen-case. Runtime-internal skill
   # shims use .agents/skills/_<name>/SKILL.md and stay owner-routed.
@@ -32,7 +47,7 @@ skill_families:
       - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
       - python3 tools/agent_tools/check_convention_compliance.py
       - agent-canon docs
-      - make agent-canon-ensure-latest
+      - ./bootstrap.sh --control-parent-root <parent> --runtime-root <runtime> status
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check
@@ -190,9 +205,6 @@ skill_families:
       required: []
       conditional:
       - tools/bin/agent-canon docs check <changed-markdown-paths>
-      - make agent-canon-ensure-latest
-      - PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
-      - PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
       - python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt>
         --providers text,semantic,vector,tool,header-deps,code-deps --format json
       - python3 tools/agent_tools/check_solid_evidence.py --changed --evidence <oop-readability-report>
@@ -696,49 +708,72 @@ skill_families:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check
   - id: agent-canon-update
-    purpose: Update AgentCanon source, parent submodule pins, root runtime views, and parent update TODO state through the canonical high-level route.
+    purpose: Update and publish standalone AgentCanon source and its shared bootstrap runtime through a qualified source PR.
     canonical_doc: agents/skills/agent-canon-update.md
     shim: .agents/skills/agent-canon-update/SKILL.md
     discovery:
       name: agent-canon-update
-      description: "Use when updating AgentCanon itself, refreshing a vendored vendor/agent-canon submodule pin, repairing AgentCanon root runtime views, applying AgentCanon update TODOs, or routing local AgentCanon source commits through a proper AgentCanon branch and PR before parent pin updates."
+      description: "Use when updating standalone AgentCanon source, its bootstrap/runtime, skills, eval/archive route, or publishing a qualified AgentCanon branch and PR."
     tool_commands:
       required: []
       conditional:
-      - make agent-canon-update-plan
-      - PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
-      - PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
-      - python3 tools/agent_tools/agent_canon_update_todos.py status
-      - python3 tools/agent_tools/agent_canon_update_todos.py plan --write
-      - make agent-canon-ensure-latest
-      - make agent-canon-latest
+      - ./bootstrap.sh --control-parent-root <parent> --runtime-root <parent>/workspace/agent-canon-runtime/<installation> status
+      - git status --short --branch
+      - git diff --check
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check
     routing:
       stage_policy: active
-      reason: AgentCanon submodule, pin, checkout, or ensure-latest workflow is in scope
+      reason: Standalone AgentCanon source, bootstrap, runtime, eval, or source PR workflow is in scope
       triggers:
-        - ["ensure-latest"]
-        - ["parent", "pin", "vendor"]
-        - ["submodule", "pin"]
-        - ["agentcanon", "update"]
-        - ["agent-canon", "update"]
-        - ["vendor/agent-canon", "update"]
-        - ["vendor/agent-canon", "sync"]
-        - ["vendor/agent-canon", "pin"]
-        - ["vendor/agent-canon", "root", "view"]
-        - ["vendor/agent-canon", "root-view"]
-        - ["root", "runtime", "view", "sync"]
-        - ["root", "view", "repair"]
-        - ["root-view", "repair"]
-        - ["agent-canon-ensure-latest"]
-        - ["agentcanon", "最新"]
-        - ["parent", "pin"]
-        - ["checkout", "drift"]
-        - ["sync_agent_canon.sh"]
+        - ["standalone", "agent-canon"]
+        - ["agent-canon", "source", "update"]
+        - ["agent-canon", "bootstrap"]
+        - ["agent-canon", "runtime", "container"]
+        - ["agent-canon", "eval"]
+        - ["agentcanon", "standalone", "最新"]
         - ["agent-canon", "pr"]
-        - ["agentcanon", "更新"]
+        - ["agentcanon", "ソース", "更新"]
+  - id: agent-canon-bootstrap
+    purpose: Own the explicit host-controlled lifecycle of one shared non-root AgentCanon Python, Rust, and LSP tool runtime, including target admission, typed tool dispatch, eval collection, and task-owned cleanup.
+    canonical_doc: agents/skills/agent-canon-bootstrap.md
+    shim: .agents/skills/agent-canon-bootstrap/SKILL.md
+    discovery:
+      name: agent-canon-bootstrap
+      description: "Use when AgentCanon's shared Python, Rust, or LSP tool runtime must be installed, started, targeted, inspected, updated, evaluated, or removed; project builds and tests remain in the project Docker/test-runner plane."
+    tool_commands:
+      required:
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime status
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime target add --root <project-root> --mode read-only
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime tool run <catalog-id> -- <args...>
+      conditional:
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime install
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime start
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime exec -- <argv...>
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime eval collect --root <project-root> --run-id <run-id>
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime eval sync --run-id <run-id>
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime stop
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime gc --dry-run
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: AgentCanon shared tool-runtime lifecycle, target admission, typed dispatch, eval archive, or cleanup is in scope
+      triggers:
+        - ["agent-canon", "bootstrap"]
+        - ["agentcanon", "bootstrap"]
+        - ["bootstrap.sh", "agent-canon"]
+        - ["shared", "tool", "runtime"]
+        - ["resident", "tool", "container"]
+        - ["agent-canon", "tool", "run"]
+        - ["target", "registry", "agent-canon"]
+        - ["agent-canon", "LSP", "container"]
+        - ["agent-canon-log", "eval"]
+        - ["AgentCanon", "副作用", "分離"]
+        - ["AgentCanon", "ツール", "コンテナ"]
+        - ["AgentCanon", "評価", "収集"]
   - id: repository-topic-clone
     purpose: Prepare, reuse, merge, publish-readback, and reconstructibly clean one generic repository topic clone before repository-kind policy decoration.
     canonical_doc: agents/skills/repository-topic-clone.md
@@ -812,8 +847,7 @@ skill_families:
       - gh issue list --state open --json number,title,labels,updatedAt,url
       - gh pr view
       - gh pr checks
-      - make agent-canon-ensure-latest
-      - PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
+      - ./bootstrap.sh --control-parent-root <parent> --runtime-root <parent>/workspace/agent-canon-runtime/<installation> status
       - python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --owner codex
         --workspace-root "$PWD"
       - gh pr view <n> --json ...
@@ -867,7 +901,7 @@ skill_families:
       conditional:
       - bash tools/agent_tools/agent_update_branch.sh validate <lane>
       - bash tools/agent_tools/agent_update_branch.sh push <lane> <branch>
-      - make agent-canon-ensure-latest
+      - ./bootstrap.sh --control-parent-root <parent> --runtime-root <runtime> status
       - bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
@@ -920,12 +954,12 @@ skill_families:
     visualization_role: adapter
     tool_id: agent_canon.visualization.adapter.knowledge_graph
     argument_schema: agent_canon.visualization.arguments.knowledge_graph.v1
-    purpose: Convert prose into a SQLite-backed structure graph, diagnose discourse/argument/evidence/experiment gaps, explain findings, and emit writing-skill handoff packets.
+    purpose: Convert prose into a SQLite-backed structure graph under an explicit external runtime, diagnose discourse/argument/evidence/experiment gaps, explain findings, and emit writing-skill handoff packets without source-tree or HOME cache fallback.
     canonical_doc: agents/skills/prose-reasoning-graph.md
     shim: .agents/skills/prose-reasoning-graph/SKILL.md
     discovery:
       name: prose-reasoning-graph
-      description: "Use when existing prose should be converted into a SQLite-backed structure graph, diagnosed for discourse/argument/evidence/experiment gaps, explained in natural language, and handed off to writing or review skills with split/merge/bridge/reorder rewrite packets."
+      description: "Use when existing prose should be converted into a SQLite-backed structure graph under an explicit external runtime, diagnosed for discourse/argument/evidence/experiment gaps, explained in natural language, and handed off to writing or review skills with split/merge/bridge/reorder rewrite packets."
     tool_commands:
       required: []
       conditional:
@@ -1146,8 +1180,7 @@ skill_families:
         > <run>/responsibility_scope.json
       - python3 tools/agent_tools/import_responsibility.py --root <root> --format json
         > <run>/import_responsibility.json
-      - make agent-canon-ensure-latest
-      - PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
+      - ./bootstrap.sh --control-parent-root <parent> --runtime-root <parent>/workspace/agent-canon-runtime/<installation> status
       - agent-canon structured-analysis document-inventory --root <root>
       - python3 tools/agent_tools/responsibility_scope.py --root <root> --format json
       - python3 tools/agent_tools/prose_reasoning_graph.py check-document <readme-path>
@@ -1176,7 +1209,6 @@ skill_families:
         - ["repo", "optimization"]
         - ["repository", "optimization"]
         - ["レポの", "最適化"]
-        - ["root", "view"]
         - ["codex", "読み込み", "優先"]
         - ["codex", "読み込み", "プライオリティ"]
         - ["codex", "loading", "priority"]
@@ -1952,12 +1984,12 @@ skill_families:
         - ["依存", "設計"]
         - ["依存", "manifest"]
   - id: devcontainer-exec
-    purpose: Execute targeted commands inside an existing Dev Container without changing its lifecycle or configuration.
+    purpose: Preserve a narrow compatibility route for targeted commands inside an explicitly selected existing project Dev Container; AgentCanon tools route to agent-canon-bootstrap.
     canonical_doc: agents/skills/devcontainer-exec.md
     shim: .agents/skills/devcontainer-exec/SKILL.md
     discovery:
       name: devcontainer-exec
-      description: "Use when an existing Dev Container needs targeted execution or validation through devcontainer exec, including a zsh shell, while preserving exact output and exit evidence."
+      description: "Use only when an explicitly selected existing project Dev Container needs a targeted command through devcontainer exec; AgentCanon's shared tools and LSPs use agent-canon-bootstrap, and project tests use the project Docker/test runner."
     tool_commands:
       required: []
       conditional:
@@ -1969,18 +2001,15 @@ skill_families:
       - python3 tools/agent_tools/skill_tool_commands.py check
     routing:
       stage_policy: active
-      reason: targeted execution or validation belongs in an existing Dev Container
+      reason: explicit compatibility execution belongs in an already-running project Dev Container; AgentCanon runtime work belongs in agent-canon-bootstrap
       triggers:
         - ["devcontainer", "exec"]
-        - ["existing container", "zsh"]
-        - ["container-internal", "validation"]
-        - ["container-internal", "testing"]
-        - ["container", "internal", "validation"]
-        - ["container", "internal", "testing"]
-        - ["コンテナ内", "テスト"]
-        - ["コンテナ内", "確認"]
-        - ["既存コンテナ", "zsh"]
-        - ["既存コンテナ", "入る"]
+        - ["project", "devcontainer", "exec"]
+        - ["existing", "project", "container"]
+        - ["project", "container", "zsh"]
+        - ["project", "container", "testing"]
+        - ["プロジェクト", "コンテナ", "テスト"]
+        - ["既存", "プロジェクト", "コンテナ"]
   - id: environment-maintenance
     purpose: Update Docker, CI, dependencies, and runtime guidance coherently.
     canonical_doc: agents/skills/environment-maintenance.md
@@ -1993,7 +2022,8 @@ skill_families:
       conditional:
       - tools/ci/python_env_policy.py --runtime container --create
       - bash tools/docker_dependency_validator.sh
-      - python3 tools/ci/container_config.py
+      - python3 -m pytest -q tests/tools/test_bootstrap_container_contract.py
+      - python3 -m pytest -q tests/bootstrap/test_bootstrap_runtime.py
       - make docker-build-check
       - make docker-build-check-host-docker
       - python3 tools/ci/run_container_pack.py --print-only
@@ -2149,7 +2179,8 @@ skill_families:
       - python3 tools/agent_tools/check_agent_runtime_alignment.py
       - python3 tools/agent_tools/skill_shim_materializer.py materialize --root . --all
       - python3 tools/agent_tools/skill_shim_materializer.py readback --root . --all
-      - python3 tools/agent_tools/skill_dependency_map.py graph --root . --output documents/runtime/skill-dependency-graph.md
+      - python3 tools/agent_tools/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>
+      - python3 tools/agent_tools/skill_dependency_map.py graph --root . --output documents/runtime/skill-dependency-graph.md --runtime-root <external-runtime-root> --source-mutation-capability-json <exact-two-path-capability.json>
       - python3 tools/agent_tools/check_skill_tool_invocation_graph.py --root .
     routing:
       stage_policy: active

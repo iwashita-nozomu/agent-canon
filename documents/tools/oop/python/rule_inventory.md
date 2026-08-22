@@ -15,7 +15,7 @@ downstream design ../../tool-docs.toml one-to-one tool/document manifest
 ## 何をチェックするか
 
 Python OOP の規約、tool、説明文書、test が現在の canonical path に揃っているかを確認します。
-root view に存在しない AgentCanon-owned shared docs は、`vendor/agent-canon/` 側の正本を解決して確認します。
+AgentCanon-owned shared docs は standalone AgentCanon source checkout の正本を確認します。
 
 - `documents/conventions/object-oriented-design.md` が存在すること。
 - `documents/conventions/coding-conventions-python.md` が存在すること。

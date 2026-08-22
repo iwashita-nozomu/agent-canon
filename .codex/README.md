@@ -114,7 +114,7 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 - `PostToolUse` は managed execution resource producer の成功した exact projection だけを in-process validator で forward します。malformed payload、validator failure、spool failure は fail-open です。
 - 各 active event は `HookLogContext` を一度だけ使い、payload は fingerprint、event、bounded かつ redacted decision telemetry だけを local spool へ no-replace で書きます。prompt、command、stdout、stderr は保存せず、spool failure は安全判定を変更しません。
 - 旧 log mount、cause、OOP、module、library、helper、style、notebook、review、goal、authority、role、reference、summary、auto-sync child は削除せず、`RETIRED_HOOK_ROUTES` と各 owner の explicit command / skill が移行先を示します。これらは active hook hot path ではありません。
-- `bash "$(PYTHONPATH=vendor/agent-canon/tools:tools python3 -c "from pathlib import Path; from agent_tools.agent_canon_source_root import resolve_agent_canon_source_root; print((resolve_agent_canon_source_root(Path(\".\")).source_root / \"tools/sync_agent_canon.sh\").as_posix())")"` link-root は root `.codex/hooks.json` と `.codex/hooks/` を shared canon へリンクします。
+- `bash bootstrap.sh --help` は AgentCanon の共有 tool runtime lifecycle を表示します。親 repository への hook/root projection は行いません。
 
 ## Model Settings
 

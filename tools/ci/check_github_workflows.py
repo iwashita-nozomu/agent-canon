@@ -6,15 +6,10 @@
 # upstream design ../../.github/AGENTS.md GitHub agent entrypoint
 # upstream design ../../issues/README.md durable operational issue conventions
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR checklist
-# upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template AgentCanon PR checklist
-# upstream design ../../templates/documents/github/pull-request/agent_canon.md canonical template-side AgentCanon PR checklist
 # upstream design ../../.github/workflows/agent-improvement-guide.yml PR and push improvement guide workflow
 # upstream design ../../.github/workflows/agent-runtime-dashboard.yml standalone AgentCanon runtime dashboard workflow
 # upstream design ../../.github/workflows/issue-mirror.yml standalone local/GitHub issue mirror workflow
 # upstream design ../../.github/workflows/agent-canon-static-gates.yml PR candidate gate workflow
-# upstream design ../../documents/agent-canon/agent-canon-github-remote.md checkout auth policy
-# upstream design ../../documents/contracts/template-github-remote.md credential boundary
-# upstream implementation ./checkout_agent_canon_submodule.sh public/private submodule helper
 # upstream implementation ../agent_tools/check_skill_frontmatter.py validates runtime skill frontmatter in static gates
 # downstream implementation ../../tests/tools/test_check_github_workflows.py tests
 # @dependency-end
@@ -33,29 +28,12 @@ from typing import cast
 
 import yaml
 
-HELPER_PATHS = (
-    ".github/scripts/checkout_agent_canon_submodule.sh",
-    "tools/ci/checkout_agent_canon_submodule.sh",
-    "tools/agent-canon/ci/checkout_agent_canon_submodule.sh",
-)
-AGENT_CANON_WORKFLOW_SURFACE_MARKERS = (
-    "vendor/agent-canon",
-    "tools/agent-canon",
-)
 LITERAL_ENV_REFERENCE_PATTERN = re.compile(
     r"\$\{\{\s*env\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}"
     r"|\$\{([A-Za-z_][A-Za-z0-9_]*)\}"
     r"|\$([A-Za-z_][A-Za-z0-9_]*)"
 )
 SHELL_LINE_CONTINUATION_PATTERN = re.compile(r"\\\r?\n")
-AGENT_CANON_INDEPENDENT_WORKFLOWS: set[str] = {
-    "agent-runtime-dashboard.yml",
-    "issue-mirror.yml",
-}
-AGENT_CANON_CREDENTIALS = (
-    "AGENT_CANON_REPO_TOKEN",
-    "AGENT_CANON_REPO_SSH_KEY",
-)
 ISSUE_MIRROR_CHECK_JOB = "issue-mirror-check"
 ISSUE_MIRROR_CHECKOUT_OUTCOME = "steps.checkout.outcome"
 ISSUE_MIRROR_CHECKOUT_FAILURE_GUARD = "failure() && "
@@ -99,23 +77,7 @@ PR_TEMPLATE_FORBIDDEN_TEXT = (
     "Copilot Configuration Impact",
     "Candidate Commit And Publication Identity",
     "GitHub Mirror / Submodule Evidence",
-    "agentcanon_structure_followup=required",
     "template submodule SHA:",
-)
-SUBMODULE_CHECKOUT_SCRIPT_REQUIREMENTS = (
-    "AGENT_CANON_SUBMODULE_AUTH=missing",
-    "AGENT_CANON_SUBMODULE_AUTH=denied",
-    "AGENT_CANON_SUBMODULE_AUTH=ssh_denied",
-    "AGENT_CANON_REPO_TOKEN",
-    "AGENT_CANON_REPO_SSH_KEY",
-    "unset AGENT_CANON_REPO_TOKEN AGENT_CANON_REPO_SSH_KEY",
-    "Credentials are never written to GITHUB_ENV",
-    "untrusted PR context",
-    "exit 86",
-)
-SUBMODULE_CHECKOUT_WRAPPER_REQUIREMENTS = (
-    ".github/scripts/checkout_agent_canon_submodule.sh",
-    "exec bash",
 )
 ROOT_COORDINATION_WORKFLOW_REQUIREMENTS = (
     "Standalone AgentCanon coordination workflow",
@@ -131,10 +93,7 @@ ROOT_COORDINATION_WORKFLOW_REQUIREMENTS = (
 ROOT_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS = (
     "generate_agent_improvement_guide.py",
 )
-ROOT_IMPROVEMENT_GUIDE_WORKFLOW_ALLOWED_TAGS = (
-    "Standalone AgentCanon improvement guidance workflow",
-    "Template AgentCanon improvement guidance workflow",
-)
+ROOT_IMPROVEMENT_GUIDE_WORKFLOW_TAG = "Standalone AgentCanon improvement guidance workflow"
 STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS = (
     "workflow_dispatch:",
     "schedule:",
@@ -151,36 +110,13 @@ STANDALONE_ISSUE_MIRROR_WORKFLOW_REQUIREMENTS = (
     "permissions:",
     "issues: write",
 )
-VENDOR_COORDINATION_WORKFLOW_REQUIREMENTS = (
-    "agents/workflows/agent-canon-pr-workflow.md",
-    "Standalone AgentCanon coordination workflow",
-    "selected roles",
-    "team_manifest.yaml",
-    "run.capacity_request.lineage.role_ids",
-    "GITHUB_STEP_SUMMARY",
-    "SCHEDULED_SPECIALISTS=",
-    "executed_role=coordination",
-    "finding=none at intake",
-    "result=bundle_ready",
-)
-VENDOR_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS = (
-    "pull_request:",
-    "paths:",
-    "workflow_dispatch:",
-    "Standalone AgentCanon improvement guidance workflow",
-    "generate_agent_improvement_guide.py",
-    "GITHUB_STEP_SUMMARY",
-    "actions/upload-artifact@v4",
-)
 AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS = (
     "pull_request:",
     "workflow_dispatch:",
     "github.event.pull_request.head.sha || github.sha",
-    "bash tools/ci/check_agent_canon_pr.sh",
+    "bootstrap.sh",
+    "run_standalone_static_gate_unit.sh",
 )
-PARENT_PROJECT_QUALITY_OWNER_ENV = "AGENT_CANON_PR_PROJECT_QUALITY_OWNER"
-PARENT_PROJECT_QUALITY_OWNER = "parent_ci"
-PARENT_PROJECT_QUALITY_COMMAND = "make ci"
 AGENT_CANON_STATIC_GATE_DIRECT_COMMANDS = (
     "tool_catalog.py",
     "tool_drift.py",
@@ -199,22 +135,7 @@ AGENT_CANON_STATIC_GATE_DIRECT_COMMANDS = (
     "cargo test --manifest-path rust/agent-canon/Cargo.toml",
     "run_repo_dependency_review.sh --fail-missing --cycle-report-only",
     "check_github_workflows.py",
-    "container_config.py",
 )
-
-
-def is_template_or_derived_repo(root: Path) -> bool:
-    """Return whether root is a template or derived repo with AgentCanon vendored."""
-    return (root / "vendor" / "agent-canon").exists() and (
-        root / ".gitmodules"
-    ).is_file()
-
-
-def agent_canon_root(root: Path) -> Path:
-    """Return the AgentCanon source root for standalone or template mode checks."""
-    if is_template_or_derived_repo(root):
-        return root / "vendor" / "agent-canon"
-    return root
 
 
 @dataclass(frozen=True)
@@ -265,12 +186,8 @@ def is_false(value: object) -> bool:
 
 
 def workflow_paths(root: Path) -> list[Path]:
-    """Return root and AgentCanon workflow files to check."""
-    paths = sorted((root / ".github" / "workflows").glob("*.y*ml"))
-    vendor_workflows = root / "vendor" / "agent-canon" / ".github" / "workflows"
-    if vendor_workflows.is_dir():
-        paths.extend(sorted(vendor_workflows.glob("*.y*ml")))
-    return paths
+    """Return the standalone AgentCanon workflow files to check."""
+    return sorted((root / ".github" / "workflows").glob("*.y*ml"))
 
 
 @dataclass(frozen=True)
@@ -351,40 +268,6 @@ def has_permissions(workflow: dict[str, object]) -> bool:
         return True
     jobs = job_items(workflow)
     return bool(jobs) and all("permissions" in job for _job_name, job in jobs)
-
-
-def credential_env_names(source: dict[str, object]) -> set[str]:
-    """Return AgentCanon credential names declared by one workflow object."""
-    env = as_string_dict(source.get("env"))
-    if env is None:
-        return set()
-    return {name for name in AGENT_CANON_CREDENTIALS if name in env}
-
-
-def non_step_credential_env_names(workflow: dict[str, object]) -> set[str]:
-    """Return AgentCanon credentials exposed beyond their helper step."""
-    names = credential_env_names(workflow)
-    for _job_name, job in job_items(workflow):
-        names.update(credential_env_names(job))
-    return names
-
-
-def agent_canon_checkout_command_steps(
-    workflow: dict[str, object],
-) -> list[StepContext]:
-    """Return steps that invoke the AgentCanon checkout helper."""
-    steps: list[StepContext] = []
-    for context in step_contexts(workflow):
-        run_values = effective_step_execution_values(
-            workflow,
-            context,
-            fields=("run",),
-            include_env=False,
-            include_working_directory=False,
-        )
-        if any(path in value for value in run_values for path in HELPER_PATHS):
-            steps.append(context)
-    return steps
 
 
 def nested_string_values(value: object) -> list[str]:
@@ -494,32 +377,6 @@ def effective_step_execution_values(
     ]
 
 
-def agent_canon_surface_steps(workflow: dict[str, object]) -> list[StepContext]:
-    """Return execution steps that consume an AgentCanon-owned path."""
-    steps: list[StepContext] = []
-    for context in step_contexts(workflow):
-        execution_values = effective_step_execution_values(workflow, context)
-        if any(
-            marker in value
-            for value in execution_values
-            for marker in AGENT_CANON_WORKFLOW_SURFACE_MARKERS
-        ):
-            steps.append(context)
-    return steps
-
-
-def referenced_agent_canon_checkout_script_available(
-    root: Path, workflow_text: str
-) -> bool:
-    """Return whether at least one helper path referenced by the workflow exists."""
-    roots = (root, agent_canon_root(root))
-    return any(
-        path in workflow_text
-        and any((candidate_root / path).is_file() for candidate_root in roots)
-        for path in HELPER_PATHS
-    )
-
-
 def workflow_declared_findings(
     path: Path, workflow: dict[str, object]
 ) -> list[Finding]:
@@ -529,115 +386,6 @@ def workflow_declared_findings(
         findings.append(Finding("error", path, "missing_permissions"))
     if "concurrency" not in workflow:
         findings.append(Finding("warning", path, "missing_top_level_concurrency"))
-    return findings
-
-
-def agent_canon_checkout_policy_findings(
-    root: Path,
-    path: Path,
-    workflow: dict[str, object],
-    workflow_text: str,
-) -> list[Finding]:
-    """Return findings for AgentCanon checkout-helper policy."""
-    findings: list[Finding] = []
-    checkouts = checkout_steps(workflow)
-    helpers = agent_canon_checkout_command_steps(workflow)
-    helper_indexes = {context.index for context in helpers}
-    checkout_indexes = {context.index for context in checkouts}
-    consumers = [
-        context
-        for context in agent_canon_surface_steps(workflow)
-        if context.index not in helper_indexes
-        and context.index not in checkout_indexes
-    ]
-    agent_canon_independent = path.name in AGENT_CANON_INDEPENDENT_WORKFLOWS
-    if not agent_canon_independent:
-        if consumers and not helpers:
-            findings.append(
-                Finding("error", path, "missing_agent_canon_checkout_helper")
-            )
-        for helper in helpers:
-            prior_checkouts = [
-                checkout
-                for checkout in checkouts
-                if checkout.job_name == helper.job_name
-                and checkout.index < helper.index
-            ]
-            if not prior_checkouts:
-                findings.append(
-                    Finding(
-                        "error",
-                        path,
-                        "agent_canon_checkout_helper_missing_prior_repository_checkout:"
-                        f"job={helper.job_name}",
-                    )
-                )
-        for job_name in sorted({context.job_name for context in consumers}):
-            first_consumer = min(
-                context.index
-                for context in consumers
-                if context.job_name == job_name
-            )
-            prior_checkouts = [
-                checkout
-                for checkout in checkouts
-                if checkout.job_name == job_name
-                and checkout.index < first_consumer
-            ]
-            if not prior_checkouts:
-                findings.append(
-                    Finding(
-                        "error",
-                        path,
-                        "agent_canon_consumer_missing_prior_repository_checkout:"
-                        f"job={job_name}",
-                    )
-                )
-            ordered_helpers = [
-                helper
-                for helper in helpers
-                if helper.job_name == job_name
-                and helper.index < first_consumer
-                and any(
-                    checkout.job_name == job_name
-                    and checkout.index < helper.index
-                    for checkout in checkouts
-                )
-            ]
-            if not ordered_helpers:
-                findings.append(
-                    Finding(
-                        "error",
-                        path,
-                        "agent_canon_consumer_missing_prior_checkout_helper:"
-                        f"job={job_name}",
-                    )
-                )
-    if agent_canon_independent:
-        if helpers:
-            findings.append(
-                Finding("error", path, "agent_canon_checkout_helper_not_allowed")
-            )
-        if any(name in workflow_text for name in AGENT_CANON_CREDENTIALS):
-            findings.append(
-                Finding("error", path, "agent_canon_credentials_not_allowed")
-            )
-    if helpers and not referenced_agent_canon_checkout_script_available(
-        root, workflow_text
-    ):
-        findings.append(
-            Finding("error", path, "missing_referenced_agent_canon_checkout_helper")
-        )
-    non_step_credentials = non_step_credential_env_names(workflow)
-    if helpers and non_step_credentials:
-        findings.append(
-            Finding(
-                "error",
-                path,
-                "agent_canon_credentials_must_be_step_local:"
-                + ",".join(sorted(non_step_credentials)),
-            )
-        )
     return findings
 
 
@@ -652,10 +400,6 @@ def checkout_step_findings(path: Path, workflow: dict[str, object]) -> list[Find
                 Finding("error", path, f"checkout_{index}_missing_with_block")
             )
             continue
-        if not is_false(with_block.get("submodules")):
-            findings.append(
-                Finding("error", path, f"checkout_{index}_missing_submodules_false")
-            )
         if not is_false(with_block.get("persist-credentials")):
             findings.append(
                 Finding(
@@ -859,7 +603,6 @@ def check_workflow(root: Path, path: Path) -> list[Finding]:
             if path.name == "agent-coordination.yml"
             else []
         ),
-        *agent_canon_checkout_policy_findings(root, path, workflow, workflow_text),
         *issue_mirror_checkout_policy_findings(path, workflow),
         *checkout_step_findings(path, workflow),
     ]
@@ -964,9 +707,9 @@ def agent_canon_static_gate_findings(
     workflow: dict[str, object],
     workflow_text: str,
 ) -> list[Finding]:
-    """Require one candidate-tree gate consumer and reject duplicate gate loops."""
+    """Require one manual bootstrap-container unit loop and no Host gate loop."""
     findings: list[Finding] = []
-    wrapper = "bash tools/ci/check_agent_canon_pr.sh"
+    wrapper = "for unit in rust contracts eval workflow-container"
     run_steps = [
         (context, run)
         for context in step_contexts(workflow)
@@ -978,35 +721,9 @@ def agent_canon_static_gate_findings(
             Finding(
                 "error",
                 path,
-                f"canonical_candidate_gate_consumer_count:{len(wrapper_steps)}",
+                f"bootstrap_container_manual_gate_count:{len(wrapper_steps)}",
             )
         )
-    non_step_read_credential = AGENT_CANON_PR_READ_CREDENTIAL in (
-        set(as_string_dict(workflow.get("env")) or {})
-        | {
-            name
-            for _job_name, job in job_items(workflow)
-            for name in set(as_string_dict(job.get("env")) or {})
-        }
-    )
-    if non_step_read_credential:
-        findings.append(
-            Finding(
-                "error",
-                path,
-                "canonical_candidate_gate_read_credential_must_be_step_local",
-            )
-        )
-    for context in wrapper_steps:
-        step_env = as_string_dict(context.step.get("env")) or {}
-        if step_env.get(AGENT_CANON_PR_READ_CREDENTIAL) != GITHUB_TOKEN_EXPRESSION:
-            findings.append(
-                Finding(
-                    "error",
-                    path,
-                    f"run_step_{context.index}_missing_step_local_github_read_credential",
-                )
-            )
     if re.search(r"(?m)^  push:\s*$", workflow_text):
         findings.append(
             Finding("error", path, "duplicate_push_trigger_for_candidate_gate")
@@ -1026,72 +743,6 @@ def agent_canon_static_gate_findings(
     return findings
 
 
-def project_quality_owner_value(source: Mapping[str, object]) -> object:
-    """Return the project-quality owner marker from a workflow object."""
-    env = as_string_dict(source.get("env"))
-    if env is None:
-        return None
-    return env.get(PARENT_PROJECT_QUALITY_OWNER_ENV)
-
-
-def has_canonical_project_quality_command(run: str) -> bool:
-    """Return whether a workflow run invokes the canonical parent quality command."""
-    return any(
-        line.strip() == PARENT_PROJECT_QUALITY_COMMAND for line in run.splitlines()
-    )
-
-
-def parent_project_quality_findings(root: Path) -> list[Finding]:
-    """Require a parent-owned quality route in derived repository workflows."""
-    workflow_dir = root / ".github" / "workflows"
-    owner_routes: list[tuple[Path, str | None]] = []
-    declared_owner = False
-    for path in sorted(workflow_dir.glob("*.y*ml")):
-        workflow = load_workflow(path)
-        for _job_name, job in job_items(workflow):
-            job_owner = project_quality_owner_value(job)
-            if job_owner is not None:
-                declared_owner = True
-            job_steps = job.get("steps")
-            steps = cast(list[object], job_steps) if isinstance(job_steps, list) else []
-            for step_object in steps:
-                step = as_string_dict(step_object)
-                if step is None:
-                    continue
-                step_owner = project_quality_owner_value(step)
-                if step_owner is not None:
-                    declared_owner = True
-                owner = step_owner if step_owner is not None else job_owner
-                if owner == PARENT_PROJECT_QUALITY_OWNER:
-                    run = step.get("run")
-                    owner_routes.append(
-                        (
-                            path,
-                            run if isinstance(run, str) else None,
-                        )
-                    )
-    if not owner_routes:
-        message = (
-            "parent_project_quality_owner_must_be_parent_ci"
-            if declared_owner
-            else "missing_parent_project_quality_owner"
-        )
-        return [Finding("error", workflow_dir, message)]
-    if any(
-        run is not None and has_canonical_project_quality_command(run)
-        for _path, run in owner_routes
-    ):
-        return []
-    return [
-        Finding(
-            "error",
-            path,
-            "parent_project_quality_route_missing_canonical_command",
-        )
-        for path, _run in owner_routes[:1]
-    ]
-
-
 def require_text(path: Path, required: Sequence[str]) -> list[Finding]:
     """Check that a file contains all required snippets."""
     if not path.exists():
@@ -1105,57 +756,11 @@ def require_text(path: Path, required: Sequence[str]) -> list[Finding]:
     ]
 
 
-def require_text_any_of(path: Path, options: Sequence[str]) -> list[Finding]:
-    """Check that a file contains one of the allowed snippets."""
-    if not path.exists():
-        return [Finding("error", path, "missing_file")]
-    text = read_text(path)
-    normalized_text = re.sub(r"/{2,}", "/", text)
-    if any(option in text or option in normalized_text for option in options):
-        return []
-    joined = " | ".join(options)
-    return [Finding("error", path, f"missing_text_any_of:{joined}")]
-
-
-def projected_template_requirements(
-    root: Path, required: Sequence[str]
-) -> tuple[str, ...]:
-    """Map standalone tool commands to the parent projection view."""
-    if not is_template_or_derived_repo(root):
-        return tuple(required)
-    return tuple(
-        item.replace("tools/agent_tools/", "tools/agent-canon/agent_tools/")
-        .replace("tools/ci/", "tools/agent-canon/ci/")
-        .replace("tools/sync_agent_canon.sh", "tools/agent-canon/sync_agent_canon.sh")
-        .replace(
-            "tools/update_agent_canon.sh", "tools/agent-canon/update_agent_canon.sh"
-        )
-        for item in required
-    )
-
-
 def check_root_copy_headers(root: Path) -> list[Finding]:
-    """Check synced root-copy workflow source markers."""
+    """Check standalone workflow source markers."""
     findings: list[Finding] = []
-    stale_template_dashboard = (
-        root / ".github" / "workflows" / "agent-runtime-dashboard.yml"
-    )
-    if is_template_or_derived_repo(root) and stale_template_dashboard.exists():
-        findings.append(
-            Finding(
-                "error",
-                stale_template_dashboard,
-                "template_runtime_dashboard_workflow_must_be_absent_use_agentcanon_repo",
-            )
-        )
     for path, required in workflow_header_requirement_specs(root):
         if path.exists():
-            if path == root / ".github" / "workflows" / "agent-improvement-guide.yml":
-                findings.extend(
-                    require_text_any_of(
-                        path, ROOT_IMPROVEMENT_GUIDE_WORKFLOW_ALLOWED_TAGS
-                    )
-                )
             findings.extend(require_text(path, required))
     return findings
 
@@ -1163,7 +768,6 @@ def check_root_copy_headers(root: Path) -> list[Finding]:
 def workflow_header_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]]:
     """Return optional workflow files and snippets that identify their contract."""
     workflow_dir = root / ".github" / "workflows"
-    vendor_workflow_dir = root / "vendor" / "agent-canon" / ".github" / "workflows"
     specs: list[tuple[Path, Sequence[str]]] = [
         (
             workflow_dir / "agent-coordination.yml",
@@ -1177,62 +781,24 @@ def workflow_header_requirement_specs(root: Path) -> list[tuple[Path, Sequence[s
             workflow_dir / "agent-canon-static-gates.yml",
             AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS,
         ),
-        (
-            vendor_workflow_dir / "agent-coordination.yml",
-            VENDOR_COORDINATION_WORKFLOW_REQUIREMENTS,
-        ),
-        (
-            vendor_workflow_dir / "agent-improvement-guide.yml",
-            VENDOR_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS,
-        ),
-        (
-            vendor_workflow_dir / "agent-canon-static-gates.yml",
-            AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS,
-        ),
     ]
-    if is_template_or_derived_repo(root):
-        specs.append(
-            (
-                vendor_workflow_dir / "agent-runtime-dashboard.yml",
-                STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS,
-            )
-        )
-        specs.append(
-            (
-                vendor_workflow_dir / "issue-mirror.yml",
-                STANDALONE_ISSUE_MIRROR_WORKFLOW_REQUIREMENTS,
-            )
-        )
-    else:
-        specs.append(
+    specs.extend(
+        [
             (
                 workflow_dir / "agent-runtime-dashboard.yml",
                 STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS,
-            )
-        )
-        specs.append(
+            ),
             (
                 workflow_dir / "issue-mirror.yml",
                 STANDALONE_ISSUE_MIRROR_WORKFLOW_REQUIREMENTS,
-            )
-        )
+            ),
+        ]
+    )
     return specs
 
 
 def pr_template_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]]:
-    """Return PR-template requirement checks for the active repository mode."""
-    if is_template_or_derived_repo(root):
-        specs: list[tuple[Path, Sequence[str]]] = [
-            (
-                root
-                / "vendor"
-                / "agent-canon"
-                / ".github"
-                / "PULL_REQUEST_TEMPLATE.md",
-                PR_TEMPLATE_REQUIRED_TEXT,
-            ),
-        ]
-        return specs
+    """Return standalone AgentCanon PR-template requirement checks."""
     return [
         (
             root / ".github" / "PULL_REQUEST_TEMPLATE.md",
@@ -1277,75 +843,44 @@ def check_pr_templates(root: Path) -> list[Finding]:
     findings: list[Finding] = []
     for path, required in pr_template_requirement_specs(root):
         findings.extend(require_text(path, required))
-    canon_root = agent_canon_root(root)
     semantic_templates = {
-        canon_root / "templates" / "documents" / "github" / "pull-request" / "agent_canon.md",
+        root / "templates" / "documents" / "github" / "pull-request" / "agent_canon.md",
+        root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md",
+        root / ".github" / "PULL_REQUEST_TEMPLATE.md",
     }
-    if not is_template_or_derived_repo(root):
-        semantic_templates.add(root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md")
-    if not is_template_or_derived_repo(root):
-        optional_root_template = root / ".github" / "PULL_REQUEST_TEMPLATE.md"
-        semantic_templates.add(optional_root_template)
     for path in sorted(semantic_templates):
         findings.extend(check_template_agentcanon_pr_gate(path))
     return findings
 
 
-def submodule_checkout_script_findings(root: Path) -> list[Finding]:
-    """Return findings for template-mode private submodule checkout script docs."""
-    if not is_template_or_derived_repo(root):
-        return []
-    findings: list[Finding] = []
-    findings.extend(
-        require_text(
-            root / ".github" / "scripts" / "checkout_agent_canon_submodule.sh",
-            SUBMODULE_CHECKOUT_SCRIPT_REQUIREMENTS,
-        )
-    )
-    wrapper_path = root / "tools" / "ci" / "checkout_agent_canon_submodule.sh"
-    if not wrapper_path.is_file():
-        wrapper_path = (
-            root / "tools" / "agent-canon" / "ci" / "checkout_agent_canon_submodule.sh"
-        )
-    findings.extend(require_text(wrapper_path, SUBMODULE_CHECKOUT_WRAPPER_REQUIREMENTS))
-    return findings
-
-
 def check_github_support_surfaces(root: Path) -> list[Finding]:
-    """Check GitHub support surfaces that are still active in Codex-only mode."""
-    return submodule_checkout_script_findings(root)
+    """Check standalone GitHub support surfaces."""
+    return []
 
 
 def check_pr_flow_docs(root: Path) -> list[Finding]:
-    """Check that the source PR lane binds typed identity, CAS, and readback."""
+    """Check that the standalone source PR lane binds ownership and readback."""
     workflow_path = (
-        agent_canon_root(root) / "agents" / "workflows" / "agent-canon-pr-workflow.md"
+        root / "agents" / "workflows" / "agent-canon-pr-workflow.md"
     )
     return require_text(
         workflow_path,
         [
-            "SourceMainRebindReceipt",
-            "CandidateFreezeReceipt",
-            "CandidateReviewReceipt",
-            "CandidateCasReceipt",
-            "PullRequestLifecycle",
-            "user|fork|contributor",
-            "PR Essence",
-            "permission_state=unknown|verified_false",
-            "PublicationReadbackReceipt",
-            "QueueReceipt",
-            "DependencyFrontier",
-            "tools/agent_tools/github_publish.py",
-            "parent pin/root sync before accepted frontier",
+            "standalone source repository",
+            "workspace/agent-canondevelop/<qualified-task>/agent-canon",
+            "iwashita-nozomu/agent-canon#<number>",
+            "source branch, PR, merge, and main readback",
+            "source status/content is unchanged",
+            "task-owned containers/images/runtime paths are absent",
+            "no AgentCanon vendor/submodule/root projection",
         ],
     )
 
 
 def check_agentcanon_issues(root: Path) -> list[Finding]:
     """Check AgentCanon durable operational issue conventions."""
-    canon_root = agent_canon_root(root)
     findings = require_text(
-        canon_root / "issues" / "README.md",
+        root / "issues" / "README.md",
         [
             "AgentCanon Operational Issues",
             "issues/open/AC-YYYYMMDD-short-slug.md",
@@ -1358,7 +893,7 @@ def check_agentcanon_issues(root: Path) -> list[Finding]:
             "DEPENDENCY_EDIT_SCOPE_PATH",
         ],
     )
-    for issue_path in sorted((canon_root / "issues").glob("*/*.md")):
+    for issue_path in sorted((root / "issues").glob("*/*.md")):
         if issue_path.name == "README.md":
             continue
         findings.extend(
@@ -1386,8 +921,6 @@ def github_workflow_findings(root: Path) -> tuple[list[Finding], list[Path]]:
     findings: list[Finding] = []
     for path in workflows:
         findings.extend(check_workflow(root, path))
-    if is_template_or_derived_repo(root):
-        findings.extend(parent_project_quality_findings(root))
     findings.extend(check_root_copy_headers(root))
     findings.extend(check_pr_templates(root))
     findings.extend(check_github_support_surfaces(root))

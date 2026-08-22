@@ -3,7 +3,6 @@
 contract reference
 responsibility Records resolution policy for the 2026-05-16 Template / AgentCanon 500 item audit.
 upstream design ../runtime/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership policy
 upstream design ./agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
 downstream design ../README.md AgentCanon repository overview
 downstream design ../../agents/canonical/CODEX_WORKFLOW.md Codex execution workflow
@@ -37,9 +36,9 @@ Resolution means one of:
 | I-021-I-030 | `risk_based`: validation entrypoints are selected by changed path; `make ci` remains full confidence, not mandatory for every small edit. |
 | I-031-I-040 | `profiled`: observability, profiling, GitHub CLI, root repair, and copy sync belong to environment, GitHub, or maintenance profiles. |
 | I-041-I-050 | `profiled`: README and Quick Start use minimal required reads plus conditional references. |
-| I-051-I-060 | `compatibility_only`: subtree, snapshot, pull, and push routes are legacy compatibility routes, not normal submodule-first work. |
-| I-061-I-080 | `risk_based`: AgentCanon update and PR evidence are required for shared-canon or pin changes, not unrelated project work. |
-| I-081-I-100 | `compatibility_only`: start-repository and update docs are GitHub/submodule-first; subtree details are appendix or migration-only. |
+| I-051-I-060 | `retired`: subtree, snapshot, pull, push, and parent projection routes are removed from the standalone source workflow. |
+| I-061-I-080 | `risk_based`: AgentCanon source PR and runtime evidence apply to AgentCanon changes, not unrelated project work. |
+| I-081-I-100 | `retired`: parent vendor/submodule update docs are replaced by the standalone source PR and bootstrap runtime route. |
 | I-101-I-110 | `retired`: repo MCP inventory was removed from current runtime policy; local AgentCanon CLI tools own repo checks. |
 | I-111-I-140 | `profiled`: Codex goals and token modes are Codex overlays; reusable profiles belong to user config, not project runtime requirements. |
 | I-141-I-150 | `profiled`: monitoring tokens, connectors, and MCP no-edit details are emitted only when the related profile is active. |
@@ -60,8 +59,8 @@ Resolution means one of:
 
 - Local AgentCanon CLI checks stay mandatory when selected by the current
   runtime profile.
-- AgentCanon-owned shared surfaces remain source-controlled under
-  `vendor/agent-canon/` or standalone AgentCanon.
+- AgentCanon-owned shared surfaces remain source-controlled in standalone
+  AgentCanon; parent projects do not vendor or symlink them.
 - Hook, eval, skill, and tool logs that are intentionally append-only evidence
   are not discarded merely because they are generated.
 - Compatibility docs may mention subtree or snapshot routes only as migration

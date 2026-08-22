@@ -6,13 +6,16 @@
 # upstream design ../../documents/design/dependency-manifest-design.md dependency graph semantics
 # upstream design ../../documents/design/source-owned-dependency-validation.md tracked source authority boundary
 # upstream implementation ./source_dependency_graph.py owns source parsing, canonical binding, and review export
-# upstream implementation ./parent_root_side_effects.py owns graph scratch and TSV publication
+# upstream implementation ./runtime_artifacts.py owns external graph scratch and TSV publication
 # downstream implementation ./render_dependency_manifest_graph.py renders exported dependency TSV
 # downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies source-derived graph review
 # @dependency-end
 set -euo pipefail
 
 ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT:-}"
+CONTROL_ROOT="${AGENT_CANON_CONTROL_PARENT_ROOT:-}"
 PRINT_EDGES=0
 CHANGED=0
 CHECK_BIDIRECTIONAL=0
@@ -26,6 +29,68 @@ EDIT_SCOPE_HITS_FILE=""
 declare -a INPUT_PATHS=()
 declare -a FOCUS_PATHS=()
 declare -a EDIT_SCOPE_PATHS=()
+
+fail_runtime_boundary() {
+  echo "DEPENDENCY_GRAPH=fail reason=$1" >&2
+  return 2
+}
+
+runtime_path() {
+  local candidate="$1"
+  python3 - "$script_dir" "$ROOT_DIR" "$CONTROL_ROOT" "$RUNTIME_ROOT" "$candidate" <<'PY'
+from pathlib import Path
+import sys
+
+source, root, control, runtime, candidate = map(Path, sys.argv[1:])
+sys.path.insert(0, str(source))
+from runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
+
+try:
+    source_root = source.parents[2].resolve(strict=True)
+    target_root = root.resolve(strict=True)
+    control_root = control.resolve(strict=True)
+    boundary = RuntimeArtifactBoundary.for_source(source_root, runtime, create=True)
+    if boundary.root == target_root or boundary.root in target_root.parents:
+        raise RuntimeArtifactError("runtime root must be outside target repository")
+    try:
+        target_root.relative_to(control_root)
+    except ValueError as exc:
+        raise RuntimeArtifactError("target repository is outside control root") from exc
+    print(boundary.resolve(candidate))
+except (OSError, RuntimeArtifactError, ValueError) as exc:
+    print(f"runtime boundary invalid: {exc}", file=sys.stderr)
+    raise SystemExit(2)
+PY
+}
+
+write_runtime_file() {
+  local candidate="$1"
+  local source_file="$2"
+  python3 - "$script_dir" "$RUNTIME_ROOT" "$candidate" "$source_file" <<'PY'
+from pathlib import Path
+import sys
+
+source, runtime, candidate, source_file = map(Path, sys.argv[1:])
+sys.path.insert(0, str(source))
+from runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
+
+try:
+    boundary = RuntimeArtifactBoundary.for_source(
+        source.parents[2].resolve(strict=True), runtime, create=True
+    )
+    boundary.atomic_write_bytes(boundary.resolve(candidate), source_file.read_bytes())
+except (OSError, RuntimeArtifactError, ValueError) as exc:
+    print(f"runtime boundary invalid: {exc}", file=sys.stderr)
+    raise SystemExit(2)
+PY
+}
+
+require_runtime_boundary() {
+  [[ -n "$RUNTIME_ROOT" ]] || { fail_runtime_boundary "runtime_root_required"; return 2; }
+  [[ -n "$CONTROL_ROOT" ]] || { fail_runtime_boundary "control_root_required"; return 2; }
+  [[ -d "$CONTROL_ROOT" ]] || { fail_runtime_boundary "control_root_missing"; return 2; }
+  runtime_path .runtime-boundary-probe >/dev/null || return 2
+}
 
 usage() {
   cat <<'EOF'
@@ -61,6 +126,9 @@ ROOT_DIR="$(realpath -e "$ROOT_DIR")" || {
   echo "DEPENDENCY_GRAPH=fail reason=root-missing" >&2
   exit 1
 }
+require_runtime_boundary || exit $?
+export AGENT_CANON_RUNTIME_ROOT="$RUNTIME_ROOT"
+export AGENT_CANON_CONTROL_PARENT_ROOT="$CONTROL_ROOT"
 
 normalize_repo_path() {
   local raw="$1"
@@ -97,23 +165,12 @@ normalize_path_array INPUT_PATHS
 normalize_path_array FOCUS_PATHS
 normalize_path_array EDIT_SCOPE_PATHS
 
-PARENT_ROOT="${AGENT_CANON_PARENT_ROOT:-$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)}"
-if [[ -z "$PARENT_ROOT" ]]; then
-  echo "DEPENDENCY_GRAPH=fail reason=missing-parent-root" >&2
-  exit 1
-fi
-PARENT_ROOT="$(cd "$PARENT_ROOT" && pwd -P)"
 CANON_SCRIPT_PATH="$(realpath -m "${BASH_SOURCE[0]}")"
 TOOL_DIR="$(dirname "$CANON_SCRIPT_PATH")"
-BOUNDARY_SCRIPT="${TOOL_DIR}/parent_root_side_effects.py"
 SOURCE_GRAPH_TOOL="${TOOL_DIR}/source_dependency_graph.py"
-TEMP_ROOT="$(
-  python3 "$BOUNDARY_SCRIPT" temp-dir \
-    --root "$PARENT_ROOT" \
-    --candidate "${AGENT_CANON_PARENT_TMPDIR:-$PARENT_ROOT/.agent-canon/tmp}" \
-    --prefix dependency-graph. \
-    --purpose dependency-graph
-)"
+TEMP_BASE="$(runtime_path tmp/dependency-graph)" || exit $?
+mkdir -p "$TEMP_BASE"
+TEMP_ROOT="$(mktemp -d "$TEMP_BASE/run.XXXXXX")"
 
 all_edges="$TEMP_ROOT/all-edges.tsv"
 edges_file="$TEMP_ROOT/edges.tsv"
@@ -125,10 +182,9 @@ cleanup_dependency_graph_temp() {
   local status=$?
   local cleanup_status=0
   trap - EXIT
-  python3 "$BOUNDARY_SCRIPT" remove-tree \
-    --root "$PARENT_ROOT" \
-    --candidate "$TEMP_ROOT" \
-    --purpose dependency-graph-cleanup >/dev/null || cleanup_status=$?
+  if [[ -d "$TEMP_ROOT" ]]; then
+    rm -rf -- "$TEMP_ROOT" || cleanup_status=$?
+  fi
   if [[ "$status" -eq 0 && "$cleanup_status" -ne 0 ]]; then
     status=$cleanup_status
   fi
@@ -192,10 +248,7 @@ if [[ -n "$GRAPH_TSV_OUTPUT" ]]; then
     printf 'direction\tkind\tsource\ttarget\n'
     cat "$edges_file"
   } >"$graph_output_staging"
-  python3 "$BOUNDARY_SCRIPT" write \
-    --root "$PARENT_ROOT" \
-    --candidate "$GRAPH_TSV_OUTPUT" \
-    --purpose dependency-graph-output <"$graph_output_staging" >/dev/null
+  write_runtime_file "$GRAPH_TSV_OUTPUT" "$graph_output_staging"
   echo "DEPENDENCY_GRAPH_TSV=$GRAPH_TSV_OUTPUT"
 fi
 

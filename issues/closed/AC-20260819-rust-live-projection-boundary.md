@@ -6,7 +6,7 @@ upstream design ../README.md durable issue-file convention and GitHub mirror pol
 downstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md live Rust/parent artifact ownership boundary
 downstream design ../../documents/runtime/shared-runtime-surfaces.toml machine-readable projection-forbidden root
 downstream implementation ../../tools/agent_tools/surface_manifest.py fail-closed target/source/transition validation
-downstream implementation ../../tools/sync_agent_canon.sh consumes only validated manifest renderers
+downstream implementation ../../tools/agent_tools/surface_manifest.py consumes only validated manifest renderers
 downstream implementation ../../tests/agent_tools/test_rust_projection_boundary.py focused projection and cleanup regression
 @dependency-end
 -->
@@ -59,9 +59,8 @@ prefix_intersection(T ∪ S ∪ U, F) = ∅
 The check uses canonical POSIX path components rather than textual string
 prefixes. It therefore rejects both descendants of `rust/` and an over-broad
 ancestor projection that would contain `rust/`. Every renderer consumed by
-`sync_agent_canon.sh` loads the same manifest authority before emitting link,
-copy, regular, cleanup, or transition specs; no shell-local Rust allowlist or
-second classifier was introduced.
+The manifest parser loads one manifest authority before emitting compatibility
+metadata; no shell-local Rust allowlist or second classifier was introduced.
 
 ## Implemented ownership boundary
 

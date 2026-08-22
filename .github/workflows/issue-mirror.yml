@@ -27,6 +27,8 @@ jobs:
     env:
       AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
       AGENT_CANON_ACTIVE_REPOSITORY_ROOT: ${{ github.workspace }}
+      AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}
+      AGENT_CANON_RUNTIME_ROOT: ${{ runner.temp }}/agent-canon-runtime
     permissions:
       contents: read
       issues: write
@@ -34,7 +36,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: false
           persist-credentials: false
 
       - name: Setup Python
@@ -46,7 +47,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          summary_file="${GITHUB_WORKSPACE}/.agent-canon/issue-mirror-${GITHUB_JOB}.md"
+          summary_file="${AGENT_CANON_RUNTIME_ROOT}/reports/issue-mirror-${GITHUB_JOB}.md"
+          mkdir -p "$(dirname "${summary_file}")"
           python3 tools/agent_tools/issue_sync.py \
             --root . \
             --repo "${GITHUB_REPOSITORY}" \
@@ -62,6 +64,8 @@ jobs:
     env:
       AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
       AGENT_CANON_ACTIVE_REPOSITORY_ROOT: ${{ github.workspace }}
+      AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}
+      AGENT_CANON_RUNTIME_ROOT: ${{ runner.temp }}/agent-canon-runtime
     permissions:
       contents: read
     steps:
@@ -74,7 +78,6 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: actions/checkout@v4
         with:
-          submodules: false
           persist-credentials: false
 
       - name: Confirm publication sync

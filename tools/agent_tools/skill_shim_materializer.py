@@ -830,14 +830,19 @@ def materialize(root: Path, *, all_skills: bool = False) -> dict[str, object]:
             if target.target_dev is not None
             else None
         )
-        if before == data:
+        current_mode = (
+            target.physical_path.stat().st_mode & 0o777
+            if target.target_dev is not None
+            else None
+        )
+        if before == data and current_mode == 0o644:
             continue
         try:
             # Reuse the already authenticated target receipt.  Calling the
             # convenience writer here would resolve the same path a second
             # time for every file, repeating component/identity checks and
             # creating an avoidable per-file attestation window.
-            boundary.atomic_publish(target, data)
+            boundary.atomic_publish(target, data, mode=0o644)
             replaced += 1
             delta_paths.append(path.relative_to(context.root).as_posix())
         except OSError as exc:

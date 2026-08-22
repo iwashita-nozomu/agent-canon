@@ -2,7 +2,6 @@
 @dependency-start
 contract policy
 responsibility Documents テスト規約（共通） for this repository.
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../design/semantic-responsibility-contract.md semantic responsibility allocation and verification ownership
 @dependency-end
 -->

@@ -27,7 +27,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          submodules: false
           persist-credentials: false
       - name: Setup Python
         uses: actions/setup-python@v5

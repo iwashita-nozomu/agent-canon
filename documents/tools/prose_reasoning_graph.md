@@ -171,41 +171,45 @@ semantic prose IR が無い旧 DB や障害時は、graph 側が
 
 ## Command Surface
 
-DB 作成 command は、`--db` が省略された場合に
-`${AGENT_CANON_PROSE_GRAPH_HOME:-$HOME/.cache/agent-canon/prose-reasoning-graph}`
-配下へ `prose_graph.sqlite` を作ります。根拠として、この default path は
-`test_ingest_defaults_db_to_user_home_cache` で検証します。run-local artifact として DB path を
-固定する workflow では `--db <path>` を渡します。
+DB 作成 command は、`AGENT_CANON_RUNTIME_ROOT` で指定した source tree 外の
+runtime 配下に `prose_graph.sqlite` を作ります。`--db <path>` を渡す場合も、
+その path は同じ external runtime 配下でなければなりません。HOME、XDG、
+source-local cache への fallback はありません。run-local artifact として DB path を
+固定する workflow では、先に runtime root を設定してから `--db <path>` を渡します。
 
 この graph DB default と command boundary を前提に、単一 document の文章構造と document-canon responsibility coverage を同時に見る入口は
 `check-document` です。
 
 ```bash
-python3 tools/agent_tools/prose_reasoning_graph.py check-document vendor/agent-canon/documents/tools/prose_reasoning_graph.md \
-  --out-dir reports/agents/<run-id>/prose_tool_doc_check \
+export AGENT_CANON_RUNTIME_ROOT="/path/to/external/agent-canon-runtime"
+RUN_DIR="$AGENT_CANON_RUNTIME_ROOT/runs/<run-id>/prose_tool_doc_check"
+python3 tools/agent_tools/prose_reasoning_graph.py check-document documents/tools/prose_reasoning_graph.md \
+  --out-dir "$RUN_DIR" \
   --profile all \
-  --stats-out reports/agents/<run-id>/prose_tool_doc_check.stats.json
+  --stats-out "$RUN_DIR.stats.json"
 ```
 
 通常の分割実行では、`ingest` 後に stats JSON の
 `.fields.PROSE_REASONING_GRAPH_DB` を後続 command へ渡します。
 
 ```bash
+export AGENT_CANON_RUNTIME_ROOT="/path/to/external/agent-canon-runtime"
+RUN_DIR="$AGENT_CANON_RUNTIME_ROOT/runs/<run-id>/prose"
 python3 tools/agent_tools/prose_reasoning_graph.py ingest documents/notes/draft.md \
-  --prompt-file reports/agents/<run-id>/user_request_contract.md \
-  --stats-out reports/agents/<run-id>/prose_ingest.stats.json
+  --prompt-file "$RUN_DIR/user_request_contract.md" \
+  --stats-out "$RUN_DIR/prose_ingest.stats.json"
 GRAPH_DB="<PROSE_REASONING_GRAPH_DB from stats JSON>"
 python3 tools/agent_tools/prose_reasoning_graph.py analyze --db "$GRAPH_DB" --profile all \
-  --stats-out reports/agents/<run-id>/prose_analyze.stats.json
+  --stats-out "$RUN_DIR/prose_analyze.stats.json"
 python3 tools/agent_tools/prose_reasoning_graph.py lint --db "$GRAPH_DB" --profile all \
-  --out reports/agents/<run-id>/prose_diagnostics.md \
-  --stats-out reports/agents/<run-id>/prose_lint.stats.json
+  --out "$RUN_DIR/prose_diagnostics.md" \
+  --stats-out "$RUN_DIR/prose_lint.stats.json"
 python3 tools/agent_tools/prose_reasoning_graph.py integrate --db "$GRAPH_DB" --profile all \
-  --out reports/agents/<run-id>/prose_integration.md \
-  --stats-out reports/agents/<run-id>/prose_integrate.stats.json
+  --out "$RUN_DIR/prose_integration.md" \
+  --stats-out "$RUN_DIR/prose_integrate.stats.json"
 python3 tools/agent_tools/prose_reasoning_graph.py skill-handoff --db "$GRAPH_DB" --profile all \
-  --out reports/agents/<run-id>/prose_handoff.md \
-  --stats-out reports/agents/<run-id>/prose_handoff.stats.json
+  --out "$RUN_DIR/prose_handoff.md" \
+  --stats-out "$RUN_DIR/prose_handoff.stats.json"
 ```
 
 複数 source document を 1 DB に入れる report / design packet では `ingest-set` を使います。

@@ -2,7 +2,6 @@
 @dependency-start
 contract reference
 responsibility Documents Linux / WSL Host Requirements for this repository.
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../../CONTAINER_OPERATIONS.md canonical container and mount ownership policy
 upstream design ../design/devcontainer/parent-devcontainer-policy.md default and optional profile contract
 upstream design ../design/devcontainer/parent-dependency-manifest-followup.md dependency and source identity contract
@@ -136,17 +135,19 @@ GPU が無いこと自体を failure 条件にしません。
 ## 8. Codex / Agent Requirement
 
 - `codex` は host に入っていることを推奨します
-- container 内の Codex CLI は AgentCanon-owned `vendor/agent-canon/.devcontainer/post-create.sh` が必要時に導入します
+- AgentCanon の Codex/tool runtime は source clone の `bootstrap.sh` が管理する共有非 root
+  container で起動します。親の `.devcontainer` はこの runtime の installer/fallback ではありません
 - container 内の Codex state は container-local です。認証に使う
   `OPENAI_API_KEY` と `OPENAI_BASE_URL` は runner の明示的な環境 forward で渡します。
-- `gh` は host に入っていることを推奨します。container 内の GitHub CLI も AgentCanon-owned `vendor/agent-canon/.devcontainer/post-create.sh` が必要時に導入します
+- `gh` は host に入っていることを推奨します。AgentCanon tool container には GitHub 認証や
+  host credentials を暗黙に渡しません。Issue/PR 操作は host workflow の責務です
 - 初回 `gh auth login`、SSH key、GitHub host key 登録は host 側で行います。container
   から credentials または SSH を再利用する場合は、明示 optional profile を選択し、
   対象が存在するときだけ read-only mount または valid socket forward を使います。
 - Docker socket と confidential secrets も既定では渡しません。必要な session だけ
   owner docs の `docker-host` または `host-secrets` profile を明示し、対象が無い場合は
   mount を省略します。
-- GitHub canonical remote と AgentCanon submodule を使う前提なので、host から GitHub へ到達できることを確認します
+- AgentCanon source PR、eval archive、Issue/PR 操作を行う場合だけ、host から対象 GitHub remote へ到達できることを確認します。親は AgentCanon submodule を要求しません
 - confidential local Git remote を dev container から使う場合は、起動前に
   `AGENT_CANON_SECRET_DIR` と、書き込みが必要なときだけ
   `AGENT_CANON_SECRET_DIR_MODE=rw` を設定します。container 側 path は

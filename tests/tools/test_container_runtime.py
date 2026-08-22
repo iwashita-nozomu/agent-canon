@@ -193,6 +193,8 @@ def test_repo_program_defaults_without_pack_or_python_rules(tmp_path: Path) -> N
         "CARGO_TARGET_DIR",
         "AGENT_CANON_CLI_TARGET_DIR",
         "AGENT_CANON_PARENT_ROOT",
+        "AGENT_CANON_CONTROL_PARENT_ROOT",
+        "AGENT_CANON_RUNTIME_ROOT",
         "AGENT_CANON_PARENT_ROOT_DEV",
         "AGENT_CANON_PARENT_ROOT_INO",
         "AGENT_CANON_CHILD_HANDOFF",
@@ -209,6 +211,10 @@ def test_repo_program_defaults_without_pack_or_python_rules(tmp_path: Path) -> N
         "AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT",
     ):
         environment.pop(key, None)
+    runtime_root = tmp_path / "runtime"
+    runtime_root.mkdir()
+    environment["AGENT_CANON_CONTROL_PARENT_ROOT"] = str(tmp_path)
+    environment["AGENT_CANON_RUNTIME_ROOT"] = str(runtime_root)
     environment["AGENT_CANON_PARENT_ROOT"] = str(repo)
     environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(repo)
 
@@ -1180,20 +1186,28 @@ def test_stable_podman_identity_rejects_missing_or_malformed_required_fields(
 
 
 def test_lifecycle_receipt_path_rejects_symlink_escape(tmp_path: Path) -> None:
-    """Receipt publication cannot resolve through a workspace symlink escape."""
+    """Receipt publication cannot resolve through an external runtime symlink."""
     runtime = load_runtime_module()
     outside = tmp_path / "outside"
     outside.mkdir()
-    root = tmp_path / "root"
+    root = tmp_path / "project"
     root.mkdir()
-    (root / ".agent-canon").symlink_to(outside, target_is_directory=True)
+    runtime_root = tmp_path / "runtime"
+    runtime_root.mkdir()
+    (runtime_root / "container-lifecycle").symlink_to(outside, target_is_directory=True)
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setenv("AGENT_CANON_CONTROL_PARENT_ROOT", str(tmp_path))
+    monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime_root))
     receipt = runtime.ContainerLifecycleReceipt(
         runtime.LifecycleContext("task-7", str(root), operation="receipt"),
         runtime.DaemonSnapshot("docker", {}, "ok"),
     )
 
-    with pytest.raises(ValueError, match="remain below workspace root"):
-        runtime.lifecycle_receipt_path(root, receipt)
+    try:
+        with pytest.raises(runtime.RuntimeArtifactError, match="symlink"):
+            runtime.lifecycle_receipt_path(root, receipt)
+    finally:
+        monkeypatch.undo()
 
 
 def test_lifecycle_receipt_identity_is_unique_and_collision_safe(
@@ -1201,6 +1215,12 @@ def test_lifecycle_receipt_identity_is_unique_and_collision_safe(
 ) -> None:
     """Concurrent same-task lifecycles receive distinct paths and reject takeover."""
     runtime = load_runtime_module()
+    root = tmp_path / "project"
+    root.mkdir()
+    runtime_root = tmp_path / "runtime"
+    runtime_root.mkdir()
+    monkeypatch.setenv("AGENT_CANON_CONTROL_PARENT_ROOT", str(tmp_path))
+    monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime_root))
     first = runtime.ContainerLifecycleReceipt(
         runtime.LifecycleContext("same-task", "same-repo", operation="run"),
         runtime.DaemonSnapshot("docker", {}, "not-created"),
@@ -1210,12 +1230,12 @@ def test_lifecycle_receipt_identity_is_unique_and_collision_safe(
         runtime.DaemonSnapshot("docker", {}, "not-created"),
     )
 
-    assert runtime.lifecycle_receipt_path(tmp_path, first) != runtime.lifecycle_receipt_path(
-        tmp_path, second
+    assert runtime.lifecycle_receipt_path(root, first) != runtime.lifecycle_receipt_path(
+        root, second
     )
 
-    collision = tmp_path / "collision.json"
+    collision = runtime_root / "collision.json"
     collision.write_text('{"lifecycle_id":"another-invocation"}\n', encoding="utf-8")
     monkeypatch.setenv("AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT", str(collision))
     with pytest.raises(ValueError, match="receipt collision"):
-        runtime.write_lifecycle_receipt(tmp_path, first)
+        runtime.write_lifecycle_receipt(root, first)

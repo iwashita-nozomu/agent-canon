@@ -20,6 +20,10 @@
 
 set -euo pipefail
 
+# Do this before importing the runtime-boundary helper. A review must not
+# compile its own Python modules into the AgentCanon source checkout.
+export PYTHONDONTWRITEBYTECODE=1
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${SCRIPT_DIR%/*}"
 
@@ -101,8 +105,18 @@ PY
 } )"
 LOG_DIR="${RUN_DIR}/logs"
 REPORT_DIR="${RUN_DIR}/reports"
-mkdir -p "${LOG_DIR}"
+TMP_DIR="${RUN_DIR}/tmp"
+XDG_CACHE_DIR="${RUN_DIR}/xdg-cache"
+mkdir -p "${LOG_DIR}" "${TMP_DIR}" "${XDG_CACHE_DIR}"
 export RUFF_CACHE_DIR="${RUN_DIR}/ruff-cache"
+export TMPDIR="${TMP_DIR}"
+export TMP="${TMP_DIR}"
+export TEMP="${TMP_DIR}"
+export XDG_CACHE_HOME="${XDG_CACHE_DIR}"
+
+# All commands below are AgentCanon checks. Anchor their cwd to this source
+# checkout instead of inheriting a caller's parent-repository cwd.
+cd "${PROJECT_ROOT}"
 
 # タイムスタンプ
 START_TIME=$(date +%s)

@@ -20,6 +20,7 @@ from pathlib import Path
 
 import pytest
 import tools.agent_tools.parent_root_side_effects as side_effects
+from tools.agent_tools.runtime_artifacts import root_capability_environment
 from tools.agent_tools.parent_root_side_effects import (
     ParentRootAttestationRequest,
     ParentRootReject,
@@ -48,6 +49,9 @@ _PARENT_BOUNDARY_PATH_KEYS = (
     "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
     "AGENT_CANON_ROOT",
     "AGENT_CANON_SOURCE_ROOT",
+    "AGENT_CANON_RUNTIME_ROOT",
+    "AGENT_CANON_RUNTIME_ROOT_DEV",
+    "AGENT_CANON_RUNTIME_ROOT_INO",
 )
 
 
@@ -801,6 +805,93 @@ def test_child_environment_rejects_target_alias_mismatch_before_creating_directo
     assert not (tmp_path / ".agent-canon" / "cache").exists()
 
 
+def test_child_environment_uses_attested_external_runtime_without_parent_writes(
+    tmp_path: Path,
+) -> None:
+    """Runtime state uses its own capability and never becomes parent-owned."""
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    source_before = {
+        path.relative_to(tmp_path): path.read_bytes()
+        for path in tmp_path.rglob("*")
+        if path.is_file() and not path.is_symlink()
+    }
+    runtime = tmp_path.parent / "external-runtime"
+    runtime.mkdir()
+    environment = root_capability_environment(
+        source_root=tmp_path,
+        runtime_root=runtime,
+        base_env=_build_clean_env({"HOME": "/unchanged/home"}),
+    )
+
+    child = boundary.child_environment(receipt, environment, issue_handoff=False)
+
+    assert Path(child["TMPDIR"]).is_relative_to(runtime.resolve())
+    assert Path(child["CARGO_HOME"]).is_relative_to(runtime.resolve())
+    assert Path(child["CARGO_TARGET_DIR"]).is_relative_to(runtime.resolve())
+    assert child["AGENT_CANON_RUNTIME_ROOT"] == str(runtime.resolve())
+    assert child["AGENT_CANON_RUNTIME_ROOT_DEV"]
+    assert child["AGENT_CANON_RUNTIME_ROOT_INO"]
+    source_after = {
+        path.relative_to(tmp_path): path.read_bytes()
+        for path in tmp_path.rglob("*")
+        if path.is_file() and not path.is_symlink()
+    }
+    assert source_after == source_before
+
+
+def test_child_environment_attests_and_initializes_explicit_runtime_root(
+    tmp_path: Path,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    runtime = tmp_path.parent / "unattested-runtime"
+    runtime.mkdir()
+
+    child = boundary.child_environment(
+        receipt,
+        _build_clean_env({"AGENT_CANON_RUNTIME_ROOT": str(runtime)}),
+        issue_handoff=False,
+    )
+    assert child["AGENT_CANON_RUNTIME_ROOT_DEV"] == str(runtime.stat().st_dev)
+    assert child["AGENT_CANON_RUNTIME_ROOT_INO"] == str(runtime.stat().st_ino)
+
+    absent = tmp_path.parent / "missing-runtime"
+    created = boundary.child_environment(
+        receipt,
+        _build_clean_env({"AGENT_CANON_RUNTIME_ROOT": str(absent)}),
+        issue_handoff=False,
+    )
+    assert absent.is_dir()
+    assert created["AGENT_CANON_RUNTIME_ROOT"] == str(absent.resolve())
+    assert not (tmp_path / ".agent-canon").exists()
+
+
+def test_child_environment_rejects_runtime_symlink_before_any_directory_creation(
+    tmp_path: Path,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    runtime = tmp_path.parent / "symlink-runtime"
+    runtime.mkdir()
+    outside = tmp_path.parent / "runtime-outside"
+    outside.mkdir()
+    redirected = runtime / "redirected"
+    redirected.symlink_to(outside, target_is_directory=True)
+    environment = root_capability_environment(
+        source_root=tmp_path,
+        runtime_root=runtime,
+        base_env=_build_clean_env({"TMPDIR": str(redirected)}),
+    )
+
+    with pytest.raises(ParentRootSideEffectError) as rejected:
+        boundary.child_environment(receipt, environment)
+
+    assert rejected.value.reject is ParentRootReject.RUNTIME_SYMLINK_ESCAPE
+    assert not (outside / "cache").exists()
+    assert not (tmp_path / ".agent-canon").exists()
+
+
 def test_file_read_and_remove_reject_replaced_capability(tmp_path: Path) -> None:
     """A capability cannot be reused after its target inode is replaced."""
     boundary = ParentRootSideEffectBoundary()
@@ -1010,7 +1101,9 @@ def test_remove_parent_owned_tree_handles_deep_tree_without_recursion(
         receipt, tmp_path / "deep", "deep-tree", "deep-tree"
     )
     current = temporary.physical_path
-    for _ in range(sys.getrecursionlimit() + 25):
+    # Exercise iterative traversal without requiring more open descriptors
+    # than a normal CI process is allowed to hold.
+    for _ in range(128):
         current = current / "x"
         os.mkdir(current)
     boundary.remove_parent_owned_tree(receipt, temporary, "deep-tree-cleanup")

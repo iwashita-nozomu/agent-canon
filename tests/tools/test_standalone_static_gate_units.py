@@ -15,6 +15,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -47,26 +48,26 @@ def test_static_unit_runner_has_four_explicit_units() -> None:
     assert "unknown standalone static-gate unit" in text
 
 
-def test_static_unit_runner_self_reentry_uses_one_parent_boundary() -> None:
+def test_static_unit_runner_requires_shared_tool_container() -> None:
     text = RUNNER.read_text(encoding="utf-8")
-    assert 'if [[ -z "${AGENT_CANON_CHILD_HANDOFF:-}" ]]' in text
-    assert "exec-parent-bound" in text
-    assert "--issue-handoff" in text
-    assert "verify-child" in text
-    assert "--consume" in text
-    assert "unset AGENT_CANON_CHILD_HANDOFF" in text
-    assert '"standalone-static-gate-unit"' in text
+    assert "/usr/local/share/agent-canon/.agent-canon-tool-container" in text
+    assert "shared_tool_runtime_required" in text
+    assert "AGENT_CANON_TARGET_ROOT" in text
+    assert "exec-parent-bound" not in text
     assert '"${CARGO_TARGET_DIR:?}/debug/agent-canon"' in text
     assert "trap cleanup_eval EXIT" in text
     assert "trap cleanup_eval RETURN" not in text
     assert "mktemp" not in text
-    assert "rm -rf" not in text
+    assert 'rm -rf -- "${temp_root}"' in text
+    assert 'rm -rf -- "${ROOT}"' not in text
 
 
 def test_eval_unit_surfaces_cleanup_failure_without_masking_primary_status(
     tmp_path: Path,
 ) -> None:
-    """EXIT cleanup fails visibly and never replaces an earlier unit failure."""
+    """The Host-facing runner rejects execution outside the shared tool image."""
+    if Path("/usr/local/share/agent-canon/.agent-canon-tool-container").is_file():
+        pytest.skip("Host rejection route is not applicable inside the tool image")
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
     fake_python = fake_bin / "python3"
@@ -84,7 +85,8 @@ def test_eval_unit_surfaces_cleanup_failure_without_masking_primary_status(
         "    done\n"
         "    mkdir -p \"$candidate\"; printf '%s\\n' \"$candidate\"; exit 0 ;;\n"
         "  *' remove-tree '*) exit \"${FAKE_REMOVE_STATUS:?}\" ;;\n"
-        "  *'run_accumulated_agent_evals.py'*) exit \"${FAKE_EVAL_STATUS:?}\" ;;\n"
+            "  *'run_accumulated_agent_evals.py'*) exit \"${FAKE_EVAL_STATUS:?}\" ;;\n"
+            "  -*) candidate=\"${@: -1}\"; mkdir -p \"$candidate\"; printf '%s\\n' \"$candidate\"; exit 0 ;;\n"
         "  *) exit 0 ;;\n"
         "esac\n",
         encoding="utf-8",
@@ -92,8 +94,9 @@ def test_eval_unit_surfaces_cleanup_failure_without_masking_primary_status(
     fake_python.chmod(0o755)
 
     def run(eval_status: int) -> subprocess.CompletedProcess[str]:
-        case_root = tmp_path / f"case-{eval_status}"
-        return subprocess.run(
+            case_root = tmp_path / f"case-{eval_status}"
+            runtime_root = case_root / "runtime"
+            return subprocess.run(
             ["bash", str(RUNNER), "eval"],
             cwd=ROOT,
             check=False,
@@ -104,16 +107,19 @@ def test_eval_unit_surfaces_cleanup_failure_without_masking_primary_status(
                 "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
                 "AGENT_CANON_CHILD_HANDOFF": "fixture-single-use-token",
                 "AGENT_CANON_HANDOFF_AUDIENCE": "standalone-static-gate-unit",
-                "AGENT_CANON_CHILD_PURPOSE": "standalone-static-gate-unit",
-                "AGENT_CANON_HOOK_ARCHIVE_DIR": str(case_root / "hook-archive"),
-                "FAKE_TEMP_ROOT": str(case_root / "temp-root"),
-                "FAKE_EVAL_STATUS": str(eval_status),
-                "FAKE_REMOVE_STATUS": "41",
-            },
-        )
+                    "AGENT_CANON_CHILD_PURPOSE": "standalone-static-gate-unit",
+                    "AGENT_CANON_CONTROL_PARENT_ROOT": str(ROOT.parents[3]),
+                    "AGENT_CANON_RUNTIME_ROOT": str(runtime_root),
+                    "AGENT_CANON_HOOK_ARCHIVE_DIR": str(runtime_root / "hook-archive"),
+                    "FAKE_TEMP_ROOT": str(case_root / "temp-root"),
+                    "FAKE_EVAL_STATUS": str(eval_status),
+                },
+            )
 
-    assert run(0).returncode == 41
-    assert run(23).returncode == 23
+    for status in (0, 23):
+        result = run(status)
+        assert result.returncode == 2
+        assert "shared_tool_runtime_required" in result.stderr
 
 
 def test_static_unit_runner_and_full_wrapper_are_shell_syntax_valid() -> None:
@@ -179,9 +185,7 @@ def test_full_wrapper_aggregates_each_unit_once_without_reowning_commands() -> N
     body = text.split("run_standalone_static_gate_ci() {", 1)[1].split(
         "\n}\n\ngithub_repo_security_status()", 1
     )[0]
-    assert "local units=(rust contracts eval workflow-container)" in body
-    assert 'for unit in "${units[@]}"; do' in body
-    assert body.count('bash "${SCRIPT_DIR}/run_standalone_static_gate_unit.sh" "${unit}"') == 1
+    assert "owned_by_bootstrap_container_workflow" in body
     for command in (
         "cargo build --manifest-path",
         "tool_catalog.py",
@@ -219,19 +223,18 @@ def test_workflow_uses_one_selector_and_native_selected_jobs() -> None:
 def test_toolchain_setup_is_bounded_to_selected_owning_jobs() -> None:
     workflow = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
     jobs = workflow["jobs"]
-    rust_text = str(jobs["rust-static"])
-    assert "rustup component add rustfmt clippy" in rust_text
-    assert "actions/setup-python" not in rust_text
-    assert "pip install" not in rust_text
-    for job_name in ("contracts-static", "eval-static", "workflow-container-static"):
+    for job_name in (
+        "rust-static",
+        "contracts-static",
+        "eval-static",
+        "workflow-container-static",
+    ):
         text = str(jobs[job_name])
-        assert "actions/setup-python@v5" in text
-        assert "pip install" in text
+        assert "bootstrap.sh" in text
+        assert "run_standalone_static_gate_unit.sh" in text
+        assert "actions/setup-python" not in text
+        assert "pip install" not in text
         assert "rustup component add" not in text
-    assert "pytest" not in str(jobs["contracts-static"])
-    assert "pytest" not in str(jobs["eval-static"])
-    assert "pytest" in str(jobs["workflow-container-static"])
-    assert "pytest" in str(jobs["static-gates"])
 
 
 def test_aggregate_required_check_accepts_only_selected_success_or_unselected_skip() -> None:
@@ -249,14 +252,14 @@ def test_aggregate_required_check_accepts_only_selected_success_or_unselected_sk
     assert 'test "${result}" = skipped' in text
 
 
-def test_workflow_full_wrapper_is_manual_only_and_no_retry_ledger_exists() -> None:
+def test_workflow_manual_full_gate_uses_bootstrap_units_without_retry_ledger() -> None:
     workflow = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
     text = WORKFLOW.read_text(encoding="utf-8")
     steps = workflow["jobs"]["static-gates"]["steps"]
     wrapper = next(
-        step for step in steps if "check_agent_canon_pr.sh" in str(step.get("run", ""))
+        step for step in steps if "for unit in rust contracts eval" in str(step.get("run", ""))
     )
     assert wrapper["if"] == "github.event_name == 'workflow_dispatch'"
-    assert wrapper["env"]["AGENT_CANON_PR_READ_TOKEN"] == "${{ github.token }}"
+    assert "bootstrap.sh" in wrapper["run"]
     for forbidden in ("retry-ledger", "validation-ledger", "cache-manifest", "receipt-schema"):
         assert forbidden not in text

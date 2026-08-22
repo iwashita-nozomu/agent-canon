@@ -105,14 +105,18 @@ class RunAccumulatedAgentEvalsTest(unittest.TestCase):
     def test_build_producers_uses_accumulation_for_every_eval_family(self) -> None:
         """Every registered eval producer should run with append-only accumulation."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
+            root = Path(temp_dir) / "source"
+            root.mkdir()
+            runtime_root = root.parent / "runtime"
+            runtime_root.mkdir()
             producers = build_producers(
                 root=root,
                 run_id="run-123",
                 skill_used=("agent-orchestration", "result-artifact-writeout"),
-                report_dir=root / "reports" / "agents" / "run-123",
+                report_dir=root.parent / "runtime" / "tasks" / "run-123" / "reports",
                 prompt_eval_manifest=root / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml",
                 python_bin=sys.executable,
+                runtime_root=runtime_root,
             )
 
         names = {producer.name for producer in producers}
@@ -141,9 +145,12 @@ class RunAccumulatedAgentEvalsTest(unittest.TestCase):
     def test_run_producers_writes_logs_and_renders_bounded_status(self) -> None:
         """Producer stdout/stderr should be stored in files, with compact status on stdout."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
+            root = Path(temp_dir) / "source"
+            root.mkdir()
             environment = parent_bound_environment(root)
-            log_dir = root / "reports" / "agent-eval-runs" / "run"
+            runtime_root = root.parent / "runtime"
+            runtime_root.mkdir()
+            log_dir = runtime_root / "tasks" / "run" / "logs"
             producers = (
                 EvalProducer("ok-family", ("ok",)),
                 EvalProducer("bad-family", ("bad",)),
@@ -166,6 +173,7 @@ class RunAccumulatedAgentEvalsTest(unittest.TestCase):
                     root=root,
                     producers=producers,
                     log_dir=log_dir,
+                    runtime_root=runtime_root,
                     runner=fake_runner,
                 )
             rendered = render_results(root, results)

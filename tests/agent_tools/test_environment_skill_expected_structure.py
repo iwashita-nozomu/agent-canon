@@ -82,10 +82,10 @@ class EnvironmentSkillExpectedStructureTests(unittest.TestCase):
         text = self.read("agents/skills/devcontainer-exec.md")
 
         for marker in (
-            "既存containerの実行結果はenvironment acceptanceではなく",
-            "canonical imageのbuildと`docker run`による標準テスト一式",
-            "このskillの成功はrequested commandの成功だけ",
-            "image constructionやrepositoryの 標準テスト一式の成功を示すものではありません",
+            "for agentcanon tools, language servers, lifecycle",
+            "shared non-root tool container",
+            "project's own `docker/` image and `test/testrunner.sh`",
+            "does not prove agentcanon bootstrap health",
         ):
             self.assertIn(marker, text, marker)
 

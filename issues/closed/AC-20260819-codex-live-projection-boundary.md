@@ -7,7 +7,7 @@ downstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md live projec
 downstream design ../../documents/runtime/shared-runtime-surfaces.toml exact root-view manifest
 downstream design ../../ROOT_AGENTS.md live parent entrypoint
 downstream implementation ../../tools/agent_tools/surface_manifest.py manifest parser and renderer
-downstream implementation ../../tools/sync_agent_canon.sh link and bounded migration consumer
+downstream implementation ../../bootstrap.sh standalone runtime consumer
 downstream implementation ../../tests/agent_tools/test_codex_projection_boundary.py focused projection regression
 @dependency-end
 -->

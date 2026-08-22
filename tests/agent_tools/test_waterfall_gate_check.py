@@ -1077,9 +1077,8 @@ class WaterfallGateCheckTest(unittest.TestCase):
         for text in (template_text, workflow_text):
             self.assertIn("Abstract Design Frame", text)
             self.assertIn("Implementation Source Packet", text)
-            self.assertIn("nearest file", text)
-            self.assertIn("helper", text)
-            self.assertIn("current finding", text)
+            self.assertRegex(text, r"(?i)(responsibility model|責務 model)")
+            self.assertRegex(text, r"(?i)(file|path)")
 
     def test_final_gate_rejects_empty_work_log(self) -> None:
         """Final gate should fail when work_log.md has no concrete entries."""

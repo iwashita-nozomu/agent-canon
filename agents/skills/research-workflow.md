@@ -23,7 +23,7 @@ upstream design ../canonical/skills.md skill canon registry
 - `agents/skills/literature-survey.md`
 - `agents/workflows/research-workflow.md`
 - `agents/workflows/experiment-workflow.md`
-- AgentCanon document `documents/experiments/experiment-critical-review.md`; from a template or derived repo root, resolve it as `vendor/agent-canon/documents/experiments/experiment-critical-review.md`
+- AgentCanon document `documents/experiments/experiment-critical-review.md`; from a parent root, read it from the qualified ignored source clone or use the published source revision selected by the task.
 
 ## Canonical Loop
 

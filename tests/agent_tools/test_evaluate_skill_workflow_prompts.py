@@ -12,6 +12,7 @@ import contextlib
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -32,11 +33,6 @@ SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_skill_workflow_promp
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 import evaluate_skill_workflow_prompts as evaluator  # noqa: E402
 from eval_manifest_paths import resolve_eval_manifest  # noqa: E402
-from parent_root_side_effects import (  # noqa: E402
-    ParentRootAttestationRequest,
-    ParentRootSideEffectBoundary,
-    attest_parent_root,
-)
 from runtime_log_paths import mounted_log_archive_root  # noqa: E402
 
 
@@ -49,6 +45,13 @@ def run_eval(*args: str, cwd: Path = PROJECT_ROOT) -> subprocess.CompletedProces
         capture_output=True,
         text=True,
     )
+
+
+def external_runtime(root: Path) -> Path:
+    """Return an explicit runtime directory outside the source checkout."""
+    runtime = root.parent / f"{root.name}-agent-canon-runtime"
+    runtime.mkdir(parents=True, exist_ok=True)
+    return runtime
 
 
 def load_toml_document(path: Path) -> dict[str, object]:
@@ -491,13 +494,16 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
     def test_report_out_writes_markdown(self) -> None:
         """The runner writes a Markdown eval artifact."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            report = Path(tmp_dir) / "report.md"
+            runtime = external_runtime(Path(tmp_dir) / "source")
+            report = runtime / "report.md"
 
             result = run_eval(
                 "--manifest",
                 "evidence/agent-evals/skill_workflow_prompt_eval.toml",
                 "--report-out",
                 str(report),
+                "--runtime-root",
+                str(runtime),
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -511,13 +517,16 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
     def test_compact_out_limits_stdout_and_writes_summary(self) -> None:
         """Compact mode writes stats to JSON and keeps stdout bounded."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            compact = Path(tmp_dir) / "compact.json"
+            runtime = external_runtime(Path(tmp_dir) / "source")
+            compact = runtime / "compact.json"
 
             result = run_eval(
                 "--manifest",
                 "evidence/agent-evals/skill_workflow_prompt_eval.toml",
                 "--compact-out",
                 str(compact),
+                "--runtime-root",
+                str(runtime),
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -532,7 +541,8 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
     def test_existing_report_out_gets_unique_sibling(self) -> None:
         """An existing report path should not be overwritten."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            report = Path(tmp_dir) / "report.md"
+            runtime = external_runtime(Path(tmp_dir) / "source")
+            report = runtime / "report.md"
             report.write_text("keep me\n", encoding="utf-8")
 
             result = run_eval(
@@ -542,6 +552,8 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
                 str(report),
                 "--skill-used",
                 "agent-orchestration",
+                "--runtime-root",
+                str(runtime),
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -554,7 +566,9 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
     def test_accumulate_writes_unique_agentcanon_report(self) -> None:
         """Accumulated prompt evals should create durable unique result files."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
+            root = Path(tmp_dir) / "source"
+            root.mkdir()
+            runtime = external_runtime(root)
             result = run_eval(
                 "--root",
                 str(PROJECT_ROOT),
@@ -562,16 +576,18 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
                 "evidence/agent-evals/skill_workflow_prompt_eval.toml",
                 "--accumulate",
                 "--results-dir",
-                str(root / "results"),
+                str(runtime / "results"),
                 "--run-id",
                 "run-123",
                 "--skill-used",
                 "agent-orchestration",
+                "--runtime-root",
+                str(runtime),
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("EVAL_ACCUMULATED_REPORT=", result.stdout)
-            reports = sorted((root / "results").glob("skill-eval-*-pass-agent-orchestration.md"))
+            reports = sorted((runtime / "results").glob("skill-eval-*-pass-agent-orchestration.md"))
             self.assertEqual(len(reports), 1)
             text = reports[0].read_text(encoding="utf-8")
             self.assertIn("run_id: `run-123`", text)
@@ -583,8 +599,10 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
     def test_accumulate_records_workflow_monitoring_event(self) -> None:
         """Accumulated prompt evals should append behavior-eval evidence."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            report_dir = root / "reports" / "agents" / "run-123"
+            root = Path(tmp_dir) / "source"
+            root.mkdir()
+            runtime = external_runtime(root)
+            report_dir = runtime / "reports" / "agents" / "run-123"
 
             result = run_eval(
                 "--root",
@@ -593,13 +611,15 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
                 "evidence/agent-evals/skill_workflow_prompt_eval.toml",
                 "--accumulate",
                 "--results-dir",
-                str(root / "results"),
+                str(runtime / "results"),
                 "--run-id",
                 "run-123",
                 "--skill-used",
                 "agent-orchestration",
                 "--report-dir",
                 str(report_dir),
+                "--runtime-root",
+                str(runtime),
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -624,7 +644,8 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             tools_dir = canon_root / "tools" / "agent_tools"
             eval_dir.mkdir(parents=True)
             tools_dir.mkdir(parents=True)
-            archive_root = mounted_log_archive_root(canon_root)
+            runtime = external_runtime(canon_root)
+            archive_root = mounted_log_archive_root(canon_root, runtime)
             archive_root.mkdir(parents=True)
             wrapper_root.mkdir()
             (wrapper_root / "agents").symlink_to(canon_root / "agents")
@@ -671,6 +692,8 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
                 "run-symlink",
                 "--skill-used",
                 "agent-orchestration",
+                "--runtime-root",
+                str(runtime),
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -1092,49 +1115,26 @@ class T14EvaluatorContractTest(unittest.TestCase):
             self.assertEqual(evaluator.compute_t14_packet_digest(packet), expected)
 
     def record_fixture(self, *, run_id: str = "test-run", attempt: int = 0, packet_digest: str | None = None):
-        configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-        if not configured_parent:
-            configured_parent = str(PROJECT_ROOT)
-            os.environ["AGENT_CANON_PARENT_ROOT"] = configured_parent
-            self.addCleanup(os.environ.pop, "AGENT_CANON_PARENT_ROOT", None)
-        parent_root = Path(configured_parent)
-        fixture_parent = Path(
-            os.environ.get(
-                "TMPDIR",
-                str(parent_root / ".agent-canon" / "validation"),
-            )
-        ) / "t14-fixtures"
-        fixture_parent.mkdir(parents=True, exist_ok=True)
-        tmp = tempfile.TemporaryDirectory(dir=fixture_parent)
+        tmp = tempfile.TemporaryDirectory()
         root = Path(tmp.name)
-        packet = root / "packet.md"
+        runtime = root.parent / f"{root.name}-agent-canon-runtime"
+        runtime.mkdir(parents=True, exist_ok=True)
+        previous_runtime = os.environ.get("AGENT_CANON_RUNTIME_ROOT")
+        os.environ["AGENT_CANON_RUNTIME_ROOT"] = str(runtime)
+        if previous_runtime is None:
+            self.addCleanup(os.environ.pop, "AGENT_CANON_RUNTIME_ROOT", None)
+        else:
+            self.addCleanup(os.environ.__setitem__, "AGENT_CANON_RUNTIME_ROOT", previous_runtime)
+        self.addCleanup(shutil.rmtree, runtime, ignore_errors=True)
+        packet = runtime / "packets" / run_id / "packet.md"
+        packet.parent.mkdir(parents=True, exist_ok=True)
         packet.write_text("packet\n", encoding="utf-8")
         report_bytes = t14_report_text().encode("utf-8")
-        raw = root / "reports" / "agents" / run_id / "evaluator_artifacts" / "iteration-1" / f"attempt-{attempt}" / "OOP-TYPE-SCENARIO-01.md"
-        return_artifact = parent_root / ".agent-canon" / "tmp" / "agentcanon-type-design-workspaces" / run_id / "iteration-1" / f"attempt-{attempt}" / "OOP-TYPE-SCENARIO-01" / "evaluator_return.bin"
+        raw = runtime / "reports" / "agents" / run_id / "evaluator_artifacts" / "iteration-1" / f"attempt-{attempt}" / "OOP-TYPE-SCENARIO-01.md"
+        return_artifact = runtime / "tmp" / "agentcanon-type-design-workspaces" / run_id / "iteration-1" / f"attempt-{attempt}" / "OOP-TYPE-SCENARIO-01" / "evaluator_return.bin"
         return_artifact.parent.mkdir(parents=True, exist_ok=True)
         return_artifact.write_bytes(report_bytes)
-        boundary = ParentRootSideEffectBoundary()
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(
-                cwd=parent_root,
-                explicit_root=parent_root,
-                purpose="t14-test-cleanup",
-            )
-        )
-        return_root = parent_root / ".agent-canon" / "tmp" / "agentcanon-type-design-workspaces" / run_id
-
-        def cleanup_return_artifact() -> None:
-            if return_root.exists():
-                receipt = boundary.resolve_parent_owned_path(
-                    attestation, return_root, "t14-test-cleanup", create=False
-                )
-                boundary.remove_parent_owned_tree(
-                    attestation, receipt, "t14-test-cleanup"
-                )
-
-        self.addCleanup(cleanup_return_artifact)
-        parent = root / "reports" / "agents" / run_id / "agent_evaluation.md"
+        parent = runtime / "reports" / "agents" / run_id / "agent_evaluation.md"
         digest = packet_digest or evaluator.compute_t14_packet_digest(packet)
         return tmp, report_bytes, raw, parent, packet, digest, return_artifact
 
@@ -1152,27 +1152,14 @@ class T14EvaluatorContractTest(unittest.TestCase):
         fixture = self.record_fixture(run_id="receipt-order")
         with fixture[0]:
             capability_established = False
-            original_capability = evaluator._parent_capability
+            original_boundary = evaluator._t14_runtime_boundary
 
-            def observe_capability(purpose: str):
+            def observe_boundary(runtime_root=None):
                 nonlocal capability_established
-                result = original_capability(purpose)
                 capability_established = True
-                return result
+                return original_boundary(runtime_root)
 
-            original_read = ParentRootSideEffectBoundary.read_parent_owned_file
-
-            def observe_read(boundary, receipt):
-                self.assertTrue(capability_established)
-                return original_read(boundary, receipt)
-
-            with mock.patch.object(
-                evaluator, "_parent_capability", side_effect=observe_capability
-            ), mock.patch.object(
-                ParentRootSideEffectBoundary,
-                "read_parent_owned_file",
-                observe_read,
-            ):
+            with mock.patch.object(evaluator, "_t14_runtime_boundary", side_effect=observe_boundary):
                 report = evaluator.record_t14_evaluation(
                     "receipt-order",
                     fixture[1],
@@ -1186,6 +1173,7 @@ class T14EvaluatorContractTest(unittest.TestCase):
                     fixture[5],
                     fixture[3],
                 )
+            self.assertTrue(capability_established)
             self.assertEqual(report.scenario_id, "OOP-TYPE-SCENARIO-01")
 
     def test_record_t14_evaluation_preserves_verbatim_raw_bytes(self) -> None:
@@ -1234,7 +1222,7 @@ class T14EvaluatorContractTest(unittest.TestCase):
             evaluator.record_t14_evaluation("duplicate-scenario", fixture[1], fixture[2], fixture[2], self.requirement_ids, "OOP-TYPE-SCENARIO-01", 1, 0, fixture[4], fixture[5], fixture[3])
             second_raw = fixture[2].parent.parent / "attempt-1" / fixture[2].name
             second_raw.parent.mkdir(parents=True, exist_ok=True)
-            second_artifact = Path("/tmp/agentcanon-type-design-workspaces") / "duplicate-scenario" / "iteration-1" / "attempt-1" / "OOP-TYPE-SCENARIO-01" / "evaluator_return.bin"
+            second_artifact = fixture[6].parent.parent.parent / "attempt-1" / "OOP-TYPE-SCENARIO-01" / "evaluator_return.bin"
             second_artifact.parent.mkdir(parents=True, exist_ok=True)
             second_artifact.write_bytes(fixture[1])
             assert_t14_error(self, lambda: evaluator.record_t14_evaluation("duplicate-scenario", fixture[1], second_raw, second_raw, self.requirement_ids, "OOP-TYPE-SCENARIO-01", 1, 1, fixture[4], fixture[5], fixture[3]), "t14-duplicate-scenario")
@@ -1288,7 +1276,16 @@ class T14EvaluatorContractTest(unittest.TestCase):
     def summary_parent(self, run_id: str = "summary") -> tuple[tempfile.TemporaryDirectory[str], Path]:
         """Create a parent evaluation with the exact initial header."""
         tmp = tempfile.TemporaryDirectory()
-        parent = Path(tmp.name) / "reports" / "agents" / run_id / "agent_evaluation.md"
+        runtime = Path(tmp.name).parent / f"{Path(tmp.name).name}-agent-canon-runtime"
+        runtime.mkdir(parents=True, exist_ok=True)
+        previous_runtime = os.environ.get("AGENT_CANON_RUNTIME_ROOT")
+        os.environ["AGENT_CANON_RUNTIME_ROOT"] = str(runtime)
+        if previous_runtime is None:
+            self.addCleanup(os.environ.pop, "AGENT_CANON_RUNTIME_ROOT", None)
+        else:
+            self.addCleanup(os.environ.__setitem__, "AGENT_CANON_RUNTIME_ROOT", previous_runtime)
+        self.addCleanup(shutil.rmtree, runtime, ignore_errors=True)
+        parent = runtime / "reports" / "agents" / run_id / "agent_evaluation.md"
         parent.parent.mkdir(parents=True)
         parent.write_text(evaluator._T14_PARENT_HEADER.format(run_id=run_id) + "\n", encoding="utf-8")
         return tmp, parent

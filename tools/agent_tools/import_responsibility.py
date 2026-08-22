@@ -253,20 +253,13 @@ def load_scope_index(root: Path, path: Path) -> tuple[ScopeIndex, dict[str, Impo
 
 
 def resolve_manifest_path(root: Path, manifest: str) -> Path:
-    """Return the active responsibility manifest path.
-
-    Parent repositories may omit a root-local override and rely on the vendored
-    AgentCanon default manifest. A root-local manifest wins when present.
-    """
+    """Return the active responsibility manifest path from the selected root."""
     requested = Path(manifest)
     if requested.is_absolute():
         return requested
     root_manifest = root / requested
     if root_manifest.is_file():
         return root_manifest
-    vendored_manifest = root / "vendor" / "agent-canon" / requested
-    if vendored_manifest.is_file():
-        return vendored_manifest
     return root_manifest
 
 

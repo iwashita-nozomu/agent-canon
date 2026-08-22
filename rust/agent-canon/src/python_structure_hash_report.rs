@@ -2074,8 +2074,8 @@ fn repair_slice_json(priority_order: &[PriorityItem], graph: &ModuleGroupGraph) 
             "after fixing this slice, rerun full python-structure-hash and python-structure-hash-report"
         ],
         "after_fix_commands": [
-            "cargo run --quiet --manifest-path vendor/agent-canon/rust/agent-canon/Cargo.toml -- python-structure-hash --root . --min-tokens 8 --format text > /tmp/python_structure_hash_findings.txt",
-            "cargo run --quiet --manifest-path vendor/agent-canon/rust/agent-canon/Cargo.toml -- python-structure-hash-report --root . --input /tmp/python_structure_hash_findings.txt --output /tmp/python_structure_hash_findings.json"
+            "CARGO_TARGET_DIR=\"${TMPDIR:-/tmp}/agent-canon-cargo-target\" cargo run --quiet --manifest-path rust/agent-canon/Cargo.toml -- python-structure-hash --root . --min-tokens 8 --format text > /tmp/python_structure_hash_findings.txt",
+            "CARGO_TARGET_DIR=\"${TMPDIR:-/tmp}/agent-canon-cargo-target\" cargo run --quiet --manifest-path rust/agent-canon/Cargo.toml -- python-structure-hash-report --root . --input /tmp/python_structure_hash_findings.txt --output /tmp/python_structure_hash_findings.json"
         ],
     })
 }

@@ -35,6 +35,25 @@ AGENT_TEAM = PROJECT_ROOT / "tools" / "agent_tools" / "agent_team.py"
 DOCKER_VALIDATOR = PROJECT_ROOT / "tools" / "docker_dependency_validator.sh"
 
 
+def runtime_root_for(root: Path) -> Path:
+    """Return the per-fixture runtime root outside the fixture checkout."""
+    runtime = root.parent / f".{root.name}.agent-canon-runtime"
+    runtime.mkdir(parents=True, exist_ok=True)
+    return runtime
+
+
+def tool_environment(root: Path) -> dict[str, str]:
+    """Provide the explicit external runtime/control roots required by tools."""
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "AGENT_CANON_RUNTIME_ROOT": str(runtime_root_for(root)),
+            "AGENT_CANON_CONTROL_PARENT_ROOT": str(root.parent.resolve()),
+        }
+    )
+    return environment
+
+
 def run_tool(*args: str, root: Path) -> subprocess.CompletedProcess[str]:
     """Run a dependency manifest shell tool."""
     return subprocess.run(
@@ -43,6 +62,7 @@ def run_tool(*args: str, root: Path) -> subprocess.CompletedProcess[str]:
         check=False,
         capture_output=True,
         text=True,
+        env=tool_environment(root),
     )
 
 
@@ -180,10 +200,14 @@ class DependencyManifestToolTest(unittest.TestCase):
     def test_code_scan_can_write_lexical_lsp_report(self) -> None:
         """Compatibility scanner can persist the canonical lexical report."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
+            workspace = Path(tmp_dir)
+            root = workspace / "source"
+            runtime = workspace / "runtime"
+            root.mkdir()
+            runtime.mkdir()
             source = root / "main.py"
             source.write_text("import package\n", encoding="utf-8")
-            analysis = root / "reports" / "analysis.json"
+            analysis = runtime / "analysis.json"
             result = subprocess.run(
                 [
                     "bash",
@@ -191,6 +215,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                     "--root",
                     str(root),
                     "--lexical-only",
+                    "--runtime-root",
+                    str(runtime),
                     "--analysis-json",
                     str(analysis),
                     "main.py",
@@ -320,10 +346,14 @@ class DependencyManifestToolTest(unittest.TestCase):
     def test_code_scan_rust_is_sidecar_only(self) -> None:
         """Rust lexical facts stay in the sidecar without fabricated TSV rows."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
+            workspace = Path(tmp_dir)
+            root = workspace / "source"
+            runtime = workspace / "runtime"
+            root.mkdir()
+            runtime.mkdir()
             source = root / "main.rs"
             source.write_text("mod helper;\nuse crate::helper;\n", encoding="utf-8")
-            analysis = root / "reports" / "analysis.json"
+            analysis = runtime / "analysis.json"
             result = subprocess.run(
                 [
                     "bash",
@@ -331,6 +361,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                     "--root",
                     str(root),
                     "--lexical-only",
+                    "--runtime-root",
+                    str(runtime),
                     "--analysis-json",
                     str(analysis),
                     "main.rs",
@@ -789,6 +821,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 check=False,
                 capture_output=True,
                 text=True,
+                env=tool_environment(root),
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -1090,32 +1123,25 @@ class DependencyManifestToolTest(unittest.TestCase):
             )
 
     def test_docker_validator_accepts_project_extras_in_parent_layout(self) -> None:
-        """The parent boundary accepts typed project extras without legacy locks."""
+        """The standalone bootstrap manifest validates without legacy Dev Container state."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            vendor = root / "vendor" / "agent-canon"
             (root / "python").mkdir()
             (root / "docker").mkdir()
-            (root / ".devcontainer").mkdir()
-            (root / "tools" / "ci").mkdir(parents=True)
-            (vendor / "tools" / "agent_tools").mkdir(parents=True)
-            (vendor / ".devcontainer").mkdir()
-            (
-                vendor / "tools" / "agent_tools" / "devcontainer_dependencies.py"
-            ).symlink_to(
+            agent_tools = root / "tools" / "agent_tools"
+            agent_tools.mkdir(parents=True)
+            (agent_tools / "devcontainer_dependencies.py").symlink_to(
                 PROJECT_ROOT / "tools" / "agent_tools" / "devcontainer_dependencies.py"
             )
-            for relative in (
-                ".devcontainer/dependencies.toml",
-                ".devcontainer/post-create.sh",
-                ".devcontainer/post-create-entrypoint.sh",
-                "CONTAINER_OPERATIONS.md",
-            ):
-                (vendor / relative).symlink_to(PROJECT_ROOT / relative)
-            (root / ".devcontainer" / "dependencies.toml").write_text(
+            (agent_tools / "dependency_plan.py").symlink_to(
+                PROJECT_ROOT / "tools" / "agent_tools" / "dependency_plan.py"
+            )
+            manifest = root / "bootstrap" / "container" / "dependencies.toml"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text(
                 "\n".join(
                     [
-                        'schema = "agent-canon.devcontainer-dependencies"',
+                        'schema = "agent-canon.tool-dependencies"',
                         "schema_version = 2",
                         "",
                         "[[records]]",
@@ -1133,11 +1159,6 @@ class DependencyManifestToolTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            (root / ".devcontainer" / "post-create-parent.sh").write_text(
-                "#!/usr/bin/env bash\n",
-                encoding="utf-8",
-            )
-            os.chmod(root / ".devcontainer" / "post-create-parent.sh", 0o755)
             (root / "pyproject.toml").write_text(
                 "[project]\ndependencies = []\n[project.optional-dependencies]\ndev = []\n",
                 encoding="utf-8",
@@ -1146,12 +1167,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "FROM ubuntu:22.04\n",
                 encoding="utf-8",
             )
-            (root / ".devcontainer" / "devcontainer.json").write_text(
-                '{"postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}"}\n',
-                encoding="utf-8",
-            )
             (root / ".dockerignore").write_text(
-                "vendor/agent-canon\n.git\n.state\n",
+                ".git\n.state\n",
                 encoding="utf-8",
             )
             (root / ".gitignore").write_text(".venv/\nvenv/\n", encoding="utf-8")
@@ -1172,8 +1189,8 @@ class DependencyManifestToolTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DEVCONTAINER_DEPENDENCY=pass", result.stdout)
-            self.assertIn("DEVCONTAINER_DEPENDENCY_ORDER=fixture,", result.stdout)
+            self.assertIn("AGENT_CANON_TOOL_DEPENDENCY=pass", result.stdout)
+            self.assertIn("AGENT_CANON_TOOL_DEPENDENCY_ORDER=fixture", result.stdout)
             self.assertNotIn("missing-file", result.stdout)
             self.assertNotIn("unsupported requirement syntax", result.stdout)
 
@@ -1237,40 +1254,6 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
 
-    def test_format_prefers_direct_template_target_for_vendor_path(self) -> None:
-        """Template header paths that point through the vendored source resolve directly."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            workflow = root / ".github" / "workflows" / "agent-improvement-guide.yml"
-            vendor_agent = root / "vendor" / "agent-canon" / ".github"
-            vendor_agent.mkdir(parents=True)
-            (vendor_agent / "AGENTS.md").write_text("# AGENTS\n", encoding="utf-8")
-            workflow.parent.mkdir(parents=True)
-            (root / "vendor" / "agent-canon" / ".github" / "workflows").mkdir(
-                parents=True
-            )
-            (root / "vendor" / "agent-canon" / ".github" / "workflows" / "agent-improvement-guide.yml").write_text(
-                "name: Agent Improvement Guide\n", encoding="utf-8"
-            )
-            workflow.write_text(
-                "\n".join(
-                    [
-                        "# @dependency-start",
-                        "# contract test",
-                        "# responsibility Exercises vendored path resolution preference.",
-                        "# upstream design ../../vendor/agent-canon/.github/AGENTS.md vendor header path",
-                        "# @dependency-end",
-                        "name: Agent Improvement Guide",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-
-            result = run_tool(str(FORMAT), "--root", str(root), str(workflow), root=root)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
-
     def test_format_rejects_dependency_path_escaping_root(self) -> None:
         """Dependency targets that resolve above ROOT_DIR are rejected."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1298,40 +1281,6 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("dependency target escapes repository root", result.stdout)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=fail", result.stdout)
-
-    def test_format_falls_back_to_template_source_context_when_direct_missing(self) -> None:
-        """Fallback context is still used when direct dependency target does not exist."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            workflow = root / ".github" / "workflows" / "agent-improvement-guide.yml"
-            workflow.parent.mkdir(parents=True)
-            (root / "vendor" / "agent-canon" / ".github" / "workflows").mkdir(
-                parents=True
-            )
-            (root / "vendor" / "agent-canon" / ".github" / "AGENTS.md").write_text(
-                "# Vendor AGENTS\n", encoding="utf-8"
-            )
-            (
-                root / "vendor" / "agent-canon" / ".github" / "workflows" / "agent-improvement-guide.yml"
-            ).write_text("name: Agent Improvement Guide\n", encoding="utf-8")
-            workflow.write_text(
-                "\n".join(
-                    [
-                        "# @dependency-start",
-                        "# contract test",
-                        "# responsibility Exercises fallback source-context resolution.",
-                        "# upstream design ../../.github/AGENTS.md context fallback",
-                        "# @dependency-end",
-                        "name: Agent Improvement Guide",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-
-            result = run_tool(str(FORMAT), "--root", str(root), str(workflow), root=root)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
 
     def test_format_accepts_markdown_h1_before_manifest(self) -> None:
         """Markdown H1 titles may precede the dependency manifest near the top."""
@@ -1666,12 +1615,9 @@ class DependencyManifestToolTest(unittest.TestCase):
             root = Path(tmp_dir)
             product = root / "product.md"
             root_view = root / ".github" / "workflows" / "agent-coordination.yml"
-            submodule = root / "vendor" / "agent-canon" / "shared.md"
             root_view.parent.mkdir(parents=True)
-            submodule.parent.mkdir(parents=True)
             product.write_text("# Product\n\nBody.\n", encoding="utf-8")
             root_view.write_text("name: Agent Coordination\n", encoding="utf-8")
-            submodule.write_text("# Shared\n\nBody.\n", encoding="utf-8")
 
             result = run_tool(
                 str(SCAN),
@@ -1681,7 +1627,6 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "--explain-missing",
                 str(product),
                 str(root_view),
-                str(submodule),
                 root=root,
             )
 
@@ -1696,12 +1641,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "MISSING_DEPENDENCY_MANIFEST=vendor/agent-canon/shared.md owner=submodule_source",
-                result.stdout,
-            )
-            self.assertIn(
                 "DEPENDENCY_HEADER_SCAN_MISSING_BY_OWNER product_file=1 root_view=1 "
-                "symlink=0 submodule_source=1 other=0",
+                "symlink=0 submodule_source=0 other=0",
                 result.stdout,
             )
             self.assertIn(
@@ -1891,7 +1832,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             source = root / "source.py"
             dependent = root / "tests" / "test_source.py"
             design = root / "design.md"
-            graph_tsv = root / "reports" / "dependency_graph.tsv"
+            graph_tsv = runtime_root_for(root) / "reports" / "dependency_graph.tsv"
             dependent.parent.mkdir(parents=True)
             design.write_text("# Design\n", encoding="utf-8")
             source.write_text(
@@ -1970,7 +1911,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 )
                 source_paths.append(relative_source)
                 expected_edges.add(f"upstream\tdesign\t{relative_source}\tdesign.md")
-            graph_tsv = root / "reports" / "dependency_graph.tsv"
+            graph_tsv = runtime_root_for(root) / "reports" / "dependency_graph.tsv"
 
             result = run_tool(
                 str(GRAPH),
@@ -2075,7 +2016,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             target = root / "target.md"
             source = root / "source.md"
             hits = root / "search_hits.txt"
-            report_dir = root / "reports" / "dependency-review"
+            report_dir = runtime_root_for(root) / "reports" / "dependency-review"
             target.write_text(
                 "\n".join(
                     [
@@ -2162,7 +2103,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             (tool_dir / "workflow_monitor.py").symlink_to(WORKFLOW_MONITOR)
             target = root / "target.md"
             source = root / "source.md"
-            report_dir = root / "reports" / "dependency-review"
+            report_dir = runtime_root_for(root) / "reports" / "dependency-review"
             target.write_text(
                 "\n".join(
                     [
@@ -2829,7 +2770,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "--fail-missing",
                 "--cycle-report-only",
                 "--report-dir",
-                str(root / "reports" / "dependency-review" / "run"),
+                str(runtime_root_for(root) / "reports" / "dependency-review" / "run"),
                 root=root,
             )
 
@@ -2979,7 +2920,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            report_dir = root / "reports" / "agents" / "run-3"
+            report_dir = runtime_root_for(root) / "reports" / "agents" / "run-3"
 
             result = run_tool(
                 str(REPO_REVIEW),
@@ -3020,10 +2961,6 @@ class DependencyManifestToolTest(unittest.TestCase):
         tools_dir = root / "tools"
         (tools_dir / "bin").mkdir(parents=True)
         (tools_dir / "agent_tools").mkdir()
-        (tools_dir / "sync_agent_canon.sh").write_text(
-            "#!/usr/bin/env bash\nexit 0\n", encoding="utf-8"
-        )
-        (tools_dir / "sync_agent_canon.sh").chmod(0o755)
         script = (
             "#!/usr/bin/env python3\n"
             "import json\n"
@@ -3062,10 +2999,13 @@ class DependencyManifestToolTest(unittest.TestCase):
         build_exit: int = 0,
     ) -> subprocess.CompletedProcess[str]:
         """Run the existing dependency-review graph ensure route."""
-        _executable, calls = self.graph_ensure_fixture(root, statuses, build_exit)
+        executable, calls = self.graph_ensure_fixture(root, statuses, build_exit)
         environment = os.environ.copy()
         environment.update(
             {
+                "AGENT_CANON_RUNTIME_ROOT": str(runtime_root_for(root)),
+                "AGENT_CANON_CONTROL_PARENT_ROOT": str(root.parent.resolve()),
+                "AGENT_CANON_GRAPH_CLI": str(executable),
                 "GRAPH_STATUS_SEQUENCE": json.dumps(statuses),
                 "GRAPH_STATUS_JSON": json.dumps(
                     {

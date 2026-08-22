@@ -6,6 +6,7 @@
 # upstream design ../../templates/agents/agent_evaluation.md defines evaluation artifact shape
 # upstream design ../../templates/agents/workflow_monitoring.md monitoring evidence
 # upstream implementation ./report_artifact_checks.py validates schedule and work log completeness
+# upstream implementation ./runtime_artifacts.py owns external evaluation artifact writes
 # downstream implementation ../../tests/agent_tools/test_evaluate_agent_run.py verifies scoring
 # @dependency-end
 """Evaluate one run bundle and write actionable agent feedback."""
@@ -14,7 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
+import sys
 import re
 
 try:
@@ -31,13 +32,7 @@ if __package__:
 else:
     from workspace_scope import resolve_report_root
 from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
-from parent_root_side_effects import (
-    ParentRootAttestationRequest,
-    ParentRootReject,
-    ParentRootSideEffectBoundary,
-    ParentRootSideEffectError,
-    attest_parent_root,
-)
+from runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary
 from report_artifact_checks import (
     check_final_review_artifact,
     check_schedule_artifact,
@@ -50,13 +45,6 @@ from report_artifact_checks import (
 DEFAULT_MIN_SCORE = 85
 
 
-def _parent_write(path: Path, data: bytes, purpose: str) -> None:
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
-    ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, data, purpose)
 DEFAULT_BEHAVIOR_CRITERION_MAX_SCORE = 5
 ARTIFACT_COMPLETENESS_SCORE = 8
 REQUEST_TRACEABILITY_SCORE = 10
@@ -88,6 +76,7 @@ DEFAULT_BEHAVIOR_MANIFEST = eval_manifest_path("agent_behavior_eval.toml")
 RUNTIME_PROFILE_INVENTORY_PATH = (
     Path(__file__).resolve().parents[2]
     / "documents"
+    / "runtime"
     / "runtime-profiles-and-check-matrix.json"
 )
 
@@ -267,6 +256,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Evaluation artifact path relative to report dir, or an absolute path.",
     )
     parser.add_argument(
+        "--runtime-root",
+        type=Path,
+        help="Explicit external runtime root for the evaluation artifact.",
+    )
+    parser.add_argument(
         "--behavior-manifest",
         default=DEFAULT_BEHAVIOR_MANIFEST,
         help="Behavior eval TOML manifest, relative to workspace root unless absolute.",
@@ -346,7 +340,7 @@ def behavior_criterion_from_manifest_entry(
     mapping = cast(dict[str, object], entry)
     name = str(mapping["name"])
     source = str(mapping.get("source", "behavior_events"))
-    if source not in {"behavior_events", "bundle"}:
+    if source not in {"behavior_events", "bundle", "runtime_profile_projection_gate"}:
         raise ValueError(f"behavior criterion {name} has invalid source={source}")
     feedback = str(mapping.get("feedback", f"Record behavior evidence for {name}."))
     return BehaviorCriterion(
@@ -938,6 +932,7 @@ def evaluate(
             {
                 "behavior_events": evidence.behavior_events_text,
                 "bundle": evidence.normalized_bundle,
+                "runtime_profile_projection_gate": evidence.behavior_events_text,
             },
             behavior_criteria,
         ),
@@ -1434,8 +1429,9 @@ def main() -> int:
         )
         report_dir = report_dir.resolve()
     output_path = Path(args.output)
-    if not output_path.is_absolute():
-        output_path = report_dir / output_path
+    boundary = runtime_artifact_boundary(workspace_root, args.runtime_root) if args.write else None
+    if not output_path.is_absolute() and boundary is not None:
+        output_path = boundary.resolve(output_path)
 
     behavior_manifest = resolve_eval_manifest(workspace_root, args.behavior_manifest)
     behavior_criteria = load_behavior_manifest(behavior_manifest)
@@ -1445,7 +1441,8 @@ def main() -> int:
     status = "pass" if score >= args.min_score and not blockers else "revise"
     report = render_markdown(report_dir, criteria, blockers, args.min_score)
     if args.write:
-        _parent_write(output_path, report.encode("utf-8"), "agent-run-evaluation")
+        assert boundary is not None
+        output_path = boundary.atomic_write_text(output_path, report)
 
     print(f"AGENT_EVALUATION_REPORT={output_path}")
     print(f"AGENT_EVALUATION_STATUS={status}")
@@ -1460,4 +1457,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except RuntimeArtifactError as exc:
+        print(f"evaluate_agent_run.py: runtime_root_required: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc

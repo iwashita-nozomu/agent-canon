@@ -5,12 +5,10 @@
 # responsibility Verifies catalog-derived materializer fixed-point and readback evidence.
 # upstream design ../../documents/design/skill-runtime-shim-materialization.md approved materializer contract
 # upstream implementation ../../tools/agent_tools/skill_shim_materializer.py single shim writer
-# downstream implementation ../../tests/fixtures/skill-runtime-shim/fixed-point/expected.json fixed-point oracle
 # @dependency-end
 
 from __future__ import annotations
 
-import json
 import sys
 import unittest
 from pathlib import Path
@@ -42,26 +40,16 @@ class SkillShimMaterializerTest(unittest.TestCase):
             "os.environ", {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}
         ):
             actual = fixed_point_acceptance(PROJECT_ROOT)
-        expected = json.loads(
-            (
-                PROJECT_ROOT
-                / "tests/fixtures/skill-runtime-shim/fixed-point/expected.json"
-            ).read_text(encoding="utf-8")
-        )
-        self.assertEqual(actual["schema"], expected["schema"])
-        self.assertEqual(actual["version"], expected["version"])
-        self.assertEqual(
-            len(actual["first_run"]["record_digests"]),
-            len(expected["first_run"]["record_digests"]),
-        )
+        self.assertEqual(actual["schema"], "agent_canon.skill_runtime_shim.fixed_point")
+        self.assertEqual(actual["version"], 2)
         self.assertEqual(actual["first_run"]["content_delta_count"], 0)
         self.assertEqual(actual["second_run"]["content_delta_count"], 0)
         self.assertTrue(actual["equal_record_digests"])
         self.assertTrue(actual["equal_projection_digests"])
         self.assertTrue(actual["equal_readback_digest"])
         self.assertEqual(
-            len(actual["first_run"]["record_digests"]),
-            len(actual["first_run"]["projection_digests"]),
+            set(actual["first_run"]["record_digests"]),
+            set(actual["first_run"]["projection_digests"]),
         )
         self.assertEqual(actual["status"], "pass")
 

@@ -29,97 +29,46 @@ class RunAllChecksScriptTest(unittest.TestCase):
         """Accumulated eval producers need a writable AgentCanon log archive."""
         text = SCRIPT.read_text(encoding="utf-8")
 
-        archive_marker = (
-            '--candidate "${AGENT_CANON_HOOK_ARCHIVE_DIR:-'
-            '${AGENT_CANON_SOURCE_ROOT}/.agent-canon/log-archive}"'
-        )
-        archive_boundary_marker = "--purpose run-all-checks-hook-archive"
-        explicit_eval_marker = "--purpose run-all-checks-explicit-eval-log"
-        temporary_eval_marker = "--purpose run-all-checks-eval-log"
-        cleanup_marker = "--purpose run-all-checks-cleanup"
+        archive_marker = 'AGENT_CANON_CI_HOOK_ARCHIVE_DIR="${AGENT_CANON_HOOK_ARCHIVE_DIR:-${AGENT_CANON_CI_RUNTIME_ROOT}/archive/agent-canon-log}"'
+        runtime_marker = 'AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_CI_RUNTIME_ROOT}"'
+        eval_runtime_marker = '--runtime-root "${AGENT_CANON_CI_RUNTIME_ROOT}"'
         producer_marker = (
             'run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}"'
         )
-        checker_marker = 'eval_accumulation_check.py" 2>&1; then'
+        checker_marker = 'eval_accumulation_check.py"'
         command_env_marker = (
             'AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"'
         )
 
         self.assertIn(archive_marker, text)
-        self.assertIn(archive_boundary_marker, text)
-        self.assertIn(explicit_eval_marker, text)
-        self.assertIn(temporary_eval_marker, text)
-        self.assertIn(cleanup_marker, text)
+        self.assertIn(runtime_marker, text)
+        self.assertGreaterEqual(text.count(eval_runtime_marker), 2)
         self.assertIn(command_env_marker, text)
         self.assertIn(
-            '--run-id run-all-checks --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}"',
+            '--run-id run-all-checks',
             text,
         )
         self.assertLess(text.index(archive_marker), text.index(producer_marker))
-        self.assertLess(text.index(archive_boundary_marker), text.index(producer_marker))
         self.assertLess(text.index(producer_marker), text.index(checker_marker))
         self.assertNotIn("export AGENT_CANON_HOOK_ARCHIVE_DIR", text)
 
-    def test_eval_accumulation_runs_only_in_standalone_source(self) -> None:
-        """run_all_checks runs accumulated eval checks only in standalone AgentCanon source."""
+    def test_eval_accumulation_is_standalone_owned(self) -> None:
+        """run_all_checks always runs eval accumulation in standalone AgentCanon."""
         text = SCRIPT.read_text(encoding="utf-8")
 
-        standalone_condition = 'if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then'
-        mode_definition = (
-            'if [[ -d "${WORKSPACE_ROOT}/vendor/agent-canon" && -f "${WORKSPACE_ROOT}/.gitmodules" ]]; then'
-        )
-        parent_template_mode = (
-            'AGENT_CANON_REPOSITORY_MODE="template_or_derived"'
-        )
-        standalone_marker = (
-            'accumulated_eval_args=(--run-id run-all-checks --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}")'
-        )
+        standalone_marker = "accumulated_eval_args=("
         standalone_eval_run = (
             'run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}" 2>&1; then'
         )
-        skip_eval_mark = "ACCUMULATED_AGENT_EVAL=skip reason=agentcanon_source_owned_gate"
-        skip_check_mark = "EVAL_ACCUMULATION=skip reason=agentcanon_source_owned_gate"
 
-        self.assertIn(standalone_condition, text)
-        self.assertIn(mode_definition, text)
-        self.assertIn(parent_template_mode, text)
         self.assertIn(standalone_marker, text)
         self.assertIn(standalone_eval_run, text)
-        self.assertIn(skip_eval_mark, text)
-        self.assertIn(skip_check_mark, text)
-
-        standalone_condition_index = text.index(standalone_condition)
-        skip_eval_index = text.index(skip_eval_mark)
-        skip_check_index = text.index(skip_check_mark)
         producer_index = text.index(standalone_eval_run)
-        checker_index = text.index('eval_accumulation_check.py" 2>&1; then')
+        checker_index = text.index('eval_accumulation_check.py"')
 
-        self.assertLess(standalone_condition_index, producer_index)
-        self.assertLess(standalone_condition_index, checker_index)
-        self.assertLess(standalone_condition_index, skip_eval_index)
-        self.assertLess(standalone_condition_index, skip_check_index)
         self.assertLess(producer_index, checker_index)
-        self.assertLess(producer_index, skip_eval_index)
-        self.assertLess(skip_eval_index, skip_check_index)
-
-    def test_mode_collision_with_root_cargo_and_vendor_submodule_skips_accumulated_eval(self) -> None:
-        """Root Cargo.toml plus vendored submodule markers classify as template_or_derived."""
-        text = SCRIPT.read_text(encoding="utf-8")
-
-        standalone_mode_marker = 'AGENT_CANON_REPOSITORY_MODE="standalone_source"'
-        template_mode_marker = 'AGENT_CANON_REPOSITORY_MODE="template_or_derived"'
-        skip_eval_mark = "ACCUMULATED_AGENT_EVAL=skip reason=agentcanon_source_owned_gate"
-        skip_check_mark = "EVAL_ACCUMULATION=skip reason=agentcanon_source_owned_gate"
-
-        self.assertGreater(text.count(standalone_mode_marker), 0)
-        self.assertEqual(text.count(template_mode_marker), 1)
-        self.assertEqual(text.count(skip_eval_mark), 1)
-        self.assertEqual(text.count(skip_check_mark), 1)
-        self.assertIn(
-            'if [[ -d "${WORKSPACE_ROOT}/vendor/agent-canon" && -f "${WORKSPACE_ROOT}/.gitmodules" ]]; then',
-            text,
-        )
-        self.assertIn("AGENT_CANON_SOURCE_ROOT=\"${WORKSPACE_ROOT}/vendor/agent-canon\"", text)
+        self.assertNotIn("AGENT_CANON_REPOSITORY_MODE", text)
+        self.assertNotIn("vendor/agent-canon", text)
 
     def test_experiment_registry_gate_can_be_skipped(self) -> None:
         """The optional experiment gate has explicit parser and guard wiring."""
@@ -153,8 +102,9 @@ class RunAllChecksScriptTest(unittest.TestCase):
             ci_text,
         )
         self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY=delegated", pr_text)
-        self.assertIn('local owner="parent_ci"', pr_text)
-        self.assertIn('owner="agentcanon_project_ci"', pr_text)
+        self.assertIn(
+            "AGENT_CANON_PR_PROJECT_QUALITY_OWNER=agentcanon_project_ci", pr_text
+        )
         self.assertNotIn('bash "${CANON_TOOLS_ROOT}/ci/run_all_checks.sh"', pr_text)
         self.assertNotIn("PR_QUICK_CI_ARGS=", pr_text)
 
@@ -170,24 +120,23 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertIn("verify-child", text)
 
     def test_all_checks_installs_setup_cleanup_before_allocations(self) -> None:
-        """A rejected late override must not leave earlier setup directories."""
+        """Runtime setup is validated before external allocations."""
         text = SCRIPT.read_text(encoding="utf-8")
 
         trap_marker = "trap cleanup_run_all_checks_temp EXIT"
-        hook_allocation = (
-            'python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" ensure-dir \\\n'
-            '    --root "${WORKSPACE_ROOT}" \\\n'
-            '    --candidate "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"'
-        )
         self.assertIn(trap_marker, text)
-        self.assertIn(hook_allocation, text)
-        self.assertLess(text.index(trap_marker), text.index(hook_allocation))
-        self.assertIn("--purpose run-all-checks-setup-rollback", text)
+        self.assertIn("runtime_boundary_root()", text)
+        self.assertIn("runtime_boundary_path()", text)
+        self.assertIn('mkdir -p "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"', text)
+        self.assertNotIn('"${WORKSPACE_ROOT}/.agent-canon', text)
 
     def test_all_checks_removes_home_tools_defaults_for_cli_target(self) -> None:
         """CLI fallback should no longer infer target paths from HOME/.tools."""
         text = SCRIPT.read_text(encoding="utf-8")
-        self.assertIn('AGENT_CANON_CLI_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR:-${WORKSPACE_ROOT}/.agent-canon/cache/cargo-target}"', text)
+        self.assertIn('AGENT_CANON_CLI_TARGET_DIR="$(runtime_boundary_path', text)
+        self.assertIn('CARGO_TARGET_DIR="$(runtime_boundary_path', text)
+        self.assertIn('AGENT_CANON_RUNTIME_ROOT', text)
+        self.assertNotIn('${WORKSPACE_ROOT}/.agent-canon/cache/cargo-target', text)
         self.assertNotIn('${HOME}/.tools/agent-canon/cargo-target', text)
 
     def test_pr_gate_has_no_legacy_profile(self) -> None:
@@ -232,12 +181,12 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertNotIn(
             "submodule-pinned-commit-unreachable-from-configured-remote", pr_text
         )
-        self.assertIn("agentcanon_pr_submodule_snapshot", pr_text)
-        self.assertIn("AGENT_CANON_SUBMODULE_EVIDENCE=pass", pr_text)
-        self.assertIn("run_shared_surface_check", pr_text)
+        self.assertNotIn("agentcanon_pr_submodule_snapshot", pr_text)
+        self.assertNotIn("AGENT_CANON_SUBMODULE_EVIDENCE", pr_text)
+        self.assertNotIn("run_shared_surface_check", pr_text)
         self.assertIn("AGENT_CANON_PR_DEPENDENCY_SOURCE_GATE=not_required", pr_text)
-        self.assertIn("agentcanon_pr_branch_dirty", pr_text)
-        self.assertIn("AGENT_CANON_PR_LATEST_DIRTY_AGENTCANON_WORKTREE=yes", pr_text)
+        self.assertNotIn("agentcanon_pr_branch_dirty", pr_text)
+        self.assertNotIn("AGENT_CANON_PR_LATEST_DIRTY_AGENTCANON_WORKTREE=yes", pr_text)
         self.assertNotIn("deferred_branch_pr", pr_text)
 
     def test_pr_gate_delegates_profile_surface_and_diff_selection(self) -> None:
@@ -263,7 +212,7 @@ class RunAllChecksScriptTest(unittest.TestCase):
             "python_quality_runner=tools/ci/run_python_quality_checks.sh",
             pre_review_text,
         )
-        self.assertIn("exec-parent-bound", pre_review_text)
+        self.assertNotIn("exec-parent-bound", pre_review_text)
         self.assertIn("python_quality_args+=(--quick)", ci_text)
         self.assertIn("PYTHON_QUALITY_CHECKS=pass", quality_text)
         self.assertIn('PYTHON_SOURCE_PATHS+=("$candidate_path")', quality_text)

@@ -25,6 +25,7 @@ TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
 sys.path.insert(0, str(TOOLS_ROOT))
 
 import skill_shim_evaluation  # noqa: E402
+from skill_shim_materializer import build_context  # noqa: E402
 from skill_shim_evaluation import (  # noqa: E402
     ProducerError,
     _host_observation,
@@ -63,7 +64,10 @@ class SkillShimEvaluationTest(unittest.TestCase):
     def test_tokens_measurement_fixture_has_paired_rows(self) -> None:
         """The fresh host fixture has current/generated rows and no absent usage."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            output = Path(tmp_dir) / "measurement.json"
+            runtime_root = Path(tmp_dir) / "runtime"
+            output = runtime_root / "measurement.json"
+            environment = os.environ.copy()
+            environment["AGENT_CANON_RUNTIME_ROOT"] = str(runtime_root)
             result = subprocess.run(
                 [
                     sys.executable,
@@ -84,6 +88,7 @@ class SkillShimEvaluationTest(unittest.TestCase):
                     str(output),
                 ],
                 cwd=PROJECT_ROOT,
+                env=environment,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -92,9 +97,16 @@ class SkillShimEvaluationTest(unittest.TestCase):
             payload = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(payload["schema"], "agent_canon.skill_runtime_shim.measurement")
             self.assertEqual(payload["summary"]["scenario_row_count"], 12)
-            self.assertEqual(payload["summary"]["candidate_row_count"], 132)
+            context = build_context(PROJECT_ROOT)
+            self.assertEqual(
+                payload["summary"]["candidate_row_count"],
+                2 * len(context.skill_ids) + payload["summary"]["scenario_row_count"],
+            )
             self.assertEqual(payload["summary"]["deterministic_reduction_status"], "pass")
-            self.assertEqual(payload["summary"]["paired_reduction_row_count"], 66)
+            self.assertEqual(
+                payload["summary"]["paired_reduction_row_count"],
+                len(context.skill_ids) + payload["summary"]["scenario_row_count"] // 2,
+            )
             self.assertEqual(payload["summary"]["non_positive_reduction_row_count"], 0)
             self.assertEqual(
                 {row["variant"] for row in payload["candidate_rows"]},
@@ -102,8 +114,8 @@ class SkillShimEvaluationTest(unittest.TestCase):
             )
 
 
-def test_route_golden_uses_parent_temp_receipt() -> None:
-    """Route prompts are staged under one parent-owned temporary receipt."""
+def test_route_golden_uses_external_runtime_receipt(tmp_path: Path) -> None:
+    """Route prompts and output use one explicit external runtime receipt."""
     parent_root = PROJECT_ROOT
     cases = tuple(
         SimpleNamespace(case_id=f"case-{index:03d}", prompt=f"prompt-{index}")
@@ -114,18 +126,21 @@ def test_route_golden_uses_parent_temp_receipt() -> None:
         expected_generated_case_count=525,
         cases=cases,
     )
-    created: list[object] = []
-    original_create = skill_shim_evaluation.ParentRootSideEffectBoundary.create_parent_owned_temp_directory
+    runtime_root = tmp_path / "runtime"
+    output = runtime_root / "reports" / "route-golden.json"
+    source_tmp = parent_root / ".agent-canon" / "tmp"
+    source_tmp_before = (
+        tuple(sorted(path.relative_to(source_tmp) for path in source_tmp.rglob("*")))
+        if source_tmp.exists()
+        else ()
+    )
     original_run = subprocess.run
-
-    def capture_create(boundary, attestation, candidate, purpose, prefix):
-        receipt = original_create(boundary, attestation, candidate, purpose, prefix)
-        created.append(receipt)
-        return receipt
 
     def fake_run(args, **kwargs):
         command = list(args)
         if "--prompt-file" in command:
+            prompt_path = Path(command[command.index("--prompt-file") + 1])
+            assert prompt_path.is_relative_to(runtime_root)
             return subprocess.CompletedProcess(
                 args,
                 0,
@@ -135,29 +150,25 @@ def test_route_golden_uses_parent_temp_receipt() -> None:
         return original_run(args, **kwargs)
 
     with mock.patch.dict(
-        os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent_root)}
+        os.environ, {"AGENT_CANON_RUNTIME_ROOT": str(runtime_root)}, clear=False
     ), mock.patch.object(
         skill_shim_evaluation, "load_manifest", return_value=manifest
-    ), mock.patch.object(
-        skill_shim_evaluation.ParentRootSideEffectBoundary,
-        "create_parent_owned_temp_directory",
-        capture_create,
     ), mock.patch.object(skill_shim_evaluation.subprocess, "run", side_effect=fake_run):
-        output = Path(
-            os.environ.get(
-                "TMPDIR", str(parent_root / ".agent-canon" / "validation")
-            )
-        ) / "route-golden.json"
-        payload = route_golden(parent_root, parent_root / "manifest.toml", parent_root / "route.py", output)
+        payload = route_golden(
+            parent_root,
+            parent_root / "manifest.toml",
+            parent_root / "route.py",
+            output,
+        )
 
     assert payload["case_count"] == 525
-    assert len(created) == 1
-    assert not created[0].physical_path.exists()
-    boundary, attestation = skill_shim_evaluation._parent_capability("test-route-cleanup")
-    output_receipt = boundary.resolve_parent_owned_path(
-        attestation, output, "test-route-cleanup", create=False
+    assert output.is_file()
+    source_tmp_after = (
+        tuple(sorted(path.relative_to(source_tmp) for path in source_tmp.rglob("*")))
+        if source_tmp.exists()
+        else ()
     )
-    boundary.remove_parent_owned_file(output_receipt)
+    assert source_tmp_after == source_tmp_before
 
     def test_host_pairs_fail_closed_for_every_manifest_scenario(self) -> None:
         """Missing, duplicate, mismatched, and incomplete observations fail directly."""

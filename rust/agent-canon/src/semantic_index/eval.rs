@@ -17,7 +17,9 @@ use super::pipeline::build_index;
 use super::query::{score_nodes, search_index};
 use super::relations::{similar_pairs_from_nodes, SimilarPair};
 use super::report::scored_node_json;
-use super::storage::{load_nodes, open_cache_connection, resolve_provider_dim};
+use super::storage::{
+    load_nodes, open_cache_connection, resolve_provider_dim, validate_analysis_db,
+};
 use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::fs;
@@ -306,6 +308,7 @@ pub(super) fn eval_pairs(
 }
 
 pub(super) fn compare_providers(args: &CompareProvidersArgs) -> Result<Value, String> {
+    validate_analysis_db(&args.root, &args.db)?;
     let conn = open_cache_connection(&args.db)?;
     let left_dim =
         resolve_provider_dim(&conn, &args.left.provider, &args.left.model, args.left.dim)?;

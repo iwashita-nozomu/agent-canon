@@ -45,27 +45,23 @@ def test_host_runtime_blocks_repo_local_venv_creation(tmp_path: Path) -> None:
     parsed = parse_output(result.stdout)
     assert parsed["RUNTIME_ENV"] == "host"
     assert parsed["REPO_LOCAL_VENV_POLICY"] == "forbid"
-    assert parsed["REPO_LOCAL_VENV_ACTION"] == "blocked_host_runtime"
+    assert parsed["REPO_LOCAL_VENV_ACTION"] == "blocked_shared_runtime_policy"
     assert not (workspace_root / ".venv").exists()
 
 
-def test_container_runtime_creates_canonical_venv(tmp_path: Path) -> None:
-    """Container runtime should create the canonical .venv with system site packages."""
+def test_container_runtime_forbids_task_venv_creation(tmp_path: Path) -> None:
+    """Shared container runtime must not create a second mutable tool environment."""
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir()
 
     result = run_cli("--runtime", "container", "--workspace-root", str(workspace_root), "--create")
 
-    assert result.returncode == 0, result.stderr
+    assert result.returncode == 2, result.stderr
     parsed = parse_output(result.stdout)
-    venv_path = workspace_root / ".venv"
     assert parsed["RUNTIME_ENV"] == "container"
-    assert parsed["REPO_LOCAL_VENV_POLICY"] == "allow"
-    assert parsed["REPO_LOCAL_VENV_ACTION"] == "created"
-    assert parsed["REPO_LOCAL_VENV_EXISTS"] == "yes"
-    assert venv_path.is_dir()
-    pyvenv_cfg = (venv_path / "pyvenv.cfg").read_text(encoding="utf-8")
-    assert "include-system-site-packages = true" in pyvenv_cfg
+    assert parsed["REPO_LOCAL_VENV_POLICY"] == "forbid"
+    assert parsed["REPO_LOCAL_VENV_ACTION"] == "blocked_shared_runtime_policy"
+    assert not (workspace_root / ".venv").exists()
 
 
 def test_container_runtime_status_is_machine_readable_without_creation(tmp_path: Path) -> None:
@@ -78,7 +74,7 @@ def test_container_runtime_status_is_machine_readable_without_creation(tmp_path:
     assert result.returncode == 0, result.stderr
     parsed = parse_output(result.stdout)
     assert parsed["RUNTIME_ENV"] == "container"
-    assert parsed["REPO_LOCAL_VENV_POLICY"] == "allow"
+    assert parsed["REPO_LOCAL_VENV_POLICY"] == "forbid"
     assert parsed["REPO_LOCAL_VENV_ACTION"] == "not_requested"
     assert parsed["REPO_LOCAL_VENV_EXISTS"] == "no"
     assert "python" in parsed["REPO_LOCAL_VENV_CREATE_COMMAND"]

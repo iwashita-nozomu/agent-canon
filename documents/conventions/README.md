@@ -2,7 +2,6 @@
 @dependency-start
 contract policy
 responsibility Documents コーディング規約索引 for this repository.
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../rule/README.md document rule canon
 downstream design ./software-engineering-principles.md language- and paradigm-neutral engineering principles
 downstream design ./object-oriented-design.md OOP and SOLID specialization

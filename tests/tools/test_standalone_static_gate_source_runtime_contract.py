@@ -66,3 +66,22 @@ def test_eval_failure_evidence_is_filtered_before_temporary_cleanup() -> None:
     assert body.index("AGENT_CANON_STATIC_EVAL_FAILURE_LINES_BEGIN") < body.index(
         "return \"${primary_status}\""
     )
+
+
+def test_all_source_gate_entrypoints_require_distinct_control_and_runtime_roots() -> None:
+    """A source checkout cannot become either the control or runtime owner."""
+    source = (ROOT / "tools" / "ci" / "run_standalone_static_gate_unit.sh").read_text(
+        encoding="utf-8"
+    )
+    run_all = (ROOT / "tools" / "ci" / "run_all_checks.sh").read_text(
+        encoding="utf-8"
+    )
+    pr = (ROOT / "tools" / "ci" / "check_agent_canon_pr.sh").read_text(
+        encoding="utf-8"
+    )
+    for text in (source, run_all, pr):
+        assert "control_parent_root_required" in text
+        assert "runtime_root_required" in text
+        assert "control_parent_root_is_source" in text
+        assert "AGENT_CANON_PARENT_ROOT=\"${AGENT_CANON_CONTROL_PARENT_ROOT}\"" in text
+        assert "${RUNNER_TEMP:-${TMPDIR:-/tmp}}" not in text

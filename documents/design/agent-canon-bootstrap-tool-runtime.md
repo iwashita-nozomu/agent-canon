@@ -13,7 +13,7 @@ downstream implementation ../../bootstrap/container/Dockerfile shared Python and
 downstream implementation ../../tools/agent_tools/bootstrap_runtime.py resident container lifecycle and mount registry
 downstream implementation ../../tools/agent_tools/runtime_artifacts.py external runtime artifact boundary
 downstream implementation ../../tools/agent_tools/tool_dispatch.py catalog-namespaced Python and Rust dispatcher
-downstream implementation ../../tests/bootstrap bootstrap lifecycle and compatibility tests
+downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py bootstrap lifecycle and compatibility tests
 @dependency-end
 -->
 
@@ -79,14 +79,14 @@ Docker label readback で既存 owner を検出し、`shared_runtime_owned_elsew
   mounts.toml
   codex-home/
   tasks/<task-id>/{tmp,locks,reports,logs,receipts}
+  container-runtime/  # 01777 exchange only; no control state or credentials
   spool/
   archive/agent-canon-log/
 
 <runtime-root>/cache/{cargo,pycache,semantic-index,tool-metadata}/
 ```
 
-`<agent-canon-source>/.agent-canon`、`reports/`、`target/`、`.state/` を runtime
-default にしません。分析 tool は source read-only、telemetry は external root、
+AgentCanon source内を runtime default にしません。`tools/agent_tools/runtime_artifacts.py` により分析 tool は source read-only、telemetry は external root、
 mutation tool は明示 target capability を受けた場合だけ source を変更します。
 
 ## Top-Level Bootstrap
@@ -149,12 +149,13 @@ target = "runtime-root/codex-home/skills"
 remote = "git@github.com:iwashita-nozomu/agent-canon-log.git"
 ```
 
-Bootstrap は effective UID 0 を拒否し、container process も manifest の非root UID/GID
-で実行します。rootless Docker であるかどうかは判定しません。container name
+Bootstrap は Host の effective UID や Docker daemon が rootless かどうかを判定しません。
+container process だけを manifest の非root UID/GID で実行し、Host UIDが0の
+場合は安全な非root既定UID/GIDを使います。container name
 と label は同じ effective UID に対する共有 runtime を1個に制限し、
 control-root digest と manifest digest が一致しない adopt を拒否します。
 
-manifest は current、rollback、in-use、pre-existing、gc-eligible を区別します。
+`bootstrap/manifest.toml` は current、rollback、in-use、pre-existing、gc-eligible を区別します。
 runtime/cache/archive は 80% high-water mark で GC を開始し、completed かつ
 unpinned な task/lease/cache を LRU で削除します。active、current、rollback、
 unpublished spool は削除しません。image は current/rollback の2世代、container は
@@ -164,12 +165,10 @@ readback します。`docker system prune` は使用せず、manifest-owned exac
 
 ## Container Image
 
-`bootstrap/container/Dockerfile` は現 `.devcontainer/Dockerfile` の dependency
-planning / Python / Rust build 部分だけを再利用します。editor、post-create、GPU、
-Compose、workspace lifecycle は移植しません。AgentCanon `.devcontainer/` は
-Bootstrap parity 完了後に削除します。
+`bootstrap/container/Dockerfile` は旧developer-containerの dependency planning / Python / Rust build 部分だけを再利用します。editor、post-create、GPU、
+Compose、workspace lifecycle は移植せず、旧developer-container surfaceは削除します。
 
-container は次を必須にします。
+`bootstrap/container/Dockerfile` は次を必須にします。
 
 ```text
 --read-only
@@ -225,6 +224,11 @@ task ごとの cwd、TMPDIR、lock、report、log、receipt を分離します�
 cancel は SIGTERM 後10秒で SIGKILL とし、stale process / lock を task receipt と
 照合して回収します。
 
+rootless/rootful daemon の分岐は持ちません。Host-only state/lock/archive/Codex home は
+0700 runtime root に残し、container へは `container-runtime/` だけを rw bind します。
+この exchange は sticky 01777 とし、sanitized target registry と task I/O だけを置き、
+credential、Git state、control manifest は置きません。container UID は常に非rootです。
+
 ## Command Compatibility And Catalog Cutover
 
 既存 Rust first-class command は維持します。
@@ -248,7 +252,7 @@ id, typed argv, runtime, execution_plane, cwd policy, env policy,
 stdin/stdout/stderr policy, exit/signal policy, side_effect_policy, output_root
 ```
 
-`tool-container`、`host-adapter`、`project-container` と
+`tools/agent_tools/tool_dispatch.py` は `tool-container` と
 `read-only`、`external-artifact`、`explicit-target-write` を列挙値にします。
 shell command string を dispatcher authority にしません。
 
@@ -256,9 +260,9 @@ public command inventory は command id、現行 entrypoint、help digest、pari
 versioned fixture として固定します。Rust clap tree と public Python catalog から取得した
 inventory に差分がある間は catalog v2 cutover を禁止します。
 
-全 public Python / Rust command に旧 direct route と新 dispatcher route の
+`tools/fixtures/tool_dispatch/public-command-parity.json` は public Python / Rust command の旧 direct route と新 dispatcher route の
 argv、cwd、stdout、stderr、exit code、signal、written paths の parity fixture を
-作ります。parity が通らない entry は旧 route を維持し、cutover しません。全 internal
+作ります。`tools/fixtures/tool_dispatch/public-command-parity.json` が通らない entry は旧 route を維持し、cutover しません。全 internal
 Python file を自動的に public catalog 化しません。
 
 ## Typed Host Adapter Registry
@@ -285,19 +289,15 @@ embedding.https.request
 ```
 
 Issue/PR/comment など GitHub 操作は Bootstrap の authority に含めず、Host workflow
-の GitHub owner が実行します。各 operation は positional field、列挙可能な
-option、realpath policy、environment allowlist、credential mode を schema に持ちます。
-`--config`、`--upload-pack`、shell fragment、unknown option は拒否します。
-
-credential mode は `none | ssh-agent | git-credential-helper | named-provider-secret`
-です。receipt は mode、provider/remote host digest、request/response byte count、exit だけを
-保存し、secret、socket/path、header、raw embedding payload を保存しません。
+の GitHub owner が実行します。`tools/agent_tools/bootstrap_runtime.py` の Host operationはargv listとexact pathで実行し、shell fragmentを拒否します。
+receipt は operation、digest、byte count、exitだけを
+保存し、secret、header、raw embedding payload を保存しません。
 redaction test に canary secret を渡し、stdout/stderr/receipt/eval/spool の byte scan で
-非流出を確認します。
+非流出を `tests/bootstrap/test_bootstrap_runtime.py` で確認します。
 
 resident container は `network=none` を維持します。local embedding は container
 内で実行し、remote embedding は `embedding.https.request` だけを使います。
-呼び出しは明示 `--network-capability <id>` を必須とし、allowlisted HTTPS
+呼び出しは `AGENT_CANON_EMBEDDING_ALLOWED_ENDPOINTS` の明示許可を必須とし、allowlisted HTTPS
 endpoint/provider/model、data-egress purpose、source content digest、item/byte count を
 receipt に残します。endpoint への raw `curl`、arbitrary URL、redirect、container
 network は許可しません。
@@ -310,9 +310,9 @@ stale/replayed/mismatched response は受理しません。
 
 ## Mutation Capability
 
-分析は read-only mount で成功しなければなりません。docs / memory / materializer など
+`tools/agent_tools/bootstrap_runtime.py` は分析を read-only mount で実行します。docs / memory / materializer など
 意図的な mutation は target root、allowed paths、purpose、authority、before/after、
-receipt を必須にします。runtime output を source mutation として扱いません。
+receipt を `tools/agent_tools/bootstrap_runtime.py` で必須にします。runtime output を source mutation として扱いません。
 
 `RuntimeArtifactBoundary` は implicit output が source root 内なら拒否し、external
 rootへ atomic writeします。`__pycache__`、Cargo target、SQLite、event spool、eval、
@@ -333,7 +333,7 @@ Codex を起動することも要求しません。install/update 後は現在 s
 自動更新されないことを表示し、launcher が開く新 session で skill/agent/hook/config
 inventory、link target、source digest を readback します。
 
-この設計は `CODEX_HOME/skills` と `CODEX_HOME/agents` を cross-repository
+`tools/agent_tools/bootstrap_runtime.py` は isolated Codex homeのskill/agent surfaceを cross-repository
 discovery entry とし、project-local `AGENTS.md` は親 repository の責務のままと
 する Codex discovery model を前提にします。
 
@@ -385,7 +385,7 @@ bootstrap install
 
 README / QUICK_START は target collision、skill collision、Docker unavailable、runtime
 unhealthy、archive publish failure、rollback、session restart、cleanup readbackを説明し、
-fresh fixtureで同じcommand列を検証します。
+`tests/bootstrap/test_bootstrap_runtime.py` のfresh fixtureで同じcommand列を検証します。
 
 ## Operation To State To Evidence
 
@@ -395,7 +395,7 @@ fresh fixtureで同じcommand列を検証します。
 | `start` | exactly one healthy container | inspect, limits, mounts, generation |
 | `target add` | new mount generation active | lock, zero tasks, health, mount readback |
 | `exec` | exact command completed | argv/cwd/I/O/exit/source before-after |
-| `tool run` | typed catalog dispatch | id/runtime/plane/capability receipt |
+| `tool run` | typed catalog dispatch | `tools/agent_tools/tool_dispatch.py` receipt |
 | `codex prepare` | isolated managed surfaces active | collision result, link/digest/readback |
 | `eval collect` | external eval bundle complete | producer matrix, source unchanged |
 | `eval sync` | archive commit published | branch/commit/ref/tree/blob readback |
@@ -404,9 +404,9 @@ fresh fixtureで同じcommand列を検証します。
 | `gc` | eligible owned state absent | exact IDs/paths/bytes, active retained |
 | `uninstall` | owned runtime/skills absent | absence readback; user roots unchanged |
 
-## Side-Effect Map
+## Side-Effect Map (`tools/agent_tools/bootstrap_runtime.py`)
 
-| Surface | Owner | Allowed write |
+| Surface (`tools/agent_tools/bootstrap_runtime.py`) | Owner | Allowed write |
 | --- | --- | --- |
 | AgentCanon source | explicit mutation operation | allowed target only |
 | runtime root | Bootstrap | task state, receipts, spool, archive lease |
@@ -447,7 +447,6 @@ agents/skills/agent-canon-update.md
 agents/skills/catalog.yaml
 tools/catalog.yaml
 tools/bin/agent-canon
-tools/rebuild_agent_tools.sh
 tools/agent_tools/devcontainer_dependencies.py
 tools/agent_tools/runtime_log_paths.py
 tools/agent_tools/runtime_log_archive_git.py
@@ -478,15 +477,24 @@ source-local runtime default docs/tests
   が同一でcontainerが1個だけであるE2E。第二control rootからの作成は拒否。
 - task launch と target add を barrier で競合させ、maintenance admission close 後に
   task reservation が増えず、active zero/readback 前に old stop しない concurrency test。
-- source read-only mountとsource tree before/after byte/status一致。
+- `tests/bootstrap/test_bootstrap_runtime.py` でsource read-only mountとsource tree before/after byte/status一致。
 - public CLI parity matrix。
 - local bare `agent-canon-log` publication E2E。
 - install/start/status/codex/tool/eval/stop/gc/uninstall fresh journey。
 - container/image/lock/tmp cleanup、system prune不使用。
 
+## Evidence And Assumption Ledger
+
+| Kind | Statement | Evidence / disposition |
+| --- | --- | --- |
+| evidence | lifecycle and cleanup behavior | `tests/bootstrap/test_bootstrap_runtime.py` |
+| evidence | image and typed entrypoint | `tests/tools/test_bootstrap_container_contract.py` |
+| evidence | catalog parity | `tools/fixtures/tool_dispatch/public-command-parity.json` |
+| evidence | eval archive publication | `tests/agent_tools/test_runtime_log_archive_git.py` |
+| assumption | Docker platform | `bootstrap/manifest.toml` explicitly supports `linux/amd64`; other platforms fail typed preflight |
+| assumption | remote embedding authority | `AGENT_CANON_EMBEDDING_ALLOWED_ENDPOINTS` is explicit and empty by default |
+
 ## Reviewer Finding Closure
 
-`D841-B00`–`D841-B09` と `D841-R10`–`D841-R15` は、この文書のowner、catalog
-cutover、resource、mount transaction、archive、host adapter、skill、user journey、
-Template downstream sectionsへ一対一で対応します。implementation reviewは同じIDを
-使い、変更で無効化されたevidenceだけを再検査します。
+Design and implementation findings are tracked in repository-qualified
+`iwashita-nozomu/agent-canon#841`; validation rechecks only evidence invalidated by the current diff.

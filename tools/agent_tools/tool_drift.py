@@ -410,28 +410,14 @@ CONTRACTS = (
         ),
     ),
     ToolContract(
-        name="container_config",
-        tool="tools/ci/container_config.py",
+        name="bootstrap_container_runtime",
+        tool="tools/agent_tools/bootstrap_runtime.py",
         links=(
-            LinkCheck("documents/conventions/coding-conventions-project.md"),
-            LinkCheck("agents/skills/environment-maintenance.md"),
-            LinkCheck("tools/docker_dependency_validator.sh"),
-            LinkCheck("tools/ci/container_runtime.py"),
-            LinkCheck("tools/ci/run_container_pack.py"),
+            LinkCheck("bootstrap/container/Dockerfile"),
+            LinkCheck("tests/tools/test_bootstrap_container_contract.py"),
+            LinkCheck("tests/bootstrap/test_bootstrap_runtime.py"),
             LinkCheck("tools/ci/run_all_checks.sh"),
-            LinkCheck("tests/tools/test_container_config.py"),
-        ),
-        text_checks=(
-            TextCheck(
-                "agents/skills/environment-maintenance.md",
-                "tools/ci/container_config.py",
-                "missing-container-config-validator",
-            ),
-            TextCheck(
-                "documents/tools/README.md",
-                "tools/ci/container_config.py",
-                "missing-container-config-entrypoint",
-            ),
+            LinkCheck("agents/skills/environment-maintenance.md"),
         ),
     ),
 )
@@ -714,10 +700,6 @@ def projected_runtime_snippet(root: Path, snippet: str) -> str:
     return (
         snippet.replace("tools/agent_tools/", "tools/agent-canon/agent_tools/")
         .replace("tools/ci/", "tools/agent-canon/ci/")
-        .replace("tools/sync_agent_canon.sh", "tools/agent-canon/sync_agent_canon.sh")
-        .replace(
-            "tools/update_agent_canon.sh", "tools/agent-canon/update_agent_canon.sh"
-        )
     )
 
 

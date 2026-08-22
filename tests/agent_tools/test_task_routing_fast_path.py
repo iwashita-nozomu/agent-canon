@@ -82,23 +82,22 @@ class TaskRoutingFastPathTest(unittest.TestCase):
     def test_contract_defers_decision_sufficiency_until_implementation(self) -> None:
         """The skill contract must not reintroduce a pre-routing packet."""
         text = TASK_ROUTING.read_text(encoding="utf-8")
-        command = text.split("## Standard Command", 1)[1].split("## Outputs", 1)[0]
-        outputs = text.split("## Outputs", 1)[1].split("## Activation Boundary", 1)[0]
-        normalized = " ".join(command.split())
+        normalized = " ".join(text.split())
 
         self.assertIn(
             "Ordinary routing does not require a Decision Sufficiency packet",
             normalized,
         )
         self.assertIn(
-            "high-risk or genuinely ambiguous implementation work", normalized
+            "high-risk or genuinely ambiguous implementation owners may invoke",
+            normalized,
         )
         self.assertNotIn(
             "Consume the semantic decision-sufficiency record before selecting a route",
-            normalized,
+            text,
         )
-        self.assertNotIn("DECISION_SUFFICIENCY_PACKET_REF", outputs)
-        self.assertNotIn("owner-produced semantic sufficiency fields", outputs)
+        self.assertNotIn("DECISION_SUFFICIENCY_PACKET_REF", text)
+        self.assertNotIn("owner-produced semantic sufficiency fields", text)
 
 
 if __name__ == "__main__":

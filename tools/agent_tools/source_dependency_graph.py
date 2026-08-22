@@ -4,7 +4,6 @@
 # responsibility Derives dependency graph query, review, and context projections directly from tracked source manifests.
 # upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL and path semantics
 # upstream design ../../documents/design/source-owned-dependency-validation.md tracked source authority boundary
-# upstream implementation ./surface_manifest.py resolves canonical parent projection bindings
 # downstream implementation ./graph_client.py exposes source-derived dependency query and context compatibility
 # downstream implementation ./check_dependency_graph.sh validates source-derived relations and writes review artifacts
 # downstream implementation ../../tests/agent_tools/test_graph_client_source_projection.py validates no-runtime projections
@@ -22,11 +21,6 @@ from collections import defaultdict, deque
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-
-try:
-    from .surface_manifest import load_manifest
-except ImportError:  # pragma: no cover - direct CLI import
-    from surface_manifest import load_manifest
 
 HEADER_SCAN_LINES = 80
 MANIFEST_FIELD_COUNT = 4
@@ -64,11 +58,8 @@ SKIPPED_PREFIXES = (
     ".pytest_cache/",
     ".ruff_cache/",
     "reports/",
-    "vendor/agent-canon/.agent-canon/log-archive/",
-    "vendor/agent-canon/reports/",
 )
 RAW_NVIDIA_FIXTURE_PREFIX = "tests/fixtures/nvidia/"
-SURFACE_MANIFEST = Path("documents/runtime/shared-runtime-surfaces.toml")
 
 
 class SourceDependencyError(RuntimeError):
@@ -177,12 +168,9 @@ def _git_files(root: Path) -> tuple[str, ...]:
 
 
 def source_paths(root: Path) -> tuple[str, ...]:
-    """Return deterministic tracked source paths, including a vendored canon checkout."""
+    """Return deterministic tracked source paths for the selected checkout."""
     root = root.resolve()
     paths = set(_git_files(root))
-    vendor_root = root / "vendor" / "agent-canon"
-    if vendor_root.is_dir():
-        paths.update(f"vendor/agent-canon/{path}" for path in _git_files(vendor_root))
     if not paths:
         paths.update(
             repo_relative(root, path)
@@ -202,53 +190,12 @@ def is_text_source(path: str) -> bool:
     return Path(normalized).suffix.lower() in TEXT_SUFFIXES
 
 
-def _surface_bindings(root: Path) -> tuple[tuple[str, str], ...]:
-    """Return canonical source bindings for generated/copied parent views."""
-    vendor_root = root / "vendor" / "agent-canon"
-    manifest = vendor_root / SURFACE_MANIFEST
-    if not manifest.is_file():
-        return ()
-    try:
-        surface_manifest = load_manifest(
-            root, "vendor/agent-canon", SURFACE_MANIFEST.as_posix()
-        )
-    except (OSError, ValueError) as error:
-        raise SourceDependencyError(f"surface manifest snapshot unavailable: {error}") from error
-    prefix = surface_manifest.prefix
-    entries = surface_manifest.entries
-    projected = (root / prefix).is_dir() and (root / ".git").exists()
-    bindings: list[tuple[str, str]] = []
-    for entry in entries:
-        if entry.mode not in {"symlink", "copy"}:
-            continue
-        source = entry.source_or_default()
-        target = (Path(prefix) / source).as_posix() if projected else source
-        bindings.append((entry.path, target))
-    return tuple(sorted(bindings, key=lambda item: (-len(item[0]), item[0], item[1])))
-
-
-def resolve_surface_binding(relative: str, bindings: Sequence[tuple[str, str]]) -> str:
-    """Map one parent view to its canonical source by deterministic longest prefix."""
-    for view, target in bindings:
-        if relative == view or relative.startswith(f"{view}/"):
-            return f"{target}{relative[len(view):]}"
-    return relative
-
-
 def resolve_source_path(
     root: Path,
     relative: str,
-    bindings: Sequence[tuple[str, str]],
 ) -> tuple[str, Path]:
-    """Return canonical relative and physical source paths."""
+    """Return repository-relative and physical source paths."""
     normalized = relative.replace("\\", "/").removeprefix("./")
-    canonical = resolve_surface_binding(normalized, bindings)
-    candidate_path = root / canonical
-    if not candidate_path.is_symlink():
-        candidate = candidate_path.resolve(strict=False)
-        repo_relative(root, candidate)
-        if candidate.is_file():
-            return canonical, candidate
     direct_path = root / normalized
     if direct_path.is_symlink():
         raise SourceDependencyError(f"source path is a symbolic link: {normalized}")
@@ -280,10 +227,9 @@ def _normalize_target(root: Path, source: Path, raw_target: str) -> str:
 def parse_manifest_document(
     root: Path,
     relative: str,
-    bindings: Sequence[tuple[str, str]],
 ) -> SourceDependencyDocument:
     """Parse one canonical source document with the strict dependency DSL."""
-    canonical, source = resolve_source_path(root, relative, bindings)
+    canonical, source = resolve_source_path(root, relative)
     text = _read_text(source, canonical)
     in_manifest = False
     saw_start = False
@@ -350,33 +296,31 @@ def parse_manifest_document(
 def parse_manifest_edges(
     root: Path,
     relative: str,
-    bindings: Sequence[tuple[str, str]],
 ) -> tuple[SourceDependencyEdge, ...]:
     """Return the normalized dependency edges for one source document."""
-    return parse_manifest_document(root, relative, bindings).edges
+    return parse_manifest_document(root, relative).edges
 
 
 def dependency_documents(root: Path) -> tuple[SourceDependencyDocument, ...]:
     """Return every unique canonical text document and manifest projection."""
     root = root.resolve()
-    bindings = _surface_bindings(root)
     documents: list[SourceDependencyDocument] = []
     canonical_sources: set[str] = set()
     for relative in source_paths(root):
         if not is_text_source(relative):
             continue
-        canonical = resolve_surface_binding(relative, bindings)
+        canonical = relative
         if canonical in canonical_sources:
             continue
         try:
-            canonical_relative, source = resolve_source_path(root, relative, bindings)
+            canonical_relative, source = resolve_source_path(root, relative)
         except SourceDependencyError:
             # Git links, deleted paths, and unavailable generated views are not text sources.
             continue
         if canonical_relative in canonical_sources or source.is_symlink():
             continue
         canonical_sources.add(canonical_relative)
-        documents.append(parse_manifest_document(root, canonical_relative, ()))
+        documents.append(parse_manifest_document(root, canonical_relative))
     return tuple(sorted(documents))
 
 
@@ -494,8 +438,7 @@ def build_context_projection(
     if depth < 0:
         raise SourceDependencyError("context depth must be non-negative")
     root = root.resolve()
-    bindings = _surface_bindings(root)
-    resolved_path, source = resolve_source_path(root, path, bindings)
+    resolved_path, source = resolve_source_path(root, path)
     text = _read_text(source, resolved_path)
     edges = dependency_edges(root)
     outgoing, incoming = _dependency_indexes(edges)

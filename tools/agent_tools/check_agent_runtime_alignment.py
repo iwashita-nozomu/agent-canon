@@ -337,6 +337,23 @@ def resolve_packet_probe_workspace() -> Path:
     return ROOT.resolve()
 
 
+@contextmanager
+def packet_probe_runtime_root():
+    """Yield an external runtime root for packet-only validation artifacts.
+
+    Alignment is a source-tree check.  Its synthetic report bundle is useful
+    only while validating packet paths and must therefore never default to a
+    ``reports/`` directory below AgentCanon itself.  A caller may provide the
+    normal runtime root; otherwise use one short-lived system temporary root.
+    """
+    configured = os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
+    if configured:
+        yield Path(configured).expanduser().resolve()
+        return
+    with tempfile.TemporaryDirectory(prefix="agent-canon-runtime-alignment-") as root:
+        yield Path(root).resolve()
+
+
 def ensure(condition: bool, message: str) -> None:
     """Raise when one expected condition is not met."""
     if not condition:
@@ -889,38 +906,39 @@ def validate_team_config_references() -> None:
         ensure(rule_role in role_ids, f"activation rule references unknown role: {rule_role}")
 
     packet_probe_workspace = resolve_packet_probe_workspace()
-    packet_probe_report_dir = ROOT / "reports" / "agents" / "_packet_probe"
-    for entry in resolve_cross_cutting_document_packet(
-        packet_probe_workspace,
-        ROOT,
-    ):
-        ensure(entry.path.exists(), f"cross-cutting document packet path missing: {entry.path}")
-    for role in config.always_on_roles + config.specialist_roles:
-        packet = resolve_role_document_packet(
-            config=config,
-            role=role,
-            report_dir=packet_probe_report_dir,
-            workspace_root=packet_probe_workspace,
-            active_design_packet=active_design_packet,
-            agentcanon_source_root=ROOT,
-        )
-        for entry in packet.read_before_work:
-            ensure(
-                "#" not in str(entry.path),
-                f"{role.id} document packet path must not encode sections: {entry.path}",
+    with packet_probe_runtime_root() as packet_probe_runtime:
+        packet_probe_report_dir = packet_probe_runtime / "reports" / "agents" / "_packet_probe"
+        for entry in resolve_cross_cutting_document_packet(
+            packet_probe_workspace,
+            ROOT,
+        ):
+            ensure(entry.path.exists(), f"cross-cutting document packet path missing: {entry.path}")
+        for role in config.always_on_roles + config.specialist_roles:
+            packet = resolve_role_document_packet(
+                config=config,
+                role=role,
+                report_dir=packet_probe_report_dir,
+                workspace_root=packet_probe_workspace,
+                active_design_packet=active_design_packet,
+                agentcanon_source_root=ROOT,
             )
-            if "/reports/agents/_packet_probe/" in str(entry.path):
-                continue
-            ensure(entry.path.exists(), f"{role.id} document packet path missing: {entry.path}")
-            for section in entry.sections:
+            for entry in packet.read_before_work:
                 ensure(
-                    bool(section.heading),
-                    f"{role.id} document packet section missing heading: {entry.path}",
+                    "#" not in str(entry.path),
+                    f"{role.id} document packet path must not encode sections: {entry.path}",
                 )
-                ensure(
-                    bool(section.anchor),
-                    f"{role.id} document packet section missing anchor: {entry.path}",
-                )
+                if "/reports/agents/_packet_probe/" in str(entry.path):
+                    continue
+                ensure(entry.path.exists(), f"{role.id} document packet path missing: {entry.path}")
+                for section in entry.sections:
+                    ensure(
+                        bool(section.heading),
+                        f"{role.id} document packet section missing heading: {entry.path}",
+                    )
+                    ensure(
+                        bool(section.anchor),
+                        f"{role.id} document packet section missing anchor: {entry.path}",
+                    )
 
 
 def validate_task_catalog_references() -> None:

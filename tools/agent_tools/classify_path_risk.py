@@ -30,7 +30,7 @@ class PathRisk:
 
 DOC_SUFFIXES = {".md", ".rst", ".txt"}
 PYTHON_SUFFIXES = {".py", ".pyi"}
-DOCKER_PREFIXES = ("docker/", ".devcontainer/")
+CONTAINER_PREFIXES = ("docker/", "bootstrap/")
 GITHUB_PREFIXES = (".github/",)
 EVAL_PREFIXES = ("agents/evals/", "evidence/agent-evals/", "reports/agent-runtime-dashboard/")
 RUST_PREFIXES = ("rust/",)
@@ -86,9 +86,10 @@ def classify(paths: tuple[str, ...]) -> tuple[PathRisk, ...]:
             "PYTHONPATH=tools/agent_tools python3 -m pyright <changed-python-paths>",
             "python3 -m pytest -q <targeted-tests>",
         )))
-    if any(path.startswith(DOCKER_PREFIXES) for path in paths):
-        active.append(PathRisk("docker-devcontainer", "docker_or_devcontainer_surface_changed", (
-            "python3 tools/ci/container_config.py --root .",
+    if any(path.startswith(CONTAINER_PREFIXES) for path in paths):
+        active.append(PathRisk("container-runtime", "container_runtime_surface_changed", (
+            "python3 -m pytest -q tests/tools/test_bootstrap_container_contract.py",
+            "python3 -m pytest -q tests/bootstrap/test_bootstrap_runtime.py",
         )))
     if any(path.startswith(GITHUB_PREFIXES) for path in paths):
         active.append(PathRisk("github-automation", "github_surface_changed", (
@@ -121,7 +122,7 @@ def select_static_gate_units(paths: tuple[str, ...], *, full_confidence: bool = 
         selected.append("contracts")
     if "agent-eval" in profiles:
         selected.append("eval")
-    if profiles & {"github-automation", "docker-devcontainer"}:
+    if profiles & {"github-automation", "container-runtime"}:
         selected.append("workflow-container")
     if paths and not selected:
         selected.append("contracts")

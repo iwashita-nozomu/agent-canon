@@ -33,11 +33,13 @@ directory に近い file ほど後に結合され、広い guidance を局所的
 この文書は legacy adapter であり、Codex が常に自動で読む runtime instruction
 surface ではありません。
 
-Template / derived repo root から Codex を開始した場合、`/AGENTS.md` runtime
-view が `vendor/agent-canon/ROOT_AGENTS.md` を読み込みます。AgentCanon source
-checkout 内を current working directory として開始した場合、この tree の
-`AGENTS.md` が standalone source-tree entrypoint になります。`.github/AGENTS.md`
-は `.github/` subtree に入ったときの overlay です。
+Parent root から Codex を開始した場合、parent の self-contained
+`AGENTS.md` が instruction entrypoint です。AgentCanon source checkout 内を
+current working directory として開始した場合、この tree の `AGENTS.md` が
+standalone source-tree entrypoint になります。必要な AgentCanon tool runtime は
+qualified source clone の `bootstrap.sh` と明示 runtime root から起動し、親へ
+instruction view を投影しません。`.github/AGENTS.md` は `.github/` subtree に
+入ったときの parent overlay です。
 
 Skills は repository instruction chain とは別 surface です。Codex は skill
 metadata で候補を選び、選択後に該当 `SKILL.md` を読みます。hook、rules、MCP、

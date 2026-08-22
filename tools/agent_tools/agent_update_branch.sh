@@ -8,12 +8,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-SUPERPROJECT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-superproject-working-tree 2>/dev/null || true)"
-if [ -n "$SUPERPROJECT_DIR" ]; then
-  ROOT_DIR="$SUPERPROJECT_DIR"
-else
-  ROOT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
-fi
+ROOT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 BASE_REF="${AGENT_UPDATE_BASE_REF:-origin/main}"
 
 usage() {
@@ -50,9 +45,7 @@ path_allowed() {
       return 1
       ;;
     canon-pin)
-      [[ "$path" == .gitmodules ]] && return 0
       [[ "$path" == .agent-canon/* ]] && return 0
-      [[ "$path" == vendor/agent-canon ]] && return 0
       [[ "$path" == AGENTS.md ]] && return 0
       [[ "$path" == .agents || "$path" == agents ]] && return 0
       [[ "$path" == .codex/* || "$path" == .github/* ]] && return 0

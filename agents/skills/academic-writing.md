@@ -110,7 +110,7 @@ python3 tools/agent_tools/doc_start.py \
 ## TeX Output Boundary
 
 - TeX は `$academic-writing` の既定出力 route です。PDF-ready な学術文章、数式密度の高い manuscript、TikZ / standalone 図版、または reviewer に渡す図表を作るときに使います。
-- TeX toolchain は devcontainer の `.devcontainer/post-create.sh` が用意します。必要な command は `latexmk`、`pdflatex`、`xelatex`、`dvisvgm`、`pdfcrop` です。
+- TeX toolchain は実行対象 project の明示された環境で用意します。AgentCanon source は `.devcontainer` を提供せず、必要なときは親 project の Docker/test 環境または明示された host toolchain を使います。
 - 生成物は原則 run bundle や ignored output directory に置き、tracked tree には canonical `.tex` source と、ユーザーが要求した final artifact だけを残します。
 - TeX を一般の `$long-form-writing`、workflow guide、migration doc、ordinary report の既定 route にしません。それらはユーザーが明示した場合だけ TeX を使います。
 

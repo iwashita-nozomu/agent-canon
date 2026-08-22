@@ -7,7 +7,6 @@ upstream design ../../agents/skills/structure-refactor.md structure-first repair
 upstream design ../../agents/skills/refactor-loop.md behavior-preserving refactor execution route
 upstream design ../../agents/skills/agent-orchestration.md routing, dispatch, and review ownership
 upstream design ../../agents/skills/task-routing.md compact skill/tool route selection
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md source, view, generated, and personal boundary
 downstream implementation ../../agents/skills/responsibility-cleanup.md public responsibility cleanup route
 downstream implementation ../../agents/skills/environment-cleanup.md environment cleanup route
 downstream implementation ../../agents/skills/code-cleanup.md code cleanup route

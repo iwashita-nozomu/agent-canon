@@ -13,15 +13,10 @@ Use this skill when agent-runtime updates should not be mixed into ordinary feat
 ## Lanes
 
 - `memory-eval`: updates durable agent memory, eval manifests, eval result artifacts, and skill prompt feedback.
-- `canon-pin`: updates the `vendor/agent-canon` submodule pin, `.agent-canon/update-state.toml`, `.gitmodules`, and root AgentCanon link/copy views.
 - `integration`: merges one or more `agent-updates/*` branches into an integration branch before `main`.
 
-`canon-pin` is a parent-repo pin lane only. AgentCanon source edits, local
-`vendor/agent-canon` commits, prompt/skill/tool source changes, and update-route
-repairs move through `$agent-canon-update` and a standalone AgentCanon
-branch/PR first. After that PR lands, the parent repo uses
-`make agent-canon-ensure-latest` and root-view sync to advance the pin. See
-`documents/agent-canon/agent-canon-update-route.md`.
+AgentCanon source/runtime changes are not an update-branch lane. They move
+through `$agent-canon-update` and the standalone AgentCanon source PR workflow.
 
 This skill does not authorize a new branch when the current parent branch
 already owns the same lane. Continue the existing branch / PR for added user

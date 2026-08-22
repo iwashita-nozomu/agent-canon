@@ -2,7 +2,6 @@
 @dependency-start
 contract policy
 responsibility Documents 文書および識別子の命名規約。
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ./README.md document rule canon index
 downstream implementation ../../tools/agent_tools/check_convention_compliance.py convention validation
 downstream implementation ../../tools/agent_tools/check_log_helper_names.py log helper naming validation

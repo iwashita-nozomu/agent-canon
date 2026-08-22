@@ -43,7 +43,7 @@ root, workflow, or Skill policy for visibility.
 | design-to-implementation correspondence | `agents/internal-routines/design-implementation-correspondence.md` |
 | repository structure and responsibility boundaries | `agents/skills/structure-refactor.md`, `documents/structure/repo-structure-contract.toml` |
 | branch, worktree, and destructive Git safety | `agents/skills/worktree-health.md`, `agents/canonical/CODEX_WORKFLOW.md`, `.codex/hooks/` |
-| AgentCanon update and projection transaction | `agents/skills/agent-canon-update.md`, `documents/agent-canon/agent-canon-update-route.md` |
+| AgentCanon source update and publication | `agents/skills/agent-canon-update.md`, `agents/workflows/agent-canon-pr-workflow.md` |
 | subagent activation and handoff | `agents/skills/agent-orchestration.md`, `agents/skills/subagent-bootstrap.md`, `agents/canonical/CODEX_SUBAGENTS.md` |
 | validation profile and closeout | `documents/runtime/runtime-profiles-and-check-matrix.md`, `agents/canonical/CODEX_WORKFLOW.md`, `tools/agent_tools/task_close.py` |
 | GitHub Issue / PR publication and status | `agents/skills/pr-processing.md`, `agents/internal-routines/github-status-lifecycle.md` |
@@ -66,10 +66,10 @@ here.
 
 | Responsibility | Canonical owner | Validation / reader route |
 | --- | --- | --- |
-| root runtime entrypoint | `ROOT_AGENTS.md` | `PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check` |
+| root runtime entrypoint | `bootstrap.sh` | `bash bootstrap.sh --help` |
 | workflow family, spawn budget, role topology | `agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |
 | public skill registry | `agents/skills/catalog.yaml` | `check_agent_runtime_alignment.py` |
-| AgentCanon update transaction | `documents/agent-canon/agent-canon-update-route.md` | `update_lifecycle_contract.py` |
+| AgentCanon source publication | `agents/workflows/agent-canon-pr-workflow.md` | repository-topic-clone and PR checks |
 | entrypoint responsibility grammar | `documents/design/entrypoint-owner-map.md` | `check_entrypoint_owner_map.py` |
 | implementation decision precedence | `documents/conventions/software-engineering-principles.md` | task-specific Skill and review evidence |
 

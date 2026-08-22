@@ -25,20 +25,16 @@ from pathlib import Path
 from typing import TypeAlias, cast
 
 try:
-    from .parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
+    from .runtime_artifacts import (  # type: ignore[no-redef]
+        RuntimeArtifactBoundary,
+        root_capability_environment,
+        runtime_artifact_boundary,
     )
 except ImportError:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
+    from runtime_artifacts import (  # type: ignore[no-redef]
+        RuntimeArtifactBoundary,
+        root_capability_environment,
+        runtime_artifact_boundary,
     )
 
 SCHEMA = "agent_canon.git_dependency_diff_summary.v1"
@@ -142,6 +138,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--report-dir",
         default="",
         help="Directory for generated artifacts. Defaults to a temp directory.",
+    )
+    parser.add_argument(
+        "--runtime-root",
+        type=Path,
+        help="Explicit external runtime root for dependency-diff artifacts.",
     )
     parser.add_argument(
         "--format",
@@ -391,22 +392,13 @@ def code_scan_paths(root: Path, rows: Sequence[ChangedPath]) -> list[str]:
     return sorted(set(candidates))
 
 
-def write_text(path: Path, text: str) -> Path:
+def write_text(
+    path: Path,
+    text: str,
+    boundary: RuntimeArtifactBoundary,
+) -> Path:
     """Write UTF-8 text and return the path."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if configured:
-        parent = Path(configured).resolve(strict=True)
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="dependency-diff")
-        )
-        ParentRootSideEffectBoundary().write_parent_owned_file(
-            attestation, path, text.encode("utf-8"), "dependency-diff"
-        )
-        return path
-    raise ParentRootSideEffectError(
-        ParentRootReject.HANDOFF_INVALID,
-        "dependency-diff: explicit parent root is required",
-    )
+    return boundary.atomic_write_text(path, text)
 
 
 def run_capture(
@@ -415,13 +407,15 @@ def run_capture(
     command: list[str],
     stdout_path: Path,
     stderr_path: Path,
+    boundary: RuntimeArtifactBoundary,
+    env: dict[str, str],
 ) -> CommandRecord:
     """Run one command and capture stdout/stderr artifacts."""
     result = subprocess.run(
-        command, cwd=root, check=False, capture_output=True, text=True
+        command, cwd=root, check=False, capture_output=True, text=True, env=env
     )
-    write_text(stdout_path, result.stdout)
-    write_text(stderr_path, result.stderr)
+    write_text(stdout_path, result.stdout, boundary)
+    write_text(stderr_path, result.stderr, boundary)
     return CommandRecord(
         command=command,
         returncode=result.returncode,
@@ -516,16 +510,21 @@ def diff_spec_from_args(args: argparse.Namespace) -> DiffSpec:
     return DiffSpec(base=args.base, head=args.head, paths=tuple(args.paths))
 
 
-def write_diff_artifacts(root: Path, report_dir: Path, diff: DiffSpec) -> DiffArtifacts:
+def write_diff_artifacts(
+    root: Path,
+    report_dir: Path,
+    diff: DiffSpec,
+    boundary: RuntimeArtifactBoundary,
+) -> DiffArtifacts:
     """Write Git diff artifacts before dependency expansion."""
     rows = collect_changed_paths(root, diff=diff)
     changed_paths = changed_file_list(rows)
     changed_files_path = write_text(
-        report_dir / "changed_files.txt", "\n".join(changed_paths) + "\n"
+        report_dir / "changed_files.txt", "\n".join(changed_paths) + "\n", boundary
     )
     git_stat_path = write_text(
         report_dir / "git_stat.txt",
-        git_stdout(root, ["diff", "--stat", *git_diff_args(diff)]),
+        git_stdout(root, ["diff", "--stat", *git_diff_args(diff)]), boundary
     )
     return DiffArtifacts(
         rows=rows,
@@ -540,6 +539,8 @@ def run_code_dependency_scan(
     report_dir: Path,
     rows: Sequence[ChangedPath],
     skip: bool,
+    boundary: RuntimeArtifactBoundary,
+    env: dict[str, str],
 ) -> tuple[Path, CommandMap, int]:
     """Run the existing code dependency scanner when source files changed."""
     code_dependencies_path = report_dir / "code_dependencies.tsv"
@@ -547,8 +548,8 @@ def run_code_dependency_scan(
     commands: CommandMap = {}
     status_code = 0
     if skip:
-        write_text(code_dependencies_path, "")
-        write_text(code_analysis_path, json.dumps({"schema_version": "agent-canon.lsp-code-analysis.v1", "status": "skipped"}) + "\n")
+        write_text(code_dependencies_path, "", boundary)
+        write_text(code_analysis_path, json.dumps({"schema_version": "agent-canon.lsp-code-analysis.v1", "status": "skipped"}) + "\n", boundary)
     else:
         scan_paths = code_scan_paths(root, rows)
         if scan_paths:
@@ -565,12 +566,14 @@ def run_code_dependency_scan(
                 ],
                 stdout_path=code_dependencies_path,
                 stderr_path=report_dir / "code_dependencies.stderr.txt",
+                boundary=boundary,
+                env=env,
             )
             commands["code_dependencies"] = asdict(record)
             status_code = max(status_code, record.returncode)
         else:
-            write_text(code_dependencies_path, "")
-            write_text(code_analysis_path, json.dumps({"schema_version": "agent-canon.lsp-code-analysis.v1", "status": "empty"}) + "\n")
+            write_text(code_dependencies_path, "", boundary)
+            write_text(code_analysis_path, json.dumps({"schema_version": "agent-canon.lsp-code-analysis.v1", "status": "empty"}) + "\n", boundary)
     return code_dependencies_path, commands, status_code
 
 
@@ -582,14 +585,16 @@ def run_dependency_review(
     changed_files_path: Path,
     skip: bool,
     strict: bool,
+    boundary: RuntimeArtifactBoundary,
+    env: dict[str, str],
 ) -> tuple[CommandMap, int]:
     """Run the existing dependency-header review wrapper."""
     commands: CommandMap = {}
     status_code = 0
     if skip:
         dependency_dir.mkdir(parents=True, exist_ok=True)
-        write_text(dependency_dir / "dependency_graph.tsv", "")
-        write_text(dependency_dir / "dependency_edit_scope.txt", "")
+        write_text(dependency_dir / "dependency_graph.tsv", "", boundary)
+        write_text(dependency_dir / "dependency_edit_scope.txt", "", boundary)
     else:
         command = [
             "bash",
@@ -608,6 +613,8 @@ def run_dependency_review(
             command=command,
             stdout_path=report_dir / "dependency_review.stdout.txt",
             stderr_path=report_dir / "dependency_review.stderr.txt",
+            boundary=boundary,
+            env=env,
         )
         commands["dependency_review"] = asdict(record)
         status_code = max(status_code, record.returncode)
@@ -621,6 +628,7 @@ def build_summary(
     diff: DiffSpec,
     diff_artifacts: DiffArtifacts,
     dependency_artifacts: DependencyArtifacts,
+    boundary: RuntimeArtifactBoundary,
 ) -> Summary:
     """Build the JSON-serializable summary payload."""
     rows = diff_artifacts.rows
@@ -664,13 +672,13 @@ def build_summary(
         "commands": dependency_artifacts.commands,
     }
     summary_json = write_text(
-        report_dir / "summary.json", json.dumps(summary, indent=2) + "\n"
+        report_dir / "summary.json", json.dumps(summary, indent=2) + "\n", boundary
     )
-    summary_markdown = write_text(report_dir / "summary.md", render_markdown(summary))
+    summary_markdown = write_text(report_dir / "summary.md", render_markdown(summary), boundary)
     summary["artifacts"]["summary_json"] = summary_json.as_posix()
     summary["artifacts"]["summary_markdown"] = summary_markdown.as_posix()
-    write_text(summary_json, json.dumps(summary, indent=2) + "\n")
-    write_text(summary_markdown, render_markdown(summary))
+    write_text(summary_json, json.dumps(summary, indent=2) + "\n", boundary)
+    write_text(summary_markdown, render_markdown(summary), boundary)
     return summary
 
 
@@ -700,49 +708,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         root = Path(str(args.root)).resolve()
+        boundary = runtime_artifact_boundary(root, args.runtime_root, create=True)
         if args.report_dir:
-            report_dir = Path(args.report_dir)
+            report_dir = boundary.resolve(Path(args.report_dir))
         else:
-            configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-            if configured:
-                parent = Path(configured).resolve(strict=True)
-                attestation = attest_parent_root(
-                    ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="dependency-diff-temp")
-                )
-                base = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
-                    attestation, parent / ".agent-canon" / "tmp" / "dependency-diff", "dependency-diff-temp"
-                )
-                report_dir = Path(tempfile.mkdtemp(prefix="agent-canon-git-dependency-diff-", dir=base.physical_path))
-            else:
-                raise ParentRootSideEffectError(
-                    ParentRootReject.HANDOFF_INVALID,
-                    "dependency-diff-temp: explicit parent root is required",
-                )
-        configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-        if not configured:
-            raise ParentRootSideEffectError(
-                ParentRootReject.HANDOFF_INVALID,
-                "dependency-diff-output: explicit parent root is required",
-            )
-        parent = Path(configured).resolve(strict=True)
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(
-                cwd=parent,
-                explicit_root=parent,
-                purpose="dependency-diff-output",
-            )
+            report_dir = boundary.ensure_directory(Path("tasks") / "dependency-diff")
+            report_dir = Path(tempfile.mkdtemp(prefix="run-", dir=str(report_dir)))
+        env = root_capability_environment(
+            source_root=root,
+            runtime_root=boundary.root,
+            target_root=root,
         )
-        report_dir = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
-            attestation, report_dir, "dependency-diff-output"
-        ).physical_path
+        env["AGENT_CANON_CONTROL_PARENT_ROOT"] = str(root)
         dependency_dir = report_dir / "dependency-review"
         diff = diff_spec_from_args(args)
-        diff_artifacts = write_diff_artifacts(root, report_dir, diff)
+        diff_artifacts = write_diff_artifacts(root, report_dir, diff, boundary)
         code_path, code_commands, code_status = run_code_dependency_scan(
             root=root,
             report_dir=report_dir,
             rows=diff_artifacts.rows,
             skip=args.skip_code_dependencies,
+            boundary=boundary,
+            env=env,
         )
         code_analysis_path = report_dir / "code_analysis.json"
         dependency_commands, dependency_status = run_dependency_review(
@@ -752,6 +739,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             changed_files_path=diff_artifacts.changed_files_path,
             skip=args.skip_dependency_review,
             strict=args.strict_dependency_review,
+            boundary=boundary,
+            env=env,
         )
         status = max(code_status, dependency_status)
         dependency_artifacts = DependencyArtifacts(
@@ -767,6 +756,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             diff=diff,
             diff_artifacts=diff_artifacts,
             dependency_artifacts=dependency_artifacts,
+            boundary=boundary,
         )
     except Exception as exc:  # pragma: no cover - defensive CLI boundary
         print(
@@ -776,7 +766,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     payload = emit(summary, args.format)
     if args.output:
-        write_text(args.output, payload)
+        write_text(args.output, payload, boundary)
     print(payload, end="")
     return status
 

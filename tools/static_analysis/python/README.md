@@ -16,12 +16,10 @@ Python review uses existing canonical tools rather than parallel wrappers.
 Default commands:
 
 ```bash
-python3 tools/agent_tools/check_static_any.py --submodule-aware
-python3 tools/agent_tools/check_log_helper_names.py --changed
-python3 tools/oop/python/readability.py --format markdown python tools tests
+./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> \
+  exec --root <target> -- python3 \
+  /usr/local/share/agent-canon/runtime/tools/agent_tools/check_static_any.py
 ```
 
-For template roots with `vendor/agent-canon` as a submodule, prefer
-`--submodule-aware` where available. Use `--root-only` when checking only the
-template product surface and `--agentcanon-only` when checking the shared canon
-source.
+Select either the standalone AgentCanon source or one project target before
+running these checks. The tool does not discover a second repository.

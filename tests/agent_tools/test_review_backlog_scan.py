@@ -31,13 +31,14 @@ class ReviewBacklogScanTest(unittest.TestCase):
             subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
             fixture_tools = root / "tools" / "agent_tools"
             fixture_tools.mkdir(parents=True)
-            for tool_name in ("file_surface_inventory.py", "surface_manifest.py"):
+            for tool_name in ("file_surface_inventory.py",):
                 shutil.copy2(
                     PROJECT_ROOT / "tools" / "agent_tools" / tool_name,
                     fixture_tools / tool_name,
                 )
-            report_dir = root / "reports"
-            configured_target = root / ".agent-canon" / "cache" / "cargo-target"
+            runtime = root.parent / "runtime"
+            report_dir = runtime / "reports"
+            configured_target = runtime / "cargo-target"
             result = subprocess.run(
                 [
                     "bash",
@@ -45,7 +46,7 @@ class ReviewBacklogScanTest(unittest.TestCase):
                     "--root",
                     str(root),
                     "--report-dir",
-                    str(report_dir),
+                    "reports",
                     "--root-only",
                     "--check",
                     "inventory",
@@ -56,7 +57,8 @@ class ReviewBacklogScanTest(unittest.TestCase):
                 text=True,
                 env={
                     **os.environ,
-                    "AGENT_CANON_PARENT_ROOT": str(root.parent / "untrusted-parent"),
+                    "AGENT_CANON_RUNTIME_ROOT": str(runtime),
+                    "AGENT_CANON_CONTROL_PARENT_ROOT": str(root.parent),
                     "AGENT_CANON_REVIEW_SCAN_TARGET_DIR": str(configured_target),
                 },
             )
@@ -72,13 +74,15 @@ class ReviewBacklogScanTest(unittest.TestCase):
     def test_stale_search_excludes_git_paths(self) -> None:
         """The stale search should not read .git object databases."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
+            root = Path(tmp_dir) / "parent"
+            root.mkdir()
             git_object = root / ".git" / "objects" / "aa" / "leak.txt"
             git_object.parent.mkdir(parents=True)
             git_object.write_text("subtree legacy format\n", encoding="utf-8")
             (root / "README.md").write_text("# Clean\n", encoding="utf-8")
             subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
-            report_dir = root / "reports"
+            runtime = root.parent / "runtime"
+            report_dir = runtime / "reports"
 
             result = subprocess.run(
                 [
@@ -87,7 +91,7 @@ class ReviewBacklogScanTest(unittest.TestCase):
                     "--root",
                     str(root),
                     "--report-dir",
-                    str(report_dir),
+                    "reports",
                     "--root-only",
                     "--check",
                     "stale",
@@ -96,6 +100,11 @@ class ReviewBacklogScanTest(unittest.TestCase):
                 check=False,
                 capture_output=True,
                 text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_RUNTIME_ROOT": str(runtime),
+                    "AGENT_CANON_CONTROL_PARENT_ROOT": str(root.parent),
+                },
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -107,9 +116,11 @@ class ReviewBacklogScanTest(unittest.TestCase):
 
     def test_review_target_override_rejects_outside_without_side_effect(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
+            root = Path(tmp_dir) / "parent"
+            root.mkdir()
             subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
-            report_dir = root / "reports"
+            runtime = root.parent / "runtime"
+            report_dir = runtime / "reports"
             outside_target = root.parent / "outside-review-target"
             result = subprocess.run(
                 [
@@ -118,7 +129,7 @@ class ReviewBacklogScanTest(unittest.TestCase):
                     "--root",
                     str(root),
                     "--report-dir",
-                    str(report_dir),
+                    "reports",
                     "--root-only",
                     "--check",
                     "inventory",
@@ -129,19 +140,23 @@ class ReviewBacklogScanTest(unittest.TestCase):
                 text=True,
                 env={
                     **os.environ,
+                    "AGENT_CANON_RUNTIME_ROOT": str(runtime),
+                    "AGENT_CANON_CONTROL_PARENT_ROOT": str(root.parent),
                     "AGENT_CANON_REVIEW_SCAN_TARGET_DIR": str(outside_target),
                 },
             )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("PARENT_ROOT_SIDE_EFFECT_ERROR", result.stderr)
+            self.assertIn("runtime path invalid", result.stderr)
             self.assertFalse(outside_target.exists())
             self.assertFalse(report_dir.exists())
 
     def test_semantic_index_check_writes_review_artifacts(self) -> None:
         """Semantic review check should write merge, thin-doc, and search JSONL."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            fake_bin = root / "fake-bin"
+            root = Path(tmp_dir) / "parent"
+            root.mkdir()
+            runtime = root.parent / "runtime"
+            fake_bin = runtime / "fake-bin"
             docs = root / "documents"
             docs.mkdir()
             subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
@@ -155,51 +170,31 @@ class ReviewBacklogScanTest(unittest.TestCase):
             (docs / "two.md").write_text(repeated, encoding="utf-8")
             query = root / "query.txt"
             query.write_text("semantic review responsibility candidate", encoding="utf-8")
-            report_dir = root / "reports"
-            fake_bin.mkdir()
+            report_dir = runtime / "reports"
+            fake_bin.mkdir(parents=True)
             stale_agent_canon = fake_bin / "agent-canon"
             stale_agent_canon.write_text(
                 "#!/usr/bin/env bash\n"
-                "if [ \"$1\" = 'semantic-index' ] && [ \"$2\" = 'help' ]; then\n"
-                "  echo 'usage: agent-canon semantic-index <build|search|similar|merge-candidates|thin-docs|eval>'\n"
-                "  exit 0\n"
-                "fi\n"
-                "echo stale agent-canon should not be selected >&2\n"
-                "exit 2\n",
-                encoding="utf-8",
-            )
-            stale_agent_canon.chmod(0o755)
-            fake_cargo = fake_bin / "cargo"
-            fake_cargo.write_text(
-                "#!/usr/bin/env bash\n"
                 "set -eu\n"
-                "while [ \"$#\" -gt 0 ] && [ \"$1\" != '--' ]; do shift; done\n"
-                "shift\n"
                 "case \"$1 $2\" in\n"
                 "  'semantic-index build')\n"
                 "    while [ \"$#\" -gt 0 ]; do\n"
                 "      if [ \"$1\" = '--db' ]; then : >\"$2\"; exit 0; fi\n"
                 "      shift\n"
                 "    done ;;\n"
-                "  'semantic-index merge-candidates')\n"
-                "    printf '%s\\n' '{\"semantic_index_pairs\":[],\"candidate_bucket\":[],\"responsibility_bucket\":[]}' ;;\n"
+                "  'semantic-index merge-candidates') printf '%s\\n' '{\"semantic_index_pairs\":[],\"candidate_bucket\":[],\"responsibility_bucket\":[]}' ;;\n"
                 "  'semantic-index thin-docs') printf '%s\\n' '{\"thin_docs\":[]}' ;;\n"
                 "  'semantic-index search') printf '%s\\n' '{\"query_chars\":42}' ;;\n"
                 "  'semantic-index eval-output')\n"
                 "    while [ \"$#\" -gt 0 ]; do\n"
-                "      if [ \"$1\" = '--report' ]; then\n"
-                "        printf '%s\\n' '{\"semantic_index_output_eval\":\"pass\"}' >\"$2\"\n"
-                "        printf '%s\\n' 'SEMANTIC_INDEX_OUTPUT_EVAL=pass'\n"
-                "        exit 0\n"
-                "      fi\n"
+                "      if [ \"$1\" = '--report' ]; then printf '%s\\n' '{\"semantic_index_output_eval\":\"pass\"}' >\"$2\"; printf '%s\\n' 'SEMANTIC_INDEX_OUTPUT_EVAL=pass'; exit 0; fi\n"
                 "      shift\n"
                 "    done ;;\n"
                 "esac\n"
                 "exit 2\n",
                 encoding="utf-8",
             )
-            fake_cargo.chmod(0o755)
-
+            stale_agent_canon.chmod(0o755)
             result = subprocess.run(
                 [
                     "bash",
@@ -207,7 +202,7 @@ class ReviewBacklogScanTest(unittest.TestCase):
                     "--root",
                     str(root),
                     "--report-dir",
-                    str(report_dir),
+                    "reports",
                     "--root-only",
                     "--check",
                     "semantic-index",
@@ -224,8 +219,10 @@ class ReviewBacklogScanTest(unittest.TestCase):
                 text=True,
                 env={
                     **os.environ,
-                    "AGENT_CANON_REVIEW_SCAN_TARGET_DIR": str(root / "cargo-target"),
-                    "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+                    "AGENT_CANON_RUNTIME_ROOT": str(runtime),
+                    "AGENT_CANON_CONTROL_PARENT_ROOT": str(root.parent),
+                    "AGENT_CANON_CLI": str(stale_agent_canon),
+                    "AGENT_CANON_REVIEW_SCAN_TARGET_DIR": "cargo-target",
                 },
             )
 
@@ -265,7 +262,7 @@ class ReviewBacklogScanTest(unittest.TestCase):
                 report_dir / "semantic_index_output_eval_root.txt"
             ).read_text(encoding="utf-8")
             self.assertIn("SEMANTIC_INDEX_OUTPUT_EVAL=pass", output_eval_summary)
-            self.assertTrue((root / "cargo-target").is_dir())
+            self.assertTrue((runtime / "cargo-target").is_dir())
 
 
 if __name__ == "__main__":

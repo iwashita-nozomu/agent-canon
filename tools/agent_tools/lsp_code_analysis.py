@@ -12,7 +12,7 @@
 
 The adapter intentionally owns only a single analysis request.  It does not
 maintain an index or discover servers from the host PATH: callers provide an
-exact command (or use the language map installed by the devcontainer
+exact command (or use the language map installed by the shared tool-runtime
 manifest).  The wire implementation is deliberately boring so fake servers
 can exercise it in unit tests.
 """
@@ -38,6 +38,10 @@ from typing import Any
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from tools.agent_tools import vector_search
+from tools.agent_tools.runtime_artifacts import (
+    RuntimeArtifactError,
+    runtime_artifact_boundary,
+)
 
 SCHEMA_VERSION = "agent-canon.lsp-code-analysis.v1"
 LSP_VERSION = "3.17"
@@ -48,6 +52,7 @@ DEFAULT_MAX_HEADER_BYTES = 64 * 1024
 IMAGE_RECEIPT_ROOT = Path(
     "/usr/local/share/agent-canon/image-dependencies/receipts"
 )
+IMAGE_MANIFEST_ROOT = Path("/usr/local/share/agent-canon/runtime")
 
 
 class LspAnalysisError(RuntimeError):
@@ -216,27 +221,49 @@ class LspServerSpec:
             repo_root = Path(__file__).resolve().parents[2]
             if str(repo_root) not in sys.path:
                 sys.path.insert(0, str(repo_root))
-            from tools.agent_tools.devcontainer_dependencies import (
+            from tools.agent_tools.dependency_plan import (
                 DependencyError,
                 resolve_verified_executable,
             )
         except ImportError as exc:  # pragma: no cover - direct isolated invocation
             raise ServerUnavailable("manifest dependency resolver is unavailable") from exc
         workspace = root.resolve()
-        vendor = vendor_root or (workspace / "vendor" / "agent-canon")
+        # ``vendor_root`` remains an API-compatible argument for old callers,
+        # but the standalone runtime never infers a vendor checkout from an
+        # analysis target. The manifest is selected from the runtime/image or
+        # an explicit environment override and is always read-only.
+        del vendor_root
+        manifest_override = os.environ.get("AGENT_CANON_DEPENDENCY_MANIFEST", "").strip()
+        if manifest_override:
+            manifest = Path(manifest_override).expanduser().resolve()
+        else:
+            source_manifest = repo_root / "bootstrap" / "container" / "dependencies.toml"
+            image_manifest = IMAGE_MANIFEST_ROOT / "dependencies.toml"
+            manifest = source_manifest if source_manifest.is_file() else image_manifest
+        if not manifest.is_file():
+            raise ServerUnavailable(
+                "shared tool dependency manifest is unavailable; start bootstrap.sh"
+            )
         if receipts is not None:
             receipt_root = receipts
         elif IMAGE_RECEIPT_ROOT.is_dir():
             receipt_root = IMAGE_RECEIPT_ROOT
         else:
-            receipt_root = workspace / ".agent-canon" / "dependency-receipts"
+            configured_receipts = os.environ.get(
+                "AGENT_CANON_DEPENDENCY_RECEIPTS", ""
+            ).strip()
+            if not configured_receipts:
+                raise ServerUnavailable(
+                    "shared tool dependency receipts are unavailable; start bootstrap.sh"
+                )
+            receipt_root = Path(configured_receipts).expanduser().resolve()
         try:
             verified = resolve_verified_executable(
-                workspace,
-                vendor if vendor.is_dir() else None,
+                manifest.parent.parent.parent,
                 receipt_root,
                 LANGUAGE_RECORDS[language_id],
                 command[0],
+                manifest=manifest,
             )
         except (DependencyError, OSError, ValueError) as exc:
             raise ServerUnavailable(
@@ -1321,23 +1348,19 @@ def _legacy_lines(report: CodeAnalysisReport, root: Path, *, print_unresolved: b
     return lines
 
 
-def _write_report_atomic(report: CodeAnalysisReport, root: Path, destination: Path) -> None:
-    """Persist either complete or failed report before emitting legacy status."""
-    destination = destination if destination.is_absolute() else root / destination
-    destination = destination.resolve(strict=False)
-    try:
-        destination.relative_to(root.resolve())
-    except ValueError as exc:
-        raise PathEscape(
-            f"analysis report destination escapes selected root: {destination}"
-        ) from exc
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destination.with_name(destination.name + ".tmp")
-    temporary.write_text(
-        json.dumps(report.as_json(root), ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    temporary.replace(destination)
+def _write_report_atomic(
+    report: CodeAnalysisReport,
+    root: Path,
+    destination: Path,
+    runtime_root: Path | None,
+) -> None:
+    """Persist a report only through the explicit external runtime boundary."""
+    boundary = runtime_artifact_boundary(root, runtime_root, create=True)
+    destination = boundary.resolve(destination)
+    payload = (
+        json.dumps(report.as_json(root), ensure_ascii=False, indent=2) + "\n"
+    ).encode("utf-8")
+    boundary.atomic_write_bytes(destination, payload)
 
 
 def _lexical_only_report(root: Path, files: Sequence[Path]) -> CodeAnalysisReport:
@@ -1387,6 +1410,7 @@ def build_parser() -> argparse.ArgumentParser:
             sub.add_argument("--print-unresolved", action="store_true", help="Retained legacy flag; unresolved candidates are emitted.")
             sub.add_argument("--paths-file", type=Path, default=None)
             sub.add_argument("--analysis-json", type=Path, default=None)
+            sub.add_argument("--runtime-root", type=Path, default=None)
             sub.add_argument("--lexical-only", action="store_true")
     return parser
 
@@ -1432,7 +1456,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         report = _failed_report(root, (), error, {})
     if args.command == "scan-legacy":
         if args.analysis_json is not None:
-            _write_report_atomic(report, root, args.analysis_json)
+            try:
+                _write_report_atomic(
+                    report, root, args.analysis_json, args.runtime_root
+                )
+            except RuntimeArtifactError as exc:
+                print(f"LSP_ANALYSIS=fail\nLSP_ANALYSIS_ERROR={exc}", file=sys.stderr)
+                return 2
         lines = _legacy_lines(report, root, print_unresolved=bool(args.print_unresolved))
         if report.status != "complete":
             print(f"AGENT_SCAN=fail\t{report.error or {}}", file=sys.stderr)

@@ -158,25 +158,31 @@ class ResponsibilityScopeTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("scope_overlap:tools/evidence.py:scopes:fixture,evidence", result.stdout)
 
-    def test_starter_manifest_partitions_parent_tools_from_agent_canon_view(self) -> None:
-        """Keep only active AgentCanon views in the starter runtime scope."""
+    def test_starter_manifest_keeps_parent_paths_source_free(self) -> None:
+        """The starter manifest must not require a vendor or root projection."""
         data = tomllib.loads(STARTER_MANIFEST.read_text(encoding="utf-8"))
         scopes = {str(raw["id"]): scope_from_mapping(raw) for raw in data["scope"]}
-        agent_canon = scopes["agent-canon-runtime-view"]
         parent = scopes["parent-repo-active-contract"]
         durable = scopes["project-durable-state"]
+
+        self.assertNotIn("agent-canon-runtime-view", scopes)
+        starter_text = STARTER_MANIFEST.read_text(encoding="utf-8")
+        self.assertNotIn("vendor/agent-canon", starter_text)
+        self.assertNotIn("tools/agent-canon", starter_text)
 
         ownership = {
             path: tuple(
                 scope.scope_id
-                for scope in (agent_canon, parent, durable)
+                for scope in (parent, durable)
                 if scope_covers(scope, path)
             )
             for path in (
-                "tools/agent-canon/sync_agent_canon.sh",
+                "AGENTS.md",
+                "bootstrap.sh",
                 "tools/project_check.py",
                 "tools/team/local.sh",
                 ".codex/config.toml",
+                ".codex/agents/local.toml",
                 "agents/skills/local.md",
                 ".agents/skills/local.md",
                 ".devcontainer/devcontainer.json",
@@ -185,10 +191,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
             )
         }
 
-        self.assertEqual(
-            ownership["tools/agent-canon/sync_agent_canon.sh"],
-            ("agent-canon-runtime-view",),
-        )
+        self.assertEqual(ownership["bootstrap.sh"], ("parent-repo-active-contract",))
         self.assertEqual(
             ownership["tools/project_check.py"],
             ("parent-repo-active-contract",),
@@ -197,8 +200,10 @@ class ResponsibilityScopeTest(unittest.TestCase):
             ownership["tools/team/local.sh"],
             ("parent-repo-active-contract",),
         )
-        self.assertEqual(ownership[".codex/config.toml"], ("agent-canon-runtime-view",))
         for path in (
+            "AGENTS.md",
+            ".codex/config.toml",
+            ".codex/agents/local.toml",
             "agents/skills/local.md",
             ".agents/skills/local.md",
             ".devcontainer/devcontainer.json",

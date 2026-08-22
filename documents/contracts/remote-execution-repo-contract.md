@@ -2,7 +2,6 @@
 @dependency-start
 contract reference
 responsibility Documents Remote Execution Repo Contract for this repository.
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 @dependency-end
 -->
 

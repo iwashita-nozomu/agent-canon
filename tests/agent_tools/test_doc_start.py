@@ -8,19 +8,18 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
-import os
 from pathlib import Path
 
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DOC_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "doc_start.py"
-TEST_PARENT_ROOT = PROJECT_ROOT.parents[2]
-TEST_TEMP_ROOT = TEST_PARENT_ROOT / ".agent-canon" / "tmp"
+TEST_TEMP_ROOT = Path(tempfile.gettempdir())
 
 
 class DocStartTest(unittest.TestCase):
@@ -55,7 +54,15 @@ class DocStartTest(unittest.TestCase):
                     str(workspace_root),
                 ],
                 cwd=PROJECT_ROOT,
-                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
+                env={
+                    key: value
+                    for key, value in os.environ.items()
+                    if key
+                    not in {
+                        "AGENT_CANON_RUNTIME_ROOT",
+                        "AGENT_CANON_CONTROL_PARENT_ROOT",
+                    }
+                },
                 check=False,
                 capture_output=True,
                 text=True,
@@ -115,7 +122,15 @@ class DocStartTest(unittest.TestCase):
                     str(workspace_root),
                 ],
                 cwd=PROJECT_ROOT,
-                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
+                env={
+                    key: value
+                    for key, value in os.environ.items()
+                    if key
+                    not in {
+                        "AGENT_CANON_RUNTIME_ROOT",
+                        "AGENT_CANON_CONTROL_PARENT_ROOT",
+                    }
+                },
                 check=False,
                 capture_output=True,
                 text=True,

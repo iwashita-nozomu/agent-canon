@@ -59,9 +59,9 @@ legacy subtree wording is unrelated to tool import disposition.
 | `scripts/jsonl_to_md.sh` | `tools/data/jsonl_to_md.py` | Reimplemented as Python CLI for testability. |
 | `scripts/hlo/summarize_hlo_jsonl.py` | `tools/hlo/summarize_hlo_jsonl.py` | Promoted as HLO JSONL summary helper. |
 | `scripts/tools/create_design_template.py` | `tools/docs/create_design_template.py` | Promoted as design-doc helper. |
-| `scripts/tools/find_redundant_designs.py` | `tools/docs/find_redundant_designs.py` | Promoted as document consolidation helper. |
-| `scripts/tools/find_similar_designs.py` | `tools/docs/find_similar_designs.py` | Promoted as design similarity helper. |
-| `scripts/tools/organize_designs.py` | `tools/docs/organize_designs.py` | Promoted as conservative design organization helper. |
+| `scripts/tools/find_redundant_designs.py` | `tools/docs/find_redundant_designs.py` | Promoted as an external-runtime document consolidation helper; deletion requires an explicit mutation capability. |
+| `scripts/tools/find_similar_designs.py` | `tools/docs/find_similar_designs.py` | Promoted as an external-runtime design similarity helper. |
+| `scripts/tools/organize_designs.py` | `tools/docs/organize_designs.py` | Promoted as a read-only organization planner; source apply requires an explicit mutation capability. |
 | `scripts/tools/tfidf_similar_docs.py` | `tools/docs/tfidf_similar_docs.py` | Promoted as dependency-free similarity helper. |
 | `scripts/read_conventions.sh` and `scripts/view_conventions.sh` | `tools/oop/python/rule_inventory.py`, `tools/oop/cpp/rule_inventory.py` | Reimplemented as repo-neutral, language-specific OOP rule inventories instead of project-root convention viewers. |
 | `scripts/restructure_code_review_skill.py` | Source repository only | Not promoted because it rewrites one historical skill layout. AgentCanon legacy tool storage is retired. |

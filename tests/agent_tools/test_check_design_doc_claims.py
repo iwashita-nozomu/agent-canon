@@ -47,8 +47,140 @@ def write(path: Path, text: str) -> None:
     path.write_text(textwrap.dedent(text).lstrip(), encoding="utf-8")
 
 
+def git(root: Path, *args: str) -> None:
+    """Run one Git operation in a fixture repository."""
+    subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True, text=True)
+
+
+def init_git(root: Path) -> None:
+    """Create a deterministic Git baseline for changed-scope fixtures."""
+    git(root, "init", "-q")
+    git(root, "config", "user.email", "fixture@example.invalid")
+    git(root, "config", "user.name", "Fixture")
+
+
 class DesignDocClaimCheckerTest(unittest.TestCase):
     """Exercise deterministic design claim checks."""
+
+    def test_github_issue_reference_is_not_an_implementation_token(self) -> None:
+        """Issue/PR references are routing evidence, not source symbols."""
+        self.assertEqual(
+            graph_claim_checker.checkable_tokens(
+                "Track implementation in `iwashita-nozomu/agent-canon#821`."
+            ),
+            (),
+        )
+
+    def test_changed_scope_keeps_active_claims_and_ignores_retired_history_and_tables(self) -> None:
+        """Changed mode gates only new active implementation claims."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write(
+                root / "documents/design/active.md",
+                """
+                # Active Design
+                <!--
+                @dependency-start
+                contract design
+                responsibility Documents active fixture.
+                downstream implementation ../../tools/runner.py runner evidence
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: `tools/runner.py`.
+                - Assumptions: the active implementation owns the route.
+
+                ## Claims
+
+                - The design must route through `old_missing_symbol`.
+                """,
+            )
+            write(
+                root / "documents/design/retired.md",
+                """
+                # Retired: old design
+                <!--
+                @dependency-start
+                contract design
+                responsibility Retired fixture redirect.
+                downstream implementation ../../tools/runner.py old evidence
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: `tools/runner.py`.
+                - Assumptions: this route is historical only.
+
+                The former design must use `retired_old_symbol`.
+                """,
+            )
+            write(
+                root / "documents/design/historical.md",
+                """
+                # Historical: old design
+                <!--
+                @dependency-start
+                contract design
+                responsibility Documents historical fixture.
+                downstream implementation ../../tools/runner.py old evidence
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: `tools/runner.py`.
+                - Assumptions: this route is historical only.
+
+                The historical design must use `historical_old_symbol`.
+                """,
+            )
+            write(
+                root / "documents/design/evidence-table.md",
+                """
+                # Evidence Table Design
+                <!--
+                @dependency-start
+                contract design
+                responsibility Documents evidence-table fixture.
+                downstream implementation ../../tools/runner.py table evidence
+                @dependency-end
+                -->
+
+                ## Evidence And Assumption Ledger
+
+                - Evidence sources: `tools/runner.py`.
+                - Assumptions: table rows are fixed evidence records.
+
+                | Kind | Evidence |
+                | --- | --- |
+                | existing | `run_feature` |
+                """,
+            )
+            write(root / "tools/runner.py", "def run_feature() -> None:\n    pass\n")
+            init_git(root)
+            git(root, "add", ".")
+            git(root, "commit", "-qm", "fixture baseline")
+
+            with (root / "documents/design/active.md").open("a", encoding="utf-8") as stream:
+                stream.write("\n- The design must route through `run_feature`.\n")
+            with (root / "documents/design/retired.md").open("a", encoding="utf-8") as stream:
+                stream.write("\n- The retired route must use `retired_new_symbol`.\n")
+            with (root / "documents/design/historical.md").open("a", encoding="utf-8") as stream:
+                stream.write("\n- The historical route must use `historical_new_symbol`.\n")
+            with (root / "documents/design/evidence-table.md").open("a", encoding="utf-8") as stream:
+                stream.write("\n| new | `unknown_generated_label` |\n")
+
+            selected = graph_claim_checker.changed_design_paths(root)
+            self.assertEqual(selected, ("documents/design/active.md",))
+            result = run_checker("--changed", root=root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DESIGN_DOC_CLAIMS_DOCUMENTS=1", result.stdout)
+            self.assertIn("DESIGN_DOC_CLAIMS_CHECKED=1", result.stdout)
+            self.assertIn("DESIGN_DOC_CLAIMS_FINDINGS=0", result.stdout)
 
     def test_pass_claim_supported_by_direct_implementation_evidence(self) -> None:
         """A design claim passes when dependency evidence contains the token."""
@@ -568,7 +700,12 @@ class DesignDocClaimCheckerTest(unittest.TestCase):
                 """,
             )
 
-            result = run_checker("documents/design/child.md", root=root)
+            result = run_checker(
+                "--recursive-depth",
+                "2",
+                "documents/design/child.md",
+                root=root,
+            )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)

@@ -1490,15 +1490,6 @@ fn check_bootstrap_docs(root: &Path) -> Vec<Finding> {
         if !path.is_file() {
             continue;
         }
-        let skip_stale = *relative == "documents/contracts/template-bootstrap.md"
-            && path.is_symlink()
-            && path
-                .canonicalize()
-                .map(|resolved| {
-                    let text = resolved.to_string_lossy();
-                    text.contains("/vendor/") && text.contains("/agent-canon/")
-                })
-                .unwrap_or(false);
         let Ok(text) = fs::read_to_string(&path) else {
             continue;
         };
@@ -1512,7 +1503,7 @@ fn check_bootstrap_docs(root: &Path) -> Vec<Finding> {
                         .to_string(),
                 });
             }
-            if !check_stale || skip_stale {
+            if !check_stale {
                 continue;
             }
             for stale in DERIVED_REPO_STALE_STRINGS {
@@ -2161,9 +2152,6 @@ fn json_escape(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(unix)]
-    use std::os::unix::fs::symlink;
-
     #[test]
     fn formats_mermeid_fence_and_reserved_graph_node() {
         let source = "```mermeid\ngraph[SQLite graph]\ngraph --> class\n```\n";
@@ -2252,88 +2240,25 @@ mod tests {
     }
 
     #[test]
-    fn resolves_root_view_relative_links_from_canonical_parent_paths() {
+    fn resolves_relative_links_from_standalone_source_paths() {
         let workspace = std::env::temp_dir().join(format!(
-            "agent-canon-docs-root-view-test-{}-{}",
+            "agent-canon-docs-standalone-link-test-{}-{}",
             std::process::id(),
             std::thread::current().name().unwrap_or("no-name")
         ));
-        fs::create_dir_all(&workspace).expect("create workspace");
-
-        let standalone_root = workspace.join("standalone");
-        let standalone_documents = standalone_root.join("documents");
-        let standalone_root_agents = standalone_root.join("ROOT_AGENTS.md");
-        let standalone_target = standalone_documents.join("root-view-target.md");
-        fs::create_dir_all(&standalone_documents).expect("create standalone documents");
-        fs::write(&standalone_root_agents, "[]").expect("write standalone root agents");
-        fs::write(&standalone_target, "[]").expect("write standalone target");
-        assert_eq!(
-            resolve_local_target(
-                &standalone_root_agents,
-                &standalone_root,
-                "documents/root-view-target.md"
-            ),
-            Some(standalone_target.clone())
-        );
-
-        let parent_root = workspace.join("parent");
-        let vendor_root = parent_root.join("vendor").join("agent-canon");
-        let vendor_documents = vendor_root.join("documents");
-        let parent_root_agents_target = vendor_documents.join("root-view-target.md");
-        let vendor_root_agents = vendor_root.join("ROOT_AGENTS.md");
-        fs::create_dir_all(&vendor_documents).expect("create vendor documents");
-        fs::write(&vendor_root_agents, "[]").expect("write vendor root agents");
-        fs::write(&parent_root_agents_target, "[]").expect("write parent target");
-
-        let parent_root_agents = parent_root.join("AGENTS.md");
-        symlink(&vendor_root_agents, &parent_root_agents).expect("create parent root symlink");
+        let documents = workspace.join("documents");
+        let source = workspace.join("ROOT_AGENTS.md");
+        let target = documents.join("root-view-target.md");
+        fs::create_dir_all(&documents).expect("create standalone documents");
+        fs::write(&source, "[]").expect("write standalone source");
+        fs::write(&target, "[]").expect("write standalone target");
 
         assert_eq!(
-            resolve_local_target(
-                &parent_root_agents,
-                &parent_root,
-                "documents/root-view-target.md"
-            ),
-            Some(parent_root_agents_target.clone())
+            resolve_local_target(&source, &workspace, "documents/root-view-target.md"),
+            Some(target)
         );
 
         fs::remove_dir_all(&workspace).ok();
-    }
-
-    #[test]
-    fn flags_parent_view_root_document_link_that_targets_outside_root() {
-        let workspace = std::env::temp_dir().join(format!(
-            "agent-canon-docs-root-view-escape-{}-{}",
-            std::process::id(),
-            std::thread::current().name().unwrap_or("no-name")
-        ));
-        let parent_root = workspace.join("parent");
-        let vendor_root = parent_root.join("vendor").join("agent-canon");
-        let vendor_documents = vendor_root.join("documents");
-        let source = vendor_root.join("ROOT_AGENTS.md");
-        let target_outside_dir = workspace.join("outside");
-        let target_outside = target_outside_dir.join("target.md");
-        let parent_root_agents = parent_root.join("AGENTS.md");
-        let linked_target = vendor_documents.join("target.md");
-
-        fs::create_dir_all(&vendor_documents).expect("create vendor documents");
-        fs::create_dir_all(&target_outside_dir).expect("create outside target dir");
-        fs::write(&source, "# root agents\n[Target](documents/target.md)\n")
-            .expect("write vendor root agents");
-        fs::write(&target_outside, "# outside target\n").expect("write outside target");
-        symlink(target_outside, linked_target).expect("link target outside root");
-        symlink(vendor_root.join("ROOT_AGENTS.md"), &parent_root_agents)
-            .expect("create parent root symlink");
-
-        let findings =
-            check_markdown_links(&parent_root, std::slice::from_ref(&parent_root_agents));
-        fs::remove_dir_all(&workspace).ok();
-
-        assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].path.as_ref(), Some(&parent_root_agents));
-        assert!(findings[0]
-            .message
-            .contains("local markdown link target is missing"));
     }
 
     #[test]

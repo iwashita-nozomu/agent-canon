@@ -41,36 +41,16 @@ from generate_agent_improvement_guide import (  # noqa: E402
     counter_lines,
     known_skill_ids,
 )
-from parent_root_side_effects import (  # noqa: E402
-    ParentRootAttestationRequest,
-    ParentRootReject,
-    ParentRootSideEffectBoundary,
-    ParentRootSideEffectError,
-    attest_parent_root,
-)
 from report_artifact_checks import (  # noqa: E402
     actual_wave_event_fields,
     markdown_table_dict_rows,
 )
 from runtime_log_paths import eval_result_search_dirs  # noqa: E402
+from runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary  # noqa: E402
 
 STATUS_RE = re.compile(r"\b[A-Z_]*STATUS=(pass|fail|skip)\b")
 
 
-def _parent_write(path: Path, data: bytes, purpose: str) -> None:
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            f"{purpose}: explicit parent root is required",
-        )
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
-    )
-    ParentRootSideEffectBoundary().write_parent_owned_file(
-        attestation, path, data, purpose
-    )
 TOKEN_COMPARISON_RE = re.compile(
     r"baseline_total=(?P<baseline>\d+)\s+"
     r"candidate_total=(?P<candidate>\d+)\s+"
@@ -408,15 +388,21 @@ class RuntimeDashboardSummary:
 class ResultFamilyReader:
     """Reads accumulated Markdown result families."""
 
-    def __init__(self, root: Path, recent_cutoff_epoch: int | None = None) -> None:
+    def __init__(
+        self,
+        root: Path,
+        recent_cutoff_epoch: int | None = None,
+        runtime_root: Path | str | None = None,
+    ) -> None:
         """Store the AgentCanon evidence root."""
         self.root = root
         self.recent_cutoff_epoch = recent_cutoff_epoch
+        self.runtime_root = runtime_root
 
     def read_family(self, family: str) -> ResultFamilySummary:
         """Read one accumulated Markdown report directory."""
         try:
-            directories = eval_result_search_dirs(self.root, family)
+            directories = eval_result_search_dirs(self.root, family, self.runtime_root)
         except RuntimeError as error:
             if not missing_log_archive_error(error):
                 raise
@@ -667,6 +653,7 @@ class TokenUsageBreakdownReader:
         cls,
         root: Path,
         recent_cutoff_epoch: int | None = None,
+        runtime_root: Path | str | None = None,
     ) -> TokenUsageBreakdown:
         """Return accumulated token comparison stats."""
         files: set[Path] = set()
@@ -686,7 +673,7 @@ class TokenUsageBreakdownReader:
         average_tokens_per_event = 0.0
         objective_selected = False
         objective_not_selected = False
-        for path in cls.candidate_paths(root):
+        for path in cls.candidate_paths(root, runtime_root):
             text = path.read_text(encoding="utf-8")
             epoch = cls.evidence_epoch(path, text)
             if not evidence_inside_recent_window(path, epoch, recent_cutoff_epoch):
@@ -770,7 +757,10 @@ class TokenUsageBreakdownReader:
         )
 
     @staticmethod
-    def candidate_paths(root: Path) -> tuple[Path, ...]:
+    def candidate_paths(
+        root: Path,
+        runtime_root: Path | str | None = None,
+    ) -> tuple[Path, ...]:
         """Return likely text files containing token comparison evidence."""
         patterns = (
             "reports/agents/**/workflow_monitoring.md",
@@ -779,8 +769,10 @@ class TokenUsageBreakdownReader:
             ".agent-canon/log-archive/eval-results/**/*.md",
         )
         paths: set[Path] = set()
-        for pattern in patterns:
-            paths.update(path for path in root.glob(pattern) if path.is_file())
+        roots = (Path(runtime_root),) if runtime_root is not None else (root,)
+        for evidence_root in roots:
+            for pattern in patterns:
+                paths.update(path for path in evidence_root.glob(pattern) if path.is_file())
         return tuple(sorted(paths))
 
     @staticmethod
@@ -835,6 +827,7 @@ class WaveExecutionBreakdownReader:
         cls,
         root: Path,
         recent_cutoff_epoch: int | None = None,
+        runtime_root: Path | str | None = None,
     ) -> WaveExecutionBreakdown:
         """Return accumulated wave and subagent execution stats."""
         report_files: set[Path] = set()
@@ -850,7 +843,7 @@ class WaveExecutionBreakdownReader:
         events_by_spawn_authority: Counter[str] = Counter()
         spawned_roles: Counter[str] = Counter()
         skipped_roles: Counter[str] = Counter()
-        for workflow_path in cls.candidate_paths(root):
+        for workflow_path in cls.candidate_paths(root, runtime_root):
             text = workflow_path.read_text(encoding="utf-8")
             epoch = TokenUsageBreakdownReader.evidence_epoch(workflow_path, text)
             if not evidence_inside_recent_window(workflow_path, epoch, recent_cutoff_epoch):
@@ -901,15 +894,20 @@ class WaveExecutionBreakdownReader:
         )
 
     @staticmethod
-    def candidate_paths(root: Path) -> tuple[Path, ...]:
+    def candidate_paths(
+        root: Path,
+        runtime_root: Path | str | None = None,
+    ) -> tuple[Path, ...]:
         """Return workflow monitor reports that may carry wave-event rows."""
         patterns = (
             "reports/agents/**/workflow_monitoring.md",
             ".agent-canon/log-archive/agent-reports/**/workflow_monitoring.md",
         )
         paths: set[Path] = set()
-        for pattern in patterns:
-            paths.update(path for path in root.glob(pattern) if path.is_file())
+        roots = (Path(runtime_root),) if runtime_root is not None else (root,)
+        for evidence_root in roots:
+            for pattern in patterns:
+                paths.update(path for path in evidence_root.glob(pattern) if path.is_file())
         return tuple(sorted(paths))
 
     @staticmethod
@@ -1029,9 +1027,10 @@ class SelectionMetricStore:
 class SelectionMetricsReader:
     """Reads selection accuracy for skills, workflows, and tools."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, runtime_root: Path | None = None) -> None:
         """Store the AgentCanon root used to resolve reset windows."""
         self.root = root
+        self.runtime_root = runtime_root
         self.known_skill_ids = known_skill_ids(root)
         self.known_workflow_names = known_workflow_names(root)
 
@@ -1121,7 +1120,9 @@ class SelectionMetricsReader:
         """Return workflow selections recorded in run-bundle monitor reports."""
         events: list[SelectionEvent] = []
         sequence = start_sequence
-        for workflow_path in WaveExecutionBreakdownReader.candidate_paths(self.root):
+        for workflow_path in WaveExecutionBreakdownReader.candidate_paths(
+            self.root, self.runtime_root
+        ):
             text = workflow_path.read_text(encoding="utf-8")
             epoch = TokenUsageBreakdownReader.evidence_epoch(workflow_path, text)
             if cutoff_epoch > NO_RESET_EPOCH and not timestamped_evidence_after_cutoff(
@@ -1406,9 +1407,15 @@ class RuntimeDashboardVisuals:
 class AgentRuntimeDashboard:
     """Builds a reader-facing dashboard from AgentCanon runtime evidence."""
 
-    def __init__(self, root: Path, recent_days: int | None = None) -> None:
+    def __init__(
+        self,
+        root: Path,
+        recent_days: int | None = None,
+        runtime_root: Path | str | None = None,
+    ) -> None:
         """Resolve the requested root to the AgentCanon evidence root."""
-        self.guide = AgentImprovementGuide(root)
+        self.runtime_root = runtime_artifact_boundary(root, runtime_root).root
+        self.guide = AgentImprovementGuide(root, self.runtime_root)
         self.root = self.guide.root
         self.recent_days = recent_days
         self.recent_cutoff_epoch = recent_cutoff_epoch(recent_days)
@@ -1416,7 +1423,9 @@ class AgentRuntimeDashboard:
     def collect(self) -> RuntimeDashboardSummary:
         """Collect dashboard evidence without mutating repository state."""
         evidence, hook_files = self.collect_evidence()
-        reader = ResultFamilyReader(self.root, self.recent_cutoff_epoch)
+        reader = ResultFamilyReader(
+            self.root, self.recent_cutoff_epoch, self.runtime_root
+        )
         result_families = (
             reader.read_family("skill-workflow-prompt"),
             reader.read_family("workflow-selection"),
@@ -1455,10 +1464,12 @@ class AgentRuntimeDashboard:
             token_usage_breakdown=TokenUsageBreakdownReader.read(
                 self.root,
                 self.recent_cutoff_epoch,
+                self.runtime_root,
             ),
             wave_execution_breakdown=WaveExecutionBreakdownReader.read(
                 self.root,
                 self.recent_cutoff_epoch,
+                self.runtime_root,
             ),
             prompt_tool_breakdown=read_prompt_tool_breakdown(
                 hook_files,
@@ -1472,7 +1483,9 @@ class AgentRuntimeDashboard:
                 hook_files,
                 self.recent_cutoff_epoch,
             ),
-            selection_metrics_breakdown=SelectionMetricsReader(self.root).read(
+            selection_metrics_breakdown=SelectionMetricsReader(
+                self.root, self.runtime_root
+            ).read(
                 hook_files,
                 self.recent_cutoff_epoch,
             ),
@@ -2929,7 +2942,7 @@ def issue_route_row(summary: RuntimeDashboardSummary, signal: str, slug: str, re
     """Return one durable issue routing row."""
     issue = issue_by_slug(summary, slug)
     issue_label = (
-        f"`{issue.relative_to(summary.root).as_posix()}`"
+        f"`{relative_path_label(issue, summary.root)}`"
         if issue is not None
         else "`missing-local-issue`"
     )
@@ -2954,7 +2967,7 @@ def token_file_rows(summary: RuntimeDashboardSummary) -> list[str]:
             )
         )
     )[:MAX_REPORT_LINES]
-    return [f"| `{path.relative_to(summary.root).as_posix()}` |" for path in files]
+    return [f"| `{relative_path_label(path, summary.root)}` |" for path in files]
 
 
 def problem_component_lines(summary: RuntimeDashboardSummary) -> list[str]:
@@ -3449,7 +3462,7 @@ def durable_issue_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboa
     """Return the next action for open durable issues."""
     if not summary.evidence.open_issues:
         return ()
-    issue = summary.evidence.open_issues[0].relative_to(summary.root).as_posix()
+    issue = relative_path_label(summary.evidence.open_issues[0], summary.root)
     return (DashboardNextAction(
         priority="P2",
         action="triage oldest open durable issue",
@@ -3513,7 +3526,7 @@ def issue_label_by_slug(summary: RuntimeDashboardSummary, slug: str) -> str:
     issue = issue_by_slug(summary, slug)
     if issue is None:
         return "missing-local-issue"
-    return issue.relative_to(summary.root).as_posix()
+    return relative_path_label(issue, summary.root)
 
 
 def relative_path_label(path: Path, root: Path) -> str:
@@ -4206,6 +4219,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument(
+        "--runtime-root",
+        type=Path,
+        help="Explicit external runtime root containing evidence and dashboard outputs.",
+    )
+    parser.add_argument(
         "--out",
         default="reports/agent-runtime-dashboard/agent-runtime-dashboard.md",
         help="Markdown output path.",
@@ -4241,22 +4259,18 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     """Generate an AgentCanon runtime dashboard."""
     args = build_parser().parse_args(argv)
-    dashboard = AgentRuntimeDashboard(args.root, recent_days=args.recent_days)
+    boundary = runtime_artifact_boundary(args.root, args.runtime_root)
+    dashboard = AgentRuntimeDashboard(
+        args.root,
+        recent_days=args.recent_days,
+        runtime_root=boundary.root,
+    )
     summary = dashboard.collect()
-    output = Path(args.out)
-    _parent_write(output, render_dashboard(summary).encode("utf-8"), "runtime-dashboard")
+    output = boundary.atomic_write_text(Path(args.out), render_dashboard(summary))
     if args.compact_out is not None:
-        _parent_write(
-            args.compact_out,
-            render_compact_dashboard(summary).encode("utf-8"),
-            "runtime-dashboard-compact",
-        )
+        boundary.atomic_write_text(args.compact_out, render_compact_dashboard(summary))
     if args.api_out is not None:
-        _parent_write(
-            args.api_out,
-            render_dashboard_api(summary).encode("utf-8"),
-            "runtime-dashboard-api",
-        )
+        boundary.atomic_write_text(args.api_out, render_dashboard_api(summary))
     print(f"AGENT_RUNTIME_DASHBOARD={output}")
     print("AGENT_RUNTIME_DASHBOARD_STATUS=pass")
     print(f"AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT={summary.root.as_posix()}")
@@ -4267,4 +4281,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except RuntimeArtifactError as exc:
+        print(f"generate_agent_runtime_dashboard.py: runtime_root_required: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc

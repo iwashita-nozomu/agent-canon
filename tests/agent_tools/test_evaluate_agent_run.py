@@ -23,7 +23,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_agent_run.py"
 MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
 RUNTIME_PROFILE_INVENTORY = (
-    PROJECT_ROOT / "documents" / "runtime-profiles-and-check-matrix.json"
+    PROJECT_ROOT / "documents" / "runtime" / "runtime-profiles-and-check-matrix.json"
 )
 
 
@@ -162,6 +162,9 @@ def write_workflow_monitoring(report_dir: Path) -> None:
             "- validation_status=pass",
             "- drift_risk=none",
             "## Behavior Events",
+            "- generated_role_view_v1 profile-attribution topology_derived_v1 "
+            "declared_team_peak_plus_nested_reservations_v1 requested_capacity_loader "
+            "model-capacity thread-capacity",
             "- skill_invocation=$agent-orchestration status=observed",
             "- subagent_routing=worker stage=implementation status=observed",
             "- tool_call=run_repo_dependency_review.sh status=pass",
@@ -209,6 +212,9 @@ def write_workflow_monitoring(report_dir: Path) -> None:
             "- config_improvement_decision: not_applicable",
             "- workflow_improvement_decision: not_applicable",
             "- memory_learning_decision: not_applicable",
+            "- runtime_profile_projection=generated_role_view_v1 profile-attribution "
+            "topology_derived_v1 declared_team_peak_plus_nested_reservations_v1 "
+            "requested_capacity_loader model-capacity thread-capacity",
             "",
         ],
     )
@@ -237,6 +243,14 @@ def write_review_closeout_artifacts(report_dir: Path) -> None:
         report_dir / "closeout_gate.md",
         [
             "# Closeout Gate",
+            "contract_observation=none "
+            "contract_observation_schema=agent-canon.task-contract-observation.v1 "
+            "task_contract_observation_eval_status=pass "
+            "task_contract_observation_digest=fixture "
+            "task_contract_observation_coverage=complete "
+            "task_contract_resolution=terminal "
+            "task_contract_observation_unresolved=none "
+            "contract_archive_route=agent-canon-log:agent-reports",
             "- validation_complete: yes",
             "- dependency_headers_complete: yes",
             "- repo_wide_dependency_tools_complete: yes",
@@ -271,6 +285,13 @@ def write_ready_run(report_dir: Path) -> None:
     write_review_closeout_artifacts(report_dir)
 
 
+def external_runtime(root: Path) -> Path:
+    """Return an explicit runtime directory outside the source fixture."""
+    runtime = root.parent / f"{root.name}-agent-canon-runtime"
+    runtime.mkdir(parents=True, exist_ok=True)
+    return runtime
+
+
 class EvaluateAgentRunTest(unittest.TestCase):
     """Verify the run evaluation helper."""
 
@@ -294,6 +315,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
+            runtime = external_runtime(report_dir)
 
             result = subprocess.run(
                 [
@@ -302,6 +324,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
                     "--report-dir",
                     str(report_dir),
                     "--write",
+                    "--runtime-root",
+                    str(runtime),
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -311,7 +335,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("AGENT_EVALUATION_STATUS=pass", result.stdout)
-            report = (report_dir / "agent_evaluation.md").read_text(encoding="utf-8")
+            report = (runtime / "agent_evaluation.md").read_text(encoding="utf-8")
             self.assertIn("- evaluation_status: pass", report)
             self.assertIn("- feedback_actions_resolved: yes", report)
             self.assertIn("- learning_capture_complete: yes", report)
@@ -321,7 +345,9 @@ class EvaluateAgentRunTest(unittest.TestCase):
     ) -> None:
         """The workflow monitor preset should satisfy evaluator closeout evidence."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            report_dir = Path(tmp_dir) / "run"
+            source_dir = Path(tmp_dir) / "source"
+            runtime = external_runtime(source_dir)
+            report_dir = runtime / "run"
             write_ready_run(report_dir)
             (report_dir / "workflow_monitoring.md").unlink()
             monitor = subprocess.run(
@@ -330,6 +356,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
                     str(MONITOR_SCRIPT),
                     "--report-dir",
                     str(report_dir),
+                    "--runtime-root",
+                    str(runtime),
                     "--closeout-token-preset",
                     "--tool-warning-status",
                     "none",
@@ -339,6 +367,12 @@ class EvaluateAgentRunTest(unittest.TestCase):
                     "stage owner=codex subagent=worker parent_direct_reason=unit-test-run",
                     "--behavior-event",
                     "subagent_routing=worker stage=implementation status=observed",
+                    "--behavior-event",
+                    "subagent_lifecycle=closed subagents_closed=yes",
+                    "--behavior-event",
+                    "generated_role_view_v1 profile-attribution topology_derived_v1 "
+                    "declared_team_peak_plus_nested_reservations_v1 requested_capacity_loader "
+                    "model-capacity thread-capacity",
                     "--behavior-event",
                     (
                         "tool_call=evaluate_skill_workflow_prompts.py "
@@ -466,6 +500,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             (report_dir / "workflow_monitoring.md").unlink()
+            runtime = external_runtime(report_dir)
 
             result = subprocess.run(
                 [
@@ -474,6 +509,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
                     "--report-dir",
                     str(report_dir),
                     "--write",
+                    "--runtime-root",
+                    str(runtime),
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -483,7 +520,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
-            report = (report_dir / "agent_evaluation.md").read_text(encoding="utf-8")
+            report = (runtime / "agent_evaluation.md").read_text(encoding="utf-8")
             self.assertIn("workflow_monitoring", report)
 
     def test_evaluate_pending_improvement_decisions_fail(self) -> None:
@@ -1372,6 +1409,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
                 "- all_clauses_resolved: no\n",
                 encoding="utf-8",
             )
+            runtime = external_runtime(report_dir)
 
             result = subprocess.run(
                 [
@@ -1380,6 +1418,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
                     "--report-dir",
                     str(report_dir),
                     "--write",
+                    "--runtime-root",
+                    str(runtime),
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -1390,5 +1430,5 @@ class EvaluateAgentRunTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
             self.assertIn("AGENT_EVALUATION_FEEDBACK_ACTIONS_OPEN=", result.stdout)
-            report = (report_dir / "agent_evaluation.md").read_text(encoding="utf-8")
+            report = (runtime / "agent_evaluation.md").read_text(encoding="utf-8")
             self.assertIn("| F1 | fix-now |", report)

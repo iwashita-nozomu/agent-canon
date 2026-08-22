@@ -17,10 +17,12 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from atexit import register
 from copy import deepcopy
 from pathlib import Path
 from typing import cast
@@ -32,7 +34,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "ci"))
 
-from agent_canon_preflight import surface_manifest_paths  # noqa: E402
 from check_agent_canon_pr import (  # noqa: E402
     GENERATED_COMPLETENESS_CHECK_IDS,
     materialize_generated_completeness_receipt,
@@ -50,7 +51,11 @@ from packets import (  # noqa: E402
     active_design_packet_mapping,
     resolve_active_design_packet_config,
 )
-from report_artifact_checks import write_completion_coverage_artifact  # noqa: E402
+from report_artifact_checks import (  # noqa: E402
+    check_completion_coverage,
+    evaluate_completion_boundary,
+    project_completion_coverage,
+)
 from task_authority import hash_baseline_bytes  # noqa: E402
 from task_close import update_lifecycle_closeout_consumer  # noqa: E402
 from team_config import (  # noqa: E402
@@ -78,7 +83,11 @@ TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py"
 WORKTREE_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "worktree_start.py"
 SETUP_WORKTREE_SCRIPT = PROJECT_ROOT / "tools" / "setup_worktree.sh"
 TEST_PARENT_ROOT = PROJECT_ROOT.parents[2]
-TEST_TEMP_ROOT = TEST_PARENT_ROOT / ".agent-canon" / "tmp"
+# Keep test artifacts outside both the parent checkout and AgentCanon source;
+# the exact process-owned root is removed when the test process exits.
+_TEST_TEMP_ROOT = tempfile.TemporaryDirectory(prefix="agent-canon-bootstrap-")
+TEST_TEMP_ROOT = Path(_TEST_TEMP_ROOT.name)
+register(_TEST_TEMP_ROOT.cleanup)
 
 
 def seed_workspace_config(workspace_root: Path) -> None:
@@ -86,6 +95,22 @@ def seed_workspace_config(workspace_root: Path) -> None:
     config_path = workspace_root / ".codex" / "config.toml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_bytes((PROJECT_ROOT / ".codex" / "config.toml").read_bytes())
+
+
+def snapshot_external_source(source_root: Path) -> tuple[tuple[str, str, int], ...]:
+    """Capture external source bytes/modes while ignoring its Git metadata."""
+    entries: list[tuple[str, str, int]] = []
+    for path in sorted(source_root.rglob("*")):
+        if path.is_symlink() or ".git" in path.parts or not path.is_file():
+            continue
+        entries.append(
+            (
+                str(path.relative_to(source_root)),
+                hashlib.sha256(path.read_bytes()).hexdigest(),
+                path.stat().st_mode & 0o777,
+            )
+        )
+    return tuple(entries)
 
 
 def expected_workflow_spawn_budget(family_id: str) -> tuple[int, int]:
@@ -165,9 +190,9 @@ def update_lifecycle_closeout_fixture() -> dict[str, object]:
             "materialize_pr_identity_gate",
         ),
         "G4": (
-            "parent_projection_integrity",
-            PROJECT_ROOT / "tools" / "update_agent_canon.sh",
-            "accept_dependency_frontier",
+            "standalone_source_branch_integrity",
+            PROJECT_ROOT / "tools" / "agent_tools" / "repository_topic_clone.py",
+            "_ensure_branch",
         ),
         "G5": (
             "remote_publication_readback",
@@ -365,12 +390,9 @@ def ready_closeout_evidence_lines(
     )
     return [
         "",
-        "## AgentCanon Latest Evidence",
-        "- agent_canon_latest_command: make agent-canon-ensure-latest",
-        "- agent_canon_latest_status: pass",
-        "- agent_canon_submodule_status: fixture-clean",
-        "- agent_canon_source_head: fixture-source-head",
-        "- agent_canon_parent_pin: fixture-parent-pin",
+        "## AgentCanon Source Evidence",
+        "- agent_canon_source_checkout: standalone",
+        "- agent_canon_source_status: inspected",
         "",
         "## Review Convergence Evidence",
         "- convergence_schema: agent-canon.review-convergence.v1",
@@ -796,10 +818,12 @@ def write_ready_completion_coverage(report_dir: Path, run_id: str) -> None:
             ],
         },
     )
-    write_completion_coverage_artifact(
-        report_dir,
+    coverage = project_completion_coverage(
         read_ledger_snapshot(report_dir, "fixture-snapshot"),
         source_binding,
+    )
+    coverage_check = check_completion_coverage(
+        coverage,
         ["T1-C1"],
         {
             "owner": "codex",
@@ -807,6 +831,9 @@ def write_ready_completion_coverage(report_dir: Path, run_id: str) -> None:
             "api_owner": "codex",
             "dependency_owner": "codex",
         },
+    )
+    completion_boundary = evaluate_completion_boundary(
+        coverage_check,
         {
             "w2_implementation_complete": True,
             "w2_review_complete": True,
@@ -841,6 +868,24 @@ def write_ready_completion_coverage(report_dir: Path, run_id: str) -> None:
                 "change_review_approved",
             ],
         },
+    )
+    gate_results = coverage_check.get("gate_results")
+    if isinstance(gate_results, dict):
+        gate_results["G5_DELIVERY_BOUNDARY"] = bool(
+            completion_boundary.get("overall_delivery_complete")
+        )
+        error_sets = cast(dict[str, object], coverage_check.get("error_sets", {}))
+        coverage_check["ok"] = not any(error_sets.values()) and all(
+            bool(value) for value in gate_results.values()
+        )
+    artifact = {
+        **coverage,
+        "coverage_check": coverage_check,
+        "completion_boundary": completion_boundary,
+    }
+    (report_dir / "completion_coverage.json").write_text(
+        json.dumps(artifact, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
     )
 
 
@@ -930,28 +975,34 @@ def write_ready_closeout_bundle(
 class BootstrapAndCloseTest(unittest.TestCase):
     """Verify machine-driven task start and close behavior."""
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        """Give external fixture artifacts one exact authenticated Git root."""
+        subprocess.run(
+            ["git", "init", "-q"],
+            cwd=TEST_TEMP_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
     def setUp(self) -> None:
         """Place isolated fixtures under one authenticated parent checkout."""
+        shutil.rmtree(TEST_TEMP_ROOT / "reports", ignore_errors=True)
         parent_env = patch.dict(
             os.environ,
             {
-                "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT),
+                "AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT),
+                "AGENT_CANON_RUNTIME_ROOT": str(TEST_TEMP_ROOT),
             },
         )
         parent_env.start()
         self.addCleanup(parent_env.stop)
 
     def test_retired_tool_names_are_not_permanent_update_surfaces(self) -> None:
-        """One-time transition candidates do not reserve future parent paths."""
-        update_paths = set(surface_manifest_paths(PROJECT_ROOT))
-
-        self.assertTrue(
-            {
-                "tools/sync_agent_canon.sh",
-                "tools/agent_tools/surface_manifest.py",
-                "tools/agent_tools/update_agent_canon.sh",
-            }.isdisjoint(update_paths)
-        )
+        """Retired repository synchronization wrappers are absent."""
+        self.assertFalse((PROJECT_ROOT / "tools" / "sync_agent_canon.sh").exists())
+        self.assertFalse((PROJECT_ROOT / "tools" / "update_agent_canon.sh").exists())
 
     def consume_update_lifecycle_fixture(
         self,
@@ -1321,9 +1372,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
     def test_bootstrap_skips_agent_canon_preflight_in_source_repo(self) -> None:
         """Source AgentCanon runs do not require a derived-repo update target."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            source_root = PROJECT_ROOT / "vendor" / "agent-canon"
-            if not source_root.exists():
-                source_root = PROJECT_ROOT
+            source_root = PROJECT_ROOT
             result = subprocess.run(
                 [
                     sys.executable,
@@ -1347,7 +1396,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(
-                "AGENT_CANON_PREFLIGHT_STATUS=skipped_source_canon", result.stdout
+                "AGENT_CANON_PREFLIGHT_STATUS=source_checkout_selected", result.stdout
             )
             self.assertIn(
                 "AGENT_CANON_PREFLIGHT_CHECKLIST=documents/agent-canon/agent-canon-parent-repo-latest-checklist.md",
@@ -1465,8 +1514,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
         expected = (hashlib.sha256(payload).hexdigest() + "\n").encode("ascii")
         self.assertEqual(hash_baseline_bytes(payload), expected)
 
-    def test_bootstrap_routes_dirty_shared_canon_to_pr_first_workflow(self) -> None:
-        """Dirty shared-canon surfaces should not point only to commit-or-stash."""
+    def test_bootstrap_does_not_adopt_embedded_parent_agentcanon_state(self) -> None:
+        """A source-free parent never acquires an embedded update workflow."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
@@ -1477,8 +1526,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (workspace_root / "Makefile").write_text(
-                "agent-canon-update-plan:\n\t@touch plan-sentinel\n"
-                "agent-canon-ensure-latest:\n\t@touch ensure-sentinel\n",
+                "unexpected-parent-agentcanon-command:\n\t@touch plan-sentinel ensure-sentinel\n",
                 encoding="utf-8",
             )
             subprocess.run(["git", "init"], cwd=workspace_root, check=True)
@@ -1506,19 +1554,11 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(
-                "AGENT_CANON_PREFLIGHT_STATUS=blocked_shared_canon_workflow",
+                "AGENT_CANON_PREFLIGHT_STATUS=skipped_source_free_parent",
                 result.stdout,
             )
-            self.assertIn("open_agent-canon_PR", result.stdout)
-            self.assertIn("preserve_current_checkout", result.stdout)
-            self.assertIn("request_current_task_user_approval", result.stdout)
-            self.assertIn("four_inline_git_authority_and_reason", result.stdout)
             self.assertFalse((workspace_root / "plan-sentinel").exists())
             self.assertFalse((workspace_root / "ensure-sentinel").exists())
-            self.assertNotIn(
-                "AGENT_CANON_PREFLIGHT_NEXT=commit_or_stash_then_run_make_agent-canon-ensure-latest",
-                result.stdout,
-            )
 
     def test_bootstrap_reports_parent_repo_latest_checklist(self) -> None:
         """Parent repos should expose the AgentCanon latest-state checklist at task start."""
@@ -1528,8 +1568,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
             seed_workspace_config(workspace_root)
             checklist = (
                 workspace_root
-                / "vendor"
-                / "agent-canon"
                 / "documents"
                 / "agent-canon"
                 / "agent-canon-parent-repo-latest-checklist.md"
@@ -1561,25 +1599,24 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(
-                "AGENT_CANON_PREFLIGHT_CHECKLIST=vendor/agent-canon/documents/agent-canon/agent-canon-parent-repo-latest-checklist.md",
+                "AGENT_CANON_PREFLIGHT_CHECKLIST=documents/agent-canon/agent-canon-parent-repo-latest-checklist.md",
                 result.stdout,
             )
             self.assertIn(
                 "AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS=present", result.stdout
             )
 
-    def test_bootstrap_uses_read_only_plan_with_unrelated_parent_dirty_state(
+    def test_bootstrap_ignores_external_clone_for_source_free_parent_preflight(
         self,
     ) -> None:
-        """A clean AgentCanon update surface may refresh despite unrelated parent dirt."""
+        """Parent task entry neither runs nor mutates a separately selected clone."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
-            report_root = workspace_root / "reports" / "agents"
+            runtime_root = workspace_root / "workspace" / "agent-canon-runtime" / "parent-dirty-unrelated"
+            report_root = runtime_root / "reports" / "agents"
             seed_workspace_config(workspace_root)
             checklist = (
                 workspace_root
-                / "vendor"
-                / "agent-canon"
                 / "documents"
                 / "agent-canon"
                 / "agent-canon-parent-repo-latest-checklist.md"
@@ -1587,70 +1624,64 @@ class BootstrapAndCloseTest(unittest.TestCase):
             checklist.parent.mkdir(parents=True)
             checklist.write_text("# Checklist\n", encoding="utf-8")
             (workspace_root / "Makefile").write_text(
-                "agent-canon-update-plan:\n\t@echo agent_canon_plan_route=already_current_tree\n"
-                "agent-canon-ensure-latest:\n\t@touch make-sentinel\n",
+                "unexpected-parent-agentcanon-command:\n\t@touch make-sentinel\n",
                 encoding="utf-8",
             )
-            source_root = workspace_root / "vendor" / "agent-canon"
-            source_agent_tools = source_root / "tools" / "agent_tools"
-            source_agent_tools.mkdir(parents=True)
-            (source_root / "agents" / "skills").mkdir(parents=True)
-            (source_root / "agents" / "skills" / "catalog.yaml").write_text(
-                "skills: []\n",
-                encoding="utf-8",
+            # AgentCanon is selected from an ignored external development
+            # clone.  The parent fixture must not grow a vendor checkout or a
+            # source projection merely to run preflight.
+            source_root = (
+                workspace_root / "workspace" / "agent-canondevelop" / "agent-canon"
             )
-            (source_agent_tools / "agent_canon_source_root.py").write_text(
-                (
-                    PROJECT_ROOT
-                    / "tools"
-                    / "agent_tools"
-                    / "agent_canon_source_root.py"
-                ).read_text(encoding="utf-8"),
-                encoding="utf-8",
+
+            def ignore_source_links(path: str, names: list[str]) -> list[str]:
+                """Do not reproduce source projections or dangling links."""
+                ignored = set(
+                    shutil.ignore_patterns(
+                        ".git",
+                        ".pytest_cache",
+                        ".ruff_cache",
+                        ".mypy_cache",
+                        "__pycache__",
+                        "target",
+                        "tests",
+                    )(path, names)
+                )
+                ignored.update(
+                    name for name in names if (Path(path) / name).is_symlink()
+                )
+                return sorted(ignored)
+
+            shutil.copytree(
+                PROJECT_ROOT,
+                source_root,
+                ignore=ignore_source_links,
             )
-            (source_agent_tools / "parent_root_side_effects.py").write_text(
-                (
-                    PROJECT_ROOT
-                    / "tools"
-                    / "agent_tools"
-                    / "parent_root_side_effects.py"
-                ).read_text(encoding="utf-8"),
-                encoding="utf-8",
-            )
-            (source_agent_tools / "surface_manifest.py").write_text(
-                "#!/usr/bin/env python3\n",
-                encoding="utf-8",
-            )
-            (source_root / "tools" / "sync_agent_canon.sh").write_text(
-                "#!/usr/bin/env bash\nset -eu\n[ \"${1:-}\" = check ]\n",
-                encoding="utf-8",
-            )
-            (source_root / "tools" / "sync_agent_canon.sh").chmod(0o755)
-            subprocess.run(["git", "init"], cwd=source_root, check=True)
-            subprocess.run(["git", "add", "."], cwd=source_root, check=True)
+            subprocess.run(["git", "init", "-q"], cwd=source_root, check=True)
             subprocess.run(
-                [
-                    "git",
-                    "-c",
-                    "user.name=Task Start Test",
-                    "-c",
-                    "user.email=bootstrap@example.invalid",
-                    "commit",
-                    "-m",
-                    "test: seed AgentCanon source",
-                ],
+                ["git", "config", "user.name", "AgentCanon Source Fixture"],
                 cwd=source_root,
                 check=True,
-                capture_output=True,
-                text=True,
             )
+            subprocess.run(
+                ["git", "config", "user.email", "source@example.invalid"],
+                cwd=source_root,
+                check=True,
+            )
+            subprocess.run(["git", "add", "-A"], cwd=source_root, check=True)
+            subprocess.run(
+                ["git", "commit", "-qm", "fixture: standalone AgentCanon source"],
+                cwd=source_root,
+                check=True,
+            )
+            source_before = snapshot_external_source(source_root)
             subprocess.run(["git", "init"], cwd=workspace_root, check=True)
             subprocess.run(
                 [
                     "git",
                     "add",
                     "Makefile",
-                    "vendor/agent-canon",
+                    ".codex/config.toml",
                 ],
                 cwd=workspace_root,
                 check=True,
@@ -1675,7 +1706,14 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "unrelated\n", encoding="utf-8"
             )
             environment = dict(os.environ)
-            environment["AGENT_CANON_PARENT_ROOT"] = str(workspace_root)
+            environment.update(
+                {
+                    "AGENT_CANON_PARENT_ROOT": str(workspace_root),
+                    "AGENT_CANON_SOURCE_ROOT": str(source_root),
+                    "AGENT_CANON_ROOT": str(source_root),
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                }
+            )
 
             result = subprocess.run(
                 [
@@ -1689,6 +1727,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     "parent-dirty-unrelated",
                     "--workspace-root",
                     str(workspace_root),
+                    "--runtime-root",
+                    str(runtime_root),
                     "--report-root",
                     str(report_root),
                 ],
@@ -1707,29 +1747,23 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "AGENT_CANON_PREFLIGHT_PARENT_DIRTY_OUTSIDE_UPDATE_SURFACE=yes",
-                result.stdout,
-            )
-            self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=pass", result.stdout)
-            self.assertNotIn(
-                "AGENT_CANON_PREFLIGHT_STATUS=blocked_shared_canon_workflow",
+                "AGENT_CANON_PREFLIGHT_STATUS=skipped_source_free_parent",
                 result.stdout,
             )
             self.assertFalse((workspace_root / "make-sentinel").exists())
+            self.assertEqual(source_before, snapshot_external_source(source_root))
             self.assertTrue(
                 (report_root / "parent-dirty-unrelated" / "schedule.md").is_file()
             )
 
-    def test_bootstrap_blocks_eval_transient_until_explicit_cleanup(self) -> None:
-        """Eval captures stop make, remain intact, and allow a rerun after cleanup."""
+    def test_source_free_parent_eval_artifact_is_not_agentcanon_preflight_state(self) -> None:
+        """Parent-local diagnostics remain parent-owned and do not trigger canon sync."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             seed_workspace_config(workspace_root)
             checklist = (
                 workspace_root
-                / "vendor"
-                / "agent-canon"
                 / "documents"
                 / "agent-canon"
                 / "agent-canon-parent-repo-latest-checklist.md"
@@ -1737,29 +1771,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             checklist.parent.mkdir(parents=True)
             checklist.write_text("# Checklist\n", encoding="utf-8")
             (workspace_root / "Makefile").write_text(
-                "agent-canon-update-plan:\n\t@echo agent_canon_plan_route=already_current_tree\n"
-                "agent-canon-ensure-latest:\n\t@touch make-sentinel\n",
-                encoding="utf-8",
-            )
-            (workspace_root / "tools").mkdir()
-            (workspace_root / "tools" / "sync_agent_canon.sh").write_text(
-                "#!/usr/bin/env bash\nset -eu\n[ \"${1:-}\" = check ]\n",
-                encoding="utf-8",
-            )
-            source_root_entrypoint = (
-                workspace_root
-                / "vendor"
-                / "agent-canon"
-                / "tools"
-                / "agent_tools"
-                / "agent_canon_source_root.py"
-            )
-            source_root_entrypoint.parent.mkdir(parents=True)
-            source_root_entrypoint.write_text(
-                "#!/usr/bin/env python3\n"
-                "import subprocess\n"
-                "import sys\n"
-                "raise SystemExit(subprocess.run(['bash', *sys.argv[2:]], check=False).returncode)\n",
+                "unexpected-parent-agentcanon-command:\n\t@touch make-sentinel\n",
                 encoding="utf-8",
             )
             subprocess.run(["git", "init"], cwd=workspace_root, check=True)
@@ -1820,19 +1832,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertEqual(blocked.returncode, 0, blocked.stderr)
             self.assertIn(
-                "AGENT_CANON_PREFLIGHT_STATUS=blocked_eval_transient_artifacts",
-                blocked.stdout,
-            )
-            self.assertIn(
-                "AGENT_CANON_PREFLIGHT_EVAL_TRANSIENT_BLOCKERS="
-                "generated_report_artifact_untracked_left_in_tree:"
-                "reports/agent-eval-runs/eval-run/01-skill.stdout.txt",
-                blocked.stdout,
-            )
-            self.assertIn(
-                "AGENT_CANON_PREFLIGHT_NEXT="
-                "sync_eval_archive_then_summarize_and_delete_transient_captures_"
-                "then_rerun_preflight",
+                "AGENT_CANON_PREFLIGHT_STATUS=skipped_source_free_parent",
                 blocked.stdout,
             )
             self.assertFalse((workspace_root / "make-sentinel").exists())
@@ -1861,7 +1861,10 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(resumed.returncode, 0, resumed.stderr)
-            self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=pass", resumed.stdout)
+            self.assertIn(
+                "AGENT_CANON_PREFLIGHT_STATUS=skipped_source_free_parent",
+                resumed.stdout,
+            )
             self.assertFalse((workspace_root / "make-sentinel").exists())
 
     def test_bootstrap_emits_workflow_skills_and_language_review_candidates(
@@ -2436,8 +2439,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_bootstrap_defaults_report_root_to_workspace_reports_agents(self) -> None:
-        """bootstrap_agent_run should default report output under the workspace root."""
+    def test_bootstrap_defaults_report_root_to_external_runtime(self) -> None:
+        """bootstrap_agent_run defaults report output below external runtime."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -2468,7 +2471,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn(
                 f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}", result.stdout
             )
-            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             self.assertIn(f"REPORT_DIR={report_dir}", result.stdout)
             self.assertIn(
                 f"TASK_AUTHORITY={report_dir / 'task_authority.yaml'}", result.stdout
@@ -2484,7 +2487,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertTrue((report_dir / "task_authority.yaml").is_file())
             self.assertTrue((report_dir / "task_authority.yaml.sha256").is_file())
             self.assertTrue(
-                (workspace_root / "reports" / "agents" / ".active_run.sha256").is_file()
+                (TEST_TEMP_ROOT / "reports" / "agents" / ".active_run.sha256").is_file()
             )
             self.assertIn("CROSS_CUTTING_DOCUMENT_PACKET=", result.stdout)
             self.assertIn("/documents/conventions/REVIEW_PROCESS.md", result.stdout)
@@ -2859,6 +2862,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     "feature/demo",
                 ],
                 cwd=workspace_root,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -2884,6 +2888,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     "feature/demo",
                 ],
                 cwd=workspace_root,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -3093,7 +3098,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
             self.assertIn(
-                "MECHANICAL_LOOP_STATIC_ANALYSIS_STATUS=targeted",
+                "REPO_WIDE_STATIC_ANALYSIS_COMPLETE=profile_selected",
                 result.stdout,
             )
 
@@ -3243,7 +3248,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             (report_dir / "verification.txt").write_text(
                 "\n".join(
                     [
@@ -3333,6 +3338,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     run_id,
                 ],
                 cwd=workspace_root,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -3344,9 +3350,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("OVERALL_DELIVERY_COMPLETE=yes", result.stdout)
             self.assertIn("COMPLETION_COVERAGE_CONSUMER_READY=True", result.stdout)
             self.assertIn("REVIEW_FINDINGS_INTEGRATED=yes", result.stdout)
-            self.assertIn("POST_FIX_FULL_REVIEW_COMPLETE=yes", result.stdout)
-            self.assertIn("MECHANICAL_COMPLETION_LOOP_COMPLETE=yes", result.stdout)
-            self.assertIn("SUBAGENTS_CLOSED=yes", result.stdout)
+            self.assertIn("FOCUSED_RECHECK_COMPLETE=yes", result.stdout)
+            self.assertIn("SUBAGENT_CLOSEOUT_STATUS=closed", result.stdout)
             self.assertIn("DIFF_CHECK_AGENT_COMPLETE=yes", result.stdout)
             self.assertIn("CANONICAL_TREE_HEAD_COMPLETE=yes", result.stdout)
             self.assertIn("REQUEST_CONTRACT_RESOLVED=yes", result.stdout)
@@ -3742,7 +3747,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             run_id = "test-task-close-doc-structure"
-            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
@@ -3763,6 +3768,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     run_id,
                 ],
                 cwd=workspace_root,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -3804,7 +3810,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             run_id = "test-task-close-doc-structure-paths"
-            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
@@ -3825,6 +3831,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     run_id,
                 ],
                 cwd=workspace_root,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -3865,7 +3872,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             run_id = "test-task-close-doc-split-decision"
-            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
@@ -3887,6 +3894,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     run_id,
                 ],
                 cwd=workspace_root,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -3928,7 +3936,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             run_id = "test-task-close-doc-structure-contract"
-            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
@@ -3956,6 +3964,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     run_id,
                 ],
                 cwd=workspace_root,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -3993,7 +4002,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "# Seed\n\nUpdated.\n", encoding="utf-8"
             )
             run_id = "test-task-close-doc-existing-topology"
-            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             environment = {**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)}
             with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(workspace_root)}):
@@ -4058,7 +4067,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "# Seed\n\nUpdated.\n", encoding="utf-8"
             )
             run_id = "test-task-close-doc-required-identity"
-            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             environment = {**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)}
             with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(workspace_root)}):
@@ -4135,7 +4144,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             workspace_root = parent_root / "workspace" / "nested"
             workspace_root.mkdir(parents=True, exist_ok=True)
             run_id = "parent-owned-nested-closeout"
-            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             with patch.dict(
                 os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent_root)}
@@ -4167,7 +4176,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
             self.assertTrue(expected_outer_diff_ref.startswith(outer_head))
             self.assertNotIn("Unable to resolve git HEAD", result.stderr)
-            self.assertTrue(report_dir.resolve().is_relative_to(parent_root.resolve()))
+            self.assertTrue(report_dir.resolve().is_relative_to(TEST_TEMP_ROOT.resolve()))
+            self.assertFalse(report_dir.resolve().is_relative_to(parent_root.resolve()))
 
     def test_task_close_rejects_stale_closeout_and_artifact_diff_ref(self) -> None:
         """task_close should compare matching closeout/artifact refs to the current diff ref."""
@@ -4235,7 +4245,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 text=True,
             )
             run_id = "test-task-close-untracked-diff-ref"
-            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
@@ -4251,6 +4261,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     run_id,
                 ],
                 cwd=workspace_root,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -4260,8 +4271,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
             self.assertIn("diff_check_latest_diff_ref", result.stdout)
 
-    def test_task_close_rejects_untracked_reports_outside_run_bundle(self) -> None:
-        """Generated report files outside reports/agents should block closeout."""
+    def test_task_close_ignores_source_local_untracked_reports(self) -> None:
+        """External runtime closeout ignores source-local report artifacts."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -4299,7 +4310,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             stray_report.parent.mkdir(parents=True, exist_ok=True)
             stray_report.write_text("# stray report\n", encoding="utf-8")
             run_id = "test-task-close-stray-report"
-            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
@@ -4312,21 +4323,17 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     run_id,
                 ],
                 cwd=workspace_root,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
                 check=False,
                 capture_output=True,
                 text=True,
             )
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=no", result.stdout)
-            self.assertIn(
-                "reports/dependency-review/agent-canon-pr/workflow_monitoring.md",
-                result.stdout,
-            )
-            self.assertIn("report_artifact_placement_clean", result.stdout)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=yes", result.stdout)
 
-    def test_task_close_rejects_other_agent_run_reports(self) -> None:
-        """Only the current run bundle may carry untracked agent reports."""
+    def test_task_close_ignores_source_local_other_agent_reports(self) -> None:
+        """External runtime closeout ignores source-local agent reports."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -4360,7 +4367,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "# old run\n", encoding="utf-8"
             )
             run_id = "test-task-close-current-run-only"
-            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
@@ -4373,16 +4380,14 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     run_id,
                 ],
                 cwd=workspace_root,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
                 check=False,
                 capture_output=True,
                 text=True,
             )
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=no", result.stdout)
-            self.assertIn(
-                "reports/agents/old-run/workflow_monitoring.md", result.stdout
-            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=yes", result.stdout)
 
     def test_task_close_allows_tracked_other_agent_run_reports(self) -> None:
         """Pre-existing tracked agent run history is baseline state."""
@@ -4436,7 +4441,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 text=True,
             )
             run_id = "test-task-close-tracked-old-agent-run"
-            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             with patch.dict(
                 os.environ, {"AGENT_CANON_PARENT_ROOT": str(workspace_root)}
@@ -4466,8 +4471,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "report_artifact_tracked_outside_current_run", result.stdout
             )
 
-    def test_task_close_rejects_ignored_reports_outside_run_bundle(self) -> None:
-        """Ignored generated report roots are still closeout blockers."""
+    def test_task_close_ignores_source_local_ignored_reports(self) -> None:
+        """External runtime closeout ignores source-local ignored reports."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -4509,7 +4514,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             ignored_report.parent.mkdir(parents=True, exist_ok=True)
             ignored_report.write_text("# ignored report\n", encoding="utf-8")
             run_id = "test-task-close-ignored-report"
-            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
@@ -4522,17 +4527,14 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     run_id,
                 ],
                 cwd=workspace_root,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
                 check=False,
                 capture_output=True,
                 text=True,
             )
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=no", result.stdout)
-            self.assertIn(
-                "reports/dependency-review/ignored-run/workflow_monitoring.md",
-                result.stdout,
-            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=yes", result.stdout)
 
     def test_task_close_allows_ignored_old_agent_run_reports(self) -> None:
         """Ignored agent run bundles are local log cache, not source-tree leakage."""
@@ -4573,7 +4575,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "# old run\n", encoding="utf-8"
             )
             run_id = "test-task-close-ignored-old-agent-run"
-            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
@@ -4586,6 +4588,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     run_id,
                 ],
                 cwd=workspace_root,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -4631,7 +4634,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 text=True,
             )
             run_id = "test-task-close-tracked-report"
-            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
@@ -4644,6 +4647,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     run_id,
                 ],
                 cwd=workspace_root,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
                 check=False,
                 capture_output=True,
                 text=True,

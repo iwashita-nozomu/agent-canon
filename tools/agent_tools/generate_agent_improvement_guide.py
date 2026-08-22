@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import subprocess
 import sys
@@ -33,6 +34,7 @@ from runtime_log_paths import (  # noqa: E402
     eval_result_search_dirs,
     hook_result_search_dirs,
 )
+from runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary  # noqa: E402
 from historical_skill_usage_reader import read_skill_usage_history  # noqa: E402
 
 COMMIT_TIME_FORMAT = "%ct"
@@ -489,10 +491,11 @@ class HookEvidenceCounter:
 class AgentImprovementGuide:
     """Build a reader-facing improvement guide from local evidence files."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, runtime_root: Path | str | None = None) -> None:
         """Store the AgentCanon root."""
         self.requested_root = root.resolve()
         self.root = resolve_agentcanon_root(root)
+        self.runtime_root = runtime_artifact_boundary(self.requested_root, runtime_root).root
 
     def collect(self) -> EvidenceSummary:
         """Collect all evidence families needed by the guide."""
@@ -518,18 +521,14 @@ class AgentImprovementGuide:
         reports = {
             path
             for result_dir in (
-                *eval_result_search_dirs(self.root, "skill-workflow-prompt"),
-                self.root / "agents" / "evals" / "results" / "skill-workflow-prompt",
+                *eval_result_search_dirs(
+                    self.root, "skill-workflow-prompt", self.runtime_root
+                ),
             )
             if result_dir.is_dir()
             for path in result_dir.glob("*.md")
             if path.name != "README.md"
         }
-        legacy_dir = self.root / "agents" / "evals" / "results" / "skill-workflow-prompt"
-        if legacy_dir.is_dir():
-            reports.update(
-                path for path in legacy_dir.glob("*.md") if path.name != "README.md"
-            )
         return tuple(sorted(reports))
 
     def memory_entry_counts(self) -> dict[str, int]:
@@ -562,8 +561,7 @@ class AgentImprovementGuide:
         """Return direct and runtime-sharded hook result JSONL paths."""
         paths: list[Path] = []
         hook_dirs = [
-            *hook_result_search_dirs(self.requested_root, self.root),
-            self.root / "agents" / "evals" / "results" / "hook-runs",
+            *hook_result_search_dirs(self.requested_root, self.root, self.runtime_root),
         ]
         for hook_dir in hook_dirs:
             direct = tuple(sorted(hook_dir.glob("*.jsonl"))) if hook_dir.is_dir() else ()
@@ -674,6 +672,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=".", help="AgentCanon root. Default: current directory.")
     parser.add_argument(
+        "--runtime-root",
+        type=Path,
+        help="Explicit external runtime root containing hook/eval evidence.",
+    )
+    parser.add_argument(
         "--out",
         default="reports/agent-improvement-guide/agent-improvement-guide.md",
         help="Markdown output path.",
@@ -682,14 +685,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def resolve_agentcanon_root(root: Path) -> Path:
-    """Resolve a parent/template root to its vendored AgentCanon evidence root."""
-    resolved = root.resolve()
-    vendored = resolved / "vendor" / "agent-canon"
-    if is_agentcanon_root(vendored):
-        return vendored.resolve()
-    if is_agentcanon_root(resolved):
-        return resolved
-    return resolved
+    """Resolve the explicitly selected AgentCanon evidence checkout."""
+    return root.resolve()
 
 
 def is_agentcanon_root(root: Path) -> bool:
@@ -813,10 +810,25 @@ def guidance(summary: EvidenceSummary) -> list[str]:
 
 
 def path_lines(root: Path, paths: tuple[Path, ...]) -> list[str]:
-    """Return Markdown bullets for repo-relative paths."""
+    """Return stable bullets for source or external-runtime evidence paths."""
     if not paths:
         return ["- none"]
-    return [f"- `{path.relative_to(root).as_posix()}`" for path in paths]
+    runtime_value = os.environ.get("AGENT_CANON_RUNTIME_ROOT")
+    runtime = Path(runtime_value).resolve() if runtime_value else None
+    rendered: list[str] = []
+    for path in paths:
+        try:
+            label = path.relative_to(root).as_posix()
+        except ValueError:
+            if runtime is not None:
+                try:
+                    label = "<runtime>/" + path.relative_to(runtime).as_posix()
+                except ValueError:
+                    label = path.name
+            else:
+                label = path.name
+        rendered.append(f"- `{label}`")
+    return rendered
 
 
 def failure_lines(failures: Counter[str]) -> list[str]:
@@ -896,12 +908,16 @@ def main() -> int:
     args = build_parser().parse_args()
     root = Path(args.root)
     output = Path(args.out)
-    guide = AgentImprovementGuide(root)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(guide.render(guide.collect()), encoding="utf-8")
+    boundary = runtime_artifact_boundary(root, args.runtime_root)
+    guide = AgentImprovementGuide(root, boundary.root)
+    output = boundary.atomic_write_text(output, guide.render(guide.collect()))
     print(f"AGENT_IMPROVEMENT_GUIDE={output}")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except RuntimeArtifactError as exc:
+        print(f"generate_agent_improvement_guide.py: runtime_root_required: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc

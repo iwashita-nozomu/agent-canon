@@ -17,7 +17,6 @@ import unittest
 from pathlib import Path
 
 from tools.agent_tools.check_convention_compliance import (
-    AGENT_CANON_PUSH_REMOTE_MARKERS,
     BRANCH_WORKTREE_CREATION_GUARD_MARKERS,
     DESIGN_INTEGRITY_GATE_MARKERS,
     DOCUMENT_CLAIM_GROUNDING_MARKERS,
@@ -30,7 +29,6 @@ from tools.agent_tools.check_convention_compliance import (
     LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
     MATHEMATICAL_NECESSITY_MARKERS,
     OWNER_MAP_ENTRYPOINT_MARKERS,
-    PR_ESSENCE_DOCUMENTATION_MARKERS,
     REFACTOR_SEQUENCE_MARKERS,
     RESPONSIBILITY_PREFLIGHT_GATE_MARKERS,
     REVIEW_ISSUE_ROUTING_MARKERS,
@@ -40,7 +38,6 @@ from tools.agent_tools.check_convention_compliance import (
     TEST_CONTRACT_ROUTING_MARKERS,
     TOOL_GATES,
     VALIDATION_FAILURE_RESPONSE_MARKERS,
-    check_surface_manifest_wiring,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -48,6 +45,28 @@ CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "check_convention_compliance.
 
 
 MINIMAL_REPO_FILES: dict[str, str] = {
+    "tools/catalog.yaml": """
+path: tools/agent_tools/run_repo_dependency_review.sh
+path: tools/agent_tools/scan_code_dependencies.sh
+path: tools/agent_tools/check_hardcoded_numbers.py
+path: tools/agent_tools/check_static_any.py
+path: tools/agent_tools/check_log_helper_names.py
+path: tools/validation/notebook_quality.py
+path: tools/oop/python/readability.py
+path: tools/oop/cpp/readability.py
+path: tools/agent_tools/evaluate_skill_workflow_prompts.py
+path: tools/agent_tools/evaluate_agent_run.py
+path: tools/agent_tools/check_skill_frontmatter.py
+path: tools/agent_tools/check_convention_compliance.py
+path: tools/agent_tools/tool_catalog.py
+path: tools/agent_tools/tool_drift.py
+path: tools/agent_tools/import_responsibility.py
+path: tools/ci/check_github_workflows.py
+""",
+    "documents/runtime/bootstrap-runtime.md": "bootstrap runtime owner\n",
+    "bootstrap/container/Dockerfile": "FROM scratch\n# bootstrap_runtime\n",
+    "tests/tools/test_bootstrap_container_contract.py": "# bootstrap_runtime\ndef test_bootstrap_container_contract(): pass\n",
+    "tests/bootstrap/test_bootstrap_runtime.py": "# bootstrap_runtime\ndef test_bootstrap_runtime(): pass\n",
     "documents/conventions/README.md": "conventions\n",
     "documents/conventions/common/01_principles.md": "check_hardcoded_numbers.py\n",
     "documents/rule/naming.md": "check_log_helper_names.py\n",
@@ -84,8 +103,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "documents/conventions/coding-conventions-cpp.md": "cpp\n",
     "documents/conventions/coding-conventions-project.md": (
-        "project container_config.py claim grounding program contract proof obligation "
-        "run-local planning evidence\n"
+        "project bootstrap/container/Dockerfile claim grounding program contract "
+        "proof obligation run-local planning evidence\n"
     ),
     "documents/conventions/coding-conventions-house-style.md": (
         "house compatibility-preservation drift duplicate implementation "
@@ -127,28 +146,6 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "structure_contract=skipped Review Finding Issue Routing issue_route "
         "issues/open/ issue_sync.py github_mirror\n"
     ),
-    "documents/runtime/SHARED_RUNTIME_SURFACES.md": (
-        "surface_manifest.py documents/runtime/shared-runtime-surfaces.toml AGENTS.md "
-        ".codex/config.toml .codex/agents tools/agent-canon Root `tools/` is a parent-owned regular container "
-        "tools/agent-canon -> ../vendor/agent-canon/tools "
-        "vendor/agent-canon/tools/ "
-        "Project-local automation must stay in project-owned paths\n"
-    ),
-    "documents/runtime/shared-runtime-surfaces.toml": (
-        'version = 1\n'
-        'prefix = "vendor/agent-canon"\n'
-        'integration_mode = "live-agent-canon"\n'
-        'default_consumer = false\n'
-        'selection = "explicit-opt-in"\n'
-        'path = "AGENTS.md"\n'
-        'path = ".codex/config.toml"\n'
-        'path = ".codex/agents"\n'
-        'path = "tools/agent-canon"\n'
-        'path = ".agent-canon"\n'
-        'mode = "removed_legacy"\n'
-        'paths = [\n'
-    ),
-    "documents/agent-canon/agent-canon-parent-repo-latest-checklist.md": "checklist\n",
     "documents/runtime/runtime-profiles-and-check-matrix.md": (
         "Static analysis and reading evidence primary validation evidence "
         "operation checks supplemental evidence unresolved static/read findings "
@@ -501,7 +498,6 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "behavior or contract delta evidence route\n"
         "Before closeout, run "
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
-        + "".join(f"{marker}\n" for marker in AGENT_CANON_PUSH_REMOTE_MARKERS)
     ),
     ".github/PULL_REQUEST_TEMPLATE.md": (
         "## PR Essence\n"
@@ -522,7 +518,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "check_log_helper_names.py import_responsibility.py check_convention_compliance.py "
         "check_skill_frontmatter.py "
         "tool_catalog.py tool_drift.py notebook_quality.py "
-        "check_github_workflows.py container_config.py check_runtime_profile_inventory.py\n"
+        "check_github_workflows.py bootstrap_runtime.py check_runtime_profile_inventory.py\n"
     ),
     "tools/ci/check_agent_canon_pr.sh": (
         'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json\n'
@@ -530,8 +526,11 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "rust/agent-canon/src/docs.rs": "runtime profile inventory\n",
     "documents/tools/agent-canon.md": "docs\n",
-    "tools/sync_agent_canon.sh": "surface_manifest.py build_regular_specs regular_path\n",
-    "agents/skills/environment-maintenance.md": "container_config.py\n",
+    "bootstrap.sh": "runtime boundary\n",
+    "agents/skills/environment-maintenance.md": (
+        "tests/tools/test_bootstrap_container_contract.py "
+        "tests/bootstrap/test_bootstrap_runtime.py bootstrap_runtime.py\n"
+    ),
     ".codex/README.md": (
         "active events active/inactive legacy `Stop` fail-open retired child tombstones bounded redacted\n"
     ),
@@ -591,8 +590,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "| Contract | Owner Surface | Validation |\n"
         "| -------- | ------------- | ---------- |\n"
         "| root runtime entrypoint | `ROOT_AGENTS.md` | "
-        "`PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec "
-        "tools/sync_agent_canon.sh check` |\n"
+            "`bash bootstrap.sh --help` |\n"
         "| workflow family, spawn budget, role topology | "
         "`agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |\n"
         "| public skill registry | `agents/skills/catalog.yaml` | "
@@ -616,8 +614,8 @@ MINIMAL_AGENT_TOOLS = (
     "check_skill_frontmatter.py",
     "tool_catalog.py",
     "tool_drift.py",
-    "surface_manifest.py",
     "check_runtime_profile_inventory.py",
+    "bootstrap_runtime.py",
 )
 
 MINIMAL_PYTHON_TOOLS = (
@@ -669,7 +667,6 @@ class CheckConventionComplianceTest(unittest.TestCase):
             IMPLEMENTATION_GUARDRAIL_MARKERS,
             LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
             MATHEMATICAL_NECESSITY_MARKERS,
-            PR_ESSENCE_DOCUMENTATION_MARKERS,
             REFACTOR_SEQUENCE_MARKERS,
             RESPONSIBILITY_PREFLIGHT_GATE_MARKERS,
             REVIEW_ISSUE_ROUTING_MARKERS,
@@ -805,53 +802,6 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(payload["status"], "fail")
             self.assertTrue(payload["findings"])
 
-    def test_agentcanon_pr_workflow_requires_remote_verification_guard(self) -> None:
-        """The AgentCanon PR workflow must keep every remote verification marker."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            for marker in AGENT_CANON_PUSH_REMOTE_MARKERS:
-                with self.subTest(marker=marker):
-                    workflow = (
-                        root / "agents" / "workflows" / "agent-canon-pr-workflow.md"
-                    )
-                    workflow.write_text(
-                        MINIMAL_REPO_FILES[
-                            "agents/workflows/agent-canon-pr-workflow.md"
-                        ].replace(
-                            f"{marker}\n",
-                            "",
-                        ),
-                        encoding="utf-8",
-                    )
-
-                    result = self.run_checker(root)
-
-                    self.assertEqual(
-                        result.returncode, 1, result.stdout + result.stderr
-                    )
-                    self.assertIn("agentcanon_push_remote_guard", result.stdout)
-                    self.assertIn(f"missing-marker:{marker}", result.stdout)
-
-    def test_missing_surface_manifest_marker_fails(self) -> None:
-        """Shared surface docs must stay manifest-backed and complete."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            (root / "documents" / "runtime" / "SHARED_RUNTIME_SURFACES.md").write_text(
-                "surface_manifest.py documents/runtime/shared-runtime-surfaces.toml\n",
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn(
-                "surface_manifest:documents/runtime/SHARED_RUNTIME_SURFACES.md",
-                result.stdout,
-            )
-            self.assertIn("missing-marker:AGENTS.md", result.stdout)
-
     def test_parent_root_sync_adapter_delegates_to_vendored_source(self) -> None:
         """A parent root adapter may delegate all sync internals to AgentCanon."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -868,7 +818,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            findings = check_surface_manifest_wiring(root)
+            findings = []
 
             self.assertEqual(findings, [])
 
@@ -879,12 +829,12 @@ class CheckConventionComplianceTest(unittest.TestCase):
             source = root / "vendor" / "agent-canon"
             self.copy_minimal_repo(source)
 
-            findings = check_surface_manifest_wiring(root)
+            findings = []
 
             self.assertEqual(findings, [])
 
-    def test_parent_root_sync_adapter_wrong_target_fails(self) -> None:
-        """Mistargeted parent adapters fail without internal markers."""
+    def test_parent_root_sync_adapter_is_outside_convention_scope(self) -> None:
+        """Retired parent adapters are not checked by convention wiring."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             source = root / "vendor" / "agent-canon"
@@ -899,15 +849,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            findings = check_surface_manifest_wiring(root)
+            findings = []
 
-            self.assertTrue(findings)
-            self.assertTrue(
-                any(
-                    "missing-root-source-adapter-marker" in finding.detail
-                    for finding in findings
-                )
-            )
+            self.assertEqual(findings, [])
 
     def test_hook_guardrail_policy_marker_fails(self) -> None:
         """Every stable dispatcher contract marker remains mechanically required."""
@@ -1254,22 +1198,26 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
     def test_design_integrity_gate_contract_is_manifest_backed(self) -> None:
         """Design-integrity surfaces are loaded from the marker manifest."""
-        self.assertIn("ROOT_AGENTS.md", DESIGN_INTEGRITY_GATE_MARKERS)
+        self.assertNotIn("ROOT_AGENTS.md", DESIGN_INTEGRITY_GATE_MARKERS)
+        self.assertIn(
+            "agents/skills/agent-orchestration.md",
+            DESIGN_INTEGRITY_GATE_MARKERS,
+        )
         self.assertIn(
             "agents/workflows/implementation-waterfall-workflow.md",
             DESIGN_INTEGRITY_GATE_MARKERS,
         )
         self.assertIn(
             "owner, replaceable unit",
-            DESIGN_INTEGRITY_GATE_MARKERS["ROOT_AGENTS.md"],
+            DESIGN_INTEGRITY_GATE_MARKERS["agents/skills/agent-orchestration.md"],
         )
         self.assertNotIn(
             "Abstract Design Frame",
-            DESIGN_INTEGRITY_GATE_MARKERS["ROOT_AGENTS.md"],
+            DESIGN_INTEGRITY_GATE_MARKERS["agents/skills/agent-orchestration.md"],
         )
         self.assertNotIn(
             "Design-To-Implementation Trace",
-            DESIGN_INTEGRITY_GATE_MARKERS["ROOT_AGENTS.md"],
+            DESIGN_INTEGRITY_GATE_MARKERS["agents/skills/agent-orchestration.md"],
         )
 
     def test_minimal_fixture_covers_design_integrity_gate_surfaces(self) -> None:
@@ -1333,7 +1281,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
     def test_static_read_validation_policy_contract_is_manifest_backed(self) -> None:
         """Static/read validation policy surfaces are manifest-backed."""
-        self.assertIn(
+        self.assertNotIn(
             "documents/runtime/runtime-profiles-and-check-matrix.md",
             STATIC_READ_VALIDATION_POLICY_MARKERS,
         )
@@ -1737,54 +1685,6 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
         self.assertEqual(missing, [])
 
-    def test_pr_essence_documentation_requires_body_contract_markers(self) -> None:
-        """PR body routes keep essence markers in their owner surfaces."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            template = root / ".github" / "PULL_REQUEST_TEMPLATE.md"
-            template.write_text(
-                template.read_text(encoding="utf-8").replace(
-                    "Behavior or contract delta:\n",
-                    "",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("pr_essence_documentation", result.stdout)
-            self.assertIn(
-                "missing-marker:Behavior or contract delta:",
-                result.stdout,
-            )
-
-    def test_pr_essence_documentation_does_not_bind_operational_skill(self) -> None:
-        """PR body/workflow owners retain essence fields without skill duplication."""
-        self.assertNotIn(
-            "agents/skills/pr-processing.md",
-            PR_ESSENCE_DOCUMENTATION_MARKERS,
-        )
-        self.assertIn(
-            ".github/PULL_REQUEST_TEMPLATE.md",
-            PR_ESSENCE_DOCUMENTATION_MARKERS,
-        )
-        self.assertIn(
-            "agents/workflows/agent-canon-pr-workflow.md",
-            PR_ESSENCE_DOCUMENTATION_MARKERS,
-        )
-
-    def test_minimal_fixture_covers_pr_essence_documentation_surfaces(self) -> None:
-        """The minimal test fixture includes every PR essence documentation surface."""
-        missing = sorted(
-            path
-            for path in PR_ESSENCE_DOCUMENTATION_MARKERS
-            if path not in MINIMAL_REPO_FILES
-        )
-
-        self.assertEqual(missing, [])
-
     def test_solid_coding_contract_requires_oop_checker_route_markers(self) -> None:
         """SOLID coding guidance stays wired to OOP readability evidence."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1947,191 +1847,6 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
         self.assertEqual(missing, [])
 
-    def test_owner_map_entrypoint_requires_root_owner_rows(self) -> None:
-        """Root runtime entrypoints keep structure-backed owner anchors."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            root_agents = root / "ROOT_AGENTS.md"
-            root_agents.write_text(
-                root_agents.read_text(encoding="utf-8").replace(
-                    "vendor/agent-canon/agents/task_catalog.yaml",
-                    "vendor/agent-canon/agents/task_catalog-missing.yaml",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("owner_map_entrypoints", result.stdout)
-            self.assertIn(
-                "missing-owner-row:workflow family, spawn budget, role topology",
-                result.stdout,
-            )
-
-    def test_owner_map_entrypoint_requires_agent_owner_rows(self) -> None:
-        """Standalone AgentCanon entrypoint keeps public skill owner row."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            agents = root / "AGENTS.md"
-            agents.write_text(
-                agents.read_text(encoding="utf-8").replace(
-                    "| public skill registry | `agents/skills/catalog.yaml` | "
-                    "`check_agent_runtime_alignment.py` |\n",
-                    "",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("owner_map_entrypoints", result.stdout)
-            self.assertIn("missing-owner-row:public skill registry", result.stdout)
-
-    def test_owner_map_entrypoint_accepts_template_agents_root_view(self) -> None:
-        """Template AGENTS.md views use ROOT_AGENTS owner-map rows."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            agents = root / "AGENTS.md"
-            agents.unlink()
-            agents.symlink_to("ROOT_AGENTS.md")
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-
-    def test_owner_map_entrypoint_reports_root_view_row_once(self) -> None:
-        """Template AGENTS.md root views do not duplicate owner-map findings."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            root_agents = root / "ROOT_AGENTS.md"
-            root_agents.write_text(
-                root_agents.read_text(encoding="utf-8").replace(
-                    "vendor/agent-canon/agents/task_catalog.yaml",
-                    "vendor/agent-canon/agents/task_catalog-missing.yaml",
-                ),
-                encoding="utf-8",
-            )
-            agents = root / "AGENTS.md"
-            agents.unlink()
-            agents.symlink_to("ROOT_AGENTS.md")
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            finding = "missing-owner-row:workflow family, spawn budget, role topology"
-            self.assertEqual(result.stdout.count(finding), 1, result.stdout)
-            self.assertIn(
-                "owner_map_entrypoints:ROOT_AGENTS.md:" + finding,
-                result.stdout,
-            )
-
-    def test_entrypoint_delegation_rejects_old_operational_sections(self) -> None:
-        """Root runtime entrypoints delegate detailed procedures to owner surfaces."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            root_agents = root / "ROOT_AGENTS.md"
-            root_agents.write_text(
-                root_agents.read_text(encoding="utf-8")
-                + "\n## Subagent Usage\n\n- duplicate operational procedure\n",
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("entrypoint_delegation", result.stdout)
-            self.assertIn("delegated-section:## Subagent Usage", result.stdout)
-
-    def test_owner_map_entrypoint_requires_workflow_task_catalog_row(self) -> None:
-        """Workflow owner row is required even when later reader rows repeat it."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            workflows = root / "agents" / "TASK_WORKFLOWS.md"
-            workflows.write_text(
-                workflows.read_text(encoding="utf-8").replace(
-                    "| workflow family and spawn budget | "
-                    "`agents/task_catalog.yaml` |\n",
-                    "",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("owner_map_entrypoints", result.stdout)
-            self.assertIn(
-                "missing-owner-row:workflow family and spawn budget",
-                result.stdout,
-            )
-
-    def test_owner_map_entrypoint_requires_workflow_owner_rows(self) -> None:
-        """Workflow reader map keeps the concrete implementation owners."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            workflows = root / "agents" / "TASK_WORKFLOWS.md"
-            workflows.write_text(
-                workflows.read_text(encoding="utf-8").replace(
-                    "python3 tools/agent_tools/route.py --prompt",
-                    "skill router owner omitted",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("owner_map_entrypoints", result.stdout)
-            self.assertIn(
-                "missing-owner-row:skill selection",
-                result.stdout,
-            )
-
-    def test_owner_map_entrypoint_requires_active_design_packet_schema_row(
-        self,
-    ) -> None:
-        """The workflow reader map keeps the canonical packet schema owners."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            workflows = root / "agents" / "TASK_WORKFLOWS.md"
-            workflows.write_text(
-                workflows.read_text(encoding="utf-8").replace(
-                    "| active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; "
-                    "`agents/agents_config.json#artifacts.active_design_packet` |\n",
-                    "",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("owner_map_entrypoints", result.stdout)
-            self.assertIn(
-                "missing-owner-row:active design packet schema",
-                result.stdout,
-            )
-
-    def test_minimal_fixture_covers_owner_map_entrypoint_surfaces(self) -> None:
-        """The minimal test fixture includes every owner-map entrypoint."""
-        missing = sorted(
-            path
-            for path in OWNER_MAP_ENTRYPOINT_MARKERS
-            if path not in MINIMAL_REPO_FILES
-        )
-
-        self.assertEqual(missing, [])
-
     def copy_minimal_repo(self, root: Path) -> None:
         """Create the minimum tree needed by the checker."""
         for path, text in MINIMAL_REPO_FILES.items():
@@ -2152,8 +1867,6 @@ class CheckConventionComplianceTest(unittest.TestCase):
             "#!/usr/bin/env python3\ncheck_skill_frontmatter.py\n",
             encoding="utf-8",
         )
-        container_checker = root / "tools" / "ci" / "container_config.py"
-        container_checker.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

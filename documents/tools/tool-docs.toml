@@ -72,7 +72,7 @@ id = "prose-reasoning-graph"
 tool = "tools/agent_tools/prose_reasoning_graph.py"
 doc = "documents/tools/prose_reasoning_graph.md"
 language = "python"
-summary = "SQLite-backed prose structure graph, diagnostics, explanation, and skill handoff documentation."
+summary = "SQLite-backed prose structure graph and external-runtime artifact boundary, diagnostics, explanation, and skill handoff documentation."
 
 [[tool]]
 id = "repo-structure-contract"

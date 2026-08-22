@@ -29,12 +29,14 @@ from typing import ParamSpec, TypeAlias, TypeVar, cast
 try:
     from tools.agent_tools.runtime_artifacts import (
         RuntimeArtifactBoundary,
+        RuntimeRootRequired,
         runtime_artifact_boundary,
     )
 except ImportError:  # pragma: no cover - direct script invocation.
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from tools.agent_tools.runtime_artifacts import (  # type: ignore[no-redef]
         RuntimeArtifactBoundary,
+        RuntimeRootRequired,
         runtime_artifact_boundary,
     )
 
@@ -69,44 +71,55 @@ class AuditLogger:
         """初期化
         
         Args:
-            log_dir: Explicit log output directory.  An explicit directory is
-                an intentional output capability and is preserved for callers
-                that already own the destination.
-            source_root: Source checkout used when resolving the default
-                external runtime destination.
+            log_dir: Optional path below the explicitly selected runtime
+                root.  Absolute paths must already be below that root;
+                relative paths are interpreted below it.  It is not a second
+                output capability and can never target a source checkout.
+            source_root: Source checkout used to reject a runtime root that
+                would overlap the source.  The checkout must be supplied by
+                the caller or by the typed target-root capability; the current
+                working directory is intentionally not inferred.
             runtime_root: Explicit external runtime root.  When ``log_dir``
                 is omitted this must be supplied or available through
                 ``AGENT_CANON_RUNTIME_ROOT``.
         """
-        self.source_root = Path(source_root or Path.cwd()).expanduser().resolve()
-        self._runtime_boundary: RuntimeArtifactBoundary | None = None
-        if log_dir is None:
+        source_value = source_root
+        if source_value is None:
+            # Bootstrap supplies a typed target-root capability to child
+            # processes.  It is an explicit handoff, unlike cwd/git-root
+            # discovery, and therefore does not accidentally select a parent
+            # repository when AgentCanon is invoked from one.
+            capability_source = os.getenv("AGENT_CANON_TARGET_ROOT", "").strip()
+            if capability_source:
+                source_value = Path(capability_source)
+        if source_value is None:
+            raise RuntimeRootRequired(
+                "explicit source root required; pass source_root or set "
+                "AGENT_CANON_TARGET_ROOT"
+            )
+        self.source_root = Path(source_value).expanduser().resolve()
+        self._runtime_boundary: RuntimeArtifactBoundary = runtime_artifact_boundary(
+            self.source_root,
+            runtime_root,
+            create=True,
+        )
+
+        configured_log_dir = log_dir
+        if configured_log_dir is None:
             explicit_log_dir = os.getenv("AUDIT_LOG_DIR", "").strip()
             if explicit_log_dir:
-                log_dir = Path(explicit_log_dir)
-        if log_dir is None:
-            self._runtime_boundary = runtime_artifact_boundary(
-                self.source_root,
-                runtime_root,
-                create=True,
-            )
-            self.log_dir = self._runtime_boundary.resolve(Path("audit"))
-            self._runtime_boundary.ensure_directory(Path("audit"))
-        else:
-            # Keep the historical explicit destination API.  This branch is
-            # never selected implicitly; callers opt into the destination.
-            self.log_dir = Path(log_dir).expanduser()
-            self.log_dir.mkdir(parents=True, exist_ok=True)
+                configured_log_dir = Path(explicit_log_dir)
+        destination = (
+            Path(configured_log_dir) if configured_log_dir is not None else Path("audit")
+        )
+        self.log_dir = self._runtime_boundary.resolve(destination)
+        self._runtime_boundary.ensure_directory(destination)
         self.log_file = self.log_dir / "audit.jsonl"
 
     def _append(self, path: Path, payload: bytes) -> None:
         """Append using the shared external resolver when one is active."""
-        if self._runtime_boundary is not None:
-            relative = path.relative_to(self._runtime_boundary.root)
-            self._runtime_boundary.append_bytes(relative, payload)
-            return
-        with path.open("ab") as stream:
-            stream.write(payload)
+        relative = path.relative_to(self._runtime_boundary.root)
+        self._runtime_boundary.append_bytes(relative, payload)
     
     def record(
         self,

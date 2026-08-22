@@ -34,11 +34,12 @@ if str(AGENT_TOOLS_ROOT) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS_ROOT))
 
 from parent_root_side_effects import (  # noqa: E402
-    ParentRootAttestationRequest,
     ParentRootReject,
-    ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
-    attest_parent_root,
+)
+from runtime_artifacts import (  # noqa: E402
+    RuntimeArtifactError,
+    runtime_artifact_boundary,
 )
 
 PROFILE_INVENTORY = Path("documents/runtime/runtime-profiles-and-check-matrix.json")
@@ -63,37 +64,45 @@ CHANGED_PATH_PACKET_SCHEMA = "agent-canon.pr-changed-paths.v1"
 GRAPH_STATUS_SCHEMA = "agent-canon.graph.status.v1"
 
 
-def _selector_write(path: Path, payload: bytes, purpose: str) -> None:
-    """Publish selector evidence through the outer parent capability."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if configured:
-        parent = Path(configured).resolve(strict=True)
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+def _selector_write(
+    path: Path,
+    payload: bytes,
+    purpose: str,
+    *,
+    source_root: Path | None = None,
+) -> None:
+    """Publish selector evidence through the caller-selected runtime root."""
+    configured_runtime = os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
+    if not configured_runtime:
+        raise ParentRootSideEffectError(
+            ParentRootReject.RUNTIME_ROOT_REQUIRED,
+            f"{purpose}: explicit runtime root is required",
         )
-        ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, payload, purpose)
-        return
-    raise ParentRootSideEffectError(
-        ParentRootReject.HANDOFF_INVALID,
-        f"{purpose}: explicit parent root is required",
+    configured_source_value = str(source_root) if source_root is not None else os.environ.get(
+        "AGENT_CANON_SOURCE_ROOT", ""
+    ).strip()
+    if not configured_source_value:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            f"{purpose}: explicit source root is required",
+        )
+    runtime = runtime_artifact_boundary(
+        Path(configured_source_value).resolve(strict=True), configured_runtime, create=True
     )
+    runtime.atomic_write_bytes(path, payload)
 
 
 def _selector_temp_dir(root: Path) -> str:
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
+    configured_runtime = os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
+    if not configured_runtime:
         raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            "pr-graph-staging: explicit parent root is required",
+            ParentRootReject.RUNTIME_ROOT_REQUIRED,
+            "pr-graph-staging: explicit runtime root is required",
         )
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="pr-graph-staging")
+    runtime = runtime_artifact_boundary(
+        root.resolve(strict=True), configured_runtime, create=True
     )
-    directory = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
-        attestation, parent / ".agent-canon" / "tmp" / "pr-graph", "pr-graph-staging"
-    )
-    return str(directory.physical_path)
+    return str(runtime.ensure_directory(Path("tasks") / "pr-graph"))
 
 
 class SelectorFailure(RuntimeError):
@@ -399,6 +408,15 @@ def emit_acceptance(status: str, reason: str, evidence: str) -> None:
     print(f"AGENT_CANON_PR_GRAPH_ACCEPTANCE_EVIDENCE={evidence}")
 
 
+def boundary_failure(error: ParentRootSideEffectError) -> tuple[str, str]:
+    """Return a stable, non-ambiguous fail-closed boundary verdict."""
+    detail_digest = hashlib.sha256(error.detail.encode("utf-8")).hexdigest()
+    return (
+        f"parent_boundary_{error.reject.value}",
+        f"reject={error.reject.value};detail_sha256={detail_digest}",
+    )
+
+
 def run_git(
     root: Path,
     args: Sequence[str],
@@ -566,7 +584,7 @@ def prepare_ci_base(root: Path, environment: Mapping[str, str]) -> PreparedBase:
             "pr_checkout_depth_invalid",
             f"value_sha256={hashlib.sha256(shallow.encode()).hexdigest()}",
         )
-    fetch_args = ["fetch", "--no-tags", "--no-recurse-submodules"]
+    fetch_args = ["fetch", "--no-tags"]
     if shallow == "true":
         fetch_args.extend(("--deepen", FULL_HISTORY_DEEPEN))
     fetch_args.extend(("origin", base_sha))
@@ -631,7 +649,6 @@ def load_diff(
             f"{base_sha}...{head_sha}",
             "--",
             ".",
-            ":(exclude)vendor/agent-canon",
         ],
         "pr_manifest_diff_failed",
     )
@@ -813,6 +830,7 @@ def write_changed_path_packet(
     root: Path,
     diff: DiffEvidence,
     packet_path: Path,
+    source_root: Path | None = None,
 ) -> None:
     """Persist the selector-owned trusted base/head path evidence."""
     merge_base = git_output(
@@ -847,8 +865,12 @@ def write_changed_path_packet(
             packet_path,
             (json.dumps(packet, indent=2, sort_keys=True) + "\n").encode("utf-8"),
             "pr-changed-path-packet",
+            source_root=source_root,
         )
-    except OSError as error:
+    except ParentRootSideEffectError as error:
+        reason, evidence = boundary_failure(error)
+        raise SelectorFailure(reason, evidence) from error
+    except (OSError, RuntimeArtifactError) as error:
         raise SelectorFailure(
             "pr_changed_path_packet_write_failed",
             f"path={packet_path};error={type(error).__name__}",
@@ -2383,11 +2405,16 @@ def parent_bound_graph_command(
     arguments: Sequence[str],
 ) -> list[str]:
     """Route one graph child through the authenticated outer parent."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_CONTROL_PARENT_ROOT", "").strip()
     if not configured:
         raise SelectorFailure(
             "trusted_base_graph_parent_unavailable",
-            "field=AGENT_CANON_PARENT_ROOT",
+            "field=AGENT_CANON_CONTROL_PARENT_ROOT",
+        )
+    if Path(configured).resolve(strict=False) == source_root.resolve():
+        raise SelectorFailure(
+            "trusted_base_graph_parent_invalid",
+            "field=AGENT_CANON_CONTROL_PARENT_ROOT;detail=source_root_same",
         )
     boundary = source_root / "tools" / "agent_tools" / "parent_root_side_effects.py"
     return [
@@ -2426,99 +2453,13 @@ def surface_manifest_producer(source_root: Path | None) -> Path:
     return resolved
 
 
-def base_gitlinks(root: Path, base_sha: str) -> tuple[tuple[str, str], ...]:
-    """Read every submodule path and exact object recorded by the base tree."""
-    output = git_output(
-        root,
-        ["ls-tree", "-r", "--full-tree", base_sha, "--"],
-        "trusted_base_submodule_identity_unavailable",
-    )
-    gitlinks: list[tuple[str, str]] = []
-    for line in output.splitlines():
-        if "\t" not in line:
-            raise SelectorFailure(
-                "trusted_base_submodule_identity_invalid",
-                "detail=malformed_ls_tree_record",
-            )
-        metadata, path = line.split("\t", 1)
-        fields = metadata.split()
-        if len(fields) != 3:
-            raise SelectorFailure(
-                "trusted_base_submodule_identity_invalid",
-                "detail=malformed_ls_tree_metadata",
-            )
-        mode, object_type, object_id = fields
-        if mode == "160000":
-            if object_type != "commit" or not HEX_SHA_RE.fullmatch(object_id):
-                raise SelectorFailure(
-                    "trusted_base_submodule_identity_invalid",
-                    f"path={path};detail=invalid_gitlink",
-                )
-            gitlinks.append((path, object_id.lower()))
-    return tuple(gitlinks)
-
-
-def materialize_base_submodules(root: Path, base_sha: str) -> None:
-    """Materialize and verify every base-tree gitlink before graph build."""
-    expected = base_gitlinks(root, base_sha)
-    if not expected:
-        return
-    update = run_git(
-        root,
-        [
-            "-c",
-            "protocol.file.allow=always",
-            "submodule",
-            "update",
-            "--init",
-            "--recursive",
-        ],
-    )
-    if update.returncode != 0:
-        stderr = update.stderr.strip()
-        raise SelectorFailure(
-            "trusted_base_submodule_materialization_failed",
-            f"exit={update.returncode};stderr_sha256="
-            f"{hashlib.sha256(stderr.encode()).hexdigest()}",
-        )
-    for relative_path, expected_head in expected:
-        submodule = root / relative_path
-        if not submodule.is_dir() or submodule.is_symlink():
-            raise SelectorFailure(
-                "trusted_base_submodule_materialization_failed",
-                f"path={relative_path};detail=missing_checkout",
-            )
-        actual_head = (
-            git_output(
-                submodule,
-                ["rev-parse", "HEAD"],
-                "trusted_base_submodule_identity_unavailable",
-            )
-            .strip()
-            .lower()
-        )
-        if actual_head != expected_head:
-            raise SelectorFailure(
-                "trusted_base_submodule_identity_mismatch",
-                f"path={relative_path};expected={expected_head};actual={actual_head}",
-            )
-
-
 def base_surface_manifest(root: Path, base_sha: str) -> str:
     """Resolve the sole surface manifest from the exact base filesystem."""
-    submodule = root / "vendor" / "agent-canon"
-    if submodule.is_dir() and not submodule.is_symlink():
-        names = git_output(
-            submodule,
-            ["ls-tree", "-r", "--name-only", "HEAD", "--"],
-            "trusted_base_surface_manifest_unavailable",
-        ).splitlines()
-    else:
-        names = git_output(
-            root,
-            ["ls-tree", "-r", "--name-only", base_sha, "--"],
-            "trusted_base_surface_manifest_unavailable",
-        ).splitlines()
+    names = git_output(
+        root,
+        ["ls-tree", "-r", "--name-only", base_sha, "--"],
+        "trusted_base_surface_manifest_unavailable",
+    ).splitlines()
     matches = tuple(
         name for name in names if Path(name).name == "shared-runtime-surfaces.toml"
     )
@@ -2527,7 +2468,7 @@ def base_surface_manifest(root: Path, base_sha: str) -> str:
             "trusted_base_surface_manifest_unavailable",
             f"match_count={len(matches)}",
         )
-    manifest = (submodule if submodule.is_dir() else root) / matches[0]
+    manifest = root / matches[0]
     if not manifest.is_file() or manifest.is_symlink():
         raise SelectorFailure(
             "trusted_base_surface_manifest_unavailable",
@@ -2574,9 +2515,14 @@ def build_trusted_base_graph(
     producer_identity = current_producer_identity(authorized_root)
     executable = graph_executable(authorized_root)
     producer = surface_manifest_producer(authorized_root)
+    try:
+        staging_root = _selector_temp_dir(root)
+    except ParentRootSideEffectError as error:
+        reason, evidence = boundary_failure(error)
+        raise SelectorFailure(reason, evidence) from error
     with tempfile.TemporaryDirectory(
         prefix="agent-canon-pr-base-",
-        dir=_selector_temp_dir(root),
+        dir=staging_root,
     ) as temp_dir:
         base_root = Path(temp_dir) / "checkout"
         clone = run_git(
@@ -2615,7 +2561,6 @@ def build_trusted_base_graph(
                 "trusted_base_graph_identity_mismatch",
                 f"expected={base_sha};actual={resolved_head}",
             )
-        materialize_base_submodules(base_root, base_sha)
         manifest = base_surface_manifest(base_root, base_sha)
 
         build = subprocess.run(
@@ -2666,8 +2611,16 @@ def build_trusted_base_graph(
             base_root / ".agent-canon" / "knowledge-graph" / "graph-build.json"
         )
         try:
-            _selector_write(result_path, build.stdout.encode("utf-8"), "pr-graph-result")
-        except OSError:
+            _selector_write(
+                result_path,
+                build.stdout.encode("utf-8"),
+                "pr-graph-result",
+                source_root=authorized_root,
+            )
+        except ParentRootSideEffectError as error:
+            reason, evidence = boundary_failure(error)
+            raise SelectorFailure(reason, evidence) from error
+        except (OSError, RuntimeArtifactError):
             raise SelectorFailure(
                 "trusted_base_graph_build_failed",
                 "result_write=failed",
@@ -2736,8 +2689,16 @@ def build_trusted_base_graph(
             base_root / ".agent-canon" / "knowledge-graph" / "graph-status.json"
         )
         try:
-            _selector_write(status_path, status.stdout.encode("utf-8"), "pr-graph-status")
-        except OSError:
+            _selector_write(
+                status_path,
+                status.stdout.encode("utf-8"),
+                "pr-graph-status",
+                source_root=authorized_root,
+            )
+        except ParentRootSideEffectError as error:
+            reason, evidence = boundary_failure(error)
+            raise SelectorFailure(reason, evidence) from error
+        except (OSError, RuntimeArtifactError):
             raise SelectorFailure(
                 "trusted_base_graph_status_unavailable",
                 "result_write=failed",
@@ -2904,7 +2865,7 @@ def select(
     source_root = authorized_source_root(source_root)
     diff = load_diff(root, environment, trusted_base_sha)
     if changed_path_packet is not None:
-        write_changed_path_packet(root, diff, changed_path_packet)
+        write_changed_path_packet(root, diff, changed_path_packet, source_root)
     surfaces = dependency_surface_paths(source_root)
     profiles = load_profiles(source_root, environment)
     touched_surfaces = tuple(path for path in diff.changed_paths if path in surfaces)
@@ -2950,6 +2911,13 @@ def main() -> int:
     if args.producer_identity:
         try:
             identity = current_producer_identity(Path(args.source_root).resolve())
+        except ParentRootSideEffectError as error:
+            reason, evidence = boundary_failure(error)
+            print(
+                "AGENT_CANON_PR_PRODUCER_IDENTITY="
+                f"fail;reason={reason};evidence={evidence}"
+            )
+            return EXIT_FAILURE
         except (OSError, SelectorFailure) as error:
             if isinstance(error, SelectorFailure):
                 print(
@@ -2984,7 +2952,12 @@ def main() -> int:
                 report_out,
                 (json.dumps(acceptance.report, indent=2, sort_keys=True) + "\n").encode("utf-8"),
                 "pr-graph-acceptance",
+                source_root=Path(args.source_root).resolve(),
             )
+        except ParentRootSideEffectError as error:
+            reason, evidence = boundary_failure(error)
+            emit_acceptance("fail", reason, evidence)
+            return EXIT_FAILURE
         except (OSError, SelectorFailure) as error:
             if isinstance(error, SelectorFailure):
                 reason = error.reason
@@ -3003,6 +2976,10 @@ def main() -> int:
     if args.prepare_ci_base:
         try:
             prepared = prepare_ci_base(Path(args.root).resolve(), os.environ)
+        except ParentRootSideEffectError as error:
+            reason, evidence = boundary_failure(error)
+            emit_base("fail", reason, evidence)
+            return EXIT_FAILURE
         except SelectorFailure as error:
             emit_base("fail", error.reason, error.evidence)
             return EXIT_FAILURE
@@ -3029,6 +3006,10 @@ def main() -> int:
             if args.changed_path_packet
             else None,
         )
+    except ParentRootSideEffectError as error:
+        reason, evidence = boundary_failure(error)
+        emit("fail", reason, evidence)
+        return EXIT_FAILURE
     except SelectorFailure as error:
         emit("fail", error.reason, error.evidence)
         return EXIT_FAILURE

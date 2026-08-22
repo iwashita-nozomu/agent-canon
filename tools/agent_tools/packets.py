@@ -185,7 +185,7 @@ COMMON_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = (
     "documents/conventions/coding-conventions-python.md",
     "documents/operations/notes-lifecycle.md",
     "agents/workflows/agent-learning-workflow.md",
-    "documents/agent-canon/agent-canon-subtree-migration.md",
+    "documents/agent-canon/agent-canon-update-route.md",
     "documents/notes/guardrails/README.md",
     "documents/notes/guardrails/engineering_avoidances.md",
 )

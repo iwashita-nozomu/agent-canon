@@ -7,7 +7,7 @@
 # upstream design ../../agents/skills/agent-orchestration.md tool-first skill execution contract
 # upstream design ../../agents/skills/catalog.yaml public skill related-skill metadata
 # upstream implementation ../../tools/agent_tools/route.py parses and validates the public skill catalog
-# upstream implementation ../../tools/agent_tools/agent_canon_source_root.py resolves standalone/vendored owner roots for fallback execution
+# upstream implementation ../../tools/agent_tools/agent_canon_source_root.py resolves the selected source checkout
 # downstream implementation ../../.agents/skills/agent-orchestration/SKILL.md materialized runtime skill command entry example
 # downstream implementation ../../tools/agent_tools/check_convention_compliance.py verifies command section wiring
 # downstream implementation ../../tests/agent_tools/test_skill_tool_commands.py tests command extraction and read-only checks
@@ -92,19 +92,7 @@ COMMAND_PREFIXES = (
 ASSIGNMENT_TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=.*")
 INLINE_CODE_RE = re.compile(r"`([^`]+)`")
 MAKEFILE_NAMES = ("GNUmakefile", "makefile", "Makefile")
-OPTIONAL_AGENT_CANON_MAKE_TARGETS = {
-    "agent-canon-update-plan": "plan",
-    "agent-canon-latest": "latest",
-    "agent-canon-ensure-latest": "latest",
-}
-SOURCE_ROOT_PYTHONPATH = "vendor/agent-canon/tools:tools"
-SOURCE_ROOT_UPDATE_PREFIX = (
-    "python3",
-    "-m",
-    "agent_tools.agent_canon_source_root",
-    "exec",
-    "tools/update_agent_canon.sh",
-)
+SOURCE_ROOT_PYTHONPATH = "tools"
 
 
 def _canonical_makefile(repository_root: Path) -> Path | None:
@@ -251,51 +239,6 @@ def make_target_is_explicit(repository_root: Path, target: str) -> bool:
     return makefile is not None and target in explicit_make_targets(makefile)
 
 
-def resolve_optional_agent_canon_make_alias(
-    command: str,
-    repository_root: Path,
-) -> str:
-    """Keep an existing explicit alias or return the canonical owner-tool route."""
-    try:
-        tokens = shlex.split(command)
-    except ValueError:
-        return command
-    command_index = 0
-    while (
-        command_index < len(tokens)
-        and ASSIGNMENT_TOKEN_RE.fullmatch(tokens[command_index])
-    ):
-        command_index += 1
-    body = tokens[command_index:]
-    if len(body) != 2 or body[0] != "make":
-        return command
-    mode = OPTIONAL_AGENT_CANON_MAKE_TARGETS.get(body[1])
-    if mode is None or make_target_is_explicit(repository_root, body[1]):
-        return command
-
-    environment = [
-        token
-        for token in tokens[:command_index]
-        if not token.startswith("PYTHONPATH=")
-    ]
-    resolved = (
-        *environment,
-        f"PYTHONPATH={SOURCE_ROOT_PYTHONPATH}",
-        *SOURCE_ROOT_UPDATE_PREFIX,
-        mode,
-    )
-    return shlex.join(resolved)
-
-
-def resolve_optional_agent_canon_make_aliases(
-    commands: Iterable[str],
-    repository_root: Path,
-) -> tuple[str, ...]:
-    """Resolve every optional alias in stable input order."""
-    return tuple(
-        resolve_optional_agent_canon_make_alias(command, repository_root)
-        for command in commands
-    )
 ISSUE_CONTRACT_MARKERS: dict[str, tuple[tuple[str, str], ...]] = {
     "experiment-lifecycle": (
         (
@@ -304,7 +247,7 @@ ISSUE_CONTRACT_MARKERS: dict[str, tuple[tuple[str, str], ...]] = {
         ),
         (
             "experiment-registry-template-contract-path",
-            "vendor/agent-canon/documents/experiments/experiment-registry.md",
+            "documents/experiments/experiment-registry.md",
         ),
         (
             "experiment-registry-project-root",
@@ -314,7 +257,7 @@ ISSUE_CONTRACT_MARKERS: dict[str, tuple[tuple[str, str], ...]] = {
     "research-workflow": (
         (
             "critical-review-template-path",
-            "vendor/agent-canon/documents/experiments/experiment-critical-review.md",
+            "documents/experiments/experiment-critical-review.md",
         ),
     ),
     "start-repository": (
@@ -413,8 +356,8 @@ class PublicCommandProjection:
 
 
 def _public_tool_prefix(root_resolution: RootResolution) -> str:
-    """Return the one public tool prefix for the selected checkout layout."""
-    return "tools" if root_resolution.layout == "standalone" else "tools/agent-canon"
+    """Return the source checkout's one public tool prefix."""
+    return "tools"
 
 
 def _project_public_path(token: str, prefix: str) -> str:
@@ -424,13 +367,11 @@ def _project_public_path(token: str, prefix: str) -> str:
             "agent_canon_public_command_invalid",
             f"Nested public tools path is not valid: {token}",
         )
-    if token.startswith("vendor/agent-canon/vendor/agent-canon/"):
+    if token.startswith("tools/agent-canon/"):
         raise SourceRootFailure(
             "agent_canon_public_command_invalid",
-            f"Repeated vendor source prefix is not valid: {token}",
+            f"Nested public tools path is not valid: {token}",
         )
-    if token.startswith("vendor/agent-canon/tools/"):
-        token = "tools/" + token.removeprefix("vendor/agent-canon/tools/")
     if token.startswith("tools/"):
         return f"{prefix}/{token.removeprefix('tools/')}"
     return token
@@ -438,28 +379,20 @@ def _project_public_path(token: str, prefix: str) -> str:
 
 def _project_contract_path(token: str, prefix: str) -> str:
     """Project a source-document operand independently of the public tool path."""
-    if token.startswith("vendor/agent-canon/vendor/agent-canon/"):
-        raise SourceRootFailure(
-            "agent_canon_public_command_invalid",
-            f"Repeated vendor contract prefix is not valid: {token}",
-        )
-    if token.startswith("vendor/agent-canon/"):
-        relative = token.removeprefix("vendor/agent-canon/")
-        return relative if prefix == "tools" else token
     if token.startswith(("documents/", "agents/", "templates/")):
-        return token if prefix == "tools" else f"vendor/agent-canon/{token}"
+        return token
     return token
 
 
 def _public_executable_tokens(tokens: tuple[str, ...]) -> tuple[str, ...]:
     """Return only public path tokens that are executable positions."""
     candidates: list[str] = []
-    if tokens and tokens[0].startswith(("tools/", "vendor/agent-canon/tools/")):
+    if tokens and tokens[0].startswith("tools/"):
         candidates.append(tokens[0])
     if (
         len(tokens) > 1
         and tokens[0] in SCRIPT_INTERPRETERS
-        and tokens[1].startswith(("tools/", "vendor/agent-canon/tools/"))
+        and tokens[1].startswith("tools/")
     ):
         candidates.append(tokens[1])
     candidates.extend(
@@ -467,7 +400,7 @@ def _public_executable_tokens(tokens: tuple[str, ...]) -> tuple[str, ...]:
         for index, token in enumerate(tokens)
         if index > 0
         and tokens[index - 1] == "exec"
-        and token.startswith(("tools/", "vendor/agent-canon/tools/"))
+        and token.startswith("tools/")
     )
     return tuple(dict.fromkeys(candidates))
 
@@ -495,7 +428,7 @@ def project_public_command(
             for entry in value.split(":"):
                 if not entry:
                     continue
-                if entry in {"tools", "vendor/agent-canon/tools"}:
+                if entry == "tools":
                     entry = prefix
                 projected.append(entry)
             value = ":".join(dict.fromkeys(projected))
@@ -506,7 +439,7 @@ def project_public_command(
     for token_index, token in enumerate(tokens):
         if token_index == 1 and tokens[0] in SCRIPT_INTERPRETERS:
             projected_tokens.append(_project_public_path(token, prefix))
-        elif token_index == 0 and token.startswith(("tools/", "vendor/agent-canon/tools/")):
+        elif token_index == 0 and token.startswith("tools/"):
             projected_tokens.append(_project_public_path(token, prefix))
         elif token_index > 0 and tokens[token_index - 1] == "exec":
             projected_tokens.append(_project_public_path(token, prefix))
@@ -518,26 +451,16 @@ def project_public_command(
         else:
             projected_tokens.append(token)
     public_tokens = tuple(projected_tokens)
-    if root_resolution.layout != "standalone":
-        public_root = (
-            root_resolution.current_repository_root / "tools" / "agent-canon"
-        ).resolve()
-        for token in _public_executable_tokens(public_tokens):
-            candidate = (
-                root_resolution.current_repository_root / token
-            ).resolve()
-            try:
-                candidate.relative_to(public_root)
-            except ValueError as exc:
-                raise SourceRootFailure(
-                    "agent_canon_public_command_escape",
-                    f"Public command escapes the authenticated public view: {token}",
-                ) from exc
-            if candidate.suffix in {".py", ".sh"} and not candidate.is_file():
-                raise SourceRootFailure(
-                    "agent_canon_public_command_missing",
-                    f"Public executable does not exist: {token}",
-                )
+    public_root = root_resolution.source_root.resolve()
+    for token in _public_executable_tokens(public_tokens):
+        candidate = (public_root / token).resolve()
+        try:
+            candidate.relative_to(public_root)
+        except ValueError as exc:
+            raise SourceRootFailure(
+                "agent_canon_public_command_escape",
+                f"Public command escapes the authenticated source checkout: {token}",
+            ) from exc
     return PublicCommandProjection(
         logical_command=shlex.join(raw),
         layout=root_resolution.layout,
@@ -553,7 +476,7 @@ def project_public_command_for_layout(
     layout: str,
 ) -> PublicCommandProjection:
     """Project a logical command when only the resolved layout is available."""
-    if layout not in {"standalone", "vendored", "override"}:
+    if layout not in {"standalone", "external"}:
         raise SourceRootFailure("agent_canon_public_command_invalid", f"unknown layout: {layout}")
     # The projection itself is independent of source identity.  A lightweight
     # resolution object keeps this helper on the same owner seam without
@@ -563,7 +486,7 @@ def project_public_command_for_layout(
         source_root=Path("."),
         layout=layout,
         canon_root=Path("."),
-        public_tool_root=Path("tools/agent-canon"),
+        public_tool_root=Path("tools"),
     )
     return project_public_command(logical_command, resolution)
 
@@ -779,14 +702,6 @@ def packet_for_skill(root_resolution: RootResolution, skill: str) -> SkillComman
         conditional_for_resolution = conditional or (FALLBACK_COMMAND,)
         required = load_skill_required_tool_commands(root).get(skill, ())
         maintenance = LEGACY_MAINTENANCE_COMMANDS
-    parent_root = root_resolution.current_repository_root
-    required = resolve_optional_agent_canon_make_aliases(required, parent_root)
-    conditional = resolve_optional_agent_canon_make_aliases(conditional, parent_root)
-    conditional_for_resolution = resolve_optional_agent_canon_make_aliases(
-        conditional_for_resolution,
-        parent_root,
-    )
-    maintenance = resolve_optional_agent_canon_make_aliases(maintenance, parent_root)
     resolved_required = tuple(
         build_command_plan(command, source_root) for command in required
     )
