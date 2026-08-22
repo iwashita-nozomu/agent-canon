@@ -173,12 +173,9 @@ run_agent_canon() {
     command=("${CANON_TOOLS_ROOT}/bin/agent-canon" "$@")
   elif [ -x "${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon" ]; then
     command=("${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon" "$@")
-  elif command -v cargo >/dev/null 2>&1 \
-    && [ -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ]; then
-    command=(cargo run --quiet --manifest-path "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" -- "$@")
   else
     echo "AGENT_CANON_CLI_BLOCKER=agent_canon_cli_unavailable" >&2
-    echo "AGENT_CANON_CLI_REASON=agent-canon CLI binary/shim missing and cargo route unavailable" >&2
+    echo "AGENT_CANON_CLI_REASON=bootstrap-managed AgentCanon CLI is unavailable" >&2
     return 127
   fi
   "${command[@]}"
