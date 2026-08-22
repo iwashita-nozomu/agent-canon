@@ -16,10 +16,23 @@ import ast
 import json
 import re
 import shlex
+import sys
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from textwrap import indent
 from typing import TypeAlias
+
+try:
+    from tools.agent_tools.runtime_artifacts import (
+        RuntimeArtifactError,
+        runtime_artifact_boundary,
+    )
+except ImportError:  # pragma: no cover - direct script invocation.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from tools.agent_tools.runtime_artifacts import (  # type: ignore[no-redef]
+        RuntimeArtifactError,
+        runtime_artifact_boundary,
+    )
 
 TARGET_EXTENSIONS = {
     "lean": "lean",
@@ -122,6 +135,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Identifier for the theorem stub.",
     )
     parser.add_argument("--out-dir", help="Optional directory for scaffold artifacts.")
+    parser.add_argument(
+        "--runtime-root",
+        help=(
+            "External runtime root used by checker environments (or rely on "
+            "AGENT_CANON_RUNTIME_ROOT in the emitted command)."
+        ),
+    )
     parser.add_argument("--format", choices=("text", "json", "markdown"), default="text")
     return parser
 
@@ -413,12 +433,28 @@ def build_obligations(sections: dict[str, list[str]]) -> tuple[str, ...]:
     return tuple(obligations)
 
 
-def build_verification_commands(stub_path: str, target: str) -> tuple[str, ...]:
-    """Return target-specific verification commands."""
+def build_verification_commands(
+    stub_path: str,
+    target: str,
+    runtime_root: str | None = None,
+) -> tuple[str, ...]:
+    """Return target-specific verification commands.
+
+    The checker environment is runtime state, not source content.  Keep the
+    command usable before an output directory exists by referring to the
+    explicit runtime-root environment variable when no concrete root was
+    supplied.
+    """
     if target == "lean":
+        if runtime_root:
+            env_dir = shlex.quote(
+                str(Path(runtime_root).expanduser() / "tasks" / "formal-proof" / "lean-proof-env")
+            )
+        else:
+            env_dir = "${AGENT_CANON_RUNTIME_ROOT}/tasks/formal-proof/lean-proof-env"
         return (
             "python3 tools/agent_tools/lean_proof_env.py check-file "
-            "--env-dir reports/formal-proof/lean-proof-env "
+            f"--env-dir {env_dir} "
             f"--lean-file {shlex.quote(stub_path)} --execute",
         )
     if target == "isabelle":
@@ -527,6 +563,7 @@ def build_plan(
     source_symbol: str | None = None,
     source_summary: str | None = None,
     extra_obligations: tuple[str, ...] = (),
+    runtime_root: str | None = None,
 ) -> FormalProofPlan:
     """Build the proof plan object."""
     sections = parse_sections(claim_text)
@@ -551,7 +588,11 @@ def build_plan(
         proof_obligations=proof_obligations,
         existing_proof_queries=build_existing_proof_queries(claim_text, domains, target),
         literature_queries=build_literature_queries(claim_text, domains),
-        verification_commands=build_verification_commands(verification_stub, target),
+        verification_commands=build_verification_commands(
+            verification_stub,
+            target,
+            runtime_root,
+        ),
         theorem_stub_path=stub_path,
         theorem_stub_name=None,
         library_trace_module_path=None,
@@ -681,7 +722,12 @@ def build_library_trace_module(plan: FormalProofPlan) -> str:
     )
 
 
-def write_outputs(plan: FormalProofPlan, out_dir: Path, name: str) -> FormalProofPlan:
+def write_outputs(
+    plan: FormalProofPlan,
+    out_dir: Path,
+    name: str,
+    runtime_root: str | None = None,
+) -> FormalProofPlan:
     """Write JSON, Markdown, query, and theorem-stub artifacts."""
     out_dir.mkdir(parents=True, exist_ok=True)
     safe_name = normalize_identifier(name)
@@ -705,6 +751,7 @@ def write_outputs(plan: FormalProofPlan, out_dir: Path, name: str) -> FormalProo
         verification_commands=build_verification_commands(
             stub_relpath,
             plan.target,
+            runtime_root,
         ),
     )
     stub_path.write_text(build_stub(plan.target, name, written_plan), encoding="utf-8")
@@ -737,6 +784,18 @@ def main() -> int:
     """Run the CLI."""
     parser = build_parser()
     args = parser.parse_args()
+    runtime_root: str | None = None
+    if args.runtime_root:
+        try:
+            runtime_root = str(
+                runtime_artifact_boundary(
+                    Path.cwd(),
+                    args.runtime_root,
+                    create=False,
+                ).root
+            )
+        except RuntimeArtifactError as exc:
+            parser.error(f"runtime_root_error: {exc}")
     domains = tuple(compact_space(domain) for domain in args.domain if compact_space(domain))
     ast_source: PythonAstSource | None = None
     try:
@@ -762,9 +821,10 @@ def main() -> int:
         source_symbol=ast_source.qualname if ast_source else None,
         source_summary=ast_source.signature if ast_source else None,
         extra_obligations=ast_source.proof_obligations if ast_source else (),
+        runtime_root=runtime_root,
     )
     if args.out_dir:
-        plan = write_outputs(plan, Path(args.out_dir), name)
+        plan = write_outputs(plan, Path(args.out_dir), name, runtime_root)
 
     if args.format == "json":
         print(json.dumps(asdict(plan), indent=2, sort_keys=True))

@@ -19,13 +19,26 @@ Audit Logger — 監査ログシステム
 
 import json
 import os
+import sys
 from collections.abc import Callable
 from datetime import datetime, timezone
-
-UTC = timezone.utc
 from enum import Enum
 from pathlib import Path
 from typing import ParamSpec, TypeAlias, TypeVar, cast
+
+try:
+    from tools.agent_tools.runtime_artifacts import (
+        RuntimeArtifactBoundary,
+        runtime_artifact_boundary,
+    )
+except ImportError:  # pragma: no cover - direct script invocation.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from tools.agent_tools.runtime_artifacts import (  # type: ignore[no-redef]
+        RuntimeArtifactBoundary,
+        runtime_artifact_boundary,
+    )
+
+UTC = timezone.utc
 
 JsonScalar: TypeAlias = str | int | float | bool | None
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
@@ -46,18 +59,54 @@ class AuditLevel(Enum):
 class AuditLogger:
     """監査ログ記録システム"""
     
-    def __init__(self, log_dir: Path | None = None):
+    def __init__(
+        self,
+        log_dir: Path | None = None,
+        *,
+        source_root: Path | None = None,
+        runtime_root: Path | str | None = None,
+    ):
         """初期化
         
         Args:
-            log_dir: ログ出力ディレクトリ（環境変数 AUDIT_LOG_DIR で設定可能）
+            log_dir: Explicit log output directory.  An explicit directory is
+                an intentional output capability and is preserved for callers
+                that already own the destination.
+            source_root: Source checkout used when resolving the default
+                external runtime destination.
+            runtime_root: Explicit external runtime root.  When ``log_dir``
+                is omitted this must be supplied or available through
+                ``AGENT_CANON_RUNTIME_ROOT``.
         """
+        self.source_root = Path(source_root or Path.cwd()).expanduser().resolve()
+        self._runtime_boundary: RuntimeArtifactBoundary | None = None
         if log_dir is None:
-            log_dir = Path(os.getenv("AUDIT_LOG_DIR", "reports/audit"))
-        
-        self.log_dir = Path(log_dir)
-        self.log_dir.mkdir(parents=True, exist_ok=True)
+            explicit_log_dir = os.getenv("AUDIT_LOG_DIR", "").strip()
+            if explicit_log_dir:
+                log_dir = Path(explicit_log_dir)
+        if log_dir is None:
+            self._runtime_boundary = runtime_artifact_boundary(
+                self.source_root,
+                runtime_root,
+                create=True,
+            )
+            self.log_dir = self._runtime_boundary.resolve(Path("audit"))
+            self._runtime_boundary.ensure_directory(Path("audit"))
+        else:
+            # Keep the historical explicit destination API.  This branch is
+            # never selected implicitly; callers opt into the destination.
+            self.log_dir = Path(log_dir).expanduser()
+            self.log_dir.mkdir(parents=True, exist_ok=True)
         self.log_file = self.log_dir / "audit.jsonl"
+
+    def _append(self, path: Path, payload: bytes) -> None:
+        """Append using the shared external resolver when one is active."""
+        if self._runtime_boundary is not None:
+            relative = path.relative_to(self._runtime_boundary.root)
+            self._runtime_boundary.append_bytes(relative, payload)
+            return
+        with path.open("ab") as stream:
+            stream.write(payload)
     
     def record(
         self,
@@ -98,9 +147,9 @@ class AuditLogger:
             "branch": self._get_current_branch(),
         })
         
-        # ファイルに追記
-        with open(self.log_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+        # ファイルに追記。デフォルト経路は外部 runtime root に限定する。
+        payload = (json.dumps(log_entry, ensure_ascii=False) + "\n").encode("utf-8")
+        self._append(self.log_file, payload)
         
         # セキュリティログの場合は別ファイルにも
         if level == AuditLevel.SECURITY or level == AuditLevel.COMPLIANCE:
@@ -111,8 +160,10 @@ class AuditLogger:
     def _log_to_security_file(self, entry: JsonObject) -> None:
         """セキュリティ・コンプライアンスログを分離ファイルに記録"""
         security_file = self.log_dir / "security.jsonl"
-        with open(security_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        self._append(
+            security_file,
+            (json.dumps(entry, ensure_ascii=False) + "\n").encode("utf-8"),
+        )
     
     def _get_current_commit(self) -> str:
         """現在の git commit SHA を取得"""
@@ -123,7 +174,7 @@ class AuditLogger:
                 capture_output=True,
                 text=True,
                 timeout=5,
-                cwd="/workspace"
+                cwd=self.source_root
             )
             return result.stdout.strip()[:8]
         except Exception:
@@ -138,7 +189,7 @@ class AuditLogger:
                 capture_output=True,
                 text=True,
                 timeout=5,
-                cwd="/workspace"
+                cwd=self.source_root
             )
             return result.stdout.strip()
         except Exception:

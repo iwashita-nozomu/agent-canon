@@ -22,8 +22,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${SCRIPT_DIR%/*}"
-LOG_DIR="${PROJECT_ROOT}/logs"
-REPORT_DIR="${PROJECT_ROOT}/reports"
 
 PYTHON_BIN="${PYTHON_BIN:-}"
 if [ -z "$PYTHON_BIN" ]; then
@@ -46,18 +44,26 @@ export NVIDIA_VISIBLE_DEVICES="${NVIDIA_VISIBLE_DEVICES:-}"
 RUN_PARALLEL=false
 GENERATE_REPORT=false
 VERBOSE=false
+RUNTIME_ROOT_ARG=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --parallel) RUN_PARALLEL=true; shift ;;
         --report) GENERATE_REPORT=true; shift ;;
         --verbose) VERBOSE=true; shift ;;
+        --runtime-root)
+            [[ $# -ge 2 ]] || { echo "--runtime-root requires a path" >&2; exit 2; }
+            RUNTIME_ROOT_ARG="$2"
+            shift 2
+            ;;
         --help)
             cat <<'EOF'
 Usage: ./tools/run_comprehensive_review.sh [--parallel] [--report] [--verbose]
+       [--runtime-root PATH]
 
 Runs static checks, tests, and workflow validators used in the comprehensive
-review flow. Logs are written under ./logs/.
+review flow. Logs and optional reports are written under the external runtime
+root (AGENT_CANON_RUNTIME_ROOT or --runtime-root).
 EOF
             exit 0
             ;;
@@ -65,8 +71,38 @@ EOF
     esac
 done
 
-# ログディレクトリ作成
-mkdir -p "$LOG_DIR"
+RUNTIME_ROOT_VALUE="${RUNTIME_ROOT_ARG:-${AGENT_CANON_RUNTIME_ROOT:-}}"
+RUN_DIR="$({
+  ROOT_DIR="${PROJECT_ROOT}" AGENT_CANON_RUNTIME_ROOT="${RUNTIME_ROOT_VALUE}" \
+    "${PYTHON_BIN}" - <<'PY'
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, os.environ["ROOT_DIR"])
+from tools.agent_tools.runtime_artifacts import (  # noqa: E402
+    RuntimeArtifactError,
+    runtime_artifact_boundary,
+)
+
+try:
+    boundary = runtime_artifact_boundary(
+        Path(os.environ["ROOT_DIR"]),
+        os.environ.get("AGENT_CANON_RUNTIME_ROOT"),
+        create=True,
+    )
+    parent = boundary.ensure_directory(Path("tasks") / "comprehensive-review")
+    print(tempfile.mkdtemp(prefix="run-", dir=str(parent)))
+except RuntimeArtifactError as exc:
+    print(f"runtime_root_error: {exc}", file=sys.stderr)
+    raise SystemExit(2)
+PY
+} )"
+LOG_DIR="${RUN_DIR}/logs"
+REPORT_DIR="${RUN_DIR}/reports"
+mkdir -p "${LOG_DIR}"
+export RUFF_CACHE_DIR="${RUN_DIR}/ruff-cache"
 
 # タイムスタンプ
 START_TIME=$(date +%s)
@@ -122,7 +158,8 @@ fi
 # Pytest
 log_info ""
 log_info "3/4️⃣ Test execution..."
-if "$PYTHON_BIN" -m pytest tests/ -v --tb=short > "$LOG_DIR/pytest.log" 2>&1; then
+if "$PYTHON_BIN" -m pytest tests/ -v --tb=short \
+    -o "cache_dir=${RUN_DIR}/pytest-cache" > "$LOG_DIR/pytest.log" 2>&1; then
     log_success "pytest: OK"
 else
     log_error "pytest: FAILED (see $LOG_DIR/pytest.log)"

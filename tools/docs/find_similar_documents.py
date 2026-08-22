@@ -14,15 +14,27 @@ and produce a report plus simple merge-draft files for manual review.
 Usage:
   python3 tools/docs/find_similar_documents.py [--min 0.5]
 
-Outputs:
-  - reports/similar_documents_report.txt
-  - reports/merge_candidates/*.md (drafts)
+Outputs are written beneath the explicit external runtime root, under a
+run-scoped directory. Set ``AGENT_CANON_RUNTIME_ROOT`` or pass
+``--runtime-root``; the source checkout is never an implicit output location.
 """
-from pathlib import Path
-import difflib
 import argparse
+import difflib
 import itertools
 import re
+import sys
+import tempfile
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from tools.agent_tools.runtime_artifacts import (  # noqa: E402
+    RuntimeArtifactBoundary,
+    RuntimeArtifactError,
+    runtime_artifact_boundary,
+)
 
 
 def normalize_text(t: str) -> str:
@@ -34,7 +46,7 @@ def normalize_text(t: str) -> str:
 
 
 def read_files(root: Path):
-    files = [p for p in root.rglob('*.md')]
+    files = [p for p in root.rglob('*.md') if p.is_file()]
     files = [p for p in files if 'template' not in p.name and not p.name.endswith('.bak')]
     return sorted(files)
 
@@ -80,15 +92,32 @@ def make_merged_draft(a_path: Path, b_path: Path, out_dir: Path, score: float):
     return out_file
 
 
+def create_output_dir(root: Path, runtime_root: str | None) -> Path:
+    """Create one symlink-safe external output directory for this run."""
+    boundary: RuntimeArtifactBoundary = runtime_artifact_boundary(
+        root, runtime_root, create=True
+    )
+    parent = boundary.ensure_directory(Path("tasks") / "similar-documents")
+    return Path(tempfile.mkdtemp(prefix="run-", dir=str(parent)))
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--min', type=float, default=0.6)
+    p.add_argument(
+        '--runtime-root',
+        help='External runtime root (or AGENT_CANON_RUNTIME_ROOT).',
+    )
     args = p.parse_args()
 
-    ROOT = Path('.').resolve()
+    ROOT = PROJECT_ROOT
     DOC_ROOT = ROOT / 'documents'
-    REPORT = ROOT / 'reports' / 'similar_documents_report.txt'
-    MERGE_DIR = ROOT / 'reports' / 'merge_candidates'
+    try:
+        output_dir = create_output_dir(ROOT, args.runtime_root)
+    except RuntimeArtifactError as exc:
+        p.error(f"runtime_root_error: {exc}")
+    REPORT = output_dir / 'similar_documents_report.txt'
+    MERGE_DIR = output_dir / 'merge_candidates'
 
     files = read_files(DOC_ROOT)
     texts = {f: normalize_text(f.read_text(encoding='utf-8')) for f in files}

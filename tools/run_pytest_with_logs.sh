@@ -7,23 +7,49 @@
 
 set -euo pipefail
 
-# このスクリプトは pytest のログを実行ごとのディレクトリに保存します。
-# 保存場所は tests/logs/[YYYYMMDD]-[HHMMSS]/ です。
+# このスクリプトは pytest のログを外部 runtime root の実行ごとの
+# ディレクトリに保存します。source checkout 内にはログを作成しません。
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LOG_ROOT="${ROOT_DIR}/tests/logs"
-RUN_DIR="${LOG_ROOT}/[$(date +%Y%m%d)]-[$(date +%H%M%S)]"
-RAW_LOG="${RUN_DIR}/pytest.raw.txt"
-JSON_LOG="${RUN_DIR}/pytest.jsonl"
-
+PYTHON_BIN="${PYTHON_BIN:-/usr/bin/python3}"
 export PYTHONPATH="${ROOT_DIR}/python${PYTHONPATH:+:${PYTHONPATH}}"
 
-mkdir -p "${RUN_DIR}"
+RUNTIME_ROOT="$({
+  ROOT_DIR="${ROOT_DIR}" PYTHON_BIN="${PYTHON_BIN}" "${PYTHON_BIN}" - <<'PY'
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, os.environ["ROOT_DIR"])
+from tools.agent_tools.runtime_artifacts import (  # noqa: E402
+    RuntimeArtifactError,
+    runtime_artifact_boundary,
+)
+
+try:
+    boundary = runtime_artifact_boundary(
+        Path(os.environ["ROOT_DIR"]),
+        os.environ.get("AGENT_CANON_RUNTIME_ROOT"),
+        create=True,
+    )
+    parent = boundary.ensure_directory(Path("tasks") / "pytest")
+    print(tempfile.mkdtemp(prefix="run-", dir=str(parent)))
+except RuntimeArtifactError as exc:
+    print(f"runtime_root_error: {exc}", file=sys.stderr)
+    raise SystemExit(2)
+PY
+} )"
+RUN_DIR="${RUNTIME_ROOT}"
+RAW_LOG="${RUN_DIR}/pytest.raw.txt"
+JSON_LOG="${RUN_DIR}/pytest.jsonl"
 
 pytest_args=("$@")
 if [[ "${#pytest_args[@]}" -eq 0 ]]; then
   pytest_args=(tests/ -q --tb=short)
 fi
+# Pytest's cache is runtime output too; keep it beside the captured logs.
+pytest_args+=("-o" "cache_dir=${RUN_DIR}/pytest-cache")
 
 cd "${ROOT_DIR}"
 
