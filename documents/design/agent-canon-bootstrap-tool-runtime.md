@@ -347,7 +347,7 @@ discovery entry とし、project-local `AGENTS.md` は親 repository の責務�
 source HEAD、AgentCanon commit/tool digest、family status、metrics、timestamp、
 `source_tree_unchanged` を必須にします。
 
-`eval sync` はHost adapterでexternal spoolを既存archive ownerへ渡します。network / 
+`eval sync` はHost adapterでexternal spoolを既存archive ownerへ渡します。network /
 archive unavailable時はspoolとfailure receiptを保持し、source treeを汚しません。
 non-force push後にremote ref/tree/blob digestをreadbackしてfinalizeします。
 

@@ -3,6 +3,7 @@
 # responsibility Tests experiment completion, terminal case invariants, and nested manifest readback.
 # upstream implementation ../../templates/experiments/_template/run.py owns schemas and artifact publication.
 # upstream implementation ../../templates/experiments/_template/cases.py owns case invariants.
+# upstream implementation ../../tools/experiments/create_experiment_topic.py owns topic materialization.
 # @dependency-end
 
 """experiment template の completion、state、manifest contract を検証します."""
@@ -10,6 +11,7 @@
 from __future__ import annotations
 
 import hashlib
+import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,6 +21,8 @@ import pytest
 TEMPLATE_ROOT = (
     Path(__file__).resolve().parents[2] / "templates" / "experiments" / "_template"
 )
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+CREATE_TOPIC = PROJECT_ROOT / "tools" / "experiments" / "create_experiment_topic.py"
 sys.path.insert(0, str(TEMPLATE_ROOT))
 
 from run import (  # noqa: E402
@@ -34,6 +38,66 @@ from run import (  # noqa: E402
 def _timestamp() -> str:
     """検証用の RFC3339 timestamp を返します."""
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def test_created_topic_readme_keeps_research_acceptance_topic_owned(
+    tmp_path: Path,
+) -> None:
+    """The creator must not regenerate a universal research acceptance gate."""
+    parent_root = tmp_path / "parent"
+    registry_path = parent_root / "experiments" / "registry.toml"
+    registry_path.parent.mkdir(parents=True)
+    registry_path.write_text(
+        "\n".join(
+            (
+                "schema_version = 1",
+                "topics = []",
+                "",
+                "[defaults]",
+                'topic_template_dir = "templates/experiments/_template"',
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(CREATE_TOPIC),
+            "--repo-root",
+            str(parent_root),
+            "--status",
+            "template",
+            "acceptance-boundary",
+        ],
+        cwd=PROJECT_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    readme = (
+        parent_root / "experiments" / "acceptance-boundary" / "README.md"
+    ).read_text(encoding="utf-8")
+    for forbidden in (
+        "受入条件",
+        "## 完了条件",
+        "completion gate",
+        "non-empty observation",
+    ):
+        assert forbidden not in readme
+    for required in (
+        "## 評価と lifecycle の境界",
+        "topic / research owner",
+        "run identity",
+        "result/<run-id>/",
+        "terminal / failure state",
+        "failure evidence",
+        "provenance / readback",
+    ):
+        assert required in readme
 
 
 def _result(**overrides: object) -> CaseResult:

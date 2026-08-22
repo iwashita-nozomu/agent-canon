@@ -21,6 +21,8 @@ Own one experiment run from preparation through terminal status. Run identity/st
 
 The reproducibility core records source identity, effective configuration, executed command/protocol, relevant environment/runtime identity, terminal status including failed or partial states, and references to artifacts that actually exist. No universal filename inventory is imposed: summaries, case records, visualization.py renderers, plots, and logs are producer-specific outputs and are required only when the selected producer/protocol declares them.
 
+Topic-specific metrics, observations, thresholds, comparisons, and research-success judgments belong to the topic or research owner. This skill records the declared protocol and operational evidence, but it does not turn execution state, exit status, artifact presence, or readback into a universal research acceptance gate.
+
 ## Use When
 
 - experiment directory の初期化
@@ -111,6 +113,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. When a Python process remains after an interrupted or failed experiment, identify the parent `run.py`, child worker, process group, and elapsed time before calling it residual. Treat active parent/worker processes as a still-running experiment and stop them only when the user asks for abort or cleanup.
 1. If the user restricts validation, distinguish non-persistent static checks from checks that leave artifacts. Static checks that do not create durable outputs are allowed. Experiment runs, visualization.py renderer execution, smoke checks, report generators, or any validation that writes result/log/report artifacts must not be run unless the user asks for them; when such a command is run and creates transient artifacts, delete those artifacts immediately after the run and report the cleanup.
 1. Keep checked-in experiment settings in `experiments/<topic>/config.yaml`; run artifacts must include a topic config snapshot, commonly `config_snapshot.json`, written by `run.py`.
+1. Keep topic-specific metrics, observations, thresholds, comparisons, and research-success judgments with the topic or research owner. Treat run state, exit status, artifact presence, and readback as operational evidence; do not promote them to a universal research acceptance gate.
 1. Require `experiments/<topic>/README.md` to describe the experiment content, question, comparison target, standard commands, config source, visualization visualization.py renderer, output schema, and run_name convention before formal execution.
 1. Require each nontrivial experiment README to include an implementation source map that lists the reused `python/` files, classes, and functions by name, plus a separate object-flow section that shows which objects each step creates, mutates, passes downstream, and writes as artifacts. If an experiment compares variants, identify the single shared execution path and the exact factory/function boundary where variants differ.
 1. Put topic visualization in `experiments/<topic>/visualization.py`; a topic may emit HTML or image artifacts from its renderer, but visualization must not be the formal run launcher, fine-grained test surface, or config source of truth.
