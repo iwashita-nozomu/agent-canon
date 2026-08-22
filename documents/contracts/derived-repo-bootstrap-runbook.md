@@ -1,55 +1,59 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents shortest safe onboarding path for repositories that vendor AgentCanon.
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md defines root view ownership.
-upstream design ../agent-canon/agent-canon-parent-repo-latest-checklist.md defines freshness and TODO handling.
-upstream design ../agent-canon/agent-canon-submodule-rollback.md defines rollback.
-upstream design ../codex/codex-configuration-reference.md defines MCP configuration boundaries.
-downstream implementation ../../tools/agent_tools/parent_repo_readiness.py validates derived repo readiness.
+responsibility Documents the source-free parent onboarding route for standalone AgentCanon.
+upstream design ../runtime/bootstrap-runtime.md owns the explicit runtime contract.
+upstream design ../agent-canon/agent-canon-update-route.md owns source publication and readback.
+upstream implementation ../../bootstrap.sh owns lifecycle commands.
 @dependency-end
 -->
 
-# Derived Repository Bootstrap Runbook
+# Parent project bootstrap runbook
 
-Use this after cloning a repository that vendors AgentCanon under
-`vendor/agent-canon/`.
+A normal project clone is source-free. It does not initialize an AgentCanon
+vendor checkout, Git submodule, source symlink, root projection, or AgentCanon
+runtime. Project code and project tests remain owned by the parent repository.
 
-## Clean Clone Checks
+## Optional AgentCanon tool runtime
 
-```bash
-git submodule update --init --recursive
-git submodule status vendor/agent-canon
-PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
-python3 tools/agent_tools/parent_repo_readiness.py --root .
-```
-
-If root views are broken:
+When a task needs AgentCanon Python/Rust/LSP tools, start one explicit shared
+runtime from the standalone AgentCanon source checkout:
 
 ```bash
-AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
-PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
+ROOT=<authorized-parent-root>
+RUNTIME="$ROOT/workspace/agent-canon-runtime/<installation>"
+COMMON=(--control-parent-root "$ROOT" --runtime-root "$RUNTIME")
+
+./bootstrap.sh "${COMMON[@]}" install
+./bootstrap.sh "${COMMON[@]}" start
+./bootstrap.sh "${COMMON[@]}" status
+./bootstrap.sh "${COMMON[@]}" target add --root <project-root> --mode read-only
+./bootstrap.sh "${COMMON[@]}" stop
+./bootstrap.sh "${COMMON[@]}" gc
+./bootstrap.sh "${COMMON[@]}" uninstall
 ```
 
-## Source Of Truth
+The control root must be the authorized parent checkout and the runtime must
+be its descendant but outside the source checkout. The source checkout cannot
+be either root. Runtime cache,
+reports, eval collections, Codex home, Cargo output, and temporary files stay
+under the external runtime root.
 
-AgentCanon-owned active root surfaces are sourced from `vendor/agent-canon/`:
-`AGENTS.md`, `.codex/config.toml`, and `tools/agent-canon`; optional transaction
-state may live under `.agent-canon/`. `.agents/`, `agents/`, `.codex/agents/`,
-`.devcontainer/`, `.vscode/`, GitHub paths, project implementation, experiments,
-reports, scripts, and runtime data remain parent-owned regular content.
+## Source and project boundaries
 
-## Failure Triage
+AgentCanon source changes are made in an ignored qualified clone under
+`workspace/agent-canondevelop/<qualified-task>/agent-canon`, published through
+an Issue-qualified AgentCanon PR, and read back from merged `main`. Parent
+project implementation and tests are run through the parent-owned Docker/test
+entrypoint. No parent command may restore a vendor checkout or submodule as a
+fallback.
+
+## Failure triage
 
 | Symptom | First check |
 | --- | --- |
-| `vendor/agent-canon` missing | `git submodule update --init --recursive` |
-| root symlink/copy drift | source-root resolver `check` |
-| stale AgentCanon pin | request-evidence-authorized `make agent-canon-ensure-latest` |
-| MCP unavailable | `documents/code../codex/codex-configuration-reference.md` |
-| GitHub auth or workflow failure | `python3 tools/ci/check_github_workflows.py` |
-| need rollback | `documents/agent-cano../agent-canon/agent-canon-submodule-rollback.md` |
-
-Do not fix a generic shared-canon defect only in the derived repo. Open an
-AgentCanon branch/PR, merge it, then update the derived repo pin.
+| missing or invalid runtime | verify explicit control/runtime arguments and containment |
+| source becomes dirty after inspection | inspect source/runtime path ownership and stop the task |
+| AgentCanon change is needed | create/update the qualified standalone source PR |
+| eval/archive publication fails | preserve the external spool and failure receipt for retry |
+| project test fails | classify the parent project execution plane separately |

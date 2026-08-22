@@ -17,8 +17,9 @@ import sys
 import tempfile
 import textwrap
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
-from typing import cast
+from typing import Iterator, cast
 
 import yaml
 
@@ -28,27 +29,58 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "prose_reasoning_graph.py"
 
 
+def _runtime_root_from_args(args: tuple[str, ...]) -> Path:
+    """Choose one external runtime root for every path in a CLI fixture."""
+    candidates: list[Path] = []
+    for value in args[1:]:
+        if not value.startswith("/"):
+            continue
+        path = Path(value)
+        candidates.append(path if path.is_dir() else path.parent)
+    if not candidates:
+        raise AssertionError(f"graph fixture has no absolute path: {args!r}")
+    return Path(os.path.commonpath([str(path) for path in candidates]))
+
+
+@contextmanager
+def graph_runtime(root: Path) -> Iterator[None]:
+    """Provide the explicit external runtime capability for direct API calls."""
+    previous = os.environ.get("AGENT_CANON_RUNTIME_ROOT")
+    os.environ["AGENT_CANON_RUNTIME_ROOT"] = str(root)
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("AGENT_CANON_RUNTIME_ROOT", None)
+        else:
+            os.environ["AGENT_CANON_RUNTIME_ROOT"] = previous
+
+
 def run_graph(*args: str) -> subprocess.CompletedProcess[str]:
     """Run the prose reasoning graph CLI."""
+    environment = os.environ.copy()
+    environment.setdefault("AGENT_CANON_RUNTIME_ROOT", str(_runtime_root_from_args(args)))
     return subprocess.run(
         [sys.executable, str(SCRIPT), *args],
         cwd=PROJECT_ROOT,
         check=False,
         capture_output=True,
         text=True,
-        env=os.environ.copy(),
+        env=environment,
     )
 
 
 def run_graph_with_env(env: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]:
     """Run the prose reasoning graph CLI with environment overrides."""
+    environment = {**os.environ, **env}
+    environment.setdefault("AGENT_CANON_RUNTIME_ROOT", str(_runtime_root_from_args(args)))
     return subprocess.run(
         [sys.executable, str(SCRIPT), *args],
         cwd=PROJECT_ROOT,
         check=False,
         capture_output=True,
         text=True,
-        env={**os.environ, **env},
+        env=environment,
     )
 
 
@@ -234,7 +266,7 @@ class ProseReasoningGraphTest(unittest.TestCase):
         """Hard ordering cycles should be visible in diagnostics."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             db = Path(tmp_dir) / "graph.sqlite"
-            with prose_graph.connect(db) as connection:
+            with graph_runtime(Path(tmp_dir)), prose_graph.connect(db) as connection:
                 prose_graph.initialize_schema(connection)
                 connection.execute(
                     """
@@ -365,17 +397,17 @@ class ProseReasoningGraphTest(unittest.TestCase):
             {"edge:a-b", "edge:b-a"},
         )
 
-    def test_ingest_defaults_db_to_user_home_cache(self) -> None:
-        """DB-creating commands should use the user-home cache unless --db is explicit."""
+    def test_ingest_defaults_db_to_external_runtime(self) -> None:
+        """DB-creating commands should use the explicit external runtime."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             source = root / "sample.md"
-            cache_root = root / "cache"
-            stats = root / "ingest.stats.json"
+            runtime_root = root / "runtime"
+            stats = runtime_root / "ingest.stats.json"
             source.write_text("# Sample\n\n根拠として本文を DB に入れる。", encoding="utf-8")
 
             ingest = run_graph_with_env(
-                {"AGENT_CANON_PROSE_GRAPH_HOME": str(cache_root)},
+                {"AGENT_CANON_RUNTIME_ROOT": str(runtime_root)},
                 "ingest",
                 str(source),
                 "--stats-out",
@@ -390,22 +422,24 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertTrue(db_path.exists(), db_path)
             self.assertEqual(db_path.name, "prose_graph.sqlite")
             self.assertTrue(
-                db_path.resolve().as_posix().startswith(cache_root.resolve().as_posix()),
+                db_path.resolve().as_posix().startswith(
+                    (runtime_root / "prose-reasoning-graph").resolve().as_posix()
+                ),
                 db_path,
             )
 
-    def test_ingest_set_defaults_db_to_user_home_cache(self) -> None:
-        """Multi-document DB creation should also accept the default cache route."""
+    def test_ingest_set_defaults_db_to_external_runtime(self) -> None:
+        """Multi-document DB creation should use the same external runtime route."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            cache_root = root / "cache"
+            runtime_root = root / "runtime"
             first = root / "first.md"
             second = root / "second.md"
             first.write_text("# First\n\n第一文書は根拠を持つ。", encoding="utf-8")
             second.write_text("# Second\n\n第二文書も根拠を持つ。", encoding="utf-8")
 
             ingest = run_graph_with_env(
-                {"AGENT_CANON_PROSE_GRAPH_HOME": str(cache_root)},
+                {"AGENT_CANON_RUNTIME_ROOT": str(runtime_root)},
                 "ingest-set",
                 str(first),
                 str(second),
@@ -416,32 +450,36 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertTrue(db_path.exists(), db_path)
             self.assertEqual(stdout_value(ingest, "PROSE_REASONING_GRAPH_DOCUMENTS"), "2")
             self.assertTrue(
-                db_path.resolve().as_posix().startswith(cache_root.resolve().as_posix()),
+                db_path.resolve().as_posix().startswith(
+                    (runtime_root / "prose-reasoning-graph").resolve().as_posix()
+                ),
                 db_path,
             )
 
-    def test_ingest_uses_home_cache_when_cache_env_is_unset(self) -> None:
-        """The default DB route should be under HOME when no cache override is set."""
+    def test_ingest_does_not_use_home_when_runtime_is_explicit(self) -> None:
+        """HOME must not influence the explicit external runtime route."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             fake_home = root / "home"
+            runtime_root = root / "runtime"
             source = root / "sample.md"
-            source.write_text("# Sample\n\nHOME 配下の cache に DB を作る。", encoding="utf-8")
+            source.write_text("# Sample\n\n外部 runtime に DB を作る。", encoding="utf-8")
 
             ingest = run_graph_with_env(
-                {"HOME": str(fake_home), "AGENT_CANON_PROSE_GRAPH_HOME": ""},
+                {"HOME": str(fake_home), "AGENT_CANON_RUNTIME_ROOT": str(runtime_root)},
                 "ingest",
                 str(source),
             )
 
             self.assertEqual(ingest.returncode, 0, ingest.stdout + ingest.stderr)
             db_path = Path(stdout_value(ingest, "PROSE_REASONING_GRAPH_DB"))
-            expected_root = fake_home / ".cache" / "agent-canon" / "prose-reasoning-graph"
+            expected_root = runtime_root / "prose-reasoning-graph"
             self.assertTrue(db_path.exists(), db_path)
             self.assertTrue(
                 db_path.resolve().as_posix().startswith(expected_root.resolve().as_posix()),
                 db_path,
             )
+            self.assertFalse(fake_home.exists())
 
     def test_ingest_analyze_project_and_explain(self) -> None:
         """The CLI should persist layers and emit human-readable outputs."""

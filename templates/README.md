@@ -3,7 +3,6 @@
 contract reference
 responsibility Indexes AgentCanon-owned template sources and the one-way static consumer export boundary.
 upstream design ../documents/contracts/static-seed-export.md static seed allowlist, provenance, and exclusion contract
-upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md separate explicit live integration boundary
 upstream design ../documents/rule/README.md document filename, placement, and language rules
 upstream design ../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring clauses and projection traces
 downstream implementation ./agents/README.md reusable agent artifact template source

@@ -2,12 +2,12 @@
 # @dependency-start
 # contract tool
 # responsibility Runs dedicated secret scanners against current tree and git history.
-# upstream design ../../CONTAINER_OPERATIONS.md shared devcontainer security tooling policy
+# upstream design ../../CONTAINER_OPERATIONS.md shared tool-runtime security policy
 # upstream implementation ../agent_tools/parent_root_side_effects.py owns scanner scratch allocation and exact cleanup
-# downstream environment ../../.devcontainer/devcontainer.json invokes the shared scanner setup
+# downstream environment ../../bootstrap.sh invokes the shared scanner setup
 # downstream design ../../tools/README.md documents the command surface
 # downstream design ../../documents/tools/README.md documents operator usage
-# downstream implementation ../../tests/tools/test_scan_secrets_script.py verifies external read-only scan input and parent-local scratch
+# downstream implementation ../../tests/tools/test_scan_secrets_script.py verifies external read-only scan input and runtime-local scratch
 # @dependency-end
 
 set -euo pipefail
@@ -19,7 +19,8 @@ scan_current=1
 trufflehog_results="${AGENT_CANON_TRUFFLEHOG_RESULTS:-verified,unknown}"
 detect_secrets_only_verified="${AGENT_CANON_DETECT_SECRETS_ONLY_VERIFIED:-1}"
 invocation_root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
-parent_root="${AGENT_CANON_PARENT_ROOT:-$invocation_root}"
+parent_root="${AGENT_CANON_CONTROL_PARENT_ROOT:-${AGENT_CANON_PARENT_ROOT:-}}"
+runtime_root="${AGENT_CANON_RUNTIME_ROOT:-}"
 script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 boundary_script="${script_root}/tools/agent_tools/parent_root_side_effects.py"
 parent_temp_paths=()
@@ -73,10 +74,22 @@ done
 
 root="$(cd "$root" && pwd -P)"
 if [ -z "$parent_root" ]; then
-  echo "SECRET_SCAN=missing_parent_root" >&2
+  echo "SECRET_SCAN=missing_control_parent_root" >&2
+  exit 2
+fi
+if [ -z "$runtime_root" ]; then
+  echo "SECRET_SCAN=missing_runtime_root" >&2
   exit 2
 fi
 parent_root="$(cd "$parent_root" && pwd -P)"
+runtime_root="$(cd "$runtime_root" && pwd -P)"
+case "$runtime_root/" in
+  "$parent_root/"*) ;;
+  *)
+    echo "SECRET_SCAN=runtime_root_outside_control_parent_root" >&2
+    exit 2
+    ;;
+esac
 cd "$root"
 if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "secret-scan-script" ]]; then
   python3 "$boundary_script" verify-child \
@@ -84,6 +97,10 @@ if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "secret-scan-script" ]]; then
     --purpose secret-scan-script \
     --consume >/dev/null
 else
+  # The control repo and scanned checkout can be distinct.  Bind runtime
+  # artifacts to the scanned project while parent_root_side_effects still
+  # authenticates the control repository.
+  export AGENT_CANON_SOURCE_ROOT="$root"
   exec python3 "$boundary_script" exec-parent-bound \
     --root "$parent_root" \
     --purpose secret-scan-script \
@@ -97,7 +114,7 @@ require_command() {
   if ! command -v "$command_name" >/dev/null 2>&1; then
     cat >&2 <<EOF
 SECRET_SCAN=missing_tool tool=${command_name}
-Install the shared devcontainer, rerun vendor/agent-canon/.devcontainer/post-create.sh, or install ${command_name} locally before scanning.
+Start the shared AgentCanon tool runtime with ./bootstrap.sh, or install ${command_name} locally before scanning.
 EOF
     exit 127
   fi
@@ -115,7 +132,7 @@ create_parent_temp_dir() {
   created_parent_temp_dir="$(
     python3 "$boundary_script" temp-dir \
       --root "$parent_root" \
-      --candidate "$parent_root/.agent-canon/tmp" \
+      --candidate "$runtime_root/secret-scan/tmp" \
       --prefix "$prefix" \
       --purpose secret-scan
   )"

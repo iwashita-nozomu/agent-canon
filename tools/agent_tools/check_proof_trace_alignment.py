@@ -251,14 +251,8 @@ def contract_anchors(contract_key: str, contract: JsonMapping) -> list[AnchorChe
 
 
 def resolve_source_path(root: Path, source_path: str) -> Path:
-    """Resolve a trace source path through root or vendored AgentCanon."""
-    direct = root / source_path
-    if direct.exists():
-        return direct
-    vendored = root / "vendor" / "agent-canon" / source_path
-    if vendored.exists():
-        return vendored
-    return direct
+    """Resolve a trace source path in the selected source checkout."""
+    return root / source_path
 
 
 PythonSymbol = ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef

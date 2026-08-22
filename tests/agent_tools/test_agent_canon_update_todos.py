@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -58,7 +59,7 @@ def commit_all(repo: Path, message: str) -> str:
 
 def write_manifest(canon_root: Path, boundary: str) -> None:
     """Write a minimal update TODO manifest."""
-    manifest = canon_root / "documents" / "agent-canon-update-tasks.toml"
+    manifest = canon_root / "documents" / "agent-canon" / "agent-canon-update-tasks.toml"
     manifest.parent.mkdir(parents=True, exist_ok=True)
     manifest.write_text(
         "\n".join(
@@ -84,8 +85,9 @@ def write_manifest(canon_root: Path, boundary: str) -> None:
 
 
 def create_canon_repo(root: Path) -> tuple[Path, str, str]:
-    """Create a tiny vendored AgentCanon git repo with one update task."""
-    canon_root = root / "vendor" / "agent-canon"
+    """Create a parent plus external AgentCanon development clone."""
+    run_git(root, "init", "-b", "main")
+    canon_root = root / "agent-canon-development" / "agent-canon"
     canon_root.mkdir(parents=True, exist_ok=True)
     run_git(canon_root, "init")
     (canon_root / "README.md").write_text("fixture canon\n", encoding="utf-8")
@@ -101,10 +103,19 @@ class AgentCanonUpdateTodosTest(unittest.TestCase):
     def run_tool(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the update TODO tool in a fixture root."""
         return subprocess.run(
-            [sys.executable, str(TOOL), "--root", str(root), *args],
+            [
+                sys.executable,
+                str(TOOL),
+                "--root",
+                str(root),
+                "--agent-canon-path",
+                "agent-canon-development/agent-canon",
+                *args,
+            ],
             check=False,
             capture_output=True,
             text=True,
+            env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(root)},
         )
 
     def test_init_creates_parent_state_and_ignored_generated_surface(self) -> None:
@@ -122,9 +133,10 @@ class AgentCanonUpdateTodosTest(unittest.TestCase):
             self.assertIn("# contract data", state_text)
             self.assertIn(target, state_text)
             self.assertIn(
-                "../vendor/agent-canon/documents/agent-canon/agent-canon-update-tasks.toml",
+                "AgentCanon source checkout documents/agent-canon/agent-canon-update-tasks.toml",
                 state_text,
             )
+            self.assertNotIn("vendor/agent-canon", state_text)
             self.assertEqual(
                 "*\n!.gitignore\n!update-state.toml\n",
                 (root / ".agent-canon" / ".gitignore").read_text(encoding="utf-8"),

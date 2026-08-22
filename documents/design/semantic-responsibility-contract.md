@@ -3,7 +3,6 @@
 contract design
 responsibility Defines the semantic responsibility contract for implementation deltas and their verification ownership.
 upstream design ../rule/README.md document filename, placement, and language rules
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared AgentCanon surface policy
 upstream design codex-spark-implementation-routing.md implementation owner and validation route
 downstream implementation ../../templates/documents/semantic-responsibility-contract.template.toml reusable empty task instance
 downstream implementation ../../tools/agent_tools/check_semantic_responsibility_contract.py schema, identity, and reference validator

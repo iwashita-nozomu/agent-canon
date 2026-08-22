@@ -11,8 +11,8 @@ downstream implementation ../../tools/experiments/gpu_command_admission.py direc
 downstream implementation ../../tools/experiments/run_gpu_command.py shell-free direct-command CLI adapter
 downstream implementation ../../tools/experiments/run_managed_experiment.py optional managed provider adapter
 downstream implementation ../../tools/ci/run_gpu_container.sh single-entry Docker injection adapter with internal CDI/all selection
-downstream contract ../../tests/tools/test_run_gpu_command.py fake NVIDIA, race, environment, lifecycle, and provider-independence acceptance tests
-downstream contract ../../tests/tools/test_run_gpu_container.py Docker argv, route selection, and exact environment acceptance tests
+downstream implementation ../../tests/tools/test_run_gpu_command.py fake NVIDIA, race, environment, lifecycle, and provider-independence acceptance tests
+downstream implementation ../../tests/tools/test_run_gpu_container.py Docker argv, route selection, and exact environment acceptance tests
 downstream design ../../agents/skills/gpu-execution.md route selection and operator workflow
 @dependency-end
 -->

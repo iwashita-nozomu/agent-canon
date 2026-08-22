@@ -69,12 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
     scope.add_argument(
         "--agentcanon-only",
         action="store_true",
-        help="Scan AgentCanon source. In a derived repo this uses vendor/agent-canon.",
-    )
-    scope.add_argument(
-        "--submodule-aware",
-        action="store_true",
-        help="Scan the parent repo surface and AgentCanon source as separate scopes.",
+        help="Scan the selected AgentCanon source checkout.",
     )
     parser.add_argument(
         "--exclude",
@@ -178,7 +173,7 @@ def main() -> int:
         root,
         root_only=bool(args.root_only),
         agentcanon_only=bool(args.agentcanon_only),
-        submodule_aware=bool(args.submodule_aware),
+        submodule_aware=False,
     )
     findings: list[Finding] = []
     files: list[Path] = []
@@ -197,11 +192,8 @@ def main() -> int:
 
 
 def agentcanon_root(root: Path) -> Path:
-    """Return the AgentCanon source root for a parent or source checkout."""
-    candidate = root / "vendor" / "agent-canon"
-    if candidate.exists():
-        return candidate.resolve()
-    return root
+    """Return the explicitly selected AgentCanon source checkout."""
+    return root.resolve()
 
 
 def resolve_scan_roots(
@@ -211,12 +203,10 @@ def resolve_scan_roots(
     agentcanon_only: bool,
     submodule_aware: bool,
 ) -> tuple[Path, ...]:
-    """Return scan roots for the requested parent/submodule scope."""
+    """Return the sole source checkout scan root."""
     canon_root = agentcanon_root(root)
     if agentcanon_only:
         return (canon_root,)
-    if submodule_aware and canon_root != root:
-        return (root, canon_root)
     return (root,)
 
 

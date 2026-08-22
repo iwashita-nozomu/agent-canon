@@ -132,10 +132,11 @@ paths = [
   "ROOT_AGENTS.md",
   ".agents/**",
   ".codex/**",
-  ".devcontainer/**",
   ".vscode/**",
   "agent-canon-environment.toml",
   "agents/**",
+  "bootstrap.sh",
+  "bootstrap/**",
   "templates/**",
 ]
 protecting_tools = [

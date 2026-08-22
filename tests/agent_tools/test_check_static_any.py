@@ -82,13 +82,12 @@ class CheckStaticAnyTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("STATIC_ANY=pass", result.stdout)
 
-    def test_submodule_aware_scope_avoids_symlink_duplicate_findings(self) -> None:
-        """Root symlink views and AgentCanon source should not duplicate findings."""
+    def test_root_only_scope_scans_selected_source_once(self) -> None:
+        """The standalone checker scans the selected root without submodule views."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            source_dir = root / "vendor" / "agent-canon" / "tools"
+            source_dir = root / "tools"
             source_dir.mkdir(parents=True)
-            (root / "tools").symlink_to(source_dir, target_is_directory=True)
             (source_dir / "bad.py").write_text(
                 "from typing import Any\nvalue: Any = 1\n",
                 encoding="utf-8",
@@ -100,7 +99,7 @@ class CheckStaticAnyTest(unittest.TestCase):
                     str(CHECKER),
                     "--root",
                     str(root),
-                    "--submodule-aware",
+                    "--root-only",
                     "tools",
                 ],
                 cwd=PROJECT_ROOT,

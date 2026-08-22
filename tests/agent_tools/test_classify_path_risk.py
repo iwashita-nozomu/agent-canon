@@ -36,6 +36,8 @@ class ClassifyPathRiskTest(unittest.TestCase):
                 "tools/agent_tools/example.py",
                 "--path",
                 ".github/workflows/demo.yml",
+                "--path",
+                "bootstrap/runtime.py",
             ],
             cwd=PROJECT_ROOT,
             check=True,
@@ -48,7 +50,8 @@ class ClassifyPathRiskTest(unittest.TestCase):
         self.assertIn("docs-only-or-docs-impact", profiles)
         self.assertIn("python-tooling", profiles)
         self.assertIn("github-automation", profiles)
-        self.assertIn("agentcanon-shared-surface", profiles)
+        self.assertIn("container-runtime", profiles)
+        self.assertNotIn("docker-devcontainer", profiles)
 
 
 if __name__ == "__main__":

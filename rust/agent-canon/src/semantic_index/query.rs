@@ -15,7 +15,9 @@ use super::model::{
     IndexedNode, ScoredNode,
 };
 use super::source::{context_excerpt, discover_files};
-use super::storage::{load_file_paths, load_nodes, open_cache_connection, resolve_provider_dim};
+use super::storage::{
+    load_file_paths, load_nodes, open_cache_connection, resolve_provider_dim, validate_analysis_db,
+};
 use rusqlite::Connection;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -89,6 +91,7 @@ pub(super) struct DirectoryAccumulator {
 }
 
 pub(super) fn search_index(args: &SearchArgs) -> Result<SearchResults, String> {
+    validate_analysis_db(&args.root, &args.db)?;
     let conn = open_cache_connection(&args.db)?;
     let query = embed_one_for_provider(
         &args.provider,
@@ -155,6 +158,7 @@ pub(super) fn context_pack(args: &ContextPackArgs) -> Result<Vec<ContextCell>, S
 pub(super) fn responsibility_tree(
     args: &ResponsibilityTreeArgs,
 ) -> Result<ResponsibilityTreeReport, String> {
+    validate_analysis_db(&args.root, &args.db)?;
     let conn = open_cache_connection(&args.db)?;
     let dim = resolve_provider_dim(&conn, &args.provider, &args.model, args.dim)?;
     let nodes = load_nodes(&conn, &args.provider, &args.model, dim)?;

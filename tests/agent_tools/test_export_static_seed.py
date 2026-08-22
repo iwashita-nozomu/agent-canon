@@ -210,8 +210,6 @@ def _assert_source_free_seed(testcase: unittest.TestCase, root: Path) -> None:
         b"vendor/agent-canon",
         b"tools/agent-canon",
         b"agent_canon_source_root",
-        b"update_agent_canon",
-        b"sync_agent_canon",
         b"https://",
         b"git submodule",
         b"agent_canon_repo_token",

@@ -14,7 +14,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import re
 import sys
 from collections import Counter
@@ -28,29 +27,20 @@ from typing import cast
 
 import yaml
 
-try:
-    from .parent_root_side_effects import (
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
-    )
-except ImportError:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
-    )
-
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import vector_search  # noqa: E402
 
-DEFAULT_INDEX_DIR = ".agent-canon/search-index"
+try:
+    from .runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
+except ImportError:
+    from runtime_artifacts import (  # type: ignore[no-redef]
+        RuntimeArtifactBoundary,
+        RuntimeArtifactError,
+    )
+
+DEFAULT_INDEX_DIR = "search-index"
 DEFAULT_CARD_FILE = "semantic-cards.jsonl"
 DEFAULT_STATE_FILE = "index-state.json"
 SCHEMA_VERSION = 1
@@ -60,22 +50,6 @@ SUMMARY_CHARS = 220
 DEFAULT_HASH_LENGTH = 12
 ELLIPSIS_CHARS = 3
 TOKEN_RE = re.compile(r"[0-9A-Za-z_\u0080-\uFFFF]+")
-
-
-def _parent_write(path: Path, data: bytes, purpose: str) -> None:
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            f"{purpose}: explicit parent root is required",
-        )
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
-    )
-    ParentRootSideEffectBoundary().write_parent_owned_file(
-        attestation, path, data, purpose
-    )
 
 
 @dataclass(frozen=True)
@@ -190,6 +164,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("build", "refresh"), help="Index operation.")
     parser.add_argument("--root", type=Path, default=Path.cwd())
+    parser.add_argument(
+        "--runtime-root",
+        type=Path,
+        default=None,
+        help="Explicit external runtime root (or AGENT_CANON_RUNTIME_ROOT).",
+    )
     parser.add_argument("--index-dir", default=DEFAULT_INDEX_DIR)
     parser.add_argument("--surface", action="append", default=[])
     parser.add_argument("--exclude", action="append", default=[])
@@ -379,16 +359,20 @@ def build_cards(options: BuildOptions) -> tuple[SearchCard, ...]:
     return tuple(cards)
 
 
-def write_jsonl(path: Path, cards: Sequence[SearchCard]) -> None:
+def write_jsonl(
+    boundary: RuntimeArtifactBoundary, path: Path, cards: Sequence[SearchCard]
+) -> None:
     """Write search cards as JSONL."""
     data = "".join(
         json.dumps(card.as_json(), ensure_ascii=False, sort_keys=True) + "\n"
         for card in cards
     )
-    _parent_write(path, data.encode("utf-8"), "search-index-cards")
+    boundary.atomic_write_bytes(path, data.encode("utf-8"))
 
 
-def write_state(path: Path, report: BuildReport, root: Path) -> None:
+def write_state(
+    boundary: RuntimeArtifactBoundary, path: Path, report: BuildReport, root: Path
+) -> None:
     """Write machine-readable index state."""
     state = {
         "schema_version": SCHEMA_VERSION,
@@ -397,17 +381,19 @@ def write_state(path: Path, report: BuildReport, root: Path) -> None:
         "cards": len(report.cards),
         "provider": "deterministic_semantic_index",
     }
-    _parent_write(
-        path,
-        json.dumps(state, ensure_ascii=False, indent=2).encode("utf-8"),
-        "search-index-state",
+    boundary.atomic_write_bytes(
+        path, json.dumps(state, ensure_ascii=False, indent=2).encode("utf-8")
     )
 
 
 def build_index(args: argparse.Namespace) -> BuildReport:
     """Build and write the search index."""
     root = args.root.resolve()
-    index_dir = (root / args.index_dir).resolve()
+    boundary = RuntimeArtifactBoundary.for_source(
+        root, args.runtime_root, create=True
+    )
+    index_dir = boundary.resolve(args.index_dir)
+    boundary.ensure_directory(index_dir.relative_to(boundary.root))
     card_file = index_dir / DEFAULT_CARD_FILE
     state_file = index_dir / DEFAULT_STATE_FILE
     cards = build_cards(
@@ -423,8 +409,8 @@ def build_index(args: argparse.Namespace) -> BuildReport:
         state_file=state_file,
         cards=cards,
     )
-    write_jsonl(card_file, cards)
-    write_state(state_file, report, root)
+    write_jsonl(boundary, card_file, cards)
+    write_state(boundary, state_file, report, root)
     return report
 
 
@@ -491,7 +477,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         report = build_index(args)
-    except RuntimeError as exc:
+    except RuntimeArtifactError as exc:
         print("SEARCH_INDEX=fail", file=sys.stderr)
         print(f"SEARCH_INDEX_ERROR={exc}", file=sys.stderr)
         return 2

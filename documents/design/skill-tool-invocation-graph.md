@@ -68,6 +68,22 @@ SourceUniverse {
 
 `agents/canonical/skills.md` は reader/index link parity の検査対象に限られ、skill-count projection でも identity source でもない。skill/command rows は `agents/skills/catalog.yaml` と resolved/materialized IR から生成する。`skills.md` の canonical-doc/shim link が catalog の id と対応しない、link target が stale、または未登録 id を指す場合だけ reader-link parity failure とする。
 
+### Artifact side-effect boundary
+
+Graph construction and `check` are read-only with respect to the source
+checkout.  A `graph` invocation without `--output` requires an explicit
+`--runtime-root` (or `AGENT_CANON_RUNTIME_ROOT`) and writes the Markdown/JSON
+projection below that external runtime root.  It never falls back to the
+tracked `documents/runtime/` pair.  An explicit output must likewise be
+external unless it names exactly `documents/runtime/skill-dependency-graph.md`
+and its derived `.json` pair with a source-mutation capability.  That
+capability has the exact `allowed_paths`, `purpose`, and `authority` fields;
+the allowed paths are fixed to the two tracked graph files.  Source mutation
+also requires an external runtime root and publishes a before/after evidence
+record there.  The record identifies the capability, changed paths, and the
+two source snapshots.  A capability cannot authorize an arbitrary source
+path, and a runtime artifact is never treated as source mutation authority.
+
 ### Canonical identity records, references, and projection envelopes
 
 ```text

@@ -48,7 +48,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as artifact_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as artifact_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'benchmark_reviewer': {
         'name': 'benchmark_reviewer',
@@ -58,7 +58,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as benchmark_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as benchmark_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'citation_evidence_reviewer': {
         'name': 'citation_evidence_reviewer',
@@ -68,7 +68,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as citation_evidence_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as citation_evidence_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'cpp_reviewer': {
         'name': 'cpp_reviewer',
@@ -78,7 +78,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as cpp_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as cpp_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'detailed_design_reviewer': {
         'name': 'detailed_design_reviewer',
@@ -88,7 +88,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as detailed_design_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as detailed_design_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'detailed_designer': {
         'name': 'detailed_designer',
@@ -98,7 +98,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as detailed_designer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as detailed_designer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'diff_triage_reviewer': {
         'name': 'diff_triage_reviewer',
@@ -108,7 +108,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as diff_triage_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review bounded diffs findings-first; route SOLID-sensitive Python boundaries to python_reviewer and require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence. Return approve, revise, or escalate, and escalate public API, workflow, runtime, security, dependency, or cross-owner scope.',
+        'developer_instructions': 'You are acting as diff_triage_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass. Review bounded diffs findings-first. Perform one initial owning review per candidate epoch, emit stable blocking finding IDs separately from advisory notes, and on repair perform only a focused recheck of addressed IDs and invalidated evidence; route SOLID-sensitive Python boundaries to python_reviewer and require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence. Return approve, revise, or escalate, and escalate public API, workflow, runtime, security, dependency, or cross-owner scope.',
     },
     'docs_workflow_steward': {
         'name': 'docs_workflow_steward',
@@ -118,7 +118,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as docs_workflow_steward with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as docs_workflow_steward with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'document_flow_reviewer': {
         'name': 'document_flow_reviewer',
@@ -128,7 +128,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as document_flow_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as document_flow_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'execution_planner': {
         'name': 'execution_planner',
@@ -138,7 +138,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as execution_planner with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as execution_planner with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'experiment_runner': {
         'name': 'experiment_runner',
@@ -148,7 +148,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as experiment_runner with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as experiment_runner with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'explorer': {
         'name': 'explorer',
@@ -158,7 +158,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as explorer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as explorer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'fair_data_reviewer': {
         'name': 'fair_data_reviewer',
@@ -168,7 +168,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as fair_data_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as fair_data_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'literature_researcher': {
         'name': 'literature_researcher',
@@ -178,7 +178,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as literature_researcher with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as literature_researcher with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'logic_gap_reviewer': {
         'name': 'logic_gap_reviewer',
@@ -188,7 +188,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as logic_gap_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as logic_gap_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'long_form_writer': {
         'name': 'long_form_writer',
@@ -198,7 +198,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as long_form_writer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as long_form_writer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'manager_reviewer': {
         'name': 'manager_reviewer',
@@ -208,7 +208,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as manager_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as manager_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'ml_science_reviewer': {
         'name': 'ml_science_reviewer',
@@ -218,7 +218,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as ml_science_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as ml_science_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'notation_definition_reviewer': {
         'name': 'notation_definition_reviewer',
@@ -228,7 +228,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as notation_definition_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as notation_definition_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'oop_readability_reviewer': {
         'name': 'oop_readability_reviewer',
@@ -238,7 +238,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as oop_readability_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as oop_readability_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'plan_reviewer': {
         'name': 'plan_reviewer',
@@ -248,7 +248,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as plan_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as plan_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'project_reviewer': {
         'name': 'project_reviewer',
@@ -258,7 +258,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as project_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as project_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'prompt_config_reviewer': {
         'name': 'prompt_config_reviewer',
@@ -268,7 +268,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as prompt_config_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as prompt_config_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'python_reviewer': {
         'name': 'python_reviewer',
@@ -278,7 +278,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as python_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review Python diffs findings-first for behavior, types, tests, and public boundaries. Follow agents/skills/python-review.md#Validation route and agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for validation scope; review the parent packet route and do not add validation outside that route. When the canonical route selects SOLID evidence, require a path-covered OOP readability report, SOLID principle signal, Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion, and check_solid_evidence.py path-coverage evidence; otherwise do not add those checks. Return revise only for evidence required by the canonical route.',
+        'developer_instructions': 'You are acting as python_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass. Review Python diffs findings-first for behavior, types, tests, and public boundaries. Preserve the candidate epoch and stable blocking finding IDs; after repair, recheck only addressed IDs and invalidated evidence, never restart broad review. Follow agents/skills/python-review.md#Validation route and agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for validation scope; review the parent packet route and do not add validation outside that route. When the canonical route selects SOLID evidence, require a path-covered OOP readability report, SOLID principle signal, Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion, and check_solid_evidence.py path-coverage evidence; otherwise do not add those checks. Return revise only for evidence required by the canonical route.',
     },
     'report_reviewer': {
         'name': 'report_reviewer',
@@ -288,7 +288,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as report_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as report_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'reproducibility_reviewer': {
         'name': 'reproducibility_reviewer',
@@ -298,7 +298,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as reproducibility_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as reproducibility_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'requirements_organizer': {
         'name': 'requirements_organizer',
@@ -308,7 +308,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as requirements_organizer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as requirements_organizer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'reviewer': {
         'name': 'reviewer',
@@ -318,7 +318,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review exact diffs findings-first against request clauses and owning evidence. For SOLID-sensitive Python changes require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence; return revise when that evidence or changed-path coverage is incomplete.',
+        'developer_instructions': 'You are acting as reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass. Review exact diffs findings-first against request clauses and owning evidence. Run one initial owning review per candidate epoch, separate stable blocking finding IDs from advisory notes, and use focused recheck only after repair. For SOLID-sensitive Python changes require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence; return revise when that evidence or changed-path coverage is incomplete.',
     },
     'scientific_computing_reviewer': {
         'name': 'scientific_computing_reviewer',
@@ -328,7 +328,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as scientific_computing_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as scientific_computing_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'ship_reviewer': {
         'name': 'ship_reviewer',
@@ -338,7 +338,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'xhigh',
-        'developer_instructions': 'You are acting as ship_reviewer for ship readiness under luna_ship. Constrain edits to one responsibility unit and one-pass materialization only when selected.',
+        'developer_instructions': 'You are acting as ship_reviewer for ship readiness under luna_ship. Act as the terminal gate for one candidate epoch. Confirm stable open blocking finding IDs and the selected validation result; do not restart broad review after repair. Zero blockers and validation pass or not_applicable is terminal, while advisory improvements go to a separate Issue or note.',
     },
     'skill_evaluator': {
         'name': 'skill_evaluator',
@@ -358,7 +358,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.3-codex-spark',
         'model_reasoning_effort': 'low',
-        'developer_instructions': 'You are acting as spark_worker for implementation execution with spark_implementation. Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop.',
+        'developer_instructions': 'You are acting as spark_worker for implementation execution with spark_implementation. Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Repair only assigned stable blocking finding IDs; do not repeat the same packet and evidence or restart broad review. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop.',
     },
     'terra': {
         'name': 'terra',
@@ -368,7 +368,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-terra',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as terra with terra_cross_cutting cross-cutting review capacity. Operate only as a conditional read-only cross-cutting specialist. Activate on multi-owner dependency closure, compaction/long-run/incomplete-handoff context reconstruction, or adversarial contradiction validation. Treat user-provided alternatives and alternatives already present in findings as admissible adversarial-comparison input. Return owner closure, context capsule, and accepted/rejected/escalated handback; send unresolved findings to Sol. Do not invent unrequested alternatives, adopt an architecture, coordinate, implement as a general worker, mutate repository state, create PRs, or make final integration decisions.',
+        'developer_instructions': 'You are acting as terra with terra_cross_cutting cross-cutting review capacity. Operate only as a conditional read-only cross-cutting specialist. Activate on multi-owner dependency closure, compaction/long-run/incomplete-handoff context reconstruction, or adversarial contradiction validation. Preserve the current candidate epoch and stable blocker IDs; add a blocker only with new contract, reachable-behavior, or structural-contradiction evidence, and never repeat the same state/action. Treat user-provided alternatives and alternatives already present in findings as admissible adversarial-comparison input. Return owner closure, context capsule, and accepted/rejected/escalated handback; send unresolved findings to Sol. Do not invent unrequested alternatives, adopt an architecture, coordinate, implement as a general worker, mutate repository state, create PRs, or make final integration decisions.',
     },
     'test_designer': {
         'name': 'test_designer',
@@ -378,7 +378,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'high',
-        'developer_instructions': 'You are acting as test_designer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.',
+        'developer_instructions': 'You are acting as test_designer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.',
     },
     'worker': {
         'name': 'worker',
@@ -388,7 +388,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
         'approval_policy': 'never',
         'model': 'gpt-5.6-luna',
         'model_reasoning_effort': 'xhigh',
-        'developer_instructions': 'You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. For this role, execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop.',
+        'developer_instructions': 'You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. For this role, execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop.',
     },
 }
 
@@ -403,6 +403,13 @@ def run_eval(*args: str) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         text=True,
     )
+
+
+def external_runtime(root: Path) -> Path:
+    """Return an explicit runtime directory outside the source fixture."""
+    runtime = root.parent / f"{root.name}-agent-canon-runtime"
+    runtime.mkdir(parents=True, exist_ok=True)
+    return runtime
 
 
 def copy_eval_root(root: Path) -> None:
@@ -687,7 +694,8 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
     def test_runtime_metrics_are_aggregated(self) -> None:
         """Optional JSONL runtime metrics should be summarized by agent."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            log_path = Path(tmp_dir) / "roles.jsonl"
+            runtime = external_runtime(Path(tmp_dir) / "source")
+            log_path = runtime / "roles.jsonl"
             log_path.write_text(
                 "\n".join(
                     [
@@ -715,7 +723,7 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = run_eval("--runtime-log", str(log_path))
+            result = run_eval("--runtime-root", str(runtime), "--runtime-log", str(log_path))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("ROLE_RUNTIME_METRICS_STATUS=observed", result.stdout)
@@ -730,9 +738,10 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
     def test_compact_out_limits_stdout_and_writes_summary(self) -> None:
         """Compact mode writes role stats to JSON and keeps stdout bounded."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            compact = Path(tmp_dir) / "roles.json"
+            runtime = external_runtime(Path(tmp_dir) / "source")
+            compact = runtime / "roles.json"
 
-            result = run_eval("--compact-out", str(compact))
+            result = run_eval("--runtime-root", str(runtime), "--compact-out", str(compact))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("CODEX_AGENT_ROLE_EVAL=pass", result.stdout)
@@ -747,9 +756,12 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
     def test_accumulate_writes_role_eval_report(self) -> None:
         """Role evals should accumulate through the shared eval result contract."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            results_dir = Path(tmp_dir) / "role-results"
+            runtime = external_runtime(Path(tmp_dir) / "source")
+            results_dir = runtime / "role-results"
 
-            result = run_eval("--accumulate", "--results-dir", str(results_dir), "--run-id", "test-run")
+            result = run_eval(
+                "--runtime-root", str(runtime), "--accumulate", "--results-dir", str(results_dir), "--run-id", "test-run"
+            )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("CODEX_AGENT_ROLE_EVAL_RUN_ID=codex-agent-role-eval-", result.stdout)
@@ -763,7 +775,8 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
     def test_runtime_metrics_report_invalid_numeric_values(self) -> None:
         """Malformed metric values should produce findings instead of tracebacks."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            log_path = Path(tmp_dir) / "roles.jsonl"
+            runtime = external_runtime(Path(tmp_dir) / "source")
+            log_path = runtime / "roles.jsonl"
             log_path.write_text(
                 json.dumps(
                     {
@@ -776,7 +789,7 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = run_eval("--runtime-log", str(log_path))
+            result = run_eval("--runtime-root", str(runtime), "--runtime-log", str(log_path))
 
             self.assertEqual(result.returncode, 1)
             self.assertIn("CODEX_AGENT_ROLE_FINDING=runtime-log:", result.stdout)

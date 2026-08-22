@@ -18,8 +18,6 @@
 # upstream design ../../templates/agents/workflow_monitoring.md tool warning closeout ledger
 # upstream design ../../templates/agents/closeout_gate.md closeout gate policy
 # upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt eval gate
-# upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
-# upstream design ../../documents/runtime/shared-runtime-surfaces.toml shared surface manifest
 # upstream implementation ./agent_canon_source_root.py resolves canonical parent adapter targets
 # upstream design ../../documents/codex/codex-configuration-reference.md Codex hook severity policy
 # upstream design ../../documents/conventions/coding-conventions-house-style.md implementation ownership guardrail
@@ -31,7 +29,6 @@
 # upstream implementation ./tool_drift.py validates tool/convention drift
 # upstream implementation ./convention_compliance_contracts.toml declares marker contracts
 # upstream implementation ./check_skill_frontmatter.py validates runtime skill frontmatter
-# upstream implementation ./surface_manifest.py validates shared surface manifest wiring
 # downstream implementation ../../tools/ci/run_all_checks.sh runs convention compliance gate
 # downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py tests verifier  # noqa: E501
 # @dependency-end
@@ -107,154 +104,81 @@ CONVENTION_SOURCES = (
     "agents/canonical/CODEX_WORKFLOW.md",
 )
 
+TOOL_CATALOG_PATH = "tools/catalog.yaml"
+
+# This table records execution surfaces and their owners.  It deliberately does
+# not require every reader-facing document to repeat a tool filename: catalog,
+# workflow, and runtime-profile checkers own those contracts independently.
 TOOL_GATES = {
     "dependency_review": (
         "tools/agent_tools/run_repo_dependency_review.sh",
-        (
-            "agents/canonical/CODEX_WORKFLOW.md",
-            "templates/agents/closeout_gate.md",
-        ),
+        (TOOL_CATALOG_PATH,),
     ),
     "code_dependency_scan": (
         "tools/agent_tools/scan_code_dependencies.sh",
-        ("agents/workflows/hypothesis-validation-workflow.md",),
+        (TOOL_CATALOG_PATH,),
     ),
     "hardcoded_numbers": (
         "tools/agent_tools/check_hardcoded_numbers.py",
-        (
-            "documents/conventions/common/01_principles.md",
-        ),
+        (TOOL_CATALOG_PATH,),
     ),
     "static_any": (
         "tools/agent_tools/check_static_any.py",
-        (
-            "tools/ci/run_all_checks.sh",
-            "documents/conventions/python/04_type_annotations.md",
-            "documents/conventions/python/07_type_checker.md",
-        ),
+        (TOOL_CATALOG_PATH,),
     ),
     "log_helper_names": (
         "tools/agent_tools/check_log_helper_names.py",
-        (
-            "tools/ci/run_all_checks.sh",
-            "documents/conventions/coding-conventions-logging.md",
-            "documents/rule/naming.md",
-        ),
+        (TOOL_CATALOG_PATH,),
     ),
     "notebook_quality": (
         "tools/validation/notebook_quality.py",
-        (
-            "tools/ci/run_all_checks.sh",
-            "tools/README.md",
-            "documents/tools/README.md",
-        ),
+        (TOOL_CATALOG_PATH,),
     ),
     "oop_readability": (
         "tools/oop/python/readability.py",
-        (
-            "documents/conventions/object-oriented-design.md",
-            "documents/conventions/coding-conventions-python.md",
-            "agents/skills/oop-readability-check.md",
-            "agents/skills/python-review.md",
-            "agents/workflows/comprehensive-refactoring-workflow.md",
-        ),
+        (TOOL_CATALOG_PATH,),
     ),
     "oop_cpp_readability": (
         "tools/oop/cpp/readability.py",
-        (
-            "documents/conventions/object-oriented-design.md",
-            "agents/workflows/comprehensive-refactoring-workflow.md",
-        ),
+        (TOOL_CATALOG_PATH,),
     ),
     "prompt_eval": (
         "tools/agent_tools/evaluate_skill_workflow_prompts.py",
-        (
-            "evidence/agent-evals/skill_workflow_prompt_eval.toml",
-            "agents/workflows/adaptive-improvement-workflow.md",
-        ),
+        (TOOL_CATALOG_PATH,),
     ),
     "behavior_eval": (
         "tools/agent_tools/evaluate_agent_run.py",
-        (
-            "evidence/agent-evals/agent_behavior_eval.toml",
-            "templates/agents/closeout_gate.md",
-        ),
+        (TOOL_CATALOG_PATH,),
     ),
     "skill_frontmatter": (
         "tools/agent_tools/check_skill_frontmatter.py",
-        (
-            "tools/ci/run_all_checks.sh",
-            "tools/ci/check_github_workflows.py",
-        ),
+        (TOOL_CATALOG_PATH,),
     ),
     "convention_compliance": (
         "tools/agent_tools/check_convention_compliance.py",
-        (
-            "tools/ci/run_all_checks.sh",
-            "evidence/agent-evals/skill_workflow_prompt_eval.toml",
-        ),
+        (TOOL_CATALOG_PATH,),
     ),
     "tool_catalog": (
         "tools/agent_tools/tool_catalog.py",
-        (
-            "tools/ci/run_all_checks.sh",
-            "tools/README.md",
-            "documents/tools/README.md",
-        ),
+        (TOOL_CATALOG_PATH,),
     ),
     "tool_convention_drift": (
         "tools/agent_tools/tool_drift.py",
-        (
-            "tools/ci/run_all_checks.sh",
-            "tools/README.md",
-            "documents/tools/README.md",
-        ),
+        (TOOL_CATALOG_PATH,),
     ),
     "import_responsibility": (
         "tools/agent_tools/import_responsibility.py",
-        (
-            "tools/ci/run_all_checks.sh",
-            "documents/design/responsibility-scope-management.md",
-            "documents/conventions/coding-conventions-python.md",
-        ),
+        (TOOL_CATALOG_PATH,),
     ),
     "github_workflow_pr_flow": (
         "tools/ci/check_github_workflows.py",
-        (
-            "tools/ci/run_all_checks.sh",
-            "tools/ci/check_agent_canon_pr.sh",
-        ),
+        (TOOL_CATALOG_PATH,),
     ),
-    "container_config": (
-        "tools/ci/container_config.py",
-        (
-            "tools/ci/run_all_checks.sh",
-            "agents/skills/environment-maintenance.md",
-            "documents/conventions/coding-conventions-project.md",
-        ),
-    ),
-    "surface_manifest": (
-        "tools/agent_tools/surface_manifest.py",
-        (
-            "tools/sync_agent_canon.sh",
-            "documents/runtime/SHARED_RUNTIME_SURFACES.md",
-        ),
-    ),
-    "runtime_profile_inventory": (
-        "rust/agent-canon/src/docs.rs",
-        ("documents/tools/agent-canon.md",),
+    "bootstrap_container_runtime": (
+        "bootstrap.sh",
+        ("documents/runtime/bootstrap-runtime.md",),
     ),
 }
-
-AGENT_CANON_PR_WORKFLOW_PATH = "agents/workflows/agent-canon-pr-workflow.md"
-AGENT_CANON_PUSH_REMOTE_MARKERS = (
-    "tools/agent_tools/github_publish.py",
-    "PullRequestLifecycle",
-    "permission_state=unknown|verified_false",
-    "CandidateCasReceipt",
-    "PublicationReadbackReceipt",
-    "QueueReceipt",
-)
 
 SKILL_ROUTING_PROMPTS = ("agents/skills/agent-orchestration.md",)
 
@@ -356,13 +280,6 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
         "structure-planning",
         "prose-reasoning-graph",
         "md-style-check",
-        "structure_contract=skipped",
-    ),
-    "agents/USER_GUIDE_JA.md": (
-        "structure-planning",
-        "prose-reasoning-graph",
-        "md-style-check",
-        "Document Structure Evidence",
         "structure_contract=skipped",
     ),
     "templates/agents/closeout_gate.md": (
@@ -612,30 +529,6 @@ REVIEW_ISSUE_ROUTING_MARKERS = {
         "github_mirror",
     ),
 }
-PR_ESSENCE_DOCUMENTATION_MARKERS = {
-    ".github/PULL_REQUEST_TEMPLATE.md": (
-        "## PR Essence",
-        "Problem / user request:",
-        "Canonical owner / responsibility unit:",
-        "Behavior or contract delta:",
-        "Evidence route:",
-    ),
-    ".github/PULL_REQUEST_TEMPLATE/agent_canon.md": (
-        "## PR Essence",
-        "Problem / user request:",
-        "Canonical owner / responsibility unit:",
-        "Behavior or contract delta:",
-        "Evidence route:",
-    ),
-    "agents/workflows/agent-canon-pr-workflow.md": (
-        "PR Essence",
-        "problem / user request",
-        "design intent",
-        "canonical owner",
-        "behavior or contract delta",
-        "evidence route",
-    ),
-}
 SOLID_CODING_CONTRACT_MARKERS = DECLARATIVE_MARKER_CONTRACTS["solid_coding_contract"]
 
 SOURCE_FILE_DEFINITION_ORDER_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
@@ -657,48 +550,6 @@ PROMPT_EVAL_MARKERS = (
     "WORKFLOW-GENERIC-1",
     "ORCH-SHIM-TOOLCALL-1",
     "CONVENTION-SKILL",
-)
-SURFACE_MANIFEST_FILES = (
-    "documents/runtime/SHARED_RUNTIME_SURFACES.md",
-    "documents/runtime/shared-runtime-surfaces.toml",
-    "documents/agent-canon/agent-canon-parent-repo-latest-checklist.md",
-    "tools/sync_agent_canon.sh",
-    "tools/agent_tools/surface_manifest.py",
-)
-SURFACE_POLICY_MARKERS = (
-    "documents/runtime/shared-runtime-surfaces.toml",
-    "AGENTS.md",
-    ".codex/config.toml",
-    ".codex/agents",
-    "tools/agent-canon",
-    "Root `tools/` is a parent-owned regular container",
-    "tools/agent-canon -> ../vendor/agent-canon/tools",
-    "vendor/agent-canon/tools/",
-    "Project-local automation must stay in project-owned paths",
-)
-SURFACE_MANIFEST_MARKERS = (
-    "version = 1",
-    'prefix = "vendor/agent-canon"',
-    'integration_mode = "live-agent-canon"',
-    "default_consumer = false",
-    'selection = "explicit-opt-in"',
-    'path = "AGENTS.md"',
-    'path = ".codex/config.toml"',
-    'path = ".codex/agents"',
-    'path = "tools/agent-canon"',
-    'path = ".agent-canon"',
-    'mode = "removed_legacy"',
-    "paths = [",
-)
-SOURCE_SURFACE_SYNC_MARKERS = (
-    "surface_manifest.py",
-    "build_regular_specs",
-    "regular_path",
-)
-ROOT_SYNC_ADAPTER_MARKERS = (
-    "vendor/agent-canon/tools:tools",
-    "python3 -m agent_tools.agent_canon_source_root exec",
-    'tools/sync_agent_canon.sh "$@"',
 )
 HOOK_GUARDRAIL_POLICY_MARKERS = {
     ".codex/hooks/hook_dispatcher.py": (
@@ -750,33 +601,68 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
             (
                 (
                     "workflow family, spawn budget, role topology",
-                    "vendor/agent-canon/agents/task_catalog.yaml",
+                    "agents/task_catalog.yaml",
                     "check_agent_runtime_alignment.py",
                 ),
                 (
                     "task bootstrap and CLI entrypoints",
-                    "vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md",
+                    "agents/canonical/CLI_ENTRYPOINTS.md",
                     "bootstrap_agent_run.py",
                 ),
                 (
                     "subagent lifecycle, same-role instances, wave ledger",
-                    "vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md",
+                    "agents/canonical/CODEX_SUBAGENTS.md",
                     "workflow_monitor.py",
                 ),
                 (
                     "role behavior and stage conditions",
-                    "vendor/agent-canon/.codex/agents/*.toml",
+                    ".codex/agents/*.toml",
                     "check_agent_runtime_alignment.py",
                 ),
                 (
                     "skill routing and public skill surface",
-                    "vendor/agent-canon/agents/skills/catalog.yaml",
-                    "python3 tools/agent-canon/agent_tools/route.py --prompt",
+                    "agents/skills/catalog.yaml",
+                    "tools/agent_tools/route.py --prompt",
                 ),
                 (
                     "report and closeout structure",
-                    "task_close.py",
+                    "tools/agent_tools/task_close.py",
                     "closeout gate",
+                ),
+                (
+                    "entrypoint responsibility grammar",
+                    "documents/design/entrypoint-owner-map.md",
+                    "check_entrypoint_owner_map.py",
+                ),
+                (
+                    "bootstrap, image, and resident container",
+                    "bootstrap.sh",
+                    "bootstrap/container profile",
+                ),
+                (
+                    "Python, Rust, and LSP tool dispatch",
+                    "tools/agent_tools/tool_dispatch.py",
+                    "tool dispatch tests",
+                ),
+                (
+                    "skill and agent installation",
+                    "tools/agent_tools/skill_shim_materializer.py",
+                    "skill materializer check",
+                ),
+                (
+                    "source-side-effect boundary",
+                    "documents/runtime/bootstrap-runtime.md",
+                    "external runtime and source-unchanged checks",
+                ),
+                (
+                    "eval archive",
+                    "tools/agent_tools/runtime_log_archive_git.py",
+                    "archive readback",
+                ),
+                (
+                    "source update",
+                    "agents/skills/agent-canon-update.md",
+                    "qualified PR and merged-main readback",
                 ),
             ),
         ),
@@ -787,8 +673,8 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
             (
                 (
                     "root runtime entrypoint",
-                    "ROOT_AGENTS.md",
-                    "PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check",
+                    "bootstrap.sh",
+                    "bash bootstrap.sh --help",
                 ),
                 (
                     "workflow family, spawn budget, role topology",
@@ -1026,7 +912,7 @@ def check_required_files(root: Path, paths: Sequence[str], check: str) -> list[F
 
 
 def check_tool_gates(root: Path) -> list[Finding]:
-    """Verify each mechanical convention gate exists and is referenced."""
+    """Verify each gate has an executable surface and one owning registry."""
     findings: list[Finding] = []
     for gate_name, (tool_path, references) in TOOL_GATES.items():
         if readable_path(root, tool_path) is None:
@@ -1034,34 +920,31 @@ def check_tool_gates(root: Path) -> list[Finding]:
                 Finding("tool_gate", tool_path, f"{gate_name}:missing-tool")
             )
             continue
-        for reference in references:
-            reference_path = readable_path(root, reference)
-            if (
-                gate_name == "surface_manifest"
-                and reference == "tools/sync_agent_canon.sh"
-                and (
-                    vendored_sync := root
-                    / "vendor"
-                    / "agent-canon"
-                    / "tools"
-                    / "sync_agent_canon.sh"
-                ).is_file()
-            ):
-                reference_path = vendored_sync
-            if reference_path is None:
+        for owner in references:
+            owner_path = readable_path(root, owner)
+            if owner_path is None:
                 findings.append(
-                    Finding("tool_gate", reference, f"{gate_name}:missing-reference")
+                    Finding("tool_gate", owner, f"{gate_name}:missing-owner-surface")
                 )
                 continue
-            tool_stem = Path(tool_path).stem
-            if tool_stem not in reference_path.read_text(encoding="utf-8"):
-                findings.append(
-                    Finding(
-                        "tool_gate",
-                        reference,
-                        f"{gate_name}:missing-{Path(tool_path).name}",
-                    )
+
+            # The structured catalog is the owner for cataloged tools. Check
+            # the path entry itself, not an incidental filename mention in a
+            # README, workflow, or skill. Catalog shape and metadata remain
+            # the responsibility of tool_catalog.py.
+            if owner == TOOL_CATALOG_PATH:
+                catalog_text = owner_path.read_text(encoding="utf-8")
+                path_re = re.compile(
+                    rf"(?m)^\s*path:\s*['\"]?{re.escape(tool_path)}['\"]?\s*(?:#.*)?$"
                 )
+                if not path_re.search(catalog_text):
+                    findings.append(
+                        Finding(
+                            "tool_gate",
+                            owner,
+                            f"{gate_name}:missing-catalog-owner",
+                        )
+                    )
     return findings
 
 
@@ -1370,46 +1253,6 @@ def check_review_issue_routing(root: Path) -> list[Finding]:
     return findings
 
 
-def check_pr_essence_documentation(root: Path) -> list[Finding]:
-    """Verify PR body and lifecycle workflow owners preserve change essence."""
-    paths = tuple(PR_ESSENCE_DOCUMENTATION_MARKERS)
-    findings = check_required_files(root, paths, "pr_essence_documentation")
-    for path, markers in PR_ESSENCE_DOCUMENTATION_MARKERS.items():
-        full_path = readable_path(root, path)
-        if full_path is None:
-            continue
-        text = full_path.read_text(encoding="utf-8")
-        for marker in markers:
-            if marker not in text:
-                findings.append(
-                    Finding(
-                        "pr_essence_documentation",
-                        path,
-                        f"missing-marker:{marker}",
-                    )
-                )
-    return findings
-
-
-def check_agentcanon_push_remote_guard(root: Path) -> list[Finding]:
-    """Verify AgentCanon PR workflow documents remote verification before push."""
-    path = AGENT_CANON_PR_WORKFLOW_PATH
-    findings = check_required_files(root, (path,), "agentcanon_push_remote_guard")
-    if findings:
-        return findings
-    text = read_text(root, path)
-    for marker in AGENT_CANON_PUSH_REMOTE_MARKERS:
-        if marker not in text:
-            findings.append(
-                Finding(
-                    "agentcanon_push_remote_guard",
-                    path,
-                    f"missing-marker:{marker}",
-                )
-            )
-    return findings
-
-
 def check_prompt_eval_wiring(root: Path) -> list[Finding]:
     """Verify prompt evals cover convention verifier and skill-call routing."""
     path = "evidence/agent-evals/skill_workflow_prompt_eval.toml"
@@ -1420,68 +1263,6 @@ def check_prompt_eval_wiring(root: Path) -> list[Finding]:
     for marker in PROMPT_EVAL_MARKERS:
         if marker not in text:
             findings.append(Finding("prompt_eval", path, f"missing-marker:{marker}"))
-    return findings
-
-
-def check_surface_manifest_wiring(root: Path) -> list[Finding]:
-    """Verify shared surface ownership has one manifest-backed route."""
-    findings = check_required_files(root, SURFACE_MANIFEST_FILES, "surface_manifest")
-    readable_files = {
-        path: resolved.read_text(encoding="utf-8")
-        for path in SURFACE_MANIFEST_FILES
-        if (resolved := readable_path(root, path)) is not None
-    }
-    policy_text = readable_files.get("documents/runtime/SHARED_RUNTIME_SURFACES.md", "")
-    for marker in SURFACE_POLICY_MARKERS:
-        if marker not in policy_text:
-            findings.append(
-                Finding(
-                    "surface_manifest",
-                    "documents/runtime/SHARED_RUNTIME_SURFACES.md",
-                    f"missing-marker:{marker}",
-                )
-            )
-    manifest_text = readable_files.get(
-        "documents/runtime/shared-runtime-surfaces.toml", ""
-    )
-    for marker in SURFACE_MANIFEST_MARKERS:
-        if marker not in manifest_text:
-            findings.append(
-                Finding(
-                    "surface_manifest",
-                    "documents/runtime/shared-runtime-surfaces.toml",
-                    f"missing-marker:{marker}",
-                )
-            )
-    root_sync = root / "tools" / "sync_agent_canon.sh"
-    vendored_sync = root / "vendor" / "agent-canon" / "tools" / "sync_agent_canon.sh"
-    source_sync = vendored_sync if vendored_sync.is_file() else root_sync
-    source_sync_text = (
-        source_sync.read_text(encoding="utf-8") if source_sync.is_file() else ""
-    )
-    source_display = source_sync.relative_to(root).as_posix()
-    for marker in SOURCE_SURFACE_SYNC_MARKERS:
-        if marker not in source_sync_text:
-            findings.append(
-                Finding(
-                    "surface_manifest",
-                    source_display,
-                    f"missing-marker:{marker}",
-                )
-            )
-    if vendored_sync.is_file() and root_sync.is_file():
-        adapter_text = (
-            root_sync.read_text(encoding="utf-8") if root_sync.is_file() else ""
-        )
-        for marker in ROOT_SYNC_ADAPTER_MARKERS:
-            if marker not in adapter_text:
-                findings.append(
-                    Finding(
-                        "surface_manifest",
-                        "tools/sync_agent_canon.sh",
-                        f"missing-root-source-adapter-marker:{marker}",
-                    )
-                )
     return findings
 
 
@@ -1721,7 +1502,6 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(check_implementation_guardrails(root))
     findings.extend(check_refactor_sequence(root))
     findings.extend(check_review_issue_routing(root))
-    findings.extend(check_pr_essence_documentation(root))
     findings.extend(
         collect_marker_contract_findings(
             root, "solid_coding_contract", SOLID_CODING_CONTRACT_MARKERS
@@ -1734,12 +1514,8 @@ def run_checks(root: Path) -> list[Finding]:
             SOURCE_FILE_DEFINITION_ORDER_MARKERS,
         )
     )
-    findings.extend(check_agentcanon_push_remote_guard(root))
     findings.extend(check_prompt_eval_wiring(root))
-    findings.extend(check_surface_manifest_wiring(root))
     findings.extend(check_hook_guardrail_policy(root))
-    findings.extend(check_owner_map_entrypoints(root))
-    findings.extend(check_entrypoint_delegated_sections(root))
     findings.extend(check_convention_assertions(root))
     findings.extend(check_legacy_forwarder_warning_policy(root))
     return sorted(

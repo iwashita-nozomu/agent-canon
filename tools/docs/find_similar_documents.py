@@ -12,17 +12,36 @@ Detect similar markdown documents under `documents/` (excluding templates and le
 and produce a report plus simple merge-draft files for manual review.
 
 Usage:
-  python3 tools/docs/find_similar_documents.py [--min 0.5]
+  python3 tools/docs/find_similar_documents.py \
+    --runtime-root /abs/path/to/workspace/agent-canon-runtime/<run> [--min 0.5] \
+    [--documents-root /path/to/documents]
 
-Outputs:
-  - reports/similar_documents_report.txt
-  - reports/merge_candidates/*.md (drafts)
+Outputs are written beneath the explicit external runtime root, under a
+run-scoped directory. ``AGENT_CANON_RUNTIME_ROOT`` may be used as the
+equivalent explicit capability. The source checkout is never an output
+location, and missing runtime capability fails before a report is opened.
 """
-from pathlib import Path
-import difflib
 import argparse
+import difflib
 import itertools
+import os
 import re
+import sys
+import tempfile
+from pathlib import Path
+
+# Direct invocation must not turn the source checkout into a Python cache.
+os.environ.setdefault('PYTHONDONTWRITEBYTECODE', '1')
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from tools.agent_tools.runtime_artifacts import (  # noqa: E402
+    RuntimeArtifactBoundary,
+    RuntimeArtifactError,
+    runtime_artifact_boundary,
+)
 
 
 def normalize_text(t: str) -> str:
@@ -34,7 +53,7 @@ def normalize_text(t: str) -> str:
 
 
 def read_files(root: Path):
-    files = [p for p in root.rglob('*.md')]
+    files = [p for p in root.rglob('*.md') if p.is_file()]
     files = [p for p in files if 'template' not in p.name and not p.name.endswith('.bak')]
     return sorted(files)
 
@@ -43,7 +62,14 @@ def similarity(a: str, b: str) -> float:
     return difflib.SequenceMatcher(None, a, b).ratio()
 
 
-def make_merged_draft(a_path: Path, b_path: Path, out_dir: Path, score: float):
+def make_merged_draft(
+    a_path: Path,
+    b_path: Path,
+    out_dir: Path,
+    score: float,
+    *,
+    boundary: RuntimeArtifactBoundary | None = None,
+):
     a = a_path.read_text(encoding='utf-8')
     b = b_path.read_text(encoding='utf-8')
     # simple merge: start with A, then append lines from B not present in A
@@ -74,21 +100,54 @@ def make_merged_draft(a_path: Path, b_path: Path, out_dir: Path, score: float):
         out.append("")
         out.extend(uniq_from_b)
 
-    out_dir.mkdir(parents=True, exist_ok=True)
     out_file = out_dir / (title + '.md')
-    out_file.write_text('\n'.join(out) + '\n', encoding='utf-8')
+    content = '\n'.join(out) + '\n'
+    if boundary is None:
+        raise RuntimeArtifactError(
+            "merge-draft output requires the external runtime artifact boundary"
+        )
+    boundary.atomic_write_text(out_file.relative_to(boundary.root), content)
     return out_file
+
+
+def create_output_dir(
+    root: Path,
+    runtime_root: str | None,
+    *,
+    boundary: RuntimeArtifactBoundary | None = None,
+) -> Path:
+    """Create one symlink-safe external output directory for this run."""
+    boundary = boundary or runtime_artifact_boundary(root, runtime_root, create=True)
+    parent = boundary.ensure_directory(Path("tasks") / "similar-documents")
+    return Path(tempfile.mkdtemp(prefix="run-", dir=str(parent)))
 
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--min', type=float, default=0.6)
+    p.add_argument(
+        '--documents-root',
+        help='Read-only Markdown root (defaults to this checkout\'s documents/).',
+    )
+    p.add_argument(
+        '--runtime-root',
+        help='External runtime root (or AGENT_CANON_RUNTIME_ROOT).',
+    )
     args = p.parse_args()
 
-    ROOT = Path('.').resolve()
-    DOC_ROOT = ROOT / 'documents'
-    REPORT = ROOT / 'reports' / 'similar_documents_report.txt'
-    MERGE_DIR = ROOT / 'reports' / 'merge_candidates'
+    ROOT = PROJECT_ROOT
+    DOC_ROOT = (
+        Path(args.documents_root).expanduser().resolve()
+        if args.documents_root
+        else ROOT / 'documents'
+    )
+    try:
+        boundary = runtime_artifact_boundary(ROOT, args.runtime_root, create=True)
+        output_dir = create_output_dir(ROOT, args.runtime_root, boundary=boundary)
+    except RuntimeArtifactError as exc:
+        p.error(f"runtime_root_error: {exc}")
+    REPORT = output_dir / 'similar_documents_report.txt'
+    MERGE_DIR = output_dir / 'merge_candidates'
 
     files = read_files(DOC_ROOT)
     texts = {f: normalize_text(f.read_text(encoding='utf-8')) for f in files}
@@ -108,13 +167,16 @@ def main():
         for sim, a, b in pairs:
             lines.append(f'{sim:.3f}  {a}  {b}')
             try:
-                draft = make_merged_draft(a, b, MERGE_DIR, sim)
+                draft = make_merged_draft(a, b, MERGE_DIR, sim, boundary=boundary)
                 lines.append(f'  Draft: {draft}')
+            except RuntimeArtifactError:
+                raise
             except Exception as e:
                 lines.append(f'  Draft generation failed: {e}')
 
-    REPORT.parent.mkdir(parents=True, exist_ok=True)
-    REPORT.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    boundary.atomic_write_text(
+        REPORT.relative_to(boundary.root), '\n'.join(lines) + '\n'
+    )
     print('Report written to', REPORT)
 
 

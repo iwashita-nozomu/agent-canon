@@ -9,14 +9,14 @@ upstream design README.md workflow catalog
 
 
 この文書は、`main` へ戻すときの統合手順の正本です。
-特に branch 側で file 構成を変えたときに、その変更を落とさず `main` へ持ち帰ることを目的にします。
+特に branch 側で file 構成を変えたときに、その変更を落とさず `main` へ持ち帰ることを目的にします。AgentCanon source は standalone repository として別 PR で統合され、親の `main` には pin や projection を持ち帰りません。
 
 ## この文書の読み方
 
 この workflow は、構成変更を含む branch を `main` へ戻すときの統合判断を
 扱います。まず `対象` と `原則` でこの手順が必要な変更か確認し、
 `推奨手順` を integration branch の操作順として読みます。`禁止事項` と
-`判定基準` は file 構成、submodule pin、validation evidence を落としていないかの
+`判定基準` は file 構成、source PR readback、validation evidence を落としていないかの
 確認に使い、`Convention Compliance Gate` は closeout 前の機械確認です。
 
 ## 対象
@@ -33,7 +33,7 @@ upstream design README.md workflow catalog
 - `git checkout <file>`、手動 copy、partial cherry-pick で構成変更を戻しません。
 - 構成変更を含む統合では、source branch の tree shape をそのまま持ち帰ることを優先します。
 - `main` への統合は、別 `git worktree` を作らず、current checkout 上の integration branch で一度閉じます。
-- `vendor/agent-canon` が submodule の場合、parent tree で比較するのは gitlink SHA です。intended named source branch の branch / ahead / diverged / dirty state は evidence として保持し、全 local uncommitted / ignored materialized paths と `HEAD` から planned result tree への exact update write set の unpreservable collision、または unresolved merge conflict だけを block します。requested topic が異なる場合だけ `documents/rule/dependency-module-changes.md` の topic workspace branch clone route を使い、source publication 後に clean pin を統合します。
+- AgentCanon source が関係する場合は、親の `main` で source bytes を統合せず、qualified source clone の Issue/PR と merged-main readback を別の runnable unit として閉じます。親 branch には親固有の project files と validation evidence だけを統合します。
 
 ## 推奨手順
 
@@ -56,7 +56,7 @@ git merge --no-ff work/<topic>-YYYYMMDD
 
 1. 構成変更が落ちていないかを確認する
    - source branch と integration commit の tree shape を比較します。
-   - submodule pin が変わる branch では、source branch の gitlink SHA と integration commit の gitlink SHA が意図通り一致しているかを確認します。
+   - AgentCanon source PR が関係する場合、source PR の merge SHA と readback を確認します。親 tree に source gitlink が存在しないことも確認します。
 
 ```bash
 python3 tools/ci/check_merge_structure.py \
@@ -64,7 +64,7 @@ python3 tools/ci/check_merge_structure.py \
   --target origin/main \
   --compare-commit HEAD
 
-git submodule status vendor/agent-canon
+test ! -e vendor/agent-canon
 ```
 
 1. 統合後の validation を走らせる
@@ -88,14 +88,14 @@ fast-forward を行います。
 - rename / delete を含む差分で `squash` だけを使い、tree check なしで close してはいけません。
 - branch 側で消した path が `main` 側に残ったまま完了扱いにしてはいけません。
 - symlink 化や file type 変更を、content 差分だけ見て close してはいけません。
-- submodule gitlink の変更を、parent repo の `git diff -- vendor/agent-canon` だけで安全判断してはいけません。submodule 内の `git status`、HEAD、remote main、proposal 要否を確認します。
+- AgentCanon source の変更を、親の file diff だけで安全判断してはいけません。qualified source clone の `git status`、HEAD、remote main、Issue/PR、merged-main readback を確認します。
 
 ## 判定基準
 
 次がそろっていれば、構成変更の統合として合格です。
 
 - source branch で structural path として変わった path が integration commit でも同じ state にある
-- submodule pin が変わる場合、source branch、integration commit、AgentCanon GitHub main の SHA 関係が evidence にある
+- AgentCanon source が関係する場合、source branch、PR merge commit、AgentCanon GitHub main の SHA 関係が evidence にある
 - `python3 tools/ci/check_merge_structure.py ...` が pass
 - `make ci-quick` が pass
 - 必要な note、doc、test が `main` から辿れる

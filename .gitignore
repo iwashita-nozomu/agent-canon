@@ -2,7 +2,6 @@
 # contract reference
 # responsibility Defines AgentCanon-local ignored generated artifacts.
 # upstream design documents/conventions/coding-conventions-project.md repository hygiene rules
-# downstream environment tools/ci/check_agent_canon_latest.sh expects generated caches not to dirty submodule status
 # @dependency-end
 
 # Python cache
@@ -31,7 +30,6 @@ reports/.cache/
 reports/*.json
 reports/*.txt
 reports/*.patch
-.devcontainer/docker-compose.generated.yml
 
 # Local environments
 .venv/

@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import os
 import subprocess
 import sys
 import tempfile
@@ -110,9 +112,12 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
         """Accumulated reports should be uniquely named and not copy raw prompts."""
         source_run_id = "source-run-42"
         with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
+            temp_root = Path(temp_dir)
+            root = temp_root / "agent-canon-development" / "agent-canon"
+            runtime_root = temp_root / "runtime"
             self.copy_runtime_fixture(root)
-            archive_root = mounted_log_archive_root(root)
+            before = self.snapshot_tree(root)
+            archive_root = mounted_log_archive_root(root, runtime_root)
             archive_root.mkdir(parents=True)
 
             result = subprocess.run(
@@ -121,6 +126,8 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
                     str(SCRIPT),
                     "--root",
                     str(root),
+                    "--runtime-root",
+                    str(runtime_root),
                     "--accumulate",
                     "--run-id",
                     source_run_id,
@@ -128,11 +135,13 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
                 check=False,
                 capture_output=True,
                 text=True,
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
             )
             reports = list(
                 (archive_root / "eval-results" / "workflow-selection").glob("*.md")
             )
             report_text = reports[0].read_text(encoding="utf-8") if reports else ""
+            self.assertEqual(before, self.snapshot_tree(root))
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("WORKFLOW_SELECTION_EVAL_REPORT=", result.stdout)
@@ -282,6 +291,20 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
             destination = root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    @staticmethod
+    def snapshot_tree(root: Path) -> tuple[tuple[str, str, int], ...]:
+        """Capture source bytes and modes to prove eval output stays external."""
+        entries: list[tuple[str, str, int]] = []
+        for path in sorted(item for item in root.rglob("*") if item.is_file()):
+            entries.append(
+                (
+                    str(path.relative_to(root)),
+                    hashlib.sha256(path.read_bytes()).hexdigest(),
+                    path.stat().st_mode & 0o777,
+                )
+            )
+        return tuple(entries)
 
 
 if __name__ == "__main__":

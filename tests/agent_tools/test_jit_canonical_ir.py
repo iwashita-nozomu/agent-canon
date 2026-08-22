@@ -38,7 +38,10 @@ class _JitToolModule(Protocol):
 
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[4]
+    # This test runs against the standalone AgentCanon checkout.  The old
+    # parent-repository root made the subprocess look for a retired
+    # ``vendor/agent-canon`` projection after AgentCanon moved out of vendor.
+    return Path(__file__).resolve().parents[2]
 
 
 def _jit_env(**overrides: str) -> dict[str, str]:
@@ -83,7 +86,7 @@ def test_jit_canonical_ir_extracts_stablehlo_and_backend_trace(tmp_path: Path) -
     subprocess.run(
         [
             sys.executable,
-            "vendor/agent-canon/tools/agent_tools/jit_canonical_ir.py",
+            "tools/agent_tools/jit_canonical_ir.py",
             "--python-symbol",
             f"{root}::main",
             "--input-factory",
@@ -183,7 +186,7 @@ def test_jit_canonical_ir_records_recursive_control_regions(tmp_path: Path) -> N
     subprocess.run(
         [
             sys.executable,
-            "vendor/agent-canon/tools/agent_tools/jit_canonical_ir.py",
+            "tools/agent_tools/jit_canonical_ir.py",
             "--python-symbol",
             f"{root}::main",
             "--input-factory",
@@ -278,7 +281,7 @@ def test_jit_canonical_ir_extracts_answer_state_info_public_return(tmp_path: Pat
     subprocess.run(
         [
             sys.executable,
-            "vendor/agent-canon/tools/agent_tools/jit_canonical_ir.py",
+            "tools/agent_tools/jit_canonical_ir.py",
             "--python-symbol",
             f"{root}::main",
             "--input-factory",

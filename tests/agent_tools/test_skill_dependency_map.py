@@ -18,6 +18,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
@@ -26,6 +27,7 @@ sys.path.insert(0, str(TOOLS_ROOT))
 from agent_canon_source_root import resolve_agent_canon_source_root  # noqa: E402
 from skill_dependency_map import (  # noqa: E402
     GraphDigestMismatchError,
+    GraphSourceMutationError,
     GraphIdentityCollisionError,
     _canonical_bytes,
     _IdentityStore,
@@ -36,8 +38,11 @@ from skill_dependency_map import (  # noqa: E402
     _validate_loaded_graph,
     build_graph,
     check_artifacts,
+    DEFAULT_GRAPH_PATH,
+    DEFAULT_JSON_PATH,
     readback_mermaid,
     render_graph_mermaid,
+    write_artifacts,
 )
 from skill_route_catalog import (  # noqa: E402
     derive_skill_invocation_order,
@@ -48,6 +53,115 @@ from skill_tool_commands import packet_for_skill  # noqa: E402
 
 class SkillToolInvocationGraphTests(unittest.TestCase):
     """Exercise production materialization and checker obligations."""
+
+    def test_graph_requires_external_runtime_when_output_is_implicit(self) -> None:
+        """An omitted output never falls back to documents/runtime in the checkout."""
+        tracked = (
+            PROJECT_ROOT / DEFAULT_GRAPH_PATH,
+            PROJECT_ROOT / DEFAULT_JSON_PATH,
+        )
+        before = tuple(path.read_bytes() for path in tracked)
+        with self.assertRaisesRegex(GraphSourceMutationError, "runtime_root_required"):
+            write_artifacts(PROJECT_ROOT)
+        self.assertEqual(before, tuple(path.read_bytes() for path in tracked))
+
+    def test_graph_default_output_is_external_and_preserves_source(self) -> None:
+        """The normal graph route writes beneath an explicit runtime root only."""
+        tracked = (
+            PROJECT_ROOT / DEFAULT_GRAPH_PATH,
+            PROJECT_ROOT / DEFAULT_JSON_PATH,
+        )
+        before = tuple(path.read_bytes() for path in tracked)
+        with tempfile.TemporaryDirectory() as runtime_dir:
+            markdown, json_path, _ = write_artifacts(
+                PROJECT_ROOT, runtime_root=Path(runtime_dir)
+            )
+            self.assertTrue(markdown.is_file())
+            self.assertTrue(json_path.is_file())
+            self.assertTrue(markdown.is_relative_to(Path(runtime_dir)))
+            self.assertTrue(json_path.is_relative_to(Path(runtime_dir)))
+        self.assertEqual(before, tuple(path.read_bytes() for path in tracked))
+
+    def test_tracked_graph_requires_exact_capability_and_external_evidence(self) -> None:
+        """Tracked projection updates require the fixed pair and leave evidence outside it."""
+        with (
+            tempfile.TemporaryDirectory() as source_dir,
+            tempfile.TemporaryDirectory() as runtime_dir,
+        ):
+            source = Path(source_dir)
+            (source / DEFAULT_GRAPH_PATH).parent.mkdir(parents=True)
+            (source / DEFAULT_GRAPH_PATH).write_text("before\n", encoding="utf-8")
+            (source / DEFAULT_JSON_PATH).write_text("before\n", encoding="utf-8")
+            capability_path = source / "capability.json"
+            capability_path.write_text(
+                json.dumps(
+                    {
+                        "allowed_paths": [
+                            DEFAULT_JSON_PATH.as_posix(),
+                            DEFAULT_GRAPH_PATH.as_posix(),
+                        ],
+                        "purpose": "refresh canonical reader projection",
+                        "authority": "test-maintainer",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            graph = {"skill_count": 1, "commands": [], "tools": [], "edges": []}
+            with (
+                mock.patch("skill_dependency_map.build_graph", return_value=graph),
+                mock.patch(
+                    "skill_dependency_map.render_graph_mermaid", return_value="graph\n"
+                ),
+                mock.patch("skill_dependency_map._json_text", return_value="{}\n"),
+            ):
+                write_artifacts(
+                    source,
+                    output=DEFAULT_GRAPH_PATH,
+                    runtime_root=Path(runtime_dir),
+                    source_mutation_capability=capability_path,
+                )
+            evidence = Path(runtime_dir) / "graphs" / "skill-dependency-graph-source-mutation.json"
+            self.assertTrue(evidence.is_file())
+            payload = json.loads(evidence.read_text(encoding="utf-8"))
+            self.assertEqual(payload["schema"], "agent_canon.skill_graph_source_mutation.v1")
+            self.assertEqual(
+                payload["allowed_paths"],
+                [DEFAULT_GRAPH_PATH.as_posix(), DEFAULT_JSON_PATH.as_posix()],
+            )
+            self.assertEqual(payload["changed_paths"], list(payload["allowed_paths"]))
+            self.assertTrue(payload["source_tree_unchanged_outside_allowed_paths"])
+
+    def test_tracked_graph_rejects_capability_with_unrelated_target(self) -> None:
+        """A capability cannot broaden graph publication beyond the canonical pair."""
+        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as runtime_dir:
+            source = Path(source_dir)
+            (source / DEFAULT_GRAPH_PATH).parent.mkdir(parents=True)
+            capability = source / "capability.json"
+            capability.write_text(
+                json.dumps(
+                    {
+                        "allowed_paths": ["README.md"],
+                        "purpose": "wrong target",
+                        "authority": "test-maintainer",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            graph = {"skill_count": 1, "commands": [], "tools": [], "edges": []}
+            with (
+                mock.patch("skill_dependency_map.build_graph", return_value=graph),
+                mock.patch(
+                    "skill_dependency_map.render_graph_mermaid", return_value="graph\n"
+                ),
+                mock.patch("skill_dependency_map._json_text", return_value="{}\n"),
+            ):
+                with self.assertRaisesRegex(GraphSourceMutationError, "target_mismatch"):
+                    write_artifacts(
+                        source,
+                        output=DEFAULT_GRAPH_PATH,
+                        runtime_root=Path(runtime_dir),
+                        source_mutation_capability=capability,
+                    )
 
     def test_complete_v2_universe_and_edge_types(self) -> None:
         """All skills, phases, resolved commands, tools, and edge kinds are present."""

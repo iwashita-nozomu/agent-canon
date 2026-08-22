@@ -90,8 +90,6 @@ load_declared_surfaces() {
   local registry="${DEPENDENCY_CONTRACT_KIND_REGISTRY:-}"
   if [[ -z "$registry" && -f "$ROOT_DIR/documents/design/dependency-contract-kinds.toml" ]]; then
     registry="$ROOT_DIR/documents/design/dependency-contract-kinds.toml"
-  elif [[ -z "$registry" && -f "$ROOT_DIR/vendor/agent-canon/documents/design/dependency-contract-kinds.toml" ]]; then
-    registry="$ROOT_DIR/vendor/agent-canon/documents/design/dependency-contract-kinds.toml"
   elif [[ -z "$registry" ]]; then
     local script_path script_dir
     script_path="$(readlink -f "${BASH_SOURCE[0]}")"
@@ -215,7 +213,7 @@ is_checkable_suffix() {
 
 is_skip_path() {
   case "$1" in
-    .git/*|.pytest_cache/*|.ruff_cache/*|reports/*|tests/fixtures/nvidia/*.txt|LICENSE|LICENSE.*|NOTICE|NOTICE.*|COPYING|COPYING.*|vendor/agent-canon/LICENSE|vendor/agent-canon/LICENSE.*|vendor/agent-canon/NOTICE|vendor/agent-canon/NOTICE.*|vendor/agent-canon/COPYING|vendor/agent-canon/COPYING.*)
+    .git/*|.pytest_cache/*|.ruff_cache/*|reports/*|tests/fixtures/nvidia/*.txt|LICENSE|LICENSE.*|NOTICE|NOTICE.*|COPYING|COPYING.*)
       return 0
       ;;
     *)
@@ -281,10 +279,6 @@ real_source_path() {
 path_owner() {
   local path="$1"
   case "$path" in
-    vendor/agent-canon/*)
-      printf '%s\n' "submodule_source"
-      return
-      ;;
     .github/workflows/agent-coordination.yml|.github/PULL_REQUEST_TEMPLATE/agent_canon.md)
       printf '%s\n' "root_view"
       return

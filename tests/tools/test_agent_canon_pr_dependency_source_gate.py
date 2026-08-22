@@ -83,7 +83,6 @@ class AgentCanonPrDependencySourceGateTest(unittest.TestCase):
         report: Path,
         packet: Path,
         *,
-        mode: str,
         required: int,
         base: str = "a" * 40,
     ) -> subprocess.CompletedProcess[str]:
@@ -104,8 +103,6 @@ class AgentCanonPrDependencySourceGateTest(unittest.TestCase):
                 str(packet),
                 "--trusted-base-sha",
                 base,
-                "--repository-mode",
-                mode,
                 "--source-review-required",
                 str(required),
             ],
@@ -127,7 +124,6 @@ class AgentCanonPrDependencySourceGateTest(unittest.TestCase):
                 tools,
                 report,
                 packet,
-                mode="standalone_source",
                 required=1,
             )
 
@@ -151,7 +147,6 @@ class AgentCanonPrDependencySourceGateTest(unittest.TestCase):
                 tools,
                 report,
                 packet,
-                mode="template_or_derived",
                 required=0,
             )
 
@@ -173,7 +168,6 @@ class AgentCanonPrDependencySourceGateTest(unittest.TestCase):
                 tools,
                 report,
                 packet,
-                mode="standalone_source",
                 required=1,
                 base="not-a-commit",
             )

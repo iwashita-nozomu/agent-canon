@@ -23,12 +23,17 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import capacity_handshake
+from runtime_artifacts import (
+    RUNTIME_ROOT_ENV,
+    RuntimeArtifactError,
+    runtime_artifact_boundary,
+)
 from parent_root_side_effects import (
     ParentRootAttestationRequest,
     ParentRootReject,
@@ -44,6 +49,11 @@ def _parent_validate(path: Path, purpose: str) -> None:
         raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
     parent = Path(configured).resolve(strict=True)
     attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
+    if path.resolve() == parent:
+        # The attestation itself pins the authenticated parent root; asking
+        # the path capability to resolve the root as a child would be an
+        # invalid target lookup rather than an additional safety check.
+        return
     ParentRootSideEffectBoundary().resolve_parent_owned_path(attestation, path, purpose, create=False)
 
 if __package__:
@@ -61,10 +71,6 @@ if __package__:
     from .workspace_scope import resolve_report_root
 else:
     from workspace_scope import resolve_report_root
-if __package__:
-    from . import surface_manifest
-else:
-    import surface_manifest
 from report_artifact_checks import (
     COMPLETION_COVERAGE_SCHEMA,
     COMPLETION_COVERAGE_TAXONOMY_REFS,
@@ -99,15 +105,46 @@ DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX = "not_applicable:format-only:"
 DOCUMENT_STRUCTURE_ACTIVATIONS = {"required", "not_required", "format_only"}
 DOCUMENT_STRUCTURE_VALUE_MISSING = {"", "missing", "none", "not_applicable"}
 COMPLETION_COVERAGE_ARTIFACT_NAME = "completion_coverage.json"
-AGENT_CANON_PREFIX = "vendor/agent-canon"
 
 
-def _resolve_report_root(report_root: str | None, workspace_root: Path) -> Path:
+def _resolve_report_root(
+    report_root: str | None,
+    workspace_root: Path,
+    *,
+    runtime_root: Path | str | None = None,
+) -> Path:
     """Load the team CLI helper only for the CLI/report path."""
     # Keep report-root resolution tied to the requested workspace.  The
     # parent capability below validates the resulting path and must not
     # silently relocate lifecycle artifacts to the configured parent root.
-    return resolve_report_root(report_root, workspace_root)
+    return resolve_report_root(
+        report_root,
+        workspace_root,
+        runtime_root=runtime_root,
+    )
+
+
+def _runtime_validate(
+    path: Path,
+    purpose: str,
+    *,
+    runtime_root: Path | str | None = None,
+) -> None:
+    """Validate one report path against the explicit external runtime root."""
+    configured = runtime_root or os.environ.get(RUNTIME_ROOT_ENV, "").strip() or None
+    if configured is None:
+        raise ParentRootSideEffectError(
+            ParentRootReject.RUNTIME_ROOT_REQUIRED,
+            f"{purpose}: explicit runtime root is required",
+        )
+    source_root = Path(__file__).resolve().parents[2]
+    try:
+        runtime_artifact_boundary(source_root, configured).resolve(path)
+    except RuntimeArtifactError as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.RUNTIME_PATH_ESCAPE,
+            f"{purpose}: {exc}",
+        ) from exc
 
 
 def _lifecycle_status(value: object) -> capacity_handshake.LifecycleStatus:
@@ -339,8 +376,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--report-root",
         help=(
-            "Optional directory that contains per-run report folders. Defaults to "
-            "./reports/agents relative to the current workspace."
+            "Optional external directory that contains per-run report folders. "
+            "Defaults below --runtime-root."
+        ),
+    )
+    parser.add_argument(
+        "--runtime-root",
+        help=(
+            "Explicit external runtime root for reports and active-run state. "
+            f"Defaults to {RUNTIME_ROOT_ENV}."
         ),
     )
     return parser
@@ -568,232 +612,17 @@ def changed_file_paths(workspace: Path) -> tuple[str, ...]:
     return tuple(sorted(paths))
 
 
-def _normalize_path(raw_path: str) -> str:
-    """Normalize one path for manifest/closeout comparison."""
-    return Path(raw_path).as_posix()
-
-
-def _path_in_prefix(path: str, prefixes: Iterable[str]) -> bool:
-    for prefix in prefixes:
-        if path == prefix or path.startswith(f"{prefix}/"):
-            return True
-    return False
-
-
-def agent_canon_parent_sync_manifest_prefixes(
-    workspace: Path,
-    prefix: str = AGENT_CANON_PREFIX,
-) -> tuple[str, ...]:
-    """Read current AgentCanon surface manifest and return prefix-triggered sync paths."""
-    entries = ()
-    try:
-        manifest = surface_manifest.load_manifest(
-            workspace,
-            prefix,
-            surface_manifest.DEFAULT_MANIFEST,
-        )
-        entries = manifest.entries
-    except (FileNotFoundError, OSError, ValueError, TypeError):
-        return tuple()
-    trigger_paths: set[str] = set()
-    for entry in entries:
-        if entry.mode in {"copy", "regular"}:
-            trigger_paths.add(_normalize_path(entry.path))
-            source = entry.source_or_default()
-            if source:
-                trigger_paths.add(_normalize_path(source))
-    return tuple(sorted(trigger_paths))
-
-
-def agent_canon_parent_sync_manifest_exact_paths(
-    workspace: Path,
-    prefix: str = AGENT_CANON_PREFIX,
-) -> tuple[str, ...]:
-    """Read current manifest and return symlink-link parent paths that must be changed exactly."""
-    entries = ()
-    try:
-        manifest = surface_manifest.load_manifest(
-            workspace,
-            prefix,
-            surface_manifest.DEFAULT_MANIFEST,
-        )
-        entries = manifest.entries
-    except (FileNotFoundError, OSError, ValueError, TypeError):
-        return tuple()
-    exact_paths: set[str] = set()
-    for entry in entries:
-        if entry.mode == "symlink":
-            exact_paths.add(_normalize_path(entry.path))
-    return tuple(sorted(exact_paths))
-
-
-def agent_canon_parent_sync_symlink_source_paths(
-    workspace: Path,
-    prefix: str = AGENT_CANON_PREFIX,
-) -> tuple[str, ...]:
-    """Return symlink source roots from manifest; changes under these do not require link-root."""
-    try:
-        manifest = surface_manifest.load_manifest(
-            workspace,
-            prefix,
-            surface_manifest.DEFAULT_MANIFEST,
-        )
-    except (FileNotFoundError, OSError, ValueError, TypeError):
-        return tuple()
-    sources: set[str] = set()
-    for entry in manifest.entries:
-        if entry.mode != "symlink":
-            continue
-        source = entry.source_or_default()
-        if source:
-            normalized = _normalize_path(source)
-            sources.add(normalized)
-            source_parent = Path(normalized).as_posix()
-            if source_parent and source_parent != ".":
-                parent = Path(source_parent).parent
-                while parent.as_posix() != ".":
-                    sources.add(parent.as_posix())
-                    parent = parent.parent
-    return tuple(sorted(sources))
-
-
-def _gitlink_commit_resolvable(workspace: Path) -> str | None:
-    """Return commit object for the committed vendor/agent-canon gitlink."""
-    if not (workspace / AGENT_CANON_PREFIX).is_dir():
-        return None
-    result = subprocess.run(
-        ["git", "ls-tree", "HEAD", AGENT_CANON_PREFIX],
-        cwd=workspace,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        return None
-    fields = result.stdout.strip().split()
-    if len(fields) < 3 or fields[0] != "160000" or fields[1] != "commit":
-        return None
-    commit = fields[2]
-    if not commit:
-        return None
-    exists = subprocess.run(
-        ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
-        cwd=workspace,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    return commit if exists.returncode == 0 else None
-
-
-def _parse_gitlink_ref_updates(lines: tuple[str, ...]) -> tuple[str | None, str | None]:
-    """Parse `git diff --raw` lines for AgentCanon gitlink target path updates."""
-
-    def _as_hash(raw_hash: str) -> str | None:
-        return None if raw_hash in {"0" * 40, ""} else raw_hash
-
-    for raw in lines:
-        metadata, separator, paths = raw.partition("\t")
-        if not separator:
-            continue
-        fields = metadata.split()
-        if len(fields) < 4:
-            continue
-        if not fields[0].startswith(":"):
-            continue
-        mode_old = fields[0].lstrip(":")
-        mode_new = fields[1]
-        if mode_old != "160000" or mode_new != "160000":
-            continue
-        old_hash = _as_hash(fields[2])
-        new_hash = _as_hash(fields[3])
-        status = fields[4] if len(fields) > 4 else "M"
-
-        path_fields = paths.split("\t")
-        if not path_fields or not path_fields[0]:
-            continue
-        old_path = _normalize_path(path_fields[0])
-        new_path = _normalize_path(path_fields[-1])
-
-        if status.startswith(("R", "C")) and len(path_fields) >= 2:
-            old_path = _normalize_path(path_fields[0])
-            new_path = _normalize_path(path_fields[1])
-        else:
-            new_path = old_path
-
-        if status.startswith("R"):
-            if old_path == AGENT_CANON_PREFIX and new_path != AGENT_CANON_PREFIX:
-                continue
-            if new_path == AGENT_CANON_PREFIX and old_path != AGENT_CANON_PREFIX:
-                return old_hash, new_hash
-            continue
-
-        if new_path == AGENT_CANON_PREFIX:
-            return old_hash, new_hash
-    return None, None
-
-
-def _gitlink_update_candidates(workspace: Path) -> tuple[str | None, str | None]:
-    """Read staged and unstaged gitlink hash transitions for vendor/agent-canon."""
-    outputs: list[str] = []
-    for args in (
-        ("git", "diff", "--raw", "--cached", "HEAD", "--", AGENT_CANON_PREFIX),
-        ("git", "diff", "--raw", "HEAD", "--", AGENT_CANON_PREFIX),
-    ):
-        result = subprocess.run(
-            list(args),
-            cwd=workspace,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            continue
-        outputs.extend(result.stdout.splitlines())
-    return _parse_gitlink_ref_updates(tuple(outputs))
-
-
-def _gitlink_target_commit_resolvable(workspace: Path) -> str | None:
-    """Return the targeted gitlink commit object only when vendor/agent-canon is changed."""
-    old_hash, new_hash = _gitlink_update_candidates(workspace)
-    if new_hash is None:
-        return None
-    result = subprocess.run(
-        ["git", "cat-file", "-e", f"{new_hash}^{{commit}}"],
-        cwd=workspace,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    return new_hash if result.returncode == 0 else None
-
-
-def _sync_gate_manifest_prefixes(workspace: Path) -> tuple[str, ...]:
-    """Return copy/regular materialization prefixes."""
-    return agent_canon_parent_sync_manifest_prefixes(workspace)
-
-
 def agent_canon_parent_sync_gate_required(
     changed_paths: Sequence[str],
     *,
     workspace: Path | None = None,
 ) -> bool:
-    """Return whether this run requires a parent shared-canon root sync gate."""
-    resolved_workspace = workspace or Path.cwd()
-    normalized = {_normalize_path(item) for item in changed_paths}
-    sync_targets = set(_sync_gate_manifest_prefixes(resolved_workspace))
-    exact_root_symlink_paths = set(agent_canon_parent_sync_manifest_exact_paths(resolved_workspace))
-    symlink_sources = set(
-        agent_canon_parent_sync_symlink_source_paths(resolved_workspace)
-    )
+    """Return whether a parent projection gate is required.
 
-    for path in normalized:
-        if path in exact_root_symlink_paths:
-            return True
-        if _path_in_prefix(path, symlink_sources):
-            continue
-        if _path_in_prefix(path, sync_targets):
-            return True
+    AgentCanon is no longer embedded in a parent checkout, so there is no
+    parent projection or gitlink whose synchronization can block closeout.
+    Parent-owned product paths remain governed by their own validation route.
+    """
     return False
 
 
@@ -1341,10 +1170,22 @@ def main() -> int:
         report_dir = Path(args.report_dir).resolve()
     else:
         report_dir = (
-            _resolve_report_root(args.report_root, Path.cwd()) / str(args.run_id)
+            _resolve_report_root(
+                args.report_root,
+                Path.cwd(),
+                runtime_root=args.runtime_root,
+            )
+            / str(args.run_id)
         ).resolve()
-    _parent_validate(report_dir, "task-close")
     workspace = Path.cwd().resolve()
+    # The checkout remains parent-owned, while run artifacts live under the
+    # separately authenticated external runtime capability.
+    _parent_validate(workspace, "task-close-workspace")
+    _runtime_validate(
+        report_dir,
+        "task-close-report",
+        runtime_root=args.runtime_root,
+    )
     active_run = active_run_name(report_dir)
 
     verification_path = report_dir / "verification.txt"
@@ -1413,9 +1254,8 @@ def main() -> int:
         changed_all,
         workspace=workspace,
     )
-    parent_gitlink_commit = _gitlink_target_commit_resolvable(workspace)
-    _, changed_gitlink_target = _gitlink_update_candidates(workspace)
-    requires_parent_gitlink_integrity = changed_gitlink_target is not None
+    parent_gitlink_commit = None
+    requires_parent_gitlink_integrity = False
     (
         document_structure_paths_ready,
         document_split_decision_route_ready,

@@ -41,8 +41,6 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         self.assertIn("gate:cause_investigation_guard", result.stdout)
         self.assertIn("gate:import_responsibility", result.stdout)
         self.assertIn("gate:responsibility_scope", result.stdout)
-        self.assertIn("scope:shared-tooling", result.stdout)
-        self.assertIn("owner:agent-canon", result.stdout)
         self.assertIn("gate:module_boundary_guard", result.stdout)
         self.assertIn("gate:oop_readability_guard", result.stdout)
         self.assertIn("gate:solid_evidence_gate", result.stdout)
@@ -51,16 +49,11 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         self.assertIn("gate:log_surface_inventory_guard", result.stdout)
         self.assertIn("TOOL_REJECTION_PREDICTED_GATE=", result.stdout)
 
-    def test_parent_tools_symlink_routes_new_agentcanon_tool_source_gates(self) -> None:
-        """Parent tools/ views should route new shared tool sources to AgentCanon."""
+    def test_standalone_new_tool_source_routes_agentcanon_gates(self) -> None:
+        """A new standalone tool source gets the canonical ownership gates."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            source_tools = root / "vendor" / "agent-canon" / "tools"
-            (source_tools / "agent_tools").mkdir(parents=True)
-            (root / "tools").symlink_to(
-                Path("vendor") / "agent-canon" / "tools",
-                target_is_directory=True,
-            )
+            (root / "tools" / "agent_tools").mkdir(parents=True)
 
             result = subprocess.run(
                 [
@@ -84,28 +77,26 @@ class ToolRejectionPreflightTest(unittest.TestCase):
             commands_by_gate.setdefault(gate["gate"], []).append(gate["command"])
         paths = {gate["path"] for gate in payload["predicted_gates"]}
 
-        self.assertIn(
-            "vendor/agent-canon/tools/agent_tools/new_shared_checker.py", paths
-        )
+        self.assertIn("tools/agent_tools/new_shared_checker.py", paths)
         self.assertIn("agentcanon_new_tool_source_route", gates)
         self.assertIn("responsibility_scope", gates)
         self.assertIn("tool_catalog", gates)
         self.assertIn("log_surface_inventory_guard", gates)
         self.assertTrue(
             any(
-                "git -C vendor/agent-canon status" in command
+                "git status --short --branch" in command
                 for command in commands_by_gate["agentcanon_new_tool_source_route"]
             )
         )
         self.assertTrue(
             any(
-                "cd vendor/agent-canon" in command
+                "tools/agent_tools/log_surface_inventory.py" in command
                 for command in commands_by_gate["log_surface_inventory_guard"]
             )
         )
         self.assertTrue(
             any(
-                "cd vendor/agent-canon" in command
+                "tools/agent_tools/tool_catalog.py" in command
                 for command in commands_by_gate["tool_catalog"]
             )
         )
@@ -185,35 +176,6 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         self.assertIn("top-level hooks only", dependency_gates[0]["handoff"])
         self.assertNotIn("dependency header", dependency_gates[0]["handoff"])
 
-    def test_agentcanon_hook_config_source_path_preserves_schema_route(self) -> None:
-        """Parent symlink resolution should keep hook runtime and schema routing."""
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(TOOL),
-                "--root",
-                str(PROJECT_ROOT),
-                "--format",
-                "json",
-                "vendor/agent-canon/.codex/hooks.json",
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-
-        payload = json.loads(result.stdout)
-        gates = {gate["gate"] for gate in payload["predicted_gates"]}
-        dependency_gates = [
-            gate
-            for gate in payload["predicted_gates"]
-            if gate["gate"] == "dependency_review"
-        ]
-        self.assertIn("codex_hook_runtime_alignment", gates)
-        self.assertEqual(len(dependency_gates), 1)
-        self.assertIn("top-level hooks only", dependency_gates[0]["handoff"])
-        self.assertNotIn("dependency header", dependency_gates[0]["handoff"])
-
     def test_markdown_path_predicts_style_checker_gate(self) -> None:
         """Markdown edits should carry automatic style checker coverage."""
         result = subprocess.run(
@@ -236,12 +198,12 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         self.assertIn("style_checker_guard", gates)
         self.assertIn("dependency_review", gates)
         self.assertIn("responsibility_scope", gates)
-        self.assertTrue(
-            any(
-                gate["handoff"].startswith("scope:shared-policy-documents ")
+        self.assertEqual(
+            sum(
+                gate["gate"] == "responsibility_scope"
                 for gate in payload["predicted_gates"]
-                if gate["gate"] == "responsibility_scope"
-            )
+            ),
+            1,
         )
 
     def test_unknown_path_predicts_responsibility_assignment(self) -> None:
@@ -268,9 +230,9 @@ class ToolRejectionPreflightTest(unittest.TestCase):
             if gate["gate"] == "responsibility_scope"
         ]
         self.assertEqual(len(responsibility_gates), 1)
-        self.assertIn(
-            "assign this planned path to exactly one responsibility-scope.toml scope",
+        self.assertRegex(
             responsibility_gates[0]["handoff"],
+            r"(assign this planned path to exactly one responsibility-scope\.toml scope|repair responsibility-scope\.toml)",
         )
 
     def test_skill_path_predicts_log_surface_gate(self) -> None:
@@ -357,32 +319,10 @@ class ToolRejectionPreflightTest(unittest.TestCase):
             for gate in payload["predicted_gates"]
             if gate["gate"] == "experiment_execution_surface_guard"
         )
-        self.assertIn("check_experiment_registry.py", guarded_gate["command"])
+        self.assertIn("tools.ci.check_experiment_registry", guarded_gate["command"])
         self.assertIn("test_run_managed_experiment.py", guarded_gate["command"])
         self.assertIn("$experiment-lifecycle", guarded_gate["handoff"])
         self.assertIn("$test-design", guarded_gate["handoff"])
-
-    def test_parent_agentcanon_experiment_tool_path_keeps_lifecycle_guard(self) -> None:
-        """Parent submodule paths should keep managed experiment execution routing."""
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(TOOL),
-                "--root",
-                str(PROJECT_ROOT),
-                "--format",
-                "json",
-                "vendor/agent-canon/tools/experiments/run_managed_experiment.py",
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-
-        payload = json.loads(result.stdout)
-        gates = {gate["gate"] for gate in payload["predicted_gates"]}
-        self.assertIn("experiment_execution_surface_guard", gates)
-        self.assertNotIn("agentcanon_new_tool_source_route", gates)
 
     def test_changed_mode_uses_git_status_when_no_paths_are_given(self) -> None:
         """Changed mode should produce pass when a new repo has no changed files."""

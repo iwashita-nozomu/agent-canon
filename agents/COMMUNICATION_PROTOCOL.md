@@ -179,8 +179,9 @@ python3 tools/agent_tools/import_responsibility.py --root <root> --format json >
 Run `document-inventory` when document, README, generated report, stale-doc,
 or reader-navigation surfaces are implicated. Run `import_responsibility.py`
 when import boundaries or package layout are implicated. In parent repos where
-the structure contract is not a root view, pass
-`--contract vendor/agent-canon/documents/structure/repo-structure-contract.toml`.
+the structure contract is not a root view, pass the qualified source-clone
+path, for example
+`--contract <agent-canon-source-clone>/documents/structure/repo-structure-contract.toml`.
 
 ## Handoff Packet
 

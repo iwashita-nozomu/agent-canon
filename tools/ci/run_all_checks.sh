@@ -6,7 +6,8 @@
 # upstream design ../../documents/design/dependency-manifest-design.md manifest DSL and explicit graph analysis projection
 # upstream implementation ./check_agent_canon_pr.sh writes owner/root/PID/status-bound source receipts
 # upstream implementation ./pr_gate_receipt.py owns receipt parsing and binding validation
-# upstream implementation ../agent_tools/parent_root_side_effects.py owns parent-local child state and exact cleanup
+# upstream implementation ../agent_tools/parent_root_side_effects.py owns explicit control authentication and child execution
+# upstream implementation ../agent_tools/runtime_artifacts.py owns external CI state and exact cleanup
 # upstream implementation ../agent_tools/check_dependency_headers.py validates changed-file dependency manifests
 # upstream implementation ../agent_tools/check_dependency_header_format.sh validates changed-file manifest syntax
 # upstream implementation ../agent_tools/check_static_any.py rejects explicit Python Any usage
@@ -28,7 +29,8 @@
 # upstream implementation ../agent_tools/evaluate_workflow_selection.py validates workflow selection routing cases
 # upstream implementation ../agent_tools/evaluate_report_quality.py validates report writing quality checklist cases
 # upstream implementation ./check_github_workflows.py validates GitHub workflow and PR checklist contracts
-# upstream implementation ./container_config.py validates Dockerfile/devcontainer/runtime pack contracts
+# upstream implementation ../../bootstrap/container/Dockerfile defines the shared tool image
+# upstream implementation ../../tools/agent_tools/bootstrap_runtime.py owns lifecycle readback
 # upstream implementation ../agent_tools/smoke_test_research_perspective_pack.py validates research role packet
 # @dependency-end
 set -euo pipefail
@@ -76,25 +78,44 @@ CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$WORKSPACE_ROOT")"
 CANON_CI_ROOT="${CANON_TOOLS_ROOT}/ci"
 cd "$WORKSPACE_ROOT"
 
-if [[ -d "${WORKSPACE_ROOT}/vendor/agent-canon" && -f "${WORKSPACE_ROOT}/.gitmodules" ]]; then
-  AGENT_CANON_REPOSITORY_MODE="template_or_derived"
-  AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
-else
-  AGENT_CANON_REPOSITORY_MODE="standalone_source"
-  AGENT_CANON_SOURCE_ROOT="$WORKSPACE_ROOT"
-fi
+AGENT_CANON_SOURCE_ROOT="$WORKSPACE_ROOT"
 AGENT_CANON_CARGO_MANIFEST="${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml"
-AGENT_CANON_CLI_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR:-${WORKSPACE_ROOT}/.agent-canon/cache/cargo-target}"
 AGENT_CANON_BOUNDARY_SCRIPT="${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py"
+# The checkout is a read-only source input.  Control and runtime roots are
+# explicit capabilities supplied by the caller; source/TMPDIR fallbacks would
+# make a CI check mutate whichever checkout happened to invoke this script.
+if [[ -z "${AGENT_CANON_CONTROL_PARENT_ROOT:-}" ]]; then
+  echo "AGENT_CANON_RUN_ALL_CHECKS=fail reason=control_parent_root_required" >&2
+  exit 2
+fi
+if [[ -z "${AGENT_CANON_RUNTIME_ROOT:-}" ]]; then
+  echo "AGENT_CANON_RUN_ALL_CHECKS=fail reason=runtime_root_required" >&2
+  exit 2
+fi
+if ! python3 - "${AGENT_CANON_SOURCE_ROOT}" "${AGENT_CANON_CONTROL_PARENT_ROOT}" <<'PY'
+from pathlib import Path
+import sys
+
+source = Path(sys.argv[1]).resolve(strict=True)
+control = Path(sys.argv[2]).resolve(strict=False)
+if source == control:
+    raise SystemExit("control parent root must differ from source root")
+PY
+then
+  echo "AGENT_CANON_RUN_ALL_CHECKS=fail reason=control_parent_root_is_source" >&2
+  exit 2
+fi
+export AGENT_CANON_PARENT_ROOT="${AGENT_CANON_CONTROL_PARENT_ROOT}"
+export AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${AGENT_CANON_CONTROL_PARENT_ROOT}"
 if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "run-all-checks-script" ]]; then
   python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" verify-child \
-    --root "${WORKSPACE_ROOT}" \
+    --root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
     --source-root "${AGENT_CANON_SOURCE_ROOT}" \
     --purpose run-all-checks-script \
     --consume >/dev/null
 else
   exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
-    --root "${WORKSPACE_ROOT}" \
+    --root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
     --source-root "${AGENT_CANON_SOURCE_ROOT}" \
     --purpose run-all-checks-script \
     --issue-handoff \
@@ -102,27 +123,58 @@ else
 fi
 unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
 
+# Generated CI state is external to the source checkout.  Path validation is
+# delegated to runtime_artifacts.py, the single runtime-root contract.
+runtime_boundary_root() {
+  local candidate="$1"
+  PYTHONPATH="${CANON_TOOLS_ROOT}/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+    python3 - "${AGENT_CANON_SOURCE_ROOT}" "${candidate}" <<'PY'
+from pathlib import Path
+import sys
+
+from runtime_artifacts import runtime_artifact_boundary
+
+print(runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True).root)
+PY
+}
+
+runtime_boundary_path() {
+  local candidate="$1"
+  PYTHONPATH="${CANON_TOOLS_ROOT}/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+    python3 - "${AGENT_CANON_SOURCE_ROOT}" "${AGENT_CANON_CI_RUNTIME_ROOT}" "${candidate}" <<'PY'
+from pathlib import Path
+import sys
+
+from runtime_artifacts import runtime_artifact_boundary
+
+boundary = runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True)
+print(boundary.resolve(Path(sys.argv[3])))
+PY
+}
+
+AGENT_CANON_CI_RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT}"
+AGENT_CANON_CI_RUNTIME_ROOT="$(runtime_boundary_root "${AGENT_CANON_CI_RUNTIME_ROOT}")"
+export AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_CI_RUNTIME_ROOT}"
+AGENT_CANON_CACHE_ROOT="$(runtime_boundary_path "${AGENT_CANON_CACHE_ROOT:-${AGENT_CANON_CI_RUNTIME_ROOT}/cache}")"
+export AGENT_CANON_CACHE_ROOT
+CARGO_HOME="$(runtime_boundary_path "${CARGO_HOME:-${AGENT_CANON_CACHE_ROOT}/cargo-home}")"
+export CARGO_HOME
+AGENT_CANON_CLI_TARGET_DIR="$(runtime_boundary_path "${AGENT_CANON_CLI_TARGET_DIR:-${AGENT_CANON_CACHE_ROOT}/cargo-target}")"
+export AGENT_CANON_CLI_TARGET_DIR
+CARGO_TARGET_DIR="$(runtime_boundary_path "${CARGO_TARGET_DIR:-${AGENT_CANON_CLI_TARGET_DIR}}")"
+export CARGO_TARGET_DIR
+TMPDIR="$(runtime_boundary_path "${TMPDIR:-${AGENT_CANON_CI_RUNTIME_ROOT}/tmp}")"
+export TMPDIR
+mkdir -p "${CARGO_HOME}" "${CARGO_TARGET_DIR}" "${TMPDIR}"
+
 AGENT_CANON_CI_EVAL_LOG_TEMP_CREATED=0
-AGENT_CANON_CI_HOOK_ARCHIVE_CREATED=0
 AGENT_CANON_CI_EXPLICIT_EVAL_CREATED=0
 AGENT_CANON_CI_SETUP_COMPLETE=0
 AGENT_CANON_CI_EVAL_LOG_DIR_VALUE=""
-AGENT_CANON_CI_HOOK_ARCHIVE_DIR="$(
-  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" resolve \
-    --root "${WORKSPACE_ROOT}" \
-    --candidate "${AGENT_CANON_HOOK_ARCHIVE_DIR:-${AGENT_CANON_SOURCE_ROOT}/.agent-canon/log-archive}" \
-    --purpose run-all-checks-hook-archive
-)"
-if [[ ! -d "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" ]]; then
-  AGENT_CANON_CI_HOOK_ARCHIVE_CREATED=1
-fi
+AGENT_CANON_CI_HOOK_ARCHIVE_DIR="${AGENT_CANON_HOOK_ARCHIVE_DIR:-${AGENT_CANON_CI_RUNTIME_ROOT}/archive/agent-canon-log}"
+AGENT_CANON_CI_HOOK_ARCHIVE_DIR="$(runtime_boundary_path "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}")"
 if [ -n "${AGENT_CANON_CI_EVAL_LOG_DIR:-}" ]; then
-  AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="$(
-    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" resolve \
-      --root "${WORKSPACE_ROOT}" \
-      --candidate "${AGENT_CANON_CI_EVAL_LOG_DIR}" \
-      --purpose run-all-checks-explicit-eval-log
-  )"
+  AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="$(runtime_boundary_path "${AGENT_CANON_CI_EVAL_LOG_DIR}")"
   if [[ ! -d "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}" ]]; then
     AGENT_CANON_CI_EXPLICIT_EVAL_CREATED=1
   fi
@@ -133,23 +185,11 @@ cleanup_run_all_checks_temp() {
   local cleanup_status=0
   trap - EXIT
   if [[ "${AGENT_CANON_CI_EVAL_LOG_TEMP_CREATED}" -eq 1 ]]; then
-    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" remove-tree \
-      --root "${WORKSPACE_ROOT}" \
-      --candidate "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}" \
-      --purpose run-all-checks-cleanup >/dev/null || cleanup_status=$?
+    rm -rf -- "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}" || cleanup_status=$?
   fi
   if [[ "${AGENT_CANON_CI_SETUP_COMPLETE}" -eq 0 ]]; then
     if [[ "${AGENT_CANON_CI_EXPLICIT_EVAL_CREATED}" -eq 1 ]]; then
-      python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" remove-empty-dir \
-        --root "${WORKSPACE_ROOT}" \
-        --candidate "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}" \
-        --purpose run-all-checks-setup-rollback >/dev/null || cleanup_status=$?
-    fi
-    if [[ "${AGENT_CANON_CI_HOOK_ARCHIVE_CREATED}" -eq 1 ]]; then
-      python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" remove-empty-dir \
-        --root "${WORKSPACE_ROOT}" \
-        --candidate "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" \
-        --purpose run-all-checks-setup-rollback >/dev/null || cleanup_status=$?
+      rmdir -- "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}" 2>/dev/null || cleanup_status=$?
     fi
   fi
   if [[ "$status" -eq 0 && "$cleanup_status" -ne 0 ]]; then
@@ -159,27 +199,12 @@ cleanup_run_all_checks_temp() {
 }
 trap cleanup_run_all_checks_temp EXIT
 
-AGENT_CANON_CI_HOOK_ARCHIVE_DIR="$(
-  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" ensure-dir \
-    --root "${WORKSPACE_ROOT}" \
-    --candidate "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" \
-    --purpose run-all-checks-hook-archive
-)"
+mkdir -p "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"
 if [ -n "${AGENT_CANON_CI_EVAL_LOG_DIR:-}" ]; then
-  AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="$(
-    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" ensure-dir \
-      --root "${WORKSPACE_ROOT}" \
-      --candidate "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}" \
-      --purpose run-all-checks-explicit-eval-log
-  )"
+  mkdir -p "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}"
 else
-  AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="$(
-    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" temp-dir \
-      --root "${WORKSPACE_ROOT}" \
-      --candidate "${WORKSPACE_ROOT}/.agent-canon/tmp" \
-      --prefix run-all-eval \
-      --purpose run-all-checks-eval-log
-  )"
+  AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="$(runtime_boundary_path "${AGENT_CANON_CI_RUNTIME_ROOT}/eval/run-all-checks-${BASHPID}")"
+  mkdir -p "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}"
   AGENT_CANON_CI_EVAL_LOG_TEMP_CREATED=1
 fi
 AGENT_CANON_CI_SETUP_COMPLETE=1
@@ -281,8 +306,8 @@ fi
 resolve_agent_canon_cli() {
   local root_tool_binary="${CANON_TOOLS_ROOT}/bin/agent-canon"
   local source_tool_binary="${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon"
-  local source_release_binary="${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/release/agent-canon"
-  local source_debug_binary="${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/debug/agent-canon"
+  local source_release_binary="${AGENT_CANON_CLI_TARGET_DIR}/release/agent-canon"
+  local source_debug_binary="${AGENT_CANON_CLI_TARGET_DIR}/debug/agent-canon"
   if [ -x "${source_tool_binary}" ]; then
     AGENT_CANON_CLI_MODE="binary"
     AGENT_CANON_CLI_CMD="${source_tool_binary}"
@@ -303,11 +328,6 @@ resolve_agent_canon_cli() {
     AGENT_CANON_CLI_CMD="${root_tool_binary}"
     return 0
   fi
-  if command -v cargo >/dev/null 2>&1 && [ -f "${AGENT_CANON_CARGO_MANIFEST}" ]; then
-    AGENT_CANON_CLI_MODE="cargo"
-    AGENT_CANON_CLI_CMD="cargo"
-    return 0
-  fi
   return 1
 }
 
@@ -315,18 +335,12 @@ run_agent_canon() {
   local command
   if [ "${AGENT_CANON_CLI_MODE:-}" = "binary" ] && [ -n "${AGENT_CANON_CLI_CMD:-}" ]; then
     command=("${AGENT_CANON_CLI_CMD}" "$@")
-  elif [ "${AGENT_CANON_CLI_MODE:-}" = "cargo" ] && [ -n "${AGENT_CANON_CLI_CMD:-}" ]; then
-    command=("${AGENT_CANON_CLI_CMD}" run --manifest-path "${AGENT_CANON_CARGO_MANIFEST}" -- "$@")
   else
     echo "AGENT_CANON_CLI_BLOCKER=agent_canon_cli_unavailable" >&2
     echo "AGENT_CANON_CLI_REASON=agent-canon CLI binary/shim missing and cargo route unavailable" >&2
     return 127
   fi
-  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
-    --root "${WORKSPACE_ROOT}" \
-    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
-    -- "${command[@]}"
-  return $?
+  "${command[@]}"
 }
 
 if ! resolve_agent_canon_cli; then
@@ -439,7 +453,7 @@ else
   echo "❌ explicit Any static checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_log_helper_names.py" --changed --exclude vendor --exclude reports 2>&1; then
+if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_log_helper_names.py" --changed --exclude reports 2>&1; then
   echo "✅ log helper naming checks 成功"
 else
   echo "❌ log helper naming checks 失敗"
@@ -519,43 +533,27 @@ else
   echo "❌ local issue sync checks 失敗"
   EXIT_CODE=1
 fi
-if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
-  accumulated_eval_args=(--run-id run-all-checks --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}")
-  if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" \
-    "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}" 2>&1; then
-    echo "✅ accumulated agent eval producers 成功"
-  else
-    echo "❌ accumulated agent eval producers 失敗"
-    EXIT_CODE=1
-  fi
-  if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/eval_accumulation_check.py" 2>&1; then
-    echo "✅ eval accumulation checks 成功"
-  else
-    echo "❌ eval accumulation checks 失敗"
-    EXIT_CODE=1
-  fi
+accumulated_eval_args=(
+  --root "${WORKSPACE_ROOT}"
+  --runtime-root "${AGENT_CANON_CI_RUNTIME_ROOT}"
+  --run-id run-all-checks
+  --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}"
+)
+if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" \
+  "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}" 2>&1; then
+  echo "✅ accumulated agent eval producers 成功"
 else
-  echo "ACCUMULATED_AGENT_EVAL=skip reason=agentcanon_source_owned_gate"
-  echo "EVAL_ACCUMULATION=skip reason=agentcanon_source_owned_gate"
-fi
-if cargo fmt --manifest-path "$AGENT_CANON_CARGO_MANIFEST" -- --check 2>&1; then
-  echo "✅ Rust format checks 成功"
-else
-  echo "❌ Rust format checks 失敗"
+  echo "❌ accumulated agent eval producers 失敗"
   EXIT_CODE=1
 fi
-if cargo clippy --manifest-path "$AGENT_CANON_CARGO_MANIFEST" --all-targets -- -D warnings 2>&1; then
-  echo "✅ Rust clippy checks 成功"
+if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/eval_accumulation_check.py" \
+  --root "${WORKSPACE_ROOT}" --runtime-root "${AGENT_CANON_CI_RUNTIME_ROOT}" 2>&1; then
+  echo "✅ eval accumulation checks 成功"
 else
-  echo "❌ Rust clippy checks 失敗"
+  echo "❌ eval accumulation checks 失敗"
   EXIT_CODE=1
 fi
-if cargo test --manifest-path "$AGENT_CANON_CARGO_MANIFEST" 2>&1; then
-  echo "✅ Rust tests 成功"
-else
-  echo "❌ Rust tests 失敗"
-  EXIT_CODE=1
-fi
+echo "RUST_CHECKS=owned_by_bootstrap_container_static_gate"
 if [ "$SKIP_GITHUB_WORKFLOWS" -eq 1 ]; then
   echo "GITHUB_WORKFLOW_CHECKS=skip reason=already_checked_by_parent_gate"
 elif "$PYTHON_BIN" "${CANON_CI_ROOT}/check_github_workflows.py" 2>&1; then
@@ -564,10 +562,12 @@ else
   echo "❌ GitHub workflow / PR template checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${CANON_CI_ROOT}/container_config.py" 2>&1; then
-  echo "✅ container configuration checks 成功"
+if "$PYTHON_BIN" -m pytest -q \
+  tests/tools/test_bootstrap_container_contract.py \
+  tests/bootstrap/test_bootstrap_runtime.py 2>&1; then
+  echo "✅ bootstrap container / lifecycle contract checks 成功"
 else
-  echo "❌ container configuration checks 失敗"
+  echo "❌ bootstrap container / lifecycle contract checks 失敗"
   EXIT_CODE=1
 fi
 echo ""

@@ -21,7 +21,7 @@
 from __future__ import annotations
 
 import argparse
-import os
+import inspect
 import re
 import subprocess
 import sys
@@ -33,32 +33,15 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest  # noqa: E402
-from parent_root_side_effects import (  # noqa: E402
-    ParentRootAttestationRequest,
-    ParentRootReject,
-    ParentRootSideEffectBoundary,
-    ParentRootSideEffectError,
-    attest_parent_root,
+from runtime_artifacts import (  # noqa: E402
+    RuntimeArtifactBoundary,
+    RuntimeArtifactError,
+    root_capability_environment,
+    runtime_artifact_boundary,
 )
 
 DEFAULT_RUN_ID = "agent-canon-accumulated-eval"
 DEFAULT_PROMPT_EVAL_MANIFEST = Path(eval_manifest_path("skill_workflow_prompt_eval.toml"))
-
-
-def _parent_write(path: Path, data: bytes, purpose: str) -> None:
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            f"{purpose}: explicit parent root is required",
-        )
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
-    )
-    ParentRootSideEffectBoundary().write_parent_owned_file(
-        attestation, path, data, purpose
-    )
 
 
 @dataclass(frozen=True)
@@ -79,13 +62,18 @@ class EvalProducerResult:
     stderr_log: Path
 
 
-Runner = Callable[[Sequence[str], Path], subprocess.CompletedProcess[str]]
+Runner = Callable[..., subprocess.CompletedProcess[str]]
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
+    parser.add_argument(
+        "--runtime-root",
+        type=Path,
+        help="Explicit external runtime root; required for eval output and logs.",
+    )
     parser.add_argument(
         "--run-id",
         default=DEFAULT_RUN_ID,
@@ -129,11 +117,17 @@ def safe_slug(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "-", value).strip("._-") or "run"
 
 
-def resolve_log_dir(root: Path, value: Path | None, run_id: str) -> Path:
+def resolve_log_dir(
+    root: Path,
+    value: Path | None,
+    run_id: str,
+    runtime_root: Path | str | None = None,
+) -> Path:
     """Resolve the directory for captured producer logs."""
+    boundary = runtime_artifact_boundary(root, runtime_root)
     if value is not None:
-        return value if value.is_absolute() else root / value
-    return root / "reports" / "agent-eval-runs" / safe_slug(run_id)
+        return boundary.resolve(value)
+    return boundary.resolve(Path("tasks") / safe_slug(run_id) / "logs")
 
 
 def resolve_path(root: Path, value: Path) -> Path:
@@ -149,9 +143,12 @@ def build_producers(
     report_dir: Path | None,
     prompt_eval_manifest: Path,
     python_bin: str,
+    runtime_root: Path | str | None = None,
 ) -> tuple[EvalProducer, ...]:
     """Build all accumulated eval producer commands."""
     canon = script_root()
+    boundary = runtime_artifact_boundary(root, runtime_root)
+    eval_root = boundary.resolve(Path("eval-results"))
     prompt_command: list[str] = [
         python_bin,
         str(canon / "tools" / "agent_tools" / "evaluate_skill_workflow_prompts.py"),
@@ -166,7 +163,9 @@ def build_producers(
     for skill in skill_used:
         prompt_command.extend(["--skill-used", skill])
     if report_dir is not None:
-        prompt_command.extend(["--report-dir", str(report_dir)])
+        prompt_command.extend(["--report-dir", str(boundary.resolve(report_dir))])
+    prompt_command.extend(["--results-dir", str(eval_root / "skill-workflow-prompt")])
+    runtime_option = ("--runtime-root", str(boundary.root))
     return (
         EvalProducer(
             "codex-agent-role",
@@ -178,9 +177,12 @@ def build_producers(
                 "--accumulate",
                 "--run-id",
                 run_id,
+                "--results-dir",
+                str(eval_root / "codex-agent-role"),
+                *runtime_option,
             ),
         ),
-        EvalProducer("skill-workflow-prompt", tuple(prompt_command)),
+        EvalProducer("skill-workflow-prompt", tuple((*prompt_command, *runtime_option))),
         EvalProducer(
             "workflow-selection",
             (
@@ -191,6 +193,9 @@ def build_producers(
                 "--accumulate",
                 "--run-id",
                 run_id,
+                "--results-dir",
+                str(eval_root / "workflow-selection"),
+                *runtime_option,
             ),
         ),
         EvalProducer(
@@ -201,26 +206,31 @@ def build_producers(
                 "--root",
                 str(root),
                 "--accumulate",
+                "--results-dir",
+                str(eval_root / "report-quality"),
+                *runtime_option,
             ),
         ),
     )
 
 
-def subprocess_runner(command: Sequence[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+def subprocess_runner(
+    command: Sequence[str], cwd: Path, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     """Run one command, capturing stdout and stderr for bounded parent output."""
     return subprocess.run(
         tuple(command),
         cwd=cwd,
+        env=env,
         check=False,
         capture_output=True,
         text=True,
     )
 
 
-def write_text(path: Path, text: str) -> Path:
+def write_text(boundary: RuntimeArtifactBoundary, path: Path, text: str) -> Path:
     """Write captured command output to one log file."""
-    _parent_write(path, text.encode("utf-8"), "accumulated-eval-log")
-    return path
+    return boundary.atomic_write_text(path, text)
 
 
 def run_producers(
@@ -228,15 +238,33 @@ def run_producers(
     root: Path,
     producers: Sequence[EvalProducer],
     log_dir: Path,
+    runtime_root: Path | str | None = None,
     runner: Runner = subprocess_runner,
 ) -> tuple[EvalProducerResult, ...]:
     """Run producers and capture their outputs."""
+    boundary = runtime_artifact_boundary(root, runtime_root)
+    log_dir = boundary.resolve(log_dir)
+    child_env = root_capability_environment(
+        source_root=root,
+        runtime_root=boundary.root,
+        target_root=root,
+    )
     results: list[EvalProducerResult] = []
     for index, producer in enumerate(producers, start=1):
-        completed = runner(producer.command, root)
+        # Keep the tiny two-argument test seam source-compatible while every
+        # real subprocess receives the complete typed root handoff.
+        signature = inspect.signature(runner)
+        accepts_env = len(signature.parameters) >= 3 or any(
+            parameter.kind is inspect.Parameter.VAR_POSITIONAL
+            for parameter in signature.parameters.values()
+        )
+        if accepts_env:
+            completed = runner(producer.command, root, child_env)
+        else:
+            completed = runner(producer.command, root)
         prefix = f"{index:02d}-{safe_slug(producer.name)}"
-        stdout_log = write_text(log_dir / f"{prefix}.stdout.txt", completed.stdout)
-        stderr_log = write_text(log_dir / f"{prefix}.stderr.txt", completed.stderr)
+        stdout_log = write_text(boundary, log_dir / f"{prefix}.stdout.txt", completed.stdout)
+        stderr_log = write_text(boundary, log_dir / f"{prefix}.stderr.txt", completed.stderr)
         results.append(
             EvalProducerResult(
                 producer=producer,
@@ -277,9 +305,11 @@ def render_results(root: Path, results: Sequence[EvalProducerResult]) -> str:
 def run(args: argparse.Namespace, runner: Runner = subprocess_runner) -> int:
     """Run accumulated eval producers from parsed args."""
     root = Path(str(args.root)).resolve()
-    report_dir = resolve_path(root, args.report_dir) if args.report_dir else None
+    runtime_root = args.runtime_root
+    boundary = runtime_artifact_boundary(root, runtime_root)
+    report_dir = boundary.resolve(args.report_dir) if args.report_dir else None
     prompt_eval_manifest = resolve_path(root, args.prompt_eval_manifest)
-    log_dir = resolve_log_dir(root, args.log_dir, str(args.run_id))
+    log_dir = resolve_log_dir(root, args.log_dir, str(args.run_id), runtime_root)
     producers = build_producers(
         root=root,
         run_id=str(args.run_id),
@@ -287,8 +317,15 @@ def run(args: argparse.Namespace, runner: Runner = subprocess_runner) -> int:
         report_dir=report_dir,
         prompt_eval_manifest=prompt_eval_manifest,
         python_bin=sys.executable,
+        runtime_root=runtime_root,
     )
-    results = run_producers(root=root, producers=producers, log_dir=log_dir, runner=runner)
+    results = run_producers(
+        root=root,
+        producers=producers,
+        log_dir=log_dir,
+        runtime_root=runtime_root,
+        runner=runner,
+    )
     print(render_results(root, results), end="")
     return 1 if any(result.returncode != 0 for result in results) else 0
 
@@ -299,4 +336,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except RuntimeArtifactError as exc:
+        print(f"run_accumulated_agent_evals.py: runtime_root_required: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc

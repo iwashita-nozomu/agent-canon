@@ -198,7 +198,8 @@ def test_canonical_generator_and_readback(workspace: Path, capsys: pytest.Captur
     assert main(["--root", str(workspace), "--generate-role-views"]) == 0
     assert capsys.readouterr().out == "MODEL_PROFILE_ROLE_VIEWS=generated:1\n"
     role_text = (workspace / ".codex" / "agents" / "sol_parent.toml").read_text(encoding="utf-8")
-    assert "@dependency-start" in role_text
+    assert "generated role view: generated_role_view_v1" in role_text
+    assert "@dependency-start" not in role_text
     assert 'model = "model-sol"' in role_text
     assert "Use the role-specific contract." in role_text
     projection = json.loads((workspace / "agents" / "agents_config.json").read_text(encoding="utf-8"))

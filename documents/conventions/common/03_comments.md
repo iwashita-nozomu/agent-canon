@@ -2,7 +2,6 @@
 @dependency-start
 contract policy
 responsibility Documents コメント for this repository.
-upstream design ../../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 downstream design ../coding-conventions-house-style.md projects Python responsibility-comment syntax
 downstream design ../../../agents/skills/comprehensive-development.md applies material decision comments during implementation
 downstream design ../../../agents/skills/change-review.md reviews decision-comment lifecycle

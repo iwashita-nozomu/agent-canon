@@ -2,7 +2,6 @@
 @dependency-start
 contract reference
 responsibility Documents Templates for this repository.
-upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../../documents/rule/README.md document filename, placement, and language rules
 downstream implementation ./github/README.md GitHub template source and checked-in standalone target map
 downstream implementation ../experiments/_template/README.md runnable experiment topic planning contract

@@ -78,6 +78,10 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
         git(source, "remote", "add", "origin", self.env["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"])
         return source
 
+    def runtime(self, canon: Path) -> Path:
+        """Return the fixture's external runtime boundary for one checkout."""
+        return canon.parent / f"{canon.name}-runtime"
+
     def run_tool(
         self,
         source: Path,
@@ -89,6 +93,11 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
     ) -> subprocess.CompletedProcess[str]:
         """Invoke the archive tool against one synthetic source and remote."""
         global_args = [] if archive_root is None else ["--archive-root", str(archive_root)]
+        # Runtime evidence is deliberately external to both the source and
+        # AgentCanon checkouts.  Keep the fixture on the same explicit route
+        # as the bootstrap caller; the archive command must not invent a
+        # source-local ``.agent-canon`` fallback.
+        runtime_root = self.runtime(canon)
         env = self.env.copy()
         if extra_env:
             env.update(extra_env)
@@ -99,6 +108,7 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
                 "--source-root", str(source),
                 "--canon-root", str(canon),
                 "--remote", str(remote),
+                "--runtime-root", str(runtime_root),
                 *global_args,
                 *args,
             ],
@@ -161,12 +171,12 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
                 canon,
                 remote,
                 "ensure",
-                archive_root=canon / ".agent-canon" / "log-archive",
+                archive_root=self.runtime(canon) / "archive" / "agent-canon-log",
                 extra_env={"AGENT_CANON_SOURCE_REPOSITORY_ID": "a" * 24},
             )
             self.assertEqual(mismatch.returncode, 1)
             self.assertIn("source_repository_id_mismatch", mismatch.stdout)
-            self.assertFalse((canon / ".agent-canon" / "log-archive").exists())
+            self.assertFalse((self.runtime(canon) / "archive" / "agent-canon-log").exists())
             unavailable_source = root / "unavailable-source"
             unavailable_source.mkdir()
             git(unavailable_source, "init", "-q")
@@ -184,7 +194,9 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
             )
             self.assertEqual(unavailable.returncode, 1)
             self.assertIn("source_remote_required", unavailable.stdout)
-            self.assertFalse((unavailable_canon / ".agent-canon" / "log-archive").exists())
+            self.assertFalse(
+                (self.runtime(unavailable_canon) / "archive" / "agent-canon-log").exists()
+            )
 
         with patch.dict(
             os.environ,
@@ -232,7 +244,7 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
             source = self.source(root, "source")
             canon = root / "canon"
             canon.mkdir()
-            archive_clone = canon / ".agent-canon" / "log-archive"
+            archive_clone = self.runtime(canon) / "archive" / "agent-canon-log"
             archive_clone.parent.mkdir(parents=True)
             subprocess.run(["git", "clone", str(remote), str(archive_clone)], check=True, capture_output=True)
             before = git(archive_clone, "rev-parse", "HEAD")
@@ -266,7 +278,16 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
             self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
             self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
             branch = stable_source_repository_id(self.env["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"])
-            snapshots = list((canon / ".agent-canon" / "log-archive" / "agent-reports" / branch / "run-1").iterdir())
+            snapshots = list(
+                (
+                    self.runtime(canon)
+                    / "archive"
+                    / "agent-canon-log"
+                    / "agent-reports"
+                    / branch
+                    / "run-1"
+                ).iterdir()
+            )
             self.assertEqual(len(snapshots), 1)
             index = snapshots[0].parent.parent / "index.jsonl"
             self.assertEqual(len(index.read_text(encoding="utf-8").splitlines()), 1)
@@ -307,10 +328,17 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             ).stdout.strip()
-            self.assertEqual(remote_head, git(second_canon / ".agent-canon" / "log-archive", "rev-parse", "HEAD"))
+            self.assertEqual(
+                remote_head,
+                git(
+                    self.runtime(second_canon) / "archive" / "agent-canon-log",
+                    "rev-parse",
+                    "HEAD",
+                ),
+            )
 
-    def test_root_resolution_standalone_vendored_and_override(self) -> None:
-        """Standalone, vendored, and mismatched explicit roots remain independently visible."""
+    def test_root_resolution_standalone_and_override(self) -> None:
+        """Standalone and explicitly selected external roots remain visible."""
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             standalone = root / "standalone"
@@ -320,14 +348,6 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
             self.assertEqual(standalone_resolution.layout, "standalone")
             self.assertEqual(standalone_resolution.source_root, standalone.resolve())
             self.assertEqual(standalone_resolution.canon_root, standalone.resolve())
-            parent = root / "parent"
-            (parent / "vendor" / "agent-canon" / "agents" / "skills").mkdir(parents=True)
-            (parent / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml").write_text("version: 1\n", encoding="utf-8")
-            vendored_resolution = resolve_agent_canon_source_root(parent)
-            vendor = parent / "vendor" / "agent-canon"
-            self.assertEqual(vendored_resolution.layout, "vendored")
-            self.assertEqual(vendored_resolution.source_root, vendor.resolve())
-            self.assertEqual(vendored_resolution.canon_root, vendor.resolve())
             source_override = root / "source-override"
             (source_override / "agents" / "skills").mkdir(parents=True)
             (source_override / "agents" / "skills" / "catalog.yaml").write_text("version: 1\n", encoding="utf-8")
@@ -335,7 +355,7 @@ class LogRepositoryLifecycleTest(unittest.TestCase):
             (canon_override / "agents" / "skills").mkdir(parents=True)
             (canon_override / "agents" / "skills" / "catalog.yaml").write_text("version: 1\n", encoding="utf-8")
             resolution = resolve_agent_canon_source_root(root, source_root=source_override, canon_root=canon_override)
-            self.assertEqual(resolution.layout, "override")
+            self.assertEqual(resolution.layout, "external")
             self.assertEqual(resolution.source_root, source_override.resolve())
             self.assertEqual(resolution.canon_root, canon_override.resolve())
             self.assertNotEqual(resolution.source_root, resolution.canon_root)

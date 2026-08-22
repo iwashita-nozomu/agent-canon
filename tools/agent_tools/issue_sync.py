@@ -336,11 +336,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def agent_canon_root(root: Path) -> Path:
-    """Return AgentCanon source root for standalone or parent invocation."""
-    vendored = root / "vendor" / "agent-canon"
-    if (vendored / "issues" / "README.md").is_file():
-        return vendored
-    return root
+    """Return the explicitly selected AgentCanon source checkout."""
+    return root.resolve()
 
 
 def relative(root: Path, path: Path) -> str:

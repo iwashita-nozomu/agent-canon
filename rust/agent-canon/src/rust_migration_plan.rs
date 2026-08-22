@@ -247,29 +247,34 @@ fn inspect_foundation(root: &Path) -> FoundationStatus {
         "documents/design/rust-agent-tool-migration.md",
         "rust/agent-canon/Cargo.toml",
         "tools/bin/agent-canon",
+        "bootstrap.sh",
+        "bootstrap/manifest.toml",
+        "bootstrap/container/Dockerfile",
+        "bootstrap/container/dependencies.toml",
+        "bootstrap/container/entrypoint.sh",
+        "tools/agent_tools/bootstrap_runtime.py",
+        "tools/agent_tools/runtime_artifacts.py",
+        "tools/agent_tools/tool_dispatch.py",
     ] {
         if !root.join(relative).exists() {
             missing.push(format!("missing-path:{relative}"));
         }
     }
 
-    let post_create = root.join(".devcontainer/post-create.sh");
-    match fs::read_to_string(&post_create) {
-        Ok(text) => {
-            for snippet in [
-                "rustup toolchain install",
-                "cargo build --release",
-                "${tools_home}/agent-canon/bin/agent-canon",
-                "/usr/local/bin/agent-canon",
-            ] {
-                if !text.contains(snippet) {
-                    missing.push(format!("post-create-missing:{snippet}"));
-                }
+    for (relative, snippet) in [
+        ("bootstrap.sh", "bootstrap_python_entrypoint"),
+        ("bootstrap/container/Dockerfile", "USER agentcanon"),
+        ("bootstrap/container/Dockerfile", "HEALTHCHECK"),
+        ("bootstrap/container/Dockerfile", "image-install"),
+        ("bootstrap/container/entrypoint.sh", "health"),
+        ("bootstrap/container/entrypoint.sh", "resident"),
+    ] {
+        if let Ok(text) = fs::read_to_string(root.join(relative)) {
+            if !text.contains(snippet) {
+                missing.push(format!("bootstrap-missing:{relative}:{snippet}"));
             }
         }
-        Err(_) => missing.push("missing-path:.devcontainer/post-create.sh".to_string()),
     }
-
     FoundationStatus {
         present: missing.is_empty(),
         missing,
@@ -583,7 +588,7 @@ mod tests {
         assert!(!foundation.present);
         assert!(foundation
             .missing
-            .contains(&"missing-path:.devcontainer/post-create.sh".to_string()));
+            .contains(&"missing-path:bootstrap.sh".to_string()));
         let _ = fs::remove_dir_all(root);
     }
 
@@ -603,10 +608,28 @@ mod tests {
         );
         write(root, "rust/agent-canon/Cargo.toml", "fixture\n");
         write(root, "tools/bin/agent-canon", "fixture\n");
+        for relative in [
+            "bootstrap.sh",
+            "bootstrap/manifest.toml",
+            "bootstrap/container/Dockerfile",
+            "bootstrap/container/dependencies.toml",
+            "bootstrap/container/entrypoint.sh",
+            "tools/agent_tools/bootstrap_runtime.py",
+            "tools/agent_tools/runtime_artifacts.py",
+            "tools/agent_tools/tool_dispatch.py",
+        ] {
+            write(root, relative, "fixture\n");
+        }
+        write(root, "bootstrap.sh", "bootstrap_python_entrypoint\n");
         write(
             root,
-            ".devcontainer/post-create.sh",
-            "tools_home=\"${AGENT_CANON_TOOLS_HOME:-${HOME}/.tools}\"\nrustup toolchain install\ncargo build --release\n${tools_home}/agent-canon/bin/agent-canon\n/usr/local/bin/agent-canon\n",
+            "bootstrap/container/Dockerfile",
+            "USER agentcanon\nHEALTHCHECK\nimage-install\n",
+        );
+        write(
+            root,
+            "bootstrap/container/entrypoint.sh",
+            "health\nresident\n",
         );
     }
 

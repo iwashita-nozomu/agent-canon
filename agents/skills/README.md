@@ -70,9 +70,12 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 `agents/skills/catalog.yaml` が唯一の列挙正本です。必須前提、後続、順序制約、
 並列可能な独立関係、責務階層は `agents/skills/skill-dependencies.yaml` が唯一の
 依存関係正本です。routing はこの辞書から呼び出し順を導出し、関連候補も同じ辞書から
-投影します。ユーザー向けの単一グラフは
-`documents/runtime/skill-dependency-graph.md` に tool 生成します。図を手で編集せず、
-辞書を変更して `skill_dependency_map.py graph` を再実行します。
+投影します。ユーザー向けの単一グラフは `skill_dependency_map.py` が生成します。通常の
+生成先は明示した `AGENT_CANON_RUNTIME_ROOT` 配下の外部 runtime artifact であり、source
+checkout の `documents/runtime/` を暗黙に更新しません。tracked reader pair を更新する
+保守操作だけは、固定された Markdown/JSON 2 ファイルを列挙した
+`--source-mutation-capability-json` と外部 before/after evidence を伴う明示的な操作にします。
+図を手で編集せず、辞書を変更して graph を再生成します。
 
 既存の Dev Container 内で一時的に `devcontainer exec --workspace-folder <root> ...`
 を使う実行・検証は `devcontainer-exec` に渡します。Dockerfile、dependency、devcontainer
@@ -84,7 +87,9 @@ GPU profile の admission semantics は `gpu-execution` に残します。
 - prompt からの skill 選択: `python3 tools/agent_tools/route.py --prompt "<user request>" --format json`
 - skill ごとの command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text`
 - 依存辞書の静的検査: `python3 tools/agent_tools/skill_dependency_map.py check --root .`
-- Mermaid グラフ生成: `python3 tools/agent_tools/skill_dependency_map.py graph --root . --output documents/runtime/skill-dependency-graph.md`
+- 依存辞書の静的検査（source tree を変更しない）: `python3 tools/agent_tools/skill_dependency_map.py check --root .`
+- 通常の Mermaid/JSON 生成（外部 runtime artifact）: `python3 tools/agent_tools/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>`
+- tracked reader pair の更新: `python3 tools/agent_tools/skill_dependency_map.py graph --root . --output documents/runtime/skill-dependency-graph.md --runtime-root <external-runtime-root> --source-mutation-capability-json <exact-two-path-capability.json>`
 
 ## Internal Review And Runtime Routines
 
@@ -155,7 +160,7 @@ in the Codex host runtime.
 - structured summary、prompt excerpt、run bundle、hook / routing / eval evidence から durable skill issue 候補を作るときは `issue-finding-report` を使い、抽象原因、重複検索、dependency-expanded edit scope、multi-agent partition を先に固定します。
 - accumulated eval family が missing / stale / fail のときは `agent-eval-accumulation` を使い、registered producer、compact checker、log archive sync の順に戻します。eval report を手で生成しません。
 - PR を処理、merge、conflict 解消、ready 化、Issue triage、queue cleanup するときは `pr-processing` を使い、mutation authority、merge order、validation evidence、Issue action table を先に固定します。
-- AgentCanon source、`vendor/agent-canon` pin、root runtime view、parent update TODO を更新するときは `agent-canon-update` を使い、source PR と parent pin 更新を分けます。
+- AgentCanon source、共有 bootstrap runtime、parent 側の development clone 運用を更新するときは `agent-canon-update` を使います。source PR と parent project change は分け、parent に pin、vendor checkout、root projection を追加しません。
 - agent-runtime 更新 branch や AgentCanon pin 更新の分離が必要なときは `agent-update-branch` を使います。
 - reader-facing な report、status report、eval summary、audit summary、decision brief、presentation narrative、PPT storyboard を書くときは `report-writing` を使い、source packet、visual asset plan、Report Quality Checklist を固定します。
 - 既存文章を graph 化し、段落接続、claim/evidence、experiment plan、split/merge/bridge/reorder operation、既存 skill handoff を出すときは `prose-reasoning-graph` を使います。

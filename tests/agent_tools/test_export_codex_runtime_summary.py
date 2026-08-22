@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import subprocess
 import sys
@@ -32,6 +33,20 @@ from runtime_log_paths import (  # noqa: E402
 
 class ExportCodexRuntimeSummaryTest(unittest.TestCase):
     """Validate bounded Codex runtime summary export."""
+
+    def setUp(self) -> None:
+        self._runtime_temp = tempfile.TemporaryDirectory()
+        self._previous_runtime = os.environ.get("AGENT_CANON_RUNTIME_ROOT")
+        runtime = Path(self._runtime_temp.name) / "runtime"
+        runtime.mkdir()
+        os.environ["AGENT_CANON_RUNTIME_ROOT"] = str(runtime)
+
+    def tearDown(self) -> None:
+        if self._previous_runtime is None:
+            os.environ.pop("AGENT_CANON_RUNTIME_ROOT", None)
+        else:
+            os.environ["AGENT_CANON_RUNTIME_ROOT"] = self._previous_runtime
+        self._runtime_temp.cleanup()
 
     def test_exports_idempotent_summary_without_prompt_text(self) -> None:
         """Exporter should write one bounded JSONL summary per unique observation."""
@@ -62,6 +77,8 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
                 sqlite_log=sqlite_log,
                 thread_id=thread_id,
             )
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
 
             output = codex_runtime_summary_path(source, canon, thread_id)
             records = [
@@ -138,6 +155,7 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             output_dir = codex_runtime_index_path(source, canon).parent / "chats"
             exported = sorted(path.name for path in output_dir.iterdir() if path.is_dir())
             index_records = [

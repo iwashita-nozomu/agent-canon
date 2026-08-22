@@ -4,9 +4,8 @@ contract policy
 responsibility Defines dependency-module identity, pin, and projection policy over the generic repository topic clone lifecycle.
 upstream design ./repository-topic-clone.md generic repository topic clone lifecycle
 upstream design ../design/dependency-manifest-design.md dependency ownership and header graph model
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md parent pin and shared-surface ownership
 downstream implementation ../../tools/agent_tools/dependency_module_change.py applies the dependency policy decorator
-downstream implementation ../../tools/update_agent_canon.sh routes AgentCanon dependency updates
+downstream design ../agent-canon/agent-canon-update-route.md routes standalone AgentCanon source updates
 downstream design ../../agents/skills/dependency-module-change.md exposes the short skill route
 @dependency-end
 -->

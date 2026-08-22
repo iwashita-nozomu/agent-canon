@@ -305,6 +305,23 @@ skill_dependencies:
     - pr-processing
     - agent-update-branch
     - structure-refactor
+    - agent-canon-bootstrap
+  agent-canon-bootstrap:
+    responsibility_group: runtime
+    required_prerequisites:
+    - agent-orchestration
+    routing_candidates:
+    - agent-orchestration
+    - agent-eval-accumulation
+    - environment-maintenance
+    - dependency-design
+    - devcontainer-exec
+    successors:
+    - agent-eval-accumulation
+    order_constraints: []
+    parallel_independent:
+    - agent-canon-update
+    - pr-processing
   repository-topic-clone:
     responsibility_group: lifecycle
     required_prerequisites: []
@@ -352,6 +369,7 @@ skill_dependencies:
     - result-artifact-writeout
     - agent-canon-update
     - agent-update-branch
+    - agent-canon-bootstrap
   agent-update-branch:
     responsibility_group: lifecycle
     required_prerequisites: []

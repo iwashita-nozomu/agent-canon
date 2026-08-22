@@ -2,7 +2,6 @@
 # contract reference
 # responsibility Provides the empty run-local semantic responsibility contract instance shape.
 # upstream design ../../documents/design/semantic-responsibility-contract.md semantic responsibility contract
-# upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared document template placement
 # downstream implementation ../../tools/agent_tools/check_semantic_responsibility_contract.py schema, identity, and reference validator
 # downstream design ../../agents/COMMUNICATION_PROTOCOL.md active design packet reference
 # @dependency-end

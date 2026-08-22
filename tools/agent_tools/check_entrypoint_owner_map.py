@@ -45,8 +45,8 @@ CONTRACTS = (
         owner_rows=(
             (
                 "root runtime entrypoint",
-                "ROOT_AGENTS.md",
-                "PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check",
+                "bootstrap.sh",
+                "bash bootstrap.sh --help",
             ),
             (
                 "workflow family, spawn budget, role topology",
@@ -59,9 +59,9 @@ CONTRACTS = (
                 "check_agent_runtime_alignment.py",
             ),
             (
-                "AgentCanon update transaction",
-                "documents/agent-canon/agent-canon-update-route.md",
-                "update_lifecycle_contract.py",
+                "AgentCanon source publication",
+                "agents/workflows/agent-canon-pr-workflow.md",
+                "repository-topic-clone and PR checks",
             ),
             (
                 "entrypoint responsibility grammar",
@@ -72,7 +72,7 @@ CONTRACTS = (
     ),
     EntrypointContract(
         path="ROOT_AGENTS.md",
-        title="# AgentCanon Live-Integration Repository Instructions",
+        title="# AgentCanon integration compatibility entrypoint",
         headings=(
             "## Integration Role",
             "## Reader Map",
@@ -84,28 +84,28 @@ CONTRACTS = (
         owner_rows=(
             (
                 "workflow family, spawn budget, role topology",
-                "vendor/agent-canon/agents/task_catalog.yaml",
+                "agents/task_catalog.yaml",
                 "check_agent_runtime_alignment.py",
             ),
             (
                 "task bootstrap and CLI entrypoints",
-                "vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md",
+                "agents/canonical/CLI_ENTRYPOINTS.md",
                 "bootstrap_agent_run.py",
             ),
             (
                 "subagent lifecycle, same-role instances, wave ledger",
-                "vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md",
+                "agents/canonical/CODEX_SUBAGENTS.md",
                 "workflow_monitor.py",
             ),
             (
                 "role behavior and stage conditions",
-                "vendor/agent-canon/.codex/agents/*.toml",
+                ".codex/agents/*.toml",
                 "check_agent_runtime_alignment.py",
             ),
             (
                 "skill routing and public skill surface",
-                "vendor/agent-canon/agents/skills/catalog.yaml",
-                "python3 tools/agent-canon/agent_tools/route.py --prompt",
+                "agents/skills/catalog.yaml",
+                "tools/agent_tools/route.py --prompt",
             ),
             (
                 "report and closeout structure",
@@ -114,7 +114,7 @@ CONTRACTS = (
             ),
             (
                 "entrypoint responsibility grammar",
-                "vendor/agent-canon/documents/design/entrypoint-owner-map.md",
+                "documents/design/entrypoint-owner-map.md",
                 "check_entrypoint_owner_map.py",
             ),
         ),

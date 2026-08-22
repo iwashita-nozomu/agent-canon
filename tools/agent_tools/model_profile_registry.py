@@ -1059,6 +1059,19 @@ def _validate_projection_mode(projection: str) -> str:
     return projection
 
 
+STATIC_EXECUTABLE_ROLE_IDS = frozenset({"skill_evaluator"})
+
+
+def _executable_projection(role_id: str, requested: str) -> str:
+    """Return the executable projection allowed for one role.
+
+    The mini skill evaluator is an intentionally source-free, artifact-only
+    consumer.  It must not receive producer paths or live team instructions;
+    all other executable role views follow the requested live/static mode.
+    """
+    return "consumer-static" if role_id in STATIC_EXECUTABLE_ROLE_IDS else requested
+
+
 def compose_consumer_static_clause(
     clause: RoleInstructionClause,
 ) -> tuple[str, tuple[str, ...]]:
@@ -1253,17 +1266,25 @@ def write_role_views(
     views = generate_role_views(registry, root_path, projection=projection)
     for view in views:
         path = root_path / ".codex" / "agents" / f"{view.role_id}.toml"
-        path.write_text(_render_role_view(view, projection), encoding="utf-8")
+        path.write_text(
+            _render_role_view(view, _executable_projection(view.role_id, projection)),
+            encoding="utf-8",
+        )
+    # Executable Codex views may contain source-bearing live clauses, while
+    # agents_config.json is the source-free consumer projection.
+    consumer_static_views = generate_role_views(
+        registry, root_path, projection="consumer-static"
+    )
     config_path = root_path / "agents" / "agents_config.json"
     raw = json.loads(config_path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ModelProfileRegistryError("agents_config:must_be_mapping")
-    agent_views, roles = _projection_records(views)
+    agent_views, roles = _projection_records(consumer_static_views)
     raw["generated_profile_projection"] = {
         "schema_id": "generated_role_profile_projection_v1",
         "materializer": "tools/agent_tools/model_profile_registry.py",
         "registry_ref": "agents/model_profiles.toml",
-        "role_count": len(views),
+        "role_count": len(consumer_static_views),
         "projection_digest": _stable_digest(
             {view.role_id: view.source_canonical_digest for view in views}
         ),
@@ -1321,7 +1342,9 @@ def _role_view_issues(root: Path, projection: str = "live") -> tuple[ValidationI
     issues: list[ValidationIssue] = []
     for view in views:
         path = root / ".codex" / "agents" / f"{view.role_id}.toml"
-        expected = _render_role_view(view, projection).encode("utf-8")
+        expected = _render_role_view(
+            view, _executable_projection(view.role_id, projection)
+        ).encode("utf-8")
         try:
             actual = path.read_bytes()
         except OSError:
@@ -1333,7 +1356,9 @@ def _role_view_issues(root: Path, projection: str = "live") -> tuple[ValidationI
         raw = json.loads(config_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         raw = None
-    expected_views, expected_roles = _projection_records(views)
+    expected_views, expected_roles = _projection_records(
+        generate_role_views(registry, root, projection="consumer-static")
+    )
     if not isinstance(raw, dict) or raw.get("agent_views") != expected_views or raw.get("roles") != expected_roles:
         issues.append(ValidationIssue("role_view.config_projection_drift", "agents_config generated projection differs", "agents/agents_config.json"))
     return tuple(sorted(issues, key=lambda item: (item.location or "", item.code)))
@@ -1362,7 +1387,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--projection",
         choices=("live", "consumer-static"),
-        default="live",
+        default="consumer-static",
         help="In-memory role projection mode; generated schema fields remain unchanged.",
     )
     mode = parser.add_mutually_exclusive_group(required=True)

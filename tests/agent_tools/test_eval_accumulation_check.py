@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -25,27 +26,46 @@ from runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E4
 class EvalAccumulationCheckTest(unittest.TestCase):
     """Exercise accumulated eval result validation."""
 
-    def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    def runtime_root(self, root: Path) -> Path:
+        """Return a sibling runtime root outside the source fixture."""
+        runtime = root.parent / f".{root.name}.agent-canon-runtime"
+        runtime.mkdir(parents=True, exist_ok=True)
+        return runtime
+
+    def run_checker(
+        self,
+        root: Path,
+        *args: str,
+        with_runtime: bool = True,
+    ) -> subprocess.CompletedProcess[str]:
         """Run the checker against a root."""
+        command = [
+            sys.executable,
+            str(SCRIPT),
+            "--root",
+            str(root),
+            "--family-registry",
+            str(PROJECT_ROOT / "evidence" / "agent-evals" / "eval_result_families.toml"),
+        ]
+        if with_runtime:
+            command.extend(["--runtime-root", str(self.runtime_root(root))])
+        command.extend(args)
+        environment = os.environ.copy()
+        if not with_runtime:
+            environment.pop("AGENT_CANON_RUNTIME_ROOT", None)
         return subprocess.run(
-            [
-                sys.executable,
-                str(SCRIPT),
-                "--root",
-                str(root),
-                "--family-registry",
-                str(PROJECT_ROOT / "evidence" / "agent-evals" / "eval_result_families.toml"),
-                *args,
-            ],
+            command,
             check=False,
             capture_output=True,
             text=True,
+            env=environment,
         )
 
     def test_complete_fixture_passes(self) -> None:
         """A complete mounted archive fixture should pass."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
+            root = Path(temp_dir) / "source"
+            root.mkdir()
             self.write_fixture(root)
             result = self.run_checker(root)
 
@@ -55,7 +75,8 @@ class EvalAccumulationCheckTest(unittest.TestCase):
     def test_duplicate_hook_run_id_fails(self) -> None:
         """Hook run ids must be unique even within the same JSONL file."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
+            root = Path(temp_dir) / "source"
+            root.mkdir()
             self.write_fixture(root)
             hook_path = self.hook_path(root)
             entry = self.hook_entry("hook-duplicate")
@@ -72,7 +93,8 @@ class EvalAccumulationCheckTest(unittest.TestCase):
     def test_compact_out_limits_stdout_and_writes_summary(self) -> None:
         """Compact mode writes finding stats to JSON and keeps stdout bounded."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
+            root = Path(temp_dir) / "source"
+            root.mkdir()
             self.write_fixture(root)
             hook_path = self.hook_path(root)
             entry = self.hook_entry("hook-duplicate")
@@ -80,7 +102,7 @@ class EvalAccumulationCheckTest(unittest.TestCase):
                 json.dumps(entry) + "\n" + json.dumps(entry) + "\n",
                 encoding="utf-8",
             )
-            compact = root / "compact.json"
+            compact = self.runtime_root(root) / "compact.json"
 
             result = self.run_checker(root, "--compact-out", str(compact))
 
@@ -431,7 +453,7 @@ class EvalAccumulationCheckTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
-            archive_root = mounted_log_archive_root(root)
+            archive_root = mounted_log_archive_root(root, self.runtime_root(root))
             archive_hook_dir = (
                 archive_root
                 / "hook-runs"
@@ -458,7 +480,7 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             self.write_fixture(root)
             hook_path = self.hook_path(root)
             hook_path.write_text("{not-json}\n", encoding="utf-8")
-            compact = root / "compact.json"
+            compact = self.runtime_root(root) / "compact.json"
 
             result = self.run_checker(root, "--compact-out", str(compact))
 
@@ -493,7 +515,7 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             root = Path(temp_dir)
             self.write_fixture(root)
             legacy_dir = (
-                mounted_log_archive_root(root)
+                mounted_log_archive_root(root, self.runtime_root(root))
                 / "eval-results"
                 / "legacy-import"
                 / "skill-workflow-prompt"
@@ -522,12 +544,12 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             (results_dir / "README.md").write_text("archive notice\n", encoding="utf-8")
             (hook_dir / "README.md").write_text("hook archive notice\n", encoding="utf-8")
 
-            result = self.run_checker(root)
+            result = self.run_checker(root, with_runtime=False)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("EVAL_ACCUMULATION=error", result.stdout)
             self.assertIn("EVAL_ACCUMULATION_ERROR_CODE=log_archive_required", result.stdout)
-            self.assertIn("NEXT_ACTION=mount_.agent-canon/log-archive_or_set_AGENT_CANON_HOOK_ARCHIVE_DIR", result.stdout)
+            self.assertIn("NEXT_ACTION=pass_--runtime-root_or_set_AGENT_CANON_RUNTIME_ROOT", result.stdout)
 
     def test_missing_skill_eval_report_fails(self) -> None:
         """At least one accumulated skill eval report is required."""
@@ -664,11 +686,11 @@ duplicate_run_id_detail = "duplicate-abstract-review-eval-run-id"
 
     def hook_path(self, root: Path) -> Path:
         """Return the archive hook fixture path."""
-        return mounted_log_archive_root(root) / "hook-runs" / repo_log_key(root) / "test" / "hook.jsonl"
+        return mounted_log_archive_root(root, self.runtime_root(root)) / "hook-runs" / repo_log_key(root) / "test" / "hook.jsonl"
 
     def eval_family_dir(self, root: Path, family: str) -> Path:
         """Return one archive eval family fixture directory."""
-        return mounted_log_archive_root(root) / "eval-results" / family
+        return mounted_log_archive_root(root, self.runtime_root(root)) / "eval-results" / family
 
     def hook_entry(self, run_id: str) -> dict[str, str]:
         """Return one valid hook entry."""

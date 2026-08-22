@@ -12,7 +12,13 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
 use std::env;
-use std::process::Command;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::path::PathBuf;
+use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use crate::runtime_boundary::{resolve_runtime_root, stable_source_key, validate_external_target};
 
 pub(super) const DEFAULT_REMOTE_EMBEDDING_MAX_CHARS: usize = 3000;
 
@@ -137,36 +143,198 @@ pub(super) fn request_openai_compatible_embeddings(
     model: &str,
     texts: &[String],
 ) -> Result<Vec<Vec<f32>>, String> {
+    request_host_embeddings(endpoint, model, texts)
+}
+
+const EMBEDDING_IPC_SCHEMA: &str = "agent_canon.embedding.https.request.v1";
+
+fn unix_millis() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+}
+
+fn json_digest(value: &Value) -> Result<String, String> {
+    let bytes = serde_json::to_vec(value).map_err(|error| error.to_string())?;
+    let mut digest = Sha256::new();
+    digest.update(bytes);
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+fn embedding_endpoint_allowed(endpoint: &str) -> bool {
+    if endpoint.contains(['\0', '\n', '\r', '\\']) {
+        return false;
+    }
+    endpoint.starts_with("https://")
+        || endpoint.starts_with("http://localhost/")
+        || endpoint.starts_with("http://127.0.0.1/")
+        || endpoint.starts_with("http://[::1]/")
+}
+
+fn host_uid() -> String {
+    env::var("AGENT_CANON_HOST_UID")
+        .or_else(|_| env::var("UID"))
+        .unwrap_or_else(|_| "unknown".to_string())
+}
+
+fn embedding_ipc_dir() -> Result<PathBuf, String> {
+    let source = env::current_dir().map_err(|error| error.to_string())?;
+    let runtime = resolve_runtime_root(&source)?;
+    let dir = runtime
+        .join("ipc")
+        .join("embedding.https.request")
+        .join(stable_source_key(&source));
+    validate_external_target(&source, &runtime, &dir, "embedding IPC directory")?;
+    fs::create_dir_all(&dir).map_err(|error| format!("create embedding IPC directory: {error}"))?;
+    Ok(dir)
+}
+
+fn canonical_envelope_bytes(value: &Value, digest_field: &str) -> Result<Vec<u8>, String> {
+    let mut copy = value.clone();
+    copy.as_object_mut()
+        .ok_or_else(|| "embedding IPC envelope must be an object".to_string())?
+        .remove(digest_field);
+    serde_json::to_vec(&copy).map_err(|error| error.to_string())
+}
+
+fn parse_host_embedding_response(
+    bytes: &[u8],
+    uid: &str,
+    nonce: &str,
+    request_digest: &str,
+    expected_count: usize,
+    deadline: u128,
+) -> Result<Vec<Vec<f32>>, String> {
+    let response: Value = serde_json::from_slice(bytes)
+        .map_err(|error| format!("embedding host response is not JSON: {error}"))?;
+    let object = response
+        .as_object()
+        .ok_or_else(|| "embedding host response is not an object".to_string())?;
+    if object.get("schema").and_then(Value::as_str) != Some(EMBEDDING_IPC_SCHEMA)
+        || object.get("operation").and_then(Value::as_str) != Some("embedding.https.request")
+        || object.get("mode").and_then(Value::as_str) != Some("response")
+        || object.get("uid").and_then(Value::as_str) != Some(uid)
+        || object.get("nonce").and_then(Value::as_str) != Some(nonce)
+        || object.get("request_digest").and_then(Value::as_str) != Some(request_digest)
+    {
+        return Err("embedding host response envelope identity mismatch".to_string());
+    }
+    let response_digest = object
+        .get("response_digest")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "embedding host response digest is missing".to_string())?;
+    let expected_digest = {
+        let canonical = canonical_envelope_bytes(&response, "response_digest")?;
+        let mut digest = Sha256::new();
+        digest.update(canonical);
+        format!("{:x}", digest.finalize())
+    };
+    if response_digest != expected_digest {
+        return Err("embedding host response digest mismatch".to_string());
+    }
+    let response_deadline = object
+        .get("deadline_ms")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| "embedding host response deadline is missing".to_string())?
+        as u128;
+    if response_deadline != deadline || unix_millis() > deadline {
+        return Err("embedding host response is stale or deadline-mismatched".to_string());
+    }
+    if object.get("status").and_then(Value::as_str) != Some("ok") {
+        return Err(object
+            .get("error")
+            .and_then(Value::as_str)
+            .unwrap_or("embedding host request failed")
+            .to_string());
+    }
+    let body = object
+        .get("body")
+        .ok_or_else(|| "embedding host response body is missing".to_string())?;
+    let body_bytes = serde_json::to_vec(body).map_err(|error| error.to_string())?;
+    let body_text = String::from_utf8(body_bytes)
+        .map_err(|error| format!("embedding host response body is not UTF-8: {error}"))?;
+    parse_openai_embeddings_response(&body_text, expected_count)
+}
+
+fn request_host_embeddings(
+    endpoint: &str,
+    model: &str,
+    texts: &[String],
+) -> Result<Vec<Vec<f32>>, String> {
+    if !embedding_endpoint_allowed(endpoint) {
+        return Err(
+            "embedding endpoint must be HTTPS (or loopback HTTP); redirects and arbitrary URLs are rejected"
+                .to_string(),
+        );
+    }
     let payload = json!({
         "model": model,
         "input": texts,
-    })
-    .to_string();
-    let curl = env::var("AGENT_CANON_EMBEDDING_CURL").unwrap_or_else(|_| "curl".to_string());
-    let output = Command::new(curl)
-        .arg("-fsS")
-        .arg("--retry")
-        .arg("2")
-        .arg("--retry-delay")
-        .arg("1")
-        .arg("-H")
-        .arg("Content-Type: application/json")
-        .arg("-d")
-        .arg(payload)
-        .arg(endpoint)
-        .output()
-        .map_err(|error| format!("embedding request failed to launch curl: {error}"))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!(
-            "embedding request failed for {endpoint}: status={} stderr={}",
-            output.status,
-            stderr.trim()
-        ));
+    });
+    let uid = host_uid();
+    let deadline = unix_millis()
+        + env::var("AGENT_CANON_EMBEDDING_DEADLINE_MS")
+            .ok()
+            .and_then(|value| value.parse::<u128>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(30_000);
+    let nonce = format!(
+        "{:x}",
+        Sha256::digest(format!("{}:{}:{}", uid, std::process::id(), unix_millis()).as_bytes())
+    );
+    let request_without_digest = json!({
+        "schema": EMBEDDING_IPC_SCHEMA,
+        "operation": "embedding.https.request",
+        "mode": "request",
+        "uid": uid,
+        "nonce": nonce,
+        "deadline_ms": deadline,
+        "redirect_policy": "deny",
+        "endpoint": endpoint,
+        "body": payload,
+    });
+    let request_digest = json_digest(&request_without_digest)?;
+    let mut request = request_without_digest;
+    request.as_object_mut().expect("request object").insert(
+        "request_digest".to_string(),
+        Value::String(request_digest.clone()),
+    );
+    let ipc_dir = embedding_ipc_dir()?;
+    let request_path = ipc_dir.join(format!("{nonce}.request.json"));
+    let response_path = ipc_dir.join(format!("{nonce}.response.json"));
+    let request_bytes = serde_json::to_vec(&request).map_err(|error| error.to_string())?;
+    let mut request_file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&request_path)
+        .map_err(|error| format!("create embedding IPC request: {error}"))?;
+    request_file
+        .write_all(&request_bytes)
+        .map_err(|error| format!("write embedding IPC request: {error}"))?;
+    request_file
+        .sync_all()
+        .map_err(|error| format!("sync embedding IPC request: {error}"))?;
+    while !response_path.is_file() && unix_millis() <= deadline {
+        thread::sleep(Duration::from_millis(20));
     }
-    let body = String::from_utf8(output.stdout)
-        .map_err(|error| format!("embedding response was not utf-8: {error}"))?;
-    parse_openai_embeddings_response(&body, texts.len())
+    if !response_path.is_file() {
+        let _ = fs::remove_file(&request_path);
+        return Err("embedding host adapter timed out waiting for a typed response".to_string());
+    }
+    let response_bytes = fs::read(&response_path)
+        .map_err(|error| format!("read embedding host response: {error}"))?;
+    let result = parse_host_embedding_response(
+        &response_bytes,
+        &uid,
+        &nonce,
+        &request_digest,
+        texts.len(),
+        deadline,
+    );
+    let _ = fs::remove_file(&request_path);
+    let _ = fs::remove_file(&response_path);
+    result
 }
 
 pub(super) fn parse_openai_embeddings_response(
@@ -225,6 +393,105 @@ pub(super) fn parse_openai_embeddings_response(
             vector.ok_or_else(|| format!("embedding response missing vector for index {index}"))
         })
         .collect()
+}
+
+#[cfg(test)]
+// Protocol fixtures remain adjacent to the response parser they exercise.
+#[allow(clippy::items_after_test_module)]
+mod tests {
+    use super::*;
+
+    fn response(uid: &str, nonce: &str, request_digest: &str, deadline: u128) -> Value {
+        let mut value = json!({
+            "schema": EMBEDDING_IPC_SCHEMA,
+            "operation": "embedding.https.request",
+            "mode": "response",
+            "uid": uid,
+            "nonce": nonce,
+            "deadline_ms": deadline,
+            "request_digest": request_digest,
+            "status": "ok",
+            "body": {"data": [{"index": 0, "embedding": [1.0, 0.0]}]},
+        });
+        let digest = {
+            let canonical = canonical_envelope_bytes(&value, "response_digest").unwrap();
+            let mut hasher = Sha256::new();
+            hasher.update(canonical);
+            format!("{:x}", hasher.finalize())
+        };
+        value
+            .as_object_mut()
+            .unwrap()
+            .insert("response_digest".to_string(), Value::String(digest));
+        value
+    }
+
+    #[test]
+    fn host_response_rejects_replay_and_identity_mismatch() {
+        let deadline = unix_millis() + 10_000;
+        let valid = response("uid-1", "nonce-1", "request-1", deadline);
+        let bytes = serde_json::to_vec(&valid).unwrap();
+        assert!(parse_host_embedding_response(
+            &bytes,
+            "uid-1",
+            "nonce-1",
+            "request-1",
+            1,
+            deadline
+        )
+        .is_ok());
+        assert!(parse_host_embedding_response(
+            &bytes,
+            "uid-1",
+            "replayed",
+            "request-1",
+            1,
+            deadline
+        )
+        .is_err());
+        assert!(parse_host_embedding_response(
+            &bytes,
+            "uid-1",
+            "nonce-1",
+            "other-request",
+            1,
+            deadline
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn host_response_rejects_stale_and_digest_mismatch() {
+        let expired = 1_u128;
+        let stale = response("uid-1", "nonce-1", "request-1", expired);
+        let stale_bytes = serde_json::to_vec(&stale).unwrap();
+        assert!(parse_host_embedding_response(
+            &stale_bytes,
+            "uid-1",
+            "nonce-1",
+            "request-1",
+            1,
+            expired
+        )
+        .is_err());
+
+        let deadline = unix_millis() + 10_000;
+        let mut mismatched = response("uid-1", "nonce-1", "request-1", deadline);
+        mismatched
+            .as_object_mut()
+            .unwrap()
+            .insert("response_digest".to_string(), Value::String("0".repeat(64)));
+        let mismatched_bytes = serde_json::to_vec(&mismatched).unwrap();
+        assert!(parse_host_embedding_response(
+            &mismatched_bytes,
+            "uid-1",
+            "nonce-1",
+            "request-1",
+            1,
+            deadline
+        )
+        .is_err());
+    }
 }
 
 pub(super) fn strip_dependency_manifest(text: &str) -> String {

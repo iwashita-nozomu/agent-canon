@@ -188,6 +188,7 @@ pub(super) struct ProviderSpec {
 
 #[derive(Debug, Clone)]
 pub(super) struct CompareProvidersArgs {
+    pub(super) root: PathBuf,
     pub(super) db: PathBuf,
     pub(super) query: Option<String>,
     pub(super) left: ProviderSpec,
@@ -967,15 +968,13 @@ fn parse_discourse_relations_args(args: &[String]) -> Result<DiscourseRelationsA
 
 fn parse_eval_args(
     args: &[String],
-    temporary_db_identity: fn() -> String,
+    _temporary_db_identity: fn() -> String,
 ) -> Result<EvalArgs, String> {
     let mut fixture: Option<PathBuf> = None;
+    let default_db = env::temp_dir().join("agent-canon-semantic-index-eval-default.sqlite");
     let mut parsed = EvalArgs {
         fixture: PathBuf::new(),
-        db: env::temp_dir().join(format!(
-            "agent-canon-semantic-index-eval-{}.sqlite",
-            temporary_db_identity()
-        )),
+        db: default_db.clone(),
         report: None,
         provider: DEFAULT_PROVIDER.to_string(),
         model: DEFAULT_MODEL.to_string(),
@@ -1027,6 +1026,9 @@ fn parse_eval_args(
         }
     }
     parsed.fixture = fixture.ok_or_else(|| "--fixture is required".to_string())?;
+    if parsed.db == default_db {
+        parsed.db = default_db_path(&parsed.fixture);
+    }
     validate_provider_dim(&parsed.provider, parsed.dim)?;
     if parsed.format == OutputFormat::Jsonl {
         return Err("--format jsonl is not supported for eval".to_string());
@@ -1036,6 +1038,7 @@ fn parse_eval_args(
 
 fn parse_compare_providers_args(args: &[String]) -> Result<CompareProvidersArgs, String> {
     let mut parsed = CompareProvidersArgs {
+        root: PathBuf::from("."),
         db: default_db_path(Path::new(".")),
         query: None,
         left: ProviderSpec {
@@ -1060,6 +1063,7 @@ fn parse_compare_providers_args(args: &[String]) -> Result<CompareProvidersArgs,
         match args[index].as_str() {
             "--root" => {
                 let root = value_path(args, index, "--root")?;
+                parsed.root = root.clone();
                 if parsed.db == default_db_path(Path::new(".")) {
                     parsed.db = default_db_path(&root);
                 }
@@ -1195,20 +1199,24 @@ pub(super) fn default_db_path(root: &Path) -> PathBuf {
 }
 
 fn semantic_index_home() -> PathBuf {
-    if let Ok(value) = env::var("AGENT_CANON_SEMANTIC_INDEX_HOME") {
+    if let Ok(value) = env::var(crate::runtime_boundary::RUNTIME_ROOT_ENV) {
         if !value.trim().is_empty() {
-            return PathBuf::from(value);
+            return PathBuf::from(value).join("semantic-index");
         }
     }
-    if let Ok(value) = env::var("HOME") {
-        if !value.trim().is_empty() {
-            return PathBuf::from(value)
-                .join(".cache")
-                .join("agent-canon")
-                .join("semantic-index");
-        }
+    #[cfg(test)]
+    {
+        env::temp_dir()
+            .join("agent-canon-test-runtime")
+            .join("semantic-index")
     }
-    env::temp_dir().join("agent-canon").join("semantic-index")
+    #[cfg(not(test))]
+    {
+        // Execution resolves AGENT_CANON_RUNTIME_ROOT before opening this
+        // path. The absolute non-writable sentinel prevents an accidental
+        // HOME, /tmp, or source-local fallback if that gate regresses.
+        PathBuf::from("/__agent_canon_runtime_root_required__/semantic-index")
+    }
 }
 
 fn repo_cache_key(root: &Path) -> String {

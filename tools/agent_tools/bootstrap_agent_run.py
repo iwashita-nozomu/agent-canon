@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -18,40 +20,17 @@ from datetime import datetime, timezone
 UTC = timezone.utc
 from pathlib import Path
 
-if __package__:
-    from .parent_root_side_effects import (
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
+try:
+    from .runtime_artifacts import runtime_artifact_boundary
+except ImportError:  # direct script/module execution
+    from runtime_artifacts import (  # type: ignore[no-redef]
+        runtime_artifact_boundary,
     )
+
+if __package__:
     from .agent_canon_source_root import resolve_agent_canon_source_root
 else:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
-    )
     from agent_canon_source_root import resolve_agent_canon_source_root
-
-
-def _write_parent(path: Path, data: bytes, purpose: str) -> None:
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            f"{purpose}: explicit parent root is required",
-        )
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
-    )
-    ParentRootSideEffectBoundary().write_parent_owned_file(
-        attestation, path, data, purpose
-    )
 
 from agent_canon_preflight import AgentCanonPreflightResult, run_agent_canon_preflight
 
@@ -309,8 +288,8 @@ def build_parser(
     """Create the CLI parser."""
     parser = argparse.ArgumentParser(
         description=(
-            "Create a standard <workspace-root>/reports/agents/<run-id>/ "
-            "bundle for one agent-team run."
+            "Create a standard external-runtime reports/agents/<run-id> bundle "
+            "for one agent-team run."
         )
     )
     parser.add_argument(
@@ -392,8 +371,15 @@ def build_parser(
     parser.add_argument(
         "--report-root",
         help=(
-            "Optional directory that will contain per-run report folders. Defaults to "
-            "<workspace-root>/reports/agents."
+            "Optional external directory that will contain per-run report folders. "
+            "Defaults below --runtime-root."
+        ),
+    )
+    parser.add_argument(
+        "--runtime-root",
+        help=(
+            "Explicit external runtime root for reports, active-run state, "
+            "ledgers, and receipts. Defaults to AGENT_CANON_RUNTIME_ROOT."
         ),
     )
     parser.add_argument(
@@ -424,7 +410,11 @@ def resolve_bootstrap_context(
     report_root = (
         repository_roots.report_root
         if repository_roots is not None
-        else resolve_report_root(args.report_root, workspace_root)
+        else resolve_report_root(
+            args.report_root,
+            workspace_root,
+            runtime_root=args.runtime_root,
+        )
     )
     run_id = args.run_id or make_run_id(args.task, created_at)
     report_dir = report_root / run_id
@@ -532,7 +522,7 @@ def emit_bootstrap_output(
     public_layout = getattr(repository_roots, "layout", None)
     if public_layout is None:
         raise RuntimeError("runtime_roots_invalid:layout_missing")
-    print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-update-plan")
+    print("AGENT_CANON_PREFLIGHT_COMMAND=bash bootstrap.sh --help")
     print(f"AGENT_CANON_PREFLIGHT_STATUS={preflight.status}")
     print(f"AGENT_CANON_PREFLIGHT_REASON={preflight.reason}")
     print(f"AGENT_CANON_PREFLIGHT_NEXT={preflight.next_step}")
@@ -770,21 +760,20 @@ def _read_optional_bytes(path: Path) -> bytes | None:
     return path.read_bytes() if path.is_file() else None
 
 
-def _restore_parent_file(
-    boundary: ParentRootSideEffectBoundary,
-    attestation: object,
+def _restore_runtime_file(
+    boundary: object,
     path: Path,
     prior: bytes | None,
     purpose: str,
 ) -> None:
-    """Restore one captured file through the authenticated parent boundary."""
+    """Restore one captured runtime file without touching source state."""
+    del purpose
     if prior is not None:
-        boundary.write_parent_owned_file(attestation, path, prior, purpose)
+        boundary.atomic_write_bytes(path, prior)  # type: ignore[attr-defined]
         return
     if not path.exists():
         return
-    receipt = boundary.resolve_parent_owned_path(attestation, path, purpose, create=False)
-    boundary.remove_parent_owned_file(receipt)
+    path.unlink()
 
 
 def publish_prepared_run(
@@ -794,22 +783,16 @@ def publish_prepared_run(
     post_move: Callable[[], None] | None = None,
 ) -> tuple[str, ...]:
     """Stage one prepared byte map, move it once, publish sidecars, and rollback."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            "bootstrap-publish: explicit parent root is required",
-        )
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(
-            cwd=parent,
-            explicit_root=parent,
-            purpose="bootstrap-publish",
-        )
+    report_root = report_root.resolve(strict=False)
+    configured_runtime = os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip() or None
+    runtime_base = configured_runtime or report_root.parent
+    boundary = runtime_artifact_boundary(
+        spec.agentcanon_source_root,
+        runtime_base,
+        create=True,
     )
-    boundary = ParentRootSideEffectBoundary()
-    report_root = report_root.resolve()
+    report_root = boundary.resolve(report_root)
+    boundary.ensure_directory(report_root.relative_to(boundary.root))
     final_run = spec.report_dir.resolve()
     expected_final_run = (report_root / spec.run_id).resolve()
     if final_run != expected_final_run:
@@ -825,15 +808,10 @@ def publish_prepared_run(
         authority_baseline: _read_optional_bytes(authority_baseline),
     }
     prior_children = {child.name for child in report_root.iterdir()} if report_root.is_dir() else set()
-    stage_receipt = None
+    stage_dir: Path | None = None
     moved = False
     try:
-        stage_receipt = boundary.create_parent_owned_temp_directory(
-            attestation,
-            report_root,
-            "bootstrap-stage",
-            ".stage-run",
-        )
+        stage_dir = Path(tempfile.mkdtemp(prefix=".stage-run-", dir=str(report_root)))
         for relative, payload in prepared.files:
             relative_path = Path(relative)
             if (
@@ -842,42 +820,22 @@ def publish_prepared_run(
                 or any(part in {"", ".", ".."} for part in relative_path.parts)
             ):
                 raise RuntimeError(f"runtime_artifact_path_invalid:stage:{relative}")
-            target = stage_receipt.physical_path / relative_path
-            boundary.write_parent_owned_file(
-                attestation,
-                target,
-                payload,
-                "bootstrap-stage-artifact",
-            )
+            target = stage_dir / relative_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(payload)
             if target.read_bytes() != payload:
                 raise RuntimeError(f"bootstrap_stage_readback_failed:{relative}")
-        boundary.move_parent_owned(
-            attestation,
-            stage_receipt.physical_path,
-            final_run,
-            "bootstrap-stage-move",
-        )
+        os.replace(stage_dir, final_run)
+        stage_dir = None
         moved = True
         pointer_bytes = (str(final_run.resolve()) + "\n").encode("utf-8")
-        boundary.write_parent_owned_file(
-            attestation,
-            pointer,
-            pointer_bytes,
-            "bootstrap-active-run",
-        )
-        boundary.write_parent_owned_file(
-            attestation,
-            pointer_baseline,
-            hash_baseline_bytes(pointer_bytes),
-            "bootstrap-active-run-baseline",
-        )
+        boundary.atomic_write_bytes(pointer, pointer_bytes)
+        boundary.atomic_write_bytes(pointer_baseline, hash_baseline_bytes(pointer_bytes))
         authority_path = final_run / AUTHORITY_FILE_NAME
         if authority_path.is_file():
-            boundary.write_parent_owned_file(
-                attestation,
+            boundary.atomic_write_bytes(
                 authority_baseline,
                 hash_baseline_bytes(authority_path.read_bytes()),
-                "bootstrap-authority-baseline",
             )
         if post_move is not None:
             post_move()
@@ -903,22 +861,13 @@ def publish_prepared_run(
     except Exception as primary_error:
         rollback_errors: list[str] = []
         try:
-            if stage_receipt is not None and not moved and stage_receipt.physical_path.exists():
-                boundary.remove_parent_owned_tree(
-                    attestation,
-                    stage_receipt,
-                    "bootstrap-stage-rollback",
-                )
+            if stage_dir is not None and stage_dir.exists():
+                shutil.rmtree(stage_dir)
             if moved and final_run.exists():
-                boundary.remove_parent_owned_tree(
-                    attestation,
-                    final_run,
-                    "bootstrap-run-rollback",
-                )
+                shutil.rmtree(final_run)
             for path, prior in prior_files.items():
-                _restore_parent_file(
+                _restore_runtime_file(
                     boundary,
-                    attestation,
                     path,
                     prior,
                     "bootstrap-publish-rollback",
@@ -943,6 +892,32 @@ def publish_prepared_run(
 
 def main() -> int:
     """Run the bootstrap command."""
+    # Source resolution itself uses the external runtime boundary.  Parse only
+    # that capability before loading source-owned config so an unrelated
+    # caller TMPDIR cannot be mistaken for this run's artifact root.
+    runtime_parser = argparse.ArgumentParser(add_help=False)
+    runtime_parser.add_argument("--runtime-root")
+    runtime_args, _ = runtime_parser.parse_known_args()
+    selected_runtime = (
+        runtime_args.runtime_root
+        or os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
+    )
+    if selected_runtime:
+        os.environ["AGENT_CANON_RUNTIME_ROOT"] = selected_runtime
+        for name in (
+            "TMPDIR",
+            "TEMP",
+            "TMP",
+            "XDG_CACHE_HOME",
+            "PYTHONPYCACHEPREFIX",
+            "AGENT_CANON_TOOLS_HOME",
+            "CARGO_HOME",
+            "CARGO_TARGET_DIR",
+            "AGENT_CANON_CLI_TARGET_DIR",
+            "RUSTUP_HOME",
+            "ELAN_HOME",
+        ):
+            os.environ.pop(name, None)
     try:
         source_resolution = resolve_agent_canon_source_root(Path(__file__).resolve())
         source_root = source_resolution.source_root
@@ -966,6 +941,7 @@ def main() -> int:
             args.report_root,
             source_root=source_root,
             canon_root=source_resolution.canon_root,
+            runtime_root=args.runtime_root,
         )
     except (RuntimeError, OSError) as exc:
         print(str(exc), flush=True)
@@ -1060,7 +1036,7 @@ def main() -> int:
                 repository_roots.agentcanon_source_root,
             ),
         )
-    except (RuntimeError, OSError, ParentRootSideEffectError) as exc:
+    except (RuntimeError, OSError) as exc:
         print(str(exc), flush=True)
         return 1
     emit_bootstrap_output(

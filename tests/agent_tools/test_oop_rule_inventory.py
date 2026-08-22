@@ -97,19 +97,13 @@ class OopRuleInventoryTest(unittest.TestCase):
             },
         )
 
-    def test_shared_inventory_resolves_vendor_surfaces(self) -> None:
-        """Shared inventory entries should accept AgentCanon-owned vendor docs."""
+    def test_shared_inventory_resolves_standalone_surfaces(self) -> None:
+        """Shared inventory entries resolve from the standalone source root."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            vendor_doc = (
-                root
-                / "vendor"
-                / "agent-canon"
-                / "documents"
-                / "object-oriented-design.md"
-            )
-            vendor_doc.parent.mkdir(parents=True)
-            vendor_doc.write_text("# OOP\n", encoding="utf-8")
+            source_doc = root / "documents" / "conventions" / "object-oriented-design.md"
+            source_doc.parent.mkdir(parents=True)
+            source_doc.write_text("# OOP\n", encoding="utf-8")
             entry = InventoryEntry(
                 "policy",
                 "documents/conventions/object-oriented-design.md",
@@ -120,7 +114,7 @@ class OopRuleInventoryTest(unittest.TestCase):
             payload = inventory_payload(root, [entry])
             missing = missing_entries(root, [entry])
 
-            self.assertEqual(resolved, vendor_doc)
+            self.assertEqual(resolved, source_doc)
             self.assertEqual(missing, [])
             self.assertEqual(payload["status"], "pass")
             self.assertEqual(payload["missing"], [])

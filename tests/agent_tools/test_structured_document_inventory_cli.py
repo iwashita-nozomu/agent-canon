@@ -10,14 +10,14 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
+from tests.agent_tools.rust_cli_fixture import standalone_agent_canon
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-AGENT_CANON = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 
 
 class StructuredDocumentInventoryCliTest(unittest.TestCase):
@@ -29,8 +29,9 @@ class StructuredDocumentInventoryCliTest(unittest.TestCase):
             temp_path = Path(temp_dir)
             root = temp_path / "repo"
             self.write_fixture(root)
-            json_out = root / "reports" / "document-inventory.json"
-            markdown_out = root / "reports" / "document-inventory.md"
+            runtime_root = temp_path / "runtime"
+            json_out = runtime_root / "reports" / "document-inventory.json"
+            markdown_out = runtime_root / "reports" / "document-inventory.md"
 
             result = self.run_agent_canon(
                 [
@@ -38,12 +39,13 @@ class StructuredDocumentInventoryCliTest(unittest.TestCase):
                     "document-inventory",
                     "--root",
                     str(root),
+                    "--runtime-root",
+                    str(runtime_root),
                     "--json-out",
                     str(json_out),
                     "--markdown-out",
                     str(markdown_out),
                 ],
-                cargo_target_dir=temp_path / "cargo-target",
             )
 
             payload = json.loads(json_out.read_text(encoding="utf-8"))
@@ -72,6 +74,7 @@ class StructuredDocumentInventoryCliTest(unittest.TestCase):
             temp_path = Path(temp_dir)
             root = temp_path / "repo"
             self.write_file(root, "documents/missing-header.md", "# Missing\n")
+            runtime_root = temp_path / "runtime"
 
             result = self.run_agent_canon(
                 [
@@ -79,28 +82,24 @@ class StructuredDocumentInventoryCliTest(unittest.TestCase):
                     "document-inventory",
                     "--root",
                     str(root),
+                    "--runtime-root",
+                    str(runtime_root),
                     "--fail-on-findings",
                 ],
-                cargo_target_dir=temp_path / "cargo-target",
             )
 
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("STRUCTURED_ANALYSIS_DOCUMENT_FINDINGS=1", result.stdout)
 
     @staticmethod
-    def run_agent_canon(
-        args: list[str], *, cargo_target_dir: Path
-    ) -> subprocess.CompletedProcess[str]:
-        """Run the Rust CLI with build artifacts isolated from the repo target."""
-        env = os.environ.copy()
-        env["CARGO_TARGET_DIR"] = str(cargo_target_dir)
+    def run_agent_canon(args: list[str]) -> subprocess.CompletedProcess[str]:
+        """Run the Rust implementation with its build target outside the source tree."""
         return subprocess.run(
-            [str(AGENT_CANON), *args],
+            [str(standalone_agent_canon()), *args],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
             text=True,
-            env=env,
         )
 
     @staticmethod

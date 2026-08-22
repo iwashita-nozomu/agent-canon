@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Owns the machine-readable AgentCanon update lifecycle schemas, identity guards, receipts, and close token mechanics.
 # upstream design ../../agents/skills/agent-orchestration.md owns Decision Sufficiency meaning and validation.
-# upstream design ../../documents/agent-canon/agent-canon-update-route.md owns the source update and projection transaction.
+# upstream design ../../documents/agent-canon/agent-canon-update-route.md owns the standalone source update transaction.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md owns the source PR sequence.
 # upstream implementation ./artifact_identity.py provides canonical JSON serialization.
 # upstream implementation ../../tools/ci/check_agent_canon_pr.py provides the authoritative G2 owner API consumed through SourceProjectionGateOwnerApis.
@@ -12,7 +12,7 @@
 # downstream implementation ./github_publish.py consumes immutable pull-request lifecycle and gate evidence.
 # downstream implementation ./publication_integrator.py consumes candidate CAS and publication receipts.
 # downstream implementation ./task_close.py consumes closeout coverage without revalidating upstream gates.
-# downstream implementation ../../tools/update_agent_canon.sh consumes queue and dependency-frontier receipts.
+# downstream implementation ./repository_topic_clone.py consumes source branch receipts.
 # downstream implementation ../../tests/agent_tools/test_publication_integrator.py validates lifecycle mechanics.
 # downstream implementation ../../tests/agent_tools/test_bootstrap_and_close.py validates terminal cleanup guards.
 # @dependency-end
@@ -194,8 +194,11 @@ GATE_CONTRACTS: dict[str, dict[str, object]] = {
         ),
     },
     "G4": {
-        "invariant": "parent_projection_integrity",
-        "owners": ("tools/update_agent_canon.sh#accept_dependency_frontier",),
+        "invariant": "standalone_source_branch_integrity",
+        "owners": (
+            "tools/agent_tools/repository_topic_clone.py#_ensure_branch",
+            "agents/workflows/agent-canon-pr-workflow.md",
+        ),
     },
     "G5": {
         "invariant": "remote_publication_readback",
@@ -1897,10 +1900,10 @@ def materialize_fresh_clone_source_projection_packet(
             "assumption_forbidden": True,
         },
         "pr_essence": {
-            "problem": "exercise parent projection from a fresh clone",
-            "intent": "queue the observed AgentCanon source update",
-            "canonical_owner": "tools/update_agent_canon.sh",
-            "contract_delta": "fresh-clone source projection",
+            "problem": "exercise standalone source publication from a fresh clone",
+            "intent": "queue the observed AgentCanon source branch update",
+            "canonical_owner": "tools/agent_tools/repository_topic_clone.py",
+            "contract_delta": "fresh-clone source PR",
             "evidence_refs": [evidence("fresh-clone-pr-essence", identity)],
         },
         "reviews": [],

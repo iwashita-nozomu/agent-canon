@@ -59,7 +59,7 @@ setup、親固有 setup の owner split を監査します。
 ## Repair Route
 
 owner skill は `environment-maintenance`、主 tool は `docker_dependency_validator.sh`、
-`tools/ci/container_config.py`、devcontainer dependency checker。Ubuntu base、user/sudo、
+bootstrap container contract checkerとproject-owned environment checker。Ubuntu base、user/sudo、
 owner split、host driver の static 誤りを先に修正し、runtime command は static に確定
 できない invariant だけ実行します。
 

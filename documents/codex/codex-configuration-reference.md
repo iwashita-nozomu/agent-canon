@@ -44,7 +44,7 @@ runtime surface and end with the practical change checklist and stability notes.
 | Surface | Scope | Main Use |
 | ------- | ----- | -------- |
 | `$CODEX_HOME/config.toml` or `~/.codex/config.toml` | user / machine | Default model, approvals, sandbox, providers, MCP, hooks, skills, UI, telemetry, profiles. |
-| `.codex/config.toml` | repository | Project-scoped defaults checked into the repo. In this template it is canon-owned and symlinked from `vendor/agent-canon/.codex/config.toml`. |
+| `.codex/config.toml` | repository | Project-scoped defaults checked into the repo. A parent owns its own file; AgentCanon runtime configuration is installed under the isolated runtime `codex-home` by `bootstrap.sh`. |
 | CLI `-c key=value` | single invocation | Highest-friction but precise override; accepts dotted paths and TOML-parsed values. |
 | CLI `--enable` / `--disable` | single invocation | Shortcut for `features.<name>=true/false`. |
 | CLI direct flags | single invocation | Common overrides for model, profile, sandbox, approval policy, cwd, images, web search, and output mode. |
@@ -727,8 +727,8 @@ Before changing Codex config in this repo:
 3. Prefer repo policy in `AGENTS.md` and runtime mechanics in `.codex/config.toml`.
 4. If changing shared canon, read `documents/rule/dependency-module-changes.md`,
    edit the managed topic-workspace source clone, and use the request-evidence-authorized
-   `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を付けた source-root resolver の `exec tools/sync_agent_canon.sh link-root`
-   command only when projecting the clean pin back into a parent repo.
+   `bash bootstrap.sh` の standalone source/runtime route. Parent repository へ
+   pin や root projection を戻す操作は行わない。
 5. If adding a new document or script, add a dependency header first.
 6. Run dependency header scan, dependency graph validation, docs checks, and relevant static checks before closeout.
 

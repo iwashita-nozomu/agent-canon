@@ -2,7 +2,6 @@
 @dependency-start
 contract design
 responsibility Documents the target C++ project boundary, target graph, artifact paths, and parent migration map.
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../runtime/runtime-profiles-and-check-matrix.md C++ profile and validation routing
 upstream design ../conventions/coding-conventions-cpp.md native source and header conventions
 upstream design ../conventions/coding-conventions-project.md project path and environment conventions
@@ -616,8 +615,8 @@ coverage/graph/JSON digests, and final Mermaid readback as one evidence chain.
 
 | exact generated path | forward: design/runtime clause → generated projection section/ref | reverse: generated projection section/ref → evidence/readback |
 | --- | --- | --- |
-| `documents/runtime/skill-dependency-graph.md` | `D-VALIDATION`, `D-RELATED-DOCUMENT-CLOSURE`, `SG-001..SG-003`, `SG-009..SG-011`, `SG-015` → generated `# Public Skill/Tool Invocation Graph`, `graph_digest`/`coverage_digest` header, source markers, and terminal digest lines | `tools/agent_tools/skill_dependency_map.py graph --root .` materializes the Mermaid projection; `tools/agent_tools/check_skill_tool_invocation_graph.py --root .` performs exact syntax/readback and digest equality; `tools/bin/agent-canon docs check` validates the Markdown projection |
-| `documents/runtime/skill-dependency-graph.json` | `D-VALIDATION`, `D-RELATED-DOCUMENT-CLOSURE`, `SG-001..SG-008`, `SG-013..SG-015` → generated `agent_canon.skill_tool_invocation_graph.v2` envelope, source snapshot/counts, coverage digests, and `readback` envelope | `tools/agent_tools/skill_dependency_map.py graph --root .` materializes the JSON projection from the catalog/dependency source; `tools/agent_tools/check_skill_tool_invocation_graph.py --root .` validates JSON self-digest, source counts, readback counts, and byte equality |
+| `documents/runtime/skill-dependency-graph.md` | `D-VALIDATION`, `D-RELATED-DOCUMENT-CLOSURE`, `SG-001..SG-003`, `SG-009..SG-011`, `SG-015` → generated `# Public Skill/Tool Invocation Graph`, `graph_digest`/`coverage_digest` header, source markers, and terminal digest lines | `tools/agent_tools/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>` materializes the normal external Mermaid projection; an explicit source-mutation capability is required to refresh this tracked reader pair; `tools/agent_tools/check_skill_tool_invocation_graph.py --root .` performs exact syntax/readback and digest equality; `tools/bin/agent-canon docs check` validates the Markdown projection |
+| `documents/runtime/skill-dependency-graph.json` | `D-VALIDATION`, `D-RELATED-DOCUMENT-CLOSURE`, `SG-001..SG-008`, `SG-013..SG-015` → generated `agent_canon.skill_tool_invocation_graph.v2` envelope, source snapshot/counts, coverage digests, and `readback` envelope | `tools/agent_tools/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>` materializes the normal external JSON projection from the catalog/dependency source; an explicit source-mutation capability is required to refresh the tracked pair; `tools/agent_tools/check_skill_tool_invocation_graph.py --root .` validates JSON self-digest, source counts, readback counts, and byte equality |
 
 ## Positive migration sequence
 

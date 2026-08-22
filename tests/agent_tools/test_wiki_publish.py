@@ -12,8 +12,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import tempfile
 import unittest
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from tools.agent_tools import wiki_publish
@@ -97,6 +100,23 @@ def compute_digest(page_root: Path, source_commit: str) -> str:
     return hasher.hexdigest()
 
 
+@contextmanager
+def runtime_environment(source_root: Path, runtime_root: Path) -> Iterator[None]:
+    """Bind a wiki fixture to explicit control/runtime roots for its duration."""
+    names = ("AGENT_CANON_CONTROL_PARENT_ROOT", "AGENT_CANON_RUNTIME_ROOT")
+    previous = {name: os.environ.get(name) for name in names}
+    os.environ["AGENT_CANON_CONTROL_PARENT_ROOT"] = str(source_root.parent)
+    os.environ["AGENT_CANON_RUNTIME_ROOT"] = str(runtime_root)
+    try:
+        yield
+    finally:
+        for name, value in previous.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
 class WikiPublishTests(unittest.TestCase):
     """Tests for wiki publish gates and page-set publication determinism."""
 
@@ -130,7 +150,7 @@ class WikiPublishTests(unittest.TestCase):
         runner = FakeRunner()
         source_root = Path(tempfile.mkdtemp())
         wiki_root = source_root / "wiki"
-        wiki_root.mkdir()
+        wiki_root.mkdir(parents=True)
         runner.add(["git", "cat-file", "-t", "a" * 40], stdout="commit")
         runner.add(
             [
@@ -159,8 +179,9 @@ class WikiPublishTests(unittest.TestCase):
     def test_prepare_without_expected_digest_outputs_page_set_digest(self) -> None:
         runner = FakeRunner()
         source_root = Path(tempfile.mkdtemp())
-        wiki_root = source_root / "wiki"
-        wiki_root.mkdir()
+        runtime_root = source_root.parent / f"{source_root.name}-runtime"
+        wiki_root = runtime_root / "wiki"
+        wiki_root.mkdir(parents=True)
         source_page = "# Home\n\n<!-- AGENT_CANON_WIKI_SOURCE_COMMIT=" + "a" * 40 + "-->\n"
         for name in ("Home.md", "_Sidebar.md", "_Footer.md"):
             (wiki_root / name).write_text(source_page, encoding="utf-8")
@@ -178,10 +199,11 @@ class WikiPublishTests(unittest.TestCase):
         runner.add(["git", "rev-parse", "--is-inside-work-tree"], stdout="true")
         runner.add(["git", "branch", "--show-current"], stdout="main")
 
-        summary = wiki_publish.publish_to_wiki(
-            build_args(source_root=source_root, wiki_root=wiki_root),
-            runner=runner,
-        )
+        with runtime_environment(source_root, runtime_root):
+            summary = wiki_publish.publish_to_wiki(
+                build_args(source_root=source_root, wiki_root=wiki_root),
+                runner=runner,
+            )
 
         self.assertEqual(summary["state"], "PREPARE_OK")
         expected = compute_digest(wiki_root, "a" * 40)
@@ -190,8 +212,9 @@ class WikiPublishTests(unittest.TestCase):
     def test_publish_rejects_digest_mismatch_after_reviewer_step(self) -> None:
         runner = FakeRunner()
         source_root = Path(tempfile.mkdtemp())
-        wiki_root = source_root / "wiki"
-        wiki_root.mkdir()
+        runtime_root = source_root.parent / f"{source_root.name}-runtime"
+        wiki_root = runtime_root / "wiki"
+        wiki_root.mkdir(parents=True)
         source_page = "# Home\n\n<!-- AGENT_CANON_WIKI_SOURCE_COMMIT=" + "a" * 40 + "-->\n"
         for name in ("Home.md", "_Sidebar.md", "_Footer.md"):
             (wiki_root / name).write_text(source_page, encoding="utf-8")
@@ -209,23 +232,25 @@ class WikiPublishTests(unittest.TestCase):
         runner.add(["git", "rev-parse", "--is-inside-work-tree"], stdout="true")
         runner.add(["git", "branch", "--show-current"], stdout="main")
 
-        with self.assertRaises(wiki_publish.UserVisibleFailure) as exc:
-            wiki_publish.publish_to_wiki(
-                build_args(
-                    source_root=source_root,
-                    wiki_root=wiki_root,
-                    expected_page_set_digest="bad" + "1" * 63,
-                ),
-                runner=runner,
-            )
+        with runtime_environment(source_root, runtime_root):
+            with self.assertRaises(wiki_publish.UserVisibleFailure) as exc:
+                wiki_publish.publish_to_wiki(
+                    build_args(
+                        source_root=source_root,
+                        wiki_root=wiki_root,
+                        expected_page_set_digest="bad" + "1" * 63,
+                    ),
+                    runner=runner,
+                )
 
         self.assertEqual(exc.exception.next_action, "page_set_digest_mismatch")
 
     def test_publish_requires_exact_default_branch_push_and_readback(self) -> None:
         runner = FakeRunner()
         source_root = Path(tempfile.mkdtemp())
-        wiki_root = source_root / "wiki"
-        wiki_root.mkdir()
+        runtime_root = source_root.parent / f"{source_root.name}-runtime"
+        wiki_root = runtime_root / "wiki"
+        wiki_root.mkdir(parents=True)
         source_page = "# Home\n\n<!-- AGENT_CANON_WIKI_SOURCE_COMMIT=" + "a" * 40 + "-->\n"
         for name in ("Home.md", "_Sidebar.md", "_Footer.md"):
             (wiki_root / name).write_text(source_page, encoding="utf-8")
@@ -249,14 +274,15 @@ class WikiPublishTests(unittest.TestCase):
         runner.add(["git", "rev-parse", "HEAD"], stdout=sidecar_head)
         runner.add(["git", "ls-remote", "https://github.com/iwashita-nozomu/agent-canon.wiki.git", "refs/heads/main"], stdout=f"{sidecar_head}\trefs/heads/main\n")
 
-        summary = wiki_publish.publish_to_wiki(
-            build_args(
-                source_root=source_root,
-                wiki_root=wiki_root,
-                expected_page_set_digest=expected,
-            ),
-            runner=runner,
-        )
+        with runtime_environment(source_root, runtime_root):
+            summary = wiki_publish.publish_to_wiki(
+                build_args(
+                    source_root=source_root,
+                    wiki_root=wiki_root,
+                    expected_page_set_digest=expected,
+                ),
+                runner=runner,
+            )
 
         self.assertEqual(summary["state"], "PUBLISHED")
         self.assertEqual(summary["local_head"], sidecar_head)
@@ -265,8 +291,9 @@ class WikiPublishTests(unittest.TestCase):
     def test_prepare_uses_supplied_wiki_root_including_untracked_pages_and_no_clone(self) -> None:
         runner = FakeRunner()
         source_root = Path(tempfile.mkdtemp())
-        wiki_root = source_root / "wiki"
-        wiki_root.mkdir()
+        runtime_root = source_root.parent / f"{source_root.name}-runtime"
+        wiki_root = runtime_root / "wiki"
+        wiki_root.mkdir(parents=True)
 
         source_page = "# Untracked\n\n<!-- AGENT_CANON_WIKI_SOURCE_COMMIT=" + "a" * 40 + "-->\n"
         for name in ("Home.md", "_Sidebar.md", "_Footer.md"):
@@ -287,10 +314,11 @@ class WikiPublishTests(unittest.TestCase):
         runner.add(["git", "rev-parse", "--is-inside-work-tree"], stdout="true")
         runner.add(["git", "branch", "--show-current"], stdout="main")
 
-        summary = wiki_publish.publish_to_wiki(
-            build_args(source_root=source_root, wiki_root=wiki_root),
-            runner=runner,
-        )
+        with runtime_environment(source_root, runtime_root):
+            summary = wiki_publish.publish_to_wiki(
+                build_args(source_root=source_root, wiki_root=wiki_root),
+                runner=runner,
+            )
 
         self.assertEqual(summary["state"], "PREPARE_OK")
         self.assertEqual(summary["page_count"], 3)

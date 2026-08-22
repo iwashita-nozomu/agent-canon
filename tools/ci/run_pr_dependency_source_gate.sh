@@ -18,7 +18,6 @@ TOOLS_ROOT=""
 REPORT_DIR=""
 CHANGED_PATH_PACKET=""
 TRUSTED_BASE_SHA=""
-REPOSITORY_MODE=""
 SOURCE_REVIEW_REQUIRED=""
 
 usage() {
@@ -30,7 +29,6 @@ Usage:
     --report-dir DIR \
     --changed-path-packet FILE \
     --trusted-base-sha SHA \
-    --repository-mode standalone_source|template_or_derived \
     --source-review-required 0|1
 
 Runs the PR dependency gate from tracked source. It never builds, queries, or
@@ -60,10 +58,6 @@ while [[ $# -gt 0 ]]; do
       TRUSTED_BASE_SHA="$2"
       shift 2
       ;;
-    --repository-mode)
-      REPOSITORY_MODE="$2"
-      shift 2
-      ;;
     --source-review-required)
       SOURCE_REVIEW_REQUIRED="$2"
       shift 2
@@ -82,7 +76,7 @@ done
 
 if [[ -z "$ROOT" || -z "$TOOLS_ROOT" || -z "$REPORT_DIR" \
   || -z "$CHANGED_PATH_PACKET" || -z "$TRUSTED_BASE_SHA" \
-  || -z "$REPOSITORY_MODE" || -z "$SOURCE_REVIEW_REQUIRED" ]]; then
+  || -z "$SOURCE_REVIEW_REQUIRED" ]]; then
   echo "AGENT_CANON_PR_DEPENDENCY_SOURCE=fail reason=required_argument_missing"
   exit 2
 fi
@@ -94,13 +88,6 @@ TOOLS_ROOT="$(realpath -e "$TOOLS_ROOT")" || {
   echo "AGENT_CANON_PR_DEPENDENCY_SOURCE=fail reason=tools_root_missing"
   exit 2
 }
-case "$REPOSITORY_MODE" in
-  standalone_source|template_or_derived) ;;
-  *)
-    echo "AGENT_CANON_PR_DEPENDENCY_SOURCE=fail reason=repository_mode_invalid"
-    exit 2
-    ;;
-esac
 case "$SOURCE_REVIEW_REQUIRED" in
   0|1) ;;
   *)
@@ -134,9 +121,7 @@ if [[ "$SOURCE_REVIEW_REQUIRED" -eq 0 ]]; then
   exit 0
 fi
 
-if [[ "$REPOSITORY_MODE" == "standalone_source" ]]; then
-  python3 "${TOOLS_ROOT}/agent_tools/tool_drift.py" --root "$ROOT"
-fi
+python3 "${TOOLS_ROOT}/agent_tools/tool_drift.py" --root "$ROOT"
 "${review[@]}" --cycle-report-only
 python3 "${TOOLS_ROOT}/agent_tools/render_dependency_manifest_graph.py" \
   --root "$ROOT" \

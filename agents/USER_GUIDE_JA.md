@@ -1,105 +1,152 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents エージェント利用ガイド for this repository.
-upstream design README.md agent canon overview
+responsibility Documents the Japanese user journey for the standalone AgentCanon runtime.
+upstream design ../documents/runtime/bootstrap-runtime.md shared runtime guide
+upstream implementation ../bootstrap.sh Host lifecycle entrypoint
+downstream design ../documents/runtime/runtime-log-archive.md eval archive route
 @dependency-end
 -->
 
-# エージェント利用ガイド
+# AgentCanon 利用ガイド
 
+このガイドは、AgentCanon の source checkout を親レポに埋め込まずに、共有
+tool runtime として使う人向けです。project のビルド、テスト、GPU、GitHub 操作は
+project / host workflow の責務であり、AgentCanon の tool container に持ち込みません。
 
-## この文書の読み方
+## 最初の一回
 
-この文書は、AgentCanon を使う読者向けの入口案内です。まず
-`どこから読むか` と `入口の使い分け` で runtime ごとの入口を選び、
-`skill の使い方` で task 形状に合う skill を確認します。repo-changing task や
-複数 agent を使う場合は `subagent の使い方` を読みます。この文書は利用案内であり、
-workflow family、role behavior、validation gate の正本はリンク先の owner surface です。
-
-## どこから読むか
-
-1. [agents/README.md](README.md)
-1. [agents/canonical/README.md](canonical/README.md)
-1. [agents/TASK_WORKFLOWS.md](TASK_WORKFLOWS.md)
-1. [agents/skills/README.md](skills/README.md)
-
-## 入口の使い分け
-
-- Codex runtime:
-  - [AGENTS.md](../AGENTS.md)
-  - [.codex/README.md](../.codex/README.md)
-
-## skill の使い方
-
-- 共通 skill の正本は `.agents/skills/` にあります。
-- skill を明示したいときは `$skill-name` を使います。
-- 例: `$repo-onboarding`、`$research-workflow`、`$adaptive-improvement-loop`、`$paper-writing`
-- plain text で skill 名を書く運用もできますが、既定表記は `$skill-name` です。
-- どの skill を使うか迷う場合は、まず `repo-onboarding` か `codex-task-workflow` を見ます。
-- Codex で毎回同じ手順を踏みたい場合は `codex-task-workflow` を見ます。
-- Python 差分では `python-review` を既定で使います。
-- C / C++ 差分では `cpp-review` を既定で使います。
-- 局所 diff を findings-first で見るときは `change-review` を使います。
-- Markdown 差分では `md-style-check` を使います。
-- semantic delta、obligation、一次検証 owner、hard-edge closure を設計する場合は
-  [semantic responsibility contract](../documents/design/semantic-responsibility-contract.md)
-  と run-local instance template を先に読みます。
-- 文書構造、reader path、claim support、source map、canonical route、document responsibility が変わる Markdown 差分では、`structure-planning` と `prose-reasoning-graph` を先に使い、closeout の `Document Structure Evidence` に構造解析 evidence を残します。
-- typo / link / format-only の Markdown 差分では、`md-style-check` と `structure_contract=skipped:<reason>` を evidence に残します。
-- owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じた repo-changing 差分は通常の owner route で進め、existing tool を読了 gate なしに先に実行し、owner boundary、existing-tool route、targeted validation を evidence に残します。public surface の追加、縮小、削除、rename、restriction、deprecation、意味変更は `scoped_change` または broader route へ進みます。
-- README、workflow、guide、migration、specification など file responsibility が一般説明 prose の文書では、`long-form-writing` を DSL-to-prose adapter として使います。長さだけでは選びません。
-- 論文、thesis chapter、scholarly note のような学術文章では `academic-writing` を使います。
-- 投稿論文や thesis chapter の draft では `paper-writing` を使います。
-- 文献調査や関連研究整理では `literature-survey` を使います。
-- 研究系 task では `research-workflow` を外側の loop に使います。
-- 実験結果を見ながら code change、調査、チューニングを継続反復する場合は `adaptive-improvement-loop` を使います。
-- 単一 run の review / rerun 分岐は `experiment-lifecycle` を使います。
-- worktree を切った直後は `worktree-start` で scope と action log を固定し、drift や cleanup 判断は `worktree-health` を使います。
-- code、docs、tools、runtime をまとめて rework する包括的変更では `comprehensive-development` を使います。
-- Docker、CI、dependency、repo-wide tool 導入案では `environment-maintenance` を使います。
-
-## subagent の使い方
-
-- Codex 用 subagent は `.codex/agents/` にあります。
-- subagent は task 固有に使い、repo 全体の正本は `agents/` 側に置きます。
-- repo-changing task では run bundle を先に作ります。
-- 着手時は `workflow=<family>`, `skills=<...>`, `review=<...>` を 1 行で宣言します。
-- `skills=<...>` には `$skill-name` で指定した skill をそのまま並べます。
-- 例: `skills=$research-workflow,$literature-survey,$paper-writing`
-- 既定の流れは workflow family で変わります。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じている修正は `Owner-Bounded Change` です。public surface に変化がある場合は `scoped_change` または broader route で `dependency/consumer/migration/docs closure` を scope 形成し、それ以外の repo-changing task は `要件整理 -> 調査 -> 実行計画立案 -> 計画レビュー -> 詳細設計 -> 詳細設計レビュー -> 文書通読レビュー -> 実装` を基準にします。
-- `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー` は別 subagent で行います。
-- `詳細設計レビュー` を通す前に実装へ進みません。
-- `test_designer` は owning mechanism の確立または修復後に、semantic responsibility
-  contract の owner で閉じない test-owned runtime risk が残る場合だけ起動します。
-  contract-only wrapper は static contract validation と canonical command evidence を使います。
-- 包括的開発では、parent が writer ごとの path / directory を `team_manifest.yaml` の write policy で管理します。
-- write scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
-- 文書主体の成果物では `document_flow_reviewer` を通し、上から順に読んだときの意味の通り方を確認します。
-- 一般説明 prose adapter を使う文書では、`document_flow_reviewer` に加えて別 reviewer で docs completeness review を通します。
-- 学術文章では、さらに `notation_definition_reviewer` と `logic_gap_reviewer` を別 instance で通します。
-- 論文 draft では、さらに `citation_evidence_reviewer` を別 instance で通します。
-- 最後の user-facing 完了報告は、`verification.txt` が `status=pass` で、`closeout_gate.md` が `auditor_status=resolved`、`review_convergence_complete=yes`、`diff_check_agent_complete=yes`、`user_completion_report=unlocked` になり、run-local diff-check artifact が現在 tracked diff ref の read-only independent approval を示すまで出しません。
-
-標準 bundle:
+`<authorized-parent-root>` は明示的に許可された親レポの root、`<project-root>` は
+解析対象の project root とします。runtime は AgentCanon source の外に置きます。
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
-  --task "repo-changing task" \
-  --task-id T1 \
-  --owner "codex" \
-  --workspace-root "$PWD"
+ROOT=<authorized-parent-root>
+RUNTIME="$ROOT/workspace/agent-canon-runtime/<installation>"
+BOOTSTRAP=/path/to/agent-canon/bootstrap.sh
+
+"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" install
+"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" start
+"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" \
+  target add --root <project-root> --mode read-only
+"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" status
 ```
 
-Codex で planning を含む session では、parent session 側の plan-mode command を先に使います。official Codex CLI では `/plan` です。
-runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を見ます。
+control root と runtime root は必須です。runtime root は control root の下でなければ
+ならず、symlink を通した脱出も拒否されます。`$HOME/.cache`、`$HOME/.local`、global
+`CODEX_HOME`、source tree を暗黙の保存先にしません。
 
-包括的開発の標準 bundle:
+## Codex を起動する
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
-  --task "comprehensive development pass" \
-  --task-id T12 \
-  --owner "codex" \
-  --workspace-root "$PWD"
+"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" codex prepare
+"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" \
+  codex launch --project-root <project-root>
 ```
+
+`prepare` は runtime root 内の isolated `codex-home/` に manifest 管理の skill、agent、
+hook、設定リンクを作ります。global `$CODEX_HOME` は変更しません。衝突する既存パスは
+fail closed で、uninstall が削除できるのはこの installation が作成したリンクだけです。
+install / update 後は新しい Codex session を起動し、manifest、link target、source digest
+を readback してください。
+
+## Tool を呼ぶ
+
+Rust の既存 first-class command は公開形を保ちます。
+
+```bash
+agent-canon docs check ...
+agent-canon semantic-index ...
+agent-canon structured-analysis ...
+```
+
+Python tool は flat な global executable にしません。schema-v2 parity fixture が確認済み
+の catalog entry だけを使います。
+
+```bash
+"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" \
+  tool run --root <project-root> <verified-catalog-id> -- <args...>
+```
+
+parity は argv、cwd、stdin/stdout/stderr、exit/signal、written paths を比較します。
+未確認の entry は legacy の正確なコマンドを、登録済み target に対する `exec` または
+既存 workflow から実行します。
+
+```bash
+"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" \
+  exec --root <project-root> -- <existing-command> <args...>
+```
+
+shell string、未知の catalog id、internal Python file の自動公開は許可しません。
+
+## Eval と agent-canon-log
+
+```bash
+"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" \
+  eval collect --root <project-root> --run-id <run-id>
+"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" \
+  eval sync --run-id <run-id>
+```
+
+`collect` は tool container 内の producer を実行し、runtime root の spool に run/task、
+source HEAD、AgentCanon/tool digest、family status、metrics、source unchanged を含む
+collection と receipt を作ります。source tree の `reports/`、`.agent-canon/`、`target/`
+には出力しません。
+
+`sync` は typed host Git adapter を通して、別リポジトリ
+[`iwashita-nozomu/agent-canon-log`](https://github.com/iwashita-nozomu/agent-canon-log) へ
+append-only の archive として公開します。branch と retention は log repository が所有
+します。通信や archive が失敗したら spool と failure receipt を残して再試行します。
+push 後の remote ref/tree/blob readback まで成功扱いにしません。
+
+## Target mode とコンテナ
+
+通常は `read-only` target を使います。意図的な source mutation は
+`explicit-target-write` を持つ operation だけが、target、allowed paths、purpose、
+before/after、receipt を要求して行います。
+
+tool container は全プロジェクトで共有する一個だけです。CPU 2、memory 4 GiB、PIDs 512、
+network 無効、read-only rootfs、capability 全 drop、`no-new-privileges`、task timeout
+30分、termination grace 10秒が既定です。daemon が rootful でも rootless でも分岐せず、
+container process は常に non-root UID です。project image、project test、GPU、Docker
+socket、host HOME、GitHub token は渡しません。
+
+## 失敗、rollback、終了
+
+target 変更は active task が0になるまで admission を閉じて generation を切り替えます。
+active task 中は `mount_update_blocked`、candidate の health/readback 失敗は candidate
+quarantine と旧 generation 維持、旧 generation も復旧できなければ
+`runtime_unavailable` です。`status` で generation、container、mount、limit、receipt
+を確認し、必要なら active task がない状態で `rollback` します。
+
+```bash
+"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" stop
+"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" gc
+"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" uninstall
+```
+
+`stop` は container を消して state と未同期 spool を残します。`gc` は完了かつ pin の
+ない、この installation の所有物だけを削除します。`uninstall` は managed image、
+container、links、state を削除しますが、親レポ、global Codex、pre-existing Docker
+resource は削除しません。uninstall 前に `eval sync`、`status`、archive readback、
+resource absence を確認してください。`docker system prune` は使いません。
+
+## AgentCanon を編集する場合
+
+Template や派生 repo の編集は、親レポが指定する ignored clone
+`workspace/agent-canondevelop/<qualified-task>/agent-canon` で行います。親レポに
+submodule、vendor checkout、source symlink、AgentCanon の tests や eval 名を追加しません。
+AgentCanon を変更したら AgentCanon 側の branch/PR/main readback を完了し、親レポ側は
+その後に必要な source revision だけを更新します。
+
+Issue の責務を混ぜないでください。[#841](https://github.com/iwashita-nozomu/agent-canon/issues/841)
+は local bootstrap、shared runtime、source side-effect、skill isolation、eval/archive
+lifecycle、[#821](https://github.com/iwashita-nozomu/agent-canon/issues/821) は prebuilt
+artifact の build/distribution です。
+
+## 詳細な owner
+
+- [Standalone Bootstrap And Shared Tool Runtime](../documents/runtime/bootstrap-runtime.md)
+- [Container Operations](../CONTAINER_OPERATIONS.md)
+- [Runtime Log Archive](../documents/runtime/runtime-log-archive.md)
+- [Runtime Profiles And Check Matrix](../documents/runtime/runtime-profiles-and-check-matrix.md)
+- [AgentCanon Update Skill](skills/agent-canon-update.md)

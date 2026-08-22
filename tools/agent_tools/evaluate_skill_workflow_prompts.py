@@ -5,6 +5,7 @@
 # upstream design ../../evidence/agent-evals/README.md prompt eval directory contract
 # upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml default prompt eval manifest
 # upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
+# upstream implementation ./runtime_artifacts.py owns external prompt-eval artifact writes
 # downstream implementation ../../tests/agent_tools/test_evaluate_skill_workflow_prompts.py tests it
 # @dependency-end
 """Evaluate skill and workflow prompt surfaces against frozen checklist evals."""
@@ -36,15 +37,8 @@ from eval_manifest_paths import (
     relative_manifest_path,
     resolve_eval_manifest,
 )
-from parent_root_side_effects import (
-    ParentRootAttestationRequest,
-    ParentRootReject,
-    ParentRootSideEffectBoundary,
-    ParentRootSideEffectError,
-    attest_parent_root,
-)
 from runtime_log_paths import agent_canon_root, eval_results_dir
-from workflow_monitor import MonitoringEntries, append_monitoring
+from runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary
 
 DEFAULT_RESULTS_FAMILY = "skill-workflow-prompt"
 REPORT_STATUS_LINE_LIMIT = 13
@@ -54,20 +48,6 @@ GIT_COMMAND_TIMEOUT_SECONDS = 5
 COMPACT_MISSING_REQUIRED_SAMPLE_LIMIT = 5
 COMPACT_MATCHED_FORBIDDEN_SAMPLE_LIMIT = 5
 COMPACT_FAILED_CHECK_SAMPLE_LIMIT = 25
-
-
-def _parent_capability(purpose: str):
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
-    parent = Path(configured)
-    attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
-    return ParentRootSideEffectBoundary(), attestation
-
-
-def _parent_write(path: Path, data: bytes, purpose: str) -> None:
-    boundary, attestation = _parent_capability(purpose)
-    boundary.write_parent_owned_file(attestation, path, data, purpose)
 
 
 @dataclass(frozen=True)
@@ -184,6 +164,7 @@ class ReportWriteRequest:
     path: str
     root: Path
     bundle: EvalRunBundle
+    runtime_root: Path | str | None = None
 
 
 @dataclass(frozen=True)
@@ -193,6 +174,7 @@ class AccumulatedReportRequest:
     root: Path
     results_dir: Path
     bundle: EvalRunBundle
+    runtime_root: Path | str | None = None
 
 
 @dataclass(frozen=True)
@@ -249,6 +231,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--root",
         default=".",
         help="Repository root. Defaults to current directory.",
+    )
+    parser.add_argument(
+        "--runtime-root",
+        type=Path,
+        help="Explicit external runtime root for reports and monitoring artifacts.",
     )
     parser.add_argument(
         "--report-out",
@@ -456,14 +443,8 @@ def expand_eval_entry(
 
 
 def resolve_target(root: Path, target: str) -> Path:
-    """Resolve a prompt target in source or vendored snapshot layouts."""
-    direct = root / target
-    if direct.exists():
-        return direct
-    vendored = root / "vendor" / "agent-canon" / target
-    if vendored.exists():
-        return vendored
-    return direct
+    """Resolve a prompt target in the selected source checkout."""
+    return root / target
 
 
 def load_checklist_item(entry: object, eval_id: str) -> ChecklistItem:
@@ -650,14 +631,18 @@ def compact_summary(bundle: EvalRunBundle, outputs: EvalOutputs) -> dict[str, ob
     }
 
 
-def write_compact_summary(path: Path, bundle: EvalRunBundle, outputs: EvalOutputs) -> Path:
+def write_compact_summary(
+    path: Path,
+    bundle: EvalRunBundle,
+    outputs: EvalOutputs,
+    runtime_root: Path | str | None = None,
+) -> Path:
     """Write a bounded JSON summary for agent consumption."""
-    _parent_write(
+    boundary = runtime_artifact_boundary(bundle.metadata.root and Path(bundle.metadata.root), runtime_root)
+    return boundary.atomic_write_text(
         path,
-        (json.dumps(compact_summary(bundle, outputs), indent=2, sort_keys=True) + "\n").encode("utf-8"),
-        "skill-workflow-evaluation-summary",
+        json.dumps(compact_summary(bundle, outputs), indent=2, sort_keys=True) + "\n",
     )
-    return path
 
 
 def render_markdown_report(
@@ -724,7 +709,8 @@ def render_markdown_report(
 def write_report(request: ReportWriteRequest) -> Path:
     """Write a Markdown eval report."""
     report_path = unique_report_path(Path(request.path), request.bundle.metadata)
-    _parent_write(
+    boundary = runtime_artifact_boundary(request.root, request.runtime_root)
+    return boundary.atomic_write_text(
         report_path,
         render_markdown_report(
             request.bundle,
@@ -733,10 +719,8 @@ def write_report(request: ReportWriteRequest) -> Path:
                 request.root,
                 request.bundle.manifest,
             ),
-        ).encode("utf-8"),
-        "skill-workflow-evaluation-report",
+        ),
     )
-    return report_path
 
 
 def relative_posix_path(from_dir: Path, to_path: Path) -> str:
@@ -824,25 +808,36 @@ def write_accumulated_report(request: AccumulatedReportRequest) -> Path:
     """Write one non-overwriting accumulated eval report."""
     status = eval_status(request.bundle.results, request.bundle.audit)
     output_dir = request.results_dir
-    boundary, attestation = _parent_capability("skill-workflow-evaluation-results")
-    boundary.ensure_parent_owned_directory(
-        attestation, output_dir, "skill-workflow-evaluation-results"
-    )
     report_path = output_dir / report_slug(
         request.bundle.manifest,
         request.bundle.metadata,
         status,
     )
-    return write_report(ReportWriteRequest(path=str(report_path), root=request.root, bundle=request.bundle))
+    return write_report(
+        ReportWriteRequest(
+            path=str(report_path),
+            root=request.root,
+            bundle=request.bundle,
+            runtime_root=request.runtime_root,
+        )
+    )
 
 
-def resolve_results_dir(root: Path, value: str) -> Path:
+def resolve_results_dir(
+    root: Path,
+    value: str,
+    runtime_root: Path | str | None = None,
+) -> Path:
     """Resolve the CLI results directory or the default archive location."""
     stripped = value.strip()
     if stripped:
         path = Path(stripped)
-        return path if path.is_absolute() else root / path
-    return eval_results_dir(agent_canon_root(root), DEFAULT_RESULTS_FAMILY)
+        if path.is_absolute():
+            return path
+        if runtime_root is not None:
+            return runtime_artifact_boundary(root, runtime_root).resolve(path)
+        return root / path
+    return eval_results_dir(agent_canon_root(root), DEFAULT_RESULTS_FAMILY, runtime_root)
 
 
 def eval_status(results: tuple[ChecklistResult, ...], audit: ManifestAudit) -> str:
@@ -880,10 +875,10 @@ _T14_REQUIREMENT_RE = re.compile(r"^(R[0-9]+)=(pass|fail|malformed): ([^\r\n]+)$
 _T14_PARENT_HEADER = (
     "schema=agent_canon.t14.agent_evaluation.v1\n"
     "run_id={run_id}\n"
-    "run_root=reports/agents/{run_id}/\n"
-    "workspace_root=.agent-canon/tmp/agentcanon-type-design-workspaces/{run_id}/\n"
-    "raw_report_base=reports/agents/{run_id}/evaluator_artifacts/\n"
-    "return_artifact_base=.agent-canon/tmp/agentcanon-type-design-workspaces/{run_id}/\n"
+    "run_root=runtime-root/reports/agents/{run_id}/\n"
+    "workspace_root=runtime-root/tmp/agentcanon-type-design-workspaces/{run_id}/\n"
+    "raw_report_base=runtime-root/reports/agents/{run_id}/evaluator_artifacts/\n"
+    "return_artifact_base=runtime-root/tmp/agentcanon-type-design-workspaces/{run_id}/\n"
     "iteration_count=2\n"
     "scenario_count=3\n"
 )
@@ -1194,6 +1189,24 @@ def _t14_validate_record_order(
         raise T14EvaluationError("t14-iteration-order")
 
 
+def _t14_runtime_boundary(runtime_root: Path | str | None = None):
+    """Return the explicit external runtime boundary for T14 artifacts."""
+    return runtime_artifact_boundary(Path.cwd(), runtime_root)
+
+
+def _t14_return_artifact(boundary, run_id: str, iteration: int, attempt: int, scenario_id: str) -> Path:
+    """Return the evaluator-return receipt path inside the runtime root."""
+    return boundary.resolve(
+        Path("tmp")
+        / "agentcanon-type-design-workspaces"
+        / run_id
+        / f"iteration-{iteration}"
+        / f"attempt-{attempt}"
+        / scenario_id
+        / "evaluator_return.bin"
+    )
+
+
 def record_t14_evaluation(
     run_id: str,
     evaluator_bytes: bytes,
@@ -1206,6 +1219,7 @@ def record_t14_evaluation(
     scenario_packet: Path,
     expected_packet_digest: str,
     parent_evaluation: Path,
+    runtime_root: Path | str | None = None,
 ) -> SkillEvaluatorReport:
     """Persist and parse one fresh evaluator return, then append its observation."""
     if _T14_RUN_ID_RE.fullmatch(run_id) is None:
@@ -1214,89 +1228,38 @@ def record_t14_evaluation(
         raise T14EvaluationError("t14-unexpected-iteration")
     if raw_evaluator_report != expected_raw_evaluator_report:
         raise T14EvaluationError("t14-raw-report-exists")
-    boundary, attestation = _parent_capability("skill-workflow-evaluator-raw")
-    parent_receipt = boundary.resolve_parent_owned_path(
-        attestation,
-        parent_evaluation,
-        "skill-workflow-parent-evaluation",
-        create=False,
+    boundary = _t14_runtime_boundary(runtime_root)
+    parent_path = boundary.resolve(parent_evaluation)
+    raw_path = boundary.resolve(raw_evaluator_report)
+    expected_raw_path = boundary.resolve(expected_raw_evaluator_report)
+    packet_path = boundary.resolve(scenario_packet)
+    return_path = _t14_return_artifact(
+        boundary, run_id, expected_iteration, expected_attempt, expected_scenario_id
     )
-    raw_receipt = boundary.resolve_parent_owned_path(
-        attestation,
-        raw_evaluator_report,
-        "skill-workflow-evaluator-raw",
-        create=False,
-    )
-    expected_raw_receipt = boundary.resolve_parent_owned_path(
-        attestation,
-        expected_raw_evaluator_report,
-        "skill-workflow-evaluator-raw-expected",
-        create=False,
-    )
-    packet_receipt = boundary.resolve_parent_owned_path(
-        attestation,
-        scenario_packet,
-        "skill-workflow-scenario-packet",
-        create=False,
-    )
-    return_artifact = (
-        attestation.parent_root
-        / ".agent-canon"
-        / "tmp"
-        / "agentcanon-type-design-workspaces"
-        / run_id
-        / f"iteration-{expected_iteration}"
-        / f"attempt-{expected_attempt}"
-        / expected_scenario_id
-        / "evaluator_return.bin"
-    )
-    return_receipt = boundary.resolve_parent_owned_path(
-        attestation,
-        return_artifact,
-        "skill-workflow-evaluator-return",
-        create=False,
-    )
-    prior_receipt = None
     if expected_attempt > 0:
         prior = (
             raw_evaluator_report.parent.parent
             / f"attempt-{expected_attempt - 1}"
             / raw_evaluator_report.name
         )
-        prior_receipt = boundary.resolve_parent_owned_path(
-            attestation,
-            prior,
-            "skill-workflow-evaluator-prior-attempt",
-            create=False,
-        )
+        prior_path = boundary.resolve(prior)
 
-    parent_bytes = (
-        boundary.read_parent_owned_file(parent_receipt)
-        if parent_receipt.target_dev is not None
-        else None
-    )
-    scenario_bytes = (
-        boundary.read_parent_owned_file(packet_receipt)
-        if packet_receipt.target_dev is not None
-        else None
-    )
-    return_bytes = (
-        boundary.read_parent_owned_file(return_receipt)
-        if return_receipt.target_dev is not None
-        else None
-    )
-    prior_exists = prior_receipt is not None and prior_receipt.target_dev is not None
+    parent_exists = parent_path.is_file()
+    parent_bytes = parent_path.read_bytes() if parent_exists else None
+    scenario_bytes = packet_path.read_bytes() if packet_path.is_file() else None
+    return_bytes = return_path.read_bytes() if return_path.is_file() else None
+    prior_exists = expected_attempt > 0 and prior_path.is_file()
     parent_text = _t14_parent_text(
         parent_evaluation,
         run_id,
         parent_bytes=parent_bytes,
-        parent_present=parent_receipt.target_dev is not None,
+        parent_present=parent_exists,
     )
     _t14_validate_effective_retry_counts(parent_text)
     _t14_validate_record_order(parent_text, expected_scenario_id, expected_iteration)
-    if raw_receipt.target_dev is not None:
+    if raw_path.exists():
         raise T14EvaluationError("t14-raw-report-exists")
-    if expected_raw_receipt.target_dev is not None:
+    if expected_raw_path.exists():
         raise T14EvaluationError("t14-raw-report-exists")
     if expected_attempt > 0 and not prior_exists:
         raise T14EvaluationError("t14-attempt-order")
@@ -1308,22 +1271,17 @@ def record_t14_evaluation(
     if return_bytes is None or return_bytes != evaluator_bytes:
         raise T14EvaluationError("t14-report-failure")
     try:
-        published_raw_receipt = boundary.write_parent_owned_file(
-            attestation,
-            raw_evaluator_report,
-            evaluator_bytes,
-            "skill-workflow-evaluator-raw",
-        )
+        published_raw_path = boundary.atomic_write_bytes(raw_path, evaluator_bytes)
     except OSError as exc:
         raise T14EvaluationError("t14-raw-report-exists") from exc
     report = parse_skill_evaluator_report(
-        raw_evaluator_report,
-        expected_raw_evaluator_report,
+        published_raw_path,
+        expected_raw_path,
         expected_requirement_ids,
         expected_scenario_id,
         expected_iteration,
         expected_attempt,
-        raw_bytes=boundary.read_parent_owned_file(published_raw_receipt),
+        raw_bytes=published_raw_path.read_bytes(),
     )
     relative_raw = _t14_relative_raw_path(raw_evaluator_report, parent_evaluation)
     effective_retry = expected_attempt + report.retry_count
@@ -1344,12 +1302,11 @@ def record_t14_evaluation(
         + ";".join(f"{requirement_id}:{result_status}" for requirement_id, result_status, _ in report.requirement_results)
         + "\nparser_status=pass\n"
     )
-    boundary.write_parent_owned_file(
-        attestation,
-        parent_evaluation,
-        (parent_text + ("\n" if parent_receipt.target_dev is not None else "") + block).encode("utf-8"),
-        "skill-workflow-parent-evaluation",
-    )
+    payload = (parent_text + ("\n" if parent_exists else "") + block).encode("utf-8")
+    if parent_exists:
+        boundary.append_bytes(parent_path, payload[len(parent_text.encode("utf-8")) :])
+    else:
+        boundary.atomic_write_bytes(parent_path, payload)
     return report
 
 
@@ -1427,73 +1384,69 @@ def append_t14_iteration_summary(
     parent_score_percent: Decimal,
     parent_critical_pass: bool,
     holdout_gap_percent: Decimal,
+    runtime_root: Path | str | None = None,
 ) -> None:
     """Append exactly one deterministic summary for one completed iteration."""
     if iteration not in {1, 2}:
         raise T14EvaluationError("t14-iteration-order")
-    boundary, attestation = _parent_capability("skill-workflow-parent-evaluation")
-    with boundary.open_parent_owned_file(
-        attestation,
-        parent_evaluation,
-        "skill-workflow-parent-evaluation",
-        create=False,
-        mode="r+",
-    ) as parent_handle:
-        parent_handle.seek(0)
-        text = parent_handle.read()
-        summaries = _t14_summary_blocks(text)
-        if any(summary.get("iteration") == str(iteration) for summary in summaries):
-            raise T14EvaluationError("t14-duplicate-summary")
-        if iteration != len(summaries) + 1:
-            raise T14EvaluationError("t14-iteration-order")
-        reports = tuple(scenario_reports)
-        complete_structure = (
-            len(reports) == len(_T14_SCENARIOS)
-            and tuple(report.scenario_id for report in reports) == _T14_SCENARIOS
-            and all(report.iteration == iteration for report in reports)
-            and set(graph_check_status) == set(_T14_SCENARIOS)
+    boundary = _t14_runtime_boundary(runtime_root)
+    parent_path = boundary.resolve(parent_evaluation)
+    try:
+        text = parent_path.read_bytes().decode("utf-8")
+    except FileNotFoundError as exc:
+        raise T14EvaluationError("t14-iteration-order") from exc
+    summaries = _t14_summary_blocks(text)
+    if any(summary.get("iteration") == str(iteration) for summary in summaries):
+        raise T14EvaluationError("t14-duplicate-summary")
+    if iteration != len(summaries) + 1:
+        raise T14EvaluationError("t14-iteration-order")
+    reports = tuple(scenario_reports)
+    complete_structure = (
+        len(reports) == len(_T14_SCENARIOS)
+        and tuple(report.scenario_id for report in reports) == _T14_SCENARIOS
+        and all(report.iteration == iteration for report in reports)
+        and set(graph_check_status) == set(_T14_SCENARIOS)
+    )
+    try:
+        score = _t14_decimal(parent_score_percent)
+        gap = _t14_decimal(holdout_gap_percent)
+    except T14EvaluationError:
+        score = Decimal("0")
+        gap = Decimal("0")
+        complete_structure = False
+        blocked_reason = "t14-score-out-of-range"
+    else:
+        blocked_reason = "t14-incomplete-iteration"
+    if not complete_structure:
+        updated = (
+            text.rstrip("\n")
+            + "\n\n"
+            + (
+                f"## Iteration {iteration} Summary\n"
+                f"iteration={iteration}\n"
+                "parent_score_percent=unscored\n"
+                "parent_critical_pass=unknown\n"
+                "holdout_gap_percent=unscored\n"
+                "retry_counts=none\n"
+                "ambiguities=none\n"
+                "provenance=none\n"
+                "graph_checks=none\n"
+                "convergence=blocked\n"
+                f"convergence_reason={blocked_reason}\n"
+            )
         )
-        try:
-            score = _t14_decimal(parent_score_percent)
-            gap = _t14_decimal(holdout_gap_percent)
-        except T14EvaluationError:
-            score = Decimal("0")
-            gap = Decimal("0")
-            complete_structure = False
-            blocked_reason = "t14-score-out-of-range"
-        else:
-            blocked_reason = "t14-incomplete-iteration"
-        if not complete_structure:
-            updated = (
-                text.rstrip("\n")
-                + "\n\n"
-                + (
-                    f"## Iteration {iteration} Summary\n"
-                    f"iteration={iteration}\n"
-                    "parent_score_percent=unscored\n"
-                    "parent_critical_pass=unknown\n"
-                    "holdout_gap_percent=unscored\n"
-                    "retry_counts=none\n"
-                    "ambiguities=none\n"
-                    "provenance=none\n"
-                    "graph_checks=none\n"
-                    "convergence=blocked\n"
-                    f"convergence_reason={blocked_reason}\n"
-                )
-            )
-        else:
-            summary = _t14_summary_line_values(
-                iteration,
-                reports,
-                graph_check_status,
-                score,
-                parent_critical_pass,
-                gap,
-            )
-            updated = text.rstrip("\n") + "\n\n" + summary
-        parent_handle.seek(0)
-        parent_handle.write(updated)
-        parent_handle.truncate()
+    else:
+        summary = _t14_summary_line_values(
+            iteration,
+            reports,
+            graph_check_status,
+            score,
+            parent_critical_pass,
+            gap,
+        )
+        updated = text.rstrip("\n") + "\n\n" + summary
+    suffix = updated[len(text) :]
+    boundary.append_bytes(parent_path, suffix.encode("utf-8"))
 
 
 def _t14_summary_map(text: str) -> dict[int, dict[str, str]]:
@@ -1536,47 +1489,46 @@ def _t14_failure_code_for_summaries(summaries: Mapping[int, Mapping[str, str]]) 
     return "none"
 
 
-def finalize_t14_evaluation(parent_evaluation: Path) -> None:
+def finalize_t14_evaluation(
+    parent_evaluation: Path,
+    runtime_root: Path | str | None = None,
+) -> None:
     """Append the sole final parent summary after the two iteration summaries."""
-    boundary, attestation = _parent_capability("skill-workflow-parent-evaluation")
-    with boundary.open_parent_owned_file(
-        attestation,
-        parent_evaluation,
-        "skill-workflow-parent-evaluation",
-        create=False,
-        mode="r+",
-    ) as parent_handle:
-        parent_handle.seek(0)
-        text = parent_handle.read()
-        if "## Parent Summary" in text:
-            raise T14EvaluationError("t14-duplicate-summary")
-        summaries = _t14_summary_map(text)
-        failure_code = _t14_failure_code_for_summaries(summaries)
-        converged = sum(1 for summary in summaries.values() if summary.get("convergence") == "converged")
-        second = summaries.get(2, {})
-        score = second.get("parent_score_percent", "unscored")
-        critical = second.get("parent_critical_pass", "unknown")
-        if failure_code == "none" and critical != "yes":
-            failure_code = "t14-retry-mismatch"
-        completion = "complete" if failure_code == "none" else "incomplete"
-        block = (
-            "## Parent Summary\n"
-            f"consecutive_converged_iterations={converged}\n"
-            f"parent_score_percent={score}\n"
-            f"parent_critical_pass={critical}\n"
-            f"completion={completion}\n"
-            f"failure_code={failure_code}\n"
-        )
-        updated = text.rstrip("\n") + "\n\n" + block
-        parent_handle.seek(0)
-        parent_handle.write(updated)
-        parent_handle.truncate()
+    boundary = _t14_runtime_boundary(runtime_root)
+    parent_path = boundary.resolve(parent_evaluation)
+    try:
+        text = parent_path.read_bytes().decode("utf-8")
+    except FileNotFoundError as exc:
+        raise T14EvaluationError("t14-iteration-order") from exc
+    if "## Parent Summary" in text:
+        raise T14EvaluationError("t14-duplicate-summary")
+    summaries = _t14_summary_map(text)
+    failure_code = _t14_failure_code_for_summaries(summaries)
+    converged = sum(1 for summary in summaries.values() if summary.get("convergence") == "converged")
+    second = summaries.get(2, {})
+    score = second.get("parent_score_percent", "unscored")
+    critical = second.get("parent_critical_pass", "unknown")
+    if failure_code == "none" and critical != "yes":
+        failure_code = "t14-retry-mismatch"
+    completion = "complete" if failure_code == "none" else "incomplete"
+    block = (
+        "## Parent Summary\n"
+        f"consecutive_converged_iterations={converged}\n"
+        f"parent_score_percent={score}\n"
+        f"parent_critical_pass={critical}\n"
+        f"completion={completion}\n"
+        f"failure_code={failure_code}\n"
+    )
+    updated = text.rstrip("\n") + "\n\n" + block
+    suffix = updated[len(text) :]
+    boundary.append_bytes(parent_path, suffix.encode("utf-8"))
 
 
 def append_prompt_eval_monitoring(
     report_dir: Path,
     bundle: EvalRunBundle,
     accumulated_report: Path,
+    runtime_root: Path | str | None = None,
 ) -> Path:
     """Record accumulated prompt eval evidence in workflow monitoring."""
     metadata = bundle.metadata
@@ -1601,15 +1553,26 @@ def append_prompt_eval_monitoring(
         f"EVAL_GIT_COMMIT={metadata.git_commit} "
         f"EVAL_GIT_DIRTY={metadata.git_dirty}"
     )
-    return append_monitoring(
-        report_dir,
-        MonitoringEntries(behavior_events=(event,)),
+    boundary = runtime_artifact_boundary(Path(bundle.metadata.root), runtime_root)
+    monitoring_path = boundary.resolve(report_dir) / "workflow_monitoring.md"
+    existing = monitoring_path.read_text(encoding="utf-8") if monitoring_path.is_file() else (
+        "# Workflow Monitoring\n\n## Behavior Events\n\n"
     )
+    marker = "## Behavior Events"
+    if marker not in existing:
+        existing = existing.rstrip() + f"\n\n{marker}\n\n"
+    updated = existing.rstrip() + "\n\n- " + event + "\n"
+    return boundary.atomic_write_text(monitoring_path, updated)
 
 
 def run(args: argparse.Namespace) -> int:
     """Run prompt evals."""
     root = Path(str(args.root)).resolve()
+    boundary = (
+        runtime_artifact_boundary(root, args.runtime_root)
+        if args.report_out or args.compact_out or args.accumulate or args.report_dir
+        else None
+    )
     manifest_arg = Path(str(args.manifest))
     manifest = resolve_eval_manifest(root, manifest_arg)
     manifest_for_report = relative_manifest_path(root, manifest)
@@ -1632,15 +1595,23 @@ def run(args: argparse.Namespace) -> int:
     report_out: Path | None = None
     compact_out: Path | None = None
     if args.report_out:
+        assert boundary is not None
         report_out = write_report(
-            ReportWriteRequest(path=str(args.report_out), root=root, bundle=bundle)
+            ReportWriteRequest(
+                path=str(args.report_out),
+                root=root,
+                bundle=bundle,
+                runtime_root=boundary.root,
+            )
         )
     if args.accumulate:
+        assert boundary is not None
         accumulated_report = write_accumulated_report(
             AccumulatedReportRequest(
                 root=root,
-                results_dir=resolve_results_dir(root, str(args.results_dir)),
+                results_dir=resolve_results_dir(root, str(args.results_dir), boundary.root),
                 bundle=bundle,
+                runtime_root=boundary.root,
             )
         )
     if args.report_dir and accumulated_report is not None:
@@ -1648,12 +1619,13 @@ def run(args: argparse.Namespace) -> int:
             Path(str(args.report_dir)),
             bundle,
             (
-                relative_to_root(accumulated_report, root)
+                accumulated_report
             ),
+            boundary.root,
         )
     outputs = EvalOutputs(
         accumulated_report=(
-            relative_to_root(accumulated_report, root).as_posix()
+            accumulated_report.as_posix()
             if accumulated_report is not None
             else ""
         ),
@@ -1661,7 +1633,9 @@ def run(args: argparse.Namespace) -> int:
         compact_out=str(args.compact_out or ""),
     )
     if args.compact_out:
-        compact_out = write_compact_summary(Path(str(args.compact_out)), bundle, outputs)
+        compact_out = write_compact_summary(
+            Path(str(args.compact_out)), bundle, outputs, boundary.root
+        )
         outputs = EvalOutputs(
             accumulated_report=outputs.accumulated_report,
             report_out=outputs.report_out,
@@ -1687,6 +1661,9 @@ def main() -> int:
     """Run the CLI."""
     try:
         return run(build_parser().parse_args())
+    except RuntimeArtifactError as exc:
+        print(f"evaluate_skill_workflow_prompts.py: runtime_root_required: {exc}", file=sys.stderr)
+        return 2
     except (OSError, ValueError) as exc:
         print(f"evaluate_skill_workflow_prompts.py: {exc}", file=sys.stderr)
         return 2

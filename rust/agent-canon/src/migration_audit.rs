@@ -2,7 +2,7 @@
 // contract implementation
 // responsibility Validates AgentCanon Rust migration boundaries.
 // upstream design ../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
-// upstream environment ../../../.devcontainer/post-create.sh installs Rust tooling outside Dockerfile
+// upstream environment ../../../bootstrap.sh owns shared tool-runtime installation
 // downstream implementation ../../../tools/bin/agent-canon invokes this command through the CLI wrapper
 // @dependency-end
 
@@ -20,14 +20,24 @@ const REQUIRED_PATHS: &[&str] = &[
     "tools/bin/agent-canon",
 ];
 
-const REQUIRED_POST_CREATE_SNIPPETS: &[&str] = &[
-    "rustup toolchain install",
-    "rustfmt",
-    "clippy",
-    "rust-analyzer",
-    "cargo build --release",
-    "${tools_home}/agent-canon/bin/agent-canon",
-    "/usr/local/bin/agent-canon",
+const REQUIRED_BOOTSTRAP_PATHS: &[&str] = &[
+    "bootstrap.sh",
+    "bootstrap/manifest.toml",
+    "bootstrap/container/Dockerfile",
+    "bootstrap/container/dependencies.toml",
+    "bootstrap/container/entrypoint.sh",
+    "tools/agent_tools/bootstrap_runtime.py",
+    "tools/agent_tools/runtime_artifacts.py",
+    "tools/agent_tools/tool_dispatch.py",
+];
+
+const REQUIRED_BOOTSTRAP_SNIPPETS: &[(&str, &str)] = &[
+    ("bootstrap.sh", "bootstrap_python_entrypoint"),
+    ("bootstrap/container/Dockerfile", "USER agentcanon"),
+    ("bootstrap/container/Dockerfile", "HEALTHCHECK"),
+    ("bootstrap/container/Dockerfile", "image-install"),
+    ("bootstrap/container/entrypoint.sh", "health"),
+    ("bootstrap/container/entrypoint.sh", "resident"),
 ];
 
 const FORBIDDEN_DOCKERFILE_SNIPPETS: &[&str] = &[
@@ -79,7 +89,8 @@ impl Args {
 fn findings(root: &Path) -> Vec<String> {
     let mut result = Vec::new();
     result.extend(missing_required_paths(root));
-    result.extend(missing_post_create_snippets(root));
+    result.extend(missing_bootstrap_paths(root));
+    result.extend(missing_bootstrap_snippets(root));
     result.extend(forbidden_dockerfile_snippets(root));
     result
 }
@@ -92,15 +103,21 @@ fn missing_required_paths(root: &Path) -> Vec<String> {
         .collect()
 }
 
-fn missing_post_create_snippets(root: &Path) -> Vec<String> {
-    let relative = ".devcontainer/post-create.sh";
-    let Some(text) = read_optional(root.join(relative)) else {
-        return vec![format!("missing-path:{relative}")];
-    };
-    REQUIRED_POST_CREATE_SNIPPETS
+fn missing_bootstrap_paths(root: &Path) -> Vec<String> {
+    REQUIRED_BOOTSTRAP_PATHS
         .iter()
-        .filter(|snippet| !text.contains(**snippet))
-        .map(|snippet| format!("post-create-missing:{snippet}"))
+        .filter(|relative| !root.join(relative).exists())
+        .map(|relative| format!("missing-path:{relative}"))
+        .collect()
+}
+
+fn missing_bootstrap_snippets(root: &Path) -> Vec<String> {
+    REQUIRED_BOOTSTRAP_SNIPPETS
+        .iter()
+        .filter_map(|(relative, snippet)| {
+            let text = read_optional(root.join(relative))?;
+            (!text.contains(snippet)).then(|| format!("bootstrap-missing:{relative}:{snippet}"))
+        })
         .collect()
 }
 
@@ -188,10 +205,19 @@ mod tests {
         for path in REQUIRED_PATHS {
             write(root, path, "fixture\n");
         }
+        for path in REQUIRED_BOOTSTRAP_PATHS {
+            write(root, path, "fixture\n");
+        }
+        write(root, "bootstrap.sh", "bootstrap_python_entrypoint\n");
         write(
             root,
-            ".devcontainer/post-create.sh",
-            &REQUIRED_POST_CREATE_SNIPPETS.join("\n"),
+            "bootstrap/container/Dockerfile",
+            "USER agentcanon\nHEALTHCHECK\nimage-install\n",
+        );
+        write(
+            root,
+            "bootstrap/container/entrypoint.sh",
+            "health\nresident\n",
         );
         write(root, "docker/Dockerfile", "FROM ubuntu:22.04\n");
     }

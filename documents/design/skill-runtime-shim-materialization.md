@@ -495,9 +495,12 @@ projection equality とします。raw digest の変化は別の `source_digest_
 - `skill_tool_commands.py show --skill <id> --format json` の logical command、
   command phase、related skill、required/discovered/conditional/maintenance の全配列、
   全 resolved argv token と source locator digest は catalog の全 skill id で一致する。
-- graph JSON/Mermaid は skill_dependency_map.py graph --root . だけで再生成し、
+- graph JSON/Mermaid は `skill_dependency_map.py graph --root . --runtime-root
+  <external-runtime-root>` で外部 runtime artifact として再生成し、
   check_skill_tool_invocation_graph.py の source/materialized/readback equality を
-  通す。generated graph を手編集しない。
+  通す。tracked reader pair を更新する保守操作だけは、固定2ファイルの
+  source-mutation capability と外部 before/after evidence を明示する。generated graph を
+  手編集しない。
 
 route golden は実在する `evidence/agent-evals/workflow_selection_eval.toml` の
 `expected_case_count=525`、`expected_generated_case_count=525` を読み、manifest loader

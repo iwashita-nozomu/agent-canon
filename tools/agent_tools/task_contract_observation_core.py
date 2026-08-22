@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # @dependency-start
-# contract library
+# contract implementation
 # responsibility Defines task-local contract observation schema and state transitions.
 # upstream design ../../documents/runtime/task-contract-observation.md defines the state machine
 # downstream implementation ./task_contract_observation.py records and evaluates run evidence

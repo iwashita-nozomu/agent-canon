@@ -2,7 +2,6 @@
 @dependency-start
 contract design
 responsibility Documents 設計ドキュメント for this repository.
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../rule/README.md document rule canon
 upstream design dependency-manifest-design.md dependency evidence contract
 downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design-doc claim evidence

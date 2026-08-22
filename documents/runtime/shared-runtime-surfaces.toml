@@ -1,105 +1,38 @@
 # @dependency-start
 # contract reference
-# responsibility Defines the explicit opt-in live AgentCanon root projection mechanics.
-# upstream design ./SHARED_RUNTIME_SURFACES.md explicit live integration policy
-# downstream implementation ../../tools/agent_tools/surface_manifest.py parses this manifest
-# downstream implementation ../../tools/sync_agent_canon.sh consumes link and retired-path specs only after explicit live integration selection
+# responsibility Defines AgentCanon-owned standalone runtime, tool, eval, and archive surfaces.
+# upstream design ./SHARED_RUNTIME_SURFACES.md bootstrap runtime surface policy
+# downstream implementation ../../tools/agent_tools/surface_manifest.py parses this inventory
+# downstream implementation ../../rust/agent-canon/src/dependency_manifest.rs uses normalized source classifications
 # @dependency-end
 
 version = 1
-prefix = "vendor/agent-canon"
-integration_mode = "live-agent-canon"
+prefix = "."
+integration_mode = "agent-canon-runtime"
 default_consumer = false
 selection = "explicit-opt-in"
 projection_forbidden_roots = ["rust"]
 
-# Rust/Cargo source and tests are AgentCanon standalone-only. This exclusion is
-# not a cleanup entry and grants no ownership over a parent's regular rust/ tree.
-
-# Codex reads these repository-scoped paths directly. The default static
-# consumer does not consult this manifest; an explicit live integration does.
 [[surface]]
-path = "AGENTS.md"
-mode = "symlink"
-source = "ROOT_AGENTS.md"
-projection_producer = "agent-canon"
+path = "bootstrap"
+mode = "runtime"
+source = "bootstrap"
+projection_producer = "agent-canon-bootstrap"
 projection_kind = "runtime_surface"
 local_override_allowed = false
 
 [[surface]]
-path = ".codex/config.toml"
-mode = "symlink"
-source = ".codex/config.toml"
+path = "tools/agent_tools"
+mode = "tool"
+source = "tools/agent_tools"
 projection_producer = "agent-canon"
-projection_kind = "runtime_surface"
+projection_kind = "tool_surface"
 local_override_allowed = false
 
 [[surface]]
-path = ".codex/agents"
-mode = "symlink"
-source = ".codex/agents"
-projection_producer = "agent-canon"
-projection_kind = "runtime_surface"
+path = "evidence/agent-evals"
+mode = "eval"
+source = "evidence/agent-evals"
+projection_producer = "agent-canon-log"
+projection_kind = "eval_surface"
 local_override_allowed = false
-
-[[surface]]
-path = ".codex/hooks.json"
-mode = "symlink"
-source = ".codex/hooks.json"
-projection_producer = "agent-canon"
-projection_kind = "runtime_surface"
-local_override_allowed = false
-
-[[surface]]
-path = ".codex/hooks"
-mode = "symlink"
-source = ".codex/hooks"
-projection_producer = "agent-canon"
-projection_kind = "runtime_surface"
-local_override_allowed = false
-
-# Update state is lifecycle-owned local state, not a Codex discovery surface.
-[[surface]]
-path = ".agent-canon"
-mode = "repo_state"
-projection_producer = "agent-canon-update"
-projection_kind = "transaction_state"
-optional = true
-local_override_allowed = false
-
-# This former directory-wide alias is one bounded legacy path, not an active
-# Codex surface. Parent-owned regular content remains protected by sync rules.
-[[surface]]
-path = "tools/agent-canon"
-mode = "removed_legacy"
-projection_producer = "legacy"
-projection_kind = "removed_legacy"
-local_override_allowed = false
-
-# These entries are bounded migration cleanup only. Parent-owned regular
-# content is preserved; stale AgentCanon symlinks may be removed.
-[[group]]
-mode = "removed_legacy"
-projection_producer = "legacy"
-projection_kind = "removed_legacy"
-paths = [
-  ".agents",
-  "agents",
-  ".codex/README.md",
-  ".devcontainer",
-  ".devcontainer/devcontainer.json",
-  ".devcontainer/gpu-admission",
-  ".devcontainer/rootless",
-  ".vscode",
-  "evidence",
-  "memory",
-  "notes",
-  ".github/AGENTS.md",
-  ".github/workflows/agent-coordination.yml",
-  ".github/workflows/agent-improvement-guide.yml",
-  ".github/ISSUE_TEMPLATE/config.yml",
-  ".github/ISSUE_TEMPLATE/agentcanon-maintenance.yml",
-  ".github/ISSUE_TEMPLATE/eval-capture.yml",
-  ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
-  ".github/scripts/checkout_agent_canon_submodule.sh",
-]

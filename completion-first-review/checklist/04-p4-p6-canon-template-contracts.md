@@ -6,7 +6,6 @@ responsibility Defines surface ownership, workflow/skill contract, and template 
 upstream design ../README.md completion-first review index
 upstream design ../explanation/01-priority-layers.md priority layer explanation
 upstream design ../../README.md AgentCanon source tree overview
-upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface policy
 @dependency-end
 -->
 

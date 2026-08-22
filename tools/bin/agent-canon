@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract tool
-# responsibility Provides stable shell entrypoint for the AgentCanon Rust CLI.
-# upstream design ../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
-# upstream implementation ../../rust/agent-canon/src/main.rs Rust CLI entrypoint
-# upstream implementation ../agent_tools/parent_root_side_effects.py bounds child execution state to the selected parent
-# downstream implementation ../agent_tools/agent_canon_source_root.py resolves public source-root tool routes
-# downstream implementation ../agent_tools/pydocstyle_review.py owns explicit Docstring review
+# responsibility Provides the stable AgentCanon CLI through the bootstrap-owned shared tool container.
+# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md typed bootstrap request boundary
+# downstream implementation ../../tools/agent_tools/tool_dispatch.py request builder and catalog route
+# downstream implementation ../../bootstrap.sh host lifecycle entrypoint
 # @dependency-end
 
 set -euo pipefail
@@ -15,127 +13,45 @@ script_path="${BASH_SOURCE[0]}"
 if command -v readlink >/dev/null 2>&1; then
   script_path="$(readlink -f "$script_path")"
 fi
-canon_root="$(cd "$(dirname "$script_path")/../.." && pwd)"
-if [ -n "${AGENT_CANON_CHILD_HANDOFF:-}" ]; then
-  if [ -z "${AGENT_CANON_SOURCE_ROOT:-}" ]; then
-    echo "agent-canon child handoff is missing its source repository root" >&2
-    exit 2
-  fi
+canon_root="$(cd "$(dirname "$script_path")/../.." && pwd -P)"
+if [ -n "${AGENT_CANON_SOURCE_ROOT:-}" ]; then
   canon_root="$(cd "${AGENT_CANON_SOURCE_ROOT}" && pwd -P)"
-elif [ ! -f "${canon_root}/rust/agent-canon/Cargo.toml" ]; then
-  invocation_source="$(git -C "${PWD}" rev-parse --show-toplevel 2>/dev/null || true)"
-  if [ -n "${invocation_source}" ] \
-    && [ -f "${invocation_source}/rust/agent-canon/Cargo.toml" ]; then
-    canon_root="${invocation_source}"
-  fi
-fi
-manifest="${canon_root}/rust/agent-canon/Cargo.toml"
-boundary_script="${canon_root}/tools/agent_tools/parent_root_side_effects.py"
-
-git_toplevel() {
-  local root="$1"
-  if ! command -v git >/dev/null 2>&1; then
-    printf "%s\n" ""
-    return 0
-  fi
-  git -C "$root" rev-parse --show-toplevel 2>/dev/null || printf "%s\n" ""
-}
-
-resolve_parent_root() {
-  local active_root="${AGENT_CANON_ACTIVE_REPOSITORY_ROOT:-}"
-  local child_handoff="${AGENT_CANON_CHILD_HANDOFF:-}"
-  local invocation_root=""
-  if [ -n "${child_handoff}" ]; then
-    if [ -z "${active_root}" ]; then
-      echo "agent-canon child handoff is missing its active repository root" >&2
-      return 2
-    fi
-    printf "%s\n" "$active_root"
-    return 0
-  fi
-  invocation_root="$(git_toplevel "${PWD}")"
-  if [ -n "${invocation_root}" ]; then
-    if [ -n "${active_root}" ]; then
-      if [ ! -d "${active_root}" ] \
-        || [ "$(cd "${active_root}" && pwd -P)" != "${invocation_root}" ]; then
-        echo "agent-canon active repository root is not authoritative without a child handoff" >&2
-        return 2
-      fi
-    fi
-    printf "%s\n" "${invocation_root}"
-    return 0
-  fi
-  invocation_root="$(git_toplevel "${canon_root}")"
-  if [ -n "${invocation_root}" ]; then
-    printf "%s\n" "${invocation_root}"
-    return 0
-  fi
-  printf "%s\n" "${canon_root}"
-}
-
-run_parent_bound() {
-  local command=("$@")
-  local boundary_args=(
-    exec-parent-bound
-    --root "${parent_root}"
-    --source-root "${canon_root}"
-  )
-  if [ -n "${AGENT_CANON_CHILD_HANDOFF:-}" ]; then
-    if [ -z "${AGENT_CANON_HANDOFF_AUDIENCE:-}" ]; then
-      echo "agent-canon child handoff audience is missing" >&2
-      return 2
-    fi
-    boundary_args+=(
-      --consume-inherited-handoff
-      --purpose "${AGENT_CANON_HANDOFF_AUDIENCE}"
-    )
-  fi
-  python3 "${boundary_script}" "${boundary_args[@]}" -- "${command[@]}"
-}
-
-parent_root="$(resolve_parent_root)"
-
-if [ "${1:-}" = "pydocstyle-review" ]; then
-  shift
-  AGENT_CANON_SOURCE_ROOT="${canon_root}" \
-    AGENT_CANON_ROOT="${canon_root}" \
-    run_parent_bound python3 \
-      "${canon_root}/tools/agent_tools/pydocstyle_review.py" "$@"
-  exit $?
 fi
 
-tools_home="${AGENT_CANON_TOOLS_HOME:-${parent_root}/.agent-canon/tools}"
-installed_binary="${tools_home}/agent-canon/bin/agent-canon"
-legacy_binary="/opt/agent-canon/bin/agent-canon"
-
-if [ ! -x "$installed_binary" ] && [ -x "$legacy_binary" ]; then
-  installed_binary="$legacy_binary"
+runtime_root="${AGENT_CANON_RUNTIME_ROOT:-}"
+control_root="${AGENT_CANON_CONTROL_PARENT_ROOT:-}"
+if [ -z "$runtime_root" ] || [ -z "$control_root" ]; then
+  echo "agent-canon requires AGENT_CANON_CONTROL_PARENT_ROOT and AGENT_CANON_RUNTIME_ROOT" >&2
+  exit 2
+fi
+if [ ! -d "$runtime_root" ] || [ ! -d "$control_root" ]; then
+  echo "agent-canon control/runtime roots must already exist" >&2
+  exit 2
 fi
 
-if [ -x "$installed_binary" ]; then
-  source_newer=""
-  if [ -d "${canon_root}/rust/agent-canon/src" ] && command -v find >/dev/null 2>&1; then
-    source_newer="$(
-      find "${canon_root}/rust/agent-canon" \
-        \( -name '*.rs' -o -name 'Cargo.toml' \) \
-        -newer "$installed_binary" \
-        -print -quit
-    )"
-  fi
-  if [ -z "$source_newer" ]; then
-    run_parent_bound "$installed_binary" "$@" && exit 0
-    exit $?
-  fi
+# The wrapper is a control-plane adapter only. It never runs cargo, invokes a
+# Python tool, creates a cache directory, or selects a source-tree fallback.
+# The dispatcher submits a typed request to bootstrap, which owns container
+# selection, mounts, resource limits, and child process execution.
+dispatcher="${canon_root}/tools/agent_tools/tool_dispatch.py"
+if [ ! -f "$dispatcher" ]; then
+  echo "agent-canon dispatcher is unavailable" >&2
+  exit 2
 fi
 
-if command -v cargo >/dev/null 2>&1; then
-  run_parent_bound cargo run --manifest-path "$manifest" -- "$@" && exit 0
+if [ "${1:-}" = "tool" ] && [ "${2:-}" = "run" ]; then
+  shift 2
+  exec env \
+    AGENT_CANON_CONTROL_PARENT_ROOT="$control_root" \
+    AGENT_CANON_RUNTIME_ROOT="$runtime_root" \
+    AGENT_CANON_SOURCE_ROOT="$canon_root" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    python3 "$dispatcher" run --root "$canon_root" "$@"
 fi
 
-if [ -x "$installed_binary" ]; then
-  run_parent_bound "$installed_binary" "$@" && exit 0
-  exit $?
-fi
-
-echo "agent-canon runtime is unavailable" >&2
-exit 1
+exec env \
+  AGENT_CANON_CONTROL_PARENT_ROOT="$control_root" \
+  AGENT_CANON_RUNTIME_ROOT="$runtime_root" \
+  AGENT_CANON_SOURCE_ROOT="$canon_root" \
+  PYTHONDONTWRITEBYTECODE=1 \
+  python3 "$dispatcher" rust-cli --root "$canon_root" -- "$@"

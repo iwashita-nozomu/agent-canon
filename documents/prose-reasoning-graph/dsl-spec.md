@@ -112,10 +112,12 @@ artifacts during a run. The database must not be treated as a durable authoring
 source. A task may delete or regenerate a graph DB from the source document and
 the same analysis profile.
 
-DB creation commands default to
-`${AGENT_CANON_PROSE_GRAPH_HOME:-$HOME/.cache/agent-canon/prose-reasoning-graph}`;
-callers may pass `--db <path>` only when an explicit artifact location is
-needed.
+DB creation commands require the caller to select an external runtime root with
+`AGENT_CANON_RUNTIME_ROOT`. The default graph DB is created below that root;
+callers may pass `--db <path>` when an explicit artifact location is needed,
+but the path must remain inside the selected runtime root. Source-tree, HOME,
+and XDG/cache fallbacks are invalid because graph state is runtime output, not
+source state.
 
 Durable state consists of:
 

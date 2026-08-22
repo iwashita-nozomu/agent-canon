@@ -88,17 +88,17 @@ from tools.agent_tools.runtime_log_paths import (
 
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "runtime_log_archive_git.py"
 LIFECYCLE_REVERSE_COVERAGE = {
-    ".devcontainer/generate-runtime-compose.sh": {"RL-002", "RL-004", "RL-013"},
+    "bootstrap/container/Dockerfile": {"RL-002", "RL-004", "RL-013"},
     "agent-canon-environment.toml": {"RL-002", "RL-004"},
     "agents/skills/agent-log-analysis.md": {"RL-013"},
     "documents/design/runtime-log-repository-lifecycle-correspondence.json": {"RL-014"},
     "documents/runtime/runtime-log-archive.md": {"RL-013"},
     "documents/tools/README.md": {"RL-013"},
     "tests/agent_tools/test_runtime_log_archive_git.py": {"RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-011", "RL-013", "RL-014", "RL-015"},
-    "tests/tools/test_container_config.py": {"RL-002", "RL-004"},
-    "tests/tools/test_run_codex_in_repo_container.py": {"RL-002", "RL-004"},
+    "tests/tools/test_bootstrap_container_contract.py": {"RL-002", "RL-004"},
+    "tests/bootstrap/test_bootstrap_runtime.py": {"RL-002", "RL-004"},
     "tools/agent_tools/runtime_log_archive_git.py": {"RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-011", "RL-013", "RL-015"},
-    "tools/ci/run_codex_in_repo_container.py": {"RL-002", "RL-004"},
+    "tools/agent_tools/bootstrap_runtime.py": {"RL-002", "RL-004"},
 }
 import runtime_log_archive_git  # noqa: E402
 
@@ -307,7 +307,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 ),
             ):
                 with runtime_log_archive_git.acquire_publication_attempt_lock(
-                    source, "a" * 64
+                    source, "a" * 64, root / "runtime"
                 ) as attempt_lock:
                     path_metadata = original_lstat(attempt_lock.lock_path)
                     fd_metadata = original_fstat(attempt_lock.fd)
@@ -364,7 +364,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                     ) as raised,
                 ):
                     with runtime_log_archive_git.acquire_publication_attempt_lock(
-                        source, "b" * 64
+                        source, "b" * 64, source.parent / "runtime"
                     ):
                         self.fail("writable attempt metadata was accepted")
                 self.assertEqual(
@@ -526,9 +526,14 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         source_root: Path,
         canon_root: Path,
         remote: Path,
+        runtime_root: Path | None = None,
         extra_env: dict[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         """Run the archive helper with explicit temp paths."""
+        # Runtime artifacts must be outside both the source checkout and the
+        # AgentCanon checkout.  Keep the command-line boundary explicit so a
+        # test cannot accidentally exercise the removed source-local fallback.
+        runtime_root = runtime_root or source_root.parent / "runtime"
         env = os.environ.copy()
         env["GIT_CONFIG_GLOBAL"] = os.devnull
         env["AGENT_CANON_LOG_ENV"] = "test-env"
@@ -546,6 +551,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 str(canon_root),
                 "--remote",
                 str(remote),
+                "--runtime-root",
+                str(runtime_root),
                 *args,
             ],
             check=False,
@@ -573,6 +580,23 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         subprocess.run(["git", "clone", "--bare", str(seed), str(remote)], check=True, capture_output=True)
         return remote
 
+    def runtime_root(self, root: Path) -> Path:
+        """Return the fixture's external runtime boundary."""
+        return root / "runtime"
+
+    def source_snapshot(self, source: Path) -> tuple[tuple[str, str, str], ...]:
+        """Capture source bytes and entry kinds without including external runtime state."""
+        entries: list[tuple[str, str, str]] = []
+        for path in sorted(source.rglob("*"), key=lambda item: item.relative_to(source).as_posix()):
+            relative = path.relative_to(source).as_posix()
+            if path.is_dir():
+                entries.append((relative, "dir", ""))
+            elif path.is_file():
+                entries.append((relative, "file", hashlib.sha256(path.read_bytes()).hexdigest()))
+            else:
+                entries.append((relative, "other", ""))
+        return tuple(entries)
+
     def make_valid_materialization_fixture(
         self,
         root: Path,
@@ -582,6 +606,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         """Create one active-run, rollout, result, and target/base identity fixture."""
         source = root / "source"
         source.mkdir(parents=True)
+        # The external runtime boundary still needs an authenticated parent
+        # root for secure publication.  Keep that parent Git root outside the
+        # source checkout so the fixture can assert source-tree cleanliness.
+        subprocess.run(["git", "init", "-q", str(root)], check=True)
         subprocess.run(["git", "init", "-q", str(source)], check=True)
         subprocess.run(
             ["git", "-C", str(source), "config", "user.email", "test@example.invalid"],
@@ -691,6 +719,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         unit_id = hashlib.sha256(raw_record).hexdigest()[:16]
         target = run_dir / f"runtime_event.{unit_id}.json"
         old_state = run_dir / "runtime_event.0000000000000000.json"
+        runtime_root = root / "runtime"
+        runtime_root.mkdir(mode=0o700)
         context = runtime_log_archive_git.ArchiveContext(
             source_root=source,
             canon_root=source,
@@ -700,6 +730,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             branch_key="fixture",
             branch="logs/fixture",
             remote=str(root / "remote.git"),
+            runtime_root=runtime_root,
         )
         args = argparse.Namespace(
             result_family="validation",
@@ -728,6 +759,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                         str(source),
                         "--archive-root",
                         str(context.archive_root),
+                        "--runtime-root",
+                        str(context.runtime_root),
                         "append-context-discovery",
                         "--run-id",
                         run_id,
@@ -768,6 +801,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             str(fixture.source),
             "--archive-root",
             str(fixture.context.archive_root),
+            "--runtime-root",
+            str(fixture.context.runtime_root),
             "append-context-discovery",
             "--run-id",
             fixture.args.run_id,
@@ -819,6 +854,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             str(fixture.source),
             "--archive-root",
             str(fixture.context.archive_root),
+            "--runtime-root",
+            str(fixture.context.runtime_root),
             "materialize-runtime-event",
             "--result-family",
             fixture.args.result_family,
@@ -869,7 +906,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
     ) -> Path:
         """Return the exact attempt-local observation directory."""
         return runtime_event_publication_outcome_spool_root(
-            fixture.source
+            fixture.source, fixture.context.runtime_root
         ) / attempt_id
 
     def archive_branch(self, archive: Path) -> str:
@@ -909,7 +946,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL={source / 'reports' / 'agents'}", result.stdout)
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH={expected_branch}", result.stdout)
         self.assertIn(
-            f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR={mounted_log_archive_root(canon) / 'agent-reports' / key}",
+            f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR={mounted_log_archive_root(canon, self.runtime_root(root)) / 'agent-reports' / key}",
             result.stdout,
         )
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_REL=agent-reports/{key}", result.stdout)
@@ -936,6 +973,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                     str(canon),
                     "--remote",
                     str(remote),
+                    "--runtime-root",
+                    str(root / "runtime"),
                     "repo-key",
                 ],
                 check=False,
@@ -965,7 +1004,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_ENSURE=pass", ensure.stdout)
 
-            archive = mounted_log_archive_root(canon)
+            archive = mounted_log_archive_root(canon, self.runtime_root(root))
             self.assertTrue((archive / ".git").exists())
             self.assertEqual(
                 subprocess.run(
@@ -1068,7 +1107,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 remote=remote,
             )
             self.assertEqual(other_ensure.returncode, 0, other_ensure.stdout + other_ensure.stderr)
-            archive = mounted_log_archive_root(canon)
+            archive = mounted_log_archive_root(canon, self.runtime_root(root))
             self.assertEqual(self.archive_branch(archive), self.expected_branch(other_source))
 
             log_path = archive / "hook-runs" / key / "runtime" / "skill_usage.jsonl"
@@ -1112,7 +1151,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 remote=remote,
             )
             self.assertEqual(other_ensure.returncode, 0, other_ensure.stdout + other_ensure.stderr)
-            archive = mounted_log_archive_root(canon)
+            archive = mounted_log_archive_root(canon, self.runtime_root(root))
             foreign_log = archive / "hook-runs" / other_key / "runtime" / "skill_usage.jsonl"
             foreign_log.parent.mkdir(parents=True)
             foreign_log.write_text('{"hook_run_id": "foreign-dirty"}\n', encoding="utf-8")
@@ -1142,7 +1181,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 remote=remote,
             )
             self.assertEqual(other_ensure.returncode, 0, other_ensure.stdout + other_ensure.stderr)
-            archive = mounted_log_archive_root(canon)
+            archive = mounted_log_archive_root(canon, self.runtime_root(root))
             tool_path = archive / "tools" / "runtime_log_dashboard.py"
             tool_path.parent.mkdir(parents=True)
             tool_path.write_text("# dashboard change\n", encoding="utf-8")
@@ -1168,7 +1207,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
 
             ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
-            archive = mounted_log_archive_root(canon)
+            archive = mounted_log_archive_root(canon, self.runtime_root(root))
             foreign_log = archive / "hook-runs" / other_key / "runtime" / "module_boundary_guard-no-git-head.jsonl"
             foreign_log.parent.mkdir(parents=True)
             foreign_log.write_text(
@@ -1223,7 +1262,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
 
             ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
-            archive = mounted_log_archive_root(canon)
+            archive = mounted_log_archive_root(canon, self.runtime_root(root))
             foreign_log = archive / "hook-runs" / other_key / "runtime" / "skill_usage-no-git-head.jsonl"
             foreign_log.parent.mkdir(parents=True)
             foreign_log.write_text(
@@ -1275,7 +1314,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
 
             ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
-            archive = mounted_log_archive_root(canon)
+            archive = mounted_log_archive_root(canon, self.runtime_root(root))
             canon_log = archive / "hook-runs" / canon_key / "runtime" / "skill_usage-no-git-head.jsonl"
             canon_log.parent.mkdir(parents=True)
             canon_log.write_text(
@@ -1326,7 +1365,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
 
             ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
-            archive = mounted_log_archive_root(canon)
+            archive = mounted_log_archive_root(canon, self.runtime_root(root))
             canon_log = archive / "hook-runs" / canon_key / "runtime" / "skill_usage.jsonl"
             canon_log.parent.mkdir(parents=True)
             canon_log.write_text(
@@ -1366,7 +1405,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
 
             ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
-            archive = mounted_log_archive_root(canon)
+            archive = mounted_log_archive_root(canon, self.runtime_root(root))
             tool_path = archive / "tools" / "runtime_log_dashboard.py"
             tool_path.parent.mkdir(parents=True)
             tool_path.write_text("# dashboard tool update\n", encoding="utf-8")
@@ -1417,7 +1456,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SKIPPED=0", archived.stdout)
             self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_REL=agent-reports/{key}", archived.stdout)
 
-            archive = mounted_log_archive_root(canon)
+            archive = mounted_log_archive_root(canon, self.runtime_root(root))
             snapshot_line = next(line for line in archived.stdout.splitlines() if line.startswith("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SNAPSHOT="))
             snapshot = snapshot_line.split("=", 1)[1]
             self.assertTrue((archive / "agent-reports" / key / "run-1" / snapshot / "summary.md").exists())
@@ -1448,7 +1487,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
 
             ensured = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensured.returncode, 0, ensured.stdout + ensured.stderr)
-            archive = mounted_log_archive_root(canon)
+            archive = mounted_log_archive_root(canon, self.runtime_root(root))
             runtime_summary = archive / "codex-runtime" / key / "chats" / "thread-1" / "summary-no-git-head.jsonl"
             runtime_summary.parent.mkdir(parents=True)
             runtime_summary.write_text('{"conversation_id": "thread-1", "thread_id": "thread-1"}\n', encoding="utf-8")
@@ -1474,6 +1513,156 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             snapshots = list((clone / "agent-reports" / key / "run-2").iterdir())
             self.assertEqual(len(snapshots), 1)
             self.assertTrue((snapshots[0] / "closeout_gate.md").exists())
+
+    def test_external_runtime_bare_remote_readback_duplicate_noop_and_conflict(self) -> None:
+        """The external runtime flow proves remote objects, replay no-op, and conflict retention."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            runtime_root = self.runtime_root(root)
+            source.mkdir()
+            canon.mkdir()
+            remote = self.make_remote(root)
+            key = repo_log_key(source)
+            source_before = self.source_snapshot(source)
+            event_id = "hook-20260822-external-e2e"
+            event = {
+                "hook_log_namespace": "test-runtime",
+                "hook_run_id": event_id,
+                "payload_fingerprint": "external-e2e",
+                "source_repo_key": key,
+                "status": "pass",
+                "timestamp": "2026-08-22T00:00:00Z",
+            }
+            event_bytes = runtime_log_archive_git._canonical_compact_json(event) + b"\n"
+            spool_path = (
+                runtime_root
+                / "spool"
+                / "hook-events"
+                / key
+                / "test-runtime"
+                / "posttooluse"
+                / f"{event_id}.json"
+            )
+            spool_path.parent.mkdir(parents=True)
+            spool_path.write_bytes(event_bytes)
+
+            ensured = self.run_tool(
+                "ensure",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+                runtime_root=runtime_root,
+            )
+            self.assertEqual(ensured.returncode, 0, ensured.stdout + ensured.stderr)
+            synced = self.run_tool(
+                "sync",
+                "--no-agent-reports",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+                runtime_root=runtime_root,
+            )
+            self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_SPOOL_SOURCE_EVENTS=1", synced.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", synced.stdout)
+            self.assertFalse(spool_path.exists())
+            self.assertEqual(self.source_snapshot(source), source_before)
+
+            branch = self.expected_branch(source)
+            remote_head = subprocess.run(
+                ["git", "--git-dir", str(remote), "rev-parse", branch],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            clone = root / "readback-clone"
+            subprocess.run(["git", "clone", str(remote), str(clone)], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(clone), "switch", branch], check=True, capture_output=True)
+            projection = clone / "hook-runs" / key / "test-runtime" / "posttooluse-no-git-head.jsonl"
+            self.assertEqual(projection.read_bytes(), event_bytes)
+            self.assertEqual(
+                subprocess.run(
+                    ["git", "--git-dir", str(remote), "show-ref", "--verify", f"refs/heads/{branch}"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.split()[0],
+                remote_head,
+            )
+            tree_paths = subprocess.run(
+                ["git", "-C", str(clone), "ls-tree", "-r", "--name-only", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.splitlines()
+            self.assertIn(projection.relative_to(clone).as_posix(), tree_paths)
+            blob_oid = subprocess.run(
+                ["git", "-C", str(clone), "rev-parse", f"HEAD:{projection.relative_to(clone).as_posix()}"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            self.assertEqual(
+                subprocess.run(
+                    ["git", "-C", str(clone), "cat-file", "blob", blob_oid],
+                    check=True,
+                    capture_output=True,
+                ).stdout,
+                event_bytes,
+            )
+
+            duplicate = self.run_tool(
+                "sync",
+                "--no-agent-reports",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+                runtime_root=runtime_root,
+            )
+            self.assertEqual(duplicate.returncode, 0, duplicate.stdout + duplicate.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_SPOOL_SOURCE_EVENTS=0", duplicate.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=no", duplicate.stdout)
+            self.assertEqual(
+                subprocess.run(
+                    ["git", "--git-dir", str(remote), "rev-parse", branch],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip(),
+                remote_head,
+            )
+
+            diverged = root / "diverged"
+            subprocess.run(["git", "clone", str(remote), str(diverged)], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(diverged), "switch", branch], check=True, capture_output=True)
+            diverged_cursor = diverged / "hook-runs" / key / ".spool-cursor.json"
+            self.assertTrue(diverged_cursor.is_file())
+            diverged_cursor.write_text('{"remote_conflict":true}\n', encoding="utf-8")
+            subprocess.run(["git", "-C", str(diverged), "config", "user.email", "test@example.invalid"], check=True)
+            subprocess.run(["git", "-C", str(diverged), "config", "user.name", "Test User"], check=True)
+            subprocess.run(["git", "-C", str(diverged), "add", str(diverged_cursor.relative_to(diverged))], check=True)
+            subprocess.run(["git", "-C", str(diverged), "commit", "-m", "remote conflict"], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(diverged), "push", "origin", f"HEAD:{branch}"], check=True, capture_output=True)
+
+            second_id = "hook-20260822-external-conflict"
+            second_path = spool_path.with_name(f"{second_id}.json")
+            second_event = dict(event, hook_run_id=second_id, payload_fingerprint="external-conflict")
+            second_path.write_bytes(runtime_log_archive_git._canonical_compact_json(second_event) + b"\n")
+            conflict = self.run_tool(
+                "sync",
+                "--no-agent-reports",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+                runtime_root=runtime_root,
+            )
+            self.assertNotEqual(conflict.returncode, 0)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_PUBLICATION_STATUS=uncertain", conflict.stdout)
+            self.assertIn("conflict:", conflict.stdout)
+            self.assertTrue(second_path.exists())
+            self.assertEqual(self.source_snapshot(source), source_before)
 
     def test_import_legacy_copies_and_deletes_old_jsonl(self) -> None:
         """import-legacy should move old in-tree hook JSONL to the archive."""
@@ -1513,7 +1702,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertFalse(source_log.exists())
 
             archive_log = (
-                mounted_log_archive_root(canon)
+                mounted_log_archive_root(canon, self.runtime_root(root))
                 / "legacy-import"
                 / "hook-runs"
                 / "old-runtime"
@@ -1573,7 +1762,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertFalse(family_notice.exists())
             self.assertFalse(report.exists())
 
-            archive = mounted_log_archive_root(canon) / "legacy-import" / "eval-results"
+            archive = mounted_log_archive_root(canon, self.runtime_root(root)) / "legacy-import" / "eval-results"
             self.assertTrue((archive / "README.md").exists())
             self.assertTrue((archive / "skill-workflow-prompt" / family_notice.name).exists())
             self.assertTrue((archive / "skill-workflow-prompt" / report.name).exists())
@@ -1782,13 +1971,13 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 if line.startswith("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SNAPSHOT=")
             )
             snapshot = snapshot_line.split("=", 1)[1]
-            archive = mounted_log_archive_root(canon) / "agent-reports" / key / "run-1" / snapshot
+            archive = mounted_log_archive_root(canon, self.runtime_root(root)) / "agent-reports" / key / "run-1" / snapshot
             self.assertTrue((archive / "verification.txt").exists())
             self.assertTrue((archive / "archive_manifest.json").exists())
             manifest = json.loads((archive / "archive_manifest.json").read_text(encoding="utf-8"))
             self.assertIn("codex_trace_key", manifest)
             self.assertIn("source_git_head", manifest)
-            index_path = mounted_log_archive_root(canon) / "agent-reports" / key / "index.jsonl"
+            index_path = mounted_log_archive_root(canon, self.runtime_root(root)) / "agent-reports" / key / "index.jsonl"
             first_index = index_path.read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(first_index), 1)
 
@@ -1931,6 +2120,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                             str(fixture.source),
                             "--archive-root",
                             str(fixture.context.archive_root),
+                            "--runtime-root",
+                            str(fixture.context.runtime_root),
                             "append-context-discovery",
                             "--run-id",
                             fixture.args.run_id,
@@ -2781,7 +2972,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             busy = self.make_valid_materialization_fixture(root / "busy")
             with fail_artifact_rename(busy):
                 self.assert_materializer_failure(busy, "publication_failure")
-            publication_root = runtime_event_publication_outcome_spool_root(busy.source)
+            publication_root = runtime_event_publication_outcome_spool_root(
+                busy.source, busy.context.runtime_root
+            )
             busy_attempt_directory = next(
                 path for path in publication_root.iterdir() if path.is_dir()
             )
@@ -2812,7 +3005,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                     invalid_lock, "publication_failure"
                 )
             invalid_root = runtime_event_publication_outcome_spool_root(
-                invalid_lock.source
+                invalid_lock.source, invalid_lock.context.runtime_root
             )
             invalid_attempt_directory = next(
                 path for path in invalid_root.iterdir() if path.is_dir()
@@ -3042,7 +3235,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             client = GraphClient(root, executable)
             self.assertEqual(client.status().status, "fresh")
             self.assertEqual(client.query(all_nodes=True).status, "fresh")
-            self.assertEqual(client.context("documents/design/example.md").status, "stale")
+            self.assertEqual(
+                client.context("documents/design/example.md", token="runtime-token").status,
+                "stale",
+            )
 
     def test_ingest_indexes_identical_projection_event_without_duplicate(self) -> None:
         """Ingest should index an identical unindexed event without appending it."""
@@ -3064,15 +3260,11 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 branch_key="test-branch",
                 branch="logs/test-branch",
                 remote="unused",
+                runtime_root=root / "runtime",
             )
-            lock_path = source / ".archive-transaction.lock"
-            spool_root = (
-                source
-                / ".agent-canon"
-                / "runtime-event-spool"
-                / "hook-events"
-                / key
-            )
+            lock_path = context.runtime_root / "locks" / "archive-transaction.lock"
+            lock_path.parent.mkdir(parents=True)
+            spool_root = context.runtime_root / "spool" / "hook-events" / key
             events: list[runtime_log_archive_git.HookSpoolEvent] = []
             event_bytes: list[bytes] = []
             event_ids = ("hook-20260718-linear-a", "hook-20260718-linear-b")
@@ -3156,15 +3348,11 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 branch_key="test-branch",
                 branch="logs/test-branch",
                 remote="unused",
+                runtime_root=root / "runtime",
             )
-            lock_path = source / ".archive-transaction.lock"
-            spool_root = (
-                source
-                / ".agent-canon"
-                / "runtime-event-spool"
-                / "hook-events"
-                / key
-            )
+            lock_path = context.runtime_root / "locks" / "archive-transaction.lock"
+            lock_path.parent.mkdir(parents=True)
+            spool_root = context.runtime_root / "spool" / "hook-events" / key
             projection_specs = (
                 ("runtime-a", "posttooluse", "hook-20260718-readback-a1"),
                 ("runtime-a", "posttooluse", "hook-20260718-readback-a2"),
@@ -3306,9 +3494,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 + b"\n"
             )
             spool_path = (
-                source
-                / ".agent-canon"
-                / "runtime-event-spool"
+                self.runtime_root(root)
+                / "spool"
                 / "hook-events"
                 / key
                 / "test-runtime"
@@ -3329,7 +3516,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertIn("RUNTIME_LOG_ARCHIVE_PUBLICATION_STATUS=committed", synced.stdout)
             self.assertFalse(spool_path.exists())
 
-            archive_root = mounted_log_archive_root(canon)
+            archive_root = mounted_log_archive_root(canon, self.runtime_root(root))
             metadata_root = archive_root / "hook-runs" / key
             index_path = metadata_root / ".spool-index.jsonl"
             cursor_path = metadata_root / ".spool-cursor.json"
@@ -3396,10 +3583,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 json.dumps(event, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
                 + "\n"
             ).encode("utf-8")
+            runtime_root = self.runtime_root(root)
             spool_directory = (
-                source
-                / ".agent-canon"
-                / "runtime-event-spool"
+                runtime_root
+                / "spool"
                 / "hook-events"
                 / key
                 / "test-runtime"
@@ -3421,12 +3608,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertIn("RUNTIME_LOG_ARCHIVE_SYNC=partial_retained", partial.stdout)
             self.assertEqual(spool_path.read_bytes(), event_bytes)
 
-            lock_path = (
-                source
-                / ".agent-canon"
-                / "runtime-event-spool"
-                / ".archive-transaction.lock"
-            )
+            lock_path = runtime_root / "locks" / "archive-transaction.lock"
             lock_path.parent.mkdir(parents=True, exist_ok=True)
             with lock_path.open("a+b") as lock_handle:
                 fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -3482,9 +3664,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 + "\n"
             ).encode("utf-8")
             spool_path = (
-                source
-                / ".agent-canon"
-                / "runtime-event-spool"
+                self.runtime_root(root)
+                / "spool"
                 / "hook-events"
                 / key
                 / "test-runtime"
@@ -3504,7 +3685,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
             self.assertEqual(spool_path.read_bytes(), event_bytes)
 
-            archive_root = mounted_log_archive_root(canon)
+            archive_root = mounted_log_archive_root(canon, self.runtime_root(root))
             metadata_root = archive_root / "hook-runs" / key
             index_path = metadata_root / ".spool-index.jsonl"
             cursor_path = metadata_root / ".spool-cursor.json"
@@ -3607,9 +3788,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 + b"\n"
             )
             spool_path = (
-                source
-                / ".agent-canon"
-                / "runtime-event-spool"
+                self.runtime_root(root)
+                / "spool"
                 / "hook-events"
                 / key
                 / "test-runtime"
@@ -3637,7 +3817,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             self.assertEqual(spool_path.read_bytes(), event_bytes)
             local_index = (
-                mounted_log_archive_root(canon)
+                mounted_log_archive_root(canon, self.runtime_root(root))
                 / "hook-runs"
                 / key
                 / ".spool-index.jsonl"

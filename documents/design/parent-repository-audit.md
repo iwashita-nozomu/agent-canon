@@ -5,7 +5,6 @@ responsibility Defines semantic parent-audit units while keeping path ownership 
 upstream design ../rule/README.md document placement and Japanese prose rules
 upstream design responsibility-scope-management.md owns the unique tracked-path ownership relation
 upstream design ../structure/repo-structure-contract.toml owns path existence and filesystem kind
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md owns runtime projection mechanics
 downstream design ../parent-repository-audit/README.md owns the reader route
 downstream implementation ../../tools/agent_tools/parent_repository_audit.py enumerates units and evidence
 downstream implementation ../../tests/agent_tools/test_parent_repository_audit.py verifies semantic selection and failure semantics

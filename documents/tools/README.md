@@ -1,497 +1,69 @@
+# AgentCanon Tool Guide
+
 <!--
 @dependency-start
 contract reference
-responsibility Documents ツール入口 for this repository.
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
-upstream design ../runtime/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
-upstream design ../design/source-owned-dependency-validation.md source-owned dependency review and PR receipt contract
-upstream design ../design/dependency-manifest-design.md dependency manifest DSL and explicit graph-analysis boundary
-upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
-upstream design ../prose-reasoning-graph/dsl-spec.md graph visualization projection contract
-upstream design ../../agents/skills/code-visualization.md sole public visualization owner and closeout boundary
-downstream implementation ../../tools/agent_tools/tool_catalog.py validates catalog/docs consistency
-downstream implementation ../../tools/agent_tools/visualization_contract.py validates typed visualization coverage and readback
-downstream implementation ../../tools/agent_tools/tool_drift.py validates tool/convention trace contracts
-downstream implementation ../../tools/agent_tools/responsibility_scope.py validates responsibility scope ownership
-downstream implementation ../../tools/agent_tools/issue_sync.py validates local issue sync state
-downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
-downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py manages mounted hook/eval/report log archive branches
-downstream implementation ../../tools/agent_tools/generated_artifact_guard.py rejects regenerated report outputs left in source tree
-downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design-document evidence claims
-downstream implementation ../../tools/ci/pr_gate_receipt.py owns the executable PR source/skipped receipt schema and parser
-downstream design dependency-tools-and-licenses.md documents dependency tool purposes and license evidence
-downstream design ../../tools/user/README.md defines stable user-facing tool entrypoint migration target
-downstream design ../../tools/internal/README.md defines skill, workflow, and compatibility helper migration targets
-downstream implementation ../../rust/agent-canon/src/semantic_index/mod.rs runs semantic vector index commands
-downstream implementation ../../rust/agent-canon/src/structured_analysis.rs runs structured-analysis cache build, document inventory, and DB import commands
-downstream implementation ../../rust/agent-canon/src/test_design.rs runs test design resilience diagnostics
-downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals
-downstream implementation ../../tools/agent_tools/search.py coordinates purpose-based search providers
-downstream implementation ../../tools/agent_tools/search_index.py builds repo-local semantic search cards
-downstream implementation ../../tools/agent_tools/prose_reasoning_graph.py builds prose graph projections and handoff packets
-downstream implementation ../../tools/agent_tools/compare_agent_run_paths.py compares run-bundle route efficiency
-downstream implementation ../../tools/agent_tools/formal_proof.py builds formal-proof scaffold plans
-downstream implementation ../../tools/agent_tools/lean_proof_env.py creates Mathlib/Aesop Lean proof environments
-downstream implementation ../../tools/agent_tools/tool_proof_coverage.py reports tool proof-obligation coverage
-downstream design lean_capability_matrix.md records Lean/Mathlib/Aesop feature routing for proof tasks
-downstream implementation ../../tools/agent_tools/jit_canonical_ir.py extracts StableHLO-derived JIT-canonical IR and backend traces
-downstream implementation ../../tools/agent_tools/cpp_source_canonical_ir.py extracts C++ source-canonical IR into thin operational IR
-downstream implementation ../../tools/agent_tools/operational_ir_to_lean.py renders thin operational IR into Lean evidence definitions
-downstream implementation ../../tools/agent_tools/cpp_template_to_lean.py fully expands C++ template source roots into Lean evidence
-downstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules
+responsibility Routes readers to standalone AgentCanon tools without recreating Host or parent-repository execution paths.
+upstream design ../runtime/bootstrap-runtime.md shared tool runtime and Host adapter boundary
+upstream implementation ../../bootstrap.sh sole Host lifecycle entrypoint
+upstream implementation ../../tools/catalog.yaml machine-readable tool inventory
+downstream design ../../agents/canonical/CLI_ENTRYPOINTS.md typed command examples
 @dependency-end
 -->
 
-# ツール入口
+## Execution boundary
 
-このディレクトリは、repo で使う補助ツールの入口です。
-詳細な機械可読台帳は `tools/catalog.yaml` を正本にし、この文書では
-root 側からよく使う実行導線だけを整理します。
+AgentCanon tools run in the shared non-root tool container created by
+`bootstrap.sh`. The AgentCanon source and selected project targets are mounted
+read-only unless an exact mutation capability is registered. Python/Rust
+caches, logs, reports, receipts, Cargo targets, and temporary files remain in
+the explicit external runtime root.
 
-agent/worktree helper、review / validation runner、docs-check helper、container runtime helper、experiment scaffold / registry helper のうち shared canon に属するものは `vendor/agent-canon/` が正本です。
-ownership と validation は [SHARED_RUNTIME_SURFACES.md](../runtime/SHARED_RUNTIME_SURFACES.md) を参照し、この文書では root 側の実行入口だけを案内します。
-実行する tool は [Runtime Profiles And Check Matrix](../runtime/runtime-profiles-and-check-matrix.md) の active profile と changed path で選びます。
+Project builds, tests, GPU execution, and application dependencies remain in
+the project-owned execution environment. The tool container does not execute
+project commands.
 
-## この文書の読み方
+## Public command routes
 
-この文書は、AgentCanon tool docs の reader-facing hub です。まず Where To Start で構造化 catalog、tool docs map、docs check、tool drift、dependency tool、graph visualization の入口を選びます。次に Tool Catalog と Tool Detail Notes で tool ごとの責務を確認し、Evidence / Assumption Ledger、置き場所の固定ルール、よく使うものへ進みます。runtime evidence または graph consumer の境界を確認する場合は Source-Bound Runtime and Graph Consumers を読み、その後に結果ログと可視化へ進みます。正確な tool registry は prose ではなく `tools/catalog.yaml` と `documents/tools/tool-docs.toml` を優先します。
+- `bootstrap.sh ... tool run --root <target> <catalog-id> -- <args...>` runs a
+  parity-verified catalog entry.
+- `bootstrap.sh ... exec --root <target> -- <argv...>` retains argv-only
+  compatibility for AgentCanon tools that are still classified as
+  `legacy-route`.
+- `bootstrap.sh ... eval collect` and `eval sync` own evaluation collection and
+  publication to `agent-canon-log`.
+- `bootstrap.sh ... codex prepare|launch` owns the isolated runtime-local Codex
+  home.
 
-## Where To Start
+There is no `tools/agent-canon` alias, vendor checkout, source projection,
+global Python executable, or Host Cargo fallback.
 
-This file explains the tool documentation surface. It is not a duplicate
-registry. When a task needs the exact command list, read the structured source
-first and then return here only for reader-facing context.
+## Tool families
 
-| Need | Start Here | Notes |
-| --- | --- | --- |
-| Decide whether a tool exists, who may call it, or whether it is retired | `tools/catalog.yaml` | Canonical registry for status, audience, placement, docs, tests, and wiring. |
-| Find one reader-facing document for a tool | `documents/tools/tool-docs.toml` | One-to-one map validated by `tool_catalog.py`; do not mirror it as prose. |
-| Run Markdown, link, math, Mermaid, or runtime-profile docs checks | `tools/bin/agent-canon docs check` | Use `docs format`, `docs fix-math`, or `docs fix-mermaid` only for mechanical repairs. |
-| Check tool catalog or drift after docs / tool edits | `tools/agent_tools/tool_catalog.py`, `tools/agent_tools/tool_drift.py` | These are validation commands, not reader navigation lists. |
-| Validate visualization coverage and post-format readback | [Visualization Contract](visualization_contract.md), then `$code-visualization` | Producers retain native domain validation; the sole public owner has final projection coverage/readback authority, and renderers are adapters. |
-| Understand dependency tool purpose and license evidence | [Dependency Tools And Licenses](dependency-tools-and-licenses.md) | Human-facing summary of external tools and license evidence. |
-| Check design-document claims against code and dependency evidence | [check_design_doc_claims.py](check_design_doc_claims.md) | Use before accepting implementation-backed design prose or structure-refactor handoff claims. |
-| Materialize source-bound runtime evidence or consume its graph snapshot | [Runtime Log Archive](../runtime/runtime-log-archive.md), then Source-Bound Runtime and Graph Consumers below | The materializer owns prepared artifact/outcome receipts; graph status/query/context are consume-only. |
-| Understand root `tools/` execution behavior | `tools/README.md` | Execution-facing hub for the symlink view and common commands. |
-| Understand graph visualization outputs | `documents/prose-reasoning-graph/dsl-spec.md`, then the same-named tool doc | Graph HTML, DOT, Mermaid, and dashboard diagrams are DSL projection or adapter artifacts. |
+| Family | Canonical owner |
+| --- | --- |
+| typed dispatch and route selection | `tools/agent_tools/tool_dispatch.py`, `tools/catalog.yaml` |
+| source/dependency analysis | `search.py`, `source_dependency_graph.py`, `lsp_code_analysis.py` |
+| runtime artifact boundary | `runtime_artifacts.py`, `bootstrap_runtime.py` |
+| eval and archive | `run_accumulated_agent_evals.py`, `runtime_log_archive_git.py` |
+| docs and structure | Rust `agent-canon docs`, `repo_structure_contract.py`, `check_design_doc_claims.py` |
+| review and closeout | `review_dispatch.py`, `task_close.py`, canonical workflow |
 
-## AgentCanon Tool Catalog
+Each tool that writes requires an external runtime/output root or an explicit
+target mutation capability. Read-only tools must not create a source-local
+fallback when that capability is absent.
 
-`tools/catalog.yaml` owns the structured catalog. Each effective entry has:
+## Validation
 
-- `audience`: who should call the tool directly: `user`, `agent`, `skill`,
-  `workflow`, `maintainer`, or `internal`.
-- `placement`: where the implementation or wrapper belongs after migration,
-  such as `user_entrypoint`, `skill_helper`, `workflow_helper`,
-  `validation_checker`, `ci_gate`, `compatibility_wrapper`, or
-  `support_library`.
-- docs and test wiring, validated by `tools/agent_tools/tool_catalog.py`.
-
-`tools/user/` and `tools/internal/` are migration targets, not second catalogs.
-Existing command paths remain stable until catalog entries, tests, docs, and
-callers move together.
-
-## Tool Detail Notes
-
-Detailed tool behavior belongs in the same-named tool document or in
-`tools/catalog.yaml`. This hub keeps only the families a reader usually needs
-to choose a route:
-
-- Catalog, drift, and pre-edit routing checks: `tool_catalog.py`,
-  `tool_drift.py`, `tool_rejection_preflight.py`, `responsibility_scope.py`,
-  and `import_responsibility.py`. `tool_rejection_preflight.py` reports a
-  `responsibility_scope` gate with the owner scope, class, and protecting tools
-  from `responsibility-scope.toml`.
-- Runtime evidence and generated output guards: `runtime_log_archive_git.py`,
-  `eval_accumulation_check.py`, `run_accumulated_agent_evals.py`, and
-  `generated_artifact_guard.py`.
-- Repo structure, issue, and PR support: `repo_structure_contract.py`,
-  `issue_sync.py`, `github_publish.py`, `classify_path_risk.py`, and
-  `render_dependency_manifest_graph.py`.
-- Search and prose structure: `tools/agent_tools/search.py`,
-  `tools/agent_tools/search_index.py`, `agent-canon semantic-index ...`,
-  `prose_reasoning_graph.py`, and `tools/agent_tools/route.py --area search`.
-- Proof, algorithm, and test design: `formal_proof.py`, `lean_proof_env.py`,
-  `tool_proof_coverage.py`, `jit_canonical_ir.py`,
-  `cpp_template_to_lean.py`,
-  `agent-canon jit-ir-to-lean`, and `agent-canon test-design check`.
-
-Graph visualization enters through the sole public `code-visualization` owner
-and the typed [Visualization Contract](visualization_contract.md).
-`render_dependency_manifest_graph.py`, `semantic_provider_html_report.py`, and
-runtime dashboard diagrams are adapters or projections; their domain producers
-keep native fact validation authority, while the canonical owner decides final
-projection coverage and post-format readback status. Proof and JIT-canonical IR
-tools provide source facts to that route. Source publication guidance is owned
-by the canonical `code-visualization` closeout and is not copied here.
-
-## Evidence And Assumption Ledger
-
-- Evidence sources:
-  `../structured-analysis/graph-dsl.md`,
-  `../prose-reasoning-graph/dsl-spec.md`,
-  `../../rust/agent-canon/src/structured_analysis.rs`, and
-  `../../tools/agent_tools/render_dependency_manifest_graph.py`.
-- Assumption:
-  Graph DSL terms in this tool index describe shared storage and projection
-  vocabulary. Standard-form / 標準形 terms stay with the design-claim checker
-  contract. Individual tools keep pass/fail authority for their native domain.
-- Parent-doc alignment:
-  `../structured-analysis/graph-dsl.md` owns Graph DSL Core storage. The prose
-  reasoning graph DSL owns prose adapter vocabulary used by prose workflows.
-
-When a reader needs exact options, run the command with `--help` or open the
-same-named file under `documents/tools/`. Do not expand this README into a
-second command manual.
-
-## 置き場所の固定ルール
-
-- shared automation の実装は `tools/` に置きます。
-- repo-local bootstrap の実装は `scripts/` に置きます。
-- agent helper、CI、review、validation、container runner、experiment helper、Markdown helper は `tools/` に置きます。
-- template 固有の slug 置換や bare remote 初期化だけを `scripts/` に置きます。
-- 過去の `tools/legacy/` 配置は廃止済みです。派生 repo 由来の tool は repo-neutral に昇格するか、元 repo 側に残すか、削除判断を `documents/tools/repo-local-tool-imports.md` に記録します。
-
-## よく使うもの
-
-- `tools/ci/run_all_checks.sh`
-  - full confidence が必要な時に主要なチェックをまとめて実行します。docs-focused / focused code では check matrix に従って個別 check を選びます。AgentCanon PR gate は strict dependency review 後に内部 receipt を渡し、検証済みなら graph/dependency-header producer を省略します。receipt のない通常経路は全 producer を実行します。
-- `tools/ci/pre_review.sh`
-  - review 前の基礎 gate をまとめて実行します。
-- `tools/bin/agent-canon docs check`
-  - Rust の統合 docs checker です。Markdown lint、link、math、Mermaid、bootstrap docs、runtime profile inventory drift をまとめて実行します。
-- `tools/agent_tools/check_design_doc_claims.py`
-  - design document の claim line を dependency header closure、implementation evidence、parent documents と比較し、Evidence And Assumption Ledger、DSL / standard-form terms、parent-doc alignment を機械的に確認します。
-- `tools/ci/run_container_pack.py`
-  - repo 定義の runtime pack を build / smoke します。
-- `tools/ci/container_config.py`
-  - repo-local Dockerfile / runtime pack と AgentCanon-owned devcontainer 生成導線の静的整合を検査します。`docker/` が無くても `.devcontainer/` があれば shared devcontainer source を検査します。
-- `tools/ci/scan_secrets.sh`
-  - `gitleaks`、`trufflehog`、`detect-secrets` をまとめて実行する公開 repo 向けの secret audit 入口です。既定では current tree と full git history を走査します。scanner は shared devcontainer の `post-create.sh` で導入されます。
-  - 例: `bash tools/ci/scan_secrets.sh --root .`、submodule 側は `bash tools/ci/scan_secrets.sh --root vendor/agent-canon`。
-- `tools/bin/agent-canon`
-  - AgentCanon Rust CLI の stable wrapper です。
-    `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/agent-canon/bin/agent-canon`
-    が devcontainer post-create で install 済みならそれを使い、未 install
-    で `cargo` がある場合は `vendor/agent-canon/rust/agent-canon` の source
-    から実行します。installed binary が checked-out Rust source より古い場合も
-    source から実行し、AgentCanon 最新化後の stale binary を避けます。
-  - `rust-migration-audit` の `--root` は AgentCanon source root を指します。
-    standalone AgentCanon checkout では `--root .`、template / derived repo
-    では `--root vendor/agent-canon` を使います。
-  - `rust-migration-plan` も AgentCanon source root を指します。AgentCanon を
-    最新化した template / derived repo は、DevContainer を作り直したあと
-    `agent-canon rust-migration-plan --root vendor/agent-canon --limit 12` で
-    次に Rust 化する tool 候補を確認します。
-  - `semantic-index` は SQLite-backed semantic evidence の Rust CLI
-    入口です。purpose-based search は `tools/agent_tools/search.py`、
-    deterministic card index は `tools/agent_tools/search_index.py`、prose
-    seed は `prose_reasoning_graph.py ingest|ingest-set` がそれぞれ所有します。
-- `tools/ci/run_in_repo_container.py`
-  - repo workspace を mount した container command を実行します。
-- `tools/ci/run_gpu_container.sh`
-  - admitted full UUID/MIG environment を値付き `-e` で渡し、Docker GPU container を単一の `--gpus all` 経路で実行します。
-- `tools/ci/run_codex_in_repo_container.py`
-  - nested Codex を canonical container 内で起動します。
-- `tools/ci/python_env_policy.py`
-  - host では `.venv` を禁止し、container では canonical `.venv` だけを許可する machine-readable helper です。
-- `tools/ci/check_server_readiness.py`
-  - main server host の readiness を確認します。
-- `tools/ci/check_experiment_registry.py`
-  - shared experiment registry contract の entrypoint と command を確認します。
-- `tools/ci/check_experiment_template.py`
-  - centralized template source を一時 parent-shaped repo へ copy し、`experiments/template-smoke/` の registry、flat result path、Python compile、summary/raw artifact structure を GPU 実行なしで確認します。source registry と canonical scaffold は変更しません。
-- `tools/validation/notebook_quality.py`
-  - default notebook directories の `.ipynb` を、細かい test ではなく、説明付きで部分実行しやすい実用 demo として読めるか検査します。
-  - Codex hook では changed notebook だけを見て、`assert`、`pytest`、`test_` 関数、保存済み error output、可視化 code 不在を block します。
-- `tools/experiments/create_experiment_topic.py`
-  - shared topic scaffold から experiment topic を作ります。
-- `tools/experiments/sync_experiment_registry_context.py`
-  - registry の branch / worktree metadata を同期します。
-- `tools/experiments/run_managed_experiment.py`
-  - shared managed-runner として server 上の実験 run artifact を初期化し、command / environment / source snapshot、artifact manifest、startup / stdout / stderr log を保存します。
-- `tools/experiments/html_artifact_access.py`
-  - SSH 越しの HPC / container 上にある HTML artifact を手元 PC のブラウザで見るため、`python3 -m http.server`、SSH tunnel、local URL の command を出します。
-- `tools/run_comprehensive_review.sh`
-  - Large delivery / maintenance profile で repo 全体の確認をまとめて実行します。
-- `tools/run_pytest_with_logs.sh`
-  - Python テストをログ付きで実行します。
-- `tools/bin/agent-canon docs format`
-  - Markdown の機械整形を実行し、同じ入口で隣接 check まで閉じます。
-- `tools/docs/fix_markdown_code_blocks.py`
-  - 言語未指定の fenced code block を補正します。
-- `tools/docs/fix_markdown_headers.py`
-  - Markdown header level の飛びを補正します。
-- `tools/bin/agent-canon docs fix-math`
-  - Markdown 数式記法を単一ドルの inline 形式と二重ドルの display 形式へ機械修正し、隣接 check を実行します。
-- `tools/bin/agent-canon docs fix-mermaid`
-  - Markdown 内の Mermaid fenced block を補正し、予約語 node id の衝突を避け、隣接 check を実行します。
-- `tools/docs/fix_markdown_docs.py`
-  - conservatively な Markdown 整形を当てます。
-- `tools/docs/extract_docx.py`
-  - 標準ライブラリだけで、DOCXを検索用Markdown・raw ZIP member・manifest付きのreference bundleへ展開します。
-- `tools/docs/find_similar_documents.py`
-  - document maintenance profile で重複・統合候補の文書を探します。
-- `tools/docs/find_redundant_designs.py`
-  - `documents/design/` の exact duplicate を検出し、consolidation report を作ります。
-- `tools/docs/find_similar_designs.py`
-  - `documents/design/` の類似候補を検出します。
-- `tools/docs/organize_designs.py`
-  - design 文書を submodule 別に整理するための conservative report を作ります。
-- `tools/docs/tfidf_similar_docs.py`
-  - Markdown 文書の TF-IDF 類似候補と merge draft を作ります。
-- `tools/data/jsonl_to_md.py`
-  - JSONL の実行結果を Markdown table report に変換します。
-- `tools/hlo/summarize_hlo_jsonl.py`
-  - HLO JSONL から dialect、tag、operation count の summary JSON を出します。
-- `tools/audit/audit_logger.py`
-  - audit profile で agent / repo automation event を JSONL audit log として保存します。
-- `tools/worktree_start.sh`
-  - worktree kickoff の user-facing 入口です。
-- `tools/update_agent_canon.sh`
-  - 派生 repo で AgentCanon submodule pin と shared root surface を更新する user-facing 入口です。通常は `make agent-canon-update-plan` で route を確認し、`make agent-canon-latest` で tool-first に適用します。
-  - mutating な `latest` / `apply` と低レベル委譲は、operation risk に応じた Git authority/reason field と `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>` を同じ command segment で必須にします。通常の update wrapper は destructive pair のみ、branch/worktree 作成は creation pair、force-create / ref-overwrite は両方を要求します。digest は user request record または canonical workflow authorization packet の exact bytes の SHA-256 です。
-  - `latest` は safe な AgentCanon `main` 更新、root view check、親 repo update TODO routing / acknowledge まで進めます。新規蓄積は `.agent-canon/log-archive/` を使い、source tree の `agents/evals/results/` を新規作成しません。pending TODO が残る場合も更新コマンドは成功終了し、`AGENT_CANON_LATEST_TOOL_RESULT=updated_with_pending_todos` と `NEXT_ACTION=apply_agent_canon_update_todos_then_rerun_latest` を出します。intended named branch の ahead / diverged / dirty state は evidence として保持し、`merge-main-into-current` は non-colliding local materialized paths をその場に残します。Git の仮想 merge conflict または exact update write set との collision だけを typed blocker として agent workflow に渡します。
-  - Local bare / proposal / snapshot refresh route は user-facing command から外しています。submodule 化済み repo の通常 path は GitHub branch と AgentCanon PR です。
-  - 派生 repo 側の shared canon 差分を upstream に渡す場合は、`vendor/agent-canon/` 内で commit し、source-root resolver の `exec tools/update_agent_canon.sh merge-main-into-current` で GitHub `main` を current branch に取り込み、validation 後にその branch を GitHub へ push して AgentCanon PR を開きます。
-  - AgentCanon PR merge 後に `make agent-canon-ensure-latest` で template / derived repo へ持ち帰ります。この target は `make agent-canon-latest` と同じ high-level route です。
-  - GitHub 管理では `iwashita-nozomu/agent-canon` と template GitHub repo の `main` SHA、AgentCanon PR URL、submodule pin を PR 本文に残します。
-- `tools/agent_tools/agent_canon_update_todos.py`
-  - AgentCanon pin 更新後に、親 repo の agent が先に消化する TODO を `vendor/agent-canon/documents/agent-canon/agent-canon-update-tasks.toml` から抽出します。
-  - 親 repo の進捗は `.agent-canon/update-state.toml` にだけ残し、生成された pending view は `.agent-canon/.gitignore` で ignored にします。
-  - `pending` は停止ではなくルーティングです。`plan --write` で TODO view を出し、`complete` または `defer` で解決記録を残してから `acknowledge` で `tasks_applied_through` を進めます。
-- `tools/rebuild_agent_tools.sh`
-  - AgentCanon pin 更新後に `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}` 配下の compiled AgentCanon tools を source commit に合わせます。
-  - uncommitted Rust source が installed binary より新しい場合も再ビルドし、作業中の CLI smoke が stale binary を使わないようにします。
-  - `make agent-canon-ensure-latest`、`make agent-canon-latest`、`make agent-canon-update` は同じ high-level latest route に入り、その safe path から自動的に呼ばれます。
-  - `AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_cargo` が出た場合は、DevContainer 内で再実行するか Rust toolchain を用意してから `make agent-canon-rebuild-tools` を実行します。
-- `tools/agent_tools/route.py`
-  - 長い候補 tool / skill 名を短い route area へ解決します。
-  - 例: `profile_surface_resolver.py` は `route.py --area surface`、`$runtime-capability-routing` は `route.py --area runtime` として扱います。
-  - 新しい public tool / skill を足す前に `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳めるか確認します。
-- `tools/sync_agent_canon.sh`
-  - shared agent canon surface の drift check と再同期を行う source 側の低レベル入口です。parent では `tools/agent-canon/` view または source-root resolver から実体を解決します。通常の作業者は直接 `pull` せず、task 開始時の latest route、root view 修復の link-root route、resolver 経由の `check` を使います。
-  - `pull`、`ensure-latest`、`link-root` などのmutating入口は、staging・checkout・submodule update・root-view mutationの前に同じcommit request evidenceをfail-closedで検証します。自動sync commitは固定identityと `AgentCanon-*` formal trailersを持ちます。
-- `tools/agent_tools/waterfall_gate_check.py`
-  - `reports/agents/<run-id>/` の中間 waterfall gate が次段へ進める状態か確認します。
-- `tools/agent_tools/vector_search.py`
-  - tools、skills、workflow、documents、MCP surface を標準ライブラリ TF-IDF vector で横断検索します。
-  - exact symbol / path / error message は `git grep` または直接 path 確認を使い、広い概念や既存 helper の再利用候補探索では `vector_search.py` を併用します。
-  - `--context` は search hit を dependency header の upstream / downstream に展開し、Python AST の direct call graph から focus 関数の callee / caller context も出します。
-  - `--dependency-depth` で複数 hop を辿り、`--symbol` で特定 Python 関数 / class / method を context seed にできます。
-  - 生成済み embedding index は commit しません。将来 external embedding を足す場合も optional layer とし、index artifact は `reports/` など ignored path に置きます。
-  - SQLite-backed semantic candidates が必要な場合は `agent-canon semantic-index` を使います。
-  - 例:
+Validate the selected owner rather than every tool family:
 
 ```bash
-python3 tools/agent_tools/search.py --purpose "dependency header graph tool" --format json
-python3 tools/agent_tools/search.py --purpose "github cli validation" --providers semantic,tool,vector --format json
-python3 tools/agent_tools/route.py --area search
-python3 tools/agent_tools/vector_search.py --query "dependency header graph"
-python3 tools/agent_tools/vector_search.py --surface tools --query "github cli validation"
-python3 tools/agent_tools/vector_search.py --surface . --query "solver logging" --context
-python3 tools/agent_tools/vector_search.py --surface python --query "initialize info" --context --symbol initialize
+python3 tools/agent_tools/tool_catalog.py
+python3 tools/agent_tools/check_convention_compliance.py
+python3 tools/agent_tools/skill_tool_commands.py check
+python3 tools/docs/check_bootstrap_docs.py --root .
 ```
 
-- `tools/agent_tools/file_surface_inventory.py`
-  - root view、submodule pin、AgentCanon source を JSON / Markdown で分類します。
-  - `--submodule-aware`、`--root-only`、`--agentcanon-only` で scope を明示します。
-- `agent-canon structured-analysis build --root . --profile manual`
-  - user-home cache に `prose_graph.sqlite` と `diagnostics.sqlite` を作り、
-    source file から中間表現 DB と warning DB を再生成します。`--out-dir`
-    を指定した場合は、その artifact root に `document_inventory.json`、
-    `exports/document_inventory.md`、`structured_analysis_build.json`、
-    `exports/structured_analysis_summary.md` を出力します。
-- `agent-canon structured-analysis graph-contract --db <prose_graph.sqlite>`
-  - Graph DSL Core の storage contract に対して、materialized DB の table、row、
-    layer、edge endpoint、JSON payload、diagnostic target を検査します。`--db`
-    なしでは contract summary と layer registry を出します。
-  - Graph projection vocabulary は source-truth anchor / source span、
-    lower graph / lower text unit、typed relation、projection view /
-    derived projection、reader-state、macro-claim、node record / nodes
-    table、edge record / edges table、`payload_json` を共通語彙として扱います。
-- `agent-canon structured-analysis document-inventory --root .`
-  - Markdown / text 文書を棚卸しし、runtime mirror、generated evidence、closed issue record、missing dependency manifest、重複見出しなどの非正本候補を正本候補と一緒に出します。
-  - 文書整理では `$document-canon-cleanup` と組み合わせ、候補 report を削除 authority ではなく triage evidence として扱います。
-- `tools/agent_tools/reference_materializer.py`
-  - consulted PDF / HTML source を Markdown に変換し、`references/external/` に source URL、content hash、抽出方法、抽出テキストを残します。
-- reference capture is selected through its owning materializer route. PDF の代わりに同等 HTML を参照した場合も、HTML source URL を Markdown reference に登録します。
-- `tools/agent_tools/tool_rejection_preflight.py`
-  - code edit 前の cause investigation evidence を canonical preflight route として検証します。
-  - `Observation:`、`Hypothesis:` / `Root Cause:`、`Expected Fix Surface:` / `Selected Surface:`、`Validation Before Edit:` / `Support Evidence:` を含む run artifact、issue、または design note を typed preflight input として扱います。
-- `tools/agent_tools/helper_function_inventory.py`
-  - Python helper 関数 / クラスを AST、呼び出し元、side effect、内部 call graph、domain 別の機能ベース rule から列挙し、`auto_helper`、`needs_user_judgment`、`redundant_helper` を分けて JSON / Markdown / text で出します。
-  - `redundant_helper` は identity return、pass-through call wrapper、normalized body が重複する helper 実装を表し、`redundancy_rule` と `redundant_with` を出します。
-  - `searchable_name`、`name_search_rule`、`matched_role_name_tokens` は、AST から推定した role と identifier 内の role/action token の対応を出します。`--only-name-gaps` は、責務検索で見つけやすい名前へ寄せる review 対象だけを抽出します。
-  - `--changed --baseline-ref HEAD` は変更 Python file だけを報告対象にし、baseline に既に存在した finding を除外します。hook や refactor review では既存 backlog を毎回 block せず、新規 finding だけを見るために使います。
-  - `helper_first_guard.py` は `helper_function_inventory.py --changed --baseline-ref HEAD --format json` の record を読み、test / docs / issue / responsibility-scope などの ownership evidence がない helper-like function 追加を block します。log には accepted / blocked の両方を分析できる `helper_candidate_records` と、blocking subset の `helper_first_records` を残し、prompt / skill eval の改善材料にします。
-  - `library_implementation_guard.py` は `vendor/**`、`site-packages`、`node_modules`、`responsibility-scope.toml` の `external_dependency` scope を protected library implementation として扱い、既存 file の直接 rewrite を block します。外部実装は wrapper / adapter、fork / upstream patch、または manifest-backed vendor import で扱います。
-- `tools/agent_tools/vendor_skill_adapters.py`
-  - AgentCanon 内部の `vendor/skills/manifest.toml` と `vendor/skills/<provider>/<skill>/SKILL.md` を検査し、enabled third-party skill を `.agents/skills/<skill>` の symlink adapter として露出します。
-  - GitHub 由来の skill では `provider`、`upstream` owner、`vendor/skills/<provider>/<skill-id>/` source path の一致を検査し、外部 repo が root や canonical skill path に直接入るのを防ぎます。
-  - `python3 tools/agent_tools/vendor_skill_adapters.py --sync` は missing adapter だけを作成し、unmanaged file は上書きしません。
-- `tools/agent_tools/check_dependency_graph.sh`
-  - `--list-related --focus <path>` は、変更 path が宣言する dependency edge と、その path を指す incoming edge をすべて列挙します。
-  - GitHub path-constraint root copy は、`vendor/agent-canon` がある場合に AgentCanon source context で dependency path を解決します。
-- `tools/agent_tools/run_repo_dependency_review.sh`
-  - `--list-changed-dependencies` は、現在の changed file ごとに related dependency surface を出力し、reviewer に渡す依存先リストを作ります。
-- `tools/agent_tools/review_backlog_scan.sh`
-  - standalone AgentCanon、template root、derived repo の repo-cross inspection run です。
-  - goal / maintainer / audit profile の tool であり、通常の owner-bounded route では required gate にしません。
-  - file inventory、stale wording search、dependency review、code dependency scan、OOP/readability、`Any`、hardcoded-number、log-helper、convention scans を run bundle へ集約します。
-  - 既定で `agent-canon semantic-index` も実行し、responsibility-scoped merge candidates、thin docs、任意の long-query search を review artifact として JSONL 保存し、`eval-output` の JSON report も残します。LLM embedding provider が明示された場合だけ provider-comparison report も保存します。
-  - template / derived repo では `--submodule-aware` を既定にし、root surface と `vendor/agent-canon` source を別 scope として扱います。
-  - PR readiness 前に、出力された inventory と dependency graph から、AgentCanon-owned source、template/root local state、synced copy、symlink view、GitHub path-constraint copy、project-owned artifact のどれを編集 / 検証するかを明示します。
-  - 例:
-
-```bash
-make review-backlog-scan ARGS="--report-dir reports/agents/<run-id>/cross_repo_inspection --submodule-aware"
-bash tools/agent_tools/review_backlog_scan.sh \
-  --report-dir reports/agents/<run-id>/cross_repo_inspection \
-  --submodule-aware
-```
-
-- `tools/oop/python/readability.py`
-  - Python source の OOP readability を機械判定します。説明文書は同名の `documents/tools/oop/python/readability.md` です。
-- `tools/oop/python/rule_inventory.py`
-  - Python OOP policy、checker、reviewer、test、説明文書の配置を確認します。説明文書は同名の `documents/tools/oop/python/rule_inventory.md` です。
-- `tools/oop/cpp/readability.py`
-  - C / C++ source の OOP readability を機械判定します。説明文書は同名の `documents/tools/oop/cpp/readability.md` です。
-- `tools/oop/cpp/rule_inventory.py`
-  - C++ OOP policy、checker、reviewer、test、説明文書の配置を確認します。説明文書は同名の `documents/tools/oop/cpp/rule_inventory.md` です。
-  - 例:
-
-```bash
-python3 tools/oop/python/readability.py --format markdown python tools tests
-python3 tools/oop/python/rule_inventory.py --format markdown
-python3 tools/oop/cpp/readability.py --format markdown cpp/include cpp/src tests/cpp cpp/experiments
-python3 tools/oop/cpp/rule_inventory.py --format markdown
-```
-
-- Codex goal state
-  - session runtime state として扱い、repository へ mirror file を作りません。durable lifecycle evidence が必要な task は run bundle の `schedule.md`、`work_log.md`、validation evidence を直接更新します。
-- `tools/agent_tools/evaluate_skill_workflow_prompts.py`
-  - skill / workflow prompt surface を `evidence/agent-evals/skill_workflow_prompt_eval.toml` の frozen eval で検査します。skill を使う run では `--accumulate --run-id <run-id> --skill-used <skill>` を付け、`.agent-canon/log-archive/eval-results/skill-workflow-prompt/` に詳細結果を蓄積します。agent が読む場合は `--compact-out <path>.json` を併用し、stdout ではなく compact JSON の統計を読んでから必要な artifact へ drill down します。
-  - hook event は PostToolUse で source repo の `.agent-canon/runtime-event-spool/` へ atomic no-replace publish し、archive Git や `ensure` を呼びません。明示 `runtime_log_archive_git.py sync` が nonblocking lock、1 回の ensure、snapshot/ingest/dedup/projection、commit/push/readback、verified finalize を所有します。hot path は `check-hook-hot-path` で archive context 構築前に検査します。eval report、Codex runtime summary、`reports/agents/` の agent run report と checkpoint 済み hook JSONL は `git@github.com:iwashita-nozomu/agent-canon-log.git` を `.agent-canon/log-archive/` に mount して蓄積します。branch / push 手順は `documents/runtime/runtime-log-archive.md` を正本にします。
-  - `generate_agent_improvement_guide.py` は `memory/`、mounted `.agent-canon/log-archive/eval-results/skill-workflow-prompt/`、mounted hook archive、`issues/open|closed/` を読んで PR / branch push 用の改善指南書を生成します。生成は read-only で、skill usage、hook event、tool name、checker target、protocol feedback token の不足をまとめ、実修正は local Codex に渡します。
-  - `generate_agent_runtime_dashboard.py` は同じ evidence tree を人間が見るための dashboard にします。正本ログの場所、hook namespace、entry 数、skill usage、prompt route 候補、human feedback、eval report family、issue 数を Markdown に出し、GitHub Actions では AgentCanon repo の Step Summary と artifact にだけ出します。agent がログ分析するときは `--compact-out` で token-light summary、generated drilldown、prompt/token rolling trend を生成し、通常分析では raw JSONL を開かずそれを読みます。token 利用は lifetime total だけではなく recent moving average と coverage status で判断します。足りない詳細は raw log 検索ではなく dashboard tool の追加 summary として生成し、raw JSONL は tool 実装、schema debugging、corruption audit の explicit rationale がある場合だけ使います。
-  - `run_accumulated_agent_evals.py` は同じ evidence tree の required eval family を機械的に追記する入口です。role、skill/workflow prompt、workflow-selection、report-quality の各 eval を `--accumulate` で実行し、標準出力は log file に捕捉します。
-  - `eval_accumulation_check.py` は同じ evidence tree の構造 gate です。hook JSONL、skill eval report、unique id、ignore rule を検査し、改善指南書が読めない evidence を早期に止めます。agent-facing run では `--compact-out <path>.json` を使い、finding 全件は JSON summary 側へ逃がします。
-  - `evaluate_workflow_selection.py` は `evidence/agent-evals/workflow_selection_eval.toml` の固定 prompt case で workflow routing を検査します。`--accumulate` を付けた run は `.agent-canon/log-archive/eval-results/workflow-selection/` に詳細結果を蓄積します。
-  - `evaluate_codex_agent_roles.py` は subagent role TOML ごとに `explorer` read-only、reviewer findings-first、`spark_worker` bounded implementation、禁止事項、model cost bucket、task routing、token / latency / retry / parent intervention / format violation / output-used metrics の受け口を検査します。agent-facing run では `--compact-out <path>.json` を使い、model matrix と finding detail は artifact で読む運用にします。
-  - 蓄積 file は `<eval_run_id>-<status>-<skill-slug>.md` 形式です。`eval_run_id` は `skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>` で採番され、既存 report を上書きしません。
-  - prompt repair 後に `EVAL_STATUS=pass`、`EVAL_AUDIT_STATUS=pass`、`EVAL_GROWTH_CANDIDATES=0` まで rerun します。
-  - manifest audit は duplicate eval IDs、duplicate explicit targets、duplicate checklist IDs を growth candidate として fail-closed にします。既存 surface の coverage を増やす場合は並行 eval を足さず、同じ target の eval entry に checklist を統合します。
-- `tools/agent_tools/compare_agent_run_paths.py`
-  - 2 つの run bundle の `workflow_monitoring.md` から `execution_path`、`route_efficiency`、`static_analysis_feedback` を読み、実行経路差分と非効率経路選択を machine-readable に判定します。
-  - `RUN_PATH_COMPARISON=fail`、`SELECTED_INEFFICIENT_ROUTE=yes`、`NEXT_ACTION=repair_skill_workflow_prompt` は behavior eval と adaptive-improvement prompt repair の入力にします。
-- `tools/agent_tools/analyze_refactor_surface.py`
-  - 大規模 refactor の設計見直しで、Python AST から長すぎる function / class / file と公開 method 過多を検出し、合格 score を出します。
-- `tools/agent_tools/check_convention_compliance.py`
-  - 規約 source inventory、workflow prohibition wiring、workflow verifier hook、skill-routing hook、convention tool gate wiring を集約検査します。自然言語規約の意味を完全証明する tool ではなく、機械化済み規約が workflow / prompt / CI から外れていないことを検査します。
-- `tools/agent_tools/skill_tool_commands.py`
-  - `.agents/skills/*/SKILL.md` の `## Tool Commands` 入口を同期・検査し、`show --skill <skill>` で runtime skill と human skill canon から command packet を表示します。
-- `tools/agent_tools/tool_catalog.py`
-  - `tools/catalog.yaml` の構造、説明、default wiring、docs/tests、legacy provenance を検査します。
-- `tools/agent_tools/tool_drift.py`
-  - GitHub PR flow、AgentCanon PR check、dependency review、skill/workflow prompt eval、runtime alignment、skill mirror parity、convention compliance、tool catalog の dependency-header trace を検査します。
-- `tools/agent_tools/check_hardcoded_numbers.py`
-  - Python / C++ source の裸の数値リテラルを検出します。既定では汎用的な係数だけを許容し、Python の module-level uppercase constant、C++ の `constexpr` constant、行単位の `hardcoded-number-ok` 根拠コメントを許容します。
-- `tools/agent_tools/check_static_any.py`
-  - Python source の明示的な `typing.Any` を検出します。`Any` import、`Any` annotation、`typing.Any` attribute reference を fail にし、外部境界は `object`、`Mapping[str, object]`、`TypedDict`、または typed dataclass に寄せます。
-- `tools/agent_tools/check_log_helper_names.py`
-  - Python source のログ用 helper 関数名を検出します。ログを書き出す、emit する、保存する、整形する helper は `_log` から始め、`write_log_*` や `append_log_*` のような prefix を fail にします。
-- `tools/oop/python/readability.py` / `tools/oop/cpp/readability.py`
-  - Python と C/C++ の OOP readability を言語別 entrypoint で機械判定します。外部 repo、bare 展開、派生 template worktree を読むときは、対象 commit、解析 path、`--exclude vendor --exclude reports` などの除外条件、Markdown / JSON report path を run bundle に残します。
-- `tools/bin/agent-canon python-algorithm-contract-check`
-  - Python AST を一度 JSON として抽出し、Rust 側で `algorithm_module_protocol` module の literal `__all__`、standard public surface、callable `Algorithm`、nested ownership、concrete `Info` schema、protocol-only import、syntax diagnostics、fnmatch 方式の `--exclude` を検査します。text/JSON artifact と exit status は同じ canonical route から出力し、fixture は `tests/fixtures/python_algorithm_contract/`、CLI parity test は `rust/agent-canon/tests/python_algorithm_contract_cli.rs` にあります。
-- `tools/experiments/update_latest_result.py`
-  - `experiments/<topic>/result/LATEST.<variant>.json` と `LATEST.<variant>.md` を更新し、flat result root内で選択した variant metadata の最新 run、summary、manifest、visual report の入口を固定します。global `LATEST.json` fallbackは作りません。`python3 -m tools.experiments.update_latest_result experiments/<topic>/result --variant <variant>` のように variant を必ず指定します。
-- `tools/experiments/save_experiment_result_annex.py`
-  - v2 manifest で identity を検証した 1 run を、決定的な 1 archive として clean な専用 git-annex worktree へ append-only で保存し、retention commit SHA を出します。
-  - SHA256E key、full readback、symlink / Git LFS pointer / identity mismatch rejection、pre-commit rollback を fail-closed に検証します。push は行いません。
-- `tools/push_origin.sh`
-  - 旧 shell push 実装の退役入口です。GitHub publish / PR 作業は `tools/agent_tools/github_publish.py` を使います。
-
-## Source-Bound Runtime and Graph Consumers
-
-`runtime_log_archive_git.py` owns the complete runtime-evidence producer and
-consumer boundary. The explicit `append-context-discovery` command reads the
-native rollout `session_meta` and selected `event_msg` / `task_complete`
-records, then publishes exactly one immutable
-`agent_canon.context_discovery_certificate.v1` certificate. The
-`materialize-runtime-event` command consumes exactly one such certificate,
-joins a fixed result-family artifact to its certified rollout record and source
-Git identities, then publishes an immutable prepared
-`agent_canon.runtime_event.v1` artifact. Its
-`publication_intent` contains only the deterministic attempt and
-`prepared_state=prepared`. Post-target evidence is appended to the repo-local
-outcome spool before a separate hash-linked receipt is published. The command
-returns success only after the latest committed receipt is durability-
-confirmed; uncertain, malformed, colliding, or unconfirmed records block.
-Rollout discovery consumes only the explicit container-local
-`AGENT_CANON_CODEX_SESSION_ROOT` supplied by the runtime owner; host `HOME`,
-`CODEX_HOME`, and `~/.codex/sessions` are not fallback inputs.
-
-`tools/bin/agent-canon graph build` は明示的な graph-analysis route です。
-dependency-manifest snapshot、persisted diagnostics、SQLite identity の生成と
-freshness はこの route が所有し、`--ensure-graph` を指定した呼び出しだけが
-必要な再構築を要求します。通常の PR source review は source scan、format、
-relation/cycle、TSV/DOT の source projection を実行し、graph を build、query、
-または receipt の根拠として読みません。
-`tools/ci/pr_gate_receipt.py` は PR gate の実行可能な receipt schema/parser の
-唯一の owner です。`check_agent_canon_pr.sh` は source review の結果を
-`source` または trusted header scan の `skipped` として書き、root identity、
-parent PID、selector reason/evidence とともに quick CI へ渡します。
-`run_all_checks.sh` は同じ module を一度だけ consumer として呼び、妥当な
-receipt を受け取ったときだけ重複する graph/header producer を省略します。
-`prepared` と `scoped` はこの PR receipt の退役状態であり、consumer は
-fail-closed で拒否します。receipt が無い通常経路は source review を実行し、
-明示的 graph-analysis route は独立して利用できます。
-`graph status`、非dependency relation query、token付き `context` とその consumer
-は明示的 graph-analysis route の snapshot 参照専用です。dependency query、
-tokenless path context、`check_design_doc_claims.py` は tracked source の
-projectionを使い、persisted v2 snapshotを読みません。通常の source review、
-PR receipt、header/format checkerもこのsnapshotを読みません。Each explicit
-graph command performs at most one bounded freshness probe; consumers do not
-reparse repository-scoped dependency guarantees or rerun the runtime producer.
-Explicit files outside a repository and non-Git checker fixtures retain their
-public local parser behavior without becoming graph authority. `graph_client.py`
-is the typed Python adapter for these responses, not a CLI entrypoint.
-
-PostToolUse hook transport is outside the graph producer. `HookLogContext`
-returns `HookAppendResult.status` as `spooled`, `duplicate`, or `failed`; that
-transport status is separate from the hook event's semantic `status` field.
-The append path writes no stdout or stderr, so a spool failure leaves dispatcher
-JSON valid. It writes one canonical no-replace event file per `hook_run_id`.
-Explicit `sync` reuses one prepared archive transaction to create the
-projection/index/cursor and deletes source files only after committed-tree
-readback. Graph status/query/context do not trigger this checkpoint.
-
-## 結果ログと可視化
-
-保存先、summary、可視化 artifact、retention decision は
-[result-log-retention-and-visualization.md](../experiments/result-log-retention-and-visualization.md)
-を正本にします。
-
-よく使う変換:
-
-```bash
-python3 tools/data/jsonl_to_md.py <input.jsonl> <output.md>
-python3 tools/hlo/summarize_hlo_jsonl.py <hlo.jsonl> > summary.json
-dot -V
-```
-
-closeout では raw log だけでなく、summary/report path と可視化 path、または
-可視化なしの理由を `verification.txt` に残します。
-
-## 補足
-
-- `setup_worktree.sh` などの branch/worktree 補助は例外運用用です。
-- 既定運用は `main` であり、通常作業の入口にはしません。
-
-## 参照先
-
-- Template-derived repositories may add a root-local `scripts/README.md` for
-  repo bootstrap scripts that are not AgentCanon-owned tools.
-- [SHARED_RUNTIME_SURFACES.md](../runtime/SHARED_RUNTIME_SURFACES.md)
+Container behavior is validated with `bootstrap.sh install -> start -> target
+add -> tool/eval -> stop -> uninstall` and exact resource absence readback.
+Do not use `docker system prune`.

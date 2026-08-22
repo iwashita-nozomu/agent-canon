@@ -28,8 +28,8 @@ jobs:
   dashboard:
     runs-on: ubuntu-latest
     env:
-      AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
-      AGENT_CANON_ACTIVE_REPOSITORY_ROOT: ${{ github.workspace }}
+      AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
+      AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/../workspace/agent-canon-runtime/dashboard
     steps:
       - name: PR required-check compatibility
         if: github.event_name == 'pull_request'
@@ -39,7 +39,6 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: actions/checkout@v4
         with:
-          submodules: false
           persist-credentials: false
 
       - name: Setup Python
@@ -52,42 +51,42 @@ jobs:
         if: github.event_name != 'pull_request'
         run: python3 -m pip install --upgrade pyyaml tomli
 
-      - name: Prepare runtime log archive
+      - name: Start shared tool runtime
         if: github.event_name != 'pull_request'
-        run: mkdir -p .agent-canon/log-archive
+        run: |
+          set -euo pipefail
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" install
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
 
       - name: Build and read back canonical graph
         if: github.event_name != 'pull_request'
         run: |
           set -euo pipefail
-          PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec \
-            tools/bin/agent-canon graph build \
-            --root "${GITHUB_WORKSPACE}" --profile default --format json
-          PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec \
-            tools/bin/agent-canon graph status \
-            --root "${GITHUB_WORKSPACE}" --profile default --format json
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- agent-canon graph build --root . --profile default --format json
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- agent-canon graph status --root . --profile default --format json
 
       - name: Run accumulated eval producers
         if: github.event_name != 'pull_request'
         run: |
-          python3 tools/agent_tools/run_accumulated_agent_evals.py \
-            --root "${GITHUB_WORKSPACE}" \
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            eval collect --root "${GITHUB_WORKSPACE}" \
             --run-id "agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-
-      - name: Validate accumulated evidence
-        if: github.event_name != 'pull_request'
-        run: python3 tools/agent_tools/eval_accumulation_check.py --root "${GITHUB_WORKSPACE}"
 
       - name: Generate runtime dashboard
         if: github.event_name != 'pull_request'
         id: dashboard
         run: |
-          report_dir="${GITHUB_WORKSPACE}/reports/agent-runtime-dashboard"
+          report_dir="$(realpath -m "${AGENT_CANON_RUNTIME_ROOT}/container-runtime/reports/agent-runtime-dashboard")"
           mkdir -p "${report_dir}"
           dashboard_path="${report_dir}/agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
-          python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
-            --root "${GITHUB_WORKSPACE}" \
-            --out "${dashboard_path}"
+          container_dashboard="/var/lib/agent-canon/runtime/reports/agent-runtime-dashboard/agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- python3 \
+            /usr/local/share/agent-canon/runtime/tools/agent_tools/generate_agent_runtime_dashboard.py \
+            --root . --runtime-root /var/lib/agent-canon/runtime --out "${container_dashboard}"
           cat "${dashboard_path}" >> "${GITHUB_STEP_SUMMARY}"
           echo "dashboard_path=${dashboard_path}" >> "$GITHUB_OUTPUT"
 
@@ -97,3 +96,9 @@ jobs:
         with:
           name: agent-runtime-dashboard-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ steps.dashboard.outputs.dashboard_path }}
+
+      - name: Release shared tool runtime
+        if: always() && github.event_name != 'pull_request'
+        run: |
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" stop || true
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" uninstall || true

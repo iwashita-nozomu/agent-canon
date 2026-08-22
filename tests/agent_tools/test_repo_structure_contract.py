@@ -75,7 +75,7 @@ class RepoStructureContractTest(unittest.TestCase):
             root = Path(tmp_dir)
             self.write_standalone_fixture(root)
             managed_artifact = root / "experiments" / "topic" / "result" / "run" / "artifact.json"
-            source_artifact = root / "notes" / "result" / "source.md"
+            source_artifact = root / "documents" / "notes" / "result" / "source.md"
             self.write_file(root, str(managed_artifact.relative_to(root)), "generated\n")
             self.write_file(root, str(source_artifact.relative_to(root)), "source\n")
 
@@ -220,7 +220,7 @@ class RepoStructureContractTest(unittest.TestCase):
             "tools/ci",
             "tests/agent_tools",
             "memory",
-            "notes",
+            "documents/notes",
             "issues",
         ]:
             (root / dir_path).mkdir(parents=True, exist_ok=True)
@@ -304,6 +304,7 @@ class RepoStructureContractTest(unittest.TestCase):
                                 {"type": "file", "name": "repo-structure-contract.toml"}
                             ],
                         },
+                        {"type": "directory", "name": "notes"},
                     ],
                 },
                 {
@@ -340,7 +341,6 @@ class RepoStructureContractTest(unittest.TestCase):
                     "contents": [{"type": "directory", "name": "agent_tools"}],
                 },
                 {"type": "directory", "name": "memory"},
-                {"type": "directory", "name": "notes"},
                 {"type": "directory", "name": "issues"},
             ],
         }

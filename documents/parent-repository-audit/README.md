@@ -29,7 +29,6 @@ path を一件も持たないことは、path の存在要求ではないため�
 
 - `responsibility-scope.toml`: 実在する tracked path の owner/class の一意な対応。
 - `repo-structure-contract.toml`: required/optional path の存在と filesystem kind。
-- `shared-runtime-surfaces.toml`: source から parent view への projection mechanics。
 - `audit-unit/*.md`: semantic change surface ごとの監査・修正・close 契約。
 
 したがって audit unit は broad path glob、tracked-tree coverage、owner overlap を再判定しません。
@@ -43,7 +42,7 @@ path を一件も持たないことは、path の存在要求ではないため�
 未知の surface は推測せず typed failure にします。
 
 `--scope` は親 root 配下の tracked file/directory を evidence として絞るだけです。scope の
-有無や path 名から unit、owner、class を決めません。submodule 内部は展開せず、親の gitlink
+有無や path 名から unit、owner、class を決めません。AgentCanon source clone 内部は展開せず、親の tracked tree と明示された runtime/source clone
 だけを tracked evidence とします。path escape、存在しない scope、親 Git 不在は fail closed
 で返します。
 

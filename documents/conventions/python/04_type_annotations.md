@@ -2,7 +2,6 @@
 @dependency-start
 contract policy
 responsibility Documents 関数の型注釈 for this repository.
-upstream design ../../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 @dependency-end
 -->
 

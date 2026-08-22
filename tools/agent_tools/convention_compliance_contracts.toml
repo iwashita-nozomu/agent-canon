@@ -47,10 +47,6 @@ markers = ["静的解析・読み取り evidence", "primary validation evidence"
 path = "agents/canonical/CODEX_WORKFLOW.md"
 markers = ["静的解析、読み取り確認、docs / targeted tests / agent checks", "Runtime evidence", "distinct unresolved claim/risk"]
 
-[[contracts.surfaces]]
-path = "documents/runtime/runtime-profiles-and-check-matrix.md"
-markers = ["Static analysis and reading evidence", "primary validation evidence", "operation checks", "supplemental evidence", "unresolved static/read findings"]
-
 [[contracts]]
 id = "literature_backed_skill_call_order"
 description = "Research-backed implementation skill-call sequences place literature-survey before research-workflow, design, implementation, benchmark, and report claims."
@@ -90,14 +86,6 @@ markers = ["responsibility_scope", "responsibility-scope.toml", "owner", "class"
 [[contracts.surfaces]]
 path = "agents/skills/codex-task-workflow.md"
 markers = ["tool_rejection_preflight", "responsibility_scope", "owner scope", "protecting tools", "実装ディレクトリ"]
-
-[[contracts.surfaces]]
-path = "tools/README.md"
-markers = ["tool_rejection_preflight.py", "responsibility_scope", "responsibility-scope.toml", "protecting tools"]
-
-[[contracts.surfaces]]
-path = "documents/tools/README.md"
-markers = ["tool_rejection_preflight.py", "responsibility_scope", "responsibility-scope.toml", "protecting tools"]
 
 [[contracts]]
 id = "experiment_execution_surface_guard"

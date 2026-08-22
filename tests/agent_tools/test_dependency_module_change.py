@@ -160,6 +160,7 @@ def install_public_cli_surface(root: Path, *, derived: bool) -> Path:
     shutil.copy2(TOOL, agent_tools / TOOL.name)
     shutil.copy2(GENERIC_TOOL, agent_tools / GENERIC_TOOL.name)
     shutil.copy2(TOOL.parent / "parent_root_side_effects.py", agent_tools / "parent_root_side_effects.py")
+    shutil.copy2(TOOL.parent / "runtime_artifacts.py", agent_tools / "runtime_artifacts.py")
     if derived:
         tools_root.mkdir(parents=True)
         (tools_root / "agent-canon").symlink_to(

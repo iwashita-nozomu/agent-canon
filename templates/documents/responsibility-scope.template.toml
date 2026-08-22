@@ -4,14 +4,13 @@
 # upstream design ../../documents/design/responsibility-scope-management.md scope ownership policy
 # upstream design ../../documents/structure/repo-structure-contract.toml separate path existence and kind contract
 # upstream implementation ../../tools/agent_tools/responsibility_scope.py validates this schema
-# downstream implementation responsibility-scope.toml is the rendered project-local contract
+# downstream implementation ../../responsibility-scope.toml is the rendered project-local contract
 # @dependency-end
 
 catalog_kind = "agent_canon_responsibility_scope"
 version = 1
 
 owner_values = [
-  "agent-canon",
   "template",
   "derived-project",
   "github",
@@ -30,20 +29,9 @@ class_values = [
 ]
 
 [[import_rule]]
-source = "agent-canon-runtime-view"
-targets = [
-  "agent-canon-runtime-view",
-  "parent-repo-active-contract",
-  "project-durable-state",
-  "parent-github-automation",
-  "external-vendor",
-]
-
-[[import_rule]]
 source = "parent-repo-active-contract"
 targets = [
   "parent-repo-active-contract",
-  "agent-canon-runtime-view",
   "project-durable-state",
   "parent-github-automation",
   "external-vendor",
@@ -54,7 +42,6 @@ source = "project-durable-state"
 targets = [
   "project-durable-state",
   "parent-repo-active-contract",
-  "agent-canon-runtime-view",
 ]
 
 [[import_rule]]
@@ -62,7 +49,6 @@ source = "parent-github-automation"
 targets = [
   "parent-github-automation",
   "parent-repo-active-contract",
-  "agent-canon-runtime-view",
 ]
 
 [[import_rule]]
@@ -72,32 +58,12 @@ targets = [
 ]
 
 [[scope]]
-id = "agent-canon-runtime-view"
-owner = "agent-canon"
-class = "shared_runtime"
-description = "Active AgentCanon source and generated runtime views consumed by the parent repository."
-paths = [
-  "vendor/agent-canon/**",
-  "AGENTS.md",
-  ".codex/config.toml",
-  ".codex/agents/**",
-  "documents/notes",
-  "documents/notes/**",
-  "tools/agent-canon/**",
-]
-protecting_tools = [
-  "tools/agent-canon/agent_tools/agent_canon_source_root.py",
-  "tools/agent-canon/agent_tools/responsibility_scope.py",
-  "tools/agent-canon/sync_agent_canon.sh",
-]
-issues = []
-
-[[scope]]
 id = "parent-repo-active-contract"
 owner = "derived-project"
 class = "active_contract"
-description = "Parent-owned active code, configuration, documentation, tests, editor state, and generated skill adapters."
+description = "Parent-owned active code, configuration, documentation, tests, editor state, and local runtime entrypoints."
 paths = [
+  "AGENTS.md",
   ".agents/**",
   ".codex/**",
   ".devcontainer/**",
@@ -107,6 +73,7 @@ paths = [
   ".gitmodules",
   ".markdownlint.json",
   ".vscode/**",
+  "bootstrap.sh",
   "LICENSE",
   "Makefile",
   "README.md",
@@ -124,16 +91,10 @@ paths = [
   "tests/**",
   "tools/**",
 ]
-exclude_paths = [
-  ".codex/config.toml",
-  ".codex/agents",
-  ".codex/agents/**",
-  "tools/agent-canon",
-  "tools/agent-canon/**",
-]
+exclude_paths = []
 protecting_tools = [
-  "tools/agent-canon/agent_tools/responsibility_scope.py",
-  "tools/agent-canon/agent_tools/import_responsibility.py",
+  "tools/agent_tools/responsibility_scope.py",
+  "tools/agent_tools/import_responsibility.py",
 ]
 issues = []
 
@@ -150,8 +111,8 @@ paths = [
   "references/**",
 ]
 protecting_tools = [
-  "tools/agent-canon/agent_tools/task_close.py",
-  "tools/agent-canon/agent_tools/responsibility_scope.py",
+  "tools/agent_tools/task_close.py",
+  "tools/agent_tools/responsibility_scope.py",
 ]
 issues = []
 
@@ -164,8 +125,8 @@ paths = [
   ".github/**",
 ]
 protecting_tools = [
-  "tools/agent-canon/ci/check_github_workflows.py",
-  "tools/agent-canon/agent_tools/github_status_lifecycle.py",
+  "tools/ci/check_github_workflows.py",
+  "tools/agent_tools/github_status_lifecycle.py",
 ]
 issues = []
 
@@ -173,15 +134,11 @@ issues = []
 id = "external-vendor"
 owner = "external-vendor"
 class = "external_dependency"
-description = "Vendored dependencies other than the active AgentCanon source tree."
+description = "Vendored dependencies owned by the derived project."
 paths = [
   "vendor/**",
 ]
-exclude_paths = [
-  "vendor/agent-canon",
-  "vendor/agent-canon/**",
-]
 protecting_tools = [
-  "tools/agent-canon/agent_tools/task_authority.py",
+  "tools/agent_tools/task_authority.py",
 ]
 issues = []

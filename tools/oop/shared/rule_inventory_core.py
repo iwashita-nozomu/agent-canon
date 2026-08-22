@@ -3,7 +3,6 @@
 # contract tool
 # responsibility Provides shared OOP rule inventory CLI behavior.
 # upstream design ../../../documents/tools/README.md tool documentation placement policy
-# upstream design ../../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared AgentCanon surface policy
 # downstream implementation ../python/rule_inventory.py Python OOP inventory entrypoint
 # downstream implementation ../cpp/rule_inventory.py C++ OOP inventory entrypoint
 # downstream implementation ../../../tests/agent_tools/test_oop_rule_inventory.py tests inventory behavior

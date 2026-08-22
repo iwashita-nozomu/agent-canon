@@ -15,6 +15,87 @@ version: 1
 catalog_kind: agent_canon_tool_catalog
 scope: shared_canon
 
+# The legacy catalog shape remains version 1 for the existing catalog checker.
+# Runtime dispatch is an additive, independently versioned contract.  Entries
+# may provide a ``dispatch`` mapping; entries without one use these typed
+# defaults. The versioned parity fixture is still required before execution.
+runtime_schema:
+  version: 2
+  # A catalog entry is not cut over merely because it is listed.  Every
+  # verified entry must carry an explicit dispatch.parity value and an
+  # observed v2 fixture row; otherwise the legacy owner remains authoritative.
+  default_parity: legacy
+  runtimes:
+    - python
+    - rust
+  execution_planes:
+    - tool-container
+  cwd_policies:
+    - source-root
+    - task-root
+    - explicit
+  env_policies:
+    - allowlisted
+    - clean
+  io_policies:
+    - inherited
+    - captured
+  exit_policies:
+    - propagate
+    - normalize-signal
+  side_effect_policies:
+    - read-only
+    - external-artifact
+    - explicit-target-write
+  output_roots:
+    - none
+    - external-runtime
+    - explicit-target
+  parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
+  # Commands exposed by rust/agent-canon/src/main.rs that do not have a
+  # one-file catalog entry below. Keeping this inventory here prevents the
+  # dispatcher from silently dropping a first-class Rust route.
+  rust_public_commands:
+    - id: rust-version
+      selector: --version
+      path: rust/agent-canon/src/main.rs
+    - id: rust-rust-migration-audit
+      selector: rust-migration-audit
+      path: rust/agent-canon/src/migration_audit.rs
+    - id: rust-rust-migration-plan
+      selector: rust-migration-plan
+      path: rust/agent-canon/src/rust_migration_plan.rs
+    - id: rust-docs
+      selector: docs
+      path: rust/agent-canon/src/docs.rs
+      writes: true
+    - id: rust-memory
+      selector: memory
+      path: rust/agent-canon/src/memory.rs
+      writes: true
+    - id: rust-structured-analysis
+      selector: structured-analysis
+      path: rust/agent-canon/src/structured_analysis.rs
+      writes: true
+    - id: rust-python-structure-hash
+      selector: python-structure-hash
+      path: rust/agent-canon/src/python_structure_hash.rs
+    - id: rust-python-structure-hash-report
+      selector: python-structure-hash-report
+      path: rust/agent-canon/src/python_structure_hash_report.rs
+      writes: true
+    - id: rust-python-structure-hash-impact
+      selector: python-structure-hash-impact
+      path: rust/agent-canon/src/python_structure_hash_impact.rs
+      writes: true
+    - id: rust-python-structure-hash-scope-plan
+      selector: python-structure-hash-scope-plan
+      path: rust/agent-canon/src/python_structure_hash_scope_plan.rs
+      writes: true
+    - id: rust-python-module-groups-check
+      selector: python-module-groups-check
+      path: rust/agent-canon/src/python_module_groups.rs
+
 status_values:
   - canonical
   - compatibility_wrapper
@@ -128,6 +209,78 @@ default_wiring_docs:
   - documents/tools/tool-docs.toml
 
 entries:
+  - id: audit-and-fix-links
+    summary: Compatibility wrapper for the canonical Rust Markdown link checker; source apply requires an explicit mutation capability.
+    path: tools/docs/audit_and_fix_links.py
+    family: docs
+    role: compatibility
+    status: compatibility_wrapper
+    audience: maintainer
+    placement: compatibility_wrapper
+    command: python3 tools/docs/audit_and_fix_links.py --check
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/README.md
+    tests:
+      - tests/tools/test_audit_and_fix_links.py
+
+  - id: find-redundant-designs
+    summary: Finds exact duplicate design documents and writes an external runtime report.
+    path: tools/docs/find_redundant_designs.py
+    family: docs
+    role: docs
+    status: maintainer_only
+    audience: maintainer
+    placement: workflow_helper
+    command: python3 tools/docs/find_redundant_designs.py --runtime-root <external-runtime>
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/README.md
+    tests:
+      - tests/tools/test_design_doc_runtime_boundaries.py
+
+  - id: find-similar-designs
+    summary: Finds similar design documents and writes an external runtime report.
+    path: tools/docs/find_similar_designs.py
+    family: docs
+    role: docs
+    status: maintainer_only
+    audience: maintainer
+    placement: workflow_helper
+    command: python3 tools/docs/find_similar_designs.py --runtime-root <external-runtime>
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/README.md
+    tests:
+      - tests/tools/test_design_doc_runtime_boundaries.py
+
+  - id: organize-designs
+    summary: Plans design-document organization and requires an explicit mutation capability to apply it.
+    path: tools/docs/organize_designs.py
+    family: docs
+    role: docs
+    status: maintainer_only
+    audience: maintainer
+    placement: workflow_helper
+    command: python3 tools/docs/organize_designs.py --runtime-root <external-runtime>
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/README.md
+    tests:
+      - tests/tools/test_design_doc_runtime_boundaries.py
+
   - id: tool-catalog
     summary: Validates the structured tool catalog and renders the tool crosswalk.
     path: tools/agent_tools/tool_catalog.py
@@ -182,13 +335,13 @@ entries:
     tests:
       - tests/agent_tools/test_responsibility_scope.py
 
-  - id: parent-repo-readiness
-    summary: Checks whether a parent repo has the AgentCanon expected documents, root views, and environment surfaces.
-    path: tools/agent_tools/parent_repo_readiness.py
+  - id: runtime-surface-inventory
+    summary: Validates AgentCanon-owned standalone runtime, tool, eval, and archive surface classification.
+    path: tools/agent_tools/surface_manifest.py
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/agent_tools/parent_repo_readiness.py
+    command: python3 tools/agent_tools/surface_manifest.py --root . --prefix . --manifest documents/runtime/shared-runtime-surfaces.toml normalized-snapshot
     writes: false
     default_wiring:
       ci: false
@@ -196,29 +349,10 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/runtime/shared-runtime-surfaces.toml
-      - documents/agent-canon/agent-canon-parent-repo-latest-checklist.md
-      - documents/contracts/github-first-module-and-devcontainer-policy.md
-    tests:
-      - tests/agent_tools/test_parent_repo_readiness.py
-
-  - id: surface-manifest-producer
-    summary: Produces canonical shared-runtime surface snapshots consumed by AgentCanon graph builds and root synchronization.
-    path: tools/agent_tools/surface_manifest.py
-    family: agent_tools
-    role: runner
-    status: canonical
-    command: python3 tools/agent_tools/surface_manifest.py --root . --prefix vendor/agent-canon --manifest documents/runtime/shared-runtime-surfaces.toml normalized-snapshot
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: true
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
+      - documents/runtime/SHARED_RUNTIME_SURFACES.md
       - documents/runtime/shared-runtime-surfaces.toml
     tests:
-      - tests/tools/test_agent_canon_pr_graph_selector.py
+      - tests/agent_tools/test_surface_manifest.py
 
   - id: visualization-contract
     summary: Validates typed visualization source universes, projection manifests, canonical ToolCalls, and post-format readback coverage.
@@ -925,7 +1059,7 @@ entries:
       - tests/agent_tools/test_semantic_provider_html_report.py
 
   - id: prose-reasoning-graph
-    summary: Builds SQLite-backed prose structure graphs, Graph DSL Core projection payloads, diagnostics, explanations, edit-operation plans, writing-skill handoff packets, and combined document checks with structured-analysis.
+    summary: Builds SQLite-backed prose structure graphs and related projections in an explicit external runtime, with diagnostics, explanations, edit-operation plans, writing-skill handoff packets, and combined document checks with structured-analysis.
     path: tools/agent_tools/prose_reasoning_graph.py
     family: agent_tools
     role: workflow
@@ -954,6 +1088,21 @@ entries:
     status: canonical
     command: python3 tools/agent_tools/route.py
     writes: false
+    dispatch:
+      runtime: python
+      argv: [python3, tools/agent_tools/route.py]
+      execution_plane: tool-container
+      cwd: source-root
+      env: allowlisted
+      stdin: inherited
+      stdout: inherited
+      stderr: inherited
+      exit: propagate
+      signal: propagate
+      side_effect: read-only
+      output_root: none
+      written_paths: []
+      parity: verified
     default_wiring:
       ci: false
       pr_check: false
@@ -1145,24 +1294,6 @@ entries:
     tests:
       - tests/tools/test_check_github_workflows.py
 
-  - id: container-config
-    summary: Validates Dockerfile, runtime pack, and devcontainer configuration.
-    path: tools/ci/container_config.py
-    family: ci
-    role: checker
-    status: canonical
-    command: python3 tools/ci/container_config.py
-    writes: false
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/conventions/coding-conventions-project.md
-    tests:
-      - tests/tools/test_container_config.py
-
   - id: run-gpu-container
     summary: Runs an admitted GPU container through one entrypoint and internally selects exact CDI or --gpus all injection.
     path: tools/ci/run_gpu_container.sh
@@ -1282,7 +1413,7 @@ entries:
       - documents/agent-canon/agent-canon-update-route.md
       - agents/workflows/agent-canon-pr-workflow.md
     tests:
-      - tests/tools/test_update_agent_canon.py
+      - tests/agent_tools/test_github_publish.py
 
   - id: check-agent-canon-pr
     summary: Runs the standalone AgentCanon PR readiness checklist.
@@ -1373,79 +1504,8 @@ entries:
     tests:
       - tests/agent_tools/test_pydocstyle_review.py
 
-  - id: check-agent-canon-latest
-    summary: Checks whether the AgentCanon pin and source are current and emits the PR-first handoff when shared canon is dirty.
-    path: tools/ci/check_agent_canon_latest.sh
-    family: ci
-    role: checker
-    status: canonical
-    command: bash tools/ci/check_agent_canon_latest.sh
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests:
-      - tests/tools/test_update_agent_canon.py
-
-  - id: sync-agent-canon
-    summary: Synchronizes shared AgentCanon surfaces into template or derived repos.
-    path: tools/sync_agent_canon.sh
-    family: root
-    role: sync
-    status: canonical
-    command: bash tools/sync_agent_canon.sh
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: true
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/runtime/SHARED_RUNTIME_SURFACES.md
-    tests:
-      - tests/tools/test_update_agent_canon.py
-
-  - id: update-agent-canon
-    summary: Provides user-facing AgentCanon latest update with eval-log parking, branch merge, and PR routes.
-    path: tools/update_agent_canon.sh
-    family: root
-    role: sync
-    status: canonical
-    command: bash tools/update_agent_canon.sh
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/agent-canon/agent-canon-subtree-migration.md
-    tests:
-      - tests/tools/test_update_agent_canon.py
-
-  - id: rebuild-agent-tools
-    summary: Rebuilds compiled AgentCanon tools after AgentCanon source updates.
-    path: tools/rebuild_agent_tools.sh
-    family: root
-    role: runner
-    status: canonical
-    command: bash tools/rebuild_agent_tools.sh
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/design/rust-agent-tool-migration.md
-    tests:
-      - tests/tools/test_update_agent_canon.py
-
   - id: agent-canon-update-todos
-    summary: Routes parent-repo agents through AgentCanon update TODOs after submodule pin updates.
+    summary: Routes parent readback tasks after a standalone AgentCanon source merge.
     path: tools/agent_tools/agent_canon_update_todos.py
     family: agent_tools
     role: workflow
@@ -1461,24 +1521,6 @@ entries:
       - documents/agent-canon/agent-canon-parent-repo-latest-checklist.md
     tests:
       - tests/agent_tools/test_agent_canon_update_todos.py
-
-  - id: checkout-agent-canon-submodule
-    summary: Checks out the AgentCanon submodule in GitHub Actions.
-    path: tools/ci/checkout_agent_canon_submodule.sh
-    family: ci
-    role: sync
-    status: canonical
-    command: bash tools/ci/checkout_agent_canon_submodule.sh
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/workflows/agent-canon-pr-workflow.md
-    tests:
-      - tests/tools/test_check_github_workflows.py
 
   - id: check-agent-runtime-alignment
     summary: Verifies runtime entrypoints and agent config mirrors stay aligned.
@@ -1640,25 +1682,6 @@ entries:
       - documents/experiments/experiment-registry.md
     tests: []
     test_exempt_reason: Registry contract is exercised through repo-wide CI smoke checks.
-
-  - id: check-experiment-template
-    summary: Creates a temporary parent-shaped topic from centralized experiment templates and validates its registry, Python, and notebook structure without executing it.
-    path: tools/ci/check_experiment_template.py
-    family: ci
-    role: checker
-    status: canonical
-    command: python3 tools/ci/check_experiment_template.py
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - templates/README.md
-      - documents/experiments/experiment-registry.md
-    tests:
-      - tests/tools/test_check_experiment_template.py
 
   - id: check-hardcoded-numbers
     summary: Rejects unexplained numeric literals in Python and C++ sources.
@@ -1840,7 +1863,7 @@ entries:
     family: agent_tools
     role: runner
     status: canonical
-    command: bash tools/agent_tools/review_backlog_scan.sh --report-dir reports/agents/<run-id>/cross_repo_inspection --submodule-aware
+    command: bash tools/agent_tools/review_backlog_scan.sh --report-dir <external-runtime>/reports/<run-id>/cross_repo_inspection
     writes: true
     default_wiring:
       ci: false
@@ -1882,7 +1905,6 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/runtime/SHARED_RUNTIME_SURFACES.md
     tests:
       - tests/agent_tools/test_file_surface_inventory.py
 

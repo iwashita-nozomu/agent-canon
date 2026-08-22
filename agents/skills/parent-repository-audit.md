@@ -18,7 +18,7 @@ downstream implementation ../../.agents/skills/parent-repository-audit/SKILL.md 
 - 目的: AgentCanon を利用する親 repository を semantic audit unit ごとに読み、finding を owner repair、対象 readback、closure まで進める。
 - 入口: `documents/parent-repository-audit/README.md`、catalog capability、dependency map、resolver が解決した tool command の順に読む。
 - 順序: `parent_repository_audit.py list` が返す unit を path 昇順で一つずつ処理し、unit receipt を残してから次へ進む。
-- 境界: path owner/class は親の `responsibility-scope.toml`、path existence/kind は structure contract、runtime projection は shared surface manifest が所有する。
+- 境界: path owner/class は親の `responsibility-scope.toml`、path existence/kind は structure contract、AgentCanon runtime lifecycle は standalone `bootstrap.sh` と明示 runtime root が所有する。
 - 出力: selected surface/unit、tracked evidence count、unit ごとの `pass|closed|failed|deferred|blocked`、repair/readback evidence、全体 status。
 
 ## Capability And Routing
@@ -66,7 +66,7 @@ python3 tools/agent_tools/parent_repository_audit.py list \
 - `--surface`: unit の `Related Change Surfaces` にある stable ID から unit を選択する。
 - `--scope`: 親 root 内の tracked file/directory evidence を絞るだけで、owner や unit を選ばない。
 - selector なし: 全 unit と全 tracked path evidence を返す。
-- submodule: 親の gitlink path だけを evidence とし、内部 tree を展開しない。
+- AgentCanon source: 親の ignored qualified clone と source PR/readback だけを evidence とし、親の tracked tree に source internals を展開しない。
 
 unknown surface、invalid unit、source/root path escape、missing evidence scope、parent Git missing
 は typed failure です。path coverage/overlap はこの tool では計算せず、親の
@@ -99,7 +99,7 @@ python3 tools/agent_tools/parent_repository_audit.py check \
 | Unit | Owner route | Static-first evidence |
 | --- | --- | --- |
 | `repository-structure` | `structure-refactor` | required/optional path existence、filesystem kind、canonical scope check |
-| `ownership-root-views` | `agent-canon-update` | source root、pin、root-view sync |
+| `ownership-root-views` | `agent-canon-update` | source clone、PR/main readback、runtime boundary |
 | `environment-containers` | `environment-maintenance` | base image、cold build、user/sudo、owner split、host driver |
 | `dependency-integrity` | `dependency-analysis` | headers、dependency manifests、graph direction |
 | `code-type-boundaries` | `oop-type-design`、language review | public type、state ownership、implementation trace |

@@ -6,6 +6,7 @@
 # upstream implementation ./route.py owns route behavior and JSON schema
 # upstream implementation ./evaluate_workflow_selection.py owns the frozen 525-case manifest loader
 # upstream implementation ./skill_shim_materializer.py owns generated shim records and content
+# upstream implementation ./runtime_artifacts.py owns external runtime receipt publication
 # downstream implementation ../../tests/agent_tools/test_skill_shim_evaluation.py focused producer tests
 # @dependency-end
 """Produce route goldens, answer-free packet receipts, and shim measurements."""
@@ -16,8 +17,10 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import unicodedata
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -30,27 +33,16 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.11+ is the supported 
 
 from evaluate_workflow_selection import load_manifest
 from skill_shim_materializer import (  # pyright: ignore[reportMissingTypeStubs]
+    BuildContext,
     build_context,
     build_record,
     render_shim,
 )
 
 try:
-    from .parent_root_side_effects import (
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
-    )
+    from .runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
 except ImportError:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
-    )
+    from runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError  # type: ignore[no-redef]
 
 SCHEMA_ROUTE = "agent_canon.route_golden_case.v1"
 SCHEMA_PACKETS = "agent_canon.skill_runtime_shim.fresh_packets"
@@ -73,23 +65,33 @@ SCENARIO_CATEGORIES = (
 HOST_OBSERVATION_SCHEMA = "agent_canon.skill_runtime_shim.host_observation"
 
 
-def _parent_capability(purpose: str):
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+def _runtime_boundary(
+    root: Path, runtime_root: Path | str | None = None
+) -> RuntimeArtifactBoundary:
+    """Resolve the explicit external runtime artifact capability.
+
+    Evaluation producers never publish into the AgentCanon checkout.  A
+    caller may pass the root directly or provide the same explicit runtime
+    capability used by the bootstrap service; there is no source-tree or
+    parent-temporary fallback.
+    """
+    configured = runtime_root or os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
     if not configured:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            f"{purpose}: explicit parent root is required",
-        )
-    parent = Path(configured)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
-    )
-    return ParentRootSideEffectBoundary(), attestation
+        raise ProducerError("runtime_root_required")
+    try:
+        return RuntimeArtifactBoundary.for_source(root, configured, create=True)
+    except RuntimeArtifactError as exc:
+        raise ProducerError(f"runtime_artifact_boundary:{exc}") from exc
 
 
-def _parent_write(path: Path, data: bytes, purpose: str) -> None:
-    boundary, attestation = _parent_capability(purpose)
-    boundary.write_parent_owned_file(attestation, path, data, purpose)
+def _runtime_write(
+    boundary: RuntimeArtifactBoundary, path: Path, data: bytes, purpose: str
+) -> None:
+    """Publish one producer result through the external runtime boundary."""
+    try:
+        boundary.atomic_write_bytes(path, data)
+    except RuntimeArtifactError as exc:
+        raise ProducerError(f"{purpose}:{exc}") from exc
 
 
 class WorkflowSelectionCase(Protocol):
@@ -256,6 +258,7 @@ def route_golden(
     manifest: Path,
     route_cli: Path,
     output: Path,
+    runtime_root: Path | str | None = None,
 ) -> Mapping[str, object]:
     """Run the real route CLI for every frozen manifest case."""
     manifest_data = cast(WorkflowSelectionManifest, load_manifest(manifest))
@@ -264,18 +267,24 @@ def route_golden(
     if len(manifest_data.cases) != 525:
         raise ProducerError("route_case_count_mismatch")
     rows: list[dict[str, object]] = []
-    boundary, attestation = _parent_capability("skill-shim-route")
-    temp_parent = root / ".agent-canon" / "tmp" / "skill-shim-evaluation"
-    prompt_receipt = boundary.create_parent_owned_temp_directory(
-        attestation, temp_parent, "skill-shim-route", "skill-shim-route"
+    boundary = _runtime_boundary(root, runtime_root)
+    temp_parent = boundary.ensure_directory("tmp")
+    prompt_root = Path(
+        tempfile.mkdtemp(prefix="skill-shim-route-", dir=str(temp_parent))
     )
+    # Validate the freshly-created staging directory before any prompt is
+    # written.  This keeps the receipt boundary explicit even if a hostile
+    # filesystem replaces a component between creation and use.
+    prompt_root = boundary.resolve(prompt_root)
     primary_error: BaseException | None = None
     try:
-        prompt_root = prompt_receipt.physical_path
         for case in manifest_data.cases:
             prompt_path = prompt_root / f"{case.case_id}.txt"
-            boundary.write_parent_owned_file(
-                attestation, prompt_path, case.prompt.encode("utf-8"), "skill-shim-route"
+            _runtime_write(
+                boundary,
+                prompt_path,
+                case.prompt.encode("utf-8"),
+                "skill-shim-route-prompt",
             )
             completed = subprocess.run(
                 [
@@ -316,10 +325,13 @@ def route_golden(
         raise
     finally:
         try:
-            boundary.remove_parent_owned_tree(
-                attestation, prompt_receipt, "skill-shim-route-cleanup"
-            )
-        except ParentRootSideEffectError as cleanup_error:
+            # prompt_root is a fresh, receipt-bound directory beneath the
+            # external runtime root; remove exactly that directory after the
+            # subprocess wave and never touch the source checkout.
+            if not prompt_root.is_relative_to(boundary.root):
+                raise ProducerError("skill-shim-route_cleanup_escape")
+            shutil.rmtree(prompt_root)
+        except (OSError, ProducerError) as cleanup_error:
             if primary_error is not None:
                 raise cleanup_error from primary_error
             raise
@@ -329,7 +341,8 @@ def route_golden(
         "case_count": len(rows),
         "cases": rows,
     }
-    _parent_write(
+    _runtime_write(
+        boundary,
         output,
         (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8"),
         "skill-shim-route-golden",
@@ -438,7 +451,14 @@ def _packet_manifest(path: Path) -> tuple[Mapping[str, object], list[Mapping[str
     return raw, rows
 
 
-def packet_receipt(root: Path, manifest: Path, model: str, profile: str, output_dir: Path) -> Mapping[str, object]:
+def packet_receipt(
+    root: Path,
+    manifest: Path,
+    model: str,
+    profile: str,
+    output_dir: Path,
+    runtime_root: Path | str | None = None,
+) -> Mapping[str, object]:
     """Emit packet receipts without adding answers or expected commands."""
     if model != MODEL_ID or profile != HOST_PROFILE:
         raise ProducerError("fresh_model_profile_mismatch")
@@ -454,7 +474,8 @@ def packet_receipt(root: Path, manifest: Path, model: str, profile: str, output_
         "packet_count": len(rows),
         "packets": rows,
     }
-    _parent_write(
+    _runtime_write(
+        _runtime_boundary(root, runtime_root),
         output_dir / "packet-receipt.json",
         (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8"),
         "skill-shim-packet-receipt",
@@ -462,13 +483,56 @@ def packet_receipt(root: Path, manifest: Path, model: str, profile: str, output_
     return cast(Mapping[str, object], payload)
 
 
-def _git_content(root: Path, path: str, revisions: Sequence[str]) -> bytes:
-    """Read a baseline candidate from the repository without changing it."""
-    for revision in revisions:
-        result = subprocess.run(["git", "show", f"{revision}:{path}"], cwd=root, capture_output=True, check=False)
-        if result.returncode == 0:
-            return result.stdout
-    raise ProducerError(f"missing_baseline_candidate:{path}")
+def _canonical_skill_content(context: BuildContext, root: Path, skill: str) -> bytes:
+    """Read the current candidate from the catalog's canonical owner.
+
+    The materializer owns the public projection.  Reading an historical Git
+    revision here would silently reintroduce a stale parent/source report as
+    the baseline and would make the measurement depend on network refs.
+    """
+    entry = context.catalog_entries.get(skill)
+    if entry is None:
+        raise ProducerError(f"unknown_skill:{skill}")
+    canonical = entry.get("canonical_doc")
+    if not isinstance(canonical, str) or not canonical:
+        raise ProducerError(f"canonical_doc_missing:{skill}")
+    path = root / canonical
+    try:
+        return path.read_bytes()
+    except OSError as exc:
+        raise ProducerError(f"canonical_doc_unreadable:{skill}") from exc
+
+
+def _host_envelope(
+    context: BuildContext,
+    records: Mapping[str, Mapping[str, object]],
+    skill: str,
+    model: str,
+    profile: str,
+    prompt_sha: str,
+) -> tuple[dict[str, object], bytes, int, int, bytes]:
+    """Build candidate-independent host input from the canonical projection."""
+    try:
+        provenance = cast(Mapping[str, object], records[skill]["provenance"])
+        projection_digest = provenance["record_digest"]
+        materializer_id = provenance["materializer_id"]
+    except (KeyError, TypeError) as exc:
+        raise ProducerError(f"skill_projection_missing:{skill}") from exc
+    if not isinstance(projection_digest, str) or not isinstance(materializer_id, str):
+        raise ProducerError(f"skill_projection_invalid:{skill}")
+    envelope_value = {
+        "model_id": model,
+        "host_profile": profile,
+        "skill_id": skill,
+        "skill_projection_digest": projection_digest,
+        "materializer_id": materializer_id,
+        "prompt_sha256": prompt_sha,
+    }
+    envelope_bytes = canonical_json_bytes(envelope_value)
+    host_bytes, host_scalars, normalized_envelope = deterministic_measure(
+        envelope_bytes.decode("utf-8")
+    )
+    return envelope_value, envelope_bytes, host_bytes, host_scalars, normalized_envelope
 
 
 def _host_observation(path: Path) -> dict[str, object]:
@@ -671,6 +735,7 @@ def measurement(
     manifest: Path,
     host_dir: Path,
     output: Path,
+    runtime_root: Path | str | None = None,
 ) -> Mapping[str, object]:
     """Build paired deterministic measurements from observed host token usage."""
     if model != MODEL_ID or profile != HOST_PROFILE:
@@ -688,36 +753,20 @@ def measurement(
     generated_contents = {skill: render_shim(records[skill]) for skill in context.skill_ids}
     for index, observation in enumerate(observations):
         skill = str(observation["skill_id"])
-        if skill not in context.host_entries:
+        if skill not in records:
             raise ProducerError(f"unknown_skill:{skill}")
         variant = cast(str, observation["variant"])
-        host = context.host_entries[skill]
         prompt = str(observation["prompt"])
         prompt_sha = sha256_bytes(prompt.encode("utf-8"))
         envelope_id = f"host-{index:04d}-{observation['scenario_id']}-{variant}"
-        envelope_value = {
-            "model_id": model,
-            "host_profile": profile,
-            "skill_id": skill,
-            "config_entry_index": host.index,
-            "config_order": host.order,
-            "config_path": host.path,
-            "enabled": host.enabled,
-            "prompt_sha256": prompt_sha,
-        }
-        envelope_bytes = canonical_json_bytes(envelope_value)
-        host_bytes, host_scalars, normalized_envelope = deterministic_measure(envelope_bytes.decode("utf-8"))
+        envelope_value, envelope_bytes, host_bytes, host_scalars, normalized_envelope = _host_envelope(
+            context, cast(Mapping[str, Mapping[str, object]], records), skill, model, profile, prompt_sha
+        )
         host_envelopes.append(
             {
                 "row_type": "host_envelope",
                 "host_envelope_id": envelope_id,
-                "model_id": model,
-                "host_profile": profile,
-                "skill_id": skill,
-                "config_entry_index": host.index,
-                "config_order": host.order,
-                "config_path": host.path,
-                "enabled": host.enabled,
+                **envelope_value,
                 "prompt_sha256": prompt_sha,
                 "host_envelope_sha256": sha256_bytes(normalized_envelope),
                 "host_utf8_bytes": host_bytes,
@@ -727,7 +776,7 @@ def measurement(
         if variant == "generated":
             candidate_text = generated_contents[skill]
         else:
-            candidate_text = _git_content(root, f".agents/skills/{skill}/SKILL.md", ("origin/main", "HEAD" )).decode("utf-8")
+            candidate_text = _canonical_skill_content(context, root, skill).decode("utf-8")
         _, _, normalized_candidate = deterministic_measure(candidate_text)
         combined = normalize_text(envelope_bytes.decode("utf-8") + "\n" + candidate_text).encode("utf-8")
         candidate_row_id = f"candidate-{index:04d}"
@@ -768,32 +817,21 @@ def measurement(
     baseline_prompt = "agent-canon.skill-runtime-shim.deterministic-measurement"
     baseline_prompt_sha = sha256_bytes(baseline_prompt.encode("utf-8"))
     for skill in context.skill_ids:
-        host = context.host_entries[skill]
-        envelope_value = {
-            "model_id": model,
-            "host_profile": profile,
-            "skill_id": skill,
-            "config_entry_index": host.index,
-            "config_order": host.order,
-            "config_path": host.path,
-            "enabled": host.enabled,
-            "prompt_sha256": baseline_prompt_sha,
-        }
-        envelope_bytes = canonical_json_bytes(envelope_value)
-        host_bytes, host_scalars, normalized_envelope = deterministic_measure(envelope_bytes.decode("utf-8"))
+        envelope_value, envelope_bytes, host_bytes, host_scalars, normalized_envelope = _host_envelope(
+            context,
+            cast(Mapping[str, Mapping[str, object]], records),
+            skill,
+            model,
+            profile,
+            baseline_prompt_sha,
+        )
         for variant in VARIANTS:
             envelope_id = f"deterministic-{skill}-{variant}"
             host_envelopes.append(
                 {
                     "row_type": "host_envelope",
                     "host_envelope_id": envelope_id,
-                    "model_id": model,
-                    "host_profile": profile,
-                    "skill_id": skill,
-                    "config_entry_index": host.index,
-                    "config_order": host.order,
-                    "config_path": host.path,
-                    "enabled": host.enabled,
+                    **envelope_value,
                     "prompt_sha256": baseline_prompt_sha,
                     "host_envelope_sha256": sha256_bytes(normalized_envelope),
                     "host_utf8_bytes": host_bytes,
@@ -803,7 +841,7 @@ def measurement(
             if variant == "generated":
                 candidate_text = generated_contents[skill]
             else:
-                candidate_text = _git_content(root, f".agents/skills/{skill}/SKILL.md", ("origin/main", "HEAD")).decode("utf-8")
+                candidate_text = _canonical_skill_content(context, root, skill).decode("utf-8")
             _, _, normalized_candidate = deterministic_measure(candidate_text)
             combined = normalize_text(envelope_bytes.decode("utf-8") + "\n" + candidate_text)
             candidate_rows.append(
@@ -866,7 +904,8 @@ def measurement(
         "scenario_rows": scenario_rows,
         "summary": summary,
     }
-    _parent_write(
+    _runtime_write(
+        _runtime_boundary(root, runtime_root),
         output,
         (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8"),
         "skill-shim-measurement",
@@ -883,12 +922,14 @@ def build_parser() -> argparse.ArgumentParser:
     route.add_argument("--manifest", type=Path, required=True)
     route.add_argument("--route-cli", type=Path, required=True)
     route.add_argument("--output", type=Path, required=True)
+    route.add_argument("--runtime-root", type=Path)
     packets = subparsers.add_parser("packets")
     packets.add_argument("--root", type=Path, default=Path.cwd())
     packets.add_argument("--manifest", type=Path, required=True)
     packets.add_argument("--model", default=MODEL_ID)
     packets.add_argument("--profile", default=HOST_PROFILE)
     packets.add_argument("--output-dir", type=Path, required=True)
+    packets.add_argument("--runtime-root", type=Path)
     tokens = subparsers.add_parser("tokens")
     tokens.add_argument("--root", type=Path, default=Path.cwd())
     tokens.add_argument("--model", default=MODEL_ID)
@@ -896,6 +937,7 @@ def build_parser() -> argparse.ArgumentParser:
     tokens.add_argument("--manifest", type=Path, required=True)
     tokens.add_argument("--host-evaluation-dir", type=Path, required=True)
     tokens.add_argument("--output", type=Path, required=True)
+    tokens.add_argument("--runtime-root", type=Path)
     return parser
 
 
@@ -904,11 +946,32 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         if args.command == "route-golden":
-            payload = route_golden(args.root.resolve(), args.manifest.resolve(), args.route_cli, args.output.resolve())
+            payload = route_golden(
+                args.root.resolve(),
+                args.manifest.resolve(),
+                args.route_cli,
+                args.output.resolve(),
+                args.runtime_root,
+            )
         elif args.command == "packets":
-            payload = packet_receipt(args.root.resolve(), args.manifest.resolve(), args.model, args.profile, args.output_dir.resolve())
+            payload = packet_receipt(
+                args.root.resolve(),
+                args.manifest.resolve(),
+                args.model,
+                args.profile,
+                args.output_dir.resolve(),
+                args.runtime_root,
+            )
         else:
-            payload = measurement(args.root.resolve(), args.model, args.profile, args.manifest.resolve(), args.host_evaluation_dir.resolve(), args.output.resolve())
+            payload = measurement(
+                args.root.resolve(),
+                args.model,
+                args.profile,
+                args.manifest.resolve(),
+                args.host_evaluation_dir.resolve(),
+                args.output.resolve(),
+                args.runtime_root,
+            )
     except (OSError, ProducerError, ValueError, json.JSONDecodeError) as exc:
         print(f"SKILL_SHIM_EVALUATION_FAILURE={exc}")
         return 2

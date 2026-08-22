@@ -5,7 +5,7 @@ contract policy
 responsibility Documents the default parent-repository licensing surface seeded from AgentCanon.
 upstream design ../../LICENSE provides the default license text seed.
 upstream design ./README.md documents parent-owned active-contract document surfaces.
-downstream implementation ../../tools/sync_agent_canon.sh seeds and checks parent-repository shared surface copies.
+downstream implementation ../../bootstrap.sh owns the standalone runtime boundary.
 @dependency-end
 -->
 

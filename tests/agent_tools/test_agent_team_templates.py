@@ -27,7 +27,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 import capacity_handshake  # noqa: E402
-import bootstrap_agent_run  # noqa: E402
 import task_close  # noqa: E402
 import update_lifecycle_contract  # noqa: E402
 from agent_team import (  # noqa: E402
@@ -50,10 +49,7 @@ from packets import (  # noqa: E402
 )
 from team_config import load_task_catalog, load_team_config, resolve_role  # noqa: E402
 from task_authority import hash_baseline_bytes  # noqa: E402
-
-TEST_PARENT_ROOT = PROJECT_ROOT.parents[2]
-TEST_TEMP_ROOT = TEST_PARENT_ROOT / ".agent-canon" / "tmp"
-
+from runtime_artifacts import RuntimeArtifactBoundary  # noqa: E402
 
 class AgentTeamTemplateTest(unittest.TestCase):
     """Verify reusable template partial expansion."""
@@ -90,7 +86,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
             resolve_role_document_packet(
                 config=config,
                 role=role,
-                report_dir=PROJECT_ROOT / "reports" / "packet-test",
+                report_dir=Path(tempfile.gettempdir()) / "agent-canon-packet-test",
                 workspace_root=PROJECT_ROOT,
             )
         with self.assertRaisesRegex(
@@ -100,7 +96,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
             _spec_source_root(
                 RunBundleSpec(
                     config=config,
-                    report_dir=PROJECT_ROOT / "reports" / "packet-test",
+                    report_dir=Path(tempfile.gettempdir()) / "agent-canon-packet-test",
                     run_id="packet-test",
                     task="packet test",
                     owner="test",
@@ -110,7 +106,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
                 )
             )
 
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_dir = Path(tmp_dir) / "reports" / "packet-test"
             workspace_root.mkdir(parents=True)
@@ -163,7 +159,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
                 task_catalog=task_catalog,
             )
 
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
+        with tempfile.TemporaryDirectory() as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             report_root.mkdir(parents=True)
             prior_run = report_root / "prior-run"
@@ -181,16 +177,11 @@ class AgentTeamTemplateTest(unittest.TestCase):
                 build_spec(report_root, "destination-mismatch"),
                 report_dir=report_root / "wrong-destination",
             )
-            with patch.dict(
-                os.environ,
-                {"AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
-                clear=False,
+            with self.assertRaisesRegex(
+                RuntimeError,
+                r"^runtime_roots_invalid:report_dir_mismatch$",
             ):
-                with self.assertRaisesRegex(
-                    RuntimeError,
-                    r"^runtime_roots_invalid:report_dir_mismatch$",
-                ):
-                    create_run_bundle(mismatch_spec)
+                create_run_bundle(mismatch_spec)
             self.assertFalse(mismatch_spec.report_dir.exists())
             self.assertEqual(pointer.read_bytes(), pointer_bytes)
             self.assertEqual(pointer_baseline.read_bytes(), pointer_baseline_bytes)
@@ -198,42 +189,34 @@ class AgentTeamTemplateTest(unittest.TestCase):
             self.assertEqual(tuple(report_root.glob(".stage-run.*")), ())
 
             spec = build_spec(report_root, "injected-failure")
-            original_write = (
-                bootstrap_agent_run.ParentRootSideEffectBoundary.write_parent_owned_file
-            )
-            stage_writes = 0
+            original_write = RuntimeArtifactBoundary.atomic_write_bytes
+            atomic_writes = 0
 
             def fail_second_stage_write(
-                boundary: object,
-                attestation: object,
+                boundary: RuntimeArtifactBoundary,
                 path: Path,
                 payload: bytes,
-                purpose: str,
-            ) -> object:
-                nonlocal stage_writes
-                if purpose == "bootstrap-stage-artifact":
-                    stage_writes += 1
-                    if stage_writes == 2:
-                        raise RuntimeError("injected-stage-write-failure")
-                return original_write(boundary, attestation, path, payload, purpose)
+                *,
+                mode: int = 0o600,
+            ) -> Path:
+                nonlocal atomic_writes
+                atomic_writes += 1
+                if atomic_writes == 2:
+                    raise RuntimeError("injected-stage-write-failure")
+                return original_write(boundary, path, payload, mode=mode)
 
             with patch.object(
-                bootstrap_agent_run.ParentRootSideEffectBoundary,
-                "write_parent_owned_file",
+                RuntimeArtifactBoundary,
+                "atomic_write_bytes",
                 new=fail_second_stage_write,
             ):
-                with patch.dict(
-                    os.environ,
-                    {"AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
-                    clear=False,
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    r"^injected-stage-write-failure$",
                 ):
-                    with self.assertRaisesRegex(
-                        RuntimeError,
-                        r"^injected-stage-write-failure$",
-                    ):
-                        create_run_bundle(spec)
+                    create_run_bundle(spec)
 
-            self.assertEqual(stage_writes, 2)
+            self.assertGreaterEqual(atomic_writes, 2)
             self.assertFalse(spec.report_dir.exists())
             self.assertEqual(pointer.read_bytes(), pointer_bytes)
             self.assertEqual(pointer_baseline.read_bytes(), pointer_baseline_bytes)
@@ -241,12 +224,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
             self.assertEqual(tuple(report_root.glob(".stage-run.*")), ())
 
             success_spec = build_spec(report_root, "successful-run")
-            with patch.dict(
-                os.environ,
-                {"AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
-                clear=False,
-            ):
-                created_files = create_run_bundle(success_spec)
+            created_files = create_run_bundle(success_spec)
             self.assertEqual(
                 tuple(path for path in created_files if path),
                 created_files,

@@ -4,8 +4,6 @@
 @dependency-start
 contract reference
 responsibility Documents the canonical total single-owner relation for tracked paths in each repository.
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared runtime projection policy
-upstream design ../runtime/shared-runtime-surfaces.toml shared surface projection mechanics
 upstream design ../structure/repo-structure-contract.toml separate path existence and kind contract
 upstream design ../../responsibility-scope.toml machine-readable repo-local ownership manifest
 downstream design ../../templates/documents/responsibility-scope.template.toml starter manifest for template-derived repositories
@@ -32,7 +30,6 @@ own the responsibility map for template-derived repositories.
   protecting-tool evidence.
 - Boundary: path existence and filesystem kind belong to
   `repo-structure-contract.toml`; projection mechanics belong to
-  `shared-runtime-surfaces.toml`.
 
 ## Ownership Relation
 

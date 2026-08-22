@@ -36,7 +36,7 @@ use super::storage::{
 use serde_json::Value;
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[test]
 fn markdown_segmentation_emits_document_sections_and_blocks() {
@@ -143,6 +143,7 @@ fn provider_compare_reuses_existing_responsibility_buckets() {
     tx.commit().unwrap();
 
     let report = compare_providers(&CompareProvidersArgs {
+        root: root.clone(),
         db,
         query: Some("provider comparison phrase".to_string()),
         left: ProviderSpec {
@@ -1314,17 +1315,13 @@ fn parse_search_accepts_query_file_and_jsonl_for_long_text() {
 }
 
 #[test]
-fn default_db_path_lives_under_home_cache_and_outside_repo() {
+fn default_db_path_uses_test_runtime_and_stays_outside_repo() {
     let root = unique_temp_dir("semantic-index-default-db");
     let db = default_db_path(&root);
     assert!(db.is_absolute());
     assert!(!db.starts_with(&root));
     assert!(db.ends_with("index.sqlite"));
-    if let Ok(home) = env::var("HOME") {
-        if !home.trim().is_empty() {
-            assert!(db.starts_with(Path::new(&home)));
-        }
-    }
+    assert!(db.starts_with(env::temp_dir().join("agent-canon-test-runtime")));
 }
 
 #[test]

@@ -4,8 +4,7 @@ contract reference
 responsibility Documents の索引と正本境界。
 upstream design ./rule/README.md filename、配置、分割規約。
 upstream design ./design/README.md target state と実装境界。
-upstream design ./runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface policy。
-upstream design ./runtime/shared-runtime-surfaces.toml machine-readable ownership manifest。
+upstream design ./runtime/bootstrap-runtime.md shared bootstrap runtime policy。
 downstream design ./parent-repository/README.md parent repository structure and projection boundary。
 downstream implementation ../rust/agent-canon/src/structured_analysis.rs document inventory。
 @dependency-end
@@ -21,8 +20,9 @@ downstream implementation ../rust/agent-canon/src/structured_analysis.rs documen
 
 - 配置・分割・命名の判断は [文書規約](./rule/README.md) から始めます。
 - target state と実装境界は [設計](./design/README.md) を読みます。
-- root view、Symlink、checked copy は [Runtime Surface](./runtime/SHARED_RUNTIME_SURFACES.md)
-  と [親レポ構造](./parent-repository/README.md) を読みます。
+- AgentCanon tool runtime は [Bootstrap Runtime](./runtime/bootstrap-runtime.md) を読みます。
+  親レポの source-free onboarding は [Derived Repository Bootstrap](./contracts/derived-repo-bootstrap-runbook.md)
+  を読みます。root view、symlink、checked copy は現行の導線ではありません。
 - 機械可読の構造契約は [structure](./structure/) にあります。
 - cross-run の知見、比較、補助記録は [notes](./notes/) に置き、正本へ昇格した内容は所有する責務文書へ移します。
 - workflow、skill、subagent の正本は `agents/` であり、この directory に複製しません。
@@ -31,7 +31,7 @@ downstream implementation ../rust/agent-canon/src/structured_analysis.rs documen
 
 | Directory | 役割 |
 | --- | --- |
-| `agent-canon/` | AgentCanon source、branch、remote、submodule、親レポ投影 |
+| `agent-canon/` | AgentCanon source、branch、remote、source PR、archive ownership |
 | `codex/` | Codex 設定、エージェント運用、skill、prompt 評価 |
 | `contracts/` | 親レポの bootstrap、host、remote、devcontainer、license 契約 |
 | `conventions/` | 言語、レビュー、logging、OOP、docstring の共通規約 |
@@ -39,10 +39,10 @@ downstream implementation ../rust/agent-canon/src/structured_analysis.rs documen
 | `experiments/` | 実験、GPU admission、ExperimentRunner、結果保持 |
 | `notes/` | cross-run insight、experiment/research summary、branch/worktree/failure の補助記録 |
 | `operations/` | branch、checklist、troubleshooting、legacy cleanup |
-| `parent-repository/` | AgentCanon をvendorする親レポのroot構造 |
+| `parent-repository/` | parent repository structure と current redirect |
 | `prose-reasoning-graph/` | 文書推論グラフのDSLと分析 |
 | `rule/` | 文書配置、命名、依存変更の抽象規約 |
-| `runtime/` | runtime surface、profile、log archive の契約 |
+| `runtime/` | bootstrap runtime、profile、log archive の契約 |
 | `structure/` | repository structure の機械可読契約 |
 | `structured-analysis/` | 構造化文書・依存・DB分析 |
 | `templates/` | 契約や設定の生成テンプレート |
@@ -65,7 +65,7 @@ downstream implementation ../rust/agent-canon/src/structured_analysis.rs documen
 - AgentCanon の更新: [agent-canon](./agent-canon/)
 - Codex の runtime 設定: [codex](./codex/)
 - 親レポの導入・環境: [contracts](./contracts/)
-- 共有runtimeの所有境界: [runtime](./runtime/)
+- 共有tool runtimeの所有境界: [runtime](./runtime/)
 - 構造の機械検証: [structure](./structure/)
 - 文書の分割判断: [rule](./rule/)
 - cross-run の知見: [notes](./notes/)

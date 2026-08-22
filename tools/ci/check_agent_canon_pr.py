@@ -6,7 +6,7 @@
 # upstream implementation ../agent_tools/parent_root_side_effects.py owns atomic G2 publication.
 # upstream implementation ./check_agent_canon_pr.sh owns the ordered generated-completeness check execution.
 # downstream implementation ../../tests/agent_tools/test_github_publish.py consumes owner-produced G2 fixtures.
-# downstream implementation ../../tests/tools/test_update_agent_canon.py consumes owner-produced G2 fixtures.
+# downstream implementation ../../tests/agent_tools/test_github_publish.py consumes owner-produced G2 fixtures.
 # @dependency-end
 """Own the G2 boundary emitted by the AgentCanon PR gate."""
 
@@ -15,7 +15,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -31,6 +30,10 @@ from parent_root_side_effects import (  # noqa: E402
     ParentRootAttestationReceipt,
     ParentRootAttestationRequest,
     ParentRootSideEffectBoundary,
+)
+from runtime_artifacts import (  # noqa: E402
+    RuntimeArtifactBoundary,
+    runtime_artifact_boundary,
 )
 from update_lifecycle_contract import (  # noqa: E402
     materialize_gate_verdict,
@@ -112,50 +115,78 @@ def _persist(
     path: Path,
     receipt: Mapping[str, object],
     *,
-    boundary: ParentRootSideEffectBoundary,
-    attestation: ParentRootAttestationReceipt,
+    boundary: RuntimeArtifactBoundary | ParentRootSideEffectBoundary,
+    attestation: ParentRootAttestationReceipt | None = None,
 ) -> dict[str, object]:
-    capability = boundary.resolve_parent_owned_path(
-        attestation, path, "agent-canon-g2-receipt"
-    )
-    if capability.target_dev is not None:
+    # Keep the helper usable by older unit fixtures, but production G2 always
+    # takes the RuntimeArtifactBoundary route below.  The compatibility path
+    # is never selected by main and therefore cannot make source-local output
+    # an accepted PR receipt.
+    if isinstance(boundary, ParentRootSideEffectBoundary):
+        if attestation is None:
+            raise ValueError("agent-canon-g2: parent attestation is required")
+        capability = boundary.resolve_parent_owned_path(
+            attestation, path, "agent-canon-g2-receipt"
+        )
+        if capability.target_dev is not None:
+            existing = validate_gate_verdict(
+                json.loads(boundary.read_parent_owned_file(capability).decode("utf-8"))
+            )
+            validate_immutable_replay(existing, receipt, field=str(path))
+            return existing
+        boundary.atomic_publish(
+            capability,
+            json.dumps(receipt, indent=2, sort_keys=True).encode("utf-8") + b"\n",
+        )
+        return dict(receipt)
+    target = boundary.resolve(path)
+    if target.is_file():
         existing = validate_gate_verdict(
-            json.loads(boundary.read_parent_owned_file(capability).decode("utf-8"))
+            json.loads(target.read_text(encoding="utf-8"))
         )
         validate_immutable_replay(existing, receipt, field=str(path))
         return existing
-    boundary.atomic_publish(
-        capability,
+    boundary.atomic_write_bytes(
+        target,
         json.dumps(receipt, indent=2, sort_keys=True).encode("utf-8") + b"\n",
     )
     return dict(receipt)
 
 
 def main() -> int:
+    """Validate and publish one runtime-owned G2 receipt."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--g1-bundle", type=Path, required=True)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--source-root", type=Path, required=True)
+    parser.add_argument("--control-parent-root", type=Path, required=True)
+    parser.add_argument("--runtime-root", type=Path, required=True)
     args = parser.parse_args()
     source_root = args.source_root.resolve()
-    parent_root = Path(
-        os.environ.get("AGENT_CANON_PARENT_ROOT", str(source_root))
-    ).resolve()
-    boundary = ParentRootSideEffectBoundary()
-    attestation = boundary.attest(
-        ParentRootAttestationRequest(
-            cwd=parent_root,
-            explicit_root=parent_root,
-            source_root=source_root,
-            purpose="agent-canon-g2",
-        )
-    )
-    output_root = (args.output or source_root).resolve()
     try:
-        output_root.relative_to(source_root)
+        control_root = args.control_parent_root.resolve(strict=True)
+    except OSError as error:
+        parser.error(f"control parent root is unavailable: {type(error).__name__}")
+    if control_root == source_root:
+        parser.error("control parent root must differ from source")
+    try:
+        ParentRootSideEffectBoundary().attest(
+            ParentRootAttestationRequest(
+                cwd=control_root,
+                explicit_root=control_root,
+                source_root=source_root,
+                purpose="agent-canon-g2",
+            )
+        )
+        runtime = runtime_artifact_boundary(source_root, args.runtime_root, create=True)
+    except (OSError, RuntimeError) as error:
+        parser.error(f"external boundary rejected: {type(error).__name__}")
+    output_root = (args.output or runtime.root / "tasks" / "g2.generated-completeness.json").resolve()
+    try:
+        output_root.relative_to(runtime.root)
     except ValueError as exc:
         raise SystemExit(
-            "agent_canon_pr_gate:output must remain under source root"
+            "agent_canon_pr_gate:output must remain under runtime root"
         ) from exc
     payload_object: object = json.loads(args.g1_bundle.read_text(encoding="utf-8"))
     payload: Mapping[str, object]
@@ -177,8 +208,8 @@ def main() -> int:
     g1_binding = cast(Mapping[str, object], g1["binding"])
     transaction_id = cast(str, g1_binding["transaction_id"])
     output = args.output or (
-        source_root
-        / ".agent-canon"
+        runtime.root
+        / "tasks"
         / "update-lifecycle"
         / "evidence"
         / transaction_id.removeprefix("tx:")
@@ -197,8 +228,7 @@ def main() -> int:
     persisted = _persist(
         output,
         receipt,
-        boundary=boundary,
-        attestation=attestation,
+        boundary=runtime,
     )
     persisted_binding = cast(Mapping[str, object], persisted["binding"])
     print("AGENT_CANON_G2_RECEIPT=materialized")

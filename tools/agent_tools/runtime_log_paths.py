@@ -25,16 +25,16 @@ import subprocess
 from pathlib import Path
 
 try:
-    from .parent_root_side_effects import (
-        ParentRootAttestationRequest,
-        ParentRootSideEffectBoundary,
-        attest_parent_root,
+    from .runtime_artifacts import (
+        RUNTIME_ROOT_ENV,
+        RuntimeArtifactBoundary,
+        runtime_artifact_boundary,
     )
 except ImportError:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
-        ParentRootSideEffectBoundary,
-        attest_parent_root,
+    from runtime_artifacts import (  # type: ignore[no-redef]
+        RUNTIME_ROOT_ENV,
+        RuntimeArtifactBoundary,
+        runtime_artifact_boundary,
     )
 
 try:
@@ -53,7 +53,7 @@ except ImportError:
 HOOK_ARCHIVE_DIR_ENV = "AGENT_CANON_HOOK_ARCHIVE_DIR"
 HOOK_EVENT_SPOOL_DIR_ENV = "AGENT_CANON_HOOK_EVENT_SPOOL_DIR"
 LOG_ENV_ENV = "AGENT_CANON_LOG_ENV"
-LOG_ARCHIVE_PARENT = Path(".agent-canon") / "log-archive"
+LOG_ARCHIVE_PARENT = Path("archive") / "agent-canon-log"
 LOG_ARCHIVE_REMOTE = "git@github.com:iwashita-nozomu/agent-canon-log.git"
 CODEX_RUNTIME_CHAT_DIR_NAME = "chats"
 CODEX_RUNTIME_INDEX_FILE = "index.jsonl"
@@ -68,36 +68,6 @@ AGENT_CANON_ROOT_MARKERS = (
     (Path("evidence") / "agent-evals" / "README.md", 2),
     (Path("documents") / "runtime-log-archive.md", 1),
 )
-
-
-def _parent_path(active_root: Path, candidate: Path, purpose: str) -> Path:
-    """Authenticate and contain a writer path beneath the outer repository.
-
-    Runtime path helpers remain usable by read-only legacy callers when the
-    parent handoff is absent.  A bounded child handoff makes the parent root
-    mandatory and rejects external overrides before a writer receives them.
-    The caller's candidate remains the logical path returned by this resolver;
-    the boundary is used only to authenticate and containment-check it.
-    """
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        return candidate
-    parent = Path(configured)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(
-            cwd=parent,
-            explicit_root=parent,
-            purpose=purpose,
-        )
-    )
-    boundary = ParentRootSideEffectBoundary()
-    boundary.resolve_parent_owned_path(
-        attestation,
-        candidate,
-        purpose,
-        create=False,
-    )
-    return candidate
 
 
 def safe_slug(value: str) -> str:
@@ -121,36 +91,42 @@ def repo_log_key(root: Path) -> str:
         return "unidentified-source"
 
 
-def hook_event_spool_root(active_root: Path) -> Path:
+def runtime_boundary(
+    source_root: Path,
+    runtime_root: Path | str | None = None,
+    *,
+    create: bool = False,
+) -> RuntimeArtifactBoundary:
+    """Return the explicit external runtime boundary for one source root."""
+    return runtime_artifact_boundary(source_root, runtime_root, create=create)
+
+
+def hook_event_spool_root(active_root: Path, runtime_root: Path | str | None = None) -> Path:
     """Return the O(1) repo-owned hook-event spool root."""
     override = os.environ.get(HOOK_EVENT_SPOOL_DIR_ENV, "").strip()
     if override:
         candidate = Path(override) / repo_log_key(active_root)
-        return _parent_path(active_root, candidate, "runtime-event-spool")
-    candidate = (
-        active_root
-        / ".agent-canon"
-        / "runtime-event-spool"
-        / "hook-events"
-        / repo_log_key(active_root)
-    )
-    return _parent_path(active_root, candidate, "runtime-event-spool")
+        # Explicit legacy override remains accepted only when it is inside the
+        # declared external runtime root.
+        boundary = runtime_boundary(active_root, runtime_root)
+        return boundary.resolve(candidate)
+    boundary = runtime_boundary(active_root, runtime_root)
+    return boundary.resolve(Path("spool") / "hook-events" / repo_log_key(active_root))
 
 
-def runtime_event_publication_outcome_spool_root(active_root: Path) -> Path:
+def runtime_event_publication_outcome_spool_root(
+    active_root: Path, runtime_root: Path | str | None = None
+) -> Path:
     """Return the repo-local publication-outcome observation spool root."""
-    candidate = (
-        active_root
-        / ".agent-canon"
-        / "runtime-event-spool"
-        / "publication-outcome"
-    )
-    return _parent_path(active_root, candidate, "publication-outcome-spool")
+    boundary = runtime_boundary(active_root, runtime_root)
+    return boundary.resolve(Path("spool") / "publication-outcome")
 
 
-def post_tooluse_spool_path(root: Path, hook_run_id: str) -> Path:
+def post_tooluse_spool_path(
+    root: Path, hook_run_id: str, runtime_root: Path | str | None = None
+) -> Path:
     """Return the O(1) default PostToolUse event path."""
-    return hook_event_spool_root(root) / "post-tool-use" / "hook" / f"{hook_run_id}.json"
+    return hook_event_spool_root(root, runtime_root) / "post-tool-use" / "hook" / f"{hook_run_id}.json"
 
 
 def _log_environment_key(root: Path) -> str:
@@ -194,10 +170,24 @@ def log_branch_key(source_root: Path, canon_root: Path) -> str:
 
 
 def source_git_head(source_root: Path) -> str:
-    """Return the source repository HEAD SHA when it is available."""
+    """Return HEAD only when ``source_root`` is the repository root itself.
+
+    ``git -C`` normally walks through parent directories.  Runtime exchange
+    directories frequently live below a different checkout, so accepting that
+    discovery would attribute the enclosing control repository's commit to a
+    source that is not a Git checkout.
+    """
     try:
         result = subprocess.run(
-            ["git", "-C", str(source_root), "rev-parse", "--verify", "HEAD"],
+            [
+                "git",
+                "-C",
+                str(source_root),
+                "rev-parse",
+                "--show-toplevel",
+                "--verify",
+                "HEAD",
+            ],
             check=False,
             capture_output=True,
             text=True,
@@ -205,7 +195,15 @@ def source_git_head(source_root: Path) -> str:
         )
     except (OSError, subprocess.TimeoutExpired):
         return ""
-    return result.stdout.strip() if result.returncode == 0 else ""
+    lines = result.stdout.splitlines()
+    if result.returncode != 0 or len(lines) != 2:
+        return ""
+    try:
+        discovered_root = Path(lines[0]).resolve(strict=True)
+        requested_root = source_root.resolve(strict=True)
+    except OSError:
+        return ""
+    return lines[1].strip() if discovered_root == requested_root else ""
 
 
 def agent_canon_git_commit_key(canon_root: Path) -> str:
@@ -224,10 +222,12 @@ def codex_runtime_summary_file(canon_root: Path) -> str:
     return f"summary-{agent_canon_git_commit_key(canon_root)}.jsonl"
 
 
-def mounted_log_archive_root(canon_root: Path) -> Path:
-    """Return the preferred AgentCanon-local log archive mount path."""
-    candidate = canon_root / LOG_ARCHIVE_PARENT
-    return _parent_path(canon_root, candidate, "runtime-log-archive")
+def mounted_log_archive_root(
+    canon_root: Path, runtime_root: Path | str | None = None
+) -> Path:
+    """Return the external AgentCanon log archive root."""
+    boundary = runtime_boundary(canon_root, runtime_root)
+    return boundary.resolve(LOG_ARCHIVE_PARENT)
 
 
 def is_agent_canon_root(root: Path) -> bool:
@@ -245,72 +245,102 @@ def marker_resolved_root(root: Path) -> Path | None:
 
 
 def agent_canon_root(root: Path) -> Path:
-    """Return AgentCanon source root for standalone or parent invocation."""
+    """Return the explicit AgentCanon source root for one invocation.
+
+    Parent repositories are intentionally source-free.  A caller running from
+    a parent must pass the external development clone as ``root`` (or resolve
+    it before calling this helper); no ``vendor/agent-canon`` discovery is
+    permitted.
+    """
     resolved = root.resolve()
-    vendored = resolved / "vendor" / "agent-canon"
-    if is_agent_canon_root(vendored):
-        return vendored
     marker_root = marker_resolved_root(resolved)
     return marker_root if marker_root is not None else resolved
 
 
-def _log_archive_root(canon_root: Path) -> Path:
+def _log_archive_root(canon_root: Path, runtime_root: Path | str | None = None) -> Path:
     """Return the active hook log archive root."""
     override = os.environ.get(HOOK_ARCHIVE_DIR_ENV, "").strip()
     if override:
-        return _parent_path(canon_root, Path(override), "hook-log-archive")
-    mount = mounted_log_archive_root(canon_root)
+        return runtime_boundary(canon_root, runtime_root).resolve(Path(override))
+    mount = mounted_log_archive_root(canon_root, runtime_root)
     if mount.is_dir():
+        return mount
+    if runtime_root is not None or os.environ.get(RUNTIME_ROOT_ENV, "").strip():
+        # A fresh runtime generation is intentionally allowed to materialize
+        # its archive lazily. The writer owns directory creation through the
+        # RuntimeArtifactBoundary; readers simply observe an empty directory.
         return mount
     raise RuntimeError(
         "AgentCanon log archive root is required; set "
-        f"{HOOK_ARCHIVE_DIR_ENV} or mount {mounted_log_archive_root(canon_root)}"
+        f"{HOOK_ARCHIVE_DIR_ENV} or configure {RUNTIME_ROOT_ENV}"
     )
 
 
-def hook_results_dir(active_root: Path, canon_root: Path) -> Path:
+def hook_results_dir(
+    active_root: Path, canon_root: Path, runtime_root: Path | str | None = None
+) -> Path:
     """Return the hook JSONL result directory for one source repository."""
-    return _log_archive_root(canon_root) / "hook-runs" / repo_log_key(active_root)
+    return _log_archive_root(canon_root, runtime_root) / "hook-runs" / repo_log_key(active_root)
 
 
-def codex_runtime_summary_dir(active_root: Path, canon_root: Path) -> Path:
+def codex_runtime_summary_dir(
+    active_root: Path, canon_root: Path, runtime_root: Path | str | None = None
+) -> Path:
     """Return the Codex runtime summary root directory for one source repository."""
-    return _log_archive_root(canon_root) / "codex-runtime" / repo_log_key(active_root)
+    return _log_archive_root(canon_root, runtime_root) / "codex-runtime" / repo_log_key(active_root)
 
 
-def codex_runtime_chat_dir(active_root: Path, canon_root: Path, conversation_id: str) -> Path:
+def codex_runtime_chat_dir(
+    active_root: Path,
+    canon_root: Path,
+    conversation_id: str,
+    runtime_root: Path | str | None = None,
+) -> Path:
     """Return the per-chat Codex runtime summary directory for one conversation."""
     return (
-        codex_runtime_summary_dir(active_root, canon_root)
+        codex_runtime_summary_dir(active_root, canon_root, runtime_root)
         / CODEX_RUNTIME_CHAT_DIR_NAME
         / safe_slug(conversation_id)
     )
 
 
-def codex_runtime_summary_path(active_root: Path, canon_root: Path, conversation_id: str) -> Path:
+def codex_runtime_summary_path(
+    active_root: Path,
+    canon_root: Path,
+    conversation_id: str,
+    runtime_root: Path | str | None = None,
+) -> Path:
     """Return the per-chat Codex runtime summary JSONL path."""
-    return codex_runtime_chat_dir(active_root, canon_root, conversation_id) / codex_runtime_summary_file(canon_root)
+    return codex_runtime_chat_dir(active_root, canon_root, conversation_id, runtime_root) / codex_runtime_summary_file(canon_root)
 
 
-def codex_runtime_index_path(active_root: Path, canon_root: Path) -> Path:
+def codex_runtime_index_path(
+    active_root: Path, canon_root: Path, runtime_root: Path | str | None = None
+) -> Path:
     """Return the cross-chat Codex runtime summary index path."""
-    return codex_runtime_summary_dir(active_root, canon_root) / CODEX_RUNTIME_INDEX_FILE
+    return codex_runtime_summary_dir(active_root, canon_root, runtime_root) / CODEX_RUNTIME_INDEX_FILE
 
 
-def agent_report_archive_dir(active_root: Path, canon_root: Path) -> Path:
+def agent_report_archive_dir(
+    active_root: Path, canon_root: Path, runtime_root: Path | str | None = None
+) -> Path:
     """Return the archived reports/agents directory for one source repository."""
-    return _log_archive_root(canon_root) / "agent-reports" / repo_log_key(active_root)
+    return _log_archive_root(canon_root, runtime_root) / "agent-reports" / repo_log_key(active_root)
 
 
-def eval_results_dir(canon_root: Path, family: str) -> Path:
+def eval_results_dir(
+    canon_root: Path, family: str, runtime_root: Path | str | None = None
+) -> Path:
     """Return the active accumulated eval result directory for one family."""
-    return _log_archive_root(canon_root) / "eval-results" / safe_slug(family)
+    return _log_archive_root(canon_root, runtime_root) / "eval-results" / safe_slug(family)
 
 
-def eval_result_search_dirs(canon_root: Path, family: str) -> tuple[Path, ...]:
+def eval_result_search_dirs(
+    canon_root: Path, family: str, runtime_root: Path | str | None = None
+) -> tuple[Path, ...]:
     """Return eval result directories to read for one family."""
     family_slug = safe_slug(family)
-    archive_root = _log_archive_root(canon_root)
+    archive_root = _log_archive_root(canon_root, runtime_root)
     candidates: list[Path] = [
         archive_root / "eval-results" / family_slug,
         archive_root / "eval-results" / "legacy-import" / family_slug,
@@ -318,13 +348,16 @@ def eval_result_search_dirs(canon_root: Path, family: str) -> tuple[Path, ...]:
     return tuple(dict.fromkeys(candidates))
 
 
-def hook_result_search_dirs(requested_root: Path, canon_root: Path) -> tuple[Path, ...]:
+def hook_result_search_dirs(
+    requested_root: Path,
+    canon_root: Path,
+    runtime_root: Path | str | None = None,
+) -> tuple[Path, ...]:
     """Return hook result directories to read for one repository context."""
-    archive_root = _log_archive_root(canon_root)
+    archive_root = _log_archive_root(canon_root, runtime_root)
     candidates: list[Path] = [
         archive_root / "hook-runs" / repo_log_key(requested_root),
         archive_root / "hook-runs" / "legacy-import",
-        canon_root / "agents" / "evals" / "results" / "hook-runs",
         archive_root / "hook-runs",
     ]
     return tuple(dict.fromkeys(candidates))

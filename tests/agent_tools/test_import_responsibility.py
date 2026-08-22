@@ -60,6 +60,19 @@ class ImportResponsibilityTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("wildcard-import:app/main.py:1:module:app.lib", result.stdout)
 
+    def test_documented_wildcard_reexport_passes(self) -> None:
+        """Explicit F403 suppression permits a compatibility re-export shim."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            self.write_file(root, "app/main.py", "from app.lib import *  # noqa: F403\n")
+            self.write_file(root, "app/lib.py", "VALUE = 1\n")
+
+            result = self.run_checker(root, "app/main.py")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("IMPORT_RESPONSIBILITY=pass", result.stdout)
+
     def test_scope_import_violation_fails(self) -> None:
         """A scope cannot import a local file outside its declared import rules."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -240,19 +253,6 @@ class ImportResponsibilityTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("scope-import:app/main.py:1:app->evidence", result.stdout)
-
-    def test_vendored_default_manifest_is_used_when_root_override_is_missing(self) -> None:
-        """Derived repos may use the vendored AgentCanon default manifest."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            self.write_fixture(root / "vendor" / "agent-canon")
-            self.write_file(root, "app/main.py", "import app.lib\n\nVALUE = app.lib.VALUE\n")
-            self.write_file(root, "app/lib.py", "VALUE = 1\n")
-
-            result = self.run_checker(root, "app/main.py")
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("IMPORT_RESPONSIBILITY=pass", result.stdout)
 
     def write_fixture(self, root: Path) -> None:
         """Write a bounded responsibility-scope fixture."""

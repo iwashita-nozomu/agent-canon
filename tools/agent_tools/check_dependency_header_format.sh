@@ -66,8 +66,6 @@ load_declared_surfaces() {
   local registry="${DEPENDENCY_CONTRACT_KIND_REGISTRY:-}"
   if [[ -z "$registry" && -f "$ROOT_DIR/documents/design/dependency-contract-kinds.toml" ]]; then
     registry="$ROOT_DIR/documents/design/dependency-contract-kinds.toml"
-  elif [[ -z "$registry" && -f "$ROOT_DIR/vendor/agent-canon/documents/design/dependency-contract-kinds.toml" ]]; then
-    registry="$ROOT_DIR/vendor/agent-canon/documents/design/dependency-contract-kinds.toml"
   elif [[ -z "$registry" ]]; then
     local script_path script_dir
     script_path="$(readlink -f "${BASH_SOURCE[0]}")"
@@ -112,10 +110,6 @@ contract_kind_registry_path() {
   fi
   if [[ -f "$ROOT_DIR/documents/design/dependency-contract-kinds.toml" ]]; then
     printf '%s\n' "$ROOT_DIR/documents/design/dependency-contract-kinds.toml"
-    return
-  fi
-  if [[ -f "$ROOT_DIR/vendor/agent-canon/documents/design/dependency-contract-kinds.toml" ]]; then
-    printf '%s\n' "$ROOT_DIR/vendor/agent-canon/documents/design/dependency-contract-kinds.toml"
     return
   fi
   local script_path script_dir
@@ -166,7 +160,7 @@ is_checkable_suffix() {
 
 is_skip_path() {
   case "$1" in
-    .git/*|.pytest_cache/*|.ruff_cache/*|reports/*|tests/fixtures/nvidia/*.txt|LICENSE|LICENSE.*|NOTICE|NOTICE.*|COPYING|COPYING.*|vendor/agent-canon/LICENSE|vendor/agent-canon/LICENSE.*|vendor/agent-canon/NOTICE|vendor/agent-canon/NOTICE.*|vendor/agent-canon/COPYING|vendor/agent-canon/COPYING.*)
+    .git/*|.pytest_cache/*|.ruff_cache/*|reports/*|tests/fixtures/nvidia/*.txt|LICENSE|LICENSE.*|NOTICE|NOTICE.*|COPYING|COPYING.*)
       return 0
       ;;
     *)
@@ -267,20 +261,6 @@ normalize_path() {
 
 source_context_file() {
   local source_file="$1"
-  case "$source_file" in
-    .github/workflows/agent-coordination.yml|.github/workflows/agent-improvement-guide.yml)
-      if [[ -f "vendor/agent-canon/$source_file" ]]; then
-        printf 'vendor/agent-canon/%s\n' "$source_file"
-        return
-      fi
-      ;;
-    .github/scripts/checkout_agent_canon_submodule.sh)
-      if [[ -f "vendor/agent-canon/tools/ci/checkout_agent_canon_submodule.sh" ]]; then
-        printf '%s\n' "vendor/agent-canon/tools/ci/checkout_agent_canon_submodule.sh"
-        return
-      fi
-      ;;
-  esac
   printf '%s\n' "$source_file"
 }
 

@@ -4,7 +4,6 @@ contract design
 responsibility Documents オブジェクト指向設計方針 for this repository.
 upstream design ./README.md documents index and discovery path
 upstream design ./software-engineering-principles.md general engineering principles, precedence, and abstraction admission
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ./coding-conventions-house-style.md shared implementation style contract
 upstream design ./coding-conventions-python.md Python convention entrypoint
 upstream design ./coding-conventions-cpp.md C++ source/header ownership and target boundary
@@ -16,7 +15,7 @@ downstream implementation ../../tools/oop/python/rule_inventory.py inventories P
 downstream implementation ../../tools/oop/cpp/rule_inventory.py inventories C++ OOP rule surfaces
 downstream implementation ../../tools/catalog.yaml records OOP tool catalog status
 downstream implementation ../../tools/agent_tools/tool_catalog.py validates OOP catalog entries
-upstream implementation ../../tools/sync_agent_canon.sh root symlink view generation
+upstream implementation ../../bootstrap.sh standalone runtime entrypoint
 @dependency-end
 -->
 

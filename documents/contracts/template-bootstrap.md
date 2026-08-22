@@ -4,7 +4,6 @@ contract reference
 responsibility Documents the default source-free template bootstrap path.
 upstream design ./static-seed-export.md static seed ownership, provenance, and exclusion contract
 upstream design ./template-github-remote.md template GitHub canonical remote policy
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md separately selected live integration boundary
 downstream implementation ../../tools/docs/check_bootstrap_docs.py rejects live runtime requirements in the default path
 downstream design ../../agents/skills/start-repository.md default repository-start workflow
 @dependency-end
@@ -94,7 +93,6 @@ bash scripts/start_repository.sh --validate-only
 
 ## 6. Live Integration Is Separate
 
-[Shared Runtime Surfaces](../runtime/SHARED_RUNTIME_SURFACES.md) は、AgentCanon の live integration を
 明示的に採用する repository だけの別契約です。default template/bootstrap はその manifest、
 投影、更新 lifecycle、source-root discovery を選択しません。採用する場合は通常経路の延長ではなく、
 repository architecture の独立した opt-in 変更として review します。

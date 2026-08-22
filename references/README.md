@@ -45,10 +45,18 @@ tracked tree.
 Use the reference materializer for consulted PDF or HTML sources:
 
 ```bash
+AGENT_CANON_PARENT_ROOT=/abs/path/to/parent-repository \
 python3 tools/agent_tools/reference_materializer.py \
   --url "https://example.com/source.pdf" \
   --input /path/to/downloaded-source.pdf
 ```
+
+`AGENT_CANON_PARENT_ROOT` must name the authenticated Git repository that owns
+the reference output. The materializer has no source-checkout or `$HOME`
+fallback: without this explicit parent capability it fails before creating a
+file. Runtime logs, temporary downloads, and extracted intermediates remain in
+the external runtime root; only the requested Markdown source record is
+published into the parent-owned `references/` tree.
 
 The output is a Markdown file under `references/external/` with source URL,
 kind, retrieval time, content hash, extraction method, and extracted text. HTML

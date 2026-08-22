@@ -2,7 +2,6 @@
 @dependency-start
 contract reference
 responsibility Documents 作業別チェックリスト for this repository.
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../contracts/github-first-module-and-devcontainer-policy.md environment ownership boundary
 @dependency-end
 -->
@@ -81,20 +80,13 @@ tools/bin/agent-canon docs check <changed-file>.md
 
 ```bash
 bash tools/docker_dependency_validator.sh
-python3 tools/ci/container_config.py
-make docker-build-check
-python3 tools/ci/run_container_pack.py --print-only
-```
-
-必要なら:
-
-```bash
-python3 tools/ci/run_codex_in_repo_container.py --print-only
+python3 -m pytest -q tests/tools/test_bootstrap_container_contract.py
+bash bootstrap.sh --control-parent-root <root> --runtime-root <runtime> install
 ```
 
 確認:
 
-- repo-local `docker/Dockerfile`、`pyproject.toml`、AgentCanon-owned `.devcontainer/` の責務境界が同期している
+- AgentCanon shared tool image と project-owned Docker/test の責務境界が分離している
 - fixed OS/Python capability、digest-pinned official Node OCI provider image、typed dependency manifest、project extras の owner が混在していない
 - `docker/README.md`、`README.md`、`QUICK_START.md` が更新されている
 - `templates/agents/environment_change_proposal.md` に proposal が残っている

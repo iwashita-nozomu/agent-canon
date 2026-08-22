@@ -10,162 +10,150 @@
   ],
   "profile_classes": [
     {
-      "id": "base-project",
-      "profile": "Base project",
+      "id": "bootstrap",
+      "profile": "Bootstrap",
       "strict_dependency_graph_required": false,
       "activates": [
-        "`README.md`",
-        "`QUICK_START.md`",
-        "`documents/README.md`",
-        "project code and tests"
+        "`bootstrap.sh`",
+        "`bootstrap/`",
+        "lifecycle parser and state"
       ],
-      "required_when": "Every template or derived repo"
+      "required_when": "AgentCanon installation, start/stop, target, or lifecycle state changes"
     },
     {
-      "id": "agent-runtime",
-      "profile": "Agent runtime",
+      "id": "tool-runtime",
+      "profile": "Tool runtime",
       "strict_dependency_graph_required": false,
       "activates": [
-        "`AGENTS.md`",
-        "`.codex/config.toml`",
-        "`tools/agent-canon`",
-        "project-owned `agents/`, `.agents/`, `.codex/`, and `tools/` remain separate"
+        "Python/Rust tool dispatch",
+        "catalog",
+        "LSP"
       ],
-      "required_when": "An agent performs or reviews repo work"
+      "required_when": "Shared AgentCanon analysis tools or language servers change"
     },
     {
-      "id": "devcontainer",
-      "profile": "Devcontainer",
+      "id": "container",
+      "profile": "Container",
       "strict_dependency_graph_required": false,
       "activates": [
-        "`.devcontainer/`",
-        "shared post-create helpers"
+        "Dockerfile",
+        "entrypoint",
+        "manifest limits"
       ],
-      "required_when": "VS Code devcontainer or agent ergonomics are used"
+      "required_when": "The shared AgentCanon tool image or container contract changes"
     },
     {
-      "id": "docker-runtime",
-      "profile": "Docker runtime",
+      "id": "mount-generation",
+      "profile": "Mount generation",
       "strict_dependency_graph_required": false,
       "activates": [
-        "root `docker/`",
-        "runtime packs"
+        "target registry",
+        "generations",
+        "rollback"
       ],
-      "required_when": "Dockerfile, image, pack, Jupyter, or container setup changes"
+      "required_when": "Target admission, mount generation, rollback, or concurrent lifecycle changes"
     },
     {
-      "id": "github-automation",
-      "profile": "GitHub automation",
+      "id": "codex-surfaces",
+      "profile": "Codex surfaces",
       "strict_dependency_graph_required": false,
       "activates": [
-        "`.github/`",
-        "PR templates",
-        "Actions helpers"
+        "isolated skills",
+        "agents",
+        "hooks",
+        "runtime-local `CODEX_HOME`"
       ],
-      "required_when": "GitHub Actions, PR automation, or GitHub path-constrained copies change"
+      "required_when": "Codex preparation, isolated runtime configuration, or owned-link cleanup changes"
     },
     {
-      "id": "experiment",
-      "profile": "Experiment",
+      "id": "eval-archive",
+      "profile": "Eval archive",
       "strict_dependency_graph_required": false,
       "activates": [
-        "`experiments/`",
-        "experiment registry",
-        "managed runner tools"
+        "eval producer",
+        "external spool",
+        "archive Git adapter"
       ],
-      "required_when": "Experiment topics, formal runs, result summaries, or research workflows change"
+      "required_when": "Eval collection, source-unchanged evidence, or agent-canon-log publication changes"
     },
     {
-      "id": "cpp",
-      "profile": "C++",
+      "id": "docs",
+      "profile": "Docs",
       "strict_dependency_graph_required": false,
       "activates": [
-        "parent root remains language-neutral",
-        "`cpp/CMakeLists.txt` as the single native project entry",
-        "`cpp/cmake/`",
-        "`cpp/src/`",
-        "`cpp/include/`",
-        "`tests/cpp/` (out-of-tree project tests)",
-        "`cpp/experiments/`",
-        "C++ OOP checks",
-        "`cmake -S \"$ROOT/cpp\" -B \"$ROOT/build/cpp/<profile>\" -DCMAKE_INSTALL_PREFIX=\"$ROOT/.state/cpp-install/<profile>\"`"
+        "README",
+        "guides",
+        "runtime contracts"
       ],
-      "required_when": "C or C++ code, build layout, or native artifacts change"
+      "required_when": "User-facing AgentCanon command, owner, migration, or runtime documentation changes"
     },
     {
-      "id": "memory-and-learning",
-      "profile": "Memory and learning",
-      "strict_dependency_graph_required": false,
-      "activates": [
-        "`memory/`",
-        "notes promotion",
-        "learning workflows"
-      ],
-      "required_when": "User asks to persist memory, feedback/retrospective is observed, or agent-learning is in scope"
-    },
-    {
-      "id": "maintenance",
-      "profile": "Maintenance",
+      "id": "source",
+      "profile": "Source",
       "strict_dependency_graph_required": true,
       "activates": [
-        "inventories",
-        "review backlog scan",
-        "improvement guide",
-        "catalog drift tools"
+        "policy",
+        "workflow",
+        "skills",
+        "canonical tools"
       ],
-      "required_when": "AgentCanon maintenance, repo-wide audit, or scheduled cleanup work"
+      "required_when": "AgentCanon source policy, workflow, skill, hook, or canonical tool changes"
+    },
+    {
+      "id": "project",
+      "profile": "Project",
+      "strict_dependency_graph_required": false,
+      "activates": [
+        "project Docker",
+        "project test runner",
+        "project GPU"
+      ],
+      "required_when": "A parent project execution environment changes; never for AgentCanon internal tests"
     }
   ],
   "compatibility_note": [
-    "Compatibility surfaces such as legacy subtree routes may remain documented, but",
-    "only under the matching compatibility profile. They are not the default path for",
-    "GitHub/submodule-first repositories."
+    "Profiles may be combined, but every changed path must have one owner and one",
+    "primary check route. Do not select `project` merely because a tool was invoked",
+    "against a project target."
   ],
   "risk_classes": [
     {
-      "risk": "Routine docs",
-      "examples": "Link/text edits in project-local docs with no source contract change",
-      "required_validation": "docs check for touched docs and changed-file dependency header checks"
+      "risk": "boundary",
+      "examples": "new mount, path default, write location, credential route",
+      "required_validation": "source before/after fingerprint, resolved paths, negative escape test"
     },
     {
-      "risk": "Focused code",
-      "examples": "Narrow Python or shell edit with local tests",
-      "required_validation": "changed-file dependency checks, targeted tests, ruff/pyright when Python changes"
+      "risk": "compatibility",
+      "examples": "CLI rename, catalog entry, execution-plane change",
+      "required_validation": "schema-v2 parity fixture for argv/cwd/streams/exit/signal/writes"
     },
     {
-      "risk": "Profile change",
-      "examples": "Docker, GitHub, experiment, C++, devcontainer, MCP, or memory surface change",
-      "required_validation": "profile-specific checker plus targeted tests"
+      "risk": "lifecycle",
+      "examples": "install/start/stop/gc/uninstall, image/container ownership",
+      "required_validation": "exact IDs, labels, limits, health and absence readback"
     },
     {
-      "risk": "Shared canon",
-      "examples": "`vendor/agent-canon/`, root shared views, skills, workflows, hooks, tools",
-      "required_validation": "`make agent-canon-pr-check` or equivalent AgentCanon PR gate"
+      "risk": "concurrency",
+      "examples": "target add, rollback, task admission",
+      "required_validation": "lock trace, active count, candidate/old generation evidence"
     },
     {
-      "risk": "Large delivery",
-      "examples": "repo-wide rewrite, workflow redesign, broad policy change, or user-requested comprehensive run",
-      "required_validation": "run bundle, dependency review, focused and full validation gates, independent review"
+      "risk": "archive",
+      "examples": "collect/sync, branch, push, readback",
+      "required_validation": "local spool, remote ref/tree/blob digest, duplicate/conflict result"
+    },
+    {
+      "risk": "docs",
+      "examples": "user route, owner, migration, issue reference",
+      "required_validation": "link/header check and clean command examples"
     }
   ],
   "risk_note": [
-    "Static analysis and reading evidence are the primary validation evidence for",
-    "AgentCanon tasks. `make ci` remains the full local confidence gate, but it is",
-    "not the default or only acceptable evidence for every owner-bounded change. Use",
-    "operation checks, smoke runs, full CI, long test suites, benchmarks, experiments,",
-    "and other broad execution as supplemental evidence when runtime behavior,",
-    "integration risk, or unresolved static/read findings require them. The selected",
-    "validation must match the changed paths, owner surface, and risk class, and the",
-    "PR or run bundle must state why that set is sufficient.",
-    "Prompt-only or prose-only edits use the surface-specific docs, prompt, eval,",
-    "and dependency checks selected by the active profile; they do not automatically",
-    "escalate to full `make ci`.",
-    "Pydocstyle is an explicit Docstring review route, not a shared correctness",
-    "requirement. The shared gate does not invoke or block on pydocstyle; active",
-    "profile validation owners remain authoritative for their selected checks.",
-    "An unavailable pydocstyle tool or its diagnostics fail only the explicit",
-    "review command.",
-    "AgentCanon development prompt and accumulated eval producers belong to the standalone static-gates owner; derived shared gates do not invoke them or apply their diagnostics to parent-owned documents."
+    "If a focused command is unavailable in a fresh checkout, report the missing",
+    "owner/route; do not create a fallback that writes into source. Use one task",
+    "temporary directory outside the source checkout and one shared tool image at",
+    "most. Track any image/container created for validation and remove that exact",
+    "resource after evidence is captured."
   ],
   "validation_failure_response": {
     "rule": [
@@ -234,47 +222,56 @@
       ]
     },
     {
-      "changed_surface": "Root shared views or submodule pin",
+      "changed_surface": "Root bootstrap or runtime lifecycle",
       "required_check": [
-        "source-root resolver `exec tools/sync_agent_canon.sh check`",
-        "`git submodule status vendor/agent-canon` evidence"
+        "`install -> start -> target add -> status -> codex prepare -> tool/exec`",
+        "`eval collect -> eval sync` or an explicit pending receipt",
+        "`stop -> gc -> uninstall -> resource absence readback`"
       ]
     },
     {
-      "changed_surface": "Docker/devcontainer/runtime pack",
+      "changed_surface": "Python/Rust tool runtime or LSP",
       "required_check": [
-        "`bash tools/docker_dependency_validator.sh`",
-        "`make docker-build-check` when build behavior changes"
+        "targeted tool-dispatch and runtime-artifact tests",
+        "schema-v2 parity evidence for argv/cwd/streams/exit/signal/writes"
       ]
     },
     {
-      "changed_surface": "GitHub workflow/PR",
+      "changed_surface": "Docker image or shared container",
       "required_check": [
-        "`python3 tools/ci/check_github_workflows.py`",
-        "relevant GitHub Actions evidence when available"
+        "container contract tests",
+        "one labeled shared image build when Docker is available",
+        "non-root, read-only source, bounded resource and LSP readback"
       ]
     },
     {
-      "changed_surface": "Experiments",
+      "changed_surface": "Target mount or generation",
       "required_check": [
-        "`make experiment-check`",
-        "managed run evidence for formal experiment changes"
+        "target registry and generation tests",
+        "lock, active-task, candidate-health, rollback and atomic-switch evidence"
       ]
     },
     {
-      "changed_surface": "C/C++",
+      "changed_surface": "Codex isolated surfaces",
       "required_check": [
-        "`cmake -S \"$ROOT/cpp\" -B \"$ROOT/build/cpp/<profile>\" -DCMAKE_INSTALL_PREFIX=\"$ROOT/.state/cpp-install/<profile>\"`",
-        "`cmake --build \"$ROOT/build/cpp/<profile>\" --parallel`",
-        "`ctest --test-dir \"$ROOT/build/cpp/<profile>\" --output-on-failure`",
-        "`cmake --install \"$ROOT/build/cpp/<profile>\"`",
-        "project-native C++ reviewer/checker evidence, including consumer-to-provider target readback"
+        "bootstrap Codex tests and manifest readback",
+        "runtime-local `CODEX_HOME` isolation",
+        "collision and foreign-link negative cases"
       ]
     },
     {
-      "changed_surface": "Memory/eval/hook logging",
+      "changed_surface": "Eval collection or archive publication",
       "required_check": [
-        "append-only artifact evidence and improvement guide/eval checks when prompts or logging fields change"
+        "runtime artifact/archive tests",
+        "local bare-remote E2E",
+        "source unchanged, pending spool, branch and remote readback evidence"
+      ]
+    },
+    {
+      "changed_surface": "Project execution environment",
+      "required_check": [
+        "project-owned Dockerfile and `test/testrunner.sh`",
+        "project test/GPU evidence; never AgentCanon internal test knowledge"
       ]
     }
   ],

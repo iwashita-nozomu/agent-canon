@@ -4,7 +4,6 @@
 @dependency-start
 contract data
 responsibility Provides on-demand, problem-solving memory records for repeated AgentCanon failures.
-upstream design ../documents/runtime/shared-runtime-surfaces.toml shared runtime surface ownership
 upstream implementation ../rust/agent-canon/src/memory.rs owns record schema, validation, search, and mutation planning
 downstream implementation ../tools/agent_tools/memory_record.py forwards optional Python calls to the Rust CLI
 @dependency-end
