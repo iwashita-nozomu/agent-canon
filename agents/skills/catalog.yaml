@@ -529,12 +529,12 @@ skill_families:
         - ["run_repo_dependency_review.sh", "dependency", "graph"]
         - ["run_repo_dependency_review.sh", "修正先"]
   - id: issue-finding-report
-    purpose: Convert accumulated prompt, run-bundle, hook, skill/tool/workflow routing, and eval evidence into durable AgentCanon skill issues by abstract cause with multi-agent review partitions.
+    purpose: Convert observed defects or accumulated evidence into cause-qualified durable Issues, and reorganize related open and closed Issues into cohesive responsibility units without clause loss.
     canonical_doc: agents/skills/issue-finding-report.md
     shim: .agents/skills/issue-finding-report/SKILL.md
     discovery:
       name: issue-finding-report
-      description: "Use when converting accumulated prompt history, run bundles, hook logs, skill/tool/workflow routing evidence, eval summaries, or agent reports into durable AgentCanon skill issues; groups repeated evidence by abstract cause, shards multi-agent review by evidence partition, and writes issue candidates from structured dashboard artifacts."
+      description: "Use when creating, splitting, merging, re-parenting, reopening, or superseding Issues by owner, decision, mechanism, validation, and completion responsibility; investigates cause hypotheses without overclaiming, preserves unique clauses, and can also convert accumulated runtime evidence into durable AgentCanon Issues."
     tool_commands:
       required: []
       conditional:
@@ -551,8 +551,15 @@ skill_families:
       - python3 tools/agent_tools/skill_tool_commands.py check
     routing:
       stage_policy: active
-      reason: accumulated runtime evidence should become durable skill or workflow issues
+      reason: a finding or related Issue set needs cause-qualified publication or responsibility reorganization
       triggers:
+        - ["issue", "切り分け"]
+        - ["issue", "責務", "切り直"]
+        - ["issue", "再編"]
+        - ["issue", "分割"]
+        - ["issue", "reorganize"]
+        - ["issue", "re-parent"]
+        - ["原因", "調査", "issue"]
         - ["スキル", "issue"]
         - ["skill", "issue"]
         - ["ログ", "issue"]
