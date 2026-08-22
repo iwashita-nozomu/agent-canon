@@ -127,3 +127,17 @@ def test_no_submodule_checkout_helper_remains() -> None:
     )
     assert all(not path.exists() for path in forbidden)
     assert "checkout_agent_canon_submodule" not in CHECKER.read_text(encoding="utf-8")
+
+
+def test_issue_mirror_resolves_runner_temp_after_job_admission() -> None:
+    """The runner context is not valid while GitHub evaluates job-level env."""
+    path = ROOT / ".github" / "workflows" / "issue-mirror.yml"
+    workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
+    for job in workflow["jobs"].values():
+        assert "runner.temp" not in str(job.get("env", {}))
+    sync_steps = workflow["jobs"]["issue-mirror-sync"]["steps"]
+    configure = next(
+        step for step in sync_steps if step.get("name") == "Configure external runtime root"
+    )
+    assert "RUNNER_TEMP" in configure["run"]
+    assert "GITHUB_ENV" in configure["run"]

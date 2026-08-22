@@ -28,11 +28,13 @@ jobs:
       AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
       AGENT_CANON_ACTIVE_REPOSITORY_ROOT: ${{ github.workspace }}
       AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}
-      AGENT_CANON_RUNTIME_ROOT: ${{ runner.temp }}/agent-canon-runtime
     permissions:
       contents: read
       issues: write
     steps:
+      - name: Configure external runtime root
+        run: echo "AGENT_CANON_RUNTIME_ROOT=${RUNNER_TEMP}/agent-canon-runtime" >> "${GITHUB_ENV}"
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -65,7 +67,6 @@ jobs:
       AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
       AGENT_CANON_ACTIVE_REPOSITORY_ROOT: ${{ github.workspace }}
       AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}
-      AGENT_CANON_RUNTIME_ROOT: ${{ runner.temp }}/agent-canon-runtime
     permissions:
       contents: read
     steps:
