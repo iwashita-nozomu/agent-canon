@@ -79,9 +79,12 @@ def test_all_source_gate_entrypoints_require_distinct_control_and_runtime_roots(
     pr = (ROOT / "tools" / "ci" / "check_agent_canon_pr.sh").read_text(
         encoding="utf-8"
     )
-    for text in (source, run_all, pr):
+    for text in (run_all, pr):
         assert "control_parent_root_required" in text
         assert "runtime_root_required" in text
         assert "control_parent_root_is_source" in text
         assert "AGENT_CANON_PARENT_ROOT=\"${AGENT_CANON_CONTROL_PARENT_ROOT}\"" in text
         assert "${RUNNER_TEMP:-${TMPDIR:-/tmp}}" not in text
+    assert "AGENT_CANON_TARGET_ROOT:?AGENT_CANON_TARGET_ROOT is required" in source
+    assert 'AGENT_CANON_STATIC_RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT}"' in source
+    assert "control_parent_root_required" not in source

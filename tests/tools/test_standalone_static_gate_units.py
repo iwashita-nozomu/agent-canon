@@ -175,9 +175,13 @@ def test_focused_regression_is_owned_by_workflow_container_unit() -> None:
         "\n}\n\ncase ", 1
     )[0]
     remainder = text.replace(workflow_body, "", 1)
-    command = "python3 -m pytest tests/tools/test_standalone_static_gate_units.py -q"
-    assert command in workflow_body
-    assert command not in remainder
+    test_path = "tests/tools/test_standalone_static_gate_units.py"
+    assert test_path in workflow_body
+    assert "-p no:cacheprovider" in workflow_body
+    executable_remainder = "\n".join(
+        line for line in remainder.splitlines() if not line.lstrip().startswith("#")
+    )
+    assert test_path not in executable_remainder
 
 
 def test_full_wrapper_aggregates_each_unit_once_without_reowning_commands() -> None:

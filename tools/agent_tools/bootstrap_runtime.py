@@ -2792,7 +2792,11 @@ class BootstrapRuntime:
                             "exit": result.returncode,
                             "receipt_path": failure_receipt["receipt_path"],
                             "stdout_digest": io["stdout_digest"],
+                            "stdout_preview": io["stdout_preview"],
+                            "stdout_truncated": io["stdout_truncated"],
                             "stderr_digest": io["stderr_digest"],
+                            "stderr_preview": io["stderr_preview"],
+                            "stderr_truncated": io["stderr_truncated"],
                         },
                     )
                 return self._result(

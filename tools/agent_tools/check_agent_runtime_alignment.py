@@ -38,21 +38,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
-    from .parent_root_side_effects import (
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
-    )
+    from .runtime_artifacts import runtime_artifact_boundary
 except ImportError:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
-    )
+    from runtime_artifacts import runtime_artifact_boundary  # type: ignore[no-redef]
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
@@ -249,81 +237,10 @@ class AlignmentWorkspace:
 
 @contextmanager
 def runtime_alignment_parent(source_resolution: RootResolution):
-    """Yield an authenticated parent that can host derived alignment state.
-
-    The standalone static-gate wrapper authenticates the source checkout itself
-    as the parent.  A derived workspace cannot place reports below that source
-    without violating the typed root boundary, so the self-check creates a
-    short-lived Git parent beside the source checkout for this fixture only.
-    Managed parent/derived executions retain their caller-provided parent.
-    """
-    configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured_parent:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            "runtime-alignment-temp: explicit parent root is required",
-        )
-    parent = Path(configured_parent).resolve(strict=True)
+    """Yield runtime-owned scratch without treating the source as a parent."""
     source_root = source_resolution.source_root.resolve()
-    if parent != source_root:
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(
-                cwd=parent,
-                explicit_root=parent,
-                purpose="runtime-alignment",
-            )
-        )
-        base = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
-            attestation,
-            parent / ".agent-canon" / "tmp" / "runtime-alignment",
-            "runtime-alignment-temp",
-        )
-        yield base.physical_path
-        return
-
-    source_origin = subprocess.run(
-        ["git", "-C", str(source_root), "remote", "get-url", "origin"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    with tempfile.TemporaryDirectory(
-        prefix=".agent-canon-runtime-parent-",
-        dir=source_root.parent,
-    ) as fixture_parent_text:
-        fixture_parent = Path(fixture_parent_text)
-        subprocess.run(["git", "init", "-q", str(fixture_parent)], check=True)
-        subprocess.run(
-            ["git", "-C", str(fixture_parent), "remote", "add", "origin", source_origin],
-            check=True,
-        )
-        previous_parent = os.environ.get("AGENT_CANON_PARENT_ROOT")
-        previous_active = os.environ.get("AGENT_CANON_ACTIVE_REPOSITORY_ROOT")
-        os.environ["AGENT_CANON_PARENT_ROOT"] = str(fixture_parent)
-        os.environ["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(fixture_parent)
-        try:
-            attestation = attest_parent_root(
-                ParentRootAttestationRequest(
-                    cwd=fixture_parent,
-                    explicit_root=fixture_parent,
-                    purpose="runtime-alignment",
-                )
-            )
-            base = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
-                attestation,
-                fixture_parent / ".agent-canon" / "tmp" / "runtime-alignment",
-                "runtime-alignment-temp",
-            )
-            yield base.physical_path
-        finally:
-            if previous_parent is None:
-                os.environ.pop("AGENT_CANON_PARENT_ROOT", None)
-            else:
-                os.environ["AGENT_CANON_PARENT_ROOT"] = previous_parent
-            if previous_active is None:
-                os.environ.pop("AGENT_CANON_ACTIVE_REPOSITORY_ROOT", None)
-            else:
-                os.environ["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = previous_active
+    boundary = runtime_artifact_boundary(source_root, create=True)
+    yield boundary.ensure_directory("checks/runtime-alignment")
 
 
 def resolve_packet_probe_workspace() -> Path:

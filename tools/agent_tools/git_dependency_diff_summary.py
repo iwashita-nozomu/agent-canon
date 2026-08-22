@@ -17,7 +17,6 @@ import json
 import subprocess
 import sys
 import tempfile
-import os
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime

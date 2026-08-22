@@ -37,7 +37,10 @@ DOCKER_VALIDATOR = PROJECT_ROOT / "tools" / "docker_dependency_validator.sh"
 
 def runtime_root_for(root: Path) -> Path:
     """Return the per-fixture runtime root outside the fixture checkout."""
-    runtime = root.parent / f".{root.name}.agent-canon-runtime"
+    inherited_runtime = os.environ.get("AGENT_CANON_RUNTIME_ROOT")
+    runtime_parent = Path(inherited_runtime) if inherited_runtime else root.parent
+    identity = hashlib.sha256(str(root.resolve()).encode("utf-8")).hexdigest()[:16]
+    runtime = runtime_parent / "dependency-manifest-tests" / identity
     runtime.mkdir(parents=True, exist_ok=True)
     return runtime
 
@@ -48,7 +51,9 @@ def tool_environment(root: Path) -> dict[str, str]:
     environment.update(
         {
             "AGENT_CANON_RUNTIME_ROOT": str(runtime_root_for(root)),
-            "AGENT_CANON_CONTROL_PARENT_ROOT": str(root.parent.resolve()),
+            "AGENT_CANON_CONTROL_PARENT_ROOT": environment.get(
+                "AGENT_CANON_CONTROL_PARENT_ROOT", str(root.parent.resolve())
+            ),
         }
     )
     return environment
@@ -238,12 +243,17 @@ class DependencyManifestToolTest(unittest.TestCase):
             root = Path(tmp_dir)
             source = root / "main.py"
             source.write_text("import package\n", encoding="utf-8")
+            environment = os.environ.copy()
+            environment["AGENT_CANON_DEPENDENCY_MANIFEST"] = str(
+                root / "missing-dependencies.toml"
+            )
             result = subprocess.run(
                 ["bash", str(CODE_SCAN), "--root", str(root), "main.py"],
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
                 text=True,
+                env=environment,
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertNotIn("CODE_DEPENDENCY_SCAN=pass", result.stdout)

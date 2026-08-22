@@ -141,18 +141,19 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
     def test_alignment_script_passes(self) -> None:
         """The runtime alignment checker should succeed without findings."""
-        environment = os.environ.copy()
-        environment["AGENT_CANON_PARENT_ROOT"] = str(PROJECT_ROOT)
-        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(PROJECT_ROOT)
-        environment.pop("AGENT_CANON_RUNTIME_ROOT", None)
-        result = subprocess.run(
-            [sys.executable, str(SCRIPT_PATH)],
-            cwd=PROJECT_ROOT,
-            env=environment,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+        with tempfile.TemporaryDirectory(
+            prefix="agent-runtime-alignment-", dir=PROJECT_ROOT.parent
+        ) as runtime_root:
+            environment = os.environ.copy()
+            environment["AGENT_CANON_RUNTIME_ROOT"] = runtime_root
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT_PATH)],
+                cwd=PROJECT_ROOT,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("AGENT_RUNTIME_ALIGNMENT=pass", result.stdout)
@@ -161,15 +162,10 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         """Runtime alignment compares the committed 35-role static snapshot."""
         runtime_alignment.validate_generated_role_views()
 
-    def test_alignment_script_standalone_parent_uses_external_fixture_parent(self) -> None:
-        """Standalone parent-bound checks keep derived reports outside source."""
+    def test_alignment_script_uses_only_explicit_external_runtime(self) -> None:
+        """Standalone checks keep derived reports in the selected runtime."""
         environment = os.environ.copy()
-        parent_root = PROJECT_ROOT.parents[3]
-        environment["AGENT_CANON_PARENT_ROOT"] = str(parent_root)
-        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(parent_root)
         environment.pop("AGENT_CANON_RUNTIME_ROOT", None)
-        fixture_prefix = ".agent" + "-canon-runtime-parent-*"
-        before = set(PROJECT_ROOT.parent.glob(fixture_prefix))
         result = subprocess.run(
             [sys.executable, str(SCRIPT_PATH)],
             cwd=PROJECT_ROOT,
@@ -178,10 +174,8 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-        after = set(PROJECT_ROOT.parent.glob(fixture_prefix))
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("AGENT_RUNTIME_ALIGNMENT=pass", result.stdout)
-        self.assertEqual(after, before)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("explicit runtime root required", result.stderr)
 
     def test_retired_command_accepts_catalog_backed_validation_owner(self) -> None:
         """A tombstone may route to a canonical validation tool in the catalog."""

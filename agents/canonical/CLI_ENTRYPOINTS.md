@@ -47,6 +47,12 @@ container with the target as its working directory:
 ```bash
 "$BOOTSTRAP" "${COMMON[@]}" exec --root "$TARGET" -- \
   agent-canon graph build --root . --profile default --format json
+"$BOOTSTRAP" "${COMMON[@]}" exec --root "$TARGET" -- \
+  agent-canon graph status --root . --profile default --format json
+"$BOOTSTRAP" "${COMMON[@]}" exec --root "$TARGET" -- \
+  agent-canon graph query --root . --profile default --all --format json
+"$BOOTSTRAP" "${COMMON[@]}" exec --root "$TARGET" -- \
+  agent-canon graph context --root . --profile default --path README.md --format json
 ```
 
 No route accepts a shell command string. Python tools use their image path or

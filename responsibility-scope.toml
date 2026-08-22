@@ -135,6 +135,8 @@ paths = [
   ".vscode/**",
   "agent-canon-environment.toml",
   "agents/**",
+  "bootstrap.sh",
+  "bootstrap/**",
   "templates/**",
 ]
 protecting_tools = [

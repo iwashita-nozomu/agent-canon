@@ -97,11 +97,12 @@ run_contracts() {
   python3 "${TOOLS_ROOT}/agent_tools/tool_proof_coverage.py"
   python3 "${TOOLS_ROOT}/agent_tools/responsibility_scope.py"
   local base_ref="${GITHUB_BASE_REF:-main}"
-  git fetch origin "${base_ref}" --depth=1 || true
+  git rev-parse --verify "origin/${base_ref}^{commit}" >/dev/null
   python3 "${TOOLS_ROOT}/agent_tools/import_responsibility.py" \
     --changed --baseline-ref "origin/${base_ref}"
   python3 "${TOOLS_ROOT}/agent_tools/issue_sync.py"
-  python3 "${TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"
+  PYTHONPATH="${ROOT}/tools/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+    python3 "${ROOT}/tools/agent_tools/check_agent_runtime_alignment.py"
   python3 "${TOOLS_ROOT}/agent_tools/check_convention_compliance.py" \
     --root "${ROOT}" --format json
   python3 "${TOOLS_ROOT}/agent_tools/skill_tool_commands.py" check
@@ -170,9 +171,9 @@ run_eval() (
 )
 
 run_workflow_container() {
-  python3 -m pytest tests/tools/test_standalone_static_gate_units.py -q
-  python3 "${TOOLS_ROOT}/ci/check_github_workflows.py"
-  python3 -m pytest -q \
+  python3 -m pytest -p no:cacheprovider tests/tools/test_standalone_static_gate_units.py -q
+  python3 "${ROOT}/tools/ci/check_github_workflows.py"
+  python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_bootstrap_container_contract.py \
     tests/bootstrap/test_bootstrap_runtime.py
 }

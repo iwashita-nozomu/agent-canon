@@ -12,7 +12,6 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import re
 import stat
 import subprocess
@@ -260,6 +259,7 @@ def test_single_repository_dockerignore_is_deny_by_default() -> None:
     assert "rust/agent-canon/target/**" in lines
     assert "**/__pycache__/**" in lines
     assert "tools/ci/**" in lines
+    assert "!tools/ci/run_standalone_static_gate_unit.sh" in lines
 
 
 def test_repository_root_dockerignore_exposes_every_copy_source() -> None:
@@ -272,6 +272,7 @@ def test_repository_root_dockerignore_exposes_every_copy_source() -> None:
     for source in (
         "!bootstrap/container/**",
         "!tools/**",
+        "!tools/ci/run_standalone_static_gate_unit.sh",
         "!rust/agent-canon/**",
     ):
         assert source in lines

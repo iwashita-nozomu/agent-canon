@@ -14,6 +14,7 @@
 !tools/
 !tools/**
 tools/ci/**
+!tools/ci/run_standalone_static_gate_unit.sh
 tools/experiments/**
 tools/run_gpu_container.sh
 tools/run_comprehensive_review.sh

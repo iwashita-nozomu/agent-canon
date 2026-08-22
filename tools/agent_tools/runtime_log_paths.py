@@ -28,14 +28,12 @@ try:
     from .runtime_artifacts import (
         RUNTIME_ROOT_ENV,
         RuntimeArtifactBoundary,
-        RuntimeArtifactError,
         runtime_artifact_boundary,
     )
 except ImportError:
     from runtime_artifacts import (  # type: ignore[no-redef]
         RUNTIME_ROOT_ENV,
         RuntimeArtifactBoundary,
-        RuntimeArtifactError,
         runtime_artifact_boundary,
     )
 

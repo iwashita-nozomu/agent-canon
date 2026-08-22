@@ -50,7 +50,7 @@ jobs:
       - name: Generate improvement guide
         id: guide
         run: |
-          report_dir="${AGENT_CANON_RUNTIME_ROOT}/container-runtime/reports/agent-improvement-guide"
+          report_dir="$(realpath -m "${AGENT_CANON_RUNTIME_ROOT}/container-runtime/reports/agent-improvement-guide")"
           mkdir -p "${report_dir}"
           guide_path="${report_dir}/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
           container_guide="/var/lib/agent-canon/runtime/reports/agent-improvement-guide/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"

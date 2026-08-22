@@ -12,21 +12,15 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from typing import Protocol, cast
-from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from parent_root_side_effects import (  # noqa: E402
-    ParentRootReject,
-    ParentRootSideEffectError,
-)
 from runtime_artifacts import RuntimeSymlinkEscape  # noqa: E402
 
 MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"

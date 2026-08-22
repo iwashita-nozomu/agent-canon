@@ -406,14 +406,22 @@ def parse_imports(root: Path, relative_path: str) -> tuple[ImportCollector | Non
         return None, [Finding("parse-error", relative_path, exc.lineno or 0, exc.msg)]
     collector = ImportCollector(relative_path)
     collector.visit(tree)
-    return collector, wildcard_findings(collector)
+    return collector, wildcard_findings(collector, text.splitlines())
 
 
-def wildcard_findings(collector: ImportCollector) -> list[Finding]:
+def wildcard_findings(
+    collector: ImportCollector,
+    lines: Sequence[str],
+) -> list[Finding]:
     """Return wildcard import findings."""
     findings: list[Finding] = []
     for record in collector.imports:
-        if record.imported_name == "*":
+        if record.imported_name == "*" and not has_noqa_code(
+            lines,
+            record.line,
+            "F403",
+            allow_type_ignore=True,
+        ):
             findings.append(
                 Finding(
                     "wildcard-import",
@@ -448,10 +456,23 @@ def unused_import_findings(collector: ImportCollector, lines: Sequence[str]) -> 
 
 def has_noqa_f401(lines: Sequence[str], line_number: int) -> bool:
     """Return whether a line carries a no-F401 marker."""
+    return has_noqa_code(lines, line_number, "F401")
+
+
+def has_noqa_code(
+    lines: Sequence[str],
+    line_number: int,
+    code: str,
+    *,
+    allow_type_ignore: bool = False,
+) -> bool:
+    """Return whether a line explicitly suppresses one lint finding."""
     if line_number <= 0 or line_number > len(lines):
         return False
     line = lines[line_number - 1]
-    return "# noqa" in line and ("F401" in line or line.rstrip().endswith("# noqa"))
+    if "# noqa" in line and (code in line or line.rstrip().endswith("# noqa")):
+        return True
+    return allow_type_ignore and f"# type: ignore[" in line and code in line
 
 
 def resolve_import_target(root: Path, record: ImportRecord) -> str | None:
