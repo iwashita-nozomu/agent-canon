@@ -4,14 +4,56 @@
 # responsibility Runs verifier pre-review checks through the shared Python quality runner.
 # upstream design ../README.md shared automation index
 # upstream implementation ./run_python_quality_checks.sh shared Python quality gate
-# upstream implementation ../agent_tools/parent_root_side_effects.py owns report paths, child state, and exact cleanup
+# upstream implementation ../agent_tools/runtime_artifacts.py owns external report paths and exact cleanup
 # @dependency-end
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${WORKSPACE_ROOT}"
-BOUNDARY_SCRIPT="${WORKSPACE_ROOT}/tools/agent_tools/parent_root_side_effects.py"
+
+# Reports and snapshots are runtime artifacts, not source files.  Resolve all
+# paths through the shared Python runtime boundary and retain only a task
+# namespace under the caller-owned external root.
+runtime_boundary_root() {
+  local candidate="$1"
+  PYTHONPATH="${WORKSPACE_ROOT}/tools/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+    python3 - "${WORKSPACE_ROOT}" "${candidate}" <<'PY'
+from pathlib import Path
+import sys
+
+from runtime_artifacts import runtime_artifact_boundary
+
+print(runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True).root)
+PY
+}
+
+runtime_boundary_path() {
+  local candidate="$1"
+  PYTHONPATH="${WORKSPACE_ROOT}/tools/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+    python3 - "${WORKSPACE_ROOT}" "${AGENT_CANON_RUNTIME_ROOT}" "${candidate}" <<'PY'
+from pathlib import Path
+import sys
+
+from runtime_artifacts import runtime_artifact_boundary
+
+boundary = runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True)
+print(boundary.resolve(Path(sys.argv[3])))
+PY
+}
+
+if [ -n "${AGENT_CANON_RUNTIME_ROOT:-}" ]; then
+  AGENT_CANON_RUNTIME_ROOT_PRESET=1
+  AGENT_CANON_PRE_REVIEW_RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT}"
+else
+  AGENT_CANON_RUNTIME_ROOT_PRESET=0
+  AGENT_CANON_PRE_REVIEW_RUNTIME_ROOT="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/agent-canon-pre-review-${PPID}-${BASHPID}"
+fi
+AGENT_CANON_RUNTIME_ROOT="$(runtime_boundary_root "${AGENT_CANON_PRE_REVIEW_RUNTIME_ROOT}")"
+export AGENT_CANON_RUNTIME_ROOT
+export AGENT_CANON_CONTROL_PARENT_ROOT="${AGENT_CANON_CONTROL_PARENT_ROOT:-${WORKSPACE_ROOT}}"
+export TMPDIR="$(runtime_boundary_path "${AGENT_CANON_RUNTIME_ROOT}/tmp")"
+mkdir -p "${TMPDIR}"
 
 REPORT_DIR="${AGENT_REPORT_DIR:-}"
 REPORT_FILE=""
@@ -24,20 +66,11 @@ AGENT_ROLE_NAME="${AGENT_ROLE:-}"
 ENFORCE_WRITE_SCOPE="${AGENT_ENFORCE_WRITE_SCOPE:-0}"
 
 if [ -n "${REPORT_DIR}" ]; then
-  REPORT_DIR="$(
-    python3 "${BOUNDARY_SCRIPT}" ensure-dir \
-      --root "${WORKSPACE_ROOT}" \
-      --candidate "${REPORT_DIR}" \
-      --purpose pre-review-report
-  )"
+  REPORT_DIR="$(runtime_boundary_path "${REPORT_DIR}")"
+  mkdir -p "${REPORT_DIR}"
   if [ -n "${AGENT_ROLE_NAME}" ] && [ "${ENFORCE_WRITE_SCOPE}" = "1" ]; then
-    TEMP_DIR="$(
-      python3 "${BOUNDARY_SCRIPT}" temp-dir \
-        --root "${WORKSPACE_ROOT}" \
-        --candidate "${WORKSPACE_ROOT}/.agent-canon/tmp" \
-        --prefix pre-review. \
-        --purpose pre-review-snapshots
-    )"
+    TEMP_DIR="$(runtime_boundary_path "${AGENT_CANON_RUNTIME_ROOT}/tasks/pre-review-${BASHPID}")"
+    mkdir -p "${TEMP_DIR}"
     REPORT_SNAPSHOT_FILE="${TEMP_DIR}/report.json"
     WORKSPACE_SNAPSHOT_FILE="${TEMP_DIR}/workspace.json"
     python3 tools/agent_tools/validate_role_write_scope.py \
@@ -52,10 +85,7 @@ fi
 write_report() {
   if [ -n "${REPORT_FILE}" ]; then
     REPORT_CONTENT+="$1"$'\n'
-    printf '%s' "${REPORT_CONTENT}" | python3 "${BOUNDARY_SCRIPT}" write \
-      --root "${WORKSPACE_ROOT}" \
-      --candidate "${REPORT_FILE}" \
-      --purpose pre-review-report-content >/dev/null
+    printf '%s' "${REPORT_CONTENT}" > "${REPORT_FILE}"
   fi
 }
 
@@ -99,10 +129,10 @@ finalize_report() {
   write_report "status=${RUN_STATUS}"
   write_report "pre_review_finished_at_utc=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   if [ -n "${TEMP_DIR}" ]; then
-    python3 "${BOUNDARY_SCRIPT}" remove-tree \
-      --root "${WORKSPACE_ROOT}" \
-      --candidate "${TEMP_DIR}" \
-      --purpose pre-review-cleanup >/dev/null || cleanup_status=$?
+    rm -rf -- "${TEMP_DIR}" || cleanup_status=$?
+  fi
+  if [ "${AGENT_CANON_RUNTIME_ROOT_PRESET}" -eq 0 ]; then
+    rm -rf -- "${AGENT_CANON_RUNTIME_ROOT}" || cleanup_status=$?
   fi
   if [ "$status" -eq 0 ] && [ "$cleanup_status" -ne 0 ]; then
     status=$cleanup_status
@@ -117,10 +147,7 @@ echo "=========================================="
 echo "PRE-REVIEW PYTHON QUALITY CHECKS"
 echo "=========================================="
 
-if python3 "${BOUNDARY_SCRIPT}" exec-parent-bound \
-  --root "${WORKSPACE_ROOT}" \
-  --purpose pre-review-python-quality \
-  -- bash tools/ci/run_python_quality_checks.sh "$@"; then
+if bash tools/ci/run_python_quality_checks.sh "$@"; then
   write_report "python_quality=pass"
 else
   RUN_STATUS="failed"

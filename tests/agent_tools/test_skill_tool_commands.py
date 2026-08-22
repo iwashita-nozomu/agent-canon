@@ -12,7 +12,6 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
 import tempfile
@@ -36,7 +35,7 @@ class SkillToolCommandsTest(unittest.TestCase):
         """Derived public argv is separate from the source execution spelling."""
         logical = (
             "PYTHONPATH=tools python3 tools/agent_tools/workflow_monitor.py "
-            "--root . --contract vendor/agent-canon/documents/structure/repo-structure-contract.toml"
+            "--root . --contract documents/structure/repo-structure-contract.toml"
         )
         standalone = project_public_command(
             logical,
@@ -44,26 +43,16 @@ class SkillToolCommandsTest(unittest.TestCase):
         )
         derived = project_public_command(
             logical,
-            RootResolution(Path("."), Path("."), "vendored", Path(".")),
+            RootResolution(Path("."), Path("."), "external", Path(".")),
         )
         self.assertEqual(standalone.public_argv[1], "tools/agent_tools/workflow_monitor.py")
-        self.assertEqual(
-            derived.public_argv[1], "tools/agent-canon/agent_tools/workflow_monitor.py"
-        )
+        self.assertEqual(derived.public_argv[1], "tools/agent_tools/workflow_monitor.py")
         self.assertEqual(
             standalone.public_argv[2:],
             ("--root", ".", "--contract", "documents/structure/repo-structure-contract.toml"),
         )
-        self.assertEqual(
-            derived.public_argv[2:],
-            (
-                "--root",
-                ".",
-                "--contract",
-                "vendor/agent-canon/documents/structure/repo-structure-contract.toml",
-            ),
-        )
-        self.assertEqual(derived.public_env, (("PYTHONPATH", "tools/agent-canon"),))
+        self.assertEqual(derived.public_argv[2:], standalone.public_argv[2:])
+        self.assertEqual(derived.public_env, (("PYTHONPATH", "tools"),))
 
     def run_tool(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the skill command tool against a root."""
@@ -443,97 +432,6 @@ class SkillToolCommandsTest(unittest.TestCase):
             self.assertEqual(argv[1], f"{expected_root}/tools/agent_tools/route.py")
             self.assertEqual(argv[2:], ["--prompt", "<user request>", "--format", "json"])
 
-    def test_show_deduplicates_parent_agents_symlink_view(self) -> None:
-        """A real parent agents symlink view uses the vendored source root once."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            parent_root = Path(tmp_dir)
-            (parent_root / ".git").touch()
-            source_root = parent_root / "source" / "agent-canon"
-            self.write_skill(source_root, "example-skill", "Use the canon.\n")
-            vendor_link = parent_root / "vendor" / "agent-canon"
-            vendor_link.parent.mkdir(parents=True, exist_ok=True)
-            os.symlink(source_root, vendor_link, target_is_directory=True)
-            os.symlink(
-                vendor_link / "agents",
-                parent_root / "agents",
-                target_is_directory=True,
-            )
-
-            result = self.run_tool(
-                parent_root,
-                "show",
-                "--skill",
-                "example-skill",
-                "--format",
-                "json",
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            payload = json.loads(result.stdout)
-            self.assertEqual(payload["runtime_skill"], ".agents/skills/example-skill/SKILL.md")
-            self.assertEqual(
-                {
-                    row[1] for row in payload["resolved_discovered_commands"]
-                },
-                {str(source_root.resolve())},
-            )
-
-    def test_show_rejects_different_symlink_view_entity(self) -> None:
-        """A parent symlink view to a different source remains ambiguous."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            parent_root = Path(tmp_dir)
-            (parent_root / ".git").touch()
-            standalone_root = parent_root / "standalone"
-            self.write_skill(standalone_root, "example-skill", "Use the standalone canon.\n")
-            vendor_root = parent_root / "vendor" / "agent-canon"
-            self.write_skill(vendor_root, "example-skill", "Use the vendored canon.\n")
-            os.symlink(
-                standalone_root / "agents",
-                parent_root / "agents",
-                target_is_directory=True,
-            )
-
-            result = self.run_tool(
-                parent_root,
-                "show",
-                "--skill",
-                "example-skill",
-                "--format",
-                "text",
-            )
-
-            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-            self.assertIn(
-                "SKILL_TOOL_COMMANDS_SOURCE_ROOT_FAILURE=agent_canon_source_root_ambiguous",
-                result.stdout + result.stderr,
-            )
-
-    def test_show_rejects_external_vendor_symlink(self) -> None:
-        """A vendor symlink outside the parent repository is a typed failure."""
-        with tempfile.TemporaryDirectory() as tmp_dir, tempfile.TemporaryDirectory() as outside_dir:
-            parent_root = Path(tmp_dir)
-            (parent_root / ".git").touch()
-            outside_root = Path(outside_dir) / "agent-canon"
-            self.write_skill(outside_root, "example-skill", "Use the external canon.\n")
-            vendor_link = parent_root / "vendor" / "agent-canon"
-            vendor_link.parent.mkdir(parents=True, exist_ok=True)
-            os.symlink(outside_root, vendor_link, target_is_directory=True)
-
-            result = self.run_tool(
-                parent_root,
-                "show",
-                "--skill",
-                "example-skill",
-                "--format",
-                "text",
-            )
-
-            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-            self.assertIn(
-                "SKILL_TOOL_COMMANDS_SOURCE_ROOT_FAILURE=agent_canon_source_root_vendor_outside_repository",
-                result.stdout + result.stderr,
-            )
-
     def test_generated_entry_is_a_read_only_packet_projection(self) -> None:
         """The materialized adapter exposes a read-only packet path."""
         runtime = (PROJECT_ROOT / ".agents/skills/agent-orchestration/SKILL.md").read_text(
@@ -559,40 +457,6 @@ class SkillToolCommandsTest(unittest.TestCase):
             self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
             self.assertIn(
                 "SKILL_TOOL_COMMANDS_SOURCE_ROOT_FAILURE=agent_canon_source_root_missing",
-                result.stdout + result.stderr,
-            )
-
-    def test_resolve_source_root_rejects_ambiguous_catalogs(self) -> None:
-        """Ambiguous standalone and vendored catalog roots are rejected."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
-            (root / "agents" / "skills" / "catalog.yaml").write_text(
-                STANDALONE_CATALOG,
-                encoding="utf-8",
-            )
-            (root / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml").parent.mkdir(
-                parents=True,
-                exist_ok=True,
-            )
-            (root / "vendor" / "agent-canon" / "agents" / "skills").mkdir(parents=True, exist_ok=True)
-            (root / "vendor" / "agent-canon" / "agents" / "skills" / "catalog.yaml").write_text(
-                STANDALONE_CATALOG,
-                encoding="utf-8",
-            )
-
-            result = self.run_tool(
-                root,
-                "show",
-                "--skill",
-                "example-skill",
-                "--format",
-                "json",
-            )
-
-            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-            self.assertIn(
-                "SKILL_TOOL_COMMANDS_SOURCE_ROOT_FAILURE=agent_canon_source_root_ambiguous",
                 result.stdout + result.stderr,
             )
 

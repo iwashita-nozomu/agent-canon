@@ -23,6 +23,8 @@ PATH_ENV_KEYS = {
     "AGENT_CANON_CHILD_PURPOSE",
     "AGENT_CANON_CLI_TARGET_DIR",
     "AGENT_CANON_PARENT_ROOT",
+    "AGENT_CANON_CONTROL_PARENT_ROOT",
+    "AGENT_CANON_RUNTIME_ROOT",
     "AGENT_CANON_PARENT_ROOT_DEV",
     "AGENT_CANON_PARENT_ROOT_INO",
     "AGENT_CANON_TOOLS_HOME",
@@ -54,7 +56,7 @@ def _pending_handoff_nonces(root: Path) -> dict[str, object]:
     return value
 
 
-def test_scan_uses_parent_local_temp_and_preserves_existing_entries(tmp_path: Path) -> None:
+def test_scan_uses_runtime_local_temp_and_preserves_existing_entries(tmp_path: Path) -> None:
     parent = tmp_path / "parent"
     parent.mkdir()
     _git("init", "-q", "-b", "main", cwd=parent)
@@ -87,12 +89,13 @@ def test_scan_uses_parent_local_temp_and_preserves_existing_entries(tmp_path: Pa
         cwd=scan_source,
     )
 
-    preexisting = parent / ".agent-canon" / "tmp" / "preexisting.txt"
+    runtime_root = parent / "workspace" / "agent-canon-runtime" / "secret-scan"
+    preexisting = runtime_root / "tmp" / "preexisting.txt"
     preexisting.parent.mkdir(parents=True)
     preexisting.write_text("keep\n", encoding="utf-8")
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
-    scan_log = parent / ".agent-canon" / "scanner-child.log"
+    scan_log = runtime_root / "scanner-child.log"
     _write_executable(
         fake_bin / "gitleaks",
         '#!/bin/sh\nprintf "gitleaks %s tmp=%s cargo=%s\\n" "$*" "$TMPDIR" "$CARGO_HOME" >> "$SCAN_LOG"\n',
@@ -108,7 +111,8 @@ def test_scan_uses_parent_local_temp_and_preserves_existing_entries(tmp_path: Pa
     env = {key: value for key, value in os.environ.items() if key not in PATH_ENV_KEYS}
     env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
     env["SCAN_LOG"] = str(scan_log)
-    env["AGENT_CANON_PARENT_ROOT"] = str(parent)
+    env["AGENT_CANON_CONTROL_PARENT_ROOT"] = str(parent)
+    env["AGENT_CANON_RUNTIME_ROOT"] = str(runtime_root)
 
     result = subprocess.run(
         ("bash", str(SCRIPT), "--root", str(scan_source), "--current-only"),
@@ -122,15 +126,15 @@ def test_scan_uses_parent_local_temp_and_preserves_existing_entries(tmp_path: Pa
     assert result.returncode == 0, result.stdout + result.stderr
     assert "SECRET_SCAN=pass" in result.stdout
     assert preexisting.read_text(encoding="utf-8") == "keep\n"
-    temp_entries = list((parent / ".agent-canon" / "tmp").iterdir())
+    temp_entries = list((runtime_root / "tmp").iterdir())
     assert temp_entries == [preexisting]
     assert not (scan_source / ".agent-canon").exists()
     assert _pending_handoff_nonces(parent) == {}
     for line in scan_log.read_text(encoding="utf-8").splitlines():
-        assert f"tmp={parent / '.agent-canon' / 'tmp'}" in line
-        assert f"cargo={parent / '.agent-canon' / 'cache' / 'cargo-home'}" in line
-        if "/.agent-canon/tmp/" in line:
-            assert str(parent / ".agent-canon" / "tmp") in line
+        assert f"tmp={runtime_root / 'tmp'}" in line
+        assert f"cargo={runtime_root / 'cache' / 'cargo-home'}" in line
+        if "/secret-scan/tmp/" in line:
+            assert str(runtime_root / "tmp") in line
 
 
 def test_scan_script_has_no_host_temp_or_raw_recursive_cleanup() -> None:

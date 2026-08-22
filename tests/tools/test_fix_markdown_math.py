@@ -14,8 +14,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tests.agent_tools.rust_cli_fixture import standalone_agent_canon
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-AGENT_CANON = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
+AGENT_CANON = standalone_agent_canon()
 
 
 class FixMarkdownMathTest(unittest.TestCase):
@@ -81,7 +83,7 @@ class FixMarkdownMathTest(unittest.TestCase):
             doc = root / "doc.md"
             self.write_file(
                 doc,
-                "# Doc\n\n```text\n\\(x + y\\)\n\\[\na + b = c\n\\]\n```\n",
+                "# Doc\n\n```text\n`\\(x + y\\)`\n`\\[`\n`a + b = c`\n`\\]`\n```\n",
             )
 
             result = self.run_cli(root, "doc.md")

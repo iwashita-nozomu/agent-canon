@@ -25,6 +25,12 @@ downstream implementation ../../tests/agent_tools/test_gpu_execution_docker_all_
 - Boundary: source、data、model、credential、GPU driver/device などの runtime input は
   image 外に置けますが、標準環境の構築には使いません。
 
+AgentCanon source is the exception to project-local Dev Container discovery:
+its Python/Rust/LSP dependencies belong to the shared image built by
+`bootstrap.sh` and `bootstrap/`. A parent project may keep its own
+`.devcontainer/`, but that directory is never an AgentCanon dependency or
+fallback.
+
 ## Expected Structure
 
 環境設計は次の完成状態から逆算します。
@@ -67,7 +73,8 @@ CIで同じimageとtest commandを再利用できる状態にします。
 - `documents/contracts/github-first-module-and-devcontainer-policy.md`
 - `documents/conventions/coding-conventions-project.md`
 - project-owned `Dockerfile` / `docker/`
-- `.devcontainer/`
+- `bootstrap.sh` / `bootstrap/`
+- project-owned `.devcontainer/` when the parent explicitly provides one
 - `.github/workflows/`
 - `README.md`
 - `agents/skills/dependency-design.md`
@@ -112,13 +119,12 @@ CIで同じimageとtest commandを再利用できる状態にします。
 ## Validation
 
 ```bash
-python3 tools/ci/container_config.py
-docker build -f <Dockerfile> --target <canonical-target> -t <image> .
-docker run --rm <runtime-wiring> <image> <canonical-full-test-command>
+./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> install
+./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> start
+./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> status
 ```
 
-- `container_config.py` はDockerfile、Dev Container、Compose、CIの静的なowner/target境界を検査します。
-  completion evidenceは後続のimage buildと`docker run`による標準テスト一式です。
+- bootstrap container contract testと実lifecycle readbackをcompletion evidenceにします。
 - supported profileごとに上記を実行します。
 - GPU deviceを必要とするtestはGPU runner上で`gpu-execution`のcontainer smokeを実行し、
   container内のfresh JAX importとGPU backendを確認します。

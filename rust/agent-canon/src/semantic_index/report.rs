@@ -20,7 +20,9 @@ use super::relations::{
     merge_candidate_bucket, merge_candidate_surface_kind, DiscourseRelation, NaturalRelation,
     SimilarPair, ThinDocCandidate, ThinDocMetrics,
 };
+use crate::runtime_boundary::RUNTIME_ROOT_ENV;
 use serde_json::{json, Value};
+use std::env;
 use std::fs;
 use std::path::Path;
 
@@ -754,14 +756,72 @@ pub(super) fn thin_doc_metrics_json(metrics: &ThinDocMetrics) -> Value {
 }
 
 pub(super) fn write_report(path: &Path, report: &Value) -> Result<(), String> {
+    validate_report_target(path)?;
     ensure_parent_dir(path)?;
     fs::write(path, format!("{}\n", report)).map_err(|error| error.to_string())
 }
 
 pub(super) fn write_pretty_report(path: &Path, report: &Value) -> Result<(), String> {
+    validate_report_target(path)?;
     ensure_parent_dir(path)?;
     let text = serde_json::to_string_pretty(report).map_err(|error| error.to_string())?;
     fs::write(path, format!("{text}\n")).map_err(|error| error.to_string())
+}
+
+fn validate_report_target(path: &Path) -> Result<(), String> {
+    let runtime = match env::var_os(RUNTIME_ROOT_ENV).filter(|value| !value.is_empty()) {
+        Some(value) => std::path::PathBuf::from(value),
+        None => {
+            #[cfg(test)]
+            {
+                return Ok(());
+            }
+            #[cfg(not(test))]
+            {
+                return Err(
+                    "AGENT_CANON_RUNTIME_ROOT is required for semantic-index reports".to_string(),
+                );
+            }
+        }
+    };
+    let runtime = fs::canonicalize(&runtime)
+        .map_err(|error| format!("canonicalize report runtime root: {error}"))?;
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        env::current_dir()
+            .map_err(|error| error.to_string())?
+            .join(path)
+    };
+    let parent = absolute
+        .parent()
+        .ok_or_else(|| format!("report has no parent: {}", path.display()))?;
+    let mut existing = parent.to_path_buf();
+    while !existing.exists() {
+        existing = existing
+            .parent()
+            .ok_or_else(|| format!("report parent has no existing ancestor: {}", path.display()))?
+            .to_path_buf();
+    }
+    let canonical_parent = fs::canonicalize(&existing).map_err(|error| error.to_string())?;
+    if canonical_parent != runtime && !canonical_parent.starts_with(&runtime) {
+        return Err(format!(
+            "report {} escapes runtime root {}",
+            path.display(),
+            runtime.display()
+        ));
+    }
+    if absolute.exists() {
+        let canonical = fs::canonicalize(&absolute).map_err(|error| error.to_string())?;
+        if canonical != runtime && !canonical.starts_with(&runtime) {
+            return Err(format!(
+                "report {} resolves outside runtime root {}",
+                path.display(),
+                runtime.display()
+            ));
+        }
+    }
+    Ok(())
 }
 
 pub(super) fn ensure_parent_dir(path: &Path) -> Result<(), String> {

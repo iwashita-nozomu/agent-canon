@@ -2,8 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Provides Git authority predicate helpers for AgentCanon tool scripts.
-# downstream implementation ../sync_agent_canon.sh preserves existing user-facing diagnostics.
-# downstream implementation ../update_agent_canon.sh preserves existing user-facing diagnostics.
+# downstream implementation ../agent_tools/repository_topic_clone.py preserves existing user-facing diagnostics.
 # @dependency-end
 
 # These predicates return status codes only; they must not emit output or exit.

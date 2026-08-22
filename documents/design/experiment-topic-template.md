@@ -10,7 +10,7 @@ downstream implementation ../../templates/experiments/_template/run.py owns run 
 downstream implementation ../../templates/experiments/_template/cases.py owns case models and execution
 downstream implementation ../../templates/experiments/_template/visualization.py owns visualization status
 downstream implementation ../../agents/skills/experiment-lifecycle.md exposes topic preparation
-downstream test ../../tests/tools/test_experiment_template_contracts.py validates materialized behavior
+downstream implementation ../../tests/tools/test_experiment_template_contracts.py validates materialized behavior
 @dependency-end
 -->
 
@@ -179,7 +179,6 @@ Targeted commands:
 ```bash
 python3 -m pytest -q tests/tools/test_experiment_template_contracts.py
 python3 -m pytest -q tests/tools/test_run_managed_experiment.py
-python3 -m pytest -q tests/tools/test_check_experiment_template.py
 python3 tools/agent_tools/check_agent_runtime_alignment.py
 python3 tools/agent_tools/check_dependency_headers.py --changed
 ```

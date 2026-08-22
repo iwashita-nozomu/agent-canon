@@ -2,62 +2,62 @@
 <!--
 @dependency-start
 contract design
-responsibility Audits ownership maps, AgentCanon source boundaries, submodule pins, and root runtime views.
+responsibility Audits ownership maps, standalone AgentCanon source boundaries, and shared runtime ownership.
 upstream design ../README.md owns canonical audit boundaries
-upstream design ../../runtime/SHARED_RUNTIME_SURFACES.md owns shared root surface policy
-upstream implementation ../../../tools/agent_tools/agent_canon_source_root.py resolves source roots
-downstream implementation ../../../agents/skills/agent-canon-update.md owns pin and root-view repair
+upstream design ../../runtime/bootstrap-runtime.md owns shared tool-runtime policy
+upstream implementation ../../../bootstrap.sh owns host lifecycle and source/runtime separation
+downstream implementation ../../../agents/skills/agent-canon-update.md owns source PR/readback
 @dependency-end
 -->
 
 ## Reader Map
 
-親固有の root view と AgentCanon source の境界、submodule pin、MCP/Codex runtime surface
-を確認します。shared canon の変更は source 側、template 固有の変更は親側という ownership
-を先に固定します。
+親固有の tracked tree と standalone AgentCanon source clone の境界、shared tool runtime、
+MCP/Codex runtime surface を確認します。shared canon の変更は source 側、template 固有の
+変更は親側という ownership を先に固定します。
 
 ## Owner Responsibility
 
-`agent-canon-update` が AgentCanon source、submodule pin、root view、sync control の
-所有境界を管理します。親監査はその boundary evidence と root/view readback を監査します。
+`agent-canon-update` が AgentCanon source clone、source PR、merged-main readback の
+所有境界を管理します。親監査はその boundary evidence と runtime/source unchanged
+readback を監査します。
 
 ## Invariant
 
-`vendor/agent-canon`、root `AGENTS.md`、`.codex/config.toml`、`.codex/agents/`、
-`tools/agent-canon/` の active views は canonical source と整合し、pin は意図した
-remote/main を指す。`agents/`、`.agents/`、`.devcontainer/`、`.vscode/`、GitHub
-paths は親-owned regular content として保持する。MCP、個人 Codex state、template
-固有説明を別責務として保持する。
+親 tracked tree に AgentCanon source、vendor path、submodule gitlink、root projection
+が存在しない。AgentCanon source は qualified ignored clone にあり、tool runtime state
+は親 workspace の明示 runtime root にあり、MCP、個人 Codex state、template 固有説明は
+別責務として保持する。
 
 ## Evidence Sources
 
-- `.gitmodules` と `git submodule status`
-- `agent_canon_source_root.py` の typed resolution
-- `tools/sync_agent_canon.sh check` と root-view diff
-- `documents/runtime/SHARED_RUNTIME_SURFACES.md`
-- root `AGENTS.md` と `vendor/agent-canon/ROOT_AGENTS.md`
+- qualified source clone の Git status、branch、remote/main、PR merge readback
+- `bootstrap.sh status` と runtime-root ownership/readback
+- source-unchanged and exact cleanup evidence
+- parent `AGENTS.md` と source clone `AGENTS.md`
 
 ## Repair Route
 
-owner skill は `agent-canon-update`、主 tool は `agent_canon_source_root.py` と
-`tools/sync_agent_canon.sh`。source/root-view drift は source owner に routing し、
-親側で正本を直接上書きしません。
+owner skill は `agent-canon-update`、主 tool は standalone source clone の
+`bootstrap.sh` と source PR workflow。source/runtime drift は source owner に routing
+し、親側で AgentCanon 正本を直接上書きしません。
 
 ## Validation
 
-source-root typed result、submodule/pin readback、root-view sync check、対象 path diff
-で十分性を判定します。remote auth/network は静的に確定できない項目だけ owner command
-を条件付きで使います。
+source clone identity、PR/main readback、runtime status、source-unchanged check、対象
+path diff で十分性を判定します。remote auth/network は静的に確定できない項目だけ owner
+command を条件付きで使います。
 
 ## Close Condition
 
-source root、pin、root views、ownership map が一致し、drift 修正後の対象 readback が
-clean になる。個人 runtime state や generated inventory を canonical source に追加しない。
+source clone、runtime root、ownership map が一致し、drift 修正後の対象 readback が clean
+になる。個人 runtime state や generated inventory を canonical source に追加しない。
 
 ## Related Change Surfaces
 
-`surface:agentcanon.root-views`、`surface:agentcanon.source-root`、`surface:submodule.pin`。
-shared surface、source-root resolver、pin、root AGENTS の変更時だけ本 unit を更新します。
+`surface:agentcanon.source-clone`、`surface:agentcanon.shared-runtime`、
+`surface:parent.source-free`。source clone、bootstrap runtime、parent boundary の変更時
+だけ本 unit を更新します。
 
 ## Legacy Migration IDs
 

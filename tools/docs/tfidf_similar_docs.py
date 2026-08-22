@@ -10,21 +10,40 @@ tfidf_similar_docs.py
 
 Simple TF-IDF based similar document detector for markdown files under `documents/`.
 
-Outputs:
- - reports/tfidf_similar_documents_report.txt
- - documents/merge_candidates_tfidf/*.md (drafts)
+Outputs are written beneath the explicit external runtime root, under a
+run-scoped directory. Set ``AGENT_CANON_RUNTIME_ROOT`` or pass
+``--runtime-root``; the source checkout is never an implicit output location,
+and missing runtime capability fails before a report is opened.
 
 Usage:
-  python3 scripts/tools/tfidf_similar_docs.py --min 0.5
+  python3 tools/docs/tfidf_similar_docs.py \
+    --runtime-root /abs/path/to/workspace/agent-canon-runtime/<run> --min 0.5 \
+    [--documents-root /path/to/documents]
 
 No external dependencies.
 """
 import argparse
 import itertools
 import math
+import os
 import re
+import sys
+import tempfile
 from collections import Counter
 from pathlib import Path
+
+# Direct invocation must not turn the source checkout into a Python cache.
+os.environ.setdefault('PYTHONDONTWRITEBYTECODE', '1')
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from tools.agent_tools.runtime_artifacts import (  # noqa: E402
+    RuntimeArtifactBoundary,
+    RuntimeArtifactError,
+    runtime_artifact_boundary,
+)
 
 
 def normalize_text(t: str) -> str:
@@ -40,6 +59,7 @@ def read_docs(root: Path):
     files = [
         p
         for p in root.rglob('*.md')
+        if p.is_file()
         if 'template' not in p.name and not p.name.endswith('.bak')
     ]
     files = sorted(files)
@@ -88,7 +108,14 @@ def cosine_sim(a: dict, b: dict) -> float:
     return num / (norm_a * norm_b)
 
 
-def make_merged_draft(a_path: Path, b_path: Path, out_dir: Path, score: float):
+def make_merged_draft(
+    a_path: Path,
+    b_path: Path,
+    out_dir: Path,
+    score: float,
+    *,
+    boundary: RuntimeArtifactBoundary | None = None,
+):
     a = a_path.read_text(encoding='utf-8')
     b = b_path.read_text(encoding='utf-8')
     a_lines = [ln.rstrip() for ln in a.splitlines()]
@@ -121,21 +148,54 @@ def make_merged_draft(a_path: Path, b_path: Path, out_dir: Path, score: float):
         out.append("")
         out.extend(uniq_from_b)
 
-    out_dir.mkdir(parents=True, exist_ok=True)
     out_file = out_dir / (title + '.md')
-    out_file.write_text('\n'.join(out) + '\n', encoding='utf-8')
+    content = '\n'.join(out) + '\n'
+    if boundary is None:
+        raise RuntimeArtifactError(
+            "merge-draft output requires the external runtime artifact boundary"
+        )
+    boundary.atomic_write_text(out_file.relative_to(boundary.root), content)
     return out_file
+
+
+def create_output_dir(
+    root: Path,
+    runtime_root: str | None,
+    *,
+    boundary: RuntimeArtifactBoundary | None = None,
+) -> Path:
+    """Create one symlink-safe external output directory for this run."""
+    boundary = boundary or runtime_artifact_boundary(root, runtime_root, create=True)
+    parent = boundary.ensure_directory(Path("tasks") / "tfidf-similar-documents")
+    return Path(tempfile.mkdtemp(prefix="run-", dir=str(parent)))
 
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--min', type=float, default=0.5)
+    p.add_argument(
+        '--documents-root',
+        help='Read-only Markdown root (defaults to this checkout\'s documents/).',
+    )
+    p.add_argument(
+        '--runtime-root',
+        help='External runtime root (or AGENT_CANON_RUNTIME_ROOT).',
+    )
     args = p.parse_args()
 
-    ROOT = Path('.').resolve()
-    DOC_ROOT = ROOT / 'documents'
-    REPORT = ROOT / 'reports' / 'tfidf_similar_documents_report.txt'
-    MERGE_DIR = DOC_ROOT / 'merge_candidates_tfidf'
+    ROOT = PROJECT_ROOT
+    DOC_ROOT = (
+        Path(args.documents_root).expanduser().resolve()
+        if args.documents_root
+        else ROOT / 'documents'
+    )
+    try:
+        boundary = runtime_artifact_boundary(ROOT, args.runtime_root, create=True)
+        output_dir = create_output_dir(ROOT, args.runtime_root, boundary=boundary)
+    except RuntimeArtifactError as exc:
+        p.error(f"runtime_root_error: {exc}")
+    REPORT = output_dir / 'tfidf_similar_documents_report.txt'
+    MERGE_DIR = output_dir / 'merge_candidates_tfidf'
 
     docs = read_docs(DOC_ROOT)
     vectors = build_tfidf(docs)
@@ -155,13 +215,16 @@ def main():
         for sim, a, b in pairs:
             lines.append(f'{sim:.3f}  {a}  {b}')
             try:
-                draft = make_merged_draft(a, b, MERGE_DIR, sim)
+                draft = make_merged_draft(a, b, MERGE_DIR, sim, boundary=boundary)
                 lines.append(f'  Draft: {draft}')
+            except RuntimeArtifactError:
+                raise
             except Exception as e:
                 lines.append(f'  Draft generation failed: {e}')
 
-    REPORT.parent.mkdir(parents=True, exist_ok=True)
-    REPORT.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    boundary.atomic_write_text(
+        REPORT.relative_to(boundary.root), '\n'.join(lines) + '\n'
+    )
     print('Report written to', REPORT)
 
 

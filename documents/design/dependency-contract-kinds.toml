@@ -23,7 +23,6 @@ header_surfaces = [
   "documents/runtime/**",
   "tools/agent_tools/**",
   "tools/ci/**",
-  "tools/sync_agent_canon.sh",
   "rust/**",
   ".devcontainer/**",
   ".github/workflows/**",

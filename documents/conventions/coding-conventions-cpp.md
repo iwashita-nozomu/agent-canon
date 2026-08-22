@@ -2,7 +2,6 @@
 @dependency-start
 contract policy
 responsibility Documents C++ コーディング規約 for this repository.
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ./DOCSTRING_GUIDE.md owns semantic Docstring clauses and sparse projection traces
 downstream design ../design/algorithm-implementation-boundary.md algorithm math-to-code boundary policy for C++ implementations
 @dependency-end

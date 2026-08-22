@@ -20,34 +20,19 @@ import hashlib
 import json
 import os
 import stat
+import tempfile
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
 if __package__:
-    from .workspace_scope import resolve_report_root
+    from .workspace_scope import resolve_report_root, resolve_runtime_artifact_path
 else:
-    from workspace_scope import resolve_report_root
-from task_authority import ACTIVE_RUN_POINTER
-
-try:
-    from .parent_root_side_effects import (
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
+    from workspace_scope import (  # type: ignore[no-redef]
+        resolve_report_root,
+        resolve_runtime_artifact_path,
     )
-except ImportError:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
-    )
-
 LEDGER_SEMANTIC_KINDS = (
     "request_clause",
     "responsibility_unit",
@@ -101,30 +86,48 @@ class MaterializerError(ValueError):
         super().__init__(code if not detail else f"{code}:{detail}")
 
 
-def _parent_capability(purpose: str):
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            f"{purpose}: explicit parent root is required",
-        )
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
-    )
-    return ParentRootSideEffectBoundary(), attestation
+def _runtime_path(path: Path, runtime_root: Path | str | None = None) -> Path:
+    """Resolve one work-log artifact below the external runtime boundary."""
+    return resolve_runtime_artifact_path(path, runtime_root=runtime_root)
 
 
-def _parent_path(path: Path, purpose: str, *, create: bool = False) -> Path:
-    boundary, attestation = _parent_capability(purpose)
+def _parent_path(
+    path: Path,
+    purpose: str,
+    *,
+    create: bool = False,
+    runtime_root: Path | str | None = None,
+) -> Path:
+    del purpose
+    target = _runtime_path(path, runtime_root)
     if create:
-        boundary.ensure_parent_owned_directory(attestation, path.parent, purpose)
-    return boundary.resolve_parent_owned_path(attestation, path, purpose).physical_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+    return target
 
 
-def _parent_write(path: Path, data: bytes, purpose: str) -> None:
-    boundary, attestation = _parent_capability(purpose)
-    boundary.write_parent_owned_file(attestation, path, data, purpose)
+def _parent_write(
+    path: Path,
+    data: bytes,
+    purpose: str,
+    runtime_root: Path | str | None = None,
+) -> None:
+    del purpose
+    target = _runtime_path(path, runtime_root)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{target.name}.", suffix=".tmp", dir=str(target.parent)
+    )
+    temporary: Path | None = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, target)
+        temporary = None
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
 
 
 def _git_blob_oid(data: bytes) -> str:
@@ -601,16 +604,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--workspace-root",
         default=".",
-        help="Workspace root containing reports/agents/.active_run.",
+        help="Workspace root used for explicit runtime selection; state is external.",
     )
     parser.add_argument("--report-dir", help="Explicit run bundle directory to update.")
-    parser.add_argument("--run-id", help="Run id under reports/agents/.")
+    parser.add_argument("--run-id", help="Run id under the external reports/agents root.")
     parser.add_argument(
         "--report-root",
         help=(
-            "Optional directory that contains per-run report folders. Defaults to "
-            "<workspace-root>/reports/agents."
+            "Optional external directory that contains per-run report folders. "
+            "Defaults below --runtime-root."
         ),
+    )
+    parser.add_argument(
+        "--runtime-root",
+        help="Explicit external runtime root; defaults to AGENT_CANON_RUNTIME_ROOT.",
     )
     parser.add_argument(
         "--kind",
@@ -653,18 +660,23 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def append_ledger_event(report_dir: Path, event: dict[str, object]) -> Path:
+def append_ledger_event(
+    report_dir: Path,
+    event: dict[str, object],
+    *,
+    runtime_root: Path | str | None = None,
+) -> Path:
     """Append one semantic event to the existing run-local work ledger."""
     event_identity = _validate_ledger_event(event, report_dir)
-    _parent_path(report_dir / "work_log.md", "work-log", create=True)
-    work_log_path = report_dir / "work_log.md"
+    work_log_path = _parent_path(
+        report_dir / "work_log.md",
+        "work-log",
+        create=True,
+        runtime_root=runtime_root,
+    )
     if not work_log_path.exists():
         _log_run_work_entry(report_dir, "ledger-bootstrap")
-    boundary, attestation = _parent_capability("work-log")
-    work_receipt = boundary.resolve_parent_owned_path(
-        attestation, work_log_path, "work-log", create=False
-    )
-    lines = boundary.read_parent_owned_file(work_receipt).decode("utf-8").splitlines()
+    lines = work_log_path.read_text(encoding="utf-8").splitlines()
     heading = "## Ledger Events"
     if heading not in lines:
         lines.extend(["", heading, ""])
@@ -688,20 +700,25 @@ def append_ledger_event(report_dir: Path, event: dict[str, object]) -> Path:
             return work_log_path
     if line not in lines:
         lines.append(line)
-        boundary.write_parent_owned_file(
-            attestation,
+        _parent_write(
             work_log_path,
             ("\n".join(lines) + "\n").encode("utf-8"),
             "work-log",
+            runtime_root,
         )
     return work_log_path
 
 
-def read_ledger_snapshot(report_dir: Path, snapshot_identity: str) -> dict[str, object]:
+def read_ledger_snapshot(
+    report_dir: Path,
+    snapshot_identity: str,
+    *,
+    runtime_root: Path | str | None = None,
+) -> dict[str, object]:
     """Reconstruct one immutable logical-ledger snapshot from the run log."""
     if not snapshot_identity.strip():
         raise ValueError("snapshot_identity must not be empty")
-    work_log_path = report_dir / "work_log.md"
+    work_log_path = _runtime_path(report_dir / "work_log.md", runtime_root)
     if not work_log_path.is_file():
         raise ValueError(f"missing work log: {work_log_path}")
     events: list[dict[str, object]] = []
@@ -744,9 +761,14 @@ def ledger_snapshot_digest(snapshot: Mapping[str, object]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _resolve_active_report_dir(workspace_root: Path, report_root: Path) -> Path | None:
-    """Resolve the current run bundle from reports/agents/.active_run."""
-    pointer = workspace_root / ACTIVE_RUN_POINTER
+def _resolve_active_report_dir(
+    workspace_root: Path,
+    report_root: Path,
+    runtime_root: Path | str | None = None,
+) -> Path | None:
+    """Resolve the current run bundle from the external runtime pointer."""
+    del workspace_root
+    pointer = _runtime_path(report_root / ".active_run", runtime_root)
     if not pointer.is_file():
         return None
     active = pointer.read_text(encoding="utf-8").strip()
@@ -755,9 +777,10 @@ def _resolve_active_report_dir(workspace_root: Path, report_root: Path) -> Path 
     active_path = Path(active)
     if active_path.is_absolute():
         return active_path
-    if active_path.as_posix().startswith("reports/agents/"):
-        return workspace_root / active_path
-    return report_root / active_path
+    return _runtime_path(
+        active_path if active_path.is_absolute() else report_root / active_path,
+        runtime_root,
+    )
 
 
 def _log_run_work_entry(report_dir: Path, entry: str) -> Path:
@@ -785,14 +808,9 @@ def _log_run_work_entry(report_dir: Path, entry: str) -> Path:
             ).encode("utf-8"),
             "work-log",
         )
-    boundary, attestation = _parent_capability("work-log")
-    receipt = boundary.resolve_parent_owned_path(
-        attestation, work_log_path, "work-log", create=False
-    )
-    existing = boundary.read_parent_owned_file(receipt)
+    existing = work_log_path.read_bytes()
     separator = b"\n" if existing else b""
-    boundary.write_parent_owned_file(
-        attestation,
+    _parent_write(
         work_log_path,
         existing + separator + f"- {entry}\n".encode("utf-8"),
         "work-log",
@@ -804,16 +822,42 @@ def main() -> int:
     """Run the CLI."""
     args = build_parser().parse_args()
     workspace_root = Path(args.workspace_root).resolve()
-    report_root = resolve_report_root(args.report_root, workspace_root)
-
     if args.report_dir and args.run_id:
         raise SystemExit("Provide at most one of --report-dir or --run-id.")
     if args.report_dir:
-        report_dir = Path(args.report_dir).resolve()
-    elif args.run_id:
-        report_dir = report_root / str(args.run_id)
+        report_dir = _runtime_path(Path(args.report_dir).resolve(), args.runtime_root)
+        report_root = report_dir.parent
     else:
-        report_dir = _resolve_active_report_dir(workspace_root, report_root)
+        if (
+            args.report_root is None
+            and args.runtime_root is None
+            and args.run_id is None
+            and not os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
+        ):
+            source = Path(__file__).resolve().parents[2]
+            candidate = workspace_root / "reports" / "agents"
+            if workspace_root != source and source not in workspace_root.parents:
+                report_root = candidate
+            else:
+                report_root = resolve_report_root(
+                    args.report_root,
+                    workspace_root,
+                    runtime_root=args.runtime_root,
+                )
+        else:
+            report_root = resolve_report_root(
+                args.report_root,
+                workspace_root,
+                runtime_root=args.runtime_root,
+            )
+    if not args.report_dir and args.run_id:
+        report_dir = report_root / str(args.run_id)
+    elif not args.report_dir:
+        report_dir = _resolve_active_report_dir(
+            workspace_root,
+            report_root,
+            args.runtime_root,
+        )
 
     if not args.request_clause_id:
         if not args.allow_missing_request_clause_id:
@@ -828,12 +872,12 @@ def main() -> int:
         if report_dir is None:
             raise SystemExit(
                 "Missing clause ids are only allowed when --report-dir or --run-id "
-                "or reports/agents/.active_run resolves a run bundle."
+                "or the external .active_run pointer resolves a run bundle."
             )
 
     if report_dir is None:
         raise SystemExit(
-            "No run bundle resolved. Provide --report-dir / --run-id or create reports/agents/.active_run."
+            "No run bundle resolved. Provide --report-dir / --run-id or configure an external .active_run pointer."
         )
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M JST")

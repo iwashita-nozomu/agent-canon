@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Builds machine-readable file-surface inventories and projection metadata for repo review.
-# upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface model
+# responsibility Builds machine-readable file-surface inventories for repo review.
 # downstream implementation ./review_backlog_scan.sh includes inventory reports
 # downstream implementation ../../tests/agent_tools/test_file_surface_inventory.py tests inventory
 # @dependency-end
@@ -15,11 +14,9 @@ import json
 import os
 import subprocess
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-
-from surface_manifest import SurfaceManifest, load_manifest
 
 CHECKABLE_SUFFIXES = frozenset(
     {
@@ -58,7 +55,6 @@ EXCLUDED_PARTS = frozenset(
         "reports",
     }
 )
-SUBMODULE_PATH = Path("vendor/agent-canon")
 ROOT_TOOLS_PATH = Path("tools")
 AGENTCANON_TOOL_SOURCE_KIND = "agentcanon_tool_source"
 AGENTCANON_TOOL_VIEW_KIND = "agentcanon_tool_view"
@@ -71,14 +67,11 @@ class FileEntry:
     scope: str
     path: str
     kind: str
-    projection_producer: str
-    projection_kind: str
     suffix: str
     checkable: bool
     git_mode: str
     symlink_target: str
     real_source_path: str
-    canonical_source_path: str
 
 
 @dataclass(frozen=True)
@@ -93,18 +86,6 @@ class ScopeInventory:
     entries: list[FileEntry]
 
 
-@dataclass(frozen=True)
-class SurfaceLookup:
-    """Root projection metadata lookup derived from the shared manifest."""
-
-    by_path: Mapping[str, tuple[str, str, str, str]]
-    prefix: str
-
-    def get(self, relative: Path) -> tuple[str, str, str, str]:
-        """Return ``(kind, projection_producer, projection_kind, source)``."""
-        return self.by_path.get(relative.as_posix(), ("", "", "", ""))
-
-
 def build_parser() -> argparse.ArgumentParser:
     """Create the command-line parser."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -112,7 +93,6 @@ def build_parser() -> argparse.ArgumentParser:
     scope = parser.add_mutually_exclusive_group()
     scope.add_argument("--root-only", action="store_true")
     scope.add_argument("--agentcanon-only", action="store_true")
-    scope.add_argument("--submodule-aware", action="store_true")
     parser.add_argument("--json-out", help="Optional JSON report path.")
     parser.add_argument("--markdown-out", help="Optional Markdown report path.")
     parser.add_argument(
@@ -122,36 +102,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum file rows to include in Markdown. JSON is always complete.",
     )
     return parser
-
-
-def load_surface_lookup(root: Path) -> SurfaceLookup:
-    """Load shared projection metadata when the manifest is available."""
-    try:
-        manifest = load_manifest(root, "vendor/agent-canon", "documents/runtime/shared-runtime-surfaces.toml")
-    except (OSError, ValueError):
-        return SurfaceLookup(by_path={}, prefix="vendor/agent-canon")
-    return SurfaceLookup(by_path=surface_entries(manifest), prefix=manifest.prefix)
-
-
-def surface_entries(manifest: SurfaceManifest) -> dict[str, tuple[str, str, str, str]]:
-    """Return path-indexed projection metadata."""
-    entries: dict[str, tuple[str, str, str, str]] = {}
-    for entry in manifest.entries:
-        kind = {
-            "copy": entry.projection_kind,
-            "repo_state": "repo_state",
-            "regular": "product_file",
-            "standalone_only": "standalone_only",
-            "removed_legacy": "removed_legacy",
-            "symlink": "symlink_view",
-        }.get(entry.mode, entry.projection_kind)
-        entries[entry.path] = (
-            kind,
-            entry.projection_producer,
-            entry.projection_kind,
-            entry.source_or_default(),
-        )
-    return entries
 
 
 def mode_for_untracked_path(path: Path) -> str:
@@ -222,14 +172,10 @@ def entry_kind(
     relative: Path,
     full_path: Path,
     git_mode: str,
-    surface_lookup: SurfaceLookup,
 ) -> str:
     """Classify one inventory entry for review routing."""
     if git_mode == "160000":
-        return "submodule_pin"
-    manifest_kind = surface_lookup.get(relative)[0] if scope_name == "root" else ""
-    if manifest_kind:
-        return manifest_kind
+        return "gitlink"
     if scope_name == "root" and relative == ROOT_TOOLS_PATH and full_path.is_symlink():
         return AGENTCANON_TOOL_VIEW_KIND
     if scope_name == "agentcanon" and relative.parts[:1] == ROOT_TOOLS_PATH.parts:
@@ -238,8 +184,6 @@ def entry_kind(
         return "symlink_view"
     if scope_name == "agentcanon":
         return "canon_source"
-    if relative.parts[:2] == SUBMODULE_PATH.parts:
-        return "submodule_source"
     return "product_file"
 
 
@@ -248,47 +192,33 @@ def make_entry(
     root: Path,
     git_mode: str,
     raw_path: str,
-    surface_lookup: SurfaceLookup,
 ) -> FileEntry:
     """Build one file entry."""
     relative = Path(raw_path)
     full_path = root / relative
     suffix = relative.suffix
-    kind = entry_kind(scope_name, relative, full_path, git_mode, surface_lookup)
-    _, projection_producer, projection_kind, source = (
-        surface_lookup.get(relative) if scope_name == "root" else ("", "", "", "")
-    )
+    kind = entry_kind(scope_name, relative, full_path, git_mode)
     symlink_target = os.readlink(full_path) if full_path.is_symlink() else ""
     real_source_path = relative_real_path(root, full_path) if surface_exists(full_path) else ""
-    canonical_source_path = (
-        str(Path(surface_lookup.prefix) / source).replace("\\", "/") if source else ""
-    )
     return FileEntry(
         scope=scope_name,
         path=relative.as_posix(),
         kind=kind,
-        projection_producer=projection_producer,
-        projection_kind=projection_kind,
         suffix=suffix,
-        checkable=suffix in CHECKABLE_SUFFIXES and kind != "submodule_pin",
+        checkable=suffix in CHECKABLE_SUFFIXES and kind != "gitlink",
         git_mode=git_mode,
         symlink_target=symlink_target,
         real_source_path=real_source_path,
-        canonical_source_path=canonical_source_path,
     )
 
 
 def scope_roots(root: Path, mode: str) -> list[tuple[str, Path]]:
     """Return scan scopes for the requested mode."""
-    canon = (root / SUBMODULE_PATH).resolve()
     if mode == "agentcanon-only":
-        return [("agentcanon", canon if canon.exists() else root)]
+        return [("agentcanon", root)]
     if mode == "root-only":
         return [("root", root)]
-    scopes = [("root", root)]
-    if canon.exists() and canon != root:
-        scopes.append(("agentcanon", canon))
-    return scopes
+    return [("root", root)]
 
 
 def selected_mode(args: argparse.Namespace) -> str:
@@ -297,14 +227,14 @@ def selected_mode(args: argparse.Namespace) -> str:
         return "root-only"
     if args.agentcanon_only:
         return "agentcanon-only"
-    return "submodule-aware"
+    return "root-only"
 
 
-def inventory_scope(scope_name: str, root: Path, surface_lookup: SurfaceLookup) -> ScopeInventory:
+def inventory_scope(scope_name: str, root: Path) -> ScopeInventory:
     """Inventory one scan scope."""
     rows = run_git_ls_files(root)
     entries = [
-        make_entry(scope_name, root, git_mode, path, surface_lookup)
+        make_entry(scope_name, root, git_mode, path)
         for git_mode, path in rows
         if not set(Path(path).parts) & EXCLUDED_PARTS
         if git_mode == "160000" or surface_exists(root / path)
@@ -356,11 +286,8 @@ def markdown_entry_rows(scopes: Sequence[ScopeInventory], limit: int) -> list[st
                         entry.scope,
                         entry.path,
                         entry.kind,
-                        entry.projection_producer,
-                        entry.projection_kind,
                         "yes" if entry.checkable else "no",
                         entry.real_source_path,
-                        entry.canonical_source_path,
                     )
                 )
                 + " |"
@@ -378,7 +305,7 @@ def render_markdown(mode: str, root: Path, scopes: Sequence[ScopeInventory], lim
         "@dependency-start",
         "responsibility Records file surface inventory for review.",
         (
-            "upstream implementation ../../../../vendor/agent-canon/tools/"
+            "upstream implementation ../../../../tools/agent_tools/"
             "agent_tools/file_surface_inventory.py generates this report"
         ),
         "@dependency-end",
@@ -405,8 +332,8 @@ def render_markdown(mode: str, root: Path, scopes: Sequence[ScopeInventory], lim
             "",
             "## File Rows",
             "",
-            "| Scope | Path | Kind | Projection Producer | Projection Kind | Checkable | Real Source Path | Canonical Source Path |",
-            "| ----- | ---- | ---- | ------------------- | --------------- | --------- | ---------------- | --------------------- |",
+            "| Scope | Path | Kind | Checkable | Real Source Path |",
+            "| ----- | ---- | ---- | --------- | ---------------- |",
             *markdown_entry_rows(scopes, limit),
         ]
     )
@@ -427,10 +354,9 @@ def main() -> int:
     args = build_parser().parse_args()
     root = Path(args.root).resolve()
     mode = selected_mode(args)
-    surface_lookup = load_surface_lookup(root)
     try:
         scopes = [
-            inventory_scope(name, scope_root, surface_lookup)
+            inventory_scope(name, scope_root)
             for name, scope_root in scope_roots(root, mode)
         ]
     except RuntimeError as exc:

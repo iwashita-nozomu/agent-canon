@@ -375,17 +375,13 @@ def append_report_dir(report_dir: Path, baseline: TokenFootprint, candidate: Tok
                 "token_footprint_comparison="
                 f"{status} baseline_total={baseline.total_tokens} "
                 f"candidate_total={candidate.total_tokens} "
-                f"token_ratio={value:.3f} target_ratio={TARGET_RATIO:.3f}"
-                ,
+                f"token_ratio={value:.3f} target_ratio={TARGET_RATIO:.3f}",
             ),
             interventions=(
                 "token footprint measured from Codex session logs "
                 f"baseline={baseline.session_file.name} "
-                f"candidate={candidate.session_file.name}"
-                ,
+                f"candidate={candidate.session_file.name}",
             ),
-            responsibility_unit_id=report_dir.name,
-            token_footprint_ref=candidate.session_file.resolve().as_posix(),
         ),
     )
 

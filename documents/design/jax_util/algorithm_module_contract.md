@@ -393,7 +393,6 @@ artifact は空 arrays を含み、下流が text の exit status だけに依�
 | CI route | `tools/ci/run_all_checks.sh` の Python nested invocation と header | `${CANON_BIN} python-algorithm-contract-check --root "$WORKSPACE_ROOT" python` に置換 |
 | catalog | `check-algorithm-module-public-surface` entry | 削除。Rust entry に capability を統合 |
 | catalog | `check-algorithm-module-nested-contract` entry | 削除。Rust entry の `default_wiring.ci` を `true` に変更 |
-| runtime mirror | `documents/runtime/shared-runtime-surfaces.toml` の retired test paths | 二つの test path を削除し、Rust test/fixture surface を登録 |
 | runtime inventory | `documents/runtime/log-surface-inventory.json` | Rust owner fix 後に canonical inventory tool で再生成し、stale-path diff を閉じる。logs/log archive は保持 |
 | tool docs | `documents/tools/README.md` の二つの Python bullet | canonical Rust bullet 一つへ統合 |
 | tool docs | `tools/README.md` の nested checker bullet | 削除し Rust CLI entry を唯一の案内にする |

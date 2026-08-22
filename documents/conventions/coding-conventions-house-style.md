@@ -2,7 +2,6 @@
 @dependency-start
 contract policy
 responsibility Documents ハウススタイル規約 for this repository.
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ./common/03_comments.md owns decision-comment meaning and lifecycle
 downstream design ./object-oriented-design.md expands OOP policy for class and Protocol decisions
 @dependency-end

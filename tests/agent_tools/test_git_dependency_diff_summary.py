@@ -18,6 +18,14 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "git_dependency_diff_summary.py"
 
+
+def runtime_root_for(root: Path) -> Path:
+    """Return a per-fixture runtime root outside the repository under test."""
+    runtime = root.parent / f".{root.name}.agent-canon-runtime"
+    runtime.mkdir(parents=True, exist_ok=True)
+    return runtime
+
+
 if str(TOOL.parent) not in sys.path:
     sys.path.insert(0, str(TOOL.parent))
 
@@ -113,7 +121,8 @@ class GitDependencyDiffSummaryTest(unittest.TestCase):
             )
             (root / "alpha.py").write_text("value = 2\n", encoding="utf-8")
             (root / "beta.py").write_text("import alpha\n", encoding="utf-8")
-            report_dir = root / "report"
+            runtime_root = runtime_root_for(root)
+            report_dir = runtime_root / "report"
 
             result = subprocess.run(
                 [
@@ -123,6 +132,8 @@ class GitDependencyDiffSummaryTest(unittest.TestCase):
                     str(root),
                     "--report-dir",
                     str(report_dir),
+                    "--runtime-root",
+                    str(runtime_root),
                     "--skip-code-dependencies",
                     "--skip-dependency-review",
                     "--format",
@@ -177,7 +188,8 @@ class GitDependencyDiffSummaryTest(unittest.TestCase):
                 capture_output=True,
             )
             (root / "new.py").write_text("value = 1\nextra = 2\n", encoding="utf-8")
-            report_dir = root / "report"
+            runtime_root = runtime_root_for(root)
+            report_dir = runtime_root / "report"
 
             result = subprocess.run(
                 [
@@ -187,6 +199,8 @@ class GitDependencyDiffSummaryTest(unittest.TestCase):
                     str(root),
                     "--report-dir",
                     str(report_dir),
+                    "--runtime-root",
+                    str(runtime_root),
                     "--skip-code-dependencies",
                     "--skip-dependency-review",
                     "--format",
@@ -243,7 +257,8 @@ class GitDependencyDiffSummaryTest(unittest.TestCase):
                 capture_output=True,
             )
             path.write_text("value = 1\nextra = 2\n", encoding="utf-8")
-            report_dir = root / "report"
+            runtime_root = runtime_root_for(root)
+            report_dir = runtime_root / "report"
 
             result = subprocess.run(
                 [
@@ -253,6 +268,8 @@ class GitDependencyDiffSummaryTest(unittest.TestCase):
                     str(root),
                     "--report-dir",
                     str(report_dir),
+                    "--runtime-root",
+                    str(runtime_root),
                     "--skip-code-dependencies",
                     "--skip-dependency-review",
                     "--format",

@@ -8,8 +8,7 @@ upstream design ../experiments/experiment-critical-review.md mathematical validi
 upstream design ../../agents/workflows/research-workflow.md research workflow equation-to-code mapping
 upstream design ../conventions/coding-conventions-python.md Python implementation policy entrypoint
 upstream design ../conventions/coding-conventions-cpp.md C++ implementation policy entrypoint
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
-upstream implementation ../../tools/sync_agent_canon.sh root symlink view generation
+upstream implementation ../../bootstrap.sh standalone runtime entrypoint
 @dependency-end
 -->
 

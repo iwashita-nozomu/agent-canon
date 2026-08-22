@@ -38,27 +38,25 @@
   },
   "owner_stage": "implementation",
   "implementation_targets": [
-    {"path": ".devcontainer/generate-runtime-compose.sh", "owner_stage": "implementation", "change_kind": "modify"},
+    {"path": "bootstrap/container/Dockerfile", "owner_stage": "implementation", "change_kind": "modify"},
     {"path": "agent-canon-environment.toml", "owner_stage": "design", "change_kind": "modify"},
     {"path": "agents/skills/agent-log-analysis.md", "owner_stage": "design", "change_kind": "modify"},
     {"path": "documents/design/runtime-log-repository-lifecycle-correspondence.json", "owner_stage": "design", "change_kind": "modify"},
     {"path": "documents/runtime/runtime-log-archive.md", "owner_stage": "design", "change_kind": "modify"},
     {"path": "documents/tools/README.md", "owner_stage": "design", "change_kind": "modify"},
     {"path": "tests/agent_tools/test_runtime_log_archive_git.py", "owner_stage": "validation", "change_kind": "modify"},
-    {"path": "tests/tools/test_container_config.py", "owner_stage": "validation", "change_kind": "modify"},
-    {"path": "tests/tools/test_run_codex_in_repo_container.py", "owner_stage": "validation", "change_kind": "modify"},
+    {"path": "tests/tools/test_bootstrap_container_contract.py", "owner_stage": "validation", "change_kind": "modify"},
+    {"path": "tests/bootstrap/test_bootstrap_runtime.py", "owner_stage": "validation", "change_kind": "modify"},
     {"path": "tools/agent_tools/runtime_log_archive_git.py", "owner_stage": "implementation", "change_kind": "modify"},
-    {"path": "tools/ci/run_codex_in_repo_container.py", "owner_stage": "implementation", "change_kind": "modify"}
+    {"path": "tools/agent_tools/bootstrap_runtime.py", "owner_stage": "implementation", "change_kind": "modify"}
   ],
-  "implementation_targets_sha256": "9dfd6e261893aa1d0453097df31f240839ef5dcba007f0326419042669ca9d42",
   "validation_route": [
     {"argv": ["python3", "-m", "pytest", "-q", "tests/agent_tools/test_runtime_log_archive_git.py", "-k", "context_discovery"], "cwd": ".", "owner_stage": "validation"},
-    {"argv": ["python3", "-m", "pytest", "-q", "tests/tools/test_container_config.py", "tests/tools/test_run_codex_in_repo_container.py"], "cwd": ".", "owner_stage": "validation"},
-    {"argv": ["bash", "-n", ".devcontainer/generate-runtime-compose.sh"], "cwd": ".", "owner_stage": "validation"},
+    {"argv": ["python3", "-m", "pytest", "-q", "tests/tools/test_bootstrap_container_contract.py"], "cwd": ".", "owner_stage": "validation"},
+    {"argv": ["python3", "-m", "pytest", "-q", "tests/bootstrap/test_bootstrap_runtime.py"], "cwd": ".", "owner_stage": "validation"},
     {"argv": ["bash", "tools/agent_tools/check_dependency_header_format.sh", "--root", ".", "--changed"], "cwd": ".", "owner_stage": "validation"},
-    {"argv": ["tools/bin/agent-canon", "docs", "check", "documents/runtime/runtime-log-archive.md", "documents/tools/README.md", "agents/skills/agent-log-analysis.md"], "cwd": ".", "owner_stage": "validation"},
+    {"argv": ["python3", "tools/docs/check_bootstrap_docs.py", "--root", "."], "cwd": ".", "owner_stage": "validation"},
     {"argv": ["git", "diff", "--check"], "cwd": ".", "owner_stage": "validation"}
   ],
-  "validation_route_sha256": "cf32425c68b1a1f0ee35178bfc802e81080fcbf60526e306736751be63e12ec7",
   "state": "review_ready"
 }

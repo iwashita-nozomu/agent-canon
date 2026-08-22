@@ -24,7 +24,7 @@ downstream implementation ../../tests/tools/test_agent_canon_pr_dependency_sourc
 downstream implementation ../../tests/tools/test_agent_canon_pr_graph_gate_integration.py prevents persisted graph orchestration from returning
 downstream implementation ../../tests/tools/test_pr_gate_receipt.py verifies receipt schema and binding rejection
 downstream implementation ../../tests/tools/test_pr_gate_receipt_round_trip.py verifies writer/parser/consumer execution
-downstream implementation ../../issues/open/AC-20260815-decouple-graph-runtime.md tracks Issue 723 implementation and validation
+downstream implementation ../../issues/closed/AC-20260815-decouple-graph-runtime.md records Issue 723 implementation and validation
 @dependency-end
 -->
 
@@ -105,8 +105,6 @@ record tuples, not process-local counters or database row IDs.
 Every relative target is resolved from the canonical source file in
 `tools/agent_tools/source_dependency_graph.py`. The resolved path must remain
 below the selected repository root. Parent views are mapped by
-`documents/runtime/shared-runtime-surfaces.toml` using deterministic longest-prefix
-selection before source bytes are read from `documents/runtime/shared-runtime-surfaces.toml`.
 
 ### Cache and runtime state are non-authoritative
 
@@ -204,7 +202,6 @@ combined with the authority correction.
   `tools/agent_tools/source_dependency_graph.py`.
 - `normalization` assumption: canonical path and surface binding normalization
   is owned by `tools/agent_tools/source_dependency_graph.py` and
-  `documents/runtime/shared-runtime-surfaces.toml`.
 - Evidence sources: source projection, receipt lifecycle, and regression tests
   are `tools/agent_tools/source_dependency_graph.py`,
   `tools/ci/pr_gate_receipt.py`, and

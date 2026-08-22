@@ -99,5 +99,5 @@ After editing this wrapper or the shared Python gate, run:
 ```bash
 bash -n tools/ci/pre_review.sh
 bash -n tools/ci/run_python_quality_checks.sh
-python3 -m pytest vendor/agent-canon/tests/tools/test_run_all_checks_script.py -q
+python3 -m pytest tests/tools/test_run_all_checks_script.py -q
 ```

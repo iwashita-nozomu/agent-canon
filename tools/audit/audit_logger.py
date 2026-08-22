@@ -19,13 +19,28 @@ Audit Logger — 監査ログシステム
 
 import json
 import os
+import sys
 from collections.abc import Callable
 from datetime import datetime, timezone
-
-UTC = timezone.utc
 from enum import Enum
 from pathlib import Path
 from typing import ParamSpec, TypeAlias, TypeVar, cast
+
+try:
+    from tools.agent_tools.runtime_artifacts import (
+        RuntimeArtifactBoundary,
+        RuntimeRootRequired,
+        runtime_artifact_boundary,
+    )
+except ImportError:  # pragma: no cover - direct script invocation.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from tools.agent_tools.runtime_artifacts import (  # type: ignore[no-redef]
+        RuntimeArtifactBoundary,
+        RuntimeRootRequired,
+        runtime_artifact_boundary,
+    )
+
+UTC = timezone.utc
 
 JsonScalar: TypeAlias = str | int | float | bool | None
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
@@ -46,18 +61,65 @@ class AuditLevel(Enum):
 class AuditLogger:
     """監査ログ記録システム"""
     
-    def __init__(self, log_dir: Path | None = None):
+    def __init__(
+        self,
+        log_dir: Path | None = None,
+        *,
+        source_root: Path | None = None,
+        runtime_root: Path | str | None = None,
+    ):
         """初期化
         
         Args:
-            log_dir: ログ出力ディレクトリ（環境変数 AUDIT_LOG_DIR で設定可能）
+            log_dir: Optional path below the explicitly selected runtime
+                root.  Absolute paths must already be below that root;
+                relative paths are interpreted below it.  It is not a second
+                output capability and can never target a source checkout.
+            source_root: Source checkout used to reject a runtime root that
+                would overlap the source.  The checkout must be supplied by
+                the caller or by the typed target-root capability; the current
+                working directory is intentionally not inferred.
+            runtime_root: Explicit external runtime root.  When ``log_dir``
+                is omitted this must be supplied or available through
+                ``AGENT_CANON_RUNTIME_ROOT``.
         """
-        if log_dir is None:
-            log_dir = Path(os.getenv("AUDIT_LOG_DIR", "reports/audit"))
-        
-        self.log_dir = Path(log_dir)
-        self.log_dir.mkdir(parents=True, exist_ok=True)
+        source_value = source_root
+        if source_value is None:
+            # Bootstrap supplies a typed target-root capability to child
+            # processes.  It is an explicit handoff, unlike cwd/git-root
+            # discovery, and therefore does not accidentally select a parent
+            # repository when AgentCanon is invoked from one.
+            capability_source = os.getenv("AGENT_CANON_TARGET_ROOT", "").strip()
+            if capability_source:
+                source_value = Path(capability_source)
+        if source_value is None:
+            raise RuntimeRootRequired(
+                "explicit source root required; pass source_root or set "
+                "AGENT_CANON_TARGET_ROOT"
+            )
+        self.source_root = Path(source_value).expanduser().resolve()
+        self._runtime_boundary: RuntimeArtifactBoundary = runtime_artifact_boundary(
+            self.source_root,
+            runtime_root,
+            create=True,
+        )
+
+        configured_log_dir = log_dir
+        if configured_log_dir is None:
+            explicit_log_dir = os.getenv("AUDIT_LOG_DIR", "").strip()
+            if explicit_log_dir:
+                configured_log_dir = Path(explicit_log_dir)
+        destination = (
+            Path(configured_log_dir) if configured_log_dir is not None else Path("audit")
+        )
+        self.log_dir = self._runtime_boundary.resolve(destination)
+        self._runtime_boundary.ensure_directory(destination)
         self.log_file = self.log_dir / "audit.jsonl"
+
+    def _append(self, path: Path, payload: bytes) -> None:
+        """Append using the shared external resolver when one is active."""
+        relative = path.relative_to(self._runtime_boundary.root)
+        self._runtime_boundary.append_bytes(relative, payload)
     
     def record(
         self,
@@ -98,9 +160,9 @@ class AuditLogger:
             "branch": self._get_current_branch(),
         })
         
-        # ファイルに追記
-        with open(self.log_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+        # ファイルに追記。デフォルト経路は外部 runtime root に限定する。
+        payload = (json.dumps(log_entry, ensure_ascii=False) + "\n").encode("utf-8")
+        self._append(self.log_file, payload)
         
         # セキュリティログの場合は別ファイルにも
         if level == AuditLevel.SECURITY or level == AuditLevel.COMPLIANCE:
@@ -111,8 +173,10 @@ class AuditLogger:
     def _log_to_security_file(self, entry: JsonObject) -> None:
         """セキュリティ・コンプライアンスログを分離ファイルに記録"""
         security_file = self.log_dir / "security.jsonl"
-        with open(security_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        self._append(
+            security_file,
+            (json.dumps(entry, ensure_ascii=False) + "\n").encode("utf-8"),
+        )
     
     def _get_current_commit(self) -> str:
         """現在の git commit SHA を取得"""
@@ -123,7 +187,7 @@ class AuditLogger:
                 capture_output=True,
                 text=True,
                 timeout=5,
-                cwd="/workspace"
+                cwd=self.source_root
             )
             return result.stdout.strip()[:8]
         except Exception:
@@ -138,7 +202,7 @@ class AuditLogger:
                 capture_output=True,
                 text=True,
                 timeout=5,
-                cwd="/workspace"
+                cwd=self.source_root
             )
             return result.stdout.strip()
         except Exception:

@@ -4,7 +4,7 @@ contract reference
 responsibility Documents Rust migration policy for AgentCanon tools.
 upstream design README.md AgentCanon documentation index
 upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
-downstream environment ../../.devcontainer/dependencies.toml declares Rust toolchain and CLI build records
+downstream implementation ../../bootstrap/container/dependencies.toml declares Rust toolchain and CLI build records
 downstream implementation ../../rust/agent-canon/src/main.rs Rust CLI entrypoint
 downstream implementation ../../rust/agent-canon/src/migration_audit.rs validates migration boundaries
 downstream implementation ../../rust/agent-canon/src/rust_migration_plan.rs prints sequential migration candidates
@@ -81,25 +81,19 @@ not rewrite repository source files or generated README surfaces.
 
 In a template or derived repository, the normal adoption path is:
 
-1. Update the `vendor/agent-canon` submodule pin to an AgentCanon commit that
-   contains this policy and the Rust CLI.
-1. Repair shared root views with request-evidence-authorized
-   the source-root resolver `exec tools/sync_agent_canon.sh link-root` if
-   the root view drifts.
-1. Run request-evidence-authorized `make agent-canon-ensure-latest` or
-   request-evidence-authorized source-root resolver `exec tools/update_agent_canon.sh apply`; this calls
-   `tools/rebuild_agent_tools.sh` after the AgentCanon pin is updated. If the
-   host has no Rust toolchain, rerun the same target inside the DevContainer or
-   recreate the DevContainer so `.devcontainer/post-create.sh` runs again.
-1. Use `agent-canon rust-migration-audit --root vendor/agent-canon` to confirm
+1. Create or reuse an ignored qualified AgentCanon source clone and an
+   Issue-qualified standalone topic branch.
+1. Run `bootstrap.sh install` with an explicit control/runtime root. The image
+   build compiles and verifies the Rust CLI from the selected source snapshot;
+   no Host Rust toolchain or separate rebuild script is used.
+1. Use `agent-canon rust-migration-audit --root <agent-canon-source>` to confirm
    the Rust foundation is present.
-1. Use `agent-canon rust-migration-plan --root vendor/agent-canon` before
+1. Use `agent-canon rust-migration-plan --root <agent-canon-source>` before
    porting the next tool.
 
-The parent repository does not need Rust in its repo-local Dockerfile to use
-AgentCanon Rust tooling. The DevContainer is AgentCanon-owned shared
-development infrastructure; the Dockerfile remains a repo-local runtime and
-dependency contract.
+The parent repository does not need Rust in its project Dockerfile to use
+AgentCanon Rust tooling. The shared tool image and the project execution image
+remain separate contracts.
 
 ## Runtime Boundary
 

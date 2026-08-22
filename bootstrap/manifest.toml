@@ -1,0 +1,35 @@
+# AgentCanon shared tool-runtime lifecycle manifest.
+# This file contains policy only; runtime ownership is recorded under the
+# explicit runtime root selected by bootstrap.sh.
+
+[container]
+platform = "linux/amd64"
+name_template = "agent-canon-tools-<effective-uid>"
+max_instances = 1
+runtime_uid = 1000
+runtime_gid = 1000
+cpus = 2
+memory_bytes = 4294967296
+pids_limit = 512
+max_parallel_tasks = 2
+task_timeout_seconds = 1800
+termination_grace_seconds = 10
+task_state_quota_bytes = 1073741824
+task_log_quota_bytes = 104857600
+health_start_period_seconds = 10
+health_timeout_seconds = 5
+health_poll_interval_seconds = 0.2
+runtime_quota_bytes = 2147483648
+cache_quota_bytes = 4294967296
+archive_lease_quota_bytes = 2147483648
+idle_stop_seconds = 3600
+max_image_generations = 2
+network = "none"
+labels = ["io.agent-canon.runtime=shared-v1", "io.agent-canon.owner-uid", "io.agent-canon.control-root-digest"]
+
+[skills]
+strategy = "managed-links"
+target = "runtime-root/codex-home/skills"
+
+[archive]
+remote = "git@github.com:iwashita-nozomu/agent-canon-log.git"

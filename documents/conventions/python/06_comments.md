@@ -2,7 +2,6 @@
 @dependency-start
 contract policy
 responsibility Documents Python コメント for this repository.
-upstream design ../../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../common/03_comments.md common decision-comment policy
 @dependency-end
 -->

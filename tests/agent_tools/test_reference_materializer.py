@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -22,7 +23,12 @@ SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "reference_materializer.p
 class ReferenceMaterializerTest(unittest.TestCase):
     """Exercise the PDF/HTML reference materializer CLI."""
 
-    def run_cli(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    def run_cli(
+        self,
+        root: Path,
+        *args: str,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         """Run the reference materializer against a temp root."""
         return subprocess.run(
             [sys.executable, str(SCRIPT_PATH), "--root", str(root), *args],
@@ -30,12 +36,21 @@ class ReferenceMaterializerTest(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
+            env={**os.environ, **(env or {})},
         )
 
     def test_html_reference_is_written_as_markdown(self) -> None:
         """HTML input should produce a references Markdown file."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
+            subprocess.run(
+                ["git", "init", "-q", "-b", "main", str(root)],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(root), "remote", "add", "origin", "https://example.invalid/parent.git"],
+                check=True,
+            )
             html_path = root / "source.html"
             html_path.write_text(
                 (
@@ -52,6 +67,7 @@ class ReferenceMaterializerTest(unittest.TestCase):
                 "https://example.com/reference.html",
                 "--input",
                 str(html_path),
+                env={"AGENT_CANON_PARENT_ROOT": str(root)},
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

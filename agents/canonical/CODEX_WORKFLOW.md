@@ -4,7 +4,7 @@ contract agent-runtime
 responsibility Documents Codex Workflow for this repository.
 upstream design ../../ROOT_AGENTS.md root runtime entrypoint
 upstream design ./CODEX_SUBAGENTS.md subagent routing contract
-upstream design ../workflows/derived-agent-canon-diff-workflow.md shared canon diff workflow
+upstream design ../workflows/agent-canon-pr-workflow.md standalone source PR workflow
 upstream design ../../issues/README.md durable AgentCanon operational finding storage
 downstream design ../workflows/token-efficient-codex-workflow.md token-aware runtime mode overlay
 downstream design ../../templates/agents/closeout_gate.md closeout gate contract
@@ -35,7 +35,7 @@ downstream implementation ../../tools/agent_tools/task_close.py enforces closeou
 1. `agents/skills/README.md` と `$agent-orchestration` skill を読み、routing mode と skill set を先に決める
 1. `agents/TASK_WORKFLOWS.md` で task family を決める
 1. Runtime profile と implementation owner がまだ固定されていない repo-changing task では、広い packet 読解より先に canonical router / semantic-index / dependency review の structured output を取る
-1. `make agent-canon-update-plan` と read-only worktree check で AgentCanon freshness を分類する。更新が必要なら current checkout を保持し、current-task user の explicit approval を得てから、操作リスクに対応した creation または destructive authority/reason を同じ command segment に置いた protected wrapper / Make target を実行する。intended named source branch の dirty / unpushed / divergent state は evidence として保持し、Git の仮想 merge conflict または exact update write set と local materialized path の collision だけを typed blocker にする。detached state は source owner identity repair へ route する
+1. read-only worktree check で、必要なら別の AgentCanon source clone を使うかを分類する。AgentCanon source はこの repository か、親の `workspace/agent-canondevelop/<qualified-task>/agent-canon` にある独立 clone だけを扱う。更新が必要なら current checkout を保持し、standalone topic branch / PR workflow に入る。source branch の dirty / unpushed / divergent state は evidence として保持し、detached state は source owner identity repair へ route する
 1. 選択された workflow/profile が必要とする Base Runtime Packet だけを読む。inactive profile の packet は `not_applicable` として記録する
 1. Cross-Cutting Packet は選択 route、review gate、または structured tool finding が必要にした slice を読む
 1. 実装を伴う task では `agents/workflows/implementation-waterfall-workflow.md` を読む
@@ -68,24 +68,12 @@ Cross-Cutting Packet:
 
 ### Agent Canon Freshness
 
-task 開始時は `make agent-canon-update-plan` と read-only worktree check で、parent repo の `vendor/agent-canon` submodule pin と worktree の freshness を分類します。preflight の contract は checkout-preserving read-only classification です。更新が必要な場合だけ current-task user approval と、操作に対応する inline Git authority/reason field を得て protected update route に入ります。
+task 開始時は read-only worktree check で、現在の AgentCanon source clone と親の作業領域を分類します。preflight の contract は checkout-preserving read-only classification です。更新が必要な場合は standalone topic branch / PR route に入ります。
 
-- submodule repo では、read-only plan の判断対象を AgentCanon update surface に限定します。
-- AgentCanon update surface は `vendor/agent-canon/` submodule worktree、parent gitlink、`.gitmodules`、および `link-root` が触る AgentCanon-owned root symlink / copy view です。
-- clean な submodule worktree が remote main を指していて parent gitlink だけ古い場合も、preflight は checkout-preserving `approval_required` route を返します。承認後の protected update が parent gitlink の stage / commit を所有します。
-- clean な submodule worktree が non-default branch を指し、その branch head が remote branch に push 済みで fetched remote main を含み、parent gitlink だけが古い場合は `deferred_branch_pr` evidence として記録し、routing / planning / review を続けます。AgentCanon PR merge 後は再度 read-only plan を行い、mutation が必要なら operation risk に応じた approval/authority fields と同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected latest route を実行します。
-- intended named `vendor/agent-canon/` source branch を source owner とし、branch / ahead / diverged / dirty state は evidence として保持します。全 local uncommitted / ignored materialized paths と `HEAD` から planned result tree への exact update write set の unpreservable collision、または unresolved merge conflict だけを block します。
-- requested topic が current branch と異なる場合だけ `documents/rule/dependency-module-changes.md` の topic workspace branch clone route を使います。parent pin/root projection は引き続き clean `main` と staged gitlink の一致を要求します。
-- update surface が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon branch / PR に出します。merge 後も read-only plan を先に行い、必要な approval/authority fields と同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected latest route の後で root view と parent pin を同期します。
-- active root projection change、parent root sync PR は `agentcanon_structure_followup=required`
-  です。template / derived parent root で
-  `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` link-root と
-  `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` check が pass した後だけ
-  `agentcanon_structure_followup=pass` として closeout に使えます。
-- 承認済み protected `ensure-latest` は `.gitmodules` の URL と immutable remote branch SHA を見て、parent gitlink と submodule worktree HEAD が remote main と一致するかを判定し、必要な pin と root shared surface を同期します。
-- local submodule commit が remote main に含まれている場合も、read-only plan の後に current-task user approval、destructive authority/reason、および同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected `apply` / latest route で parent pin を remote main へ揃えます。route が branch/worktree を作成する場合だけ creation authority/reason も要求します。
-- local submodule history が remote main と diverge している場合は fail-closed とし、`agents/workflows/derived-agent-canon-diff-workflow.md` に従って AgentCanon branch push、AgentCanon PR / merge、派生 repo submodule pin 再同期を完了してから実装へ戻ります。
-- `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。template の root symlink view から起動したときに `skipped_source_canon` が出る場合は misconfiguration として扱い、workspace root、`.gitmodules`、`vendor/agent-canon` の状態を確認します。`skipped_source_canon` は standalone AgentCanon source checkout でだけ妥当です。
+- AgentCanon source/runtime変更は standalone cloneから `agents/workflows/agent-canon-pr-workflow.md` に入り、AgentCanon branch / PR / merge / main readbackを閉じます。親repoへroot view、vendor、submodule pinを同期しません。
+- 親で source の変更が必要な場合は、親の ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon` に clone し、完了時に exact clone path を削除します。親の product test、Docker、CI、GPU は親の entrypoint で実行し、AgentCanon runtime はそれらを発見または mount しません。
+- standalone AgentCanon source branch が remote main と divergeしている場合はfail-closedとし、source branchのrebase/merge判断、AgentCanon PR、merge後main readbackを完了してから実装へ戻ります。
+- `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。親から起動したときは AgentCanon source clone の存在、runtime root の containment、source-unchanged readbackを確認します。`skipped_source_canon` は AgentCanon source checkout がこの task の owner でない場合だけ妥当です。
 
 ### Branch Reuse Default
 
@@ -115,8 +103,8 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
 - 通常 task の authority は、user が別 branch を明示した場合の `user_request` です。AgentCanon source update の authority は、AgentCanon branch / PR workflow と canonical update tool が owner の `agent_canon_workflow` です。
 - 「fresh start」「dirty state 回避」「追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」は、既存 branch / PR 継続の理由として扱います。
 - branch / worktree 作成前に run bundle、work log、または PR body へ `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と authority 対応箇所を記録します。それだけでは実行権限になりません。current-task user approval 後の同じ shell segment に、通常作成なら creation authority/reason、force-create/ref overwrite なら creation と destructive の両 authority pair を置いた場合だけ実行できます。
-- AgentCanon source 変更は intended named `vendor/agent-canon/` branch を source owner とし、branch / ahead / diverged / dirty state を evidence として collision-safe merge / review を続けます。vendor checkout が別 topic/branch に占有されている場合だけ、`dependency-module-change` で topic workspace clone を prepare/reuse します。parent pin/root projection は source publication 後に行います。
-- vendor-first は非並列 single-stream の既定です。独立 stream の workspace placement も、vendor checkout の別 topic/branch 占有時のみ、replaceable responsibility unit、disjoint write scope、依存/merge order、validation route、reviewer ownership を固定して選択します。parent は ready な全 stream を launch し、全 descendant を monitor し、同一責任・同一 worker context を再利用します。細粒度の fresh-agent fan-out は独立 stream とみなしません。
+- AgentCanon source 変更は standalone source clone を source owner とし、branch / ahead / diverged / dirty state を evidence として collision-safe merge / review を続けます。親で作業する場合は ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon` clone を再利用します。親の pin や root projection は作成しません。
+- standalone source の変更は非並列 single-stream の既定です。独立 stream の workspace placement は、replaceable responsibility unit、disjoint write scope、依存/merge order、validation route、reviewer ownership を固定して選択します。parent は ready な全 stream を launch し、全 descendant を monitor し、同一責任・同一 worker context を再利用します。細粒度の fresh-agent fan-out は独立 stream とみなしません。
 - repository source は `repository-topic-clone` の一つの prepare route で扱います。exact identity の既存 clone と named local/remote branch は再利用し、branch が無い場合だけ最新 `origin/main` から作成します。parent、dependency、standalone の区別は prepare 後の policy decorator です。各 source branch は candidate review / PR 前に最新 `origin/main` を通常 merge し、conflict は状態を保持して意図的に解消します。`origin/main` の read/CAS だけでは merge 済みの代替になりません。
 
 ### Runtime Profile And Risk Selection
@@ -188,8 +176,8 @@ file や path の欠落を見つけたときは、再作成、削除済み判定
 
 1. current repo で、欠落している path が root symlink view、synced root copy、shared workflow / skill / tool / memory surface、または template 由来の scaffold かを確認する
 1. template root または登録された template remote / current template main で同じ path の有無と現在の正本形を確認する
-1. `vendor/agent-canon/` と standalone `agent-canon` で同じ path の有無、rename、移動、sync 対象からの除外理由を確認する
-1. canon-owned surface なら `documents/runtime/shared-runtime-surfaces.toml`、`documents/runtime/SHARED_RUNTIME_SURFACES.md`、`vendor/agent-canon/tools/sync_agent_canon.sh` の manifest-backed ownership に従い、`link-root`、vendor update、standalone canon update、または意図的削除のどれかに分類する
+1. standalone AgentCanon source clone と親の development clone で同じ path の有無、rename、移動、外部 runtime への移行理由を確認する
+1. AgentCanon-owned surface なら `documents/runtime/bootstrap-runtime.md`、`documents/runtime/runtime-log-archive.md`、および選択した owner Skill に従い、standalone source update、shared runtime update、または意図的削除のどれかに分類する
 1. template と canon のどちらにも無く、task 固有に必要な file だけを新規作成候補にし、既存実装・文書で足りない理由を run bundle に残す
 
 欠落を見つけた agent は、handoff や review artifact に `missing_file_triage` として確認した template path、canon path、分類、次 action を記録します。
@@ -403,7 +391,7 @@ bash tools/agent_tools/check_dependency_graph.sh --print-edges
 - code / docs / tools / runtime をまとめて rework するなら `Comprehensive Development`
 - Docker / CI / dependency を触るなら `Platform And Environment`
   - `environment-maintenance` と `environment_change_proposal.md` を先に起こし、code requirement と blocked command を固定する
-  - host runtime では repo-local virtual environment を作らず、environment validation には `bash tools/docker_dependency_validator.sh` と `python3 tools/ci/container_config.py` を使う
+  - Host にrepo-local virtual environmentを作らず、AgentCanon environment validationはbootstrap container contractと実lifecycle readbackを使う。project environmentはproject-owned validatorへ委譲する
 - 外部調査や比較実験が必要なら `Research-Driven Change`
 - tuning、比較改善、探索的 protocol refinement を backlog 付きで回すなら `Adaptive Improvement Loop`
   - Agile outer loop とし、1 extension ごとに 1 waterfall run-id / 1 waterfall pass / 1 decision state へ分解する
@@ -833,7 +821,7 @@ environment, produce resources, or duplicate tests/gates.
 #### Completion Readiness
 
 - repo に残す差分がある task では、validation 後に commit を作る
-- commit は `documents/operations/BRANCH_SCOPE.md` の Git 上の runnable unit として作る。validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。commit SHA、submodule SHA、validation command、対象 path、残った dirty / untracked path の分類を evidence に残す
+- commit は `documents/operations/BRANCH_SCOPE.md` の Git 上の runnable unit として作る。validation が参照した source、config、schema、fixture、文書、tool entrypoint を tracked tree に含める。code 変更では file-level code dependency と関数 / public entrypoint 単位の call-site evidence も残す。commit SHA、source clone SHA、validation command、対象 path、残った dirty / untracked path の分類を evidence に残す
 - commit / PR の切り方は `documents/operations/BRANCH_SCOPE.md` の範囲分割契約に従う。commit は実行単位、PR はレビュー単位として扱い、複数の問題、canonical owner、behavior or contract delta、validation route にまたがる差分は範囲表を作ってから merge 前に別 PR または別 commit へ分ける
 - final report の前に branch push を行い、user が明示的に停止を指定した場合は停止理由を final report に残す
 - user-facing final report は、`verification.txt` が `status=pass`、`closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked`、`user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` の状態で出す

@@ -35,6 +35,7 @@ class LiveReceiptFixture:
         "tools/ci/run_python_quality_checks.sh",
         "tools/lib/repo_paths.sh",
         "tools/agent_tools/parent_root_side_effects.py",
+        "tools/agent_tools/runtime_artifacts.py",
         "tools/agent_tools/review_dispatch.py",
         "tools/agent_tools/artifact_identity.py",
         "tools/agent_tools/external_artifact_binding.py",
@@ -48,12 +49,14 @@ class LiveReceiptFixture:
         "tests/agent_tools/test_publication_integrator.py",
         "tests/agent_tools/test_review_dispatch.py",
         "tests/agent_tools/test_work_log.py",
-        "tools/sync_agent_canon.sh",
     )
 
     def __init__(self, root: Path, status: str) -> None:
         """Bind the fixture root and source-gate status used by one case."""
-        self.root = root
+        self.temp_root = root
+        self.control_root = root / "control"
+        self.root = self.control_root / "workspace" / "agent-canon"
+        self.runtime_root = self.control_root / "workspace" / "agent-canon-runtime" / "pr-gate"
         self.status = status
         self.log = root / "calls.log"
         self.bin = root / "bin"
@@ -72,8 +75,35 @@ class LiveReceiptFixture:
         target.write_text(content, encoding="utf-8")
         target.chmod(0o755)
 
+    def write_external_executable(self, name: str, content: str) -> None:
+        """Write a fake tool outside the source checkout."""
+        target = self.bin / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+        target.chmod(0o755)
+
     def prepare(self) -> None:
         """Install production scripts and unrelated-check stubs."""
+        self.root.mkdir(parents=True, exist_ok=True)
+        self.control_root.mkdir(parents=True, exist_ok=True)
+        (self.control_root / ".gitignore").write_text("/workspace/\n", encoding="utf-8")
+        subprocess.run(["git", "init", "-q"], cwd=self.control_root, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "control@example.invalid"],
+            cwd=self.control_root,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Control Fixture"],
+            cwd=self.control_root,
+            check=True,
+        )
+        subprocess.run(["git", "add", ".gitignore"], cwd=self.control_root, check=True)
+        subprocess.run(
+            ["git", "commit", "-qm", "control fixture"],
+            cwd=self.control_root,
+            check=True,
+        )
         for relative in self.COPIED_FILES:
             self.copy_file(relative)
         self.write_executable(
@@ -119,20 +149,20 @@ class LiveReceiptFixture:
             "print('AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE=base=' + 'a' * 40)\n",
         )
         self.bin.mkdir(parents=True, exist_ok=True)
-        self.write_executable(
-            "bin/quality-python",
+        self.write_external_executable(
+            "quality-python",
             "#!/usr/bin/env bash\n"
             "set -eu\n"
             "printf 'quality-python=%s\\n' \"$*\" >> \"${CALL_LOG:?}\"\n",
         )
-        self.write_executable(
-            "bin/cargo",
+        self.write_external_executable(
+            "cargo",
             "#!/usr/bin/env bash\n"
             "set -eu\n"
             "printf 'cargo=%s\\n' \"$*\" >> \"${CALL_LOG:?}\"\n",
         )
-        self.write_executable(
-            "bin/gh",
+        self.write_external_executable(
+            "gh",
             "#!/usr/bin/env bash\n"
             "exit 1\n",
         )
@@ -153,6 +183,8 @@ class LiveReceiptFixture:
             "PYTHON_BIN": str(self.bin / "quality-python"),
             "CALL_LOG": str(self.log),
             "SOURCE_STATUS": self.status,
+            "AGENT_CANON_CONTROL_PARENT_ROOT": str(self.control_root),
+            "AGENT_CANON_RUNTIME_ROOT": str(self.runtime_root),
         }
 
     def run_pr_check(self) -> subprocess.CompletedProcess[str]:
@@ -245,13 +277,13 @@ class PrGateReceiptRoundTripTest(unittest.TestCase):
                     consumed = subprocess.run(
                         [
                             "bash",
-                            str(Path(temporary) / "tools/ci/run_all_checks.sh"),
+                            str(fixture.root / "tools/ci/run_all_checks.sh"),
                             "--pr-gate-receipt",
                             str(receipt),
                             "--pr-gate-parent-pid",
                             str(os.getpid()),
                         ],
-                        cwd=temporary,
+                        cwd=fixture.root,
                         env=fixture.environment(),
                         check=False,
                         capture_output=True,

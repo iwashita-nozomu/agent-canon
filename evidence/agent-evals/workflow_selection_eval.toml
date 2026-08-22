@@ -317,11 +317,11 @@ expected_skills = ["agent-canon-update"]
 expected_tools = ["agent-canon-cli"]
 limit = 25
 prompt_templates = [
-  "{subject} の agent-canon-ensure-latest と vendor/agent-canon submodule pin を直して",
-  "AgentCanon 最新と親 pin のずれで止まる {subject} を更新 route で処理して",
-  "{subject} は Agent-Canon PR と submodule pin を通してから進めて",
-  "vendor/agent-canon の checkout drift を見て {subject} の parent pin を更新して",
-  "agentcanon 最新確認と sync_agent_canon.sh を使って {subject} を進めて",
+  "{subject} の agent-canon update と agent-canon pr を external AgentCanon clone で処理して",
+  "agentcanon 最新の agent-canon update と pull request で {subject} を external AgentCanon clone から処理して",
+  "{subject} は agent-canon update と agent-canon pr を external AgentCanon clone で通してから進めて",
+  "development clone の checkout drift を見て agent-canon update と agent-canon pr で {subject} を処理して",
+  "external AgentCanon clone で agent-canon update と agent-canon pr を確認して {subject} を進めて",
 ]
 subjects = [
   "shared skill edit",

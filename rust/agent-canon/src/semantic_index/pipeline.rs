@@ -15,6 +15,9 @@ use super::storage::{
     clear_index, ensure_parent_dir, finish_write_db, init_schema, insert_embedding, insert_file,
     insert_node, load_missing_node_texts, open_cache_connection, prepare_write_db,
 };
+use crate::runtime_boundary::{
+    resolve_runtime_root, runtime_root_is_explicit, validate_external_target,
+};
 use std::fs;
 use std::path::PathBuf;
 
@@ -34,6 +37,15 @@ pub(super) struct EmbedStats {
 }
 
 pub(super) fn build_index(args: &BuildArgs) -> Result<BuildStats, String> {
+    let runtime_root = resolve_runtime_root(&args.root)?;
+    if runtime_root_is_explicit() || !cfg!(test) {
+        validate_external_target(
+            &args.root,
+            &runtime_root,
+            &args.db,
+            "semantic-index database",
+        )?;
+    }
     ensure_parent_dir(&args.db)?;
     let write_db = prepare_write_db(&args.db)?;
     let mut conn = open_cache_connection(&write_db)?;
@@ -123,6 +135,15 @@ pub(super) fn build_index(args: &BuildArgs) -> Result<BuildStats, String> {
 }
 
 pub(super) fn embed_existing_nodes(args: &EmbedProviderArgs) -> Result<EmbedStats, String> {
+    let runtime_root = resolve_runtime_root(&args.root)?;
+    if runtime_root_is_explicit() || !cfg!(test) {
+        validate_external_target(
+            &args.root,
+            &runtime_root,
+            &args.db,
+            "semantic-index database",
+        )?;
+    }
     let mut conn = open_cache_connection(&args.db)?;
     let node_texts =
         load_missing_node_texts(&conn, &args.root, &args.provider, &args.model, args.dim)?;

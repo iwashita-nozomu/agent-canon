@@ -3,7 +3,6 @@
 contract design
 responsibility Defines the structural grammar and ownership invariant for root agent instruction entrypoints.
 upstream design ../conventions/software-engineering-principles.md single-owner, information-hiding, and contract-complete change policy
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md default-consumer and explicit live-integration boundary
 downstream design ../../AGENTS.md standalone source-tree entrypoint
 downstream design ../../ROOT_AGENTS.md explicit live-integration entrypoint
 downstream implementation ../../tools/agent_tools/check_entrypoint_owner_map.py structural verifier

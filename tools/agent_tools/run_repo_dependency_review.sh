@@ -20,31 +20,57 @@ set -euo pipefail
 
 ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-REVIEW_PARENT_ROOT=""
 REVIEW_TEMP_BASE=""
+RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT:-}"
+CONTROL_ROOT="${AGENT_CANON_CONTROL_PARENT_ROOT:-}"
+
+fail_runtime_boundary() {
+  echo "REPO_DEPENDENCY_REVIEW=fail reason=$1" >&2
+  return 2
+}
+
+runtime_path() {
+  local candidate="$1"
+  python3 - "$script_dir" "$ROOT_DIR" "$CONTROL_ROOT" "$RUNTIME_ROOT" "$candidate" <<'PY'
+from pathlib import Path
+import sys
+
+source, root, control, runtime, candidate = map(Path, sys.argv[1:])
+sys.path.insert(0, str(source))
+from runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
+
+try:
+    source_root = source.parents[2].resolve(strict=True)
+    target_root = root.resolve(strict=True)
+    control_root = control.resolve(strict=True)
+    boundary = RuntimeArtifactBoundary.for_source(source_root, runtime, create=True)
+    runtime_root = boundary.root
+    if runtime_root == target_root or runtime_root in target_root.parents:
+        raise RuntimeArtifactError("runtime root must be outside target repository")
+    try:
+        target_root.relative_to(control_root)
+    except ValueError as exc:
+        raise RuntimeArtifactError("target repository is outside control root") from exc
+    print(boundary.resolve(candidate))
+except (OSError, RuntimeArtifactError, ValueError) as exc:
+    print(f"runtime boundary invalid: {exc}", file=sys.stderr)
+    raise SystemExit(2)
+PY
+}
+
+require_runtime_boundary() {
+  [[ -n "$RUNTIME_ROOT" ]] || { fail_runtime_boundary "runtime_root_required"; return 2; }
+  [[ -n "$CONTROL_ROOT" ]] || { fail_runtime_boundary "control_root_required"; return 2; }
+  [[ -d "$CONTROL_ROOT" ]] || { fail_runtime_boundary "control_root_missing"; return 2; }
+  runtime_path .runtime-boundary-probe >/dev/null || return 2
+}
 
 parent_temp_base() {
-  REVIEW_PARENT_ROOT="$(realpath -e "${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}")" || {
-    echo "REPO_DEPENDENCY_REVIEW=fail reason=parent_root_missing" >&2
+  REVIEW_TEMP_BASE="$(runtime_path tmp/dependency-review)" || {
+    echo "REPO_DEPENDENCY_REVIEW=fail reason=runtime_root_missing" >&2
     return 2
   }
-  ROOT_PHYSICAL="$(realpath -e "$ROOT_DIR")" || {
-    echo "REPO_DEPENDENCY_REVIEW=fail reason=root_missing" >&2
-    return 2
-  }
-  case "$ROOT_PHYSICAL" in
-    "$REVIEW_PARENT_ROOT"|"$REVIEW_PARENT_ROOT"/*) ;;
-    *)
-      echo "REPO_DEPENDENCY_REVIEW=fail reason=parent_root_not_ancestor" >&2
-      return 2
-      ;;
-  esac
-  REVIEW_TEMP_BASE="$(
-    python3 "${script_dir}/parent_root_side_effects.py" temp-dir \
-      --root "$REVIEW_PARENT_ROOT" \
-      --candidate "$REVIEW_PARENT_ROOT/.agent-canon/tmp/dependency-review" \
-      --prefix review --purpose dependency-review-temp
-  )"
+  mkdir -p "$REVIEW_TEMP_BASE"
 }
 CHECK_BIDIRECTIONAL=0
 CYCLE_REPORT_ONLY=0
@@ -178,6 +204,13 @@ ROOT_DIR="$(realpath -e "$ROOT_DIR")" || {
   echo "REPO_DEPENDENCY_REVIEW=fail reason=root_missing"
   exit 2
 }
+require_runtime_boundary || exit $?
+export AGENT_CANON_RUNTIME_ROOT="$RUNTIME_ROOT"
+export AGENT_CANON_CONTROL_PARENT_ROOT="$CONTROL_ROOT"
+if [[ -n "$REPORT_DIR" ]]; then
+  REPORT_DIR="$(runtime_path "$REPORT_DIR")" || exit $?
+  mkdir -p "$REPORT_DIR"
+fi
 SCRIPT_TOOLS_ROOT="$(realpath -m "$(dirname "$(realpath -m "$script_dir")")")"
 cd "$ROOT_DIR"
 
@@ -196,10 +229,21 @@ CHECK_DEPENDENCY_HEADER_FORMAT="${CANON_TOOLS_ROOT}/agent_tools/check_dependency
 CHECK_DEPENDENCY_GRAPH="${CANON_TOOLS_ROOT}/agent_tools/check_dependency_graph.sh"
 CHECK_DESIGN_DOC_CLAIMS_TOOL="${CANON_TOOLS_ROOT}/agent_tools/check_design_doc_claims.py"
 # Persisted graph operations are repository-scoped; source review tools remain script-owned.
-GRAPH_CLI="${ROOT_DIR}/tools/bin/agent-canon"
+if [[ -n "${AGENT_CANON_GRAPH_CLI:-}" ]]; then
+  GRAPH_CLI="$(realpath -e "$AGENT_CANON_GRAPH_CLI")" || {
+    echo "REPO_DEPENDENCY_REVIEW=fail reason=graph_executable_missing" >&2
+    exit 1
+  }
+else
+  GRAPH_CLI="$(command -v agent-canon || true)"
+fi
 WORKFLOW_MONITOR="${CANON_TOOLS_ROOT}/agent_tools/workflow_monitor.py"
 
 if [[ "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
+  GRAPH_CLI="$(realpath -e "$GRAPH_CLI")" || {
+    echo "REPO_DEPENDENCY_REVIEW=fail reason=graph_executable_missing" >&2
+    exit 1
+  }
   if [[ ! -x "$GRAPH_CLI" ]]; then
     echo "canonical graph executable is missing for root: $ROOT_DIR" >&2
     exit 1
@@ -212,9 +256,9 @@ if [[ "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
     local primary_status=$?
     local cleanup_status=0
     trap - EXIT
-    python3 "${script_dir}/parent_root_side_effects.py" remove-tree \
-      --root "$REVIEW_PARENT_ROOT" --candidate "$tmp_base" \
-      --purpose dependency-review-temp >/dev/null || cleanup_status=$?
+    if [[ -d "$tmp_base" ]]; then
+      rm -rf -- "$tmp_base" || cleanup_status=$?
+    fi
     if [[ "$primary_status" -ne 0 ]]; then
       exit "$primary_status"
     fi
@@ -335,17 +379,11 @@ if [[ "$HEADER_SCAN_ONLY" -eq 1 ]]; then
 fi
 
 if [[ -n "$REPORT_DIR" ]]; then
-  if [[ -n "${AGENT_CANON_PARENT_ROOT:-}" ]]; then
-    parent_root_real="$(realpath -m "$AGENT_CANON_PARENT_ROOT")"
-    report_real="$(realpath -m "$REPORT_DIR")"
-    case "$report_real" in
-      "$parent_root_real"|"$parent_root_real"/*) ;;
-      *) echo "REPO_DEPENDENCY_REVIEW=fail reason=report_dir_outside_parent"; exit 2 ;;
-    esac
-  fi
   mkdir -p "$REPORT_DIR"
 fi
-if [[ -z "$GRAPH_TSV_OUTPUT" && -n "$REPORT_DIR" ]]; then
+if [[ -n "$GRAPH_TSV_OUTPUT" ]]; then
+  GRAPH_TSV_OUTPUT="$(runtime_path "$GRAPH_TSV_OUTPUT")" || exit $?
+elif [[ -n "$REPORT_DIR" ]]; then
   GRAPH_TSV_OUTPUT="$REPORT_DIR/dependency_graph.tsv"
 fi
 

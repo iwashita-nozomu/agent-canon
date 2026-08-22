@@ -20,14 +20,15 @@ body:
     attributes:
       label: 影響する runtime profile
       options:
-        - Agent runtime
-        - 文書
-        - Python/tooling
-        - Docker/devcontainer
-        - GitHub automation
-        - MCP
-        - Submodule/update
-        - Eval/logging
+        - Bootstrap
+        - Tool runtime
+        - Container
+        - Mount generation
+        - Codex surfaces
+        - Eval archive
+        - Docs
+        - Source
+        - Project
         - その他
     validations:
       required: true

@@ -32,20 +32,16 @@ from urllib.parse import quote
 import yaml
 
 try:
-    from .parent_root_side_effects import (
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
+    from .runtime_artifacts import (
+        RuntimeArtifactBoundary,
+        RuntimeArtifactError,
+        runtime_artifact_boundary,
     )
 except ImportError:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
+    from runtime_artifacts import (  # type: ignore[no-redef]
+        RuntimeArtifactBoundary,
+        RuntimeArtifactError,
+        runtime_artifact_boundary,
     )
 
 try:
@@ -96,21 +92,27 @@ SKILL_HANDOFF_TARGETS = (
 )
 
 
-def _parent_resolve(path: Path, purpose: str) -> Path:
-    """Resolve graph DB/output paths under the attested outer parent."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            f"{purpose}: explicit parent root is required",
-        )
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
-    )
-    return ParentRootSideEffectBoundary().resolve_parent_owned_path(
-        attestation, path, purpose, create=False
-    ).physical_path
+def graph_source_root() -> Path:
+    """Return the source checkout whose files must remain side-effect free."""
+    for name in ("AGENT_CANON_SOURCE_ROOT", "AGENT_CANON_PARENT_ROOT"):
+        configured = os.environ.get(name, "").strip()
+        if configured:
+            return Path(configured).expanduser().resolve()
+    return Path(__file__).resolve().parents[2]
+
+
+def runtime_boundary(*, create: bool = True) -> RuntimeArtifactBoundary:
+    """Return the caller-selected external runtime boundary."""
+    return runtime_artifact_boundary(graph_source_root(), create=create)
+
+
+def runtime_resolve(path: Path, purpose: str) -> Path:
+    """Resolve one graph artifact under the explicit external runtime root."""
+    try:
+        boundary = runtime_boundary(create=True)
+        return boundary.resolve(path)
+    except RuntimeArtifactError as exc:
+        raise RuntimeArtifactError(f"{purpose}: {exc}") from exc
 ASCII_SENTENCE_ABBREVIATIONS = frozenset(
     {
         "dr",
@@ -215,7 +217,6 @@ STOPWORDS = {
 }
 SQLITE_BUSY_TIMEOUT_SECONDS = 30
 WSL_MOUNT_MIN_PATH_PARTS = 3
-DEFAULT_DB_HOME_ENV = "AGENT_CANON_PROSE_GRAPH_HOME"
 DEFAULT_DB_NAME = "prose_graph.sqlite"
 DEFAULT_CACHE_HASH_LENGTH = 12
 VERIFICATION_RECURSION_MAX_DEPTH = 3
@@ -395,7 +396,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     ingest = subparsers.add_parser("ingest", help="Ingest Markdown/plain text into a graph DB.")
     ingest.add_argument("input", type=Path)
-    ingest.add_argument("--db", type=Path, help="Graph DB path. Defaults to the user-home prose graph cache.")
+    ingest.add_argument("--db", type=Path, help="Graph DB path under the external runtime root.")
     ingest.add_argument("--kind", default="document")
     ingest.add_argument("--prompt", default="", help="Optional user prompt text for corpus/domain inference.")
     ingest.add_argument("--prompt-file", type=Path, help="Optional user prompt file for corpus/domain inference.")
@@ -403,7 +404,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     ingest_set = subparsers.add_parser("ingest-set", help="Ingest multiple Markdown/plain text files into one graph DB.")
     ingest_set.add_argument("inputs", nargs="+", type=Path)
-    ingest_set.add_argument("--db", type=Path, help="Graph DB path. Defaults to the user-home prose graph cache.")
+    ingest_set.add_argument("--db", type=Path, help="Graph DB path under the external runtime root.")
     ingest_set.add_argument("--kind", default="document")
     ingest_set.add_argument("--recursive", action="store_true", help="Recurse into input directories.")
     ingest_set.add_argument("--prompt", default="", help="Optional user prompt text for corpus/domain inference.")
@@ -456,7 +457,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run prose graph analysis and structured-analysis document-canon checks for one document.",
     )
     check_document.add_argument("input", type=Path)
-    check_document.add_argument("--db", type=Path, help="Graph DB path. Defaults to the user-home prose graph cache.")
+    check_document.add_argument("--db", type=Path, help="Graph DB path under the external runtime root.")
     check_document.add_argument("--repo-root", type=Path, help="Root for structured-analysis. Defaults from the input path.")
     check_document.add_argument("--out-dir", type=Path, required=True)
     check_document.add_argument("--profile", choices=PROFILES, default="all")
@@ -516,7 +517,7 @@ def graph_db_path(args: argparse.Namespace, inputs: Sequence[Path]) -> Path:
     """Return the explicit or default graph DB path for DB-creating commands."""
     explicit_db = getattr(args, "db", None)
     if isinstance(explicit_db, Path):
-        return _parent_resolve(explicit_db, "prose-reasoning-graph-db")
+        return runtime_resolve(explicit_db, "prose-reasoning-graph-db")
     db_path = default_graph_db_path(inputs)
     args.db = db_path
     return db_path
@@ -528,20 +529,11 @@ def default_graph_db_path(inputs: Sequence[Path]) -> Path:
 
 
 def default_graph_home() -> Path:
-    """Return the root directory for generated prose graph DBs."""
-    configured = os.environ.get(DEFAULT_DB_HOME_ENV)
-    if configured:
-        return _parent_resolve(Path(configured).expanduser(), "prose-reasoning-graph-home")
-    parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if parent:
-        return _parent_resolve(
-            Path(parent).resolve() / ".agent-canon" / "prose-reasoning-graph",
-            "prose-reasoning-graph-home",
-        )
-    raise ParentRootSideEffectError(
-        ParentRootReject.HANDOFF_INVALID,
-        "prose-reasoning-graph-home: explicit parent root is required",
-    )
+    """Return the generated graph DB directory in the external runtime."""
+    boundary = runtime_boundary(create=True)
+    home = boundary.resolve(Path("prose-reasoning-graph"))
+    boundary.ensure_directory(home.relative_to(boundary.root))
+    return home
 
 
 def repo_cache_key() -> str:
@@ -583,25 +575,14 @@ def sanitize_cache_segment(value: str) -> str:
 
 def connect(path: Path) -> sqlite3.Connection:
     """Open a SQLite connection and enable foreign keys."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            "prose-reasoning-graph-db: explicit parent root is required",
-        )
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(
-            cwd=parent,
-            explicit_root=parent,
-            purpose="prose-reasoning-graph-db",
-        )
+    boundary = runtime_boundary(create=True)
+    physical_path = boundary.resolve(path)
+    boundary.ensure_directory(physical_path.parent.relative_to(boundary.root))
+    connection = sqlite3.connect(
+        sqlite_target(physical_path),
+        timeout=SQLITE_BUSY_TIMEOUT_SECONDS,
+        uri=is_wsl_mount(physical_path),
     )
-    physical_parent = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
-        attestation, path.parent, "prose-reasoning-graph-db"
-    ).physical_path
-    physical_path = physical_parent / path.name
-    connection = sqlite3.connect(sqlite_target(physical_path), timeout=SQLITE_BUSY_TIMEOUT_SECONDS, uri=is_wsl_mount(physical_path))
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA busy_timeout = 30000")
     connection.execute("PRAGMA foreign_keys = ON")
@@ -1261,6 +1242,11 @@ def dependency_records_for_graph_source(
             break
     if source_node is not None:
         raw_payload = source_node.get("payload")
+        if raw_payload is None:
+            # The tracked-source dependency projection intentionally exposes
+            # only path identity; manifest responsibility text is optional.
+            # Dependency facts below remain authoritative for this source.
+            raw_payload = {}
         if not isinstance(raw_payload, dict):
             raise ValueError("canonical graph source payload must be an object")
         payload = cast(dict[str, object], raw_payload)
@@ -4271,24 +4257,9 @@ def command_check_document(args: argparse.Namespace) -> int:
     """Run prose and document-canon checks through one bounded tool path."""
     input_path = cast(Path, args.input)
     db_path = graph_db_path(args, [input_path])
-    out_dir = _parent_resolve(cast(Path, args.out_dir), "prose-reasoning-graph-output")
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            "prose-reasoning-graph-output: explicit parent root is required",
-        )
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(
-            cwd=parent,
-            explicit_root=parent,
-            purpose="prose-reasoning-graph-output",
-        )
-    )
-    out_dir = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
-        attestation, out_dir, "prose-reasoning-graph-output"
-    ).physical_path
+    out_dir = runtime_resolve(cast(Path, args.out_dir), "prose-reasoning-graph-output")
+    boundary = runtime_boundary(create=True)
+    boundary.ensure_directory(out_dir.relative_to(boundary.root))
     repo_root = structured_repo_root(args, input_path)
     inventory_json = structured_inventory_path(args, repo_root)
     prompt_text = prompt_context(args)
@@ -4437,7 +4408,17 @@ def structured_repo_root(args: argparse.Namespace, input_path: Path) -> Path:
     for index in range(len(parts) - 1):
         if parts[index] == "vendor" and parts[index + 1] == "agent-canon":
             return Path(*parts[: index + 2]).resolve()
-    return Path.cwd().resolve()
+    # Standalone source fixtures are not necessarily below the tool checkout.
+    # Prefer their actual Git root when available, otherwise use the source's
+    # containing directory so dependency manifests are read from that source
+    # rather than silently from the caller's cwd.
+    git_root = subprocess.run(
+        ["git", "-C", str(resolved.parent), "rev-parse", "--show-toplevel"],
+        check=False,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    return Path(git_root).resolve() if git_root else resolved.parent
 
 
 def structured_inventory_path(args: argparse.Namespace, repo_root: Path) -> Path:
@@ -4817,20 +4798,7 @@ def render_document_check_report(
 
 def write_output(path: Path, text: str) -> None:
     """Write text to one output path."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if configured:
-        parent = Path(configured).resolve(strict=True)
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="prose-reasoning-graph-output")
-        )
-        ParentRootSideEffectBoundary().write_parent_owned_file(
-            attestation, path, text.encode("utf-8"), "prose-reasoning-graph-output"
-        )
-        return
-    raise ParentRootSideEffectError(
-        ParentRootReject.HANDOFF_INVALID,
-        "prose-reasoning-graph-output: explicit parent root is required",
-    )
+    runtime_boundary(create=True).atomic_write_text(path, text)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -502,8 +502,8 @@ credential は committed config に直書きしません。
 1. 変更 surface を決める
 2. 公式 schema で key 名を確認する
 3. repo policy と runtime mechanics を分離する
-4. canon 変更なら `vendor/agent-canon/` を編集する
-5. root view は `sync_agent_canon.sh link-root`
+4. canon 変更なら standalone AgentCanon source clone を編集する
+5. parent root view は作らず、必要なら `bootstrap.sh` の isolated runtime を使う
 6. dependency header を追加する
 7. dependency / docs / static checks を通す
 

@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -34,6 +35,20 @@ DASHBOARD_PROMPT_CHAR_COUNT = 27
 
 
 class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
+
+    def setUp(self) -> None:
+        self._runtime_temp = tempfile.TemporaryDirectory()
+        self._previous_runtime = os.environ.get("AGENT_CANON_RUNTIME_ROOT")
+        self.runtime_root = Path(self._runtime_temp.name) / "runtime"
+        self.runtime_root.mkdir()
+        os.environ["AGENT_CANON_RUNTIME_ROOT"] = str(self.runtime_root)
+
+    def tearDown(self) -> None:
+        if self._previous_runtime is None:
+            os.environ.pop("AGENT_CANON_RUNTIME_ROOT", None)
+        else:
+            os.environ["AGENT_CANON_RUNTIME_ROOT"] = self._previous_runtime
+        self._runtime_temp.cleanup()
     """Verify dashboard output from accumulated runtime evidence."""
 
     def test_iter_entries_tolerates_disappeared_log_file(self) -> None:
@@ -112,11 +127,13 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         """A selected token objective reports missing evidence and an action."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            report = root / "reports" / "agents" / "run" / "workflow_monitoring.md"
+            report = self.runtime_root / "reports" / "agents" / "run" / "workflow_monitoring.md"
             report.parent.mkdir(parents=True)
             report.write_text("token_reduction_objective=selected\n", encoding="utf-8")
 
-            breakdown = TokenUsageBreakdownReader.read(root)
+            breakdown = TokenUsageBreakdownReader.read(
+                root, runtime_root=self.runtime_root
+            )
 
         self.assertTrue(breakdown.objective_selected)
         self.assertEqual(breakdown.comparison_count, 0)
@@ -133,7 +150,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         """An explicit opt-out is truthful and does not invent a global gap."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            report = root / "reports" / "agents" / "run" / "workflow_monitoring.md"
+            report = self.runtime_root / "reports" / "agents" / "run" / "workflow_monitoring.md"
             report.parent.mkdir(parents=True)
             report.write_text("token_efficiency_not_required reason=single-route\n", encoding="utf-8")
 
@@ -152,8 +169,8 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
-            output = root / "reports" / "dashboard.md"
-            compact_output = root / "reports" / "compact-dashboard.md"
+            output = self.runtime_root / "reports" / "dashboard.md"
+            compact_output = self.runtime_root / "reports" / "compact-dashboard.md"
 
             result = subprocess.run(
                 [
@@ -170,6 +187,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             dashboard = output.read_text(encoding="utf-8")
             compact_dashboard = compact_output.read_text(encoding="utf-8")
 
@@ -359,20 +377,19 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         for expected in required:
             self.assertIn(expected, dashboard)
 
-    def test_resolves_parent_repo_vendored_agentcanon_logs(self) -> None:
-        """Parent-root invocation should read vendored AgentCanon evidence."""
+    def test_reads_external_runtime_evidence_for_standalone_source(self) -> None:
+        """Standalone source invocation reads the explicit external archive."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            parent = Path(temp_dir)
-            canon_root = parent / "vendor" / "agent-canon"
-            self.write_fixture(canon_root, source_root=parent)
-            output = parent / "reports" / "dashboard.md"
+            canon_root = Path(temp_dir)
+            self.write_fixture(canon_root)
+            output = self.runtime_root / "reports" / "dashboard.md"
 
             result = subprocess.run(
                 [
                     sys.executable,
                     str(SCRIPT),
                     "--root",
-                    str(parent),
+                    str(canon_root),
                     "--out",
                     str(output),
                 ],
@@ -392,7 +409,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             root = Path(temp_dir)
             self.write_fixture(root)
             self.write_out_of_order_trend_fixture(root)
-            compact_output = root / "reports" / "compact-dashboard.md"
+            compact_output = self.runtime_root / "reports" / "compact-dashboard.md"
 
             result = subprocess.run(
                 [
@@ -401,7 +418,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     "--root",
                     str(root),
                     "--out",
-                    str(root / "reports" / "dashboard.md"),
+                    str(self.runtime_root / "reports" / "dashboard.md"),
                     "--compact-out",
                     str(compact_output),
                 ],
@@ -422,7 +439,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_recent_filter_fixture(root)
-            compact_output = root / "reports" / "compact-dashboard.md"
+            compact_output = self.runtime_root / "reports" / "compact-dashboard.md"
 
             result = subprocess.run(
                 [
@@ -431,7 +448,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     "--root",
                     str(root),
                     "--out",
-                    str(root / "reports" / "dashboard.md"),
+                    str(self.runtime_root / "reports" / "dashboard.md"),
                     "--compact-out",
                     str(compact_output),
                     "--recent-days",
@@ -463,7 +480,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                 spawned_roles="none",
                 skipped_roles="requirements_organizer,explorer:pending_parent_spawn",
             )
-            compact_output = root / "reports" / "compact-dashboard.md"
+            compact_output = self.runtime_root / "reports" / "compact-dashboard.md"
 
             result = subprocess.run(
                 [
@@ -472,7 +489,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     "--root",
                     str(root),
                     "--out",
-                    str(root / "reports" / "dashboard.md"),
+                    str(self.runtime_root / "reports" / "dashboard.md"),
                     "--compact-out",
                     str(compact_output),
                 ],
@@ -495,8 +512,8 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             root = Path(temp_dir)
             self.write_fixture(root)
             self.append_dashboard_schema_fixture(root)
-            api_output = root / "reports" / "dashboard-api.json"
-            compact_output = root / "reports" / "compact-dashboard.md"
+            api_output = self.runtime_root / "reports" / "dashboard-api.json"
+            compact_output = self.runtime_root / "reports" / "compact-dashboard.md"
 
             result = subprocess.run(
                 [
@@ -505,7 +522,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     "--root",
                     str(root),
                     "--out",
-                    str(root / "reports" / "dashboard.md"),
+                    str(self.runtime_root / "reports" / "dashboard.md"),
                     "--compact-out",
                     str(compact_output),
                     "--api-out",
@@ -580,7 +597,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             root = Path(temp_dir)
             self.write_fixture(root)
             self.append_selection_normalization_fixture(root)
-            output = root / "reports" / "dashboard.md"
+            output = self.runtime_root / "reports" / "dashboard.md"
 
             result = subprocess.run(
                 [
@@ -611,7 +628,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             self.write_fixture(root)
             self.write_workflow_catalog_fixture(root)
             self.append_run_bundle_workflow_selection_fixture(root)
-            output = root / "reports" / "dashboard.md"
+            output = self.runtime_root / "reports" / "dashboard.md"
 
             result = subprocess.run(
                 [
@@ -641,7 +658,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             root = Path(temp_dir)
             self.write_fixture(root)
             self.append_tool_alias_fixture(root)
-            output = root / "reports" / "dashboard.md"
+            output = self.runtime_root / "reports" / "dashboard.md"
 
             result = subprocess.run(
                 [
@@ -693,7 +710,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     )
                     + "\n"
                 )
-            output = root / "reports" / "dashboard.md"
+            output = self.runtime_root / "reports" / "dashboard.md"
 
             self.assertEqual(tool_source_path_candidates(invalid_tool), ())
             result = subprocess.run(
@@ -745,7 +762,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     )
                     + "\n"
                 )
-            output = root / "reports" / "dashboard.md"
+            output = self.runtime_root / "reports" / "dashboard.md"
 
             result = subprocess.run(
                 [
@@ -790,7 +807,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                     )
                     + "\n"
                 )
-            output = root / "reports" / "dashboard.md"
+            output = self.runtime_root / "reports" / "dashboard.md"
 
             result = subprocess.run(
                 [
@@ -1066,7 +1083,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
                 )
                 + "\n"
             )
-        workflow_report = root / "reports" / "agents" / "test" / "workflow_monitoring.md"
+        workflow_report = self.runtime_root / "reports" / "agents" / "test" / "workflow_monitoring.md"
         workflow_report.write_text(
             workflow_report.read_text(encoding="utf-8")
             + "- `2026-05-17 10:02 JST` workflow=Platform And Environment, "
@@ -1169,7 +1186,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
     def write_workflow_monitor_fixture(self, root: Path) -> None:
         """Write token comparison fixture files."""
         self.write_wave_bundle_fixture(root)
-        workflow_report = root / "reports" / "agents" / "test" / "workflow_monitoring.md"
+        workflow_report = self.runtime_root / "reports" / "agents" / "test" / "workflow_monitoring.md"
         text = workflow_report.read_text(encoding="utf-8")
         workflow_report.write_text(
             text
@@ -1179,8 +1196,8 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             encoding="utf-8",
         )
 
-    @staticmethod
     def write_wave_bundle_fixture(
+        self,
         root: Path,
         *,
         status: str = "done",
@@ -1189,7 +1206,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         skipped_roles: str = "none",
     ) -> None:
         """Write a minimal schedule/workflow wave-event fixture."""
-        report_dir = root / "reports" / "agents" / "test"
+        report_dir = self.runtime_root / "reports" / "agents" / "test"
         report_dir.mkdir(parents=True, exist_ok=True)
         schedule_row = (
             f"| WAVE-1 | parent | {spawn_authority} | initial_intake | 12/12 | "
@@ -1297,7 +1314,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
     def write_out_of_order_trend_fixture(self, root: Path) -> None:
         """Write trend evidence where lexical and chronological order disagree."""
         hook_dir = mounted_log_archive_root(root) / "hook-runs" / repo_log_key(root) / "test-container"
-        (root / "reports" / "agents" / "test" / "workflow_monitoring.md").unlink()
+        (self.runtime_root / "reports" / "agents" / "test" / "workflow_monitoring.md").unlink()
         new_entries = [
             self.prompt_entry(f"2026-05-{day:02d}T00:00:00Z", 10)
             for day in range(2, 10)
@@ -1333,8 +1350,8 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "timestamp": timestamp,
         }
 
-    @staticmethod
     def write_token_report(
+        self,
         root: Path,
         name: str,
         timestamp: str,
@@ -1343,7 +1360,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         ratio: float,
     ) -> None:
         """Write one token comparison report."""
-        report = root / "reports" / "agents" / name / "workflow_monitoring.md"
+        report = self.runtime_root / "reports" / "agents" / name / "workflow_monitoring.md"
         report.parent.mkdir(parents=True, exist_ok=True)
         report.write_text(
             f"timestamp={timestamp} baseline_total={baseline} "

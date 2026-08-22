@@ -78,11 +78,13 @@ reader path, source map, or canonical route.
 1. Classify findings that appear only after DSL-to-prose projection as
    `dsl_to_prose_prompt_defect` against the receiving writing skill prompt.
 
-1. Let `ingest` or `ingest-set` create the graph DB under
-   `${AGENT_CANON_PROSE_GRAPH_HOME:-$HOME/.cache/agent-canon/prose-reasoning-graph}`
-   unless the workflow explicitly passes `--db <graph.sqlite>`. Store
-   generated outputs and stats under the active run bundle, report, or other
-   task-local artifact directory.
+1. Set an explicit external runtime root before creating graph artifacts:
+   `export AGENT_CANON_RUNTIME_ROOT=<external-runtime-root>`. Let `ingest` or
+   `ingest-set` create the graph DB under that runtime root, or pass an
+   explicit `--db <graph.sqlite>` path that is already inside the selected
+   runtime root. Never use a source-tree, user-home, XDG, or implicit cache
+   fallback. Store generated outputs and stats under the same external runtime
+   root, preferably below the active run bundle.
 1. Run `ingest` on the source Markdown/plain text with `--prompt` or
    `--prompt-file` when user request context can identify the intended corpus.
    Always use `--stats-out`, then pass the emitted
@@ -163,7 +165,7 @@ The skill contract is:
 
 | Command | Runtime result | How the skill consumes it |
 | ------- | -------------- | ------------------------- |
-| `ingest` / `ingest-set` | Pass marker plus stats JSON containing `PROSE_REASONING_GRAPH_DB`; DB stored under the default cache unless `--db` is explicit. | Save the DB path and pass it to later commands. Do not read raw SQLite tables. |
+| `ingest` / `ingest-set` | Pass marker plus stats JSON containing `PROSE_REASONING_GRAPH_DB`; DB stored under the explicit external runtime unless `--db` selects another path inside that runtime. | Save the DB path and pass it to later commands. Do not read raw SQLite tables. |
 | `ingest` / `ingest-set` semantic-prose extraction | Deterministic `semantic_prose_ir` with source documents, terms, `analysis_intents`, and `corpus_hints`. | Treat graph metadata as the corpus-management and existing-document-structure evidence. Read it through the stats or projection path, not chat stdout. |
 | `analyze` | Pass marker plus stats JSON; graph layers are added or refreshed inside the DB. | Treat the DB as updated intermediate state. Do not stream graph contents to chat. |
 | `lint --out` | Diagnostics Markdown plus stats JSON. | Read severity, rule, target, message, and `verification_route` summaries; classify active findings before rewrite. |

@@ -4,7 +4,6 @@
 # upstream implementation ../../tools/docs/check_bootstrap_docs.py bootstrap and static-consumer checker under test
 # upstream design ../../documents/contracts/template-bootstrap.md default static-seed bootstrap contract
 # upstream design ../../documents/contracts/static-seed-export.md static seed boundary
-# upstream design ../../documents/runtime/shared-runtime-surfaces.toml explicit live-integration manifest metadata
 # @dependency-end
 """Tests for bootstrap-facing docs and source-free static-seed validation."""
 
@@ -15,7 +14,6 @@ import os
 import subprocess
 import sys
 import tempfile
-import tomllib
 import unittest
 from pathlib import Path
 
@@ -246,22 +244,6 @@ class CheckBootstrapDocsTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout)
             self.assertIn("static seed must not contain symlinks", result.stdout)
 
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_static_seed_consumer(root)
-            self.write_file(
-                root / "documents" / "runtime" / "shared-runtime-surfaces.toml",
-                'version = 1\nprefix = "vendor/agent-canon"\n',
-            )
-
-            result = self.run_cli(root, "--static-seed-consumer")
-
-            self.assertEqual(result.returncode, 1, result.stdout)
-            self.assertIn(
-                "documents/runtime/shared-runtime-surfaces.toml: live AgentCanon consumer surface is forbidden",
-                result.stdout,
-            )
-
     def test_static_seed_consumer_scans_every_config_and_role_payload_for_exact_prefixes(self) -> None:
         """The source-free gate applies the case-normalized prefix set to every payload."""
         prefixes = (
@@ -293,17 +275,6 @@ class CheckBootstrapDocsTest(unittest.TestCase):
                     result = self.run_cli(root, "--static-seed-consumer")
                     self.assertEqual(result.returncode, 1, result.stdout)
                     self.assertIn("static seed contains forbidden runtime marker", result.stdout)
-
-    def test_live_runtime_manifest_is_explicit_opt_in(self) -> None:
-        """The legacy projection manifest must identify itself as non-default."""
-        manifest = tomllib.loads(
-            (PROJECT_ROOT / "documents" / "runtime" / "shared-runtime-surfaces.toml").read_text(
-                encoding="utf-8"
-            )
-        )
-        self.assertEqual(manifest["integration_mode"], "live-agent-canon")
-        self.assertFalse(manifest["default_consumer"])
-        self.assertEqual(manifest["selection"], "explicit-opt-in")
 
 
 if __name__ == "__main__":

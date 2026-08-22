@@ -243,16 +243,20 @@ AREA_DATA: tuple[AreaData, ...] = (
     (
         "env",
         "environment",
-        "Classify host, container, devcontainer, and server environment needs.",
+        "Keep the shared AgentCanon tool container separate from the project Docker/test runner.",
         "classify_environment_profile",
-        ("python3 tools/ci/container_config.py",),
         (
+            "./bootstrap.sh --control-parent-root <parent> --runtime-root <runtime> status",
+            "docker build -f docker/Dockerfile -t <project-image> . && docker run --rm <project-image> test/testrunner.sh",
+            "python3 -m pytest -q tests/tools/test_bootstrap_container_contract.py",
+            "python3 -m pytest -q tests/bootstrap/test_bootstrap_runtime.py",
+        ),
+        (
+            "agent-canon-bootstrap",
             "environment_profile_detect.py",
             "environment-profile",
-            "container_need_detector.py",
+            "project-docker-test-runner",
             "container-on-demand",
-            "python_env_decider.py",
-            "python-env-lite",
         ),
     ),
     (
@@ -266,9 +270,13 @@ AREA_DATA: tuple[AreaData, ...] = (
     (
         "remote",
         "remote policy",
-        "Keep GitHub-first remote rules separate from machine-local remote repair.",
+        "Keep standalone AgentCanon source PR/archive publication separate from project Docker execution.",
         "route_remote_policy",
-        ("bash tools/update_agent_canon.sh plan",),
+        (
+            "git status --short --branch",
+            "gh pr view --repo iwashita-nozomu/agent-canon",
+            "gh issue view 841 --repo iwashita-nozomu/agent-canon",
+        ),
         (
             "remote_policy_router.py",
             "remote-policy-cleanup",
@@ -279,14 +287,17 @@ AREA_DATA: tuple[AreaData, ...] = (
     (
         "canon",
         "AgentCanon update",
-        "Route submodule update, local branch, and parent TODO state.",
+        "Route standalone AgentCanon source, bootstrap runtime, and source PR readback.",
         "route_agentcanon_update",
-        ("bash tools/update_agent_canon.sh latest",),
         (
-            "submodule_state_router.py",
-            "submodule-routing",
-            "agent_canon_update_planner.py",
-            "canon-update-lite",
+            "./bootstrap.sh --control-parent-root <parent> --runtime-root <runtime> status",
+            "git status --short --branch",
+            "gh pr view --repo iwashita-nozomu/agent-canon",
+        ),
+        (
+            "agent-canon-bootstrap",
+            "agent-canon-update",
+            "agent-canon-pr-workflow",
         ),
     ),
     (

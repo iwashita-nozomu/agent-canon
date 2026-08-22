@@ -23,22 +23,14 @@ GitHub-facing automation. Repository-wide runtime, skill, structure,
 validation, or closeout rules belong in the root entrypoint or the owner
 surface it names, not here.
 
-- shared instructions: `AGENTS.md` in standalone AgentCanon or
-  `vendor/agent-canon/AGENTS.md` in a derived parent
-- human canonical hub: `agents/README.md` in standalone AgentCanon or
-  `vendor/agent-canon/agents/README.md` in a derived parent
-- curated project skills: `.agents/skills/` in standalone AgentCanon or
-  `vendor/agent-canon/.agents/skills/` in a derived parent
-- canonical GitHub template source: `templates/documents/github/issue/` and
-  `templates/documents/github/pull-request/` in standalone AgentCanon, or
-  `vendor/agent-canon/templates/documents/github/issue/` and
-  `vendor/agent-canon/templates/documents/github/pull-request/` in a derived parent
+- shared instructions: `/AGENTS.md`
+- human canonical hub: `/agents/README.md`
+- curated project skills: `/.agents/skills/`
+- canonical GitHub template source: `/templates/documents/github/issue/` and
+  `/templates/documents/github/pull-request/`
 - standalone AgentCanon PR checklist: `/.github/PULL_REQUEST_TEMPLATE.md`
-- generated template / derived repo AgentCanon PR checklist:
-  `/.github/PULL_REQUEST_TEMPLATE/agent_canon.md`; edit the canonical source above.
-- The standalone checklist is an AgentCanon-only `standalone_only` surface; it is not
-  projected into a parent template root and is not a second owner of the generated
-  template-side checklist.
+- edit canonical GitHub templates in `/templates/documents/github/`; generated
+  copies are not consumed by this repository's CI.
 - Plan mode: use `/plan` or an explicit written plan before non-trivial changes
   under `.github/`, including GitHub Actions, PR templates, issue templates, and
   GitHub-facing automation.

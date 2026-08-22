@@ -33,6 +33,13 @@ def run_eval(*args: str, cwd: Path = PROJECT_ROOT) -> subprocess.CompletedProces
     return completed
 
 
+def external_runtime(root: Path) -> Path:
+    """Return an explicit runtime directory outside the source fixture."""
+    runtime = root.parent / f"{root.name}-agent-canon-runtime"
+    runtime.mkdir(parents=True, exist_ok=True)
+    return runtime
+
+
 class ReportQualityEvalTest(unittest.TestCase):
     """Verify report quality eval behavior."""
 
@@ -48,9 +55,12 @@ class ReportQualityEvalTest(unittest.TestCase):
     def test_accumulate_writes_unique_report(self) -> None:
         """The runner writes a uniquely named accumulated Markdown report."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            results_dir = Path(tmp_dir) / "report-quality"
+            runtime = external_runtime(Path(tmp_dir) / "source")
+            results_dir = runtime / "report-quality"
 
-            result = run_eval("--accumulate", "--results-dir", str(results_dir))
+            result = run_eval(
+                "--runtime-root", str(runtime), "--accumulate", "--results-dir", str(results_dir)
+            )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             reports = sorted(results_dir.glob("*.md"))

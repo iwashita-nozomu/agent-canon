@@ -125,8 +125,9 @@ directly from inside a container and tunneling to the container IP.
   durable project knowledge or release evidence.
 - Keep bulky raw run outputs untracked unless the task explicitly requires
   publishing them.
-- Generated `reports/broken_links.txt`, transient Docker build logs, pycache,
-  and local notebook checkpoints are cleanup targets before closeout.
+- Link-audit reports, transient Docker build logs, pycache, and local notebook
+  checkpoints are runtime artifacts and remain outside the source checkout;
+  clean their task-scoped external runtime directory before closeout.
 - If a generated artifact is needed for review but should not be tracked, put
   its path and checksum in `verification.txt` or the experiment report.
 - If a run-local `reports/agents/<run-id>/` bundle is needed after the current

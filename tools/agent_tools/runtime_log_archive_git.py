@@ -58,9 +58,11 @@ from runtime_log_paths import (  # noqa: E402
     log_environment_key,
     mounted_log_archive_root,
     repo_log_key,
+    runtime_boundary,
     runtime_event_publication_outcome_spool_root,
     source_git_head,
 )
+from runtime_artifacts import RUNTIME_ROOT_ENV  # noqa: E402
 from parent_root_side_effects import (  # noqa: E402
     ParentRootAttestationRequest,
     ParentRootAttestationReceipt,
@@ -171,7 +173,7 @@ HOOK_SPOOL_CURSOR_SCHEMA = "agent_canon.hook_spool_cursor.v1"
 HOOK_SPOOL_CURSOR_SCHEMA_VERSION = 1
 HOOK_SPOOL_INDEX_NAME = ".spool-index.jsonl"
 HOOK_SPOOL_CURSOR_NAME = ".spool-cursor.json"
-HOOK_SPOOL_LOCK_RELATIVE = Path(".agent-canon") / "runtime-event-spool" / ".archive-transaction.lock"
+ARCHIVE_TRANSACTION_LOCK_RELATIVE = Path("locks") / "archive-transaction.lock"
 HOOK_SPOOL_ZERO_SHA256 = "0" * 64
 HOOK_HOT_PATH_ROOTS = (
     "HookLogContext.append",
@@ -218,6 +220,10 @@ class ArchiveContext:
     branch_key: str
     branch: str
     remote: str
+    # Explicit runtime root when the shared bootstrap owns the archive.  A
+    # caller that supplies --archive-root remains compatible; all other
+    # runtime paths still require this field or AGENT_CANON_RUNTIME_ROOT.
+    runtime_root: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -681,7 +687,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source-root",
         type=Path,
-        help="Repository whose runtime logs are being written. Defaults to the superproject when AgentCanon is vendored.",
+        help="Explicit source checkout whose runtime logs are being written.",
     )
     parser.add_argument(
         "--canon-root",
@@ -697,7 +703,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--archive-root",
         type=Path,
-        help="Override the archive clone path. Defaults to <canon-root>/.agent-canon/log-archive.",
+        help="Override the archive clone path. Defaults to the external runtime archive.",
+    )
+    parser.add_argument(
+        "--runtime-root",
+        type=Path,
+        help=f"Explicit external runtime root (or {RUNTIME_ROOT_ENV}).",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -819,6 +830,22 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    eval_archive = subparsers.add_parser(
+        "archive-eval",
+        help="Append one external bootstrap eval bundle to the current archive branch.",
+    )
+    eval_archive.add_argument(
+        "--spool-root",
+        type=Path,
+        required=True,
+        help="External bootstrap spool containing collection.json and eval-results/.",
+    )
+    eval_archive.add_argument(
+        "--run-id",
+        required=True,
+        help="Bootstrap eval run id; must match collection.json.",
+    )
+
     agent_report = subparsers.add_parser(
         "archive-agent-report",
         help="Snapshot a reports/agents/<run-id> bundle into the external log archive.",
@@ -913,24 +940,9 @@ def git_root(path: Path) -> Path | None:
     return None
 
 
-def superproject_root(path: Path) -> Path | None:
-    """Return the superproject root when AgentCanon is checked out as a submodule."""
-    result = run(
-        ["git", "-C", str(path), "rev-parse", "--show-superproject-working-tree"],
-        check=False,
-    )
-    if result.returncode == 0 and result.stdout.strip():
-        return Path(result.stdout.strip()).resolve()
-    return None
-
-
 def default_source_root(canon_root: Path) -> Path:
-    """Return the default source repo for branch naming."""
-    cwd_git_root = git_root(Path.cwd())
-    canon_git_root = git_root(canon_root)
-    if cwd_git_root is not None and canon_git_root is not None and cwd_git_root == canon_git_root:
-        return cwd_git_root
-    return superproject_root(canon_root) or cwd_git_root or Path.cwd().resolve()
+    """Return the standalone source checkout when no consumer is supplied."""
+    return canon_root.resolve()
 
 
 def _parent_boundary() -> tuple[ParentRootSideEffectBoundary, ParentRootAttestationReceipt] | None:
@@ -985,11 +997,17 @@ def build_context(args: argparse.Namespace) -> ArchiveContext:
     """Resolve source/canon/archive paths and branch names."""
     canon_root = args.canon_root.resolve()
     source_root = (args.source_root.resolve() if args.source_root else default_source_root(canon_root))
+    runtime_root = args.runtime_root.resolve() if args.runtime_root else None
     archive_root = (
         args.archive_root.resolve()
         if args.archive_root
-        else mounted_log_archive_root(canon_root).resolve()
+        else mounted_log_archive_root(canon_root, runtime_root).resolve()
     )
+    if archive_root == source_root or source_root in archive_root.parents:
+        raise ArchiveGitError(
+            "runtime-log-archive must be external to source root: "
+            f"source={source_root} archive={archive_root}"
+        )
     archive_root = _parent_archive_path(archive_root, "runtime-log-archive")
     try:
         key = source_repository_id_for_write(source_root)
@@ -1006,6 +1024,7 @@ def build_context(args: argparse.Namespace) -> ArchiveContext:
         branch_key=branch_key,
         branch=f"logs/{branch_key}",
         remote=args.remote,
+        runtime_root=runtime_root,
     )
 
 
@@ -2475,24 +2494,21 @@ def _validate_publication_attempt_directories(attempt_directory: Path) -> Path:
     """Validate every fixed 0700 directory in one publication attempt path."""
     spool_root = attempt_directory.parent
     runtime_spool = spool_root.parent
-    agent_canon_directory = runtime_spool.parent
-    source_root = agent_canon_directory.parent
+    runtime_root = runtime_spool.parent
     if (
         spool_root.name != "publication-outcome"
-        or runtime_spool.name != "runtime-event-spool"
-        or agent_canon_directory.name != ".agent-canon"
+        or runtime_spool.name != "spool"
     ):
         raise ValueError("publication spool path mismatch")
-    resolved_source = source_root.resolve(strict=True)
     for directory in (
-        agent_canon_directory,
+        runtime_root,
         runtime_spool,
         spool_root,
         attempt_directory,
     ):
         metadata = directory.lstat()
         resolved = directory.resolve(strict=True)
-        resolved.relative_to(resolved_source)
+        resolved.relative_to(runtime_root.resolve(strict=True))
         if (
             resolved != directory
             or directory.is_symlink()
@@ -2551,14 +2567,16 @@ def validate_publication_attempt_lock(attempt_lock: PublicationAttemptLock) -> N
 
 @contextmanager
 def acquire_publication_attempt_lock(
-    source_root: Path, attempt_id: str
+    source_root: Path,
+    attempt_id: str,
+    runtime_root: Path | str | None = None,
 ) -> Iterator[PublicationAttemptLock]:
     """Acquire and always release the sole nonblocking same-attempt lock."""
     if not RUNTIME_EVENT_HEX64.fullmatch(attempt_id):
         raise RuntimeEventMaterializationError(
             "publication_attempt_lock_invalid", "attempt id is invalid"
         )
-    spool_root = runtime_event_publication_outcome_spool_root(source_root)
+    spool_root = runtime_event_publication_outcome_spool_root(source_root, runtime_root)
     attempt_directory = spool_root / attempt_id
     lock_path = attempt_directory / ".attempt.lock"
     fd = -1
@@ -2566,14 +2584,12 @@ def acquire_publication_attempt_lock(
     body_error: BaseException | None = None
     try:
         source_root = source_root.resolve(strict=True)
-        configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-        spool_base = Path(configured_parent).resolve(strict=True) if configured_parent else source_root
+        # Publication observations are external runtime state.  Anchor
+        # validation at the declared runtime root instead of assuming the
+        # historical source-local ``.agent-canon`` layout.
+        spool_base = runtime_boundary(source_root, runtime_root).root
         relative_spool = spool_root.relative_to(spool_base)
-        if relative_spool.parts != (
-            ".agent-canon",
-            "runtime-event-spool",
-            "publication-outcome",
-        ):
+        if relative_spool.parts != ("spool", "publication-outcome"):
             raise RuntimeEventMaterializationError(
                 "publication_attempt_lock_invalid",
                 "publication spool root is not canonical",
@@ -2582,7 +2598,12 @@ def acquire_publication_attempt_lock(
         for component in (*relative_spool.parts, attempt_id):
             directory /= component
             try:
-                _parent_ensure_directory(directory, "publication-outcome-directory")
+                if _parent_boundary() is None:
+                    directory.mkdir(parents=True, mode=0o700, exist_ok=True)
+                else:
+                    _parent_ensure_directory(
+                        directory, "publication-outcome-directory"
+                    )
             except FileExistsError:
                 pass
             metadata = directory.lstat()
@@ -3708,6 +3729,7 @@ def reconcile_runtime_event_publication(
     target: Path,
     record: RuntimeEventRecord,
     artifact_bytes: bytes,
+    runtime_root: Path | str | None = None,
 ) -> DurablePublicationOutcomeReceipt:
     """Reconcile one prepared artifact and its append-only outcome chain."""
     validate_runtime_event_schema(artifact_bytes)
@@ -3728,7 +3750,7 @@ def reconcile_runtime_event_publication(
             "schema_invalid", "prepared artifact target or hash mismatch"
         )
 
-    with acquire_publication_attempt_lock(source_root, attempt_id) as attempt_lock:
+    with acquire_publication_attempt_lock(source_root, attempt_id, runtime_root) as attempt_lock:
         observations: list[dict[str, object]] = []
         observation_paths: dict[int, Path] = {}
         for path in sorted(
@@ -4167,7 +4189,11 @@ def command_materialize_runtime_event(context: ArchiveContext, args: argparse.Na
     event_bytes = _canonical_runtime_event_bytes(record)
     validate_runtime_event_schema(event_bytes)
     receipt = reconcile_runtime_event_publication(
-        context.source_root.resolve(), target.resolve(), record, event_bytes
+        context.source_root.resolve(),
+        target.resolve(),
+        record,
+        event_bytes,
+        context.runtime_root,
     )
     observation = cast(dict[str, object], receipt.value["observation"])
     if observation["outcome"] != "committed":
@@ -4282,9 +4308,6 @@ def archive_tree_keys(context: ArchiveContext) -> tuple[str, ...]:
 def associated_repo_keys(context: ArchiveContext) -> tuple[str, ...]:
     """Return repo keys allowed to coexist on the same chat archive branch."""
     keys = {context.repo_key, repo_log_key(context.canon_root)}
-    parent = superproject_root(context.canon_root)
-    if parent is not None:
-        keys.add(repo_log_key(parent))
     return tuple(sorted(keys))
 
 
@@ -4513,7 +4536,12 @@ def prepare_archive_transaction(
     allow_branch_switch: bool = False,
 ) -> PreparedArchiveTransaction:
     """Acquire the source lock, ensure once, and return one prepared boundary."""
-    lock_path = (context.source_root / HOOK_SPOOL_LOCK_RELATIVE).resolve()
+    # The transaction lock is runtime state, not a source-checkout artifact.
+    # Resolve it through the same explicit external boundary as hook spools so
+    # acquiring a lock cannot dirty or create ``source/.agent-canon``.
+    lock_path = runtime_boundary(
+        context.source_root, context.runtime_root
+    ).resolve(ARCHIVE_TRANSACTION_LOCK_RELATIVE)
     if lock_path in _ACTIVE_ARCHIVE_LOCKS:
         raise ArchiveGitError("archive_transaction_busy")
     _parent_ensure_directory(lock_path.parent, "runtime-archive-lock")
@@ -4640,7 +4668,9 @@ def _restore_atomic_file(path: Path, prior: bytes | None) -> None:
 
 def _spool_root(transaction: PreparedArchiveTransaction) -> Path:
     context = _require_prepared(transaction)
-    return hook_event_spool_root(context.source_root).resolve()
+    return hook_event_spool_root(
+        context.source_root, context.runtime_root
+    ).resolve()
 
 
 def snapshot_hook_spool_events(
@@ -5646,6 +5676,129 @@ def command_import_eval_results(context: ArchiveContext, args: argparse.Namespac
         return _finalize_legacy_import(transaction, plan, args)
 
 
+def _eval_bundle_files(spool_root: Path, run_id: str) -> list[tuple[Path, Path]]:
+    """Return validated source/destination pairs for one external eval bundle."""
+    spool = spool_root.resolve()
+    if not spool.is_dir() or spool.is_symlink():
+        raise ArchiveGitError(f"eval_spool_missing:{spool}")
+    collection_path = spool / "collection.json"
+    if not collection_path.is_file() or collection_path.is_symlink():
+        raise ArchiveGitError("eval_collection_missing")
+    try:
+        collection = json.loads(collection_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ArchiveGitError("eval_collection_invalid") from exc
+    if not isinstance(collection, dict) or collection.get("schema") != "agent_canon.eval_collection.v1":
+        raise ArchiveGitError("eval_collection_invalid:schema")
+    if collection.get("run_id") != run_id:
+        raise ArchiveGitError("eval_collection_invalid:run_id")
+    results_root = spool / "eval-results"
+    if not results_root.is_dir() or results_root.is_symlink():
+        raise ArchiveGitError("eval_results_missing")
+    pairs: list[tuple[Path, Path]] = []
+    for source in sorted(results_root.rglob("*")):
+        if source.is_symlink():
+            raise ArchiveGitError(f"eval_bundle_symlink:{source}")
+        if not source.is_file():
+            continue
+        relative = source.relative_to(results_root)
+        destination = Path("eval-results") / relative
+        safe_archive_relative_path(destination.as_posix())
+        pairs.append((source, destination))
+    producer_logs = spool / "producer-logs"
+    if not producer_logs.is_dir() or producer_logs.is_symlink():
+        raise ArchiveGitError("eval_producer_logs_missing")
+    for source in sorted(producer_logs.rglob("*")):
+        if source.is_symlink():
+            raise ArchiveGitError(f"eval_bundle_symlink:{source}")
+        if not source.is_file():
+            continue
+        relative = source.relative_to(producer_logs)
+        destination = (
+            Path("eval-results") / "runs" / run_id / "producer-logs" / relative
+        )
+        safe_archive_relative_path(destination.as_posix())
+        pairs.append((source, destination))
+    # Keep the collection receipt in the archive as durable, source-independent
+    # evidence. Producer reports remain under their declared family paths so
+    # existing eval consumers can discover them without a new reader contract.
+    pairs.append((collection_path, Path("eval-results") / "collections" / f"{run_id}.json"))
+    return pairs
+
+
+def _prepare_eval_bundle(
+    transaction: PreparedArchiveTransaction,
+    args: argparse.Namespace,
+) -> tuple[tuple[Path, ...], int]:
+    """Copy an eval bundle after a complete conflict preflight."""
+    context = _require_prepared(transaction)
+    run_id = safe_run_id(str(args.run_id))
+    pairs = _eval_bundle_files(Path(args.spool_root), run_id)
+    conflicts: list[Path] = []
+    new_pairs: list[tuple[Path, Path]] = []
+    for source, relative in pairs:
+        target = context.archive_root / relative
+        if target.exists():
+            if target.is_symlink() or not target.is_file():
+                raise ArchiveGitError(f"eval_archive_conflict:{relative.as_posix()}")
+            if target.read_bytes() != source.read_bytes():
+                conflicts.append(relative)
+            continue
+        new_pairs.append((source, relative))
+    if conflicts:
+        names = ",".join(path.as_posix() for path in conflicts)
+        raise ArchiveGitError(f"eval_archive_conflict:{names}")
+    for source, relative in new_pairs:
+        target = context.archive_root / relative
+        _parent_ensure_directory(target.parent, "eval-archive-destination")
+        _parent_copy_file(source, target, "eval-archive-file")
+    return tuple(context.archive_root / relative for _source, relative in pairs), len(new_pairs)
+
+
+def command_archive_eval(context: ArchiveContext, args: argparse.Namespace) -> int:
+    """Publish one bootstrap eval spool through the canonical archive owner."""
+    run_id = safe_run_id(str(args.run_id))
+    with prepare_archive_transaction(context, fetch=True) as transaction:
+        required_paths, new_count = _prepare_eval_bundle(transaction, args)
+        if new_count == 0:
+            # A duplicate replay is a successful no-op only after the current
+            # branch and every requested blob have been read back from origin.
+            head = _archive_oid(context, "HEAD")
+            tree = _archive_oid(context, f"{head}^{{tree}}") if head else ""
+            duplicate = ArchivePublicationReceipt(
+                status="committed",
+                commit_created=False,
+                pushed=True,
+                archive_commit_oid=head,
+                archive_tree_oid=tree,
+                dedup_index_sha256="",
+                cursor_sha256="",
+            )
+            blobs = _verify_remote_archive_readback(context, duplicate, required_paths)
+            print_context(context)
+            print(f"RUNTIME_LOG_ARCHIVE_EVAL_RUN_ID={run_id}")
+            print("RUNTIME_LOG_ARCHIVE_EVAL_STATUS=duplicate_noop")
+            print("RUNTIME_LOG_ARCHIVE_EVAL_NEW_FILES=0")
+            print(f"RUNTIME_LOG_ARCHIVE_EVAL_COMMIT={duplicate.archive_commit_oid}")
+            print(f"RUNTIME_LOG_ARCHIVE_EVAL_TREE={duplicate.archive_tree_oid}")
+            print(f"RUNTIME_LOG_ARCHIVE_EVAL_REMOTE_REF=refs/heads/{context.branch}")
+            print(f"RUNTIME_LOG_ARCHIVE_EVAL_BLOBS={json.dumps(blobs, sort_keys=True, separators=(',', ':'))}")
+            return 0
+        receipt = publish_prepared_archive(transaction, args)
+        blobs: dict[str, str] = {}
+        if receipt.status == "committed":
+            blobs = _verify_remote_archive_readback(context, receipt, required_paths)
+        print_context(context)
+        print(f"RUNTIME_LOG_ARCHIVE_EVAL_RUN_ID={run_id}")
+        print(f"RUNTIME_LOG_ARCHIVE_EVAL_STATUS={receipt.status}")
+        print(f"RUNTIME_LOG_ARCHIVE_EVAL_NEW_FILES={new_count}")
+        print(f"RUNTIME_LOG_ARCHIVE_EVAL_COMMIT={receipt.archive_commit_oid}")
+        print(f"RUNTIME_LOG_ARCHIVE_EVAL_TREE={receipt.archive_tree_oid}")
+        print(f"RUNTIME_LOG_ARCHIVE_EVAL_REMOTE_REF=refs/heads/{context.branch}")
+        print(f"RUNTIME_LOG_ARCHIVE_EVAL_BLOBS={json.dumps(blobs, sort_keys=True, separators=(',', ':'))}")
+        return 0 if receipt.status == "committed" else 1
+
+
 def iter_report_files(report_dir: Path) -> list[Path]:
     """Return deterministic report bundle files to snapshot."""
     files: list[Path] = []
@@ -5752,7 +5905,7 @@ def _archive_agent_report_prepared(
         raise ArchiveGitError(f"report directory has no files to archive: {report_dir}")
     snapshot_id = report_snapshot_digest(report_dir, files)
     archive_id = f"{run_id}-{snapshot_id}"
-    destination = agent_report_archive_dir(context.source_root, context.canon_root) / run_id / snapshot_id
+    destination = _agent_report_archive_root(context) / run_id / snapshot_id
     _parent_ensure_directory(destination, "agent-report-archive")
 
     file_entries: list[dict[str, object]] = []
@@ -5811,7 +5964,7 @@ def _archive_agent_report_prepared(
     else:
         _atomic_write_bytes(manifest_path, manifest_text.encode("utf-8"))
 
-    index_path = agent_report_archive_dir(context.source_root, context.canon_root) / "index.jsonl"
+    index_path = _agent_report_archive_root(context) / "index.jsonl"
     index_appended = write_jsonl_once(
         index_path,
         {
@@ -5864,6 +6017,20 @@ def report_root_for_context(context: ArchiveContext, report_root: Path | None) -
     return (report_root.resolve() if report_root else context.source_root / DEFAULT_AGENT_REPORT_ROOT)
 
 
+def _agent_report_archive_root(context: ArchiveContext) -> Path:
+    """Return the archive-owned report root without a source-tree fallback."""
+    if context.runtime_root is not None or os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip():
+        return agent_report_archive_dir(
+            context.source_root,
+            context.canon_root,
+            context.runtime_root,
+        )
+    # An explicit --archive-root is a legacy public CLI capability.  It is
+    # already authenticated as the archive clone by build_context, so derive
+    # the destination directly without consulting source-local paths.
+    return context.archive_root / DEFAULT_AGENT_REPORT_DESTINATION / context.repo_key
+
+
 def should_skip_agent_report(relative: Path, source: Path, max_file_bytes: int) -> bool:
     """Return whether one report artifact should stay out of the log archive."""
     if any(part in AGENT_REPORT_EXCLUDED_DIRS for part in relative.parts):
@@ -5891,7 +6058,7 @@ def copy_agent_reports_prepared(
             f"expected {DEFAULT_AGENT_REPORT_DESTINATION}"
         )
     root = report_root_for_context(context, report_root)
-    default_destination = agent_report_archive_dir(context.source_root, context.canon_root)
+    default_destination = _agent_report_archive_root(context)
     if context.archive_root.resolve() == root or context.archive_root.resolve() in root.parents:
         raise ArchiveGitError("agent report root cannot be inside the archive clone")
     if not root.exists():
@@ -6005,7 +6172,7 @@ def _verify_remote_archive_readback(
     context: ArchiveContext,
     receipt: ArchivePublicationReceipt,
     required_paths: tuple[Path, ...],
-) -> None:
+) -> dict[str, str]:
     """Verify remote ref, commit tree, and required archive index/blob bytes."""
     if receipt.status != "committed" or not receipt.pushed:
         raise ArchiveGitError("archive_readback_mismatch:publication_not_committed")
@@ -6015,6 +6182,7 @@ def _verify_remote_archive_readback(
     remote_tree = _archive_oid(context, f"{remote_commit}^{{tree}}")
     if not remote_tree or remote_tree != receipt.archive_tree_oid:
         raise ArchiveGitError("archive_readback_mismatch:tree")
+    blobs: dict[str, str] = {}
     for path in required_paths:
         try:
             relative = path.resolve().relative_to(context.archive_root.resolve())
@@ -6028,6 +6196,8 @@ def _verify_remote_archive_readback(
             raise ArchiveGitError(
                 f"archive_readback_mismatch:blob:{relative.as_posix()}"
             )
+        blobs[relative.as_posix()] = hashlib.sha256(remote).hexdigest()
+    return blobs
 
 
 def _rebase_to_remote(context: ArchiveContext) -> tuple[bool, str]:
@@ -6310,6 +6480,8 @@ def main(argv: list[str] | None = None) -> int:
             return command_import_legacy(context, args)
         if args.command == "import-eval-results":
             return command_import_eval_results(context, args)
+        if args.command == "archive-eval":
+            return command_archive_eval(context, args)
         if args.command == "archive-agent-report":
             return command_archive_agent_report(context, args)
         if args.command == "archive-agent-reports":
@@ -6332,8 +6504,17 @@ def main(argv: list[str] | None = None) -> int:
             print("CONTEXT_DISCOVERY_APPEND=fail")
             return 1
         message = str(exc)
-        if message.startswith("source_identity_preflight_failed:"):
-            print(f"RUNTIME_LOG_ARCHIVE_ERROR_CODE={message.split(':', 1)[1]}")
+        # Every bounded failure has a machine-readable first token.  Preserve
+        # the full detail below, but expose the typed code before any caller
+        # has to parse Git output.  Shell/Git diagnostics contain spaces and
+        # therefore do not qualify as an error code.
+        error_code = (
+            message.split(":", 1)[1].split(":", 1)[0]
+            if message.startswith("source_identity_preflight_failed:")
+            else message.split(":", 1)[0]
+        )
+        if re.fullmatch(r"[a-z][a-z0-9_]*", error_code):
+            print(f"RUNTIME_LOG_ARCHIVE_ERROR_CODE={error_code}")
         print(f"RUNTIME_LOG_ARCHIVE_ERROR={exc}")
         print("RUNTIME_LOG_ARCHIVE=fail")
         return 1

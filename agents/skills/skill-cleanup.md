@@ -43,7 +43,7 @@ graph/readback を一つの source-to-generated cleanup unit として既存 own
 2. `.codex/config.toml` を host-wiring の source/input として読み、catalog skill id に対する
    entry set、source order、path、enabled を readback する。
 3. 既存 materializer は `.agents/skills/<skill>/SKILL.md` だけを生成する。
-4. `skill_dependency_map.py graph` で graph JSON/Mermaid を生成し、既存 checker で source/readback equality を確認する。
+4. `skill_dependency_map.py graph` は通常、明示した外部 runtime root に graph JSON/Mermaid を生成し、既存 checker で source/readback equality を確認する。tracked reader pair を更新する場合だけ、固定2ファイルの mutation capability と外部 before/after evidence を明示する。
 5. validation command の実行範囲は `agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary` を参照し、skill-cleanup 側で別の test/full-scan policy を作らない。文書は `document-canon-cleanup`、worktree は `worktree-health`、log は `agent-log-analysis`/`runtime-log-repair`、結果は `result-artifact-writeout` を再利用する。
 
 ## Tool Commands
@@ -52,7 +52,12 @@ graph/readback を一つの source-to-generated cleanup unit として既存 own
 python3 tools/agent_tools/check_agent_runtime_alignment.py
 python3 tools/agent_tools/skill_shim_materializer.py materialize --root . --all
 python3 tools/agent_tools/skill_shim_materializer.py readback --root . --all
-python3 tools/agent_tools/skill_dependency_map.py graph --root . --output documents/runtime/skill-dependency-graph.md
+python3 tools/agent_tools/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>
+# tracked reader pair の更新（capability は documents/runtime の md/json だけを列挙）
+python3 tools/agent_tools/skill_dependency_map.py graph --root . \
+  --output documents/runtime/skill-dependency-graph.md \
+  --runtime-root <external-runtime-root> \
+  --source-mutation-capability-json <exact-two-path-capability.json>
 python3 tools/agent_tools/check_skill_tool_invocation_graph.py --root .
 ```
 

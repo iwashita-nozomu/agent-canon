@@ -2,7 +2,6 @@
 @dependency-start
 contract policy
 responsibility Documents Python コーディング規約 for this repository.
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ./DOCSTRING_GUIDE.md owns semantic Docstring clauses and sparse projection traces
 downstream design ../design/algorithm-implementation-boundary.md algorithm math-to-code boundary policy for Python implementations
 downstream design ./object-oriented-design.md general OOP policy for Python class decisions

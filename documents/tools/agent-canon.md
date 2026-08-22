@@ -83,8 +83,14 @@ the same adjacent `check` path. A formatter run is complete only when the final
 `DOCS_CHECK=pass` evidence is present or the unavailable command is recorded as
 a blocker.
 
-## Legacy Entrypoints
+## Compatibility Entrypoints
 
-`python3 tools/docs/audit_and_fix_links.py --check` remains a legacy link-check
-entrypoint. The canonical Markdown, math, and Mermaid route is
-`tools/bin/agent-canon docs ...`.
+`python3 tools/docs/audit_and_fix_links.py --check` is a compatibility spelling
+that forwards to the single canonical Rust route, `tools/bin/agent-canon docs
+check ...`; it does not create `reports/broken_links.txt`. Its `--apply` mode
+is source mutation and requires a typed `--mutation-capability-json` covering
+every file to be changed. Design duplicate/similarity/organization tools also
+require an explicit external `--runtime-root` (or the equivalent runtime
+capability) for reports; organization and deletion apply modes require the
+same explicit mutation capability. No documentation tool defaults output to
+the source checkout.

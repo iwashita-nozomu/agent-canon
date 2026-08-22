@@ -27,6 +27,7 @@ mod python_structure_hash;
 mod python_structure_hash_impact;
 mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
+mod runtime_boundary;
 mod rust_migration_plan;
 mod semantic_index;
 mod structured_analysis;

@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Inventories machine-readable log and hook output fields from hooks, skills, Python tools, shell tools, and Rust CLI tools.
 # upstream design ../../documents/runtime/runtime-log-archive.md hook result accumulation contract
+# upstream implementation ./runtime_log_paths.py identifies canonical source roots for baseline defaults
 # downstream implementation ./check_hook_retirement.py validates stale retirement inventory drift
 # downstream implementation ../../tests/agent_tools/test_log_surface_inventory.py validates field extraction and baseline checks
 # @dependency-end
@@ -37,6 +38,11 @@ except ImportError:
         ParentRootSideEffectError,
         attest_parent_root,
     )
+
+try:
+    from .runtime_log_paths import is_agent_canon_root
+except ImportError:
+    from runtime_log_paths import is_agent_canon_root  # type: ignore[no-redef]
 
 SurfaceKind = Literal["hook", "skill", "tool"]
 Certainty = Literal["static", "dynamic"]
@@ -409,8 +415,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", help="Write the JSON inventory to this path.")
     parser.add_argument(
         "--baseline",
-        default=str(DEFAULT_BASELINE),
-        help="Baseline JSON path for --check. Defaults to documents/runtime/log-surface-inventory.json.",
+        help=(
+            "Explicit baseline JSON path for --check. When omitted, the "
+            "default is available only from an AgentCanon source root."
+        ),
     )
     parser.add_argument(
         "--check",
@@ -736,8 +744,16 @@ def main() -> int:
     """Run the inventory CLI."""
     args = build_parser().parse_args()
     root = Path(args.root).resolve()
+    if args.check and not args.baseline and not is_agent_canon_root(root):
+        print("LOG_SURFACE_INVENTORY=fail")
+        print("LOG_SURFACE_INVENTORY_ERROR=explicit_baseline_required")
+        return 1
     check_root = root
-    baseline_path = resolve_baseline_path(root, Path(args.baseline))
+    baseline_path = (
+        resolve_baseline_path(root, Path(args.baseline))
+        if args.baseline
+        else default_baseline_path(root)
+    )
     if args.check and baseline_path.is_file() and not args.paths:
         check_root = inventory_root_for_baseline(baseline_path)
     try:
@@ -747,10 +763,15 @@ def main() -> int:
         print(f"LOG_SURFACE_INVENTORY_ERROR={exc}")
         return 1
 
-    if args.output:
-        write_inventory((root / args.output).resolve(), inventory)
-        if not args.quiet:
-            print(f"LOG_SURFACE_INVENTORY_OUTPUT={args.output}")
+    try:
+        if args.output:
+            write_inventory((root / args.output).resolve(), inventory)
+            if not args.quiet:
+                print(f"LOG_SURFACE_INVENTORY_OUTPUT={args.output}")
+    except ParentRootSideEffectError as exc:
+        print("LOG_SURFACE_INVENTORY=fail")
+        print(f"LOG_SURFACE_INVENTORY_ERROR={exc.reject.value}")
+        return 1
 
     if args.check:
         if not baseline_path.is_file():
@@ -773,16 +794,22 @@ def main() -> int:
 
 
 def resolve_baseline_path(root: Path, raw_baseline: Path) -> Path:
-    """Return the standalone or vendored inventory baseline path."""
+    """Resolve an explicitly selected inventory baseline.
+
+    A baseline is never inferred from a vendor checkout.  Callers that need a
+    baseline from another source checkout must pass its absolute path (or an
+    explicit path relative to ``root``).
+    """
     if raw_baseline.is_absolute():
         return raw_baseline
-    direct = (root / raw_baseline).resolve()
-    if direct.is_file():
-        return direct
-    vendored = (root / "vendor" / "agent-canon" / raw_baseline).resolve()
-    if vendored.is_file():
-        return vendored
-    return direct
+    return (root / raw_baseline).resolve()
+
+
+def default_baseline_path(root: Path) -> Path:
+    """Return the default baseline only for a canonical AgentCanon root."""
+    if is_agent_canon_root(root):
+        return (root / DEFAULT_BASELINE).resolve()
+    return (root / ".agent-canon-baseline-required.json").resolve()
 
 
 def inventory_root_for_baseline(baseline: Path) -> Path:

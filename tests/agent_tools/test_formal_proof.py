@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import os
 import runpy
 import subprocess
 import sys
@@ -37,7 +38,8 @@ class FormalProofToolTest(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as tmp_dir:
             claim_path = Path(tmp_dir) / "claim.md"
-            out_dir = Path(tmp_dir) / "proof"
+            runtime_dir = Path(tmp_dir) / "runtime"
+            out_dir = runtime_dir / "tasks" / "formal-proof" / "spd"
             claim_path.write_text(claim, encoding="utf-8")
 
             result = subprocess.run(
@@ -54,6 +56,8 @@ class FormalProofToolTest(unittest.TestCase):
                     "spd_quadratic_form_positive",
                     "--out-dir",
                     str(out_dir),
+                    "--runtime-root",
+                    str(runtime_dir),
                     "--format",
                     "json",
                 ],
@@ -149,7 +153,8 @@ class FormalProofToolTest(unittest.TestCase):
             root = Path(tmp_dir)
             sample = root / "sample.py"
             sentinel = root / "side_effect.txt"
-            out_dir = root / "proof"
+            runtime_dir = root / "runtime"
+            out_dir = runtime_dir / "tasks" / "formal-proof" / "python-ast"
             sample.write_text(
                 "\n".join(
                     [
@@ -176,6 +181,8 @@ class FormalProofToolTest(unittest.TestCase):
                     "lean",
                     "--out-dir",
                     str(out_dir),
+                    "--runtime-root",
+                    str(runtime_dir),
                     "--format",
                     "json",
                 ],
@@ -230,7 +237,9 @@ class FormalProofToolTest(unittest.TestCase):
                     "--format",
                     "json",
                     "--out-dir",
-                    str(Path(tmp_dir) / "proof"),
+                    str(Path(tmp_dir) / "runtime" / "tasks" / "formal-proof" / "nested"),
+                    "--runtime-root",
+                    str(Path(tmp_dir) / "runtime"),
                 ],
                 cwd=PROJECT_ROOT,
                 check=True,
@@ -285,6 +294,55 @@ class FormalProofToolTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Python AST symbol not found", result.stderr)
+
+    def test_output_requires_explicit_external_runtime_root(self) -> None:
+        """A write request fails closed instead of creating source-local output."""
+        source_output = PROJECT_ROOT / "reports" / f"formal-proof-forbidden-{os.getpid()}"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                "--claim",
+                "Claim: one equals one.",
+                "--out-dir",
+                str(source_output),
+            ],
+            cwd=PROJECT_ROOT,
+            env={**dict(os.environ), "PYTHONDONTWRITEBYTECODE": "1"},
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("runtime_root_error", result.stderr)
+        self.assertFalse(source_output.exists())
+
+    def test_output_root_cannot_be_inside_source_checkout(self) -> None:
+        """An explicit runtime root still cannot redirect output into source."""
+        with tempfile.TemporaryDirectory() as runtime_tmp:
+            source_output = PROJECT_ROOT / "reports" / f"formal-proof-forbidden-{os.getpid()}"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--claim",
+                    "Claim: one equals one.",
+                    "--runtime-root",
+                    runtime_tmp,
+                    "--out-dir",
+                    str(source_output),
+                ],
+                cwd=PROJECT_ROOT,
+                env={**dict(os.environ), "PYTHONDONTWRITEBYTECODE": "1"},
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("runtime_root_error", result.stderr)
+        self.assertFalse(source_output.exists())
 
 
 if __name__ == "__main__":

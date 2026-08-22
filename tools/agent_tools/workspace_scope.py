@@ -21,6 +21,23 @@ from datetime import datetime
 from pathlib import Path
 
 try:
+    from .runtime_artifacts import (
+        RUNTIME_ROOT_ENV,
+        RuntimeRootRequired,
+        SourceLocalArtifact,
+        RuntimeSymlinkEscape,
+        runtime_artifact_boundary,
+    )
+except ImportError:  # direct script/module execution
+    from runtime_artifacts import (  # type: ignore[no-redef]
+        RUNTIME_ROOT_ENV,
+        RuntimeRootRequired,
+        SourceLocalArtifact,
+        RuntimeSymlinkEscape,
+        runtime_artifact_boundary,
+    )
+
+try:
     from .parent_root_side_effects import (
         ParentRootAttestationRequest,
         ParentRootSideEffectBoundary,
@@ -70,6 +87,54 @@ RUN_ID_TASK_SLUG_MAX_CHARS = 40
 SHA256_READ_CHUNK_BYTES = 65_536
 
 DEFAULT_REPORT_ROOT = Path("reports") / "agents"
+
+
+def _agent_canon_source_root() -> Path:
+    """Return this module's AgentCanon source root for artifact containment."""
+    return Path(__file__).resolve().parents[2]
+
+
+def resolve_runtime_artifact_path(
+    path: Path | str,
+    *,
+    runtime_root: Path | str | None = None,
+    source_root: Path | None = None,
+) -> Path:
+    """Resolve one explicit external runtime artifact path.
+
+    The runtime root is selected only by the caller or
+    ``AGENT_CANON_RUNTIME_ROOT``.  A caller that supplied an explicit absolute
+    artifact path before the runtime-root migration remains supported, but a
+    relative path (including a path derived from the current directory) fails
+    closed.  This keeps the old explicit ``--report-dir`` interface additive
+    without restoring a source-relative default.
+    """
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute():
+        raise RuntimeRootRequired(
+            "explicit external runtime root required for relative artifact path: "
+            f"{candidate}; pass --runtime-root or set {RUNTIME_ROOT_ENV}"
+        )
+    source = (source_root or _agent_canon_source_root()).resolve()
+    configured = runtime_root
+    if configured is None:
+        configured = os.environ.get(RUNTIME_ROOT_ENV, "").strip() or None
+    if configured is not None:
+        boundary = runtime_artifact_boundary(source, configured)
+        return boundary.resolve(candidate)
+    probe = candidate
+    while probe != probe.parent:
+        if probe.is_symlink():
+            raise RuntimeSymlinkEscape(
+                f"runtime artifact contains a symlink component: {probe}"
+            )
+        probe = probe.parent
+    resolved = candidate.resolve(strict=False)
+    if resolved == source or source in resolved.parents:
+        raise SourceLocalArtifact(
+            f"runtime artifact must not resolve into AgentCanon source: {resolved}"
+        )
+    return resolved
 
 
 def _resolve_rooted_path(root: Path, relative_path: str, root_key: str) -> Path:
@@ -124,6 +189,7 @@ def resolve_repository_roots(
     *,
     source_root: Path | None = None,
     canon_root: Path | None = None,
+    runtime_root: str | Path | None = None,
 ) -> RepositoryRoots:
     """Assemble source/state/report roots before constructing a run spec."""
     workspace = workspace_root.resolve()
@@ -143,7 +209,10 @@ def resolve_repository_roots(
             canon_root=canon_root,
         )
     selected_report = resolve_report_root(
-        None if report_root is None else str(report_root), workspace
+        None if report_root is None else str(report_root),
+        workspace,
+        runtime_root=runtime_root,
+        source_root=resolution.source_root,
     )
     public = resolution.public_tool_root
     return RepositoryRoots(
@@ -158,45 +227,34 @@ def resolve_repository_roots(
 def resolve_report_root(
     report_root: str | None,
     workspace_root: Path | None = None,
+    *,
+    runtime_root: Path | str | None = None,
+    source_root: Path | None = None,
 ) -> Path:
-    """Resolve the report root relative to the active workspace by default."""
-    base_root = (
-        workspace_root.resolve() if workspace_root is not None else Path.cwd().resolve()
+    """Resolve reports below one explicit external runtime root.
+
+    The old ``<workspace>/reports/agents`` default is intentionally gone.  A
+    runtime root must be supplied directly or through
+    ``AGENT_CANON_RUNTIME_ROOT``.  An absolute ``--report-root`` remains an
+    additive compatibility path and is accepted only when it is outside the
+    AgentCanon source tree.
+    """
+    del workspace_root  # retained for the additive positional API
+    source = (source_root or _agent_canon_source_root()).resolve()
+    configured = runtime_root
+    if configured is None:
+        configured = os.environ.get(RUNTIME_ROOT_ENV, "").strip() or None
+    if configured is not None:
+        boundary = runtime_artifact_boundary(source, configured)
+        declared = DEFAULT_REPORT_ROOT if report_root is None else Path(report_root)
+        return boundary.resolve(declared)
+    if report_root is not None and Path(report_root).is_absolute():
+        return resolve_runtime_artifact_path(report_root, source_root=source)
+    raise RuntimeRootRequired(
+        "explicit external runtime root required for report artifacts; pass "
+        "--runtime-root or set "
+        f"{RUNTIME_ROOT_ENV}"
     )
-    try:
-        # A caller may run from a nested checkout while its report bundle is
-        # intentionally owned by the already-authenticated outer repository.
-        # Authenticate that explicit parent through Git before accepting the
-        # capability; the environment variable is only a path selector and is
-        # never trusted as identity evidence on its own.  Attesting with the
-        # parent as cwd avoids replacing the selected outer boundary with the
-        # nested checkout's Git toplevel.
-        configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-        if configured_parent:
-            parent_root = Path(configured_parent).resolve(strict=True)
-            attestation = attest_parent_root(
-                ParentRootAttestationRequest(
-                    cwd=parent_root,
-                    explicit_root=parent_root,
-                    purpose="report-root",
-                )
-            )
-        else:
-            attestation = attest_parent_root(
-                ParentRootAttestationRequest(
-                    cwd=base_root, explicit_root=None, purpose="report-root"
-                )
-            )
-        candidate = DEFAULT_REPORT_ROOT if report_root is None else Path(report_root)
-        if not candidate.is_absolute():
-            candidate = base_root / candidate
-        return resolve_parent_owned_path(
-            attestation, candidate, "report-root", create=False
-        ).physical_path
-    except ParentRootSideEffectError as exc:
-        raise ReportBundleArtifactPathError(
-            str(report_root or DEFAULT_REPORT_ROOT), exc.reject.value
-        ) from exc
 
 
 class ReportBundleArtifactPathError(RuntimeError):
@@ -227,39 +285,7 @@ def resolve_report_bundle_artifact_path(
     for component in parts:
         if component == "..":
             raise ReportBundleArtifactPathError(declared_path, "outside_bundle")
-    report_root = report_dir.resolve()
-    try:
-        configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-        if configured_parent:
-            attestation_root = Path(configured_parent).resolve()
-            attestation = attest_parent_root(
-                ParentRootAttestationRequest(
-                    cwd=attestation_root,
-                    explicit_root=attestation_root,
-                    purpose="report-artifact",
-                )
-            )
-        else:
-            attestation_cwd = report_root
-            while not attestation_cwd.exists():
-                parent = attestation_cwd.parent
-                if parent == attestation_cwd:
-                    break
-                attestation_cwd = parent
-            attestation = attest_parent_root(
-                ParentRootAttestationRequest(
-                    cwd=attestation_cwd,
-                    explicit_root=None,
-                    purpose="report-artifact",
-                )
-            )
-        # This is a non-creating capability check; the lexical checks below
-        # continue to provide the stable report-specific error taxonomy.
-        resolve_parent_owned_path(
-            attestation, report_root / Path(declared_path), "report-artifact"
-        )
-    except ParentRootSideEffectError as exc:
-        raise ReportBundleArtifactPathError(declared_path, exc.reject.value) from exc
+    report_root = resolve_runtime_artifact_path(report_dir)
     lexical_path = report_root
     for index, component in enumerate(parts):
         lexical_path = lexical_path / component

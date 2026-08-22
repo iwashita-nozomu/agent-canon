@@ -14,8 +14,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tests.agent_tools.rust_cli_fixture import standalone_agent_canon
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-AGENT_CANON = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
+AGENT_CANON = standalone_agent_canon()
 
 
 class CheckMarkdownMathTest(unittest.TestCase):

@@ -27,20 +27,19 @@ from typing import Any
 
 try:
     from .parent_root_side_effects import (
-        ParentRootAttestationRequest,
         ParentRootReject,
-        ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
         ParentRootReject,
-        ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
     )
+
+try:
+    from .runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
+except ImportError:  # pragma: no cover - direct script execution
+    from runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError  # type: ignore[no-redef]
 
 MAX_ERROR_CHARS = 4000
 REMOTE_UNINITIALIZED = "REMOTE_UNINITIALIZED"
@@ -48,38 +47,35 @@ WIKI_SOURCE_MARKER_PREFIX = "<!-- AGENT_CANON_WIKI_SOURCE_COMMIT="
 AGENT_CANON_BIN = Path("tools/bin/agent-canon")
 
 
-def _wiki_temp_dir() -> str | None:
-    """Return parent-local staging for formatter scratch files."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+def _wiki_runtime_boundary(source_root: Path) -> RuntimeArtifactBoundary:
+    """Return the explicit external runtime boundary for wiki artifacts."""
+    configured = os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
     if not configured:
         raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            "wiki-staging: explicit parent root is required",
+            ParentRootReject.RUNTIME_ROOT_REQUIRED,
+            "wiki-publication: explicit runtime root is required",
         )
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="wiki-publication")
-    )
-    directory = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
-        attestation, parent / ".agent-canon" / "tmp" / "wiki", "wiki-staging"
-    )
-    return str(directory.physical_path)
-
-
-def _write_wiki_file(path: Path, data: bytes) -> None:
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
+    try:
+        return RuntimeArtifactBoundary.for_source(
+            source_root.resolve(strict=True), configured, create=True
+        )
+    except RuntimeArtifactError as exc:
         raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            "wiki-publication: explicit parent root is required",
-        )
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="wiki-publication")
-    )
-    ParentRootSideEffectBoundary().write_parent_owned_file(
-        attestation, path, data, "wiki-publication"
-    )
+            ParentRootReject.RUNTIME_ROOT_INVALID,
+            f"wiki-publication: invalid runtime root: {exc}",
+        ) from exc
+
+
+def _wiki_temp_dir(source_root: Path) -> str:
+    """Return formatter staging below the explicit external runtime root."""
+    boundary = _wiki_runtime_boundary(source_root)
+    return str(boundary.ensure_directory(Path("wiki-publication") / "tmp"))
+
+
+def _write_wiki_file(source_root: Path, path: Path, data: bytes) -> None:
+    """Write a wiki artifact only below the explicit external runtime root."""
+    boundary = _wiki_runtime_boundary(source_root)
+    boundary.atomic_write_bytes(path, data)
 
 
 @dataclass(frozen=True)
@@ -312,7 +308,7 @@ def format_page_for_publish(
     runner: Runner,
     page: Path,
 ) -> bytes:
-    with tempfile.TemporaryDirectory(dir=_wiki_temp_dir()) as page_tmp:
+    with tempfile.TemporaryDirectory(dir=_wiki_temp_dir(source_root)) as page_tmp:
         temp_page = Path(page_tmp) / "page.md"
         temp_page.write_text(page.read_text(encoding="utf-8"), encoding="utf-8")
         run_command(
@@ -374,7 +370,7 @@ def publish_prepared_pages(
     remote_url: str,
 ) -> tuple[str, str]:
     for path, data in prepared.items():
-        _write_wiki_file(path, data)
+        _write_wiki_file(source_root, path, data)
 
     run_command(
         runner,
@@ -552,6 +548,7 @@ def main() -> int:
         summary = publish_to_wiki(args)
         if args.summary_out:
             _write_wiki_file(
+                Path(args.source_root).resolve(),
                 Path(args.summary_out),
                 json.dumps(summary, sort_keys=True, indent=2).encode("utf-8"),
             )

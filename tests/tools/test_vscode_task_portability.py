@@ -4,7 +4,7 @@
 # contract test
 # responsibility Verifies VS Code commands resolve the canonical AgentCanon tool root in both layouts.
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared VS Code surface policy
-# upstream implementation ../../tools/agent_tools shared AgentCanon tool root
+# upstream implementation ../../tools/agent_tools/tool_dispatch.py shared AgentCanon tool root
 # downstream implementation ../../.vscode/tasks.json shared validation task commands
 # @dependency-end
 
@@ -51,15 +51,17 @@ class VscodeTaskPortabilityTest(unittest.TestCase):
         return {task["label"]: task["command"] for task in tasks["tasks"]}
 
     def test_settings_and_tasks_use_portable_tool_views(self) -> None:
-        """Shared settings and tasks must cover parent tool views without workspace files."""
+        """Shared settings and tasks use only the standalone source checkout."""
         commands = self.task_commands()
         for label, command in commands.items():
-            self.assertIn("tools/agent-canon", command, label)
-            self.assertIn("CANON_TOOLS_ROOT", command, label)
+            self.assertIn("${workspaceFolder}", command, label)
             self.assertNotIn("tools/lib/repo_paths.sh", command, label)
+            self.assertNotIn("tools/agent-canon", command, label)
+            self.assertNotIn("CANON_TOOLS_ROOT", command, label)
         settings = json.loads(SETTINGS_JSON.read_text(encoding="utf-8"))
-        self.assertIn("./tools/agent-canon", settings["python.analysis.extraPaths"])
-        self.assertIn("./tools/agent-canon/agent_tools", settings["python.analysis.extraPaths"])
+        self.assertIn("./tools", settings["python.analysis.extraPaths"])
+        self.assertNotIn("./tools/agent-canon", settings["python.analysis.extraPaths"])
+        self.assertNotIn("./tools/agent-canon/agent_tools", settings["python.analysis.extraPaths"])
         self.assertFalse((PROJECT_ROOT / ".code-workspace").exists())
 
     def test_vscode_tasks_resolve_standalone_tools(self) -> None:
@@ -102,30 +104,29 @@ class VscodeTaskPortabilityTest(unittest.TestCase):
             self.assertEqual(headers.returncode, 0, headers.stderr)
             self.assertIn("DEP_HEADERS=standalone", headers.stdout)
 
-    def test_vscode_tasks_resolve_parent_tool_view(self) -> None:
-        """Task commands should resolve tools/agent-canon in parent mode."""
+    def test_vscode_tasks_ignore_parent_tool_view(self) -> None:
+        """Task commands must not revive a parent-local or vendor tool view."""
         commands = self.task_commands()
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace = Path(tmp_dir)
-            self.write_exec(
-                workspace / "tools" / "agent-canon" / "bin" / "agent-canon",
-                '#!/usr/bin/env bash\necho DOCS_BIN=parent',
+            # A conflicting legacy view must never win over the source checkout.
+            self.write_exec(workspace / "tools" / "agent-canon" / "bin" / "agent-canon", "echo BAD_PARENT_VIEW")
+            self.write_exec(workspace / "tools" / "bin" / "agent-canon", "echo DOCS_BIN=standalone")
+            self.write_py(
+                workspace / "tools" / "agent_tools" / "check_convention_compliance.py",
+                'print("CONVENTION=standalone")',
             )
             self.write_py(
-                workspace / "tools" / "agent-canon" / "agent_tools" / "check_convention_compliance.py",
-                'print("CONVENTION=parent")',
-            )
-            self.write_py(
-                workspace / "tools" / "agent-canon" / "agent_tools" / "check_dependency_headers.py",
-                'print("DEP_HEADERS=parent")',
+                workspace / "tools" / "agent_tools" / "check_dependency_headers.py",
+                'print("DEP_HEADERS=standalone")',
             )
             self.write_exec(
-                workspace / "tools" / "agent-canon" / "agent_tools" / "scan_dependency_headers.sh",
-                "echo SCAN_HEADERS=parent",
+                workspace / "tools" / "agent_tools" / "scan_dependency_headers.sh",
+                "echo SCAN_HEADERS=standalone",
             )
             self.write_exec(
-                workspace / "tools" / "agent-canon" / "agent_tools" / "check_dependency_header_format.sh",
-                "echo CHECK_HEADER_FORMAT=parent",
+                workspace / "tools" / "agent_tools" / "check_dependency_header_format.sh",
+                "echo CHECK_HEADER_FORMAT=standalone",
             )
 
             docs = run_shell_command_in_workspace(workspace, commands["AgentCanon: Docs Check"])
@@ -136,11 +137,12 @@ class VscodeTaskPortabilityTest(unittest.TestCase):
                 workspace, commands["AgentCanon: Dependency Headers"]
             )
             self.assertEqual(docs.returncode, 0, docs.stderr)
-            self.assertIn("DOCS_BIN=parent", docs.stdout)
+            self.assertIn("DOCS_BIN=standalone", docs.stdout)
+            self.assertNotIn("BAD_PARENT_VIEW", docs.stdout)
             self.assertEqual(convention.returncode, 0, convention.stderr)
-            self.assertIn("CONVENTION=parent", convention.stdout)
+            self.assertIn("CONVENTION=standalone", convention.stdout)
             self.assertEqual(headers.returncode, 0, headers.stderr)
-            self.assertIn("DEP_HEADERS=parent", headers.stdout)
+            self.assertIn("DEP_HEADERS=standalone", headers.stdout)
 
 
 if __name__ == "__main__":

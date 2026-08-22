@@ -6,7 +6,6 @@ responsibility Repairs and reviews repository structure with deterministic drift
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog
 upstream design ../../documents/design/responsibility-rationale.md drift repair, review scope, and prose-diagnostic rationale
-upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared root runtime surface policy
 upstream design ../../documents/rule/README.md document rule canon
 upstream design ../../documents/design/README.md design canon reader route
 upstream design refactor-loop.md behavior-preserving refactor loop

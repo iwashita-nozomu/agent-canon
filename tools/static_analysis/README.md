@@ -23,7 +23,8 @@ Use this split for routing:
 The integrated repo entrypoint is:
 
 ```bash
-bash tools/agent_tools/review_backlog_scan.sh \
-  --report-dir reports/agents/<run-id>/cross_repo_inspection \
-  --submodule-aware
+./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> \
+  exec --root <target> -- bash \
+  /usr/local/share/agent-canon/runtime/tools/agent_tools/review_backlog_scan.sh \
+  --report-dir /var/lib/agent-canon/runtime/reports/<run-id>/cross_repo_inspection
 ```

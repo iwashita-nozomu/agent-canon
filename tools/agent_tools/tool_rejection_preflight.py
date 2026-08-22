@@ -85,13 +85,7 @@ HOOK_SURFACE_PREFIXES = (
     ".codex/hooks/",
 )
 HOOK_CONFIG_PATHS = frozenset({".codex/hooks.json"})
-AGENT_CANON_HOOK_SURFACE_PREFIXES = (
-    "vendor/agent-canon/.codex/hooks/",
-)
-AGENT_CANON_HOOK_CONFIG_PATHS = frozenset(
-    {"vendor/agent-canon/.codex/hooks.json"}
-)
-STRICT_SCHEMA_JSON_PATHS = HOOK_CONFIG_PATHS | AGENT_CANON_HOOK_CONFIG_PATHS
+STRICT_SCHEMA_JSON_PATHS = HOOK_CONFIG_PATHS
 SKILL_SURFACE_PREFIXES = (
     ".agents/skills/",
     "agents/skills/",
@@ -100,9 +94,7 @@ TOOL_SURFACE_PREFIXES = (
     "tools/",
 )
 LOG_SURFACE_PREFIXES = (
-    HOOK_SURFACE_PREFIXES
-    + AGENT_CANON_HOOK_SURFACE_PREFIXES
-    + SKILL_SURFACE_PREFIXES
+    HOOK_SURFACE_PREFIXES + SKILL_SURFACE_PREFIXES
     + TOOL_SURFACE_PREFIXES
 )
 GITHUB_SURFACE_PREFIXES = (".github/workflows/", ".github/actions/")
@@ -139,8 +131,7 @@ LIBRARY_SURFACE_PREFIXES = (
     "node_modules/",
     ".venv/",
 )
-AGENT_CANON_SUBMODULE_PREFIX = "vendor/agent-canon"
-AGENT_CANON_TOOL_SOURCE_ROOT = f"{AGENT_CANON_SUBMODULE_PREFIX}/tools"
+AGENT_CANON_TOOL_SOURCE_ROOT = "tools"
 RESPONSIBILITY_SCOPE_COMMAND = (
     "python3 tools/agent_tools/responsibility_scope.py --root . --format json"
 )
@@ -362,39 +353,11 @@ AGENT_CANON_NEW_TOOL_SOURCE_ROUTE_GATE_TEMPLATES = (
     GateTemplate(
         gate="agentcanon_new_tool_source_route",
         command_template=(
-            "git -C vendor/agent-canon status --short --branch && "
-            "git submodule status vendor/agent-canon"
+            "git status --short --branch"
         ),
         handoff=(
-            "treat this planned path as new AgentCanon-owned tool source: add it "
-            "on an AgentCanon branch/PR under vendor/agent-canon, then update "
-            "the parent submodule pin; do not create a parent-local tools implementation"
-        ),
-    ),
-)
-AGENT_CANON_LOG_SURFACE_GATE_TEMPLATES = (
-    GateTemplate(
-        gate="log_surface_inventory_guard",
-        command_template=(
-            "cd vendor/agent-canon && "
-            "python3 tools/agent_tools/log_surface_inventory.py --root . "
-            "--check --baseline documents/runtime/log-surface-inventory.json"
-        ),
-        handoff=(
-            "validate AgentCanon source log-surface inventory from "
-            "vendor/agent-canon when a parent root tools/ view resolves there"
-        ),
-    ),
-)
-AGENT_CANON_TOOL_CATALOG_GATE_TEMPLATES = (
-    GateTemplate(
-        gate="tool_catalog",
-        command_template=(
-            "cd vendor/agent-canon && python3 tools/agent_tools/tool_catalog.py"
-        ),
-        handoff=(
-            "validate AgentCanon tool catalog from vendor/agent-canon for "
-            "shared tool source changes"
+            "treat this planned path as AgentCanon-owned source: add it on the "
+            "standalone AgentCanon branch/PR; do not create a parent-local copy"
         ),
     ),
 )
@@ -510,7 +473,6 @@ def path_gates(root: Path, path: str, scope_report: ScopeReport) -> tuple[Predic
         templates.extend(LOG_SURFACE_GATE_TEMPLATES)
     if agent_canon_new_tool_source_path(root, path):
         templates.extend(AGENT_CANON_NEW_TOOL_SOURCE_ROUTE_GATE_TEMPLATES)
-        templates.extend(AGENT_CANON_LOG_SURFACE_GATE_TEMPLATES)
     if path.startswith(SKILL_SURFACE_PREFIXES):
         templates.extend(SKILL_MIRROR_GATE_TEMPLATES)
     if path.startswith(GITHUB_SURFACE_PREFIXES):
@@ -521,8 +483,6 @@ def path_gates(root: Path, path: str, scope_report: ScopeReport) -> tuple[Predic
         templates.extend(EXPERIMENT_EXECUTION_SURFACE_GATE_TEMPLATES)
     if path in TOOL_CATALOG_PATHS or path.startswith(TOOL_SURFACE_PREFIXES):
         templates.extend(TOOL_CATALOG_GATE_TEMPLATES)
-    if agent_canon_tool_source_path(path):
-        templates.extend(AGENT_CANON_TOOL_CATALOG_GATE_TEMPLATES)
     if library_surface_path(path):
         templates.extend(LIBRARY_GATE_TEMPLATES)
     gates.extend(template.for_path(path) for template in templates)
@@ -578,10 +538,7 @@ def agent_canon_new_tool_source_path(root: Path, path: str) -> bool:
     """Return whether a planned path would create a new AgentCanon tool source."""
     if not agent_canon_tool_source_path(path):
         return False
-    if (root / path).exists():
-        return False
-    source_relative = path.removeprefix(AGENT_CANON_SUBMODULE_PREFIX + "/")
-    return not (root / source_relative).exists()
+    return not (root / path).exists()
 
 
 def dependency_gate_templates(path: str) -> tuple[GateTemplate, ...]:
@@ -595,24 +552,17 @@ def hook_runtime_surface_path(path: str) -> bool:
     """Return whether a planned path belongs to Codex hook runtime wiring."""
     return (
         path in HOOK_CONFIG_PATHS
-        or path in AGENT_CANON_HOOK_CONFIG_PATHS
         or path.startswith(HOOK_SURFACE_PREFIXES)
-        or path.startswith(AGENT_CANON_HOOK_SURFACE_PREFIXES)
     )
 
 
 def library_surface_path(path: str) -> bool:
     """Return whether a planned path belongs to protected library surfaces."""
-    if path == AGENT_CANON_SUBMODULE_PREFIX or path.startswith(AGENT_CANON_SUBMODULE_PREFIX + "/"):
-        return False
     return path.startswith(LIBRARY_SURFACE_PREFIXES)
 
 
 def agent_canon_logical_path(path: str) -> str:
-    """Return the AgentCanon logical path for parent-submodule paths."""
-    prefix = AGENT_CANON_SUBMODULE_PREFIX + "/"
-    if path.startswith(prefix):
-        return path.removeprefix(prefix)
+    """Return the standalone AgentCanon path used by routing predicates."""
     return path
 
 

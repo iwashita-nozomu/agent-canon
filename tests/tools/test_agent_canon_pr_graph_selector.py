@@ -123,45 +123,19 @@ def graph_change_fixture(root: Path, extra_base_files: dict[str, str]) -> str:
     return base
 
 
-def derived_parent_graph_fixture(root: Path) -> tuple[Path, str, str]:
-    """Create a derived parent whose base contains an AgentCanon gitlink."""
-    parent = root / "derived-parent"
-    parent.mkdir()
-    git(parent, "init", "-b", "main")
-    git(parent, "config", "user.email", "selector@example.invalid")
-    git(parent, "config", "user.name", "Selector Fixture")
-    git(
-        parent,
-        "-c",
-        "protocol.file.allow=always",
-        "submodule",
-        "add",
-        PROJECT_ROOT.as_uri(),
-        "vendor/agent-canon",
-    )
-    manifest = parent / "documents" / "runtime" / "shared-runtime-surfaces.toml"
-    manifest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(
-        PROJECT_ROOT / "documents" / "runtime" / "shared-runtime-surfaces.toml",
-        manifest,
-    )
-    (parent / "changed.py").write_text("before\n", encoding="utf-8")
-    git(parent, "add", ".")
-    git(parent, "commit", "-m", "derived parent base")
-    base = git(parent, "rev-parse", "HEAD")
-    gitlink = git(parent, "ls-tree", "HEAD", "vendor/agent-canon").split()[2]
-    (parent / "changed.py").write_text("after\n", encoding="utf-8")
-    git(parent, "add", "changed.py")
-    git(parent, "commit", "-m", "derived parent change")
-    return parent, base, gitlink
-
-
 def graph_builder_exit_fixture(
     root: Path,
     process_exit_code: int,
     result_exit_code: int,
 ) -> tuple[Path, Path, str]:
     """Create a base repo and builder executable with independently chosen exits."""
+    git(root, "init", "-b", "main")
+    git(root, "config", "user.email", "selector@example.invalid")
+    git(root, "config", "user.name", "Selector Fixture")
+    git(root, "remote", "add", "origin", "https://example.invalid/control.git")
+    (root / ".control-fixture").write_text("control\n", encoding="utf-8")
+    git(root, "add", ".control-fixture")
+    git(root, "commit", "-m", "control base")
     parent = root / "base-repo"
     parent.mkdir()
     manifest = parent / "documents" / "runtime" / "shared-runtime-surfaces.toml"
@@ -196,57 +170,13 @@ def graph_builder_exit_fixture(
         PROJECT_ROOT / "documents" / "runtime" / "shared-runtime-surfaces.toml",
         manifest,
     )
+    git(source_root, "init", "-b", "main")
+    git(source_root, "config", "user.email", "selector@example.invalid")
+    git(source_root, "config", "user.name", "Selector Fixture")
+    git(source_root, "remote", "add", "origin", "https://example.invalid/builder.git")
+    git(source_root, "add", ".")
+    git(source_root, "commit", "-m", "builder source")
     return parent, source_root, base
-
-
-def experiment_runner_legacy_base_fixture(root: Path) -> tuple[Path, str]:
-    """Create an ExperimentRunner-shaped parent pinned to the legacy AgentCanon."""
-    legacy_source = root / "agent-canon-f7e79cec"
-    subprocess.run(
-        [
-            "git",
-            "clone",
-            "--local",
-            "--no-hardlinks",
-            str(PROJECT_ROOT),
-            str(legacy_source),
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    git(legacy_source, "checkout", "--detach", "--quiet", "f7e79cec")
-
-    parent = root / "experiment-runner"
-    parent.mkdir()
-    git(parent, "init", "-b", "main")
-    git(parent, "config", "user.email", "selector@example.invalid")
-    git(parent, "config", "user.name", "Selector Fixture")
-    git(
-        parent,
-        "-c",
-        "protocol.file.allow=always",
-        "submodule",
-        "add",
-        legacy_source.as_uri(),
-        "vendor/agent-canon",
-    )
-    (parent / "changed.py").write_text("before\n", encoding="utf-8")
-    git(parent, "add", ".")
-    git(parent, "commit", "-m", "ExperimentRunner legacy base")
-    base = git(parent, "rev-parse", "HEAD")
-    (parent / "changed.py").write_text(
-        "# @dependency-start\n"
-        "# contract implementation\n"
-        "# responsibility Current graph gate fixture.\n"
-        "# upstream design missing-base.md fixture target\n"
-        "# @dependency-end\n"
-        "after\n",
-        encoding="utf-8",
-    )
-    git(parent, "add", "changed.py")
-    git(parent, "commit", "-m", "ExperimentRunner current head")
-    return parent, base
 
 
 def write_graph_result(
@@ -425,6 +355,10 @@ def isolated_current_builder_environment(root: Path) -> dict[str, str]:
     return {
         "AGENT_CANON_TOOLS_HOME": str(root / "agent-canon-tools-home"),
         "CARGO_TARGET_DIR": str(root / "agent-canon-cargo-target"),
+        "AGENT_CANON_RUNTIME_ROOT": str(
+            root.parent / f".{root.name}-agent-canon-runtime"
+        ),
+        "AGENT_CANON_CONTROL_PARENT_ROOT": str(root),
     }
 
 
@@ -877,15 +811,21 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             base = graph_change_fixture(root, {})
-            packet = root / "reports" / "dependency-review" / "changed-paths.json"
+            runtime_root = root.parent / f".{root.name}-agent-canon-runtime"
+            packet = runtime_root / "reports" / "dependency-review" / "changed-paths.json"
 
-            selection = selector.select(
-                root,
-                PROJECT_ROOT,
-                {},
-                trusted_base_sha=base,
-                changed_path_packet=packet,
-            )
+            with patch.dict(
+                os.environ,
+                isolated_current_builder_environment(root),
+                clear=False,
+            ):
+                selection = selector.select(
+                    root,
+                    PROJECT_ROOT,
+                    {},
+                    trusted_base_sha=base,
+                    changed_path_packet=packet,
+                )
 
             self.assertEqual(selection.status, "skipped")
             payload = json.loads(packet.read_text(encoding="utf-8"))
@@ -995,135 +935,6 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
         self.assertEqual(result_error.exception.reason, "graph_identity_invalid")
         self.assertEqual(database_error.exception.reason, "graph_identity_invalid")
 
-    def test_trusted_base_builder_rejects_process_zero_result_one_fixture(self) -> None:
-        """The trusted-base process path rejects a zero/one exit mismatch."""
-        self.base_graph_patch.stop()
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            parent, source_root, base = graph_builder_exit_fixture(
-                Path(tmp_dir),
-                process_exit_code=0,
-                result_exit_code=1,
-            )
-            with patch.object(
-                selector, "selector_source_root", return_value=source_root
-            ):
-                with self.assertRaises(selector.SelectorFailure) as raised:
-                    selector.build_trusted_base_graph(parent, base, source_root)
-
-        self.assertEqual(
-            raised.exception.reason,
-            "trusted_base_graph_exit_code_mismatch",
-        )
-
-    def test_trusted_base_builder_rejects_process_one_result_zero_fixture(self) -> None:
-        """The trusted-base process path rejects a one/zero exit mismatch."""
-        self.base_graph_patch.stop()
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            parent, source_root, base = graph_builder_exit_fixture(
-                Path(tmp_dir),
-                process_exit_code=1,
-                result_exit_code=0,
-            )
-            with patch.object(
-                selector, "selector_source_root", return_value=source_root
-            ):
-                with self.assertRaises(selector.SelectorFailure) as raised:
-                    selector.build_trusted_base_graph(parent, base, source_root)
-
-        self.assertEqual(
-            raised.exception.reason,
-            "trusted_base_graph_exit_code_mismatch",
-        )
-
-    @unittest.skipUnless(
-        shutil.which("cargo"), "cargo is required for the real builder"
-    )
-    def test_real_builder_reads_materialized_derived_parent_base_submodule(
-        self,
-    ) -> None:
-        """The trusted base build uses the exact derived-parent AgentCanon gitlink."""
-        self.base_graph_patch.stop()
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            parent, base, gitlink = derived_parent_graph_fixture(Path(tmp_dir))
-            expected_gitlink = git(
-                parent, "ls-tree", base, "vendor/agent-canon"
-            ).split()[2]
-
-            with patch.dict(
-                os.environ,
-                isolated_current_builder_environment(Path(tmp_dir)),
-                clear=False,
-            ):
-                trusted_base = selector.build_trusted_base_graph(
-                    parent,
-                    base,
-                    PROJECT_ROOT,
-                )
-
-        self.assertEqual(gitlink, expected_gitlink)
-        self.assertEqual(trusted_base.snapshot_head, base)
-        self.assertTrue(trusted_base.verified)
-
-    @unittest.skipUnless(
-        shutil.which("cargo"), "cargo is required for the real builder"
-    )
-    def test_experiment_runner_legacy_pin_reaches_partition_with_current_producer(
-        self,
-    ) -> None:
-        """A legacy base pin builds and exposes a new head diagnostic to partitioning."""
-        self.base_graph_patch.stop()
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            parent, base = experiment_runner_legacy_base_fixture(Path(tmp_dir))
-            legacy_script = (
-                parent
-                / "vendor"
-                / "agent-canon"
-                / "tools"
-                / "agent_tools"
-                / "surface_manifest.py"
-            )
-            self.assertNotIn(
-                "normalized-snapshot", legacy_script.read_text(encoding="utf-8")
-            )
-            graph_result = write_graph_result(
-                parent,
-                ("changed.py",),
-                (),
-                (
-                    source_diagnostic_fixture(
-                        "target-unresolved",
-                        "changed.py",
-                        "missing-base.md",
-                        "upstream",
-                        "design",
-                        "missing target",
-                        message="changed.py:4:missing-base.md",
-                    ),
-                ),
-            )
-
-            with patch.dict(
-                os.environ,
-                isolated_current_builder_environment(Path(tmp_dir)),
-                clear=False,
-            ):
-                acceptance = selector.evaluate_built_graph(
-                    parent,
-                    graph_result,
-                    {},
-                    trusted_base_sha=base,
-                    source_root=PROJECT_ROOT,
-                )
-
-        self.assertEqual(acceptance.status, "fail")
-        self.assertEqual(
-            acceptance.report["trusted_base_graph"]["snapshot_head"],
-            base,
-        )
-        blocking = acceptance.report["blocking_diagnostics"]
-        self.assertEqual(len(blocking), 1)
-        self.assertFalse(blocking[0]["base_match"])
-
     def test_pr_entrypoint_prepares_and_passes_trusted_base(self) -> None:
         """The parent gate wires shallow preparation to the exact selector argument."""
         entrypoint = CHECKER_PATH.read_text(encoding="utf-8")
@@ -1157,7 +968,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
         self.assertIn("dependency_surface_owner=", selection.evidence)
         self.assertIn("changed_paths_sha256=", selection.evidence)
 
-    def test_canonical_maintenance_profile_requires_graph(self) -> None:
+    def test_canonical_source_profile_requires_graph(self) -> None:
         """Strict graph selection comes from the canonical profile inventory."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -1167,14 +978,14 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 root,
                 PROJECT_ROOT,
                 {
-                    "AGENT_CANON_PR_VALIDATION_PROFILE": "maintenance",
+                    "AGENT_CANON_PR_VALIDATION_PROFILE": "source",
                 },
                 trusted_base_sha=base,
             )
 
         self.assertEqual(selection.status, "required")
         self.assertIn("canonical_profile_requires_graph", selection.reason)
-        self.assertIn("graph_profiles=maintenance", selection.evidence)
+        self.assertIn("graph_profiles=source", selection.evidence)
 
     def test_canonical_non_graph_profile_keeps_pin_only_diff_skipped(self) -> None:
         """A known profile with a false canonical requirement does not escalate."""
@@ -1186,13 +997,13 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 root,
                 PROJECT_ROOT,
                 {
-                    "AGENT_CANON_PR_VALIDATION_PROFILE": "agent-runtime",
+                    "AGENT_CANON_PR_VALIDATION_PROFILE": "tool-runtime",
                 },
                 trusted_base_sha=base,
             )
 
         self.assertEqual(selection.status, "skipped")
-        self.assertIn("selected_profiles=agent-runtime", selection.evidence)
+        self.assertIn("selected_profiles=tool-runtime", selection.evidence)
 
     def test_unknown_profile_is_typed_failure(self) -> None:
         """Unknown local profile strings never degrade to a skipped graph gate."""

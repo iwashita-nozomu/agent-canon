@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -31,6 +30,18 @@ try:
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
+try:
+    from tools.agent_tools.runtime_artifacts import (
+        RuntimeArtifactBoundary,
+        RuntimeArtifactError,
+    )
+except ImportError:  # pragma: no cover - direct script loading.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from agent_tools.runtime_artifacts import (  # type: ignore[no-redef]
+        RuntimeArtifactBoundary,
+        RuntimeArtifactError,
+    )
+
 
 def detect_workspace_root() -> Path:
     """Return the repo root even when reached through a symlink view."""
@@ -43,8 +54,7 @@ def detect_workspace_root() -> Path:
     return Path(__file__).absolute().parents[2]
 
 
-# Preserve the template or derived checkout root when this module is imported
-# through a symlinked runtime surface from vendor/agent-canon.
+# Resolve the standalone AgentCanon source checkout for runtime helpers.
 WORKSPACE_ROOT = detect_workspace_root()
 HOST_GH_CONFIG = Path.home() / ".config" / "gh"
 HOST_SSH_DIR = Path.home() / ".ssh"
@@ -769,13 +779,24 @@ def scope_pack_image_tag(pack: ContainerPack, context: LifecycleContext) -> Cont
 def lifecycle_receipt_path(
     workspace_root: Path, receipt: ContainerLifecycleReceipt
 ) -> Path:
-    """Resolve a lifecycle receipt strictly below the selected workspace."""
-    root = workspace_root.resolve()
+    """Resolve a lifecycle receipt strictly below the external runtime root."""
+    root = workspace_root.resolve(strict=True)
+    control_configured = os.environ.get("AGENT_CANON_CONTROL_PARENT_ROOT", "").strip()
+    if not control_configured:
+        raise RuntimeArtifactError(
+            "explicit AGENT_CANON_CONTROL_PARENT_ROOT is required for lifecycle receipts"
+        )
+    control_root = Path(control_configured).expanduser().resolve(strict=True)
+    try:
+        root.relative_to(control_root)
+    except ValueError as exc:
+        raise RuntimeArtifactError(
+            "workspace root must be below AGENT_CANON_CONTROL_PARENT_ROOT"
+        ) from exc
+    boundary = RuntimeArtifactBoundary.for_source(root, create=True)
     configured = os.environ.get("AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT")
     if configured:
-        candidate = Path(configured)
-        if not candidate.is_absolute():
-            candidate = root / candidate
+        candidate = configured
     else:
         task = re.sub(r"[^A-Za-z0-9._-]+", "_", receipt.context.task_id).strip("._")
         operation = re.sub(
@@ -784,23 +805,16 @@ def lifecycle_receipt_path(
         lifecycle = re.sub(
             r"[^A-Za-z0-9._-]+", "_", receipt.context.lifecycle_id
         ).strip("._")
-        candidate = root / ".agent-canon" / "container-lifecycle" / (
+        candidate = Path("container-lifecycle") / (
             f"{operation or 'run'}-{task or 'task'}-{lifecycle or 'lifecycle'}.json"
         )
-    resolved = candidate.resolve(strict=False)
-    try:
-        resolved.relative_to(root)
-    except ValueError as exc:
-        raise ValueError(
-            "AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT must remain below workspace root"
-        ) from exc
-    return resolved
+    return boundary.resolve(candidate)
 
 
 def write_lifecycle_receipt(
     workspace_root: Path, receipt: ContainerLifecycleReceipt
 ) -> Path:
-    """Atomically publish one receipt through the authenticated parent boundary."""
+    """Atomically publish one receipt through the external runtime boundary."""
     target = lifecycle_receipt_path(workspace_root, receipt)
     if target.is_file():
         try:
@@ -812,32 +826,15 @@ def write_lifecycle_receipt(
         existing_mapping = cast(Mapping[str, object], existing)
         if existing_mapping.get("lifecycle_id") != receipt.context.lifecycle_id:
             raise ValueError(f"lifecycle receipt collision at {target}")
-    boundary_path = Path(__file__).resolve().parents[1] / "agent_tools" / "parent_root_side_effects.py"
-    spec = importlib.util.spec_from_file_location(
-        "agent_canon_parent_root_side_effects", boundary_path
-    )
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"parent side-effect boundary is unavailable: {boundary_path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    boundary = module.ParentRootSideEffectBoundary()
-    request = module.ParentRootAttestationRequest(
-        cwd=workspace_root,
-        explicit_root=workspace_root,
-        purpose="container-lifecycle-receipt",
-    )
-    attestation = boundary.attest(request)
     payload = (json.dumps(receipt.as_json(), sort_keys=True, indent=2) + "\n").encode(
         "utf-8"
     )
-    boundary.write_parent_owned_file(
-        attestation,
-        target.relative_to(workspace_root.resolve()),
-        payload,
-        "container-lifecycle-receipt",
+    boundary = RuntimeArtifactBoundary.for_source(
+        workspace_root.resolve(strict=True),
+        os.environ.get("AGENT_CANON_RUNTIME_ROOT"),
+        create=True,
     )
-    return target
+    return boundary.atomic_write_bytes(target, payload)
 
 
 class ContainerLifecycleBoundary:

@@ -946,32 +946,32 @@ required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
 [[evals.checklist]]
 id = "ROOT-AGENTS-SHARED-SEARCH-1"
 critical = true
-description = "Routes search, read scope, and reuse survey to deterministic owner surfaces."
-required_regex = ["search, read scope, and reuse survey", "semantic-index", "search.py", "dependency review artifacts"]
+description = "Routes implementation, runtime, and validation reading through canonical owner surfaces."
+required_regex = ["Reader Map", "implementation and review basis", "shared tool runtime lifecycle", "validation and closeout"]
 
 [[evals.checklist]]
 id = "ROOT-AGENTS-SHARED-PUBLISH-1"
 critical = true
-description = "Routes shared AgentCanon update and PR evidence through update/sync owner surfaces."
-required_regex = ["shared AgentCanon update", "update_agent_canon\\.sh", "sync_agent_canon\\.sh", "AgentCanon PR workflow", "agentcanon_structure_followup"]
+description = "Routes standalone source publication and eval evidence through explicit owner surfaces."
+required_regex = ["source update and PR lifecycle", "agents/workflows/agent-canon-pr-workflow\\.md", "eval collection and archive publication", "iwashita-nozomu/agent-canon-log"]
 
 [[evals]]
 id = "agent-canon-pr-gh-publish-workflow"
 target = "agents/workflows/agent-canon-pr-workflow.md"
 kind = "workflow"
-description = "The AgentCanon PR workflow binds one typed PR lifecycle to candidate CAS and publication readback."
+description = "The AgentCanon PR workflow binds standalone source ownership to qualified PR and main readback."
 
 [[evals.checklist]]
 id = "AGENT-CANON-PR-GH-PUBLISH-1"
 critical = true
-description = "Requires the canonical adapter, typed topology, immutable permission identity, and retained PR Essence."
-required_regex = ["tools/agent_tools/github_publish\\.py", "PullRequestLifecycle", "user\\|fork\\|contributor", "permission", "PR Essence", "contributor diff"]
+description = "Requires a qualified standalone source clone, Issue, branch, PR, merge, and main readback."
+required_regex = ["standalone source repository", "workspace/agent-canondevelop/<qualified-task>/agent-canon", "iwashita-nozomu/agent-canon#<number>", "source branch, PR, merge, and main readback"]
 
 [[evals.checklist]]
 id = "AGENT-CANON-PR-GH-PUBLISH-2"
 critical = true
-description = "Separates candidate CAS from publication readback and hands one queue receipt to the frontier."
-required_regex = ["CandidateCasReceipt", "PublicationReadbackReceipt", "QueueReceipt", "DependencyFrontier", "parent pin/root sync before accepted frontier"]
+description = "Requires runtime/source evidence and exact cleanup without a parent projection."
+required_regex = ["source status/content is unchanged", "task-owned containers/images/runtime paths are absent", "no AgentCanon vendor/submodule/root projection"]
 
 [[evals]]
 id = "agents-readme-routing-entrypoint"
@@ -1921,24 +1921,6 @@ description = "Documents the PR and branch-push improvement guide tool."
 required_regex = ["generate_agent_improvement_guide\\.py", "mounted runtime hook archive", "issues/open\\|closed/", "read-only evidence"]
 
 [[evals]]
-id = "documents-tools-readme-prompt-eval-audit"
-target = "documents/tools/README.md"
-kind = "tool-doc"
-description = "The human-facing tool index must document prompt eval manifest audit closeout gates."
-
-[[evals.checklist]]
-id = "DOCS-TOOLS-EVAL-AUDIT-1"
-critical = true
-description = "Requires prompt eval audit status and duplicate-growth candidate wording."
-required_regex = ["EVAL_AUDIT_STATUS=pass", "EVAL_GROWTH_CANDIDATES=0", "duplicate eval IDs", "duplicate explicit targets", "duplicate checklist IDs"]
-
-[[evals.checklist]]
-id = "DOCS-TOOLS-EVAL-ACCUMULATE-1"
-critical = true
-description = "Requires unique accumulated prompt eval report naming."
-required_regex = ["--accumulate", ".agent-canon/log-archive/eval-results/skill-workflow-prompt/", "<eval_run_id>-<status>-<skill-slug>\\.md", "skill-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>"]
-
-[[evals]]
 id = "agent-log-analysis-canonical-dashboard-api-skill"
 target = ".agents/skills/agent-log-analysis/SKILL.md"
 canonical_target = "agents/skills/agent-log-analysis.md"
@@ -2084,43 +2066,43 @@ id = "agent-canon-update-routing"
 target = ".agents/skills/agent-canon-update/SKILL.md"
 canonical_target = "agents/skills/agent-canon-update.md"
 kind = "skill"
-description = "The runtime AgentCanon update skill must route parent pin updates, source PR work, root-view repair, and update TODO state through the canonical high-level commands."
+description = "The runtime AgentCanon update skill routes standalone source work through the shared bootstrap and qualified PR lifecycle."
 
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-SHIM-1"
 critical = true
-description = "Requires the high-level parent latest route, named structure follow-up gate, and root-view verification commands."
-required_regex = ["make agent-canon-ensure-latest", "make agent-canon-update-plan", "agentcanon_structure_followup=required", "agentcanon_structure_followup=pass", "python3 -m agent_tools\\.agent_canon_source_root exec tools/sync_agent_canon\\.sh link-root", "python3 -m agent_tools\\.agent_canon_source_root exec tools/sync_agent_canon\\.sh check", "sync_agent_canon\\.sh"]
+description = "Requires explicit shared bootstrap roots and target registration."
+required_regex = ["bootstrap\\.sh", "--control-parent-root", "--runtime-root", "target add", "tool run --root <project-root> <verified-catalog-id>"]
 
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-SHIM-2"
 critical = true
-description = "Separates another topic's vendor ownership from collision-safe local materialization and clean parent pin projection while retaining the standalone source publication route."
-required_regex = ["Dirty state\\s+remains evidence, not a blocker", "ignored untracked paths", "virtual merge result tree", "independently typed merge conflict", "unpreservable materialization\\s+collision", "exact update write set", "dependency-module", "prepare --topic", "--module", "--branch", "workspace/<topic-slug>/agent-canon", "clean vendor pin projection", "source branch/PR", "\\$agent-update-branch"]
+description = "Keeps AgentCanon standalone and uses a qualified disposable development clone without restoring vendor state."
+required_regex = ["workspace/agent-canondevelop/<qualified-task>/agent-canon", "Do not restore a", "submodule", "source branch", "AgentCanon PR", "iwashita-nozomu/agent-canon#"]
 
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-SHIM-3"
 critical = true
-description = "Requires parent update TODO state handling before unrelated work."
-required_regex = ["agent_canon_update_todos\\.py status", "agent_canon_update_todos\\.py plan --write", "before unrelated work"]
+description = "Requires external eval/archive evidence and exact resource cleanup."
+required_regex = ["eval collect", "eval sync", "iwashita-nozomu/agent-canon-log", "source tree unchanged", "docker system prune", "exact task-owned resources"]
 
 [[evals]]
 id = "agent-canon-update-route-doc"
 target = "agents/skills/agent-canon-update.md"
 kind = "skill-doc"
-description = "The AgentCanon update consumer must point to the canonical transaction and source-to-parent frontier."
+description = "The AgentCanon update owner documents the standalone source, bootstrap, archive, and publication frontier."
 
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-DOC-1"
 critical = true
-description = "Consumes the canonical front door and append-only source transaction receipts."
-required_regex = ["documents/agent-canon/agent-canon-update-route\\.md", "tools/update_agent_canon\\.sh", "SourceMainRebindReceipt", "PullRequestLifecycle", "source-main readback", "G1-G6"]
+description = "Consumes the standalone bootstrap and runtime/archive owners."
+required_regex = ["documents/runtime/bootstrap-runtime\\.md", "CONTAINER_OPERATIONS\\.md", "runtime-log-archive\\.md", "agent-canon-pr-workflow\\.md"]
 
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-DOC-2"
 critical = true
-description = "Queues source publication once and blocks parent projection until the ordered frontier is accepted."
-required_regex = ["QueueReceipt", "DependencyFrontier", "#388 -> #389 -> current transaction", "accepted-frontier evidence before", "parent pin/root projection", "no parent projection"]
+description = "Publishes the owning source PR before any parent consumption and keeps Issue identities qualified."
+required_regex = ["Commit with the owning Issue reference", "push the topic branch", "open/update", "After merge", "Only then update a parent revision", "iwashita-nozomu/agent-canon#"]
 
 [[evals]]
 id = "p5-generated-runtime-profile-projection"

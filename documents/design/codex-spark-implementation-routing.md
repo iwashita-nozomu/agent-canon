@@ -4,7 +4,6 @@ contract design
 responsibility Defines Target-State-First Spark implementation routing and model/profile-specific prompt materialization.
 upstream design ../README.md design-document index and canonical design ownership
 upstream design dependency-manifest-design.md dependency evidence and header contract
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md AgentCanon source/view ownership
 upstream design ../conventions/object-oriented-design.md OOP responsibility and dependency-direction rules
 upstream design ../runtime/runtime-profiles-and-check-matrix.md validation profile and closeout routing
 upstream design ../../agents/task_catalog.yaml workflow activation and role topology

@@ -28,17 +28,27 @@ does not prove the claim. Its output status is
 formalization without placeholders such as `<FORMAL_TARGET>`, `sorry`, or
 `Admitted`.
 
-Use it from the repository root:
+Use it from the repository root.  Writing a scaffold is an explicit runtime
+operation: choose a runtime root outside the checkout and place `--out-dir`
+below that root.  There is no source-local `reports/` fallback.
 
 ```bash
+RUNTIME_ROOT=/abs/path/to/workspace/agent-canon-runtime/<run>
 python3 tools/agent_tools/formal_proof.py \
-  --claim-file reports/formal-proof/claim.md \
+  --claim-file /path/to/claim.md \
   --target lean \
   --domain "linear algebra" \
   --name spd_quadratic_form_positive \
-  --out-dir reports/formal-proof/spd \
+  --runtime-root "$RUNTIME_ROOT" \
+  --out-dir tasks/formal-proof/spd \
   --format markdown
 ```
+
+`--out-dir` may also be an absolute path, but it must resolve below
+`--runtime-root` (or `AGENT_CANON_RUNTIME_ROOT`) and outside the AgentCanon
+checkout.  A write request without that external capability fails before any
+directory is created.  The read-only planner route can omit `--out-dir` and
+prints the plan to stdout.
 
 The output directory contains:
 
@@ -57,7 +67,8 @@ python3 tools/agent_tools/formal_proof.py \
   --python-symbol path/to/algorithm.py::<implementation_symbol> \
   --target lean \
   --domain "<mathematical domain>" \
-  --out-dir reports/formal-proof/<topic> \
+  --runtime-root "$RUNTIME_ROOT" \
+  --out-dir tasks/formal-proof/<topic> \
   --format markdown
 ```
 
@@ -67,11 +78,11 @@ summary, and additional obligations for extracted branch and return-expression
 structure. These fields are provenance and planning evidence only, not proof
 evidence.
 
-To keep the trace when a project is distributed as a Python library, write the
-output directory inside the package tree or copy the generated
-`*_proof_trace.py` file into a package module. Python source files are retained
-by ordinary setuptools package discovery, so downstream users can import the
-trace after installing the wheel:
+The generated trace is runtime evidence.  The formal-proof tool never writes
+it into a project package or the AgentCanon checkout.  If a project later
+decides to retain a checked trace as package data, that is a separate,
+explicit project-owned mutation after review; copy only the selected artifact
+and record its checker receipt.
 
 ```python
 from my_package.proof_traces.spd_quadratic_form_positive_proof_trace import (
@@ -96,10 +107,19 @@ Python trace module avoids that extra packaging requirement.
 The generated query files are inputs for `$formal-proof-workflow` and
 `$literature-survey`. Search formal libraries and existing proofs before writing
 new lemmas. Verification authority remains with the target checker command
-reported in the plan, for example `python3
-tools/agent_tools/lean_proof_env.py check-file --env-dir
-reports/formal-proof/lean-proof-env --lean-file <stub>.lean --execute`,
-`isabelle process`, `coqc`, `z3`, or `cvc5`. Lean stubs should use the
+reported in the plan, for example:
+
+```bash
+python3 tools/agent_tools/lean_proof_env.py check-file \
+  --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" \
+  --lean-file "$RUNTIME_ROOT/tasks/formal-proof/spd/spd_quadratic_form_positive.lean" \
+  --execute
+```
+
+The Lean environment and its cache are runtime state and must use that same
+external root; do not pass a checkout-local `reports/`, `target/`, or package
+directory as `--env-dir`.  Other checker routes are `isabelle process`,
+`coqc`, `z3`, or `cvc5`.  Lean stubs should use the
 AgentCanon Mathlib/Aesop proof environment unless the theorem package itself
 owns a Mathlib-based theory.
 

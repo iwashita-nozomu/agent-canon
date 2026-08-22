@@ -25,12 +25,26 @@ from runtime_log_paths import mounted_log_archive_root  # noqa: E402
 class GenerateAgentImprovementGuideTest(unittest.TestCase):
     """Verify deterministic guide output from accumulated evidence."""
 
+    def setUp(self) -> None:
+        self._runtime_temp = tempfile.TemporaryDirectory()
+        self._previous_runtime = os.environ.get("AGENT_CANON_RUNTIME_ROOT")
+        self.runtime_root = Path(self._runtime_temp.name) / "runtime"
+        self.runtime_root.mkdir()
+        os.environ["AGENT_CANON_RUNTIME_ROOT"] = str(self.runtime_root)
+
+    def tearDown(self) -> None:
+        if self._previous_runtime is None:
+            os.environ.pop("AGENT_CANON_RUNTIME_ROOT", None)
+        else:
+            os.environ["AGENT_CANON_RUNTIME_ROOT"] = self._previous_runtime
+        self._runtime_temp.cleanup()
+
     def test_generates_guidance_from_issues_eval_memory_and_hook_logs(self) -> None:
         """The guide should summarize every evidence family."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
-            output = root / "reports" / "guide.md"
+            output = self.runtime_root / "reports" / "guide.md"
 
             result = subprocess.run(
                 [
@@ -45,6 +59,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
             guide = output.read_text(encoding="utf-8")
 
@@ -93,40 +108,12 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn("memory/records", guide)
         self.assertIn("Local Codex", guide)
 
-    def test_resolves_vendored_agentcanon_root_from_parent_repo(self) -> None:
-        """Parent-root invocation should use vendored AgentCanon evidence."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            parent_root = Path(temp_dir)
-            canon_root = parent_root / "vendor" / "agent-canon"
-            self.write_fixture(canon_root)
-            output = parent_root / "reports" / "guide.md"
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--root",
-                    str(parent_root),
-                    "--out",
-                    str(output),
-                ],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            guide = output.read_text(encoding="utf-8")
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(f"evidence_root: `{canon_root.resolve().as_posix()}`", guide)
-        self.assertIn("open_issues: `1`", guide)
-        self.assertIn("hook_status_counts: `{'warn': 1, 'pass': 4}`", guide)
-
     def test_skill_routing_gap_ignores_pre_cutover_skill_logs(self) -> None:
         """Skill source updates should archive older routing signals from gap math."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_cutover_fixture(root)
-            output = root / "reports" / "guide.md"
+            output = self.runtime_root / "reports" / "guide.md"
 
             result = subprocess.run(
                 [
@@ -141,6 +128,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             guide = output.read_text(encoding="utf-8")
 
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -156,7 +144,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_cutover_fixture(root, include_post_cutover=True)
-            output = root / "reports" / "guide.md"
+            output = self.runtime_root / "reports" / "guide.md"
 
             result = subprocess.run(
                 [
@@ -171,6 +159,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             guide = output.read_text(encoding="utf-8")
 
         self.assertEqual(result.returncode, 0, result.stderr)

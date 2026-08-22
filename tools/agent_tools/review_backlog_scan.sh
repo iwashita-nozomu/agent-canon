@@ -15,7 +15,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENT_CANON_SOURCE_ROOT="$(realpath -m "$SCRIPT_DIR/../..")"
 ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 REPORT_DIR=""
-SCOPE_MODE="submodule-aware"
+RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT:-}"
+CONTROL_ROOT="${AGENT_CANON_CONTROL_PARENT_ROOT:-}"
+SCOPE_MODE="root-only"
 FAIL_ON_FINDINGS=0
 SEMANTIC_QUERY_FILE=""
 SEMANTIC_TOP_K=20
@@ -27,11 +29,90 @@ SEMANTIC_LLM_DIM="${AGENT_CANON_SEMANTIC_INDEX_LLM_DIM:-0}"
 SEMANTIC_LLM_BATCH="${AGENT_CANON_SEMANTIC_INDEX_LLM_BATCH:-16}"
 declare -a REQUESTED_CHECKS=()
 
+fail_runtime_boundary() {
+  echo "REVIEW_BACKLOG_SCAN=fail reason=$1" >&2
+  exit 2
+}
+
+require_runtime_boundary() {
+  [[ -n "$RUNTIME_ROOT" ]] || fail_runtime_boundary "runtime_root_required"
+  [[ -n "$CONTROL_ROOT" ]] || fail_runtime_boundary "control_root_required"
+  [[ -d "$CONTROL_ROOT" ]] || fail_runtime_boundary "control_root_missing"
+  python3 - "$AGENT_CANON_SOURCE_ROOT" "$ROOT_DIR" "$CONTROL_ROOT" "$RUNTIME_ROOT" <<'PY'
+from pathlib import Path
+import sys
+
+source, root, control, runtime = map(Path, sys.argv[1:])
+sys.path.insert(0, str(source / "tools" / "agent_tools"))
+from runtime_artifacts import (
+    RuntimeArtifactBoundary,
+    RuntimeArtifactError,
+)
+
+try:
+    source = source.resolve(strict=True)
+    root = root.resolve(strict=True)
+    control = control.resolve(strict=True)
+    # This is a preflight only.  Do not create the runtime root until every
+    # caller-controlled output override has been validated below.
+    boundary = RuntimeArtifactBoundary.for_source(source, runtime, create=False)
+    runtime_resolved = boundary.root
+    if runtime_resolved == root or root in runtime_resolved.parents:
+        raise RuntimeArtifactError("runtime root must be outside target repository")
+    try:
+        root.relative_to(control)
+    except ValueError as exc:
+        raise RuntimeArtifactError("target repository is outside control root") from exc
+except (OSError, RuntimeArtifactError, ValueError) as exc:
+    print(f"runtime boundary invalid: {exc}", file=sys.stderr)
+    raise SystemExit(2)
+print(runtime_resolved)
+PY
+}
+
+runtime_path() {
+  local candidate="$1"
+  python3 - "$AGENT_CANON_SOURCE_ROOT" "$ROOT_DIR" "$RUNTIME_ROOT" "$candidate" <<'PY'
+from pathlib import Path
+import sys
+
+source, root, runtime, candidate = map(Path, sys.argv[1:])
+sys.path.insert(0, str(source / "tools" / "agent_tools"))
+from runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
+
+try:
+    # Path validation must be side-effect free.  In particular, an invalid
+    # report/target/CLI override must not create the runtime root first.
+    boundary = RuntimeArtifactBoundary.for_source(source, runtime, create=False)
+    resolved_root = root.resolve(strict=True)
+    target = boundary.resolve(candidate)
+    if target == resolved_root or resolved_root in target.parents:
+        raise RuntimeArtifactError("runtime artifact must not be inside target repository")
+except (OSError, RuntimeArtifactError, ValueError) as exc:
+    print(f"runtime path invalid: {exc}", file=sys.stderr)
+    raise SystemExit(2)
+print(target)
+PY
+}
+
+materialize_runtime_boundary() {
+  python3 - "$AGENT_CANON_SOURCE_ROOT" "$RUNTIME_ROOT" <<'PY'
+from pathlib import Path
+import sys
+
+source, runtime = map(Path, sys.argv[1:])
+sys.path.insert(0, str(source / "tools" / "agent_tools"))
+from runtime_artifacts import RuntimeArtifactBoundary
+
+RuntimeArtifactBoundary.for_source(source, runtime, create=True)
+PY
+}
+
 usage() {
   cat <<'EOF'
 Usage:
   review_backlog_scan.sh [--root DIR] [--report-dir DIR]
-                         [--submodule-aware|--root-only|--agentcanon-only]
+                         [--root-only]
                          [--semantic-query-file FILE]
                          [--semantic-top-k N] [--semantic-min-score SCORE]
                          [--semantic-llm-provider NAME --semantic-llm-model NAME]
@@ -39,7 +120,7 @@ Usage:
                          [--check NAME ...] [--fail-on-findings]
 
 Runs integrated review scans and writes JSON/Markdown/log artifacts under REPORT_DIR.
-Default scope is --submodule-aware. Default checks are all checks.
+The selected checkout is the only scan scope. Default checks are all checks.
 
 Checks:
   inventory, stale, code-dependencies, dependency-review, oop,
@@ -57,16 +138,8 @@ while [[ $# -gt 0 ]]; do
       REPORT_DIR="$2"
       shift 2
       ;;
-    --submodule-aware)
-      SCOPE_MODE="submodule-aware"
-      shift
-      ;;
     --root-only)
       SCOPE_MODE="root-only"
-      shift
-      ;;
-    --agentcanon-only)
-      SCOPE_MODE="agentcanon-only"
       shift
       ;;
     --check)
@@ -121,27 +194,32 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-ROOT_DIR="$(realpath -m "$ROOT_DIR")"
+ROOT_DIR="$(realpath -e "$ROOT_DIR")" || fail_runtime_boundary "target_root_missing"
+CONTROL_ROOT="$(realpath -e "$CONTROL_ROOT")" || fail_runtime_boundary "control_root_missing"
+RUNTIME_ROOT="$(require_runtime_boundary)" || exit $?
+export AGENT_CANON_RUNTIME_ROOT="$RUNTIME_ROOT"
+export AGENT_CANON_CONTROL_PARENT_ROOT="$CONTROL_ROOT"
 if [[ -z "$REPORT_DIR" ]]; then
-  REPORT_DIR="$ROOT_DIR/reports/agents/review-backlog-scan"
+  REPORT_DIR="reports/review-backlog-scan"
 fi
-REPORT_DIR="$(realpath -m "$REPORT_DIR")"
+REPORT_DIR="$(runtime_path "$REPORT_DIR")"
 if [[ -n "$SEMANTIC_QUERY_FILE" ]]; then
   SEMANTIC_QUERY_FILE="$(realpath -m "$SEMANTIC_QUERY_FILE")"
 fi
-TOOL_DIR="$ROOT_DIR/tools/agent_tools"
-BOUNDARY_SCRIPT="$TOOL_DIR/parent_root_side_effects.py"
-if [[ ! -f "$BOUNDARY_SCRIPT" ]]; then
-  BOUNDARY_SCRIPT="$AGENT_CANON_SOURCE_ROOT/tools/agent_tools/parent_root_side_effects.py"
+TOOL_DIR="$AGENT_CANON_SOURCE_ROOT/tools/agent_tools"
+REVIEW_SCAN_TARGET_DIR="${AGENT_CANON_REVIEW_SCAN_TARGET_DIR:-review-scan-target}"
+REVIEW_SCAN_TARGET_DIR="$(runtime_path "$REVIEW_SCAN_TARGET_DIR")"
+if [[ -n "${AGENT_CANON_CLI:-}" ]]; then
+  AGENT_CANON_CLI="$(realpath -e "$AGENT_CANON_CLI")" || fail_runtime_boundary "agent_canon_cli_missing"
+else
+  AGENT_CANON_CLI="$(command -v agent-canon || true)"
 fi
-REVIEW_SCAN_TARGET_DIR="${AGENT_CANON_REVIEW_SCAN_TARGET_DIR:-$ROOT_DIR/.agent-canon/cache/review-scan-target}"
-REVIEW_SCAN_TARGET_DIR="$(python3 "$BOUNDARY_SCRIPT" resolve \
-  --root "$ROOT_DIR" --candidate "$REVIEW_SCAN_TARGET_DIR" \
-  --purpose "review-backlog-scan-target")"
+# All host-side Python checks are read-only with respect to the source tree.
+# Their reports and caches are already redirected to the external runtime.
+export PYTHONDONTWRITEBYTECODE=1
+materialize_runtime_boundary
+mkdir -p "$REPORT_DIR"
 REVIEW_SCAN_TARGET_READY=0
-REPORT_DIR="$(python3 "$BOUNDARY_SCRIPT" ensure-dir \
-  --root "$ROOT_DIR" --candidate "$REPORT_DIR" \
-  --purpose "review-backlog-scan-report")"
 REPORT="$REPORT_DIR/review_backlog_scan.md"
 COMMAND_STATUS="$REPORT_DIR/review_backlog_scan_status.tsv"
 NONZERO_COMMANDS=0
@@ -171,33 +249,11 @@ has_check() {
 }
 
 scope_args() {
-  case "$SCOPE_MODE" in
-    root-only) printf '%s\n' "--root-only" ;;
-    agentcanon-only) printf '%s\n' "--agentcanon-only" ;;
-    *) printf '%s\n' "--submodule-aware" ;;
-  esac
+  printf '%s\n' "--root-only"
 }
 
 scope_roots() {
-  local canon_root="$ROOT_DIR/vendor/agent-canon"
-  case "$SCOPE_MODE" in
-    root-only)
-      printf 'root\t%s\n' "$ROOT_DIR"
-      ;;
-    agentcanon-only)
-      if [[ -d "$canon_root" ]]; then
-        printf 'agentcanon\t%s\n' "$canon_root"
-      else
-        printf 'agentcanon\t%s\n' "$ROOT_DIR"
-      fi
-      ;;
-    *)
-      printf 'root\t%s\n' "$ROOT_DIR"
-      if [[ -d "$canon_root" ]]; then
-        printf 'agentcanon\t%s\n' "$canon_root"
-      fi
-      ;;
-  esac
+  printf 'root\t%s\n' "$ROOT_DIR"
 }
 
 record_command() {
@@ -216,62 +272,21 @@ record_command() {
 
 ensure_review_scan_target() {
   if [[ "$REVIEW_SCAN_TARGET_READY" -eq 0 ]]; then
-    REVIEW_SCAN_TARGET_DIR="$(python3 "$BOUNDARY_SCRIPT" ensure-dir \
-      --root "$ROOT_DIR" --candidate "$REVIEW_SCAN_TARGET_DIR" \
-      --purpose "review-backlog-scan-target")"
+    mkdir -p "$REVIEW_SCAN_TARGET_DIR"
     REVIEW_SCAN_TARGET_READY=1
   fi
 }
 
 run_agent_canon() {
-  if command -v cargo >/dev/null 2>&1 && [[ -f "$AGENT_CANON_SOURCE_ROOT/rust/agent-canon/Cargo.toml" ]]; then
-    ensure_review_scan_target
+  ensure_review_scan_target
+  if [[ -z "$AGENT_CANON_CLI" || ! -x "$AGENT_CANON_CLI" ]]; then
+    echo "REVIEW_BACKLOG_SCAN=fail reason=runtime_cli_missing path=$AGENT_CANON_CLI" >&2
+    return 127
+  fi
+  AGENT_CANON_RUNTIME_ROOT="$RUNTIME_ROOT" \
+    AGENT_CANON_CONTROL_PARENT_ROOT="$CONTROL_ROOT" \
     CARGO_TARGET_DIR="$REVIEW_SCAN_TARGET_DIR" \
-      cargo run --quiet --manifest-path "$AGENT_CANON_SOURCE_ROOT/rust/agent-canon/Cargo.toml" -- "$@"
-    return
-  fi
-  if command -v cargo >/dev/null 2>&1 && [[ -f "$ROOT_DIR/rust/agent-canon/Cargo.toml" ]]; then
-    ensure_review_scan_target
-    CARGO_TARGET_DIR="$REVIEW_SCAN_TARGET_DIR" \
-      cargo run --quiet --manifest-path "$ROOT_DIR/rust/agent-canon/Cargo.toml" -- "$@"
-    return
-  fi
-  if command -v cargo >/dev/null 2>&1 && [[ -f "$ROOT_DIR/vendor/agent-canon/rust/agent-canon/Cargo.toml" ]]; then
-    ensure_review_scan_target
-    CARGO_TARGET_DIR="$REVIEW_SCAN_TARGET_DIR" \
-      cargo run --quiet --manifest-path "$ROOT_DIR/vendor/agent-canon/rust/agent-canon/Cargo.toml" -- "$@"
-    return
-  fi
-  if command -v agent-canon >/dev/null 2>&1; then
-    if agent-canon semantic-index help 2>/dev/null \
-      | grep -Eq 'embed-provider.*context-pack.*compare-providers.*eval-output|context-pack.*embed-provider.*compare-providers.*eval-output'; then
-      agent-canon "$@"
-      return
-    fi
-  fi
-  if [[ -x "$AGENT_CANON_SOURCE_ROOT/rust/agent-canon/target/debug/agent-canon" ]]; then
-    if "$AGENT_CANON_SOURCE_ROOT/rust/agent-canon/target/debug/agent-canon" semantic-index help 2>/dev/null \
-      | grep -Eq 'embed-provider.*context-pack.*compare-providers.*eval-output|context-pack.*embed-provider.*compare-providers.*eval-output'; then
-      "$AGENT_CANON_SOURCE_ROOT/rust/agent-canon/target/debug/agent-canon" "$@"
-      return
-    fi
-  fi
-  if [[ -x "$ROOT_DIR/rust/agent-canon/target/debug/agent-canon" ]]; then
-    if "$ROOT_DIR/rust/agent-canon/target/debug/agent-canon" semantic-index help 2>/dev/null \
-      | grep -Eq 'embed-provider.*context-pack.*compare-providers.*eval-output|context-pack.*embed-provider.*compare-providers.*eval-output'; then
-      "$ROOT_DIR/rust/agent-canon/target/debug/agent-canon" "$@"
-      return
-    fi
-  fi
-  if [[ -x "$ROOT_DIR/vendor/agent-canon/rust/agent-canon/target/debug/agent-canon" ]]; then
-    if "$ROOT_DIR/vendor/agent-canon/rust/agent-canon/target/debug/agent-canon" semantic-index help 2>/dev/null \
-      | grep -Eq 'embed-provider.*context-pack.*compare-providers.*eval-output|context-pack.*embed-provider.*compare-providers.*eval-output'; then
-      "$ROOT_DIR/vendor/agent-canon/rust/agent-canon/target/debug/agent-canon" "$@"
-      return
-    fi
-  fi
-  echo "agent-canon CLI unavailable for ROOT_DIR=$ROOT_DIR" >&2
-  return 127
+    "$AGENT_CANON_CLI" "$@"
 }
 
 run_inventory() {
@@ -331,9 +346,6 @@ run_scope_checks() {
     [[ -n "$scope_name" && -n "$scope_root" ]] || continue
     paths=(python include src tools tests mcp)
     excludes=(--exclude reports --exclude legacy)
-    if [[ "$scope_name" == "root" ]]; then
-      excludes+=(--exclude vendor)
-    fi
     if has_check code-dependencies; then
       record_command \
         "code-dependencies:${scope_name}" \
@@ -346,13 +358,16 @@ run_scope_checks() {
       record_command \
         "dependency-review:${scope_name}" \
         "$REPORT_DIR/dependency_review_${scope_name}.txt" \
-        bash "$TOOL_DIR/run_repo_dependency_review.sh" --root "$scope_root" --fail-missing
+        bash "$TOOL_DIR/run_repo_dependency_review.sh" \
+          --root "$scope_root" \
+          --report-dir "$REPORT_DIR/dependency-review-${scope_name}" \
+          --fail-missing
     fi
     if has_check oop; then
       record_command \
         "oop-python:${scope_name}" \
         "$REPORT_DIR/oop_python_readability_${scope_name}.md" \
-        python3 "$ROOT_DIR/tools/oop/python/readability.py" \
+        python3 "$AGENT_CANON_SOURCE_ROOT/tools/oop/python/readability.py" \
           --root "$scope_root" \
           --format markdown \
           --include-snippets \
@@ -362,7 +377,7 @@ run_scope_checks() {
       record_command \
         "oop-cpp:${scope_name}" \
         "$REPORT_DIR/oop_cpp_readability_${scope_name}.md" \
-        python3 "$ROOT_DIR/tools/oop/cpp/readability.py" \
+        python3 "$AGENT_CANON_SOURCE_ROOT/tools/oop/cpp/readability.py" \
           --root "$scope_root" \
           --format markdown \
           --include-snippets \
@@ -514,8 +529,8 @@ write_report() {
 <!--
 @dependency-start
 responsibility Records integrated review backlog scan output.
-upstream implementation ../../../../vendor/agent-canon/tools/agent_tools/review_backlog_scan.sh generates this report
-upstream implementation ../../../../vendor/agent-canon/tools/agent_tools/file_surface_inventory.py generates inventory artifacts
+upstream implementation ../../tools/agent_tools/review_backlog_scan.sh generates this report
+upstream implementation ../../tools/agent_tools/file_surface_inventory.py generates inventory artifacts
 @dependency-end
 -->
 

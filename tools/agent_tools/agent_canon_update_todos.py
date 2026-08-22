@@ -49,7 +49,9 @@ DEFAULT_MANIFEST = Path("documents/agent-canon/agent-canon-update-tasks.toml")
 DEFAULT_STATE_PATH = Path(".agent-canon/update-state.toml")
 DEFAULT_GENERATED_PATH = Path(".agent-canon/update-todos.generated.md")
 DEFAULT_PENDING_JSON_PATH = Path(".agent-canon/update-todos.pending.json")
-DEFAULT_PREFIX = Path("vendor/agent-canon")
+# A parent selects its ignored development clone explicitly.  The standalone
+# source checkout may use ``.``; no vendor/submodule path is inferred.
+DEFAULT_PREFIX = Path(".")
 STATE_TABLE = "agent_canon_update"
 
 
@@ -255,7 +257,9 @@ class Paths:
         canon_root = (root / prefix).resolve()
         manifest = Path(args.manifest) if args.manifest else DEFAULT_MANIFEST
         if not canon_root.exists():
-            canon_root = root
+            raise RuntimeError(
+                f"agent_canon_update_source_missing: {canon_root}"
+            )
         return cls(
             root=root,
             canon_root=canon_root,
@@ -368,14 +372,9 @@ def string_key_mapping(value: object) -> Mapping[str, object] | None:
 
 
 def parent_target_commit(paths: Paths, explicit_target: str) -> str:
-    """Return the AgentCanon commit the parent repo currently targets."""
+    """Return the selected external AgentCanon checkout commit."""
     if explicit_target:
         return explicit_target
-    parent_git = Git(paths.root)
-    submodule_ref = f"HEAD:{paths.prefix.as_posix()}"
-    submodule_commit = parent_git.output("rev-parse", submodule_ref, check=False)
-    if submodule_commit:
-        return submodule_commit
     return Git(paths.canon_root).output("rev-parse", "HEAD")
 
 
@@ -619,8 +618,8 @@ def render_state(state: UpdateState) -> str:
         "# @dependency-start",
         "# contract data",
         "# responsibility Tracks this parent repo's applied AgentCanon update TODO boundary.",
-        "# upstream design ../vendor/agent-canon/documents/agent-canon/agent-canon-parent-repo-latest-checklist.md parent update workflow",
-        "# upstream design ../vendor/agent-canon/documents/agent-canon/agent-canon-update-tasks.toml shared update TODO manifest",
+        "# upstream design AgentCanon source checkout documents/agent-canon/agent-canon-parent-repo-latest-checklist.md parent update workflow",
+        "# upstream design AgentCanon source checkout documents/agent-canon/agent-canon-update-tasks.toml shared update TODO manifest",
         "# downstream implementation ../tools/agent_tools/agent_canon_update_todos.py advances this state",
         "# @dependency-end",
         "",
@@ -771,8 +770,8 @@ def run_plan(paths: Paths, target_commit: str, *, write: bool) -> int:
 def main() -> int:
     """Run the update TODO command."""
     args = build_parser().parse_args()
-    paths = Paths.from_args(args)
     try:
+        paths = Paths.from_args(args)
         target_commit = parent_target_commit(paths, args.target_commit or "")
         if args.command == "init":
             result = write_initial_state(paths, target_commit, force=args.force)

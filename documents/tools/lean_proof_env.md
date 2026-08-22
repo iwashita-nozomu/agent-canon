@@ -40,18 +40,21 @@ whether a proof attempt belongs in a topic-local package or in this reusable
 - Boundary: durable theorem dependencies for an active proof theme belong in
   that topic's own Lake package.
 
-Initialize the environment without executing Lake:
+Initialize the environment without executing Lake.  The environment directory
+is runtime state and must be below the explicit external AgentCanon runtime
+root; a checkout-local `reports/` or package directory is not a valid target.
 
 ```bash
+RUNTIME_ROOT=/abs/path/to/workspace/agent-canon-runtime/<run>
 python3 tools/agent_tools/lean_proof_env.py init \
-  --env-dir reports/formal-proof/lean-proof-env
+  --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env"
 ```
 
 Smoke-check local proof-search tactics when network/cache access is available:
 
 ```bash
 python3 tools/agent_tools/lean_proof_env.py smoke \
-  --env-dir reports/formal-proof/lean-proof-env \
+  --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" \
   --execute
 ```
 
@@ -60,7 +63,7 @@ search request:
 
 ```bash
 python3 tools/agent_tools/lean_proof_env.py agent-smoke \
-  --env-dir reports/formal-proof/lean-proof-env \
+  --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" \
   --execute
 ```
 
@@ -69,7 +72,7 @@ property; it succeeds only when Plausible finds a concrete counterexample:
 
 ```bash
 python3 tools/agent_tools/lean_proof_env.py counterexample-smoke \
-  --env-dir reports/formal-proof/lean-proof-env \
+  --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" \
   --execute
 ```
 
@@ -77,7 +80,7 @@ Run all reusable proof-tooling checks:
 
 ```bash
 python3 tools/agent_tools/lean_proof_env.py all-smoke \
-  --env-dir reports/formal-proof/lean-proof-env \
+  --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" \
   --execute
 ```
 
@@ -85,8 +88,8 @@ Check a generated Lean proof stub through the same environment:
 
 ```bash
 python3 tools/agent_tools/lean_proof_env.py check-file \
-  --env-dir reports/formal-proof/lean-proof-env \
-  --lean-file reports/formal-proof/example/example.lean \
+  --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" \
+  --lean-file "$RUNTIME_ROOT/tasks/formal-proof/example/example.lean" \
   --execute
 ```
 

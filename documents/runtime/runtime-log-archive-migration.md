@@ -110,9 +110,9 @@ concrete destination, such as `hook-runs/README.md`, are preserved at the
 source and reported as preserved/not-imported; being listed in a plan is not
 deletion authority.
 
-`reports/broken_links.txt` is local docs-check output, not a runtime hook JSONL
-stream. It remains ignored local validation output and must not be copied into
-the runtime hook archive.
+Link-audit diagnostics are external task-scoped docs-check output, not a runtime
+hook JSONL stream. They must not be created under `reports/` or copied into the
+runtime hook archive.
 
 ## Failure Handling
 

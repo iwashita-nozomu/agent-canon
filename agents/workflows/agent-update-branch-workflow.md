@@ -9,8 +9,9 @@ downstream design ../skills/agent-update-branch.md exposes the workflow as a ski
 @dependency-end
 -->
 
-This workflow makes the template repository the update hub for AgentCanon pins,
-memory feedback, and eval feedback without mixing those updates into feature branches.
+This workflow keeps AgentCanon source updates, memory/eval feedback, and parent
+project changes in separate ownership lanes. A parent never becomes an update
+hub for AgentCanon source, and no source pin or projection is maintained.
 
 ## Branch Reuse Gate
 
@@ -37,7 +38,7 @@ the user.
 ## Branch Lanes
 
 - `agent-updates/memory-eval/<slug>`: memory and eval-only updates.
-- `agent-updates/canon-pin/<slug>`: AgentCanon submodule pin, AgentCanon update-state, and root runtime view updates.
+- `agent-updates/canon-source/<slug>`: qualified standalone AgentCanon source clone and source PR updates.
 - `agent-updates/integration/<slug>`: merges update branches and validates them before `main`.
 
 ## Memory/Eval Branch
@@ -49,13 +50,13 @@ the user.
 1. Commit with a message that states this is a memory/eval-only agent update branch.
 1. Push with `bash tools/agent_tools/agent_update_branch.sh push memory-eval <branch>`.
 
-## Canon Pin Branch
+## Canon Source Branch
 
-1. Reuse the current branch if it already owns this canon-pin lane.
-1. Otherwise request user direction and approval for `agent-updates/canon-pin/<slug>` after recording `branch_creation_reason=<reason>`; create it only through the same-segment creation-authority guard contract. Add the destructive authority/reason pair only when the route force-creates or overwrites a ref.
-1. Update the AgentCanon submodule pin, `.agent-canon/update-state.toml`, and root runtime links.
-1. Run `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh plan`, `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check`, and `bash tools/agent_tools/agent_update_branch.sh validate canon-pin`.
-1. Commit with the AgentCanon target commit in the message.
+1. Reuse the current branch if it already owns this canon-source lane.
+1. Otherwise request user direction and approval for `agent-updates/canon-source/<slug>` after recording `branch_creation_reason=<reason>`; create it only through the same-segment creation-authority guard contract. Add the destructive authority/reason pair only when the route force-creates or overwrites a ref.
+1. Update the standalone AgentCanon source in the qualified development clone and keep the parent tracked tree unchanged.
+1. Run the AgentCanon focused checks, bootstrap runtime checks, and `bash tools/agent_tools/agent_update_branch.sh validate canon-source`.
+1. Commit with the AgentCanon Issue and source commit in the message.
 1. Push the branch.
 
 ## Integration Branch

@@ -72,8 +72,6 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
   - `agents/workflows/agent-canon-pr-workflow.md`
 - open AgentCanon source PR と dependent template pin PR を順番に片付ける
   - `agents/workflows/pr-queue-cleanup-workflow.md`
-- 派生 repo の `vendor/agent-canon/` 差分を proposal / shared canon main / 派生 repo snapshot の順で閉じる
-  - `agents/workflows/derived-agent-canon-diff-workflow.md`
 - task から agent philosophy や durable observation を昇格する
   - `agents/workflows/agent-learning-workflow.md`
 
@@ -127,8 +125,6 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
   - shared canon change の branch、PR、upstream sync
 - `pr-queue-cleanup-workflow.md`
   - AgentCanon source PR と template / derived pin PR が同時に開いているとき、source merge、template pin realignment、dependent PR validation、ready / merge 判断を順番に閉じる手順
-- `derived-agent-canon-diff-workflow.md`
-  - 派生 repo の agent-canon 差分を AgentCanon branch / PR、shared canon main、派生 repo submodule pin へ順に反映する手順
 - `agent-learning-workflow.md`
   - `memory/` と guardrail への learning promotion
 - `workflow-references.md`
@@ -139,39 +135,32 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 `agent-canon` 自体を保守する場合は、次を追加で見ます。
 
 - `ROOT_AGENTS.md`
-- `documents/runtime/SHARED_RUNTIME_SURFACES.md`
-- `documents/agent-canon/agent-canon-subtree-migration.md`
+- `documents/agent-canon/agent-canon-update-route.md`
 - `agents/workflows/agent-canon-pr-workflow.md`
 - `agents/workflows/pr-queue-cleanup-workflow.md`
-- `agents/workflows/derived-agent-canon-diff-workflow.md`
 
 基本手順:
 
-1. upstream `agent-canon` を最新化する
-1. `documents/rule/dependency-module-changes.md` を読み、必要なら
-   `dependency_module_change.py prepare --topic <topic> --module <module> --branch <branch> --owner-evidence <file>`
-   で topic workspace の独立 source cloneを作成・再利用してそこで編集する
-1. root surface を再同期する
-1. shared canon 用 check を流す
+1. standalone `agent-canon` source の remote/main と Issue-qualified branch を確認する
+1. 必要なら親の ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon`
+   に source clone を作成・再利用してそこで編集する
+1. 明示 control/runtime root で bootstrap の status と必要な validation を流す
+1. source、runtime、parent project の責務別 evidence を記録する
 1. AgentCanon source PR を merge する
-1. template / derived repo 側で `make agent-canon-ensure-latest` を再実行して pin を持ち帰る
-1. template 側 pin PR を閉じる
+1. merged `main` の commit/tree を読み戻し、親側の own validation を実行する
+1. source/runtime/parent の責務別 evidence を記録して task-owned runtime を cleanup する
 
 ```bash
-AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  make agent-canon-ensure-latest
-AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
-PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
-make agent-canon-pr-check
+ROOT=<authorized-parent-root>
+RUNTIME="$ROOT/workspace/agent-canon-runtime/<installation>"
+./bootstrap.sh --control-parent-root "$ROOT" --runtime-root "$RUNTIME" status
 ```
 
-derived repo から shared canon だけ更新するときは、必要に応じて次を使います。
+親 project から AgentCanon source を更新するときは、親の tracked tree を
+変更せず、ignored qualified clone から source PR を作成します。
 
 ```bash
-python3 tools/agent_tools/dependency_module_change.py --root . prepare \
-  --topic <topic> --module vendor/agent-canon --branch <source-branch> \
-  --owner-evidence <owner-evidence>
+git -C <SOURCE_CLONE> remote get-url origin
 git -C <SOURCE_CLONE> push origin HEAD
 ```
 

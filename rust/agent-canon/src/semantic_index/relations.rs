@@ -17,7 +17,9 @@ use super::embedding::{
 };
 use super::model::{count_lines, responsibility_scope_bucket, IndexedNode};
 use super::source::context_excerpt;
-use super::storage::{load_nodes, open_cache_connection, resolve_provider_dim};
+use super::storage::{
+    load_nodes, open_cache_connection, resolve_provider_dim, validate_analysis_db,
+};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -211,6 +213,7 @@ pub(super) fn document_responsibility_bucket(path: &str) -> &'static str {
 }
 
 pub(super) fn similar_pairs(args: &SimilarArgs) -> Result<Vec<SimilarPair>, String> {
+    validate_analysis_db(&args.root, &args.db)?;
     let conn = open_cache_connection(&args.db)?;
     let dim = resolve_provider_dim(&conn, &args.provider, &args.model, args.dim)?;
     let nodes = load_nodes(&conn, &args.provider, &args.model, dim)?;
@@ -289,6 +292,7 @@ pub(super) fn similar_pairs_from_nodes(
 }
 
 pub(super) fn thin_docs(args: &ThinDocsArgs) -> Result<Vec<ThinDocCandidate>, String> {
+    validate_analysis_db(&args.root, &args.db)?;
     let conn = open_cache_connection(&args.db)?;
     let dim = resolve_provider_dim(&conn, &args.provider, &args.model, args.dim)?;
     let nodes = load_nodes(&conn, &args.provider, &args.model, dim)?;
@@ -340,6 +344,7 @@ pub(super) fn thin_docs(args: &ThinDocsArgs) -> Result<Vec<ThinDocCandidate>, St
 pub(super) fn natural_relations(
     args: &NaturalRelationsArgs,
 ) -> Result<Vec<NaturalRelation>, String> {
+    validate_analysis_db(&args.root, &args.db)?;
     let conn = open_cache_connection(&args.db)?;
     let dim = resolve_provider_dim(&conn, &args.provider, &args.model, args.dim)?;
     let nodes: Vec<IndexedNode> = load_nodes(&conn, &args.provider, &args.model, dim)?
@@ -433,6 +438,7 @@ pub(super) fn natural_relation_candidate_pairs_from_nodes(
 pub(super) fn discourse_relations(
     args: &DiscourseRelationsArgs,
 ) -> Result<Vec<DiscourseRelation>, String> {
+    validate_analysis_db(&args.root, &args.db)?;
     let conn = open_cache_connection(&args.db)?;
     let dim = resolve_provider_dim(&conn, &args.provider, &args.model, args.dim)?;
     let mut nodes: Vec<IndexedNode> = load_nodes(&conn, &args.provider, &args.model, dim)?

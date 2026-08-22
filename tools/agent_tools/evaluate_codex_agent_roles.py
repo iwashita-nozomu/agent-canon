@@ -9,6 +9,7 @@
 # upstream implementation ./model_profile_registry.py owns canonical model/profile expectations
 # upstream implementation ./capacity_handshake.py owns typed capacity provenance
 # upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
+# upstream implementation ./runtime_artifacts.py owns external role-eval artifact writes
 # downstream implementation ../../tests/agent_tools/test_evaluate_codex_agent_roles.py tests role eval behavior
 # @dependency-end
 """Evaluate Codex custom agent role definitions and routing policy."""
@@ -18,7 +19,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import subprocess
 import sys
 
@@ -39,25 +39,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
 
-from parent_root_side_effects import (
-    ParentRootAttestationRequest,
-    ParentRootReject,
-    ParentRootSideEffectBoundary,
-    ParentRootSideEffectError,
-    attest_parent_root,
-)
+from runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary
+from runtime_log_paths import eval_results_dir
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-
-def _parent_write(path: Path, data: bytes, purpose: str) -> None:
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
-    ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, data, purpose)
 
 if __package__:
     from .team_config import (
@@ -92,7 +79,6 @@ else:
         workflow_spawn_budget,
         workflow_topology_policy_violations,
     )
-from runtime_log_paths import eval_results_dir  # noqa: E402
 
 COMPACT_FINDING_SAMPLE_LIMIT = 25
 DEFAULT_RESULTS_FAMILY = "codex-agent-role"
@@ -165,6 +151,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument(
+        "--runtime-root",
+        type=Path,
+        help="Explicit external runtime root for reports and role metrics.",
+    )
+    parser.add_argument(
         "--runtime-log",
         action="append",
         default=[],
@@ -195,10 +186,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def agent_canon_root(root: Path) -> Path:
-    """Return AgentCanon root for standalone or template invocation."""
-    vendored = root / "vendor" / "agent-canon"
-    if (vendored / ".codex" / "agents").is_dir():
-        return vendored.resolve()
+    """Return the explicitly selected AgentCanon source checkout."""
     return root.resolve()
 
 
@@ -332,7 +320,7 @@ def evaluate_generated_role_projection(
             if config.get(field) != source.get(field):
                 findings.append(Finding("generated-view", agent_id, f"source-divergence-{field}"))
         expected_view = generated.get(agent_id)
-        if expected_view is None or config.get("developer_instructions", "").strip() != expected_view.rendered_instructions.strip():
+        if expected_view is None or source.get("developer_instructions", "").strip() != expected_view.rendered_instructions.strip():
             findings.append(Finding("generated-view", agent_id, "developer-instructions-not-materialized"))
         if "generated_role_view_v1" not in (root / ".codex" / "agents" / f"{agent_id}.toml").read_text(encoding="utf-8"):
             findings.append(Finding("generated-view", agent_id, "missing-generated-header"))
@@ -771,18 +759,29 @@ def evaluate_routing(root: Path) -> list[Finding]:
     return findings
 
 
-def runtime_log_paths(root: Path, explicit_logs: list[str]) -> tuple[Path, ...]:
+def runtime_log_paths(
+    root: Path,
+    explicit_logs: list[str],
+    runtime_root: Path | str | None = None,
+) -> tuple[Path, ...]:
     """Resolve optional runtime metric logs."""
-    paths = [Path(raw).resolve() for raw in explicit_logs]
-    default_dir = root / "agents" / "evals" / "results" / "subagent-role-runtime"
+    if runtime_root is None and not explicit_logs:
+        return ()
+    boundary = runtime_artifact_boundary(root, runtime_root)
+    paths = [boundary.resolve(Path(raw)) for raw in explicit_logs]
+    default_dir = boundary.resolve(Path("metrics") / "subagent-role-runtime")
     if default_dir.is_dir():
         paths.extend(sorted(default_dir.glob("*.jsonl")))
     return tuple(path for path in paths if path.is_file())
 
 
-def runtime_metrics(root: Path, explicit_logs: list[str]) -> tuple[str, dict[str, RuntimeSummary], list[Finding]]:
+def runtime_metrics(
+    root: Path,
+    explicit_logs: list[str],
+    runtime_root: Path | str | None = None,
+) -> tuple[str, dict[str, RuntimeSummary], list[Finding]]:
     """Aggregate optional token, latency, retry, intervention, format, and output-use metrics."""
-    paths = runtime_log_paths(root, explicit_logs)
+    paths = runtime_log_paths(root, explicit_logs, runtime_root)
     if not paths:
         return "missing", {}, []
     raw: dict[str, Counter[str]] = defaultdict(Counter)
@@ -911,7 +910,12 @@ def build_eval_run_metadata(root: Path, run_id: str) -> EvalRunMetadata:
     )
 
 
-def evaluate(root: Path, runtime_logs: list[str], run_id: str = "") -> EvalReport:
+def evaluate(
+    root: Path,
+    runtime_logs: list[str],
+    run_id: str = "",
+    runtime_root: Path | str | None = None,
+) -> EvalReport:
     """Run the full role eval."""
     canon_root = agent_canon_root(root)
     configs = load_agent_configs(canon_root)
@@ -920,7 +924,7 @@ def evaluate(root: Path, runtime_logs: list[str], run_id: str = "") -> EvalRepor
         *evaluate_static_agent_configs(canon_root, configs),
         *evaluate_routing(canon_root),
     ]
-    metrics_status, metrics, metric_findings = runtime_metrics(canon_root, runtime_logs)
+    metrics_status, metrics, metric_findings = runtime_metrics(canon_root, runtime_logs, runtime_root)
     findings.extend(metric_findings)
     return EvalReport(
         metadata=build_eval_run_metadata(canon_root, run_id),
@@ -985,16 +989,24 @@ def compact_summary(report: EvalReport) -> dict[str, object]:
     }
 
 
-def write_compact_summary(path: Path, report: EvalReport) -> None:
+def write_compact_summary(
+    path: Path,
+    report: EvalReport,
+    runtime_root: Path | str | None = None,
+) -> Path:
     """Write a bounded JSON summary for agent consumption."""
-    _parent_write(
+    boundary = runtime_artifact_boundary(Path(report.metadata.root), runtime_root)
+    return boundary.atomic_write_text(
         path,
-        (json.dumps(compact_summary(report), indent=2, sort_keys=True) + "\n").encode("utf-8"),
-        "codex-agent-role-evaluation",
+        json.dumps(compact_summary(report), indent=2, sort_keys=True) + "\n",
     )
 
 
-def write_markdown_report(path: Path, report: EvalReport) -> Path:
+def write_markdown_report(
+    path: Path,
+    report: EvalReport,
+    runtime_root: Path | str | None = None,
+) -> Path:
     """Write a Markdown role eval report."""
     lines = [
         "# Codex Agent Role Eval",
@@ -1032,17 +1044,25 @@ def write_markdown_report(path: Path, report: EvalReport) -> Path:
         lines.append("- none")
     if path.exists():
         path = path.with_name(f"{path.stem}-{report.metadata.eval_run_id}{path.suffix}")
-    _parent_write(path, ("\n".join(lines) + "\n").encode("utf-8"), "codex-agent-role-evaluation")
-    return path
+    boundary = runtime_artifact_boundary(Path(report.metadata.root), runtime_root)
+    return boundary.atomic_write_text(path, "\n".join(lines) + "\n")
 
 
-def resolve_results_dir(root: Path, value: str) -> Path:
+def resolve_results_dir(
+    root: Path,
+    value: str,
+    runtime_root: Path | str | None = None,
+) -> Path:
     """Resolve the CLI results directory or the default archive location."""
     stripped = value.strip()
     if stripped:
         path = Path(stripped)
-        return path if path.is_absolute() else root / path
-    return eval_results_dir(agent_canon_root(root), DEFAULT_RESULTS_FAMILY)
+        if path.is_absolute():
+            return path
+        if runtime_root is not None:
+            return runtime_artifact_boundary(root, runtime_root).resolve(path)
+        return root / path
+    return eval_results_dir(agent_canon_root(root), DEFAULT_RESULTS_FAMILY, runtime_root)
 
 
 def accumulated_report_path(results_dir: Path, report: EvalReport) -> Path:
@@ -1053,17 +1073,32 @@ def accumulated_report_path(results_dir: Path, report: EvalReport) -> Path:
 def main() -> int:
     """Run the role eval."""
     args = build_parser().parse_args()
-    report = evaluate(args.root, cast(list[str], args.runtime_log), str(args.run_id))
+    needs_boundary = bool(
+        args.report_out or args.compact_out or args.accumulate or args.runtime_log
+    )
+    boundary = runtime_artifact_boundary(args.root, args.runtime_root) if needs_boundary else None
+    report = evaluate(
+        args.root,
+        cast(list[str], args.runtime_log),
+        str(args.run_id),
+        boundary.root if boundary is not None else None,
+    )
     report_paths: list[Path] = []
     if args.report_out is not None:
-        report_paths.append(write_markdown_report(args.report_out, report))
+        assert boundary is not None
+        report_paths.append(write_markdown_report(args.report_out, report, boundary.root))
     if args.compact_out is not None:
-        write_compact_summary(args.compact_out, report)
+        assert boundary is not None
+        write_compact_summary(args.compact_out, report, boundary.root)
     if args.accumulate:
+        assert boundary is not None
         report_paths.append(
             write_markdown_report(
-                accumulated_report_path(resolve_results_dir(args.root, str(args.results_dir)), report),
+                accumulated_report_path(
+                    resolve_results_dir(args.root, str(args.results_dir), boundary.root), report
+                ),
                 report,
+                boundary.root,
             )
         )
     if args.format == "json":
@@ -1085,4 +1120,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except RuntimeArtifactError as exc:
+        print(f"evaluate_codex_agent_roles.py: runtime_root_required: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc

@@ -25,7 +25,11 @@ use super::storage::{
 use serde_json::Value;
 
 pub(super) fn run(args: &[String]) -> i32 {
-    match parse_args(args, temporary_db_identity) {
+    let configured = match configure_runtime_root(args) {
+        Ok(value) => value,
+        Err(error) => return fail("CLI", error),
+    };
+    match parse_args(&configured, temporary_db_identity) {
         Ok(ParsedArgs::Command(SemanticCommand::Help)) => {
             print_usage();
             0
@@ -261,6 +265,27 @@ pub(super) fn run(args: &[String]) -> i32 {
     }
 }
 
+fn configure_runtime_root(args: &[String]) -> Result<Vec<String>, String> {
+    let mut configured = Vec::with_capacity(args.len());
+    let mut index = 0;
+    while index < args.len() {
+        if args[index] == "--runtime-root" {
+            let value = args
+                .get(index + 1)
+                .ok_or_else(|| "--runtime-root requires a value".to_string())?;
+            if value.trim().is_empty() {
+                return Err("--runtime-root must not be empty".to_string());
+            }
+            std::env::set_var(crate::runtime_boundary::RUNTIME_ROOT_ENV, value);
+            index += 2;
+        } else {
+            configured.push(args[index].clone());
+            index += 1;
+        }
+    }
+    Ok(configured)
+}
+
 fn fail(scope: &str, message: String) -> i32 {
     eprintln!("SEMANTIC_INDEX_{scope}=fail");
     eprintln!("SEMANTIC_INDEX_ERROR={message}");
@@ -271,7 +296,7 @@ fn print_usage() {
     eprintln!(
         "usage: agent-canon semantic-index <build|embed-provider|search|context-pack|responsibility-tree|similar|merge-candidates|thin-docs|natural-relations|discourse-relations|eval|compare-providers|eval-output> [options]"
     );
-    eprintln!("build: --root <repo-root> [--include path] [--db path] [--provider name] [--model name] [--dim N] [--embedding-url URL] [--embedding-batch N]");
+    eprintln!("build: --root <repo-root> [--runtime-root path] [--include path] [--db path] [--provider name] [--model name] [--dim N] [--embedding-url URL] [--embedding-batch N]");
     eprintln!("embed-provider: --root <repo-root> --db path --provider name --model name [--dim N] [--embedding-url URL] [--embedding-batch N]");
     eprintln!("search: (--query <text>|--query-file path|--query-stdin) [--root repo] [--db path] [--provider name] [--model name] [--embedding-url URL] [--top-k N] [--format text|json|jsonl]");
     eprintln!("context-pack: (--query <text>|--query-file path|--query-stdin) [--root repo] [--db path] [--provider name] [--model name] [--embedding-url URL] [--max-cells N] [--max-cell-chars N] [--max-total-chars N] [--format text|json|jsonl]");
