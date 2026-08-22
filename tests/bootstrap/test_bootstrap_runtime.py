@@ -20,6 +20,7 @@ from tools.agent_tools.bootstrap_runtime import (  # noqa: E402
     sha256_bytes,
     validate_roots,
 )
+from tools.agent_tools.runtime_exchange_cleanup import clear_exchange  # noqa: E402
 
 
 @pytest.fixture()
@@ -529,6 +530,9 @@ def test_uninstall_removes_only_owned_container_and_image(
     manager.install()
     manager.start()
     manager.codex_prepare()
+    generated = manager.paths.container_runtime / "tmp" / "pytest-of-agentcanon"
+    generated.mkdir(parents=True)
+    (generated / "artifact").write_text("fixture", encoding="utf-8")
     manager.uninstall()
     state_file = manager.paths.state.read_text(encoding="utf-8")
     assert json.loads(state_file)["state"] == "uninstalled"
@@ -540,6 +544,36 @@ def test_uninstall_removes_only_owned_container_and_image(
     # The fake image is removed by its digest; absence is read back by Docker.
     assert manager.docker.inspect_image(manager._image_tag()) is None
     assert not manager.paths.container_runtime.exists()
+    cleanup_index = next(
+        index
+        for index, command in enumerate(fake_docker.commands)
+        if command[-2:] == [
+            "python3",
+            "/usr/local/share/agent-canon/runtime/tools/agent_tools/"
+            "runtime_exchange_cleanup.py",
+        ]
+    )
+    stop_index = next(
+        index
+        for index, command in enumerate(fake_docker.commands)
+        if len(command) > 1 and command[1] == "stop"
+    )
+    assert cleanup_index < stop_index
+
+
+def test_exchange_cleanup_unlinks_symlink_without_touching_target(tmp_path: Path) -> None:
+    """The in-container cleanup cannot follow an exchange child symlink."""
+    exchange = tmp_path / "exchange"
+    outside = tmp_path / "outside"
+    exchange.mkdir()
+    outside.mkdir()
+    protected = outside / "protected"
+    protected.write_text("keep", encoding="utf-8")
+    (exchange / "linked").symlink_to(outside, target_is_directory=True)
+
+    assert clear_exchange(exchange) == 1
+    assert protected.read_text(encoding="utf-8") == "keep"
+    assert not (exchange / "linked").exists()
 
 
 def test_changed_inputs_preserve_status_and_exact_cleanup_then_allow_reinstall(

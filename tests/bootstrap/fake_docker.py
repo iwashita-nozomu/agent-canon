@@ -277,6 +277,23 @@ def main(argv: list[str]) -> int:
             print("ACCUMULATED_AGENT_EVAL_FAILED=-")
             print("ACCUMULATED_AGENT_EVAL=pass")
             return 0
+        if command == [
+            "python3",
+            "/usr/local/share/agent-canon/runtime/tools/agent_tools/runtime_exchange_cleanup.py",
+        ]:
+            runtime_mount = next(
+                mount
+                for mount in found[1]["Mounts"]
+                if mount["Destination"] == "/var/lib/agent-canon/runtime"
+            )
+            runtime_root = Path(runtime_mount["Source"])
+            for child in runtime_root.iterdir():
+                if child.is_dir() and not child.is_symlink():
+                    shutil.rmtree(child)
+                else:
+                    child.unlink()
+            print("AGENT_CANON_RUNTIME_EXCHANGE_REMOVED=fixture")
+            return 0
         if command == ["agent-canon", "fail"]:
             print("failure output token=canary", file=sys.stderr)
             return 7

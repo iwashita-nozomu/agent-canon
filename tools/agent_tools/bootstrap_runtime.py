@@ -2219,6 +2219,43 @@ class BootstrapRuntime:
             )
         c["state"], c["id"] = "absent", None
 
+    def _clear_exchange_in_container(self, state: dict[str, Any]) -> None:
+        """Remove user-namespace-owned exchange children before container stop."""
+        container = state.get("resources", {}).get("container", {})
+        identifier = container.get("id") or container.get("name")
+        if not identifier:
+            return
+        inspected = self.docker.inspect_container(str(identifier))
+        if inspected is None:
+            return
+        self._validate_cleanup_resource(inspected, state, "container")
+        if inspected.get("State", {}).get("Running") is not True:
+            self.docker.start_container(str(identifier))
+            self._wait_for_healthy(state, str(identifier))
+        result = self.docker.exec_container(
+            str(identifier),
+            cwd=CONTAINER_RUNTIME_DESTINATION,
+            argv=[
+                "python3",
+                "/usr/local/share/agent-canon/runtime/tools/agent_tools/"
+                "runtime_exchange_cleanup.py",
+            ],
+        )
+        if result.returncode != 0:
+            stderr = _redact_output(result.stderr or "")
+            stdout = _redact_output(result.stdout or "")
+            raise BootstrapError(
+                "exchange_cleanup_failed",
+                f"container exchange cleanup exited with {result.returncode}",
+                evidence={
+                    "exit": result.returncode,
+                    "stderr_digest": sha256_text(stderr),
+                    "stderr_preview": stderr[:1000],
+                    "stdout_digest": sha256_text(stdout),
+                    "stdout_preview": stdout[:1000],
+                },
+            )
+
     def _remove_exchange(self) -> None:
         """Remove the dedicated container exchange after the container is absent."""
         exchange = self.paths.container_runtime
@@ -3491,6 +3528,7 @@ class BootstrapRuntime:
                 raise BootstrapError(
                     "active_tasks", "cannot uninstall while tasks are active"
                 )
+            self._clear_exchange_in_container(state)
             self._stop_owned_container(state)
             self._remove_exchange()
             for entry in state.get("managed_links", []):
