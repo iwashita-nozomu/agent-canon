@@ -31,7 +31,10 @@ import stat
 import subprocess
 import sys
 import time
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10 in the pinned Ubuntu tool image.
+    import tomli as tomllib  # type: ignore[no-redef]
 import urllib.error
 import urllib.request
 from collections.abc import Iterator, Mapping, Sequence
@@ -171,6 +174,17 @@ def _redact_argv(argv: Sequence[str]) -> list[str]:
             continue
         redacted.append(_redact_output(value))
     return redacted
+
+
+def _bounded_output_preview(value: str, limit: int = MAX_RECEIPT_IO_BYTES) -> str:
+    """Keep both failure context and the terminal diagnostic within a limit."""
+    if len(value) <= limit:
+        return value
+    separator = "\n...<truncated>...\n"
+    available = max(0, limit - len(separator))
+    prefix = available // 2
+    suffix = available - prefix
+    return value[:prefix] + separator + value[-suffix:]
 
 
 def _validate_tool_plane_argv(
@@ -471,7 +485,7 @@ def _io_evidence(
         payload = redacted.encode("utf-8")
         destination = task_path / "logs" / filename
         _atomic_bytes(destination, payload)
-        bounded = redacted[:MAX_RECEIPT_IO_BYTES]
+        bounded = _bounded_output_preview(redacted)
         evidence[f"{name}_log"] = str(destination)
         evidence[f"{name}_digest"] = sha256_bytes(payload)
         evidence[f"{name}_bytes"] = len(payload)
@@ -871,10 +885,10 @@ class DockerAdapter:
                     "argv": _redact_argv(command[1:]),
                     "exit": result.returncode,
                     "stderr_digest": sha256_text(stderr),
-                    "stderr_preview": stderr[:1000],
+                    "stderr_preview": _bounded_output_preview(stderr, 1000),
                     "stderr_truncated": len(stderr) > 1000,
                     "stdout_digest": sha256_text(stdout),
-                    "stdout_preview": stdout[:1000],
+                    "stdout_preview": _bounded_output_preview(stdout, 1000),
                     "stdout_truncated": len(stdout) > 1000,
                 },
             )
@@ -2250,9 +2264,9 @@ class BootstrapRuntime:
                 evidence={
                     "exit": result.returncode,
                     "stderr_digest": sha256_text(stderr),
-                    "stderr_preview": stderr[:1000],
+                    "stderr_preview": _bounded_output_preview(stderr, 1000),
                     "stdout_digest": sha256_text(stdout),
-                    "stdout_preview": stdout[:1000],
+                    "stdout_preview": _bounded_output_preview(stdout, 1000),
                 },
             )
 

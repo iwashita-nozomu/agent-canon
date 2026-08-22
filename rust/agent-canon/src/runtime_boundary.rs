@@ -59,7 +59,12 @@ pub(crate) fn resolve_runtime_root_at(
             source_root.display()
         )
     })?;
-    let raw = requested.map(Path::to_path_buf).or_else(|| {
+    // The explicit match keeps the test-only fallback lazy without creating a
+    // non-test closure that Clippy correctly identifies as unnecessary.
+    #[allow(clippy::manual_map)]
+    let raw = match requested {
+        Some(requested) => Some(requested.to_path_buf()),
+        None => {
             #[cfg(test)]
             {
                 let digest = Sha256::digest(source.to_string_lossy().as_bytes());
@@ -67,18 +72,19 @@ pub(crate) fn resolve_runtime_root_at(
                     .iter()
                     .map(|byte| format!("{byte:02x}"))
                     .collect::<String>();
-                return Some(env::temp_dir().join(format!("agent-canon-test-runtime-{key}")));
+                Some(env::temp_dir().join(format!("agent-canon-test-runtime-{key}")))
             }
             #[cfg(not(test))]
             {
                 None
             }
-        })
-        .ok_or_else(|| {
-            format!(
-                "{RUNTIME_ROOT_ENV} is required; analysis artifacts must use an external runtime root"
-            )
-        })?;
+        }
+    }
+    .ok_or_else(|| {
+        format!(
+            "{RUNTIME_ROOT_ENV} is required; analysis artifacts must use an external runtime root"
+        )
+    })?;
     let raw = absolute(&raw)?;
     let mut cursor = PathBuf::new();
     for component in raw.components() {

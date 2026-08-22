@@ -368,7 +368,8 @@ def test_exec_preserves_nonzero_command_exit_and_redacts_output(
     assert failure.value.evidence["exit"] == 7
     assert "canary" not in failure.value.evidence["stderr_preview"]
     assert "<redacted>" in failure.value.evidence["stderr_preview"]
-    assert failure.value.evidence["stderr_truncated"] is False
+    assert "terminal-diagnostic" in failure.value.evidence["stderr_preview"]
+    assert failure.value.evidence["stderr_truncated"] is True
     receipt = json.loads(
         Path(failure.value.evidence["receipt_path"]).read_text(encoding="utf-8")
     )

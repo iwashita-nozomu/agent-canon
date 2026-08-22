@@ -163,10 +163,11 @@ def test_rust_commands_are_confined_to_rust_unit() -> None:
         "cargo build --manifest-path rust/agent-canon/Cargo.toml",
         "cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check",
         "cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D warnings",
-        "cargo test --manifest-path rust/agent-canon/Cargo.toml",
     ):
         assert command in rust_body
         assert command not in remainder
+    assert "env -u AGENT_CANON_RUNTIME_ROOT" in rust_body
+    assert "cargo test --manifest-path rust/agent-canon/Cargo.toml" in rust_body
 
 
 def test_focused_regression_is_owned_by_workflow_container_unit() -> None:

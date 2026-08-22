@@ -396,6 +396,8 @@ pub(super) fn parse_openai_embeddings_response(
 }
 
 #[cfg(test)]
+// Protocol fixtures remain adjacent to the response parser they exercise.
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use super::*;
 

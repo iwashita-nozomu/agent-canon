@@ -295,7 +295,10 @@ def main(argv: list[str]) -> int:
             print("AGENT_CANON_RUNTIME_EXCHANGE_REMOVED=fixture")
             return 0
         if command == ["agent-canon", "fail"]:
-            print("failure output token=canary", file=sys.stderr)
+            print(
+                "failure output token=canary " + ("x" * 700) + " terminal-diagnostic",
+                file=sys.stderr,
+            )
             return 7
         if command[:1] != ["cat"]:
             return 0

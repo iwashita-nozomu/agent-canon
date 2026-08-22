@@ -75,7 +75,8 @@ run_rust() {
   "${memory_cli}" memory validate --root .
   cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check
   cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D warnings
-  cargo test --manifest-path rust/agent-canon/Cargo.toml
+  env -u AGENT_CANON_RUNTIME_ROOT \
+    cargo test --manifest-path rust/agent-canon/Cargo.toml
 }
 
 run_contracts() {
@@ -163,7 +164,8 @@ run_eval() (
     primary_status=$?
   fi
   if [[ "${primary_status}" -eq 0 ]]; then
-    python3 "${TOOLS_ROOT}/agent_tools/smoke_test_research_perspective_pack.py"
+    PYTHONPATH="${ROOT}/tools/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+      python3 "${ROOT}/tools/agent_tools/smoke_test_research_perspective_pack.py"
     primary_status=$?
   fi
   set -e

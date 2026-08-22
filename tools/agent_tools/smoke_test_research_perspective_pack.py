@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import tempfile
 from datetime import datetime, timezone
 
 UTC = timezone.utc
@@ -58,7 +59,6 @@ else:
 
 ROOT = Path(__file__).resolve().parents[2]
 from parent_root_side_effects import (  # noqa: E402
-    ParentOwnedPathReceipt,
     ParentRootAttestationReceipt,
     ParentRootAttestationRequest,
     ParentRootReject,
@@ -66,6 +66,7 @@ from parent_root_side_effects import (  # noqa: E402
     ParentRootSideEffectError,
     attest_parent_root,
 )
+from runtime_artifacts import runtime_artifact_boundary  # noqa: E402
 
 BASE_RESEARCH_ROLE_IDS = (
     "researcher",
@@ -325,13 +326,7 @@ def main() -> int:
     args = build_parser().parse_args()
     source_resolution = resolve_agent_canon_source_root(Path(__file__).resolve())
     source_root = source_resolution.source_root
-    temp_receipts: list[
-        tuple[
-            ParentRootSideEffectBoundary,
-            ParentRootAttestationReceipt,
-            ParentOwnedPathReceipt,
-        ]
-    ] = []
+    runtime_temp: tempfile.TemporaryDirectory[str] | None = None
 
     if args.workspace_root is None:
         workspace_root = source_root
@@ -340,23 +335,14 @@ def main() -> int:
         _ensure_parent(workspace_root, "research-perspective-smoke")
 
     if args.report_root is None:
-        configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-        if not configured:
-            raise ParentRootSideEffectError(
-                ParentRootReject.HANDOFF_INVALID,
-                "research-perspective-smoke: explicit parent root is required",
-            )
-        parent = Path(configured)
-        temp_root = parent / ".agent-canon" / "tmp" / "research-pack"
-        boundary, attestation = _parent_capability("research-perspective-smoke")
-        report_receipt = boundary.create_parent_owned_temp_directory(
-            attestation,
-            temp_root,
-            "research-perspective-smoke",
-            "research-pack-reports",
+        runtime_boundary = runtime_artifact_boundary(source_root, create=True)
+        temp_parent = runtime_boundary.ensure_directory(
+            "tmp/research-perspective-smoke"
         )
-        report_root = report_receipt.physical_path
-        temp_receipts.append((boundary, attestation, report_receipt))
+        runtime_temp = tempfile.TemporaryDirectory(
+            prefix="research-pack-", dir=temp_parent
+        )
+        report_root = Path(runtime_temp.name)
     else:
         report_root = Path(args.report_root).resolve()
         _ensure_parent(report_root, "research-perspective-smoke")
@@ -419,14 +405,12 @@ def main() -> int:
         raise
     finally:
         if not args.keep_temp:
-            cleanup_error: ParentRootSideEffectError | None = None
-            for boundary, attestation, receipt in reversed(temp_receipts):
+            cleanup_error: OSError | None = None
+            if runtime_temp is not None:
                 try:
-                    boundary.remove_parent_owned_tree(
-                        attestation, receipt, "research-perspective-smoke-cleanup"
-                    )
-                except ParentRootSideEffectError as exc:
-                    cleanup_error = cleanup_error or exc
+                    runtime_temp.cleanup()
+                except OSError as exc:
+                    cleanup_error = exc
             if cleanup_error is not None:
                 if primary_error is not None:
                     raise cleanup_error from primary_error

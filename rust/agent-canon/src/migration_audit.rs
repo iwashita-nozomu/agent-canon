@@ -115,9 +115,7 @@ fn missing_bootstrap_snippets(root: &Path) -> Vec<String> {
     REQUIRED_BOOTSTRAP_SNIPPETS
         .iter()
         .filter_map(|(relative, snippet)| {
-            let Some(text) = read_optional(root.join(relative)) else {
-                return None;
-            };
+            let text = read_optional(root.join(relative))?;
             (!text.contains(snippet)).then(|| format!("bootstrap-missing:{relative}:{snippet}"))
         })
         .collect()

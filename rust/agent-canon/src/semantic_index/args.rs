@@ -1206,9 +1206,9 @@ fn semantic_index_home() -> PathBuf {
     }
     #[cfg(test)]
     {
-        return env::temp_dir()
+        env::temp_dir()
             .join("agent-canon-test-runtime")
-            .join("semantic-index");
+            .join("semantic-index")
     }
     #[cfg(not(test))]
     {
