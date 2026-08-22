@@ -99,17 +99,20 @@ def main(argv: list[str]) -> int:
             values = dict(
                 part.split("=", 1) for part in argv[index + 1].split(",") if "=" in part
             )
+            source = values["src"]
+            if os.environ.get("FAKE_DOCKER_CANONICALIZE_MOUNTS") == "1":
+                source = str(Path(source).resolve())
             parsed_mounts.append(
                 {
                     "Type": "bind",
-                    "Source": values["src"],
+                    "Source": source,
                     "Destination": values["dst"],
                     "RW": "readonly" not in argv[index + 1],
                     "Mode": "ro" if "readonly" in argv[index + 1] else "rw",
                 }
             )
             if values["dst"] == "/var/lib/agent-canon/mount-registry.toml":
-                mount_snapshots[values["dst"]] = Path(values["src"]).read_text(
+                mount_snapshots[values["dst"]] = Path(source).read_text(
                     encoding="utf-8"
                 )
         cid = f"container-{state['next']}"

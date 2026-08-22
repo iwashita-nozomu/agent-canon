@@ -56,6 +56,58 @@ def test_explicit_roots_reject_escape_and_symlink_without_rootless_policy(
         validate_roots(control, link / "runtime")
 
 
+def test_explicit_roots_canonicalize_dot_segments_after_symlink_validation(
+    tmp_path: Path,
+) -> None:
+    """Use one canonical host path for state, mount creation, and readback."""
+    control = tmp_path / "control"
+    nested = control / "nested"
+    nested.mkdir(parents=True)
+
+    observed_control, observed_runtime = validate_roots(
+        nested / "..", nested / ".." / "runtime"
+    )
+
+    assert observed_control == control
+    assert observed_runtime == control / "runtime"
+
+
+def test_explicit_roots_reject_symlink_even_when_dot_segments_cancel_it(
+    tmp_path: Path,
+) -> None:
+    """Do not let lexical normalization hide a traversed symlink component."""
+    control = tmp_path / "control"
+    outside = tmp_path / "outside"
+    control.mkdir()
+    outside.mkdir()
+    (control / "link").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(BootstrapError, match="symlink_path_rejected"):
+        validate_roots(control, control / "link" / ".." / "runtime")
+
+
+def test_start_accepts_daemon_canonical_mount_readback(
+    tmp_path: Path,
+    fake_docker: DockerAdapter,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Match rootful Docker inspect output to the canonical admitted roots."""
+    control = tmp_path / "control"
+    nested = control / "nested"
+    nested.mkdir(parents=True)
+    monkeypatch.setenv("FAKE_DOCKER_CANONICALIZE_MOUNTS", "1")
+    manager = BootstrapRuntime(
+        nested / "..",
+        nested / ".." / "runtime",
+        repository_root=REPOSITORY_ROOT,
+        docker=fake_docker,
+    )
+
+    manager.install()
+
+    assert manager.start()["after_state"] == "ready"
+
+
 def test_effective_root_is_allowed_but_manifest_container_uid_is_nonzero(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fake_docker: DockerAdapter
 ) -> None:

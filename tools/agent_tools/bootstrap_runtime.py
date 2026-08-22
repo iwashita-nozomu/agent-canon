@@ -487,6 +487,11 @@ def _assert_absolute(path: Path, field: str) -> None:
         )
 
 
+def _normalize_absolute_path(path: Path) -> Path:
+    """Collapse lexical dot segments after the caller validates the raw path."""
+    return Path(os.path.normpath(os.fspath(path)))
+
+
 def _open_dir(path: Path) -> int:
     try:
         return os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
@@ -524,7 +529,7 @@ def _existing_no_symlink(path: Path, *, field: str) -> Path:
             raise BootstrapError(
                 "path_not_directory", f"{field} is not a directory: {current}"
             )
-    return path
+    return _normalize_absolute_path(path)
 
 
 def _existing_path_no_symlink(path: Path, *, field: str) -> Path:
@@ -539,17 +544,11 @@ def _existing_path_no_symlink(path: Path, *, field: str) -> Path:
             raise BootstrapError("path_missing", f"{field} does not exist: {path}") from exc
         if stat.S_ISLNK(observed.st_mode):
             raise BootstrapError("symlink_path_rejected", f"{field} contains a symlink: {current}")
-    return path
+    return _normalize_absolute_path(path)
 
 
 def _validate_new_path(path: Path, *, field: str, beneath: Path) -> Path:
     _assert_absolute(path, field)
-    try:
-        path.relative_to(beneath)
-    except ValueError as exc:
-        raise BootstrapError(
-            "runtime_root_escape", f"{field} must be beneath {beneath}"
-        ) from exc
     current = Path(path.anchor or "/")
     for part in path.parts[1:]:
         current = current / part
@@ -569,7 +568,14 @@ def _validate_new_path(path: Path, *, field: str, beneath: Path) -> Path:
             raise BootstrapError(
                 "path_not_directory", f"{field} is not a directory: {current}"
             )
-    return path
+    normalized = _normalize_absolute_path(path)
+    try:
+        normalized.relative_to(beneath)
+    except ValueError as exc:
+        raise BootstrapError(
+            "runtime_root_escape", f"{field} must be beneath {beneath}"
+        ) from exc
+    return normalized
 
 
 def validate_roots(control_parent_root: Path, runtime_root: Path) -> tuple[Path, Path]:
@@ -1745,7 +1751,11 @@ class BootstrapRuntime:
                 "docker_readback_invalid", "mount readback is not a list"
             )
         expected_mounts = {
-            (m["source"], m["destination"], m["mode"])
+            (
+                str(_normalize_absolute_path(Path(m["source"]))),
+                m["destination"],
+                m["mode"],
+            )
             for m in self._mounts(state.get("targets", {}))
         }
         observed_mounts: set[tuple[str, str, str]] = set()
@@ -1761,11 +1771,31 @@ class BootstrapRuntime:
                 or mount.get("Mode") in {"ro", "ro,z"}
                 else "explicit-target-write"
             )
+            source = str(mount.get("Source"))
+            normalized_source = (
+                str(_normalize_absolute_path(Path(source)))
+                if Path(source).is_absolute()
+                else source
+            )
             observed_mounts.add(
-                (str(mount.get("Source")), str(mount.get("Destination")), mode)
+                (normalized_source, str(mount.get("Destination")), mode)
             )
         if observed_mounts != expected_mounts:
-            raise BootstrapError("docker_readback_invalid", "mount readback mismatch")
+            fields = ("source", "destination", "mode")
+            raise BootstrapError(
+                "docker_readback_invalid",
+                "mount readback mismatch",
+                evidence={
+                    "missing_mounts": [
+                        dict(zip(fields, item, strict=True))
+                        for item in sorted(expected_mounts - observed_mounts)
+                    ],
+                    "unexpected_mounts": [
+                        dict(zip(fields, item, strict=True))
+                        for item in sorted(observed_mounts - expected_mounts)
+                    ],
+                },
+            )
 
     def _container_inspect(
         self, state: dict[str, Any], *, require_running: bool
