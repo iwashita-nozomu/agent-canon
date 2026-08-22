@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -572,9 +573,35 @@ def test_exchange_cleanup_unlinks_symlink_without_touching_target(tmp_path: Path
     protected.write_text("keep", encoding="utf-8")
     (exchange / "linked").symlink_to(outside, target_is_directory=True)
 
-    assert clear_exchange(exchange) == 1
+    assert clear_exchange(exchange) == (1, 0)
     assert protected.read_text(encoding="utf-8") == "keep"
     assert not (exchange / "linked").exists()
+
+
+def test_exchange_cleanup_preserves_host_owned_entries_for_host_phase(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A root-Host entry may remain until the following Host cleanup phase."""
+    exchange = tmp_path / "exchange"
+    host_owned = exchange / "host-owned"
+    host_file = host_owned / "receipt"
+    host_owned.mkdir(parents=True)
+    host_file.write_text("host", encoding="utf-8")
+    original_unlink = Path.unlink
+
+    def deny_container_unlink(path: Path, *args: Any, **kwargs: Any) -> None:
+        if path == host_file:
+            raise PermissionError("simulated root-Host ownership")
+        original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", deny_container_unlink)
+
+    assert clear_exchange(exchange) == (0, 1)
+    assert host_file.read_text(encoding="utf-8") == "host"
+    original_unlink(host_file)
+    host_owned.rmdir()
+    exchange.rmdir()
+    assert not exchange.exists()
 
 
 def test_changed_inputs_preserve_status_and_exact_cleanup_then_allow_reinstall(
