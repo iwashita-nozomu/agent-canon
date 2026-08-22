@@ -117,7 +117,7 @@ def test_static_gate_uses_bootstrap_container_units() -> None:
         for step in job.get("steps", [])
     ]
     assert not any("check_agent_canon_pr.sh" in run for run in runs)
-    assert sum("run_standalone_static_gate_unit.sh" in run for run in runs) == 5
+    assert sum("run_standalone_static_gate_unit.sh" in run for run in runs) == 1
 
 
 def test_no_submodule_checkout_helper_remains() -> None:

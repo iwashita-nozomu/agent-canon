@@ -200,61 +200,34 @@ def test_full_wrapper_aggregates_each_unit_once_without_reowning_commands() -> N
         assert command not in body
 
 
-def test_workflow_uses_one_selector_and_native_selected_jobs() -> None:
+def test_workflow_uses_one_selector_and_one_shared_runtime_job() -> None:
     workflow = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
     jobs = workflow["jobs"]
-    assert set(jobs) == {
-        "select-static-units",
-        "rust-static",
-        "contracts-static",
-        "eval-static",
-        "workflow-container-static",
-        "static-gates",
-    }
+    assert set(jobs) == {"select-static-units", "static-gates"}
     selector_text = str(jobs["select-static-units"])
     assert "classify_path_risk.py" in selector_text
     assert "git diff --name-only" in selector_text
-    for job_name, output in (
-        ("rust-static", "rust"),
-        ("contracts-static", "contracts"),
-        ("eval-static", "eval"),
-        ("workflow-container-static", "workflow_container"),
-    ):
-        job = jobs[job_name]
-        assert job["needs"] == "select-static-units"
-        assert output in str(job["if"])
+    assert jobs["static-gates"]["needs"] == "select-static-units"
 
 
-def test_toolchain_setup_is_bounded_to_selected_owning_jobs() -> None:
+def test_toolchain_setup_occurs_once_in_required_shared_job() -> None:
     workflow = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
-    jobs = workflow["jobs"]
-    for job_name in (
-        "rust-static",
-        "contracts-static",
-        "eval-static",
-        "workflow-container-static",
-    ):
-        text = str(jobs[job_name])
-        assert "bootstrap.sh" in text
-        assert "run_standalone_static_gate_unit.sh" in text
-        assert "actions/setup-python" not in text
-        assert "pip install" not in text
-        assert "rustup component add" not in text
+    text = str(workflow["jobs"]["static-gates"])
+    assert "bootstrap.sh" in text
+    assert "run_standalone_static_gate_unit.sh" in text
+    assert "actions/setup-python" not in text
+    assert "pip install" not in text
+    assert "rustup component add" not in text
+    assert WORKFLOW.read_text(encoding="utf-8").count(" install\n") == 1
 
 
-def test_aggregate_required_check_accepts_only_selected_success_or_unselected_skip() -> None:
+def test_required_check_runs_selected_units_sequentially() -> None:
     workflow = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
-    aggregate = workflow["jobs"]["static-gates"]
-    assert aggregate["needs"] == [
-        "select-static-units",
-        "rust-static",
-        "contracts-static",
-        "eval-static",
-        "workflow-container-static",
-    ]
-    text = str(aggregate)
-    assert 'test "${result}" = success' in text
-    assert 'test "${result}" = skipped' in text
+    required = workflow["jobs"]["static-gates"]
+    run = "\n".join(str(step.get("run", "")) for step in required["steps"])
+    assert 'for unit in "${units[@]}"' in run
+    assert '"${unit}"' in run
+    assert "selected_units=none" in run
 
 
 def test_workflow_manual_full_gate_uses_bootstrap_units_without_retry_ledger() -> None:
@@ -262,9 +235,9 @@ def test_workflow_manual_full_gate_uses_bootstrap_units_without_retry_ledger() -
     text = WORKFLOW.read_text(encoding="utf-8")
     steps = workflow["jobs"]["static-gates"]["steps"]
     wrapper = next(
-        step for step in steps if "for unit in rust contracts eval" in str(step.get("run", ""))
+        step for step in steps if "for unit in" in str(step.get("run", ""))
     )
-    assert wrapper["if"] == "github.event_name == 'workflow_dispatch'"
     assert "bootstrap.sh" in wrapper["run"]
+    assert "rust,contracts,eval,workflow-container" in text
     for forbidden in ("retry-ledger", "validation-ledger", "cache-manifest", "receipt-schema"):
         assert forbidden not in text

@@ -707,21 +707,24 @@ def agent_canon_static_gate_findings(
     workflow: dict[str, object],
     workflow_text: str,
 ) -> list[Finding]:
-    """Require one manual bootstrap-container unit loop and no Host gate loop."""
+    """Require one shared-runtime unit loop and no duplicated Host gate loop."""
     findings: list[Finding] = []
-    wrapper = "for unit in rust contracts eval workflow-container"
     run_steps = [
         (context, run)
         for context in step_contexts(workflow)
         if isinstance((run := context.step.get("run")), str)
     ]
-    wrapper_steps = [context for context, run in run_steps if wrapper in run]
+    wrapper_steps = [
+        context
+        for context, run in run_steps
+        if "for unit in" in run and "run_standalone_static_gate_unit.sh" in run
+    ]
     if len(wrapper_steps) != 1:
         findings.append(
             Finding(
                 "error",
                 path,
-                f"bootstrap_container_manual_gate_count:{len(wrapper_steps)}",
+                f"bootstrap_container_shared_gate_count:{len(wrapper_steps)}",
             )
         )
     if re.search(r"(?m)^  push:\s*$", workflow_text):
@@ -729,7 +732,7 @@ def agent_canon_static_gate_findings(
             Finding("error", path, "duplicate_push_trigger_for_candidate_gate")
         )
     for context, run in run_steps:
-        if wrapper in run:
+        if context in wrapper_steps:
             continue
         for command in AGENT_CANON_STATIC_GATE_DIRECT_COMMANDS:
             if command in run:
