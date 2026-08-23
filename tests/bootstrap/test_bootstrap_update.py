@@ -123,3 +123,18 @@ def test_tree_digest_is_worktree_content_identity(tmp_path: Path) -> None:
     before = _source_snapshot(repo)["tree_digest"]
     (repo / "README.md").write_text("changed\n", encoding="utf-8")
     assert _source_snapshot(repo)["tree_digest"] != before
+
+
+def test_update_then_codex_prepare_reads_current_tracked_adapters(tmp_path: Path) -> None:
+    manager, _docker = _runtime(tmp_path)
+    manager.install()
+    manager.update()
+    result = manager.codex_prepare()
+    manifest = json.loads((manager.paths.codex_home / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["source_root"] == str(ROOT)
+    assert manifest["tree_digest"] == manager.source_identity["tree_digest"]
+    assert manifest["manifest_digest"] == manager.manifest_digest
+    skill_links = [entry for entry in result["details"]["links"] if entry["surface"] == "skills"]
+    assert skill_links
+    assert all("/.agents/skills/" in entry["source"] for entry in skill_links)
+    assert all(Path(entry["target"]).is_symlink() for entry in skill_links)

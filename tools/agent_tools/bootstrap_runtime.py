@@ -2694,7 +2694,7 @@ class BootstrapRuntime:
     def _managed_links(self) -> list[dict[str, str]]:
         entries: list[dict[str, str]] = []
         for surface, source in (
-            ("skills", self.repository_root / "agents" / "skills"),
+            ("skills", self.repository_root / ".agents" / "skills"),
             ("agents", self.repository_root / ".codex" / "agents"),
             ("hooks", self.repository_root / ".codex" / "hooks"),
             ("config", self.repository_root / ".codex" / "config.toml"),
@@ -2760,6 +2760,10 @@ class BootstrapRuntime:
                 {
                     "schema": SCHEMA_SKILLS,
                     "source_root": str(self.repository_root),
+                    "source_commit": self.source_identity.get("head"),
+                    "tree_digest": self.source_identity.get("tree_digest"),
+                    "image_input_digest": self.image_input_digest,
+                    "manifest_digest": self.manifest_digest,
                     "links": links,
                 },
             )
