@@ -93,7 +93,9 @@ handled call. Source acquisition remains the downstream dotfiles responsibility.
 `install` and `update` also converge `<control-parent-root>/.agents` to an
 exact symlink targeting the tracked source `.agents`. A regular file, directory,
 or different symlink at that path is a typed collision. `uninstall` removes only
-that exact owned link; it does not touch global `~/.agents` or `.codex`.
+that exact owned link; it never creates an implicit home link and does not touch
+global `.codex`. When the caller explicitly selects `$HOME` as control root,
+the owned path is deliberately `$HOME/.agents`.
 
 The container is bounded by the manifest: two CPUs, 4 GiB memory, 512 PIDs,
 network disabled, read-only root filesystem, all Linux capabilities dropped,

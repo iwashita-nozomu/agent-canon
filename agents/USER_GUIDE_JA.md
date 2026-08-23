@@ -52,7 +52,8 @@ install / update 後は新しい Codex session を起動し、manifest、link ta
 
 install / update は明示された control root の `.agents` を、AgentCanon source の
 tracked `.agents` への exact symlink として管理します。global `~/.agents` と global
-`.codex` は管理しません。regular pathや別symlinkが存在する場合は collision として停止します。
+`.codex` は暗黙には管理しません。control root に `$HOME` を明示した場合だけ
+`~/.agents` が管理対象になります。regular pathや別symlinkが存在する場合は collision として停止します。
 
 ## Tool を呼ぶ
 
