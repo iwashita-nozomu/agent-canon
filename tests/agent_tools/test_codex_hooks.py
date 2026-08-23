@@ -406,9 +406,14 @@ class CodexHooksTest(unittest.TestCase):
             [hook["command"] for hook in cast("list[dict[str, object]]", pre_tool_group["hooks"])],
             ["python3 .codex/hooks/hook_dispatcher.py PreToolUse"],
         )
-        self.assertEqual(
-            post_tool_group["matcher"],
-            "Bash|apply_patch|python|python3|Task|spawn_agent|send_input|wait_agent|close_agent|resume_agent|send_message|followup_task|list_agents|interrupt_agent",
+        post_matcher = cast(str, post_tool_group["matcher"])
+        self.assertTrue(
+            {
+                "send_message",
+                "followup_task",
+                "list_agents",
+                "interrupt_agent",
+            }.issubset(set(post_matcher.split("|")))
         )
         self.assertEqual(
             [hook["command"] for hook in cast("list[dict[str, object]]", post_tool_group["hooks"])],
@@ -515,6 +520,55 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(payload["schema"], "agent-canon.posttooluse-stop.v1")
         self.assertEqual(hook_output["hookEventName"], "PostToolUse")
         self.assertEqual(hook_output["additionalContext"], projection_stdout)
+
+    def test_coordination_receipt_uses_real_posttool_result(self) -> None:
+        """Coordination receipts live in the base spool event, not behavior snapshots."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "source"
+            root.mkdir()
+            payload = {
+                "hookEventName": "PostToolUse",
+                "tool_name": "send_message",
+                "tool_input": {"to": "worker"},
+                "tool_response": {"exit_code": 0, "stderr": "", "stdout": "sent"},
+            }
+            self._run_hook_in_root(root, "PostToolUse", payload)
+            event = self._spooled_event(root)
+            receipt = cast("dict[str, object]", event["coordination_receipt"])
+            self.assertEqual(
+                set(receipt),
+                {
+                    "schema",
+                    "operation",
+                    "capability_status",
+                    "effective_operations",
+                    "evidence_ref",
+                    "transport",
+                    "direct_peer",
+                    "status",
+                },
+            )
+            self.assertEqual(receipt["schema"], "agent-canon.coordination-receipt.v1")
+            self.assertEqual(receipt["operation"], "send_message")
+            self.assertEqual(receipt["status"], "succeeded")
+            self.assertEqual(receipt["capability_status"], "unverified")
+            self.assertEqual(receipt["transport"], "durable_artifact")
+            self.assertFalse(receipt["direct_peer"])
+            self.assertNotIn("coordination_mode", event)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "source"
+            root.mkdir()
+            payload = {
+                "hookEventName": "PostToolUse",
+                "tool_name": "send_message",
+                "tool_input": {"to": "worker"},
+                "tool_response": {"exit_code": 1, "stderr": "failed", "stdout": ""},
+            }
+            self._run_hook_in_root(root, "PostToolUse", payload)
+            event = self._spooled_event(root)
+            receipt = cast("dict[str, object]", event["coordination_receipt"])
+            self.assertEqual(receipt["status"], "failed")
 
     def test_post_tool_malformed_json_and_schema_matrix_is_noop(self) -> None:
         """Malformed PostToolUse JSON, raw schema, and projection schema fail open quietly."""

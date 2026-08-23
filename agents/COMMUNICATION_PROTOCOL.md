@@ -104,22 +104,30 @@ An operation matcher is observation only. Seeing `send_message`,
 
 ### Coordination Receipt
 
-Every coordination attempt emits one coordination receipt through the
-existing event/artifact route. Its closed fields are:
+Every coordination attempt emits one coordination receipt through the existing
+`HookLogContext.append` base-event route. It is stored under the
+`coordination_receipt` member of that transport event; it is not added to the
+fixed `agent-canon.behavior-event.v1` snapshot field set. Its closed fields are:
 
 - `schema`: `agent-canon.coordination-receipt.v1`
 - `operation`: the observed operation
 - `capability_status`: the handshake status used for the decision
-- `transport`: `direct_peer`, `parent_relay`, or `durable_artifact`
+- `effective_operations`: operations actually read back from the direct runtime
+  namespace; the hook route uses an empty list when no readback is available
 - `evidence_ref`: the handshake evidence or an explicit artifact reference
-- `status`: the operation result
+- `transport`: `direct_peer`, `parent_relay`, or `durable_artifact`
+- `direct_peer`: a boolean consistency readback for the transport
+- `status`: `succeeded`, `failed`, or `invalid_tool_result`, derived from the
+  real tool response
 
 `transport=direct_peer` is valid only with `capability_status=available` and
-an evidence reference that names the operation. A parent relay is always
+an evidence reference that names the operation. The hook dispatcher cannot
+observe the parent handoff capability, so its receipt is always
+`capability_status=unverified`, `effective_operations=[]`,
+`transport=durable_artifact`, and `direct_peer=false`. A parent relay is always
 recorded as `parent_relay`; it must never be rewritten as direct peer
 communication. If the runtime cannot return the direct namespace, use
-`durable_artifact` and preserve the honest `unverified` or `unavailable`
-status.
+`durable_artifact` and preserve the honest `unverified` or `unavailable` status.
 
 ## 主要な通信面
 

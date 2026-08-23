@@ -592,13 +592,17 @@ def validate_project_hooks() -> None:
         ensure(isinstance(event_contract.get("matchers"), list), f"hook contract {event} matchers must be a list")
         ensure(isinstance(event_contract.get("failure"), str) and event_contract["failure"], f"hook contract {event} failure must be non-empty")
         ensure(isinstance(event_contract.get("telemetry"), str) and event_contract["telemetry"], f"hook contract {event} telemetry must be non-empty")
-    post_tool_matcher = (
-        "Bash|apply_patch|python|python3|Task|spawn_agent|send_input|wait_agent|"
-        "close_agent|resume_agent|" + "|".join(COLLABORATION_OPERATIONS)
-    )
+    post_tool_matchers = event_contracts["PostToolUse"].get("matchers")
     ensure(
-        event_contracts["PostToolUse"].get("matchers") == [post_tool_matcher],
-        "PostToolUse matcher must observe the complete subagent collaboration operation set",
+        isinstance(post_tool_matchers, list)
+        and len(post_tool_matchers) == 1
+        and isinstance(post_tool_matchers[0], str),
+        "PostToolUse matcher contract must expose one string matcher",
+    )
+    matcher_tokens = set(post_tool_matchers[0].split("|")) if isinstance(post_tool_matchers, list) and post_tool_matchers and isinstance(post_tool_matchers[0], str) else set()
+    ensure(
+        set(COLLABORATION_OPERATIONS).issubset(matcher_tokens),
+        "PostToolUse matcher must observe collaboration operations without implying capability",
     )
     retired = require_list(contract.get("retired_child_tombstones", []), "retired child tombstones must be a list")
     moved = require_list(contract.get("moved_source_absences", []), "moved source absences must be a list")

@@ -67,7 +67,11 @@ from parent_root_side_effects import (  # noqa: E402
     attest_parent_root,
 )
 from prompt_classifier import PromptClassifierInputs, freeze  # noqa: E402
-from subagent_selection import select_subagents  # noqa: E402
+from subagent_selection import (  # noqa: E402
+    SubagentSelection,
+    build_coordination_receipt,
+    select_subagents,
+)
 from tool_selection import select_tools  # noqa: E402
 from workflow_context import WorkflowContext, load_workflow_context  # noqa: E402
 from workflow_monitor import emit_behavior_projection  # noqa: E402
@@ -387,7 +391,7 @@ def prepare_parts(
     entry: dict[str, object],
     root: Path,
     report_dir: Path | None,
-) -> HookInvocationParts:
+) -> tuple[HookInvocationParts, SubagentSelection | None]:
     """Construct typed assembly inputs without writing an artifact."""
     parsed = payload is not None
     safe_payload = payload if parsed else None
@@ -409,24 +413,27 @@ def prepare_parts(
         tools = None
         subagents = None
         rules = None
-    return HookInvocationParts(
-        hook_event_name=event,
-        hook_invocation_id=str(entry["hook_run_id"]),
-        hook_payload=safe_payload,
-        payload_status="parsed" if parsed else "malformed_payload",
-        handler_result=FinalHandlerResult(
-            status=status,
-            output_kind="block" if output else "additional_context" if status == "projection_forwarded" else "",
-            safe_fields={"safety_decision": "block"} if status.startswith("blocked_") else {},
+    return (
+        HookInvocationParts(
+            hook_event_name=event,
+            hook_invocation_id=str(entry["hook_run_id"]),
+            hook_payload=safe_payload,
+            payload_status="parsed" if parsed else "malformed_payload",
+            handler_result=FinalHandlerResult(
+                status=status,
+                output_kind="block" if output else "additional_context" if status == "projection_forwarded" else "",
+                safe_fields={"safety_decision": "block"} if status.startswith("blocked_") else {},
+            ),
+            classifier_rules=rules,
+            tool_selection=tools,
+            subagent_selection=subagents,
+            workflow_context=context,
+            payload_fingerprint=str(entry["payload_fingerprint"]),
+            timestamp=str(entry["timestamp"]),
+            root=root,
+            report_dir=report_dir,
         ),
-        classifier_rules=rules,
-        tool_selection=tools,
-        subagent_selection=subagents,
-        workflow_context=context,
-        payload_fingerprint=str(entry["payload_fingerprint"]),
-        timestamp=str(entry["timestamp"]),
-        root=root,
-        report_dir=report_dir,
+        subagents,
     )
 
 
@@ -480,17 +487,23 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
         root_state.active_root,
         **telemetry,
     )
-    behavior = record_hook_invocation(
-        prepare_parts(
-            event,
-            payload,
-            status,
-            output,
-            spool_entry,
-            root_state.active_root,
-            report_dir,
-        )
+    parts, subagent_selection = prepare_parts(
+        event,
+        payload,
+        status,
+        output,
+        spool_entry,
+        root_state.active_root,
+        report_dir,
     )
+    receipt = build_coordination_receipt(
+        payload,
+        subagent_selection,
+        hook_event_name=event,
+    )
+    if receipt is not None:
+        spool_entry["coordination_receipt"] = receipt
+    behavior = record_hook_invocation(parts)
     if behavior is not None:
         spool_entry.update(behavior.as_dict())
     try:

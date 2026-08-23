@@ -120,9 +120,9 @@ class BehaviorEventAssemblyTest(unittest.TestCase):
         self.assertIsNotNone(event)
         data = event.as_dict() if event is not None else {}
         self.assertEqual(data["subagent_event_kind"], "send_message")
-        self.assertEqual(data["coordination_capability_status"], "unverified")
-        self.assertEqual(data["coordination_mode"], "durable_artifact")
-        self.assertEqual(data["coordination_receipt_status"], "observed")
+        self.assertNotIn("coordination_capability_status", data)
+        self.assertNotIn("coordination_mode", data)
+        self.assertNotIn("coordination_receipt_status", data)
 
 
 if __name__ == "__main__":

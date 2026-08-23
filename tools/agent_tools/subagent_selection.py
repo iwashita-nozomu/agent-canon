@@ -22,12 +22,7 @@ COLLABORATION_OPERATIONS = (
     "list_agents",
     "interrupt_agent",
 )
-COORDINATION_CAPABILITY_STATUSES = frozenset(
-    {"available", "unavailable", "unverified"}
-)
-COORDINATION_MODES = frozenset(
-    {"direct_peer", "parent_relay", "durable_artifact"}
-)
+COORDINATION_RECEIPT_SCHEMA = "agent-canon.coordination-receipt.v1"
 
 
 @dataclass(frozen=True)
@@ -44,11 +39,6 @@ class SubagentSelection:
     prompt_fingerprint: str = ""
     prompt_char_count: int = 0
     item_count: int = 0
-    capability_status: str = "unverified"
-    effective_operations: tuple[str, ...] = ()
-    evidence_ref: str = ""
-    coordination_mode: str = "durable_artifact"
-    receipt_status: str = ""
 
     def should_log(self) -> bool:
         return self.invoked
@@ -80,37 +70,51 @@ def _normalise_operation(tool_name: str, action: str) -> str:
     return action
 
 
-def _coordination_fields(
-    payload: dict[str, object], operation: str
-) -> tuple[str, tuple[str, ...], str, str, str]:
-    """Read explicit capability evidence; never infer it from a matcher/tool name."""
-    raw_status = payload.get("coordination_capability_status", payload.get("capability_status"))
-    status = raw_status if isinstance(raw_status, str) and raw_status in COORDINATION_CAPABILITY_STATUSES else "unverified"
-    raw_operations = payload.get(
-        "coordination_effective_operations", payload.get("effective_operations", ())
+def build_coordination_receipt(
+    payload: object,
+    selection: SubagentSelection | None,
+    *,
+    hook_event_name: str,
+) -> dict[str, object] | None:
+    """Build one honest base-event receipt from the real PostToolUse result."""
+    if (
+        hook_event_name != "PostToolUse"
+        or selection is None
+        or selection.action not in COLLABORATION_OPERATIONS
+    ):
+        return None
+    exact_post_tool_payload = (
+        isinstance(payload, dict)
+        and set(payload) == {"hookEventName", "tool_name", "tool_input", "tool_response"}
+        and payload.get("hookEventName") == "PostToolUse"
+        and isinstance(payload.get("tool_name"), str)
+        and isinstance(payload.get("tool_input"), dict)
     )
-    operations = tuple(
-        item
-        for item in raw_operations
-        if isinstance(item, str) and item in COLLABORATION_OPERATIONS
-    ) if isinstance(raw_operations, (list, tuple)) else ()
-    raw_evidence = payload.get("coordination_evidence_ref", payload.get("evidence_ref", ""))
-    evidence = raw_evidence if isinstance(raw_evidence, str) else ""
-    requested_mode = payload.get("coordination_mode", payload.get("communication_mode", ""))
-    mode = requested_mode if isinstance(requested_mode, str) else ""
-    if status == "available":
-        mode = "direct_peer" if operation in operations and evidence else "durable_artifact"
-    elif mode not in {"parent_relay", "durable_artifact"}:
-        mode = "durable_artifact"
-    raw_receipt_status = payload.get("coordination_receipt_status", "")
-    receipt_status = (
-        raw_receipt_status
-        if isinstance(raw_receipt_status, str) and raw_receipt_status
-        else "observed"
-        if operation in COLLABORATION_OPERATIONS
-        else ""
+    response = payload.get("tool_response") if exact_post_tool_payload else None
+    valid_response = (
+        isinstance(response, dict)
+        and set(response) == {"exit_code", "stderr", "stdout"}
+        and type(response.get("exit_code")) is int
+        and isinstance(response.get("stderr"), str)
+        and isinstance(response.get("stdout"), str)
     )
-    return status, operations, evidence, mode, receipt_status
+    result_status = (
+        "succeeded"
+        if valid_response and response["exit_code"] == 0
+        else "failed"
+        if valid_response
+        else "invalid_tool_result"
+    )
+    return {
+        "schema": COORDINATION_RECEIPT_SCHEMA,
+        "operation": selection.action,
+        "capability_status": "unverified",
+        "effective_operations": [],
+        "evidence_ref": "",
+        "transport": "durable_artifact",
+        "direct_peer": False,
+        "status": result_status,
+    }
 
 
 def _string(payload: dict[str, object], *keys: str) -> str:
@@ -131,7 +135,6 @@ def select_subagents(payload: object, workflow_context: object = None) -> Subage
     targets = tuple(item for item in raw_targets if isinstance(item, str) and item) if isinstance(raw_targets, (list, tuple)) else ()
     target = _string(payload, "subagent_target", "target")
     prompt = _string(payload, "subagent_prompt", "prompt")
-    capability_status, effective_operations, evidence_ref, coordination_mode, receipt_status = _coordination_fields(payload, action)
     return SubagentSelection(
         invoked=bool(action or targets or target or payload.get("subagent_invoked")),
         action=action,
@@ -145,9 +148,4 @@ def select_subagents(payload: object, workflow_context: object = None) -> Subage
         prompt_fingerprint=hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16] if prompt else "",
         prompt_char_count=len(prompt),
         item_count=len(targets),
-        capability_status=capability_status,
-        effective_operations=effective_operations,
-        evidence_ref=evidence_ref,
-        coordination_mode=coordination_mode,
-        receipt_status=receipt_status,
     )

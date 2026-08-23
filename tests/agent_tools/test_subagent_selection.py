@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "agent_tools"))
-from subagent_selection import select_subagents  # noqa: E402
+from subagent_selection import build_coordination_receipt, select_subagents  # noqa: E402
 
 
 class SubagentSelectionTest(unittest.TestCase):
@@ -31,32 +31,59 @@ class SubagentSelectionTest(unittest.TestCase):
                 result = select_subagents({"tool_name": f"tools.collaboration.{operation}"})
                 self.assertTrue(result.invoked)
                 self.assertEqual(result.action, operation)
-                self.assertEqual(result.capability_status, "unverified")
-                self.assertEqual(result.coordination_mode, "durable_artifact")
 
-    def test_direct_peer_requires_explicit_runtime_readback(self) -> None:
+    def test_hook_selection_ignores_synthetic_capability_fields(self) -> None:
         result = select_subagents(
             {
                 "tool_name": "send_message",
                 "coordination_capability_status": "available",
                 "coordination_effective_operations": ["send_message"],
                 "coordination_evidence_ref": "reports/runtime/capability.json",
+                "coordination_mode": "direct_peer",
             }
         )
-        self.assertEqual(result.coordination_mode, "direct_peer")
+        self.assertEqual(result.action, "send_message")
 
-        matcher_only = select_subagents({"tool_name": "send_message"})
-        self.assertNotEqual(matcher_only.coordination_mode, "direct_peer")
-
-    def test_parent_relay_stays_distinct_from_direct_peer(self) -> None:
+    def test_coordination_receipt_uses_real_tool_result(self) -> None:
+        selection = select_subagents({"tool_name": "send_message"})
         result = select_subagents(
             {
                 "tool_name": "send_message",
-                "coordination_capability_status": "unavailable",
                 "coordination_mode": "parent_relay",
             }
         )
-        self.assertEqual(result.coordination_mode, "parent_relay")
+        self.assertEqual(result.action, "send_message")
+        success = build_coordination_receipt(
+            {
+                "hookEventName": "PostToolUse",
+                "tool_name": "send_message",
+                "tool_input": {},
+                "tool_response": {"exit_code": 0, "stderr": "", "stdout": "ok"},
+            },
+            selection,
+            hook_event_name="PostToolUse",
+        )
+        self.assertIsNotNone(success)
+        self.assertEqual(success["status"], "succeeded")
+        self.assertFalse(success["direct_peer"])
+        self.assertEqual(success["effective_operations"], [])
+        failure = build_coordination_receipt(
+            {
+                "hookEventName": "PostToolUse",
+                "tool_name": "send_message",
+                "tool_input": {},
+                "tool_response": {"exit_code": 1, "stderr": "error", "stdout": ""},
+            },
+            selection,
+            hook_event_name="PostToolUse",
+        )
+        self.assertEqual(failure["status"], "failed")
+        invalid = build_coordination_receipt(
+            {"tool_name": "send_message"},
+            selection,
+            hook_event_name="PostToolUse",
+        )
+        self.assertEqual(invalid["status"], "invalid_tool_result")
 
 
 if __name__ == "__main__":
