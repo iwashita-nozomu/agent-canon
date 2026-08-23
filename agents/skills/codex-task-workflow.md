@@ -12,6 +12,7 @@ upstream design tool-finding-report.md tool-based finding packet and prompt feed
 upstream design ../internal-routines/design-implementation-correspondence.md design read/fingerprint/handoff correspondence route
 upstream design ../../documents/design/request-intent-and-update-relation.md compact task-packet request and update projection
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner allocation
+upstream design ./agent-orchestration.md owner-first read trace and implementation admission
 downstream design ../../.agents/skills/codex-task-workflow/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
@@ -76,6 +77,17 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 
 - `agents/canonical/CODEX_WORKFLOW.md`
 
+## Owner-First Readback
+
+Before the implementation stage, consume
+`agents/skills/agent-orchestration.md#Owner-First-Read-Trace`. The current task
+update must name the active root Reader Map row, selected canonical Skill,
+operational owner and route, then show
+`docs_first_status=resolved` and `implementation_read=ready`. If the trace is
+unresolved, implementation remains locked and the existing coordinated-search
+route owns the bounded lookup. Do not replace this readback with an
+implementation-path list, a repository sweep, or a new durable packet.
+
 ## CompletionCoverage Reader Projection
 
 Closeout reporting consumes the generated `agent-canon.completion-coverage.v1`
@@ -104,6 +116,7 @@ does not create a second semantic ledger; review reads the same instance back.
 1. intake and semantic decision sufficiency
 1. owner-critical context and validation route
 1. workflow and skill selection
+1. owner-first Skill/operational-owner readback
 1. optional durable artifact placement when coordination or resumption needs it
 1. optional subagent bootstrap for a launchable wave
 1. selected implementation
