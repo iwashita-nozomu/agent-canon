@@ -9,7 +9,13 @@ from pathlib import Path
 
 import pytest
 
-from tools.agent_tools.bootstrap_runtime import BootstrapError, BootstrapRuntime, DockerAdapter, _source_snapshot
+from tools.agent_tools.bootstrap_runtime import (
+    BootstrapError,
+    BootstrapRuntime,
+    DockerAdapter,
+    _source_snapshot,
+    build_parser,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -218,3 +224,24 @@ def test_codex_prepare_removes_only_exact_stale_managed_links(tmp_path: Path) ->
     manager.codex_prepare()
     assert not stale_target.exists() and not stale_target.is_symlink()
     assert foreign.read_text(encoding="utf-8") == "foreign\n"
+
+
+def test_template_logical_command_routes_to_container_receipt(tmp_path: Path) -> None:
+    manager, docker = _runtime(tmp_path)
+    manager.install()
+    manager.target_add(ROOT)
+    result = manager.template_export(ROOT, "agent-artifacts", "bundle")
+    assert result["details"]["execution_plane"] == "agentcanon_tool_container"
+    command = next(command for command in docker.commands if command[1] == "exec")
+    assert "python3" not in command
+    assert "PYTHONPATH" not in command
+    parsed = build_parser().parse_args(
+        [
+            "--repository-root", str(ROOT),
+            "--control-parent-root", str(tmp_path / "control"),
+            "--runtime-root", str(tmp_path / "control/runtime"),
+            "template", "export", "--root", str(ROOT),
+            "--profile", "agent-artifacts", "--output", "bundle",
+        ]
+    )
+    assert not hasattr(parsed, "execution_plane")

@@ -74,13 +74,7 @@ Python tool は flat な global executable にしません。schema-v2 parity fi
 ```
 
 parity は argv、cwd、stdin/stdout/stderr、exit/signal、written paths を比較します。
-未確認の entry は legacy の正確なコマンドを、登録済み target に対する `exec` または
-既存 workflow から実行します。
-
-```bash
-"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" \
-  exec --root <project-root> -- <existing-command> <args...>
-```
+未確認の内部Python entryはpublic bootstrap commandとして公開されません。
 
 shell string、未知の catalog id、internal Python file の自動公開は許可しません。
 

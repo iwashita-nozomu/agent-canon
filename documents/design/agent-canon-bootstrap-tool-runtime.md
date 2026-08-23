@@ -96,13 +96,12 @@ mutation tool は明示 target capability を受けた場合だけ source を変
 ```bash
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> install
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> update
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> update
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> start
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> status
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> target add --root <project-a> --mode read-only
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> target add --root <project-b> --mode read-only
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> exec --root <path> -- <existing-command...>
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> tool run <catalog-id> -- <args...>
+./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> template export --root <registered-source> --profile <profile> --output <runtime-relative-directory>
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> codex prepare
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> codex --project-root <path>
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> eval collect --root <path> --run-id <id>
@@ -404,8 +403,8 @@ unhealthy、archive publish failure、rollback、session restart、cleanup readb
 | `update` | current checkout reconciled in existing v2 lifecycle | source commit/tree digest, image-input/manifest digest, Docker IDs |
 | `start` | exactly one healthy container | inspect, limits, mounts, generation |
 | `target add` | new mount generation active | lock, zero tasks, health, mount readback |
-| `exec` | exact command completed | argv/cwd/I/O/exit/source before-after |
 | `tool run` | typed catalog dispatch | `tools/agent_tools/tool_dispatch.py` receipt |
+| `template export` | external template bundle exported | container-plane receipt and bundle provenance |
 | `codex prepare` | isolated managed surfaces active | collision result, link/digest/readback |
 | `eval collect` | external eval bundle complete | producer matrix, source unchanged |
 | `eval sync` | archive commit published | branch/commit/ref/tree/blob readback |

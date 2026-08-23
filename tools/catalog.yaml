@@ -791,8 +791,24 @@ entries:
     family: agent_tools
     role: helper
     status: canonical
-    command: python3 tools/agent_tools/template_bundle.py export --source-root <root> --source-ref <commit> --profile <profile> --output <fresh-directory>
+    command: bootstrap.sh template export --root <registered-root> --profile <profile> --output <runtime-relative-directory>
     writes: true
+    dispatch:
+      runtime: python
+      argv: [python3, tools/agent_tools/template_bundle.py]
+      execution_plane: tool-container
+      cwd: source-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: external-artifact
+      output_root: external-runtime
+      written_paths: []
+      parity: verified
+      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
     default_wiring:
       ci: false
       pr_check: false

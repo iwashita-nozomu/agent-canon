@@ -44,7 +44,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "BOOTSTRAP",
-      "line": 106,
+      "line": 51,
       "path": "agents/skills/agent-canon-update.md",
       "surface": "skill"
     },
@@ -52,7 +52,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "COMMON",
-      "line": 107,
+      "line": 52,
       "path": "agents/skills/agent-canon-update.md",
       "surface": "skill"
     },
@@ -60,7 +60,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "ROOT",
-      "line": 104,
+      "line": 49,
       "path": "agents/skills/agent-canon-update.md",
       "surface": "skill"
     },
@@ -68,47 +68,7 @@
       "certainty": "static",
       "emitter": "markdown_key_value_example",
       "field": "RUNTIME",
-      "line": 105,
-      "path": "agents/skills/agent-canon-update.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "immutable_parent_surfaces",
-      "line": 57,
-      "path": "agents/skills/agent-canon-update.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "management_write_set",
-      "line": 56,
-      "path": "agents/skills/agent-canon-update.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "migration_status",
-      "line": 59,
-      "path": "agents/skills/agent-canon-update.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "mixed_file_limit",
-      "line": 58,
-      "path": "agents/skills/agent-canon-update.md",
-      "surface": "skill"
-    },
-    {
-      "certainty": "static",
-      "emitter": "markdown_key_value_example",
-      "field": "source_free_parent_issue",
-      "line": 55,
+      "line": 50,
       "path": "agents/skills/agent-canon-update.md",
       "surface": "skill"
     },
@@ -1412,7 +1372,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "RUST_MIGRATION_AUDIT",
-      "line": 141,
+      "line": 143,
       "path": "rust/agent-canon/src/migration_audit.rs",
       "surface": "tool"
     },
@@ -1420,7 +1380,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "RUST_MIGRATION_AUDIT",
-      "line": 144,
+      "line": 146,
       "path": "rust/agent-canon/src/migration_audit.rs",
       "surface": "tool"
     },
@@ -1436,7 +1396,7 @@
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
       "field": "RUST_MIGRATION_FINDING",
-      "line": 146,
+      "line": 148,
       "path": "rust/agent-canon/src/migration_audit.rs",
       "surface": "tool"
     },
@@ -3532,7 +3492,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 102,
+      "line": 98,
       "path": "tools/agent_tools/bootstrap_runtime.py",
       "surface": "tool"
     },
@@ -3540,7 +3500,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 417,
+      "line": 423,
       "path": "tools/agent_tools/bootstrap_runtime.py",
       "surface": "tool"
     },
@@ -3548,7 +3508,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 2429,
+      "line": 2287,
       "path": "tools/agent_tools/bootstrap_runtime.py",
       "surface": "tool"
     },
@@ -3556,7 +3516,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 2433,
+      "line": 2291,
       "path": "tools/agent_tools/bootstrap_runtime.py",
       "surface": "tool"
     },
@@ -3564,7 +3524,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 2434,
+      "line": 2292,
       "path": "tools/agent_tools/bootstrap_runtime.py",
       "surface": "tool"
     },
@@ -3572,7 +3532,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 2435,
+      "line": 2293,
       "path": "tools/agent_tools/bootstrap_runtime.py",
       "surface": "tool"
     },
@@ -3948,7 +3908,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_ALIGNMENT",
-      "line": 2294,
+      "line": 2377,
       "path": "tools/agent_tools/check_agent_runtime_alignment.py",
       "surface": "tool"
     },
@@ -6004,7 +5964,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1102,
+      "line": 1103,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6012,7 +5972,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 2613,
+      "line": 2614,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6020,7 +5980,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "completed",
-      "line": 5145,
+      "line": 5146,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6028,7 +5988,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "error",
-      "line": 5135,
+      "line": 5136,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6036,7 +5996,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "executable_bindings",
-      "line": 3630,
+      "line": 3631,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6044,7 +6004,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "manifest_version",
-      "line": 3630,
+      "line": 3631,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6052,7 +6012,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "owner",
-      "line": 3630,
+      "line": 3631,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6060,7 +6020,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "phase",
-      "line": 3630,
+      "line": 3631,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6068,7 +6028,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "plan_fingerprint",
-      "line": 3630,
+      "line": 3631,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6076,7 +6036,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "plan_fingerprint",
-      "line": 5145,
+      "line": 5146,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6084,7 +6044,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "record_fingerprint",
-      "line": 3630,
+      "line": 3631,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6092,7 +6052,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "record_id",
-      "line": 3630,
+      "line": 3631,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6100,7 +6060,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 3630,
+      "line": 3631,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6108,7 +6068,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "source_identity",
-      "line": 3630,
+      "line": 3631,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6116,7 +6076,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 3630,
+      "line": 3631,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6124,7 +6084,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 5135,
+      "line": 5136,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6132,7 +6092,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 5145,
+      "line": 5146,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6140,7 +6100,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "verification",
-      "line": 3630,
+      "line": 3631,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6148,7 +6108,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "completed",
-      "line": 5145,
+      "line": 5146,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6156,7 +6116,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "error",
-      "line": 5135,
+      "line": 5136,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6164,7 +6124,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "plan_fingerprint",
-      "line": 5145,
+      "line": 5146,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6172,7 +6132,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "status",
-      "line": 5135,
+      "line": 5136,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6180,7 +6140,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "status",
-      "line": 5145,
+      "line": 5146,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6188,7 +6148,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 4837,
+      "line": 4838,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6196,7 +6156,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "AGENT_CANON_RUNTIME_BOUNDARY_FINDING",
-      "line": 2735,
+      "line": 2736,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6204,7 +6164,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_IMAGE_INSTALL",
-      "line": 5149,
+      "line": 5150,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6212,38 +6172,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_CANON_IMAGE_VERIFY",
-      "line": 5141,
-      "path": "tools/agent_tools/devcontainer_dependencies.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_IMAGE_VERIFY",
-      "line": 5151,
-      "path": "tools/agent_tools/devcontainer_dependencies.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_RUNTIME_BOUNDARY_FINDING",
-      "line": 5154,
-      "path": "tools/agent_tools/devcontainer_dependencies.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_TOOL_DEPENDENCY",
-      "line": 5147,
-      "path": "tools/agent_tools/devcontainer_dependencies.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_TOOL_DEPENDENCY_ERROR",
       "line": 5142,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
@@ -6251,8 +6179,32 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "DEPENDENCY_RECORD_WARN",
-      "line": 3363,
+      "field": "AGENT_CANON_IMAGE_VERIFY",
+      "line": 5152,
+      "path": "tools/agent_tools/devcontainer_dependencies.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_RUNTIME_BOUNDARY_FINDING",
+      "line": 5155,
+      "path": "tools/agent_tools/devcontainer_dependencies.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_TOOL_DEPENDENCY",
+      "line": 5148,
+      "path": "tools/agent_tools/devcontainer_dependencies.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_CANON_TOOL_DEPENDENCY_ERROR",
+      "line": 5143,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -6260,7 +6212,15 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_RECORD_WARN",
-      "line": 3438,
+      "line": 3364,
+      "path": "tools/agent_tools/devcontainer_dependencies.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "DEPENDENCY_RECORD_WARN",
+      "line": 3439,
       "path": "tools/agent_tools/devcontainer_dependencies.py",
       "surface": "tool"
     },
@@ -7780,7 +7740,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "hook_entries",
-      "line": 2006,
+      "line": 2007,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -7788,7 +7748,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "hook_files",
-      "line": 2006,
+      "line": 2007,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -7796,7 +7756,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "recent_days",
-      "line": 2006,
+      "line": 2007,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -7804,7 +7764,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "root",
-      "line": 2006,
+      "line": 2007,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -7812,7 +7772,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 2006,
+      "line": 2007,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -7820,7 +7780,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 3690,
+      "line": 3691,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -7828,7 +7788,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 4167,
+      "line": 4168,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -7836,7 +7796,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 4174,
+      "line": 4175,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -7844,110 +7804,6 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "AGENT_RUNTIME_DASHBOARD_BLOCKING_NEXT_ACTIONS",
-      "line": 3587,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_CLOSED_ISSUES",
-      "line": 3589,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_CODEX_AGENT_ROLE_REPORTS",
-      "line": 3550,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT",
-      "line": 3543,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES",
-      "line": 3546,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_HOOK_FILES",
-      "line": 3545,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_ATTRIBUTED",
-      "line": 3552,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_CONTEXT_ATTRIBUTED",
-      "line": 3554,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING",
-      "line": 3553,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_FAILURES",
-      "line": 3579,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_REPORTS",
-      "line": 3578,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_MARKDOWN_HOOK_SIGNALS",
-      "line": 3580,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_NEXT_ACTIONS",
-      "line": 3586,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_OPEN_ISSUES",
       "line": 3588,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
@@ -7955,103 +7811,15 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_PROBLEM_COMPONENTS",
-      "line": 3585,
+      "field": "AGENT_RUNTIME_DASHBOARD_CLOSED_ISSUES",
+      "line": 3590,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_PROMPT_ENTRIES",
-      "line": 3569,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_RECENT_DAYS",
-      "line": 3544,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_REFERENCE_BLOCKED_ENTRIES",
-      "line": 3584,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_REFERENCE_CAPTURE_ENTRIES",
-      "line": 3581,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS",
-      "line": 3583,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_REFERENCE_URL_OBSERVATIONS",
-      "line": 3582,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_REPORT_QUALITY_REPORTS",
-      "line": 3549,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_SELECTION_CANDIDATES",
-      "line": 3573,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_SELECTION_ITEMS",
-      "line": 3571,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_SELECTION_MISSES",
-      "line": 3574,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_SELECTION_SELECTED",
-      "line": 3572,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_SKILL_EVAL_FAILED_SKILLS",
+      "field": "AGENT_RUNTIME_DASHBOARD_CODEX_AGENT_ROLE_REPORTS",
       "line": 3551,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
@@ -8059,7 +7827,15 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_SKILL_EVAL_REPORTS",
+      "field": "AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT",
+      "line": 3544,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES",
       "line": 3547,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
@@ -8067,23 +7843,23 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_SKILL_SELECTION_MISS_RATE",
-      "line": 3575,
+      "field": "AGENT_RUNTIME_DASHBOARD_HOOK_FILES",
+      "line": 3546,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_STATUS",
-      "line": 3542,
+      "field": "AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_ATTRIBUTED",
+      "line": 3553,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_TOKEN_COMPARISONS",
+      "field": "AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_CONTEXT_ATTRIBUTED",
       "line": 3555,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
@@ -8091,39 +7867,63 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_TOKEN_OBJECTIVE_SELECTED",
-      "line": 3557,
+      "field": "AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING",
+      "line": 3554,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARIES",
-      "line": 3556,
+      "field": "AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_FAILURES",
+      "line": 3580,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARY_EVENTS",
-      "line": 3559,
+      "field": "AGENT_RUNTIME_DASHBOARD_MARKDOWN_EVAL_REPORTS",
+      "line": 3579,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARY_SESSIONS",
-      "line": 3558,
+      "field": "AGENT_RUNTIME_DASHBOARD_MARKDOWN_HOOK_SIGNALS",
+      "line": 3581,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_TOOL_SELECTION_ENTRIES",
+      "field": "AGENT_RUNTIME_DASHBOARD_NEXT_ACTIONS",
+      "line": 3587,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_OPEN_ISSUES",
+      "line": 3589,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_PROBLEM_COMPONENTS",
+      "line": 3586,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_PROMPT_ENTRIES",
       "line": 3570,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
@@ -8131,95 +7931,95 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_TOOL_SELECTION_MISS_RATE",
-      "line": 3577,
+      "field": "AGENT_RUNTIME_DASHBOARD_RECENT_DAYS",
+      "line": 3545,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_BLOCKED",
-      "line": 3564,
+      "field": "AGENT_RUNTIME_DASHBOARD_REFERENCE_BLOCKED_ENTRIES",
+      "line": 3585,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_COMPLETED",
-      "line": 3566,
+      "field": "AGENT_RUNTIME_DASHBOARD_REFERENCE_CAPTURE_ENTRIES",
+      "line": 3582,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_EVENTS",
-      "line": 3562,
+      "field": "AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS",
+      "line": 3584,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL",
-      "line": 3567,
+      "field": "AGENT_RUNTIME_DASHBOARD_REFERENCE_URL_OBSERVATIONS",
+      "line": 3583,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_PLANNED",
-      "line": 3561,
+      "field": "AGENT_RUNTIME_DASHBOARD_REPORT_QUALITY_REPORTS",
+      "line": 3550,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_REPORTS",
-      "line": 3560,
+      "field": "AGENT_RUNTIME_DASHBOARD_SELECTION_CANDIDATES",
+      "line": 3574,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_SKIPPED",
-      "line": 3565,
+      "field": "AGENT_RUNTIME_DASHBOARD_SELECTION_ITEMS",
+      "line": 3572,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_SPAWNED",
-      "line": 3563,
+      "field": "AGENT_RUNTIME_DASHBOARD_SELECTION_MISSES",
+      "line": 3575,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_UNPLANNED_ACTUAL",
-      "line": 3568,
+      "field": "AGENT_RUNTIME_DASHBOARD_SELECTION_SELECTED",
+      "line": 3573,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_WORKFLOW_SELECTION_MISS_RATE",
-      "line": 3576,
+      "field": "AGENT_RUNTIME_DASHBOARD_SKILL_EVAL_FAILED_SKILLS",
+      "line": 3552,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "AGENT_RUNTIME_DASHBOARD_WORKFLOW_SELECTION_REPORTS",
+      "field": "AGENT_RUNTIME_DASHBOARD_SKILL_EVAL_REPORTS",
       "line": 3548,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
@@ -8227,8 +8027,168 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_SKILL_SELECTION_MISS_RATE",
+      "line": 3576,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_STATUS",
+      "line": 3543,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_TOKEN_COMPARISONS",
+      "line": 3556,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_TOKEN_OBJECTIVE_SELECTED",
+      "line": 3558,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARIES",
+      "line": 3557,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARY_EVENTS",
+      "line": 3560,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARY_SESSIONS",
+      "line": 3559,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_TOOL_SELECTION_ENTRIES",
+      "line": 3571,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_TOOL_SELECTION_MISS_RATE",
+      "line": 3578,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_BLOCKED",
+      "line": 3565,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_COMPLETED",
+      "line": 3567,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_EVENTS",
+      "line": 3563,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL",
+      "line": 3568,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_PLANNED",
+      "line": 3562,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_REPORTS",
+      "line": 3561,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_SKIPPED",
+      "line": 3566,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_SPAWNED",
+      "line": 3564,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_WAVE_UNPLANNED_ACTUAL",
+      "line": 3569,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_WORKFLOW_SELECTION_MISS_RATE",
+      "line": 3577,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
+      "field": "AGENT_RUNTIME_DASHBOARD_WORKFLOW_SELECTION_REPORTS",
+      "line": 3549,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
       "field": "applicable",
-      "line": 1989,
+      "line": 1990,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -8236,7 +8196,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD",
-      "line": 4273,
+      "line": 4274,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -8244,30 +8204,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT",
-      "line": 4275,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES",
-      "line": 4278,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_RUNTIME_DASHBOARD_HOOK_FILES",
-      "line": 4277,
-      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_RUNTIME_DASHBOARD_RECENT_DAYS",
       "line": 4276,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
@@ -8275,8 +8211,32 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "AGENT_RUNTIME_DASHBOARD_HOOK_ENTRIES",
+      "line": 4279,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_RUNTIME_DASHBOARD_HOOK_FILES",
+      "line": 4278,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "AGENT_RUNTIME_DASHBOARD_RECENT_DAYS",
+      "line": 4277,
+      "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_DASHBOARD_STATUS",
-      "line": 4274,
+      "line": 4275,
       "path": "tools/agent_tools/generate_agent_runtime_dashboard.py",
       "surface": "tool"
     },
@@ -8308,7 +8268,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "artifacts",
-      "line": 674,
+      "line": 675,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8316,7 +8276,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "artifacts",
-      "line": 679,
+      "line": 680,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8324,7 +8284,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "artifacts",
-      "line": 687,
+      "line": 688,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8332,7 +8292,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "base",
-      "line": 674,
+      "line": 675,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8340,7 +8300,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "base",
-      "line": 679,
+      "line": 680,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8348,7 +8308,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "base",
-      "line": 687,
+      "line": 688,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8356,7 +8316,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "changed_files",
-      "line": 674,
+      "line": 675,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8364,7 +8324,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "changed_files",
-      "line": 679,
+      "line": 680,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8372,7 +8332,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "changed_files",
-      "line": 687,
+      "line": 688,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8380,7 +8340,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "commands",
-      "line": 674,
+      "line": 675,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8388,7 +8348,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "commands",
-      "line": 679,
+      "line": 680,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8396,7 +8356,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "commands",
-      "line": 687,
+      "line": 688,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8404,7 +8364,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "generated_at",
-      "line": 674,
+      "line": 675,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8412,7 +8372,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "generated_at",
-      "line": 679,
+      "line": 680,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8420,7 +8380,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "generated_at",
-      "line": 687,
+      "line": 688,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8428,7 +8388,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "head",
-      "line": 674,
+      "line": 675,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8436,7 +8396,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "head",
-      "line": 679,
+      "line": 680,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8444,7 +8404,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "head",
-      "line": 687,
+      "line": 688,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8452,7 +8412,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "paths",
-      "line": 674,
+      "line": 675,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8460,7 +8420,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "paths",
-      "line": 679,
+      "line": 680,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8468,7 +8428,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "paths",
-      "line": 687,
+      "line": 688,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8476,7 +8436,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "root",
-      "line": 674,
+      "line": 675,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8484,7 +8444,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "root",
-      "line": 679,
+      "line": 680,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8492,7 +8452,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "root",
-      "line": 687,
+      "line": 688,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8500,7 +8460,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 674,
+      "line": 675,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8508,7 +8468,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 679,
+      "line": 680,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8516,7 +8476,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 687,
+      "line": 688,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8524,7 +8484,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema_version",
-      "line": 551,
+      "line": 552,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8532,7 +8492,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema_version",
-      "line": 575,
+      "line": 576,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8540,7 +8500,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 551,
+      "line": 552,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8548,7 +8508,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 575,
+      "line": 576,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8556,7 +8516,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 674,
+      "line": 675,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8564,7 +8524,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 679,
+      "line": 680,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8572,7 +8532,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 687,
+      "line": 688,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8580,7 +8540,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "totals",
-      "line": 674,
+      "line": 675,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8588,7 +8548,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "totals",
-      "line": 679,
+      "line": 680,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8596,7 +8556,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "totals",
-      "line": 687,
+      "line": 688,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8604,7 +8564,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "GIT_DEPENDENCY_DIFF_SUMMARY",
-      "line": 693,
+      "line": 694,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8612,14 +8572,6 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "GIT_DEPENDENCY_DIFF_SUMMARY_CHANGED_FILES",
-      "line": 695,
-      "path": "tools/agent_tools/git_dependency_diff_summary.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_literal",
-      "field": "GIT_DEPENDENCY_DIFF_SUMMARY_CODE_EDGES",
       "line": 696,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
@@ -8627,7 +8579,7 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "GIT_DEPENDENCY_DIFF_SUMMARY_EDIT_SCOPE_LINES",
+      "field": "GIT_DEPENDENCY_DIFF_SUMMARY_CODE_EDGES",
       "line": 697,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
@@ -8635,7 +8587,7 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "GIT_DEPENDENCY_DIFF_SUMMARY_JSON",
+      "field": "GIT_DEPENDENCY_DIFF_SUMMARY_EDIT_SCOPE_LINES",
       "line": 698,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
@@ -8643,7 +8595,7 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "GIT_DEPENDENCY_DIFF_SUMMARY_MARKDOWN",
+      "field": "GIT_DEPENDENCY_DIFF_SUMMARY_JSON",
       "line": 699,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
@@ -8651,7 +8603,7 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
-      "field": "GIT_DEPENDENCY_DIFF_SUMMARY_REPORT_DIR",
+      "field": "GIT_DEPENDENCY_DIFF_SUMMARY_MARKDOWN",
       "line": 700,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
@@ -8659,8 +8611,16 @@
     {
       "certainty": "static",
       "emitter": "key_value_literal",
+      "field": "GIT_DEPENDENCY_DIFF_SUMMARY_REPORT_DIR",
+      "line": 701,
+      "path": "tools/agent_tools/git_dependency_diff_summary.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_literal",
       "field": "GIT_DEPENDENCY_DIFF_SUMMARY_SCHEMA",
-      "line": 694,
+      "line": 695,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -8668,7 +8628,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GIT_DEPENDENCY_DIFF_SUMMARY",
-      "line": 761,
+      "line": 762,
       "path": "tools/agent_tools/git_dependency_diff_summary.py",
       "surface": "tool"
     },
@@ -9100,7 +9060,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "files",
-      "line": 627,
+      "line": 606,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -9108,7 +9068,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 627,
+      "line": 606,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -9116,7 +9076,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "imports",
-      "line": 627,
+      "line": 606,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -9124,7 +9084,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 627,
+      "line": 606,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -9132,7 +9092,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 507,
+      "line": 486,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -9140,7 +9100,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "IMPORT_RESPONSIBILITY",
-      "line": 619,
+      "line": 598,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -9148,7 +9108,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "IMPORT_RESPONSIBILITY_FILES",
-      "line": 616,
+      "line": 595,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -9164,7 +9124,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "IMPORT_RESPONSIBILITY_FINDINGS",
-      "line": 618,
+      "line": 597,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -9172,7 +9132,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "IMPORT_RESPONSIBILITY_IMPORTS",
-      "line": 617,
+      "line": 596,
       "path": "tools/agent_tools/import_responsibility.py",
       "surface": "tool"
     },
@@ -11684,7 +11644,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REVIEW_BACKLOG_SCAN",
-      "line": 283,
+      "line": 280,
       "path": "tools/agent_tools/review_backlog_scan.sh",
       "surface": "tool"
     },
@@ -11692,7 +11652,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REVIEW_BACKLOG_SCAN",
-      "line": 580,
+      "line": 577,
       "path": "tools/agent_tools/review_backlog_scan.sh",
       "surface": "tool"
     },
@@ -11700,7 +11660,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REVIEW_BACKLOG_SCAN_NONZERO_COMMANDS",
-      "line": 583,
+      "line": 580,
       "path": "tools/agent_tools/review_backlog_scan.sh",
       "surface": "tool"
     },
@@ -11708,7 +11668,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REVIEW_BACKLOG_SCAN_REPORT",
-      "line": 582,
+      "line": 579,
       "path": "tools/agent_tools/review_backlog_scan.sh",
       "surface": "tool"
     },
@@ -11716,7 +11676,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REVIEW_BACKLOG_SCAN_SCOPE",
-      "line": 581,
+      "line": 578,
       "path": "tools/agent_tools/review_backlog_scan.sh",
       "surface": "tool"
     },
@@ -11860,7 +11820,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ACCUMULATED_AGENT_EVAL",
-      "line": 307,
+      "line": 301,
       "path": "tools/agent_tools/run_accumulated_agent_evals.py",
       "surface": "tool"
     },
@@ -11868,7 +11828,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ACCUMULATED_AGENT_EVAL_FAILED",
-      "line": 306,
+      "line": 300,
       "path": "tools/agent_tools/run_accumulated_agent_evals.py",
       "surface": "tool"
     },
@@ -11876,7 +11836,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ACCUMULATED_AGENT_EVAL_PRODUCER",
-      "line": 299,
+      "line": 293,
       "path": "tools/agent_tools/run_accumulated_agent_evals.py",
       "surface": "tool"
     },
@@ -11884,7 +11844,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "ACCUMULATED_AGENT_EVAL_PRODUCERS",
-      "line": 305,
+      "line": 299,
       "path": "tools/agent_tools/run_accumulated_agent_evals.py",
       "surface": "tool"
     },
@@ -11892,7 +11852,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "GRAPH_ENSURE",
-      "line": 329,
+      "line": 322,
       "path": "tools/agent_tools/run_repo_dependency_review.sh",
       "surface": "tool"
     },
@@ -11900,7 +11860,15 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "GRAPH_REBUILD",
-      "line": 302,
+      "line": 295,
+      "path": "tools/agent_tools/run_repo_dependency_review.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "GRAPH_REBUILD",
+      "line": 297,
       "path": "tools/agent_tools/run_repo_dependency_review.sh",
       "surface": "tool"
     },
@@ -11916,7 +11884,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "GRAPH_REBUILD",
-      "line": 311,
+      "line": 307,
       "path": "tools/agent_tools/run_repo_dependency_review.sh",
       "surface": "tool"
     },
@@ -11924,15 +11892,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "GRAPH_REBUILD",
-      "line": 314,
-      "path": "tools/agent_tools/run_repo_dependency_review.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "GRAPH_REBUILD",
-      "line": 322,
+      "line": 315,
       "path": "tools/agent_tools/run_repo_dependency_review.sh",
       "surface": "tool"
     },
@@ -11980,7 +11940,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REPO_DEPENDENCY_REVIEW",
-      "line": 234,
+      "line": 237,
       "path": "tools/agent_tools/run_repo_dependency_review.sh",
       "surface": "tool"
     },
@@ -11988,7 +11948,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REPO_DEPENDENCY_REVIEW",
-      "line": 244,
+      "line": 303,
       "path": "tools/agent_tools/run_repo_dependency_review.sh",
       "surface": "tool"
     },
@@ -11996,7 +11956,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REPO_DEPENDENCY_REVIEW",
-      "line": 310,
+      "line": 318,
       "path": "tools/agent_tools/run_repo_dependency_review.sh",
       "surface": "tool"
     },
@@ -12004,7 +11964,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REPO_DEPENDENCY_REVIEW",
-      "line": 325,
+      "line": 364,
       "path": "tools/agent_tools/run_repo_dependency_review.sh",
       "surface": "tool"
     },
@@ -12012,15 +11972,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REPO_DEPENDENCY_REVIEW",
-      "line": 371,
-      "path": "tools/agent_tools/run_repo_dependency_review.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "REPO_DEPENDENCY_REVIEW",
-      "line": 450,
+      "line": 443,
       "path": "tools/agent_tools/run_repo_dependency_review.sh",
       "surface": "tool"
     },
@@ -12028,7 +11980,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "REPO_DEPENDENCY_REVIEW_PATHS",
-      "line": 341,
+      "line": 334,
       "path": "tools/agent_tools/run_repo_dependency_review.sh",
       "surface": "tool"
     },
@@ -12102,22 +12054,6 @@
       "field": "root",
       "line": 131,
       "path": "tools/agent_tools/runtime_artifacts.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_RUNTIME_EXCHANGE_HOST_PRESERVED",
-      "line": 65,
-      "path": "tools/agent_tools/runtime_exchange_cleanup.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_RUNTIME_EXCHANGE_REMOVED",
-      "line": 64,
-      "path": "tools/agent_tools/runtime_exchange_cleanup.py",
       "surface": "tool"
     },
     {
@@ -12204,7 +12140,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 5792,
+      "line": 5785,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12212,7 +12148,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 5805,
+      "line": 5798,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12220,7 +12156,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 5862,
+      "line": 5855,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12228,7 +12164,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 5880,
+      "line": 5873,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12236,7 +12172,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "agent_canon_git_head",
-      "line": 5960,
+      "line": 5953,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12244,7 +12180,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "archive_id",
-      "line": 5960,
+      "line": 5953,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12252,7 +12188,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "archived_at",
-      "line": 5960,
+      "line": 5953,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12340,7 +12276,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "branch",
-      "line": 5960,
+      "line": 5953,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12348,7 +12284,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "canon_root",
-      "line": 5960,
+      "line": 5953,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12372,7 +12308,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "codex_trace_key",
-      "line": 5960,
+      "line": 5953,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12396,7 +12332,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "destination",
-      "line": 5960,
+      "line": 5953,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12428,7 +12364,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "file_count",
-      "line": 5960,
+      "line": 5953,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12436,7 +12372,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "files",
-      "line": 5960,
+      "line": 5953,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12572,7 +12508,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "repo_key",
-      "line": 5960,
+      "line": 5953,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12580,7 +12516,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "report_dir",
-      "line": 5960,
+      "line": 5953,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12652,7 +12588,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "run_id",
-      "line": 5960,
+      "line": 5953,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12716,7 +12652,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 5960,
+      "line": 5953,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12748,7 +12684,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "snapshot_id",
-      "line": 5960,
+      "line": 5953,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12772,7 +12708,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "source_git_head",
-      "line": 5960,
+      "line": 5953,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12780,7 +12716,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "source_root",
-      "line": 5960,
+      "line": 5953,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12828,7 +12764,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTEXT_DISCOVERY_APPEND",
-      "line": 6503,
+      "line": 6496,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12836,7 +12772,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTEXT_DISCOVERY_APPEND",
-      "line": 6511,
+      "line": 6504,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12852,7 +12788,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTEXT_DISCOVERY_ERROR_CODE",
-      "line": 6502,
+      "line": 6495,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12860,7 +12796,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "CONTEXT_DISCOVERY_ERROR_CODE",
-      "line": 6510,
+      "line": 6503,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12892,7 +12828,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_EVENT_ERROR_CODE",
-      "line": 6505,
+      "line": 6498,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12916,7 +12852,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_EVENT_MATERIALIZE",
-      "line": 6506,
+      "line": 6499,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12972,7 +12908,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE",
-      "line": 6526,
+      "line": 6519,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -12980,102 +12916,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT",
-      "line": 5999,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORTS",
-      "line": 6129,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_COPIED",
-      "line": 6110,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_DESTINATION",
-      "line": 5994,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_DESTINATION",
-      "line": 6108,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_EXISTING",
-      "line": 6112,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_EXISTING_FILES",
-      "line": 5997,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_FILES",
-      "line": 5995,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_FILES",
-      "line": 6109,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_INDEX_APPENDED",
-      "line": 5998,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_NEW_FILES",
-      "line": 5996,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_ROOT",
-      "line": 6107,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_RUN_ID",
       "line": 5992,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
@@ -13083,8 +12923,104 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORTS",
+      "line": 6122,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_COPIED",
+      "line": 6103,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_DESTINATION",
+      "line": 5987,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_DESTINATION",
+      "line": 6101,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_EXISTING",
+      "line": 6105,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_EXISTING_FILES",
+      "line": 5990,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_FILES",
+      "line": 5988,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_FILES",
+      "line": 6102,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_INDEX_APPENDED",
+      "line": 5991,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_NEW_FILES",
+      "line": 5989,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_ROOT",
+      "line": 6100,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_RUN_ID",
+      "line": 5985,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SKIPPED",
-      "line": 6113,
+      "line": 6106,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13092,7 +13028,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SNAPSHOT",
-      "line": 5993,
+      "line": 5986,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13100,7 +13036,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_UPDATED",
-      "line": 6111,
+      "line": 6104,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13164,7 +13100,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_COMMITTED",
-      "line": 6417,
+      "line": 6410,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13172,7 +13108,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_COMMITTED",
-      "line": 6448,
+      "line": 6441,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13236,7 +13172,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_ERROR",
-      "line": 6525,
+      "line": 6518,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13252,7 +13188,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_ERROR_CODE",
-      "line": 6524,
+      "line": 6517,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13260,6 +13196,78 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_EVAL_BLOBS",
+      "line": 5785,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_EVAL_BLOBS",
+      "line": 5798,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_EVAL_COMMIT",
+      "line": 5782,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_EVAL_COMMIT",
+      "line": 5795,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_EVAL_NEW_FILES",
+      "line": 5781,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_EVAL_NEW_FILES",
+      "line": 5794,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_EVAL_REMOTE_REF",
+      "line": 5784,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_EVAL_REMOTE_REF",
+      "line": 5797,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_EVAL_RUN_ID",
+      "line": 5779,
+      "path": "tools/agent_tools/runtime_log_archive_git.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "RUNTIME_LOG_ARCHIVE_EVAL_RUN_ID",
       "line": 5792,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
@@ -13267,72 +13275,8 @@
     {
       "certainty": "static",
       "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_EVAL_BLOBS",
-      "line": 5805,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_EVAL_COMMIT",
-      "line": 5789,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_EVAL_COMMIT",
-      "line": 5802,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_EVAL_NEW_FILES",
-      "line": 5788,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_EVAL_NEW_FILES",
-      "line": 5801,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_EVAL_REMOTE_REF",
-      "line": 5791,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_EVAL_REMOTE_REF",
-      "line": 5804,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_EVAL_RUN_ID",
-      "line": 5786,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_EVAL_RUN_ID",
-      "line": 5799,
+      "field": "RUNTIME_LOG_ARCHIVE_EVAL_STATUS",
+      "line": 5780,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13340,15 +13284,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_EVAL_STATUS",
-      "line": 5787,
-      "path": "tools/agent_tools/runtime_log_archive_git.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RUNTIME_LOG_ARCHIVE_EVAL_STATUS",
-      "line": 5800,
+      "line": 5793,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13356,7 +13292,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_EVAL_TREE",
-      "line": 5790,
+      "line": 5783,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13364,7 +13300,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_EVAL_TREE",
-      "line": 5803,
+      "line": 5796,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13772,7 +13708,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_PUBLICATION_STATUS",
-      "line": 6418,
+      "line": 6411,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13780,7 +13716,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_PUBLICATION_STATUS",
-      "line": 6449,
+      "line": 6442,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13788,7 +13724,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_PUSH_STATUS",
-      "line": 6419,
+      "line": 6412,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13796,7 +13732,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_PUSH_STATUS",
-      "line": 6450,
+      "line": 6443,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13868,7 +13804,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_SPOOL_ACCEPTED",
-      "line": 6435,
+      "line": 6428,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13876,7 +13812,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_SPOOL_DUPLICATES",
-      "line": 6436,
+      "line": 6429,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13884,7 +13820,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_SPOOL_FINALIZED",
-      "line": 6447,
+      "line": 6440,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13892,7 +13828,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_SPOOL_SOURCE_EVENTS",
-      "line": 6434,
+      "line": 6427,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13948,7 +13884,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_SYNC",
-      "line": 6453,
+      "line": 6446,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13956,7 +13892,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_SYNC",
-      "line": 6456,
+      "line": 6449,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13964,7 +13900,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_SYNC",
-      "line": 6459,
+      "line": 6452,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13972,7 +13908,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_SYNC",
-      "line": 6461,
+      "line": 6454,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -13980,7 +13916,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUNTIME_LOG_ARCHIVE_SYNC_PUSH",
-      "line": 6452,
+      "line": 6445,
       "path": "tools/agent_tools/runtime_log_archive_git.py",
       "surface": "tool"
     },
@@ -14020,7 +13956,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 217,
+      "line": 219,
       "path": "tools/agent_tools/runtime_log_paths.py",
       "surface": "tool"
     },
@@ -15212,7 +15148,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ACTIVE_ROLES",
-      "line": 400,
+      "line": 414,
       "path": "tools/agent_tools/smoke_test_research_perspective_pack.py",
       "surface": "tool"
     },
@@ -15220,7 +15156,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "REPORT_DIR",
-      "line": 398,
+      "line": 412,
       "path": "tools/agent_tools/smoke_test_research_perspective_pack.py",
       "surface": "tool"
     },
@@ -15228,7 +15164,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "RUN_ID",
-      "line": 397,
+      "line": 411,
       "path": "tools/agent_tools/smoke_test_research_perspective_pack.py",
       "surface": "tool"
     },
@@ -15236,7 +15172,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SMOKE_TEST",
-      "line": 401,
+      "line": 415,
       "path": "tools/agent_tools/smoke_test_research_perspective_pack.py",
       "surface": "tool"
     },
@@ -15244,7 +15180,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "WORKSPACE_ROOT",
-      "line": 399,
+      "line": 413,
       "path": "tools/agent_tools/smoke_test_research_perspective_pack.py",
       "surface": "tool"
     },
@@ -16366,70 +16302,6 @@
       "field": "<dynamic>",
       "line": 90,
       "path": "tools/agent_tools/team_config.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 120,
-      "path": "tools/agent_tools/template_bundle.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 145,
-      "path": "tools/agent_tools/template_bundle.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "error",
-      "line": 143,
-      "path": "tools/agent_tools/template_bundle.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "output",
-      "line": 120,
-      "path": "tools/agent_tools/template_bundle.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "status",
-      "line": 143,
-      "path": "tools/agent_tools/template_bundle.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_stdout",
-      "field": "<dynamic>",
-      "line": 145,
-      "path": "tools/agent_tools/template_bundle.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "error",
-      "line": 143,
-      "path": "tools/agent_tools/template_bundle.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_stdout",
-      "field": "status",
-      "line": 143,
-      "path": "tools/agent_tools/template_bundle.py",
       "surface": "tool"
     },
     {
@@ -18524,7 +18396,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 391,
+      "line": 399,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18532,7 +18404,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 393,
+      "line": 401,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18540,31 +18412,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 397,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "shell_key_value_stdout",
-      "field": "<dynamic>",
-      "line": 398,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "shell_key_value_stdout",
-      "field": "<dynamic>",
-      "line": 400,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "shell_key_value_stdout",
-      "field": "<dynamic>",
-      "line": 404,
+      "line": 405,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18580,7 +18428,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 409,
+      "line": 408,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18588,7 +18436,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 411,
+      "line": 412,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18604,7 +18452,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 416,
+      "line": 417,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18620,7 +18468,31 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 421,
+      "line": 422,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "shell_key_value_stdout",
+      "field": "<dynamic>",
+      "line": 424,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "shell_key_value_stdout",
+      "field": "<dynamic>",
+      "line": 427,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "shell_key_value_stdout",
+      "field": "<dynamic>",
+      "line": 429,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18628,7 +18500,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_CLI_BLOCKER",
-      "line": 177,
+      "line": 180,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18636,7 +18508,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_CLI_REASON",
-      "line": 178,
+      "line": 181,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18644,7 +18516,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_G1_RECEIPT",
-      "line": 340,
+      "line": 343,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18652,7 +18524,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_G2_RECEIPT",
-      "line": 372,
+      "line": 375,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18684,7 +18556,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_CHECK",
-      "line": 518,
+      "line": 526,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18692,7 +18564,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH",
-      "line": 208,
+      "line": 211,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18700,78 +18572,6 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH",
-      "line": 226,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH",
-      "line": 237,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH",
-      "line": 243,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE",
-      "line": 228,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE",
-      "line": 239,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE",
-      "line": 245,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON",
-      "line": 227,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON",
-      "line": 238,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON",
-      "line": 244,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR",
       "line": 229,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
@@ -18779,8 +18579,64 @@
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR",
-      "line": 264,
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH",
+      "line": 240,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH",
+      "line": 246,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE",
+      "line": 231,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE",
+      "line": 242,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE",
+      "line": 248,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON",
+      "line": 230,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON",
+      "line": 241,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON",
+      "line": 247,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18788,7 +18644,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR",
-      "line": 268,
+      "line": 232,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18796,7 +18652,23 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR",
-      "line": 279,
+      "line": 267,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR",
+      "line": 271,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR",
+      "line": 282,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18804,7 +18676,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_DEPENDENCY_SOURCE_GATE",
-      "line": 459,
+      "line": 467,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18812,7 +18684,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_DEPENDENCY_SOURCE_GATE",
-      "line": 482,
+      "line": 490,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18820,7 +18692,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_DEPENDENCY_SOURCE_GATE",
-      "line": 486,
+      "line": 494,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18828,7 +18700,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_DEPENDENCY_SOURCE_GATE",
-      "line": 489,
+      "line": 497,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18836,15 +18708,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_GATE_RECEIPT",
-      "line": 307,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_GATE_RECEIPT",
-      "line": 311,
+      "line": 310,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18859,8 +18723,8 @@
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_GATE_RECEIPT_HANDOFF",
-      "line": 327,
+      "field": "AGENT_CANON_PR_GATE_RECEIPT",
+      "line": 317,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18868,7 +18732,15 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_GATE_RECEIPT_HANDOFF",
-      "line": 334,
+      "line": 330,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_GATE_RECEIPT_HANDOFF",
+      "line": 337,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18876,7 +18748,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_PROJECT_QUALITY",
-      "line": 290,
+      "line": 293,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18884,7 +18756,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_PROJECT_QUALITY_OWNER",
-      "line": 291,
+      "line": 294,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18892,7 +18764,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_PROJECT_QUALITY_WORKFLOW",
-      "line": 292,
+      "line": 295,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18900,15 +18772,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_PROPAGATION_WORKFLOW",
-      "line": 519,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_STATIC_GATE_UNITS",
-      "line": 383,
+      "line": 527,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18916,7 +18780,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "NEXT_ACTION",
-      "line": 520,
+      "line": 528,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18924,7 +18788,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_pr_temp_root",
-      "line": 429,
+      "line": 437,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18932,7 +18796,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_remote",
-      "line": 430,
+      "line": 438,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18940,7 +18804,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "workspace_root",
-      "line": 428,
+      "line": 436,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18972,7 +18836,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOWS_CHECKED",
-      "line": 945,
+      "line": 967,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },
@@ -18980,7 +18844,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOW_ERRORS",
-      "line": 946,
+      "line": 968,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },
@@ -18988,7 +18852,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "GITHUB_WORKFLOW_WARNINGS",
-      "line": 947,
+      "line": 969,
       "path": "tools/ci/check_github_workflows.py",
       "surface": "tool"
     },
@@ -19332,7 +19196,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_CLI_BLOCKER",
-      "line": 339,
+      "line": 346,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -19340,7 +19204,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_CLI_MODE",
-      "line": 350,
+      "line": 357,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -19348,7 +19212,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_CLI_PATH",
-      "line": 352,
+      "line": 359,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -19356,7 +19220,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_CLI_REASON",
-      "line": 340,
+      "line": 347,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -19388,7 +19252,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DEPENDENCY_HEADER_CHECKS",
-      "line": 431,
+      "line": 438,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -19396,7 +19260,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DOCS_CHECKS",
-      "line": 578,
+      "line": 602,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -19404,7 +19268,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "EXPERIMENT_REGISTRY",
-      "line": 590,
+      "line": 614,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -19412,7 +19276,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "EXPERIMENT_REGISTRY",
-      "line": 593,
+      "line": 617,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -19420,7 +19284,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "GITHUB_WORKFLOW_CHECKS",
-      "line": 558,
+      "line": 582,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -19429,14 +19293,6 @@
       "emitter": "shell_key_value_stdout",
       "field": "PR_GATE_RECEIPT",
       "line": 303,
-      "path": "tools/ci/run_all_checks.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "RUST_CHECKS",
-      "line": 556,
       "path": "tools/ci/run_all_checks.sh",
       "surface": "tool"
     },
@@ -19596,7 +19452,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_MEMORY_CLI_BUILD",
-      "line": 72,
+      "line": 109,
       "path": "tools/ci/run_standalone_static_gate_unit.sh",
       "surface": "tool"
     },
@@ -19604,7 +19460,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_STATIC_EVAL_FAILURE_LINES_BEGIN",
-      "line": 154,
+      "line": 189,
       "path": "tools/ci/run_standalone_static_gate_unit.sh",
       "surface": "tool"
     },
@@ -19612,7 +19468,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_STATIC_EVAL_FAILURE_LINES_END",
-      "line": 156,
+      "line": 191,
       "path": "tools/ci/run_standalone_static_gate_unit.sh",
       "surface": "tool"
     },
@@ -19620,7 +19476,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_STATIC_EVAL_LOG_BEGIN",
-      "line": 150,
+      "line": 185,
       "path": "tools/ci/run_standalone_static_gate_unit.sh",
       "surface": "tool"
     },
@@ -19628,7 +19484,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_STATIC_EVAL_LOG_END",
-      "line": 152,
+      "line": 187,
       "path": "tools/ci/run_standalone_static_gate_unit.sh",
       "surface": "tool"
     },
@@ -19636,7 +19492,23 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_STATIC_GATE",
-      "line": 22,
+      "line": 30,
+      "path": "tools/ci/run_standalone_static_gate_unit.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_STATIC_GATE",
+      "line": 34,
+      "path": "tools/ci/run_standalone_static_gate_unit.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_STATIC_GATE",
+      "line": 47,
       "path": "tools/ci/run_standalone_static_gate_unit.sh",
       "surface": "tool"
     },
@@ -19644,7 +19516,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_STATIC_GATE_UNIT",
-      "line": 194,
+      "line": 228,
       "path": "tools/ci/run_standalone_static_gate_unit.sh",
       "surface": "tool"
     },
@@ -20945,6 +20817,126 @@
       "surface": "tool"
     },
     {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_TOOL_REBUILD",
+      "line": 29,
+      "path": "tools/rebuild_agent_tools.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_TOOL_REBUILD",
+      "line": 33,
+      "path": "tools/rebuild_agent_tools.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_TOOL_REBUILD",
+      "line": 74,
+      "path": "tools/rebuild_agent_tools.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_TOOL_REBUILD",
+      "line": 187,
+      "path": "tools/rebuild_agent_tools.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_TOOL_REBUILD_CARGO_HOME",
+      "line": 185,
+      "path": "tools/rebuild_agent_tools.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_TOOL_REBUILD_NEXT",
+      "line": 138,
+      "path": "tools/rebuild_agent_tools.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_TOOL_REBUILD_ROOT",
+      "line": 183,
+      "path": "tools/rebuild_agent_tools.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_TOOL_REBUILD_RUST",
+      "line": 132,
+      "path": "tools/rebuild_agent_tools.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_TOOL_REBUILD_RUST",
+      "line": 137,
+      "path": "tools/rebuild_agent_tools.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_TOOL_REBUILD_RUST",
+      "line": 150,
+      "path": "tools/rebuild_agent_tools.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_TOOL_REBUILD_RUST",
+      "line": 179,
+      "path": "tools/rebuild_agent_tools.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_TOOL_REBUILD_TOOLS_HOME",
+      "line": 184,
+      "path": "tools/rebuild_agent_tools.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_TOOL_REBUILD_USR_LOCAL",
+      "line": 115,
+      "path": "tools/rebuild_agent_tools.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_source_commit",
+      "line": 174,
+      "path": "tools/rebuild_agent_tools.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_source_root",
+      "line": 173,
+      "path": "tools/rebuild_agent_tools.sh",
+      "surface": "tool"
+    },
+    {
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
@@ -21412,7 +21404,6 @@
     "tools/agent_tools/run_accumulated_agent_evals.py",
     "tools/agent_tools/run_repo_dependency_review.sh",
     "tools/agent_tools/runtime_artifacts.py",
-    "tools/agent_tools/runtime_exchange_cleanup.py",
     "tools/agent_tools/runtime_log_archive_git.py",
     "tools/agent_tools/runtime_log_paths.py",
     "tools/agent_tools/scan_code_dependencies.sh",
@@ -21437,7 +21428,6 @@
     "tools/agent_tools/task_contract_observation.py",
     "tools/agent_tools/task_contract_observation_core.py",
     "tools/agent_tools/team_config.py",
-    "tools/agent_tools/template_bundle.py",
     "tools/agent_tools/theorem_graph_board.py",
     "tools/agent_tools/theorem_graph_circularity_check.py",
     "tools/agent_tools/tool_calls.py",
@@ -21533,6 +21523,7 @@
     "tools/oop/shared/readability_core.py",
     "tools/oop/shared/rule_inventory_core.py",
     "tools/push_origin.sh",
+    "tools/rebuild_agent_tools.sh",
     "tools/run_comprehensive_review.sh",
     "tools/run_pytest_with_logs.sh",
     "tools/setup_worktree.sh",

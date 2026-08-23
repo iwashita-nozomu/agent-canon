@@ -1078,6 +1078,7 @@ class DockerAdapter:
                 "GIT_CONFIG_COUNT",
                 "GIT_CONFIG_KEY_0",
                 "GIT_CONFIG_VALUE_0",
+                "AGENT_CANON_OUTPUT_ROOT",
             }:
                 raise BootstrapError("environment_rejected", key)
             command.extend(("--env", f"{key}={value}"))
@@ -2894,7 +2895,13 @@ class BootstrapRuntime:
             )
         return prepared
 
-    def exec(self, root: Path, argv: Sequence[str]) -> dict[str, Any]:
+    def exec(
+        self,
+        root: Path,
+        argv: Sequence[str],
+        *,
+        extra_environment: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
         """Execute a typed argv in a registered target and collect a receipt."""
         _validate_tool_plane_argv(root, self.repository_root, argv)
         target = self._target_record(root, "read-only")
@@ -2917,17 +2924,19 @@ class BootstrapRuntime:
             self._admit_task_locked(state, task_id, target_root=root)
             try:
                 c = self._ensure_container(state, start=True)
+                environment = {
+                    "AGENT_CANON_TARGET_ROOT": f"/targets/{target['digest']}",
+                    "AGENT_CANON_TASK_ROOT": f"/targets/{target['digest']}",
+                    "GIT_CONFIG_COUNT": "1",
+                    "GIT_CONFIG_KEY_0": "safe.directory",
+                    "GIT_CONFIG_VALUE_0": f"/targets/{target['digest']}",
+                }
+                environment.update(extra_environment or {})
                 result = self.docker.exec_container(
                     str(c["id"]),
                     cwd=f"/targets/{target['digest']}",
                     argv=list(argv),
-                    environment={
-                        "AGENT_CANON_TARGET_ROOT": f"/targets/{target['digest']}",
-                        "AGENT_CANON_TASK_ROOT": f"/targets/{target['digest']}",
-                        "GIT_CONFIG_COUNT": "1",
-                        "GIT_CONFIG_KEY_0": "safe.directory",
-                        "GIT_CONFIG_VALUE_0": f"/targets/{target['digest']}",
-                    },
+                    environment=environment,
                     embedding_exchange=self.paths.container_runtime,
                     embedding_allowed_endpoints={
                         value.strip()
@@ -2949,6 +2958,7 @@ class BootstrapRuntime:
                     "argv": _redact_argv(argv),
                     "cwd": str(root),
                     "exit": result.returncode,
+                    "execution_plane": "agentcanon_tool_container",
                     **io,
                 }
                 if mutation_before is not None:
@@ -3015,7 +3025,12 @@ class BootstrapRuntime:
                 self._release_task_locked(state, task_id)
 
     def tool_run(
-        self, catalog_id: str, argv: Sequence[str], *, root: Path | None = None
+        self,
+        catalog_id: str,
+        argv: Sequence[str],
+        *,
+        root: Path | None = None,
+        environment: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
         """Dispatch a catalog command through the resident AgentCanon CLI."""
         _slug(catalog_id)
@@ -3050,6 +3065,37 @@ class BootstrapRuntime:
                 "--",
                 *list(argv),
             ],
+            extra_environment=environment,
+        )
+
+    def template_export(
+        self, root: Path, profile: str, output: str
+    ) -> dict[str, Any]:
+        """Export a template profile through the resident tool-container catalog."""
+        _slug(profile)
+        relative = Path(output)
+        if relative.is_absolute() or ".." in relative.parts or not relative.parts:
+            raise BootstrapError("template_output_invalid", "output must be runtime-relative")
+        target = self._target_record(root, "read-only")
+        host_output = self.paths.runtime_root / "template-exports" / relative
+        if host_output.exists() or host_output.is_symlink():
+            raise BootstrapError("template_output_exists", str(host_output))
+        container_output = f"{CONTAINER_RUNTIME_DESTINATION}/template-exports/{relative.as_posix()}"
+        return self.tool_run(
+            "template-bundle",
+            [
+                "export",
+                "--source-root",
+                f"/targets/{target['digest']}",
+                "--source-ref",
+                "HEAD",
+                "--profile",
+                profile,
+                "--output",
+                container_output,
+            ],
+            root=root,
+            environment={"AGENT_CANON_OUTPUT_ROOT": str(host_output)},
         )
 
     def eval_collect(self, root: Path, run_id: str) -> dict[str, Any]:
@@ -3787,6 +3833,12 @@ def build_parser() -> argparse.ArgumentParser:
     tool_run.add_argument("--root")
     tool_run.add_argument("catalog_id")
     tool_run.add_argument("command", nargs=argparse.REMAINDER)
+    template = sub.add_parser("template")
+    template_sub = template.add_subparsers(dest="template_operation", required=True)
+    template_export = template_sub.add_parser("export")
+    template_export.add_argument("--root", required=True)
+    template_export.add_argument("--profile", required=True)
+    template_export.add_argument("--output", required=True)
     codex = sub.add_parser("codex")
     codex_sub = codex.add_subparsers(dest="codex_operation")
     codex_sub.add_parser("prepare")
@@ -3880,6 +3932,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             args.catalog_id,
             command,
             root=Path(args.root) if args.root else None,
+        )
+    if operation == "template" and args.template_operation == "export":
+        return runtime.template_export(
+            Path(args.root), args.profile, args.output
         )
     if operation == "codex":
         if args.codex_operation == "prepare":

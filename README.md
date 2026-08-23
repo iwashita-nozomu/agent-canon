@@ -111,17 +111,16 @@ agent-canon structured-analysis ...
 ```
 
 Python tools are not exposed as a new collection of flat global executables.
-Only catalog entries with schema-v2 parity evidence can use:
+Only catalog entries with schema-v2 parity evidence can use the bootstrap-owned route:
 
 ```bash
 agent-canon tool run <catalog-id> -- <args...>  # AGENT_CANON_TARGET_ROOT is explicit
 ```
 
 Parity covers argv, cwd, stdin/stdout/stderr, exit and signal behavior, and
-written paths. Until an entry is verified, use its existing exact command via
-the owning workflow or `bootstrap ... exec --root <registered-target> --
-<command...>`. The dispatcher rejects shell command strings and does not infer
-public status for every internal Python file. See [tools/README.md](tools/README.md)
+written paths. Unverified internal tools are not exposed through the public
+bootstrap command family. The dispatcher rejects shell command strings and does
+not infer public status for every internal Python file. See [tools/README.md](tools/README.md)
 and [the tool catalog](tools/catalog.yaml).
 
 ## Repository layout

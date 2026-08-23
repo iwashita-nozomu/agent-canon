@@ -34,9 +34,9 @@ evidence.
   and the active generation are read back before dispatch. Concurrent target
   changes are serialized by the bootstrap lifecycle; a failed candidate keeps
   the last verified generation active.
-- `tool run` is the verified namespaced route. `exec` is the explicitly
-  observed bootstrap compatibility route and must not be used as an
-  unverified replacement for tool parity. Never create flat host wrappers.
+- `tool run` is the verified namespaced route. Internal Python/Rust/LSP tools
+  are not exposed as host commands or compatibility choices. Never create flat
+  host wrappers.
 - Project code is tested through the project-owned `docker/` image and
   `test/testrunner.sh`/test list. Do not mount a project's tests into the
   AgentCanon tool container and do not make AgentCanon know project test names.

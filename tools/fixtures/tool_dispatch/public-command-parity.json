@@ -27,6 +27,32 @@
         "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "written_paths": []
       }
+    },
+    {
+      "id": "template-bundle",
+      "probe_args": ["export", "--help"],
+      "observed": {
+        "argv": ["python3", "tools/agent_tools/template_bundle.py"],
+        "cwd": "source-root",
+        "stdin": "inherited",
+        "stdout": "captured",
+        "stderr": "captured",
+        "exit": "propagate",
+        "signal": "propagate",
+        "written_paths": []
+      },
+      "legacy_result": {
+        "exit_code": 0,
+        "stdout_sha256": "2d3a0a88adb12ea9deeab5059594a6d0a61897260e9ed549f5a659751bc0d556",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_paths": []
+      },
+      "container_result": {
+        "exit_code": 0,
+        "stdout_sha256": "2d3a0a88adb12ea9deeab5059594a6d0a61897260e9ed549f5a659751bc0d556",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_paths": []
+      }
     }
   ]
 }

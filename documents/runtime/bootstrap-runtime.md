@@ -150,11 +150,9 @@ gain flat global executables. A catalog entry is runnable through
 cwd, standard streams, exit/signal behavior, and written paths. The
 dispatcher rejects shell command strings and unknown catalog entries.
 
-Until parity is verified, use the existing exact command through
-`bootstrap ... exec --root <registered-target> -- <command...>` or its owning
-workflow. Bootstrap does not silently rewrite a legacy command, and a failed
-parity check leaves the legacy route authoritative. Do not infer that an
-internal Python file is a public catalog command.
+Until parity is verified, an internal Python file is not exposed through the
+public bootstrap command family. Do not infer that an internal Python file is
+a public catalog command.
 
 ## Evaluation and archive route
 
@@ -190,7 +188,7 @@ The normal movement is:
 
 ```text
 install -> start -> target add -> status -> codex prepare -> codex launch
-  -> tool run / exec -> eval collect -> eval sync -> stop -> gc -> uninstall
+  -> tool run -> template export / eval collect -> eval sync -> stop -> gc -> uninstall
 ```
 
 Use a distinct `<installation>` or task id when an independent lifecycle is
