@@ -63,7 +63,10 @@ evidence.
    not a project-code failure; report the plane and exact owner separately.
 5. For eval work, run the registered producers, collect the run bundle, sync
    it through the archive adapter, and verify the remote repository and commit
-   readback. Use `$agent-eval-accumulation` for the producer/checker details.
+   readback. Producer definitions and manifests come from the image-owned
+   AgentCanon snapshot; the registered project remains only the observed,
+   read-only target. Use `$agent-eval-accumulation` for the producer/checker
+   details.
 6. Stop/release task leases, remove only resources created by this task, run
    scoped garbage collection, and verify the source checkout and unrelated
    Docker resources are unchanged. Keep the closeout receipt and cleanup

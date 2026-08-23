@@ -236,9 +236,11 @@ def main(argv: list[str]) -> int:
             )
             relative = Path(runtime_arg).relative_to("/var/lib/agent-canon/runtime")
             exchange = Path(target["Source"]) / relative
+            eval_failed = os.environ.get("FAKE_EVAL_FAIL") == "1"
+            (exchange / "eval-results").mkdir(parents=True, exist_ok=True)
             families = {
                 "skill-workflow-prompt": (
-                    f"skill-eval-20260101T000000000000Z-0123456789-pass-bootstrap.md",
+                    "skill-eval-20260101T000000000000Z-0123456789-pass-bootstrap.md",
                     f"EVAL_RUN_ID=skill-{run_id}\n",
                 ),
                 "workflow-selection": (
@@ -255,6 +257,8 @@ def main(argv: list[str]) -> int:
                 ),
             }
             for family, (filename, content) in families.items():
+                if eval_failed:
+                    continue
                 destination = exchange / "eval-results" / family / filename
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_text(content, encoding="utf-8")
@@ -263,20 +267,30 @@ def main(argv: list[str]) -> int:
             (log_dir / "01-codex-agent-role.stdout.txt").write_text(
                 "producer=codex-agent-role\n", encoding="utf-8"
             )
+            producer_status = "fail" if eval_failed else "pass"
             print(
-                "ACCUMULATED_AGENT_EVAL_PRODUCER=codex-agent-role:pass:"
-                "stdout=tasks/%s/logs/01-codex-agent-role.stdout.txt:stderr=tasks/%s/logs/01-codex-agent-role.stderr.txt"
-                % (run_id, run_id)
+                f"ACCUMULATED_AGENT_EVAL_PRODUCER=codex-agent-role:{producer_status}:"
+                f"stdout=tasks/{run_id}/logs/01-codex-agent-role.stdout.txt:"
+                f"stderr=tasks/{run_id}/logs/01-codex-agent-role.stderr.txt"
             )
             for name in ("skill-workflow-prompt", "workflow-selection", "report-quality"):
                 print(
-                    "ACCUMULATED_AGENT_EVAL_PRODUCER=%s:pass:stdout=tasks/%s/logs/%s.stdout.txt:stderr=tasks/%s/logs/%s.stderr.txt"
-                    % (name, run_id, name, run_id, name)
+                    "ACCUMULATED_AGENT_EVAL_PRODUCER="
+                    f"{name}:{producer_status}:"
+                    f"stdout=tasks/{run_id}/logs/{name}.stdout.txt:"
+                    f"stderr=tasks/{run_id}/logs/{name}.stderr.txt"
                 )
             print("ACCUMULATED_AGENT_EVAL_PRODUCERS=4")
-            print("ACCUMULATED_AGENT_EVAL_FAILED=-")
-            print("ACCUMULATED_AGENT_EVAL=pass")
-            return 0
+            print(
+                "ACCUMULATED_AGENT_EVAL_FAILED="
+                + (
+                    "codex-agent-role,skill-workflow-prompt,workflow-selection,report-quality"
+                    if eval_failed
+                    else "-"
+                )
+            )
+            print(f"ACCUMULATED_AGENT_EVAL={'fail' if eval_failed else 'pass'}")
+            return 1 if eval_failed else 0
         if command == [
             "python3",
             "/usr/local/share/agent-canon/runtime/tools/agent_tools/runtime_exchange_cleanup.py",

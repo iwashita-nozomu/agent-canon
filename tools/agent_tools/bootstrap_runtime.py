@@ -31,10 +31,12 @@ import stat
 import subprocess
 import sys
 import time
+
 try:
     import tomllib
 except ModuleNotFoundError:  # Python 3.10 in the pinned Ubuntu tool image.
     import tomli as tomllib  # type: ignore[no-redef]
+
 import urllib.error
 import urllib.request
 from collections.abc import Iterator, Mapping, Sequence
@@ -115,10 +117,18 @@ def _image_input_digest(repository_root: Path) -> str:
     """Bind the image identity to every admitted repository build input."""
     roots = (
         repository_root / ".dockerignore",
+        repository_root / "AGENTS.md",
+        repository_root / "ROOT_AGENTS.md",
+        repository_root / ".agents",
+        repository_root / ".codex" / "agents",
+        repository_root / ".codex" / "config.toml",
         repository_root / "bootstrap" / "container",
         repository_root / "tools",
         repository_root / "agents",
-        repository_root / "documents" / "runtime",
+        repository_root / "documents",
+        repository_root / "evidence" / "agent-evals",
+        repository_root / "references",
+        repository_root / "templates",
         repository_root / "rust" / "agent-canon",
     )
     files: list[Path] = []
@@ -2919,6 +2929,7 @@ class BootstrapRuntime:
         before_source = _source_snapshot(source)
         capabilities = [
             "target-read-only",
+            "producer-definitions-image-owned",
             "tool-container-execution",
             "external-runtime-write",
             "no-network",
@@ -2971,6 +2982,7 @@ class BootstrapRuntime:
                 image = state.get("resources", {}).get("image", {})
                 collection["tool_image_digest"] = image.get("id")
                 target_path = f"/targets/{target['digest']}"
+                canon_root = "/usr/local/share/agent-canon/runtime"
                 container_runtime = "/var/lib/agent-canon/runtime"
                 exchange_runtime = (
                     f"{container_runtime}/tasks/{task_id}/{exchange_nonce}"
@@ -2979,6 +2991,8 @@ class BootstrapRuntime:
                     "python3",
                     "/usr/local/share/agent-canon/runtime/tools/agent_tools/run_accumulated_agent_evals.py",
                     "--root",
+                    canon_root,
+                    "--target-root",
                     target_path,
                     "--runtime-root",
                     exchange_runtime,
@@ -2987,11 +3001,11 @@ class BootstrapRuntime:
                     "--log-dir",
                     f"{exchange_runtime}/tasks/{run_id}/logs",
                     "--prompt-eval-manifest",
-                    f"{target_path}/evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                    f"{canon_root}/evidence/agent-evals/skill_workflow_prompt_eval.toml",
                 ]
                 result = self.docker.exec_container(
                     str(container["id"]),
-                    cwd=target_path,
+                    cwd=canon_root,
                     argv=command,
                     environment={
                         "AGENT_CANON_TARGET_ROOT": target_path,

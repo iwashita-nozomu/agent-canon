@@ -24,6 +24,7 @@ from run_accumulated_agent_evals import (  # noqa: E402
     run_producers,
 )
 
+
 def _tracked_snapshot() -> tuple[str, dict[str, str]]:
     status = subprocess.run(
         ["git", "status", "--porcelain=v1"],
@@ -57,9 +58,12 @@ def _tracked_snapshot() -> tuple[str, dict[str, str]]:
 
 
 def test_producer_child_receives_typed_runtime_and_root_capabilities(tmp_path: Path) -> None:
+    """Keep producer-definition and observed-target capabilities distinct."""
     source = tmp_path / "source"
+    target = tmp_path / "target"
     runtime = tmp_path / "runtime"
     source.mkdir()
+    target.mkdir()
     runtime.mkdir()
     observed: dict[str, str] = {}
 
@@ -71,18 +75,20 @@ def test_producer_child_receives_typed_runtime_and_root_capabilities(tmp_path: P
         root=source,
         producers=(EvalProducer("fixture", ("fixture",)),),
         log_dir=runtime / "logs",
+        target_root=target,
         runtime_root=runtime,
         runner=fake_runner,
     )
 
     assert observed["AGENT_CANON_RUNTIME_ROOT"] == str(runtime.resolve())
     assert observed["AGENT_CANON_PARENT_ROOT"] == str(source.resolve())
-    assert observed["AGENT_CANON_TARGET_ROOT"] == str(source.resolve())
+    assert observed["AGENT_CANON_TARGET_ROOT"] == str(target.resolve())
     assert json.loads(observed["AGENT_CANON_PARENT_ROOT_CAPABILITY"])["kind"] == "parent-root"
     assert json.loads(observed["AGENT_CANON_TARGET_ROOT_CAPABILITY"])["kind"] == "target-root"
 
 
 def test_eval_producers_leave_source_status_and_bytes_unchanged(tmp_path: Path) -> None:
+    """Real producer execution must leave AgentCanon source unchanged."""
     runtime = tmp_path / "runtime"
     runtime.mkdir()
     before_status, before_files = _tracked_snapshot()

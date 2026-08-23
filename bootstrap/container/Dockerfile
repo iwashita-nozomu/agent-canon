@@ -147,12 +147,23 @@ RUN python3 /opt/agent-canon/tools/agent_tools/dependency_plan.py \
 # catalog and Python-tool updates do not rebuild the shared toolchain.
 COPY tools /usr/local/share/agent-canon/runtime/tools
 COPY agents /usr/local/share/agent-canon/runtime/agents
-COPY documents/runtime /usr/local/share/agent-canon/runtime/documents/runtime
+COPY documents /usr/local/share/agent-canon/runtime/documents
+COPY .agents /usr/local/share/agent-canon/runtime/.agents
+COPY .codex/agents /usr/local/share/agent-canon/runtime/.codex/agents
+COPY .codex/config.toml /usr/local/share/agent-canon/runtime/.codex/config.toml
+COPY evidence/agent-evals /usr/local/share/agent-canon/runtime/evidence/agent-evals
+COPY references /usr/local/share/agent-canon/runtime/references
+COPY templates /usr/local/share/agent-canon/runtime/templates
+COPY AGENTS.md ROOT_AGENTS.md /usr/local/share/agent-canon/runtime/
 RUN test -f /usr/local/share/agent-canon/runtime/tools/catalog.yaml \
     && test -f /usr/local/share/agent-canon/runtime/tools/agent_tools/tool_dispatch.py \
     && test -f /usr/local/share/agent-canon/runtime/tools/bin/agent-canon \
     && test -f /usr/local/share/agent-canon/runtime/tools/fixtures/tool_dispatch/public-command-parity.json \
     && test -f /usr/local/share/agent-canon/runtime/agents/skills/catalog.yaml \
+    && test -f /usr/local/share/agent-canon/runtime/.codex/config.toml \
+    && test -f /usr/local/share/agent-canon/runtime/.codex/agents/worker.toml \
+    && test -f /usr/local/share/agent-canon/runtime/evidence/agent-evals/skill_workflow_prompt_eval.toml \
+    && test -f /usr/local/share/agent-canon/runtime/ROOT_AGENTS.md \
     && test -f /usr/local/share/agent-canon/runtime/documents/runtime/runtime-profiles-and-check-matrix.json \
     && chown -R root:root /usr/local/share/agent-canon/runtime/tools /usr/local/share/agent-canon/runtime/agents /usr/local/share/agent-canon/runtime/documents
 
