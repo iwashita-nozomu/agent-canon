@@ -2,7 +2,7 @@
 name: agent-canon-update
 description: "Use when updating standalone AgentCanon source, its bootstrap/runtime, skills, eval/archive route, or publishing a qualified AgentCanon branch and PR."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"0975f97a0d9a0fbda89a3b7ee8aadde1269d54500a469de43eb86f4b1c52bec9"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"05d938049c7a2a7cc6b5b46883c47dd057cbd2b648d7bde2fab74b051b3db8dd"} -->
 
 <!--
 @dependency-start

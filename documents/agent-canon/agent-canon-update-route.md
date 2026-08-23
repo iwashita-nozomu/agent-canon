@@ -31,6 +31,13 @@ projection, source symlink, or copied policy surface.
    PR, process review/CI, merge it, and fetch/read back the resulting `main`
    revision before changing a parent project.
 
+For a parent source-free migration, read
+[`derived-repo-bootstrap-runbook.md`](../contracts/derived-repo-bootstrap-runbook.md)
+before mutation. The migration scope contains only the exact AgentCanon
+management edges listed in the existing task scope update. Parent Docker,
+product/numerical tests, permissions, mounts, GPU, runtime semantics, and
+acceptance policy remain outside this source-update route.
+
 ## Runtime and publication boundaries
 
 Runtime sessions use the top-level `bootstrap.sh` documented in
