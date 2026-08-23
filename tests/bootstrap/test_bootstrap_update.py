@@ -134,6 +134,12 @@ def test_update_then_codex_prepare_reads_current_tracked_adapters(tmp_path: Path
     assert manifest["source_root"] == str(ROOT)
     assert manifest["tree_digest"] == manager.source_identity["tree_digest"]
     assert manifest["manifest_digest"] == manager.manifest_digest
+    assert {entry["surface"] for entry in manifest["links"]} == {
+        "skills", "agents", "hooks", "config"
+    }
+    for entry in manifest["links"]:
+        assert Path(entry["target"]).is_symlink()
+        assert Path(entry["target"]).resolve() == Path(entry["source"]).resolve()
     skill_links = [entry for entry in result["details"]["links"] if entry["surface"] == "skills"]
     assert skill_links
     assert all("/.agents/skills/" in entry["source"] for entry in skill_links)
