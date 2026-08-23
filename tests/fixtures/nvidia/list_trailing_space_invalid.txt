@@ -1,0 +1,1 @@
+GPU 0: Fixture A (UUID: GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) 

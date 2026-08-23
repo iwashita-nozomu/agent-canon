@@ -1,0 +1,127 @@
+# @dependency-start
+# contract environment
+# responsibility Declares only the shared AgentCanon Python, Rust, and LSP image capabilities.
+# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared tool runtime boundary
+# downstream implementation ./Dockerfile image-install and immutable receipts
+# downstream implementation ../../tools/agent_tools/dependency_plan.py typed dependency planner
+# @dependency-end
+
+schema = "agent-canon.tool-dependencies"
+schema_version = 2
+
+# The image is intentionally amd64-only. UID/GID are non-root defaults; the
+# bootstrap may replace them with the invoking non-root Host identity without
+# branching on rootless/rootful daemon mode.
+[container]
+platform = "linux/amd64"
+uid = 1000
+gid = 1000
+
+# The shared image intentionally excludes project dependencies, Codex, GitHub
+# CLI, editor integrations, GPU tooling, and lifecycle helpers.
+
+[[records]]
+id = "pyright-language-server"
+package = "pyright"
+method = "npm-global"
+version = "1.1.411"
+source = "https://registry.npmjs.org/pyright"
+verification = { kind = "npm-package", executable = "pyright", args = ["--version"], output_contains = "1.1.411" }
+deps = ["node"]
+provides = ["pyright", "pyright-langserver"]
+failure_policy = "fail"
+
+[[records]]
+id = "bash-language-server"
+package = "bash-language-server"
+method = "npm-global"
+version = "5.6.0"
+source = "https://registry.npmjs.org/bash-language-server"
+verification = { kind = "npm-package", executable = "bash-language-server", args = ["--version"], output_contains = "5.6.0" }
+deps = ["node"]
+provides = ["bash-language-server"]
+failure_policy = "fail"
+
+[[records]]
+id = "jq"
+package = "jq"
+method = "apt-package"
+version = "1.6-2.1ubuntu3.2"
+platform = "linux/amd64"
+source = "ubuntu:22.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = ["jq"]
+failure_policy = "fail"
+
+[[records]]
+id = "tree"
+package = "tree"
+method = "apt-package"
+version = "2.0.2-1"
+platform = "linux/amd64"
+source = "ubuntu:22.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = ["tree"]
+failure_policy = "fail"
+
+[[records]]
+id = "clang-format"
+package = "clang-format"
+method = "apt-package"
+version = "1:14.0-55~exp2"
+platform = "linux/amd64"
+source = "ubuntu:22.04"
+executable_owner_packages = ["clang-format", "clang-format-14"]
+verification = { kind = "apt-package", executable = "clang-format", args = ["--version"], output_contains = "Ubuntu clang-format version 14.0.0-1ubuntu1.1" }
+deps = []
+provides = ["clang-format"]
+failure_policy = "fail"
+
+[[records]]
+id = "clangd-language-server"
+package = "clangd-18"
+method = "apt-repository"
+version = "1:18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144"
+platform = "linux/amd64"
+source = "https://apt.llvm.org/jammy/"
+repository_suite = "llvm-toolchain-jammy-18"
+repository_components = ["main"]
+repository_packages_sha256 = "380ae90b5df8029aca2e30302427949f0a384d4970b156d843eeb0cea7fc4da2"
+repository_package_url = "https://apt.llvm.org/jammy/pool/main/l/llvm-toolchain-18/clangd-18_18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144_amd64.deb"
+repository_package_sha256 = "05ba173847cca9a3362155b9b7b59b3a7968195cde17dfa5e26bd777d9558660"
+key_url = "https://apt.llvm.org/llvm-snapshot.gpg.key"
+key_fingerprint = "6084F3CF814B57C1CF12EFD515CF4D18AF4F7421"
+verification = { kind = "apt-repository", executable = "clangd-18", args = ["--version"], output_contains = "clangd version 18.1.8" }
+deps = ["ca-certificates"]
+provides = ["clangd-18"]
+failure_policy = "fail"
+
+[[records]]
+id = "rust-toolchain"
+package = "rust"
+method = "rust-toolchain"
+version = "1.89.0"
+source = "https://static.rust-lang.org"
+components = ["rust-src", "rustfmt", "clippy", "rust-analyzer"]
+verification = { kind = "rust-toolchain" }
+deps = ["rustup-init", "build-essential", "curl"]
+provides = ["rust", "cargo", "rustfmt", "clippy", "rust-analyzer"]
+failure_policy = "fail"
+
+[[records]]
+id = "agent-canon-cli"
+package = "agent-canon"
+method = "cargo-source-build"
+version = "0.1.0"
+source = "rust/agent-canon"
+repo = "https://github.com/iwashita-nozomu/agent-canon.git"
+source_identity = "canonical-snapshot"
+source_tree_sha256 = "a7907c68176ee717f73efb4491a7523f45335bebabfa33600aeffb560f9ebfe8"
+cargo_lock_sha256 = "060b8825843b14b12bebb9da095503f4ec7f68a77934e595c082957cb1f72638"
+locked = true
+verification = { kind = "cargo-binary", path = "target/release/agent-canon", args = ["--version"], output_contains = "agent-canon 0.1.0" }
+deps = ["cargo"]
+provides = ["agent-canon"]
+failure_policy = "fail"

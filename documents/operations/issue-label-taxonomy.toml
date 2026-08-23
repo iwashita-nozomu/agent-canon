@@ -1,0 +1,20 @@
+# @dependency-start
+# contract configuration
+# responsibility Owns canonical GitHub status lifecycle labels for this repository.
+# upstream design ../../agents/internal-routines/github-status-lifecycle.md consumes this mapping.
+# downstream implementation ../../tools/agent_tools/github_status_lifecycle.py validates and uses it.
+# downstream design ./issue-label-taxonomy.md explains this machine-readable owner.
+# @dependency-end
+
+# Canonical AgentCanon status labels. This file is the machine-readable owner;
+# issue-label-taxonomy.md is a reader projection and is never parsed by tools.
+
+[status_lifecycle]
+active = "in progress"
+ready_for_review = "ready for review"
+needs_verification = "need verification"
+
+[status_lifecycle.legacy_aliases]
+active = ["status:in-progress"]
+ready_for_review = ["status:ready-for-review"]
+needs_verification = []

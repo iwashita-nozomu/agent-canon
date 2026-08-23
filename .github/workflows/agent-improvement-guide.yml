@@ -1,0 +1,74 @@
+# @dependency-start
+# contract configuration
+# responsibility Generates bounded AgentCanon improvement guidance for its generator surface and manual dispatch.
+# upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR evidence rules
+# upstream implementation ../../tools/agent_tools/generate_agent_improvement_guide.py builds the guide
+# upstream implementation ../../tools/agent_tools/runtime_artifacts.py owns external report/archive paths
+# @dependency-end
+
+# Standalone AgentCanon improvement guidance workflow. Derived repositories run
+# it automatically only when the guide generator surface changes.
+name: Agent Improvement Guide
+
+on:
+  pull_request:
+    paths:
+      - "tools/agent_tools/generate_agent_improvement_guide.py"
+      - "tests/agent_tools/test_generate_agent_improvement_guide.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-improvement-guide-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guide:
+    runs-on: ubuntu-latest
+    env:
+      AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
+      AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/../workspace/agent-canon-runtime/improvement-guide
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Start shared tool runtime
+        run: |
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" install
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
+
+      - name: Generate improvement guide
+        id: guide
+        run: |
+          report_dir="$(realpath -m "${AGENT_CANON_RUNTIME_ROOT}/container-runtime/reports/agent-improvement-guide")"
+          mkdir -p "${report_dir}"
+          guide_path="${report_dir}/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          container_guide="/var/lib/agent-canon/runtime/reports/agent-improvement-guide/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+            exec --root "${GITHUB_WORKSPACE}" -- python3 \
+            /usr/local/share/agent-canon/runtime/tools/agent_tools/generate_agent_improvement_guide.py \
+            --root . --runtime-root /var/lib/agent-canon/runtime --out "${container_guide}"
+          cat "${guide_path}" >> "${GITHUB_STEP_SUMMARY}"
+          echo "guide_path=${guide_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload improvement guide
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-improvement-guide-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.guide.outputs.guide_path }}
+
+      - name: Release shared tool runtime
+        if: always()
+        run: |
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" stop || true
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" uninstall || true

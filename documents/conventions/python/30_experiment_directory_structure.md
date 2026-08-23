@@ -1,0 +1,118 @@
+# 実験ディレクトリ構成
+<!--
+@dependency-start
+contract policy
+responsibility Documents 実験ディレクトリ構成 for this repository.
+upstream design ../README.md convention index
+@dependency-end
+-->
+
+
+この章は、このリポジトリで experiment をどこへ置くかを定めます。
+研究の問い、数式、比較設計、段階的改造の手順は `agents/workflows/research-workflow.md` を正本とします。
+
+## この文書の読み方
+
+- この文書は、experiment runtime、topic 固有コード、result 生成物の配置を定めます。
+- 主な順路は、要約、規約、補足、更新手順です。
+- experiment topic や長時間実行の出力先を作る前に読みます。
+- 境界: 研究の問いや比較設計の workflow は
+  `agents/workflows/research-workflow.md` が正本です。
+
+## 要約
+
+- 再利用できる汎用 runtime は pip installed `experiment_runner` package に置きます。
+- topic 固有のケース生成と実験本体は `experiments/` 配下に置きます。
+- 長時間実行の topic 生成物は run ごとの `result/<run-id>/raw/` と `result/<run-id>/summary/` に分け、ライブラリ本体へ混ぜません。
+- experiment run は 1 回の fresh 実行で完走させ、途中停止 run を継ぎ足して完了扱いにしません。
+
+## 規約
+
+### 1. 役割分担
+
+- `experiment_runner` package は、topic 非依存の実験実行基盤です。
+- subprocess 実行、resource scheduling、GPU 環境変数の受け渡し、context の整形のような汎用機能は package 側へ置きます。
+- 特定 topic に閉じたケース生成と CLI は `experiments/` 側へ置きます。
+
+### 2. topic ごとの配置
+
+- 単独で完結する experiment は `experiments/<topic>/` に置きます。
+- `experiments/` 配下の topic ディレクトリには、少なくとも README、`cases.py`、`config.yaml`、`run.py`、`visualization.py`、`report/`、`result/` を置ける形にします。
+- topic ディレクトリ名は `snake_case` を使います。
+
+### 3. 推奨レイアウト
+
+```text
+experiments/
+├── registry.toml
+└── <topic>/
+    ├── README.md
+    ├── cases.py
+    ├── config.yaml
+    ├── run.py
+    ├── visualization.py
+    ├── report/
+    │   └── .gitkeep
+    └── result/
+        └── .gitkeep
+```
+
+```text
+experiments/<topic>/report/
+├── .gitkeep
+└── <run-id>.md
+```
+
+### 4. どこへ何を置くか
+
+- topic をまたいで再利用する protocol や scheduler は pip installed `experiment_runner` 側へ置きます。
+- その topic のためだけに存在する `cases.py`、`config.yaml`、`run.py`、`visualization.py` は `experiments/<topic>/` に置きます。
+- `cases.py` には case 列の展開と `resource_estimate(case)` を置きます。
+- `run.py` には `main::main`、runner 起動、final summary 生成を置きます。
+- `visualization.py` には run artifact を読む topic 固有 renderer を置きます。既定 template は notebook を生成しません。
+- 生結果は `result/<run-id>/raw/`、可視化・要約・report 参照用の compact artifact は `result/<run-id>/summary/` にまとめます。
+- topic 固有ディレクトリの README や note から、定式化と比較対象を必ず辿れるようにします。
+- 長時間実行で生成される raw JSON/JSONL と dump は `result/<run-id>/raw/`、summary JSON/JSONL、HTML、SVG、manifest は `result/<run-id>/summary/` に集約します。
+- 人が読む experiment report は `experiments/<topic>/report/<run-id>.md` に置きます。
+- 複数 run をまたぐ要約は `documents/notes/experiments/<topic>.md` に置きます。
+- top-level `reports/` は topic ごとの experiment report の正本にしません。
+- JSONL は run 中の progress 記録として扱い、resume 用の canonical input にはしません。
+- 生成物は `.gitignore` と `result/<run-id>/{raw,summary}/` 運用で管理し、安定ライブラリやテストディレクトリへ混ぜません。
+
+### 4.5 naming
+
+- run_name は `<topic>_<variant>_<YYYYMMDDTHHMMSSZ>` に固定します。
+- `result/` の主要生成物は次でそろえます。
+  - `result/<run-id>/run_manifest.json`
+  - `result/<run-id>/eval_manifest.json`
+  - `result/<run-id>/summary/summary.json`
+  - `result/<run-id>/summary/cases.jsonl`
+  - `result/<run-id>/run.log`
+- topic README には、run_name 形式、report パス、result ディレクトリ構成を明記します。
+- topic の canonical entrypoint と smoke / formal command は `experiments/registry.toml` にも書きます。
+- server 実行では、`tools/experiments/run_managed_experiment.py` のような wrapper で host / command / commit metadata を残すことを推奨します。
+
+### 5. テスト
+
+- 汎用 runtime のテストは外部 `experiment_runner` package 側に置きます。
+- topic 固有 helper のうち再利用価値が高いものは、対応する unit test を `tests/` 側へ追加します。
+- 一回限りの実行スクリプトは、README の smoke command と集計結果の形式保証を優先し、無理にライブラリ級の API にしません。
+- 実行スクリプトは、指定した条件を 1 回の invocation で完走する責務を持たせます。
+- 途中停止した場合は、同じ結果ファイルへ継ぎ足さず、新しい run_name と出力先で 0 から再実行します。
+
+### 6. `main` への統合
+
+- `main` へ統合するときは、コードだけでなく test と document を同時にそろえます。
+- 隔離環境で削除した冗長ファイルは、`main` 側でも不要なら削除します。
+- 実行結果そのものは raw のまま全部を `main` へ戻さず、必要な最終 JSON と note を残します。
+- `main` へ持ち帰るのは完走 run の `result/<run-id>/` と report だけにします。partial run は診断用に留めます。
+
+## 補足
+
+- `python/experiment/` という別の top-level package は、現時点では新設しません。
+- 現在の repo では、汎用層は同梱せず、pip installed `experiment_runner` へ責務を集約します。
+
+## 更新手順
+
+- benchmark の置き場と境界を変えた場合は [20_benchmark_policy.md](./20_benchmark_policy.md) を同時に更新します。
+- worktree 運用や result / report の配置を変えた場合は [documents/conventions/coding-conventions-experiments.md](../coding-conventions-experiments.md) も更新します。

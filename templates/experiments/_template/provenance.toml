@@ -1,0 +1,147 @@
+# @dependency-start
+# contract template
+# responsibility Defines machine-readable experiment plan, resource, run, result, and reproducibility fields.
+# upstream design ./README.md reader-facing experiment contract.
+# upstream design ../../../documents/design/experiment_runner.md managed experiment execution contract.
+# downstream implementation ../../../templates/experiments/_template/run.py produces the referenced run artifact.
+# @dependency-end
+
+version = 1
+template_kind = "experiment-provenance"
+template_complete = false
+completion_status = "incomplete"
+# template_complete=false または placeholder 残存中は success に遷移させない。
+# result.state は incomplete / success / failed / blocked のいずれか一つだけを取る。
+
+[experiment]
+topic = "<topic>"
+owner = "<owner>"
+question = "<question>"
+hypothesis = "<hypothesis>"
+plan_digest = "<sha256>"
+non_goals = ["<non-goal>"]
+
+[plan]
+baseline = "<baseline>"
+candidate = "<candidate>"
+cases = ["<case-id>"]
+metrics = ["<metric>"]
+stopping_rule = "<stopping-rule>"
+acceptance_oracle = "<oracle>"
+
+[plan.algorithm_contract]
+public_entrypoint = "<entrypoint>"
+input_schema = "<input-schema>"
+state_transition = "<state-transition-or-recurrence>"
+invariants = ["<invariant>"]
+stopping_rule = "<stopping-rule>"
+failure_semantics = "<typed-failure-and-preserved-state>"
+
+[plan.oracle_boundary]
+necessary_observations = ["<observation>"]
+sufficient_observations = ["<observation>"]
+not_proven = ["<claim-outside-oracle>"]
+test_activation = "<required-or-not-applicable-with-reason>"
+
+[[plan.options]]
+id = "option-a"
+mechanism = "<mechanism-and-cost>"
+status = "selected-or-rejected"
+rejected_rationale = "<rationale-or-none>"
+selection_evidence = "<evidence-path-or-record>"
+
+[[plan.options]]
+id = "option-b"
+mechanism = "<mechanism-and-cost>"
+status = "selected-or-rejected"
+rejected_rationale = "<rationale-or-none>"
+selection_evidence = "<evidence-path-or-record>"
+
+[[plan.options]]
+id = "option-c"
+mechanism = "<mechanism-and-cost>"
+status = "selected-or-rejected"
+rejected_rationale = "<rationale-or-none>"
+selection_evidence = "<evidence-path-or-record>"
+
+[plan.selection]
+selected_option = "<option-id>"
+rejected_rationale = "<why-other-options-were-rejected>"
+selection_evidence = "<evidence-path-or-record>"
+
+[resource]
+# Resource allocation belongs to the caller or scheduler; do not hard-code a GPU id.
+admission_owner = "caller-or-scheduler"
+request = "<cpu-memory-gpu-request>"
+selection_reason = "<capability-or-scheduler-reason>"
+gpu_visibility = "caller-provided"
+parallelism_policy = "scheduler-or-caller"
+environment_limit = "<none-or-recorded-limit>"
+allocation_evidence = "<caller-or-scheduler-record>"
+
+[source]
+repository = "<repository>"
+branch = "<branch>"
+commit = "<commit-sha>"
+dirty_state = "clean"
+
+[input]
+config_path = "<config-path>"
+config_snapshot = "<result-path>/summary/config_snapshot.json"
+seed_policy = "<seed-policy>"
+environment_snapshot = "<result-path>/summary/environment.json"
+
+[run]
+runner = "<managed-runner>"
+command = "<exact-command>"
+run_id = "<run-id>"
+started_at = "<RFC3339>"
+finished_at = "<RFC3339>"
+exit_status = "<exit-status>"
+
+[result]
+path = "<result-path>"
+summary = "<result-path>/summary/summary.json"
+cases = "<result-path>/summary/cases.jsonl"
+manifest = "<result-path>/summary/artifact-manifest.json"
+visualization_status = "<result-path>/summary/visualization-status.json"
+state = "incomplete"
+status = "incomplete"
+accepted_failure = false
+failure_class = "<expected|infrastructure|implementation|oracle|unknown|none>"
+failure_evidence = "<required-path-or-none>"
+accepted_failure_reason = "<required-reason-or-none>"
+preserved_artifacts = ["<required-path-or-none>"]
+close_condition = "<required-close-condition>"
+validation_oracle = "<required-oracle-and-observation>"
+failure_cause_owner = "<owner>"
+conflict_intent = "<preserved-intent-or-none>"
+# success と failed は相互排他的。success は exit_status=0、validation_oracle=pass、
+# acceptance pass が必要。failed は failure_evidence と preserved_artifacts が必要。
+# blocked は未完了状態であり、close_condition が満たされるまで結論にしない。
+
+[reproducibility]
+readback_command = "<command>"
+required_artifacts = ["summary/summary.json", "summary/artifact-manifest.json"]
+required_case_artifact = "summary/cases.jsonl"
+config_snapshot = "<result-path>/summary/config_snapshot.json"
+environment_snapshot = "<result-path>/summary/environment.json"
+known_nondeterminism = "<none-or-description>"
+retention_owner = "<owner>"
+cleanup_policy = "<policy>"
+cleanup_command = "<command>"
+reconstructibility_readback = "<evidence-path-or-command>"
+
+[review]
+independent_reviewer = "<reviewer>"
+source_snapshot = "<commit-or-artifact>"
+selection_evidence = "<evidence-path-or-record>"
+review_decision = "<pass-or-revise-or-reject>"
+
+[[cases]]
+id = "<case-id>"
+parameters = "<parameter-record>"
+expected = "<expected-observation>"
+
+# For a preserved failure result, set result.status = "failed", accepted_failure = true,
+# fill failure_class and record the evidence and close condition in the README.

@@ -1,0 +1,14 @@
+<!--
+@dependency-start
+contract template
+responsibility Provides reusable review findings table template for area-based reviews.
+upstream design ../README.md documents review template partial expansion policy.
+downstream implementation ../../../tools/agent_tools/agent_team.py expands template partials.
+@dependency-end
+-->
+
+## Findings（指摘）
+
+| Area | Finding | Severity | Status | Evidence |
+| ---- | ------- | -------- | ------ | -------- |
+<!-- status: blocking | non-blocking | question | not-applicable | accepted-risk; overall outcome is changes-required only for unresolved blocking rows. -->

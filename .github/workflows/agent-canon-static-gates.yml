@@ -1,0 +1,90 @@
+# @dependency-start
+# contract configuration
+# responsibility Selects and runs standalone AgentCanon validation in one shared tool runtime and one required check.
+# upstream design ../../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
+# upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
+# upstream implementation ../../tools/agent_tools/classify_path_risk.py canonical changed-path selector and unit mapping
+# upstream implementation ../../tools/ci/run_standalone_static_gate_unit.sh executes one selected static-gate unit
+# downstream implementation ../../tools/ci/check_github_workflows.py validates workflow and PR template conventions
+# downstream implementation ../../tests/tools/test_standalone_static_gate_units.py validates execution-unit boundaries and selection
+# @dependency-end
+
+name: AgentCanon Static Gates
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
+  AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/../workspace/agent-canon-runtime/static-gates
+
+concurrency:
+  group: agent-canon-static-gates-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  select-static-units:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      units: ${{ steps.select.outputs.units }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select validation units from trusted PR diff
+        id: select
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" > "${RUNNER_TEMP}/agent-canon-changed-paths.txt"
+          python3 tools/agent_tools/classify_path_risk.py \
+            --paths-file "${RUNNER_TEMP}/agent-canon-changed-paths.txt" \
+            --format github-output | tee -a "${GITHUB_OUTPUT}"
+
+  static-gates:
+    needs: select-static-units
+    if: >-
+      always() &&
+      (github.event_name == 'workflow_dispatch' ||
+       needs.select-static-units.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Start one shared tool runtime
+        run: |
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" install
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" start
+          ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
+
+      - name: Run selected units in the shared runtime
+        env:
+          SELECTED_UNITS: ${{ github.event_name == 'workflow_dispatch' && 'rust,contracts,eval,workflow-container' || needs.select-static-units.outputs.units }}
+        run: |
+          if [ -z "${SELECTED_UNITS}" ]; then
+            echo "selected_units=none"
+            exit 0
+          fi
+          IFS=',' read -r -a units <<< "${SELECTED_UNITS}"
+          printf 'selected_units=%s\n' "${SELECTED_UNITS}"
+          for unit in "${units[@]}"; do
+            ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
+              exec --root "${GITHUB_WORKSPACE}" -- bash \
+              /usr/local/share/agent-canon/runtime/tools/ci/run_standalone_static_gate_unit.sh "${unit}"
+          done
+
+      - name: Release shared tool runtime
+        if: always()
+        run: ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" uninstall || true

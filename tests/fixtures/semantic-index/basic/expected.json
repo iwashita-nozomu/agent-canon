@@ -1,0 +1,28 @@
+{
+  "queries": [
+    {
+      "id": "agent_update",
+      "text": "AgentCanon latest submodule pin validation workflow",
+      "expected_paths": [
+        "docs/agent_update.md"
+      ],
+      "min_recall_at_5": 1.0
+    }
+  ],
+  "similar_pairs": [
+    {
+      "id": "agent_update_sync",
+      "left": "docs/agent_update.md",
+      "right": "docs/agent_sync.md",
+      "min_score": 0.35
+    }
+  ],
+  "must_not_pairs": [
+    {
+      "id": "agent_update_security",
+      "left": "docs/agent_update.md",
+      "right": "docs/security_audit.md",
+      "max_score": 0.8
+    }
+  ]
+}

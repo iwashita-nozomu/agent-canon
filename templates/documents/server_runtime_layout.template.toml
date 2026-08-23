@@ -1,0 +1,34 @@
+# @dependency-start
+# contract reference
+# responsibility Provides the server runtime layout.template configuration template.
+# @dependency-end
+
+# Reader map: この TOML は server runtime の owner、path、mount、builder、required capability を
+# machine-readable に保持する。host固有の resource/env provenance と cleanup は inventory/run
+# result 側で記録し、template source に成功結果を戻さない。
+
+[server]
+id = "main-server"
+label = "Main Server"
+host_kind = "wsl2"
+container_builder = "docker"
+codex_cli_required = true
+python_bin = "python3"
+
+[paths]
+workspace_root = "/mnt/l/workspace"
+local_state_root = "/var/lib/project-template"
+docker_state_root = "/var/lib/docker"
+artifact_root = "/mnt/l/workspace/project_template/reports"
+
+[mounts.workspace_root]
+type = "cifs"
+required = true
+
+[mounts.local_state_root]
+type = "ext4"
+required = false
+
+[mounts.docker_state_root]
+type = "ext4"
+required = true

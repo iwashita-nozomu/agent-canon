@@ -1,0 +1,275 @@
+<!--
+@dependency-start
+contract template
+responsibility Provides the canonical structure for a design document.
+upstream design ../../documents/design/README.md design-document ownership and reader route.
+upstream design ../../documents/rule/README.md repository document filename and language rules.
+upstream design ../../documents/conventions/DOCSTRING_GUIDE.md owns semantic Docstring clauses and sparse projection traces.
+downstream implementation README.md implements the approved boundary.
+@dependency-end
+-->
+
+# <Design title>
+
+この template は、設計判断を実装可能な責務境界へ変換するための正本雛形です。
+
+## Reader Map
+
+この design document は、target state、責務/OOP boundary、依存と副作用、algorithm contract、
+oracle、failure semantics、選択肢、実装 trace、validation、再構築、cleanup をこの順に示します。
+読者は requester → designer → implementer → reviewer → maintainer の順に必要な判断を追えます。
+
+- purpose:
+- intended reader and decision:
+- what this document contains:
+- canonical owner / generated evidence boundary:
+- required source readback and targeted validation:
+- lifecycle retention and cleanup owner:
+
+## Dependency header sample
+
+派生 repo で利用するときは、実際の implementation path に置き換えた dependency header を
+この本文 sample から作成します。sample はこの template 自体の graph header ではありません。
+
+```text
+@dependency-start
+downstream implementation <implementation-path> implements the approved boundary.
+@dependency-end
+```
+
+## 責務
+
+- この文書が正本として固定する契約、責務、型境界、依存方向、失敗意味論を記録する。
+- 実装者、reviewer、保守者が同じ判断を再構築できる根拠と受入条件を残す。
+- 設計提案と既存実装の事実を混同せず、未解決の選択肢を明示する。
+
+## 読者 map
+
+- **利用者 / requester**: 何が変わり、何が変わらないかを確認する。
+- **実装者**: replaceable responsibility unit、公開境界、依存、side effect を実装する。
+- **reviewer**: 根拠、敵対レビュー、代替案、受入条件を adjudicate する。
+- **保守者**: 再構築手順、更新責任、非正本 artifact の扱いを確認する。
+
+## 含む内容
+
+authority、責務、OOP/type boundary、依存閉包、side effect と failure semantics、
+複数の選択肢と棄却根拠、敵対レビュー、再構築手順、受入条件、evidence and
+assumption ledger を含めます。実装詳細の羅列、未検証の性能主張、run-local log の
+貼り付けは含めません。
+
+## Docstring projection
+
+実装責務に Docstring がある場合は、[Docstring Semantic Contract](../../documents/conventions/DOCSTRING_GUIDE.md#canonical-template-skeleton)
+を意味の正本として参照し、次の projection trace だけをこの design document に記録します。
+
+- responsibility region:
+- selected semantic delta / clause relation:
+- implementation or template anchor:
+- sparse trace and reviewer evidence:
+
+この欄は契約本文を複製しません。signature、type、namespace、field、または意味差分のない
+固定 section は記録せず、選択した差分がない場合は責務の一文だけで閉じます。
+
+## Authority and decision status
+
+- canonical owner:
+- governing request / issue / contract:
+- decision status: `proposed` / `approved` / `superseded`:
+- approval authority and date:
+- source-of-truth paths:
+- generated or non-canonical evidence paths:
+
+## Target state and scope
+
+### Target state
+
+<!-- 変更後に利用者が観測できる契約を、実装手順ではなく状態として書く。 -->
+
+- public entrypoint / input:
+- state transition or recurrence:
+- return / output projection:
+- observable side effect:
+- preconditions and invariants:
+- stopping, acceptance, or typed failure rule:
+
+### Scope and non-goals
+
+- in scope:
+- explicitly out of scope:
+- compatibility or migration boundary:
+- public behavior / schema impact:
+
+## Responsibility and OOP/type boundary
+
+| replaceable unit | owns | does not own | public capability / type | invariant |
+| --- | --- | --- | --- | --- |
+| `<unit>` | `<responsibility>` | `<boundary>` | `<type or protocol>` | `<invariant>` |
+
+- owner object / module:
+- collaborator interfaces:
+- data ownership and lifetime:
+- substitution boundary:
+- invalid state that the type must make unrepresentable:
+- test or checker that exercises this boundary:
+
+## Algorithm contract before tests
+
+tests の期待値を決める前に、public entrypoint、入力 domain、state transition/recurrence、
+invariants、stopping/acceptance rule、typed failure semantics を固定します。
+
+- public entrypoint and input schema:
+- state transition / recurrence:
+- invariants and preconditions:
+- stopping / acceptance rule:
+- failure semantics and preserved state:
+- implementation mechanism selected from this contract:
+
+## Dependency closure and effects
+
+### Dependency direction
+
+```text
+request / caller -> public entrypoint -> owned unit -> collaborator -> external effect
+```
+
+- upstream design / contract:
+- implementation source:
+- downstream consumers:
+- dependency edges that must change together:
+- import, header, or runtime boundary:
+
+### Side effects and failure semantics
+
+| effect | owner | trigger | durable artifact / mutation | failure result | recovery or rollback |
+| --- | --- | --- | --- | --- | --- |
+| `<effect>` | `<unit>` | `<condition>` | `<path or none>` | `<typed result>` | `<action>` |
+
+failure 時に何を保持し、何を fail-closed にし、どの caller が retry できるかを記述します。
+environment limitation を silent fallback や test-only branch に変換しません。
+
+### Failure-cause classification
+
+| cause class | observable evidence | owner | accepted result or repair route |
+| --- | --- | --- | --- |
+| expected contract failure | `<evidence>` | `<owner>` | `<accepted-failure-oracle>` |
+| infrastructure / environment | `<evidence>` | `<owner>` | `<blocked-or-retry-condition>` |
+| implementation / algorithm | `<evidence>` | `<owner>` | `<repair-and-regression-route>` |
+| oracle / specification | `<evidence>` | `<owner>` | `<design-adjudication-route>` |
+| unknown | `<evidence>` | `<owner>` | `<investigation-close-condition>` |
+
+## Options and decision
+
+少なくとも 2 つの viable option を比較してから 1 つを選択します。
+
+| option | mechanism | benefits | costs / risks | dependency and effect impact | status |
+| --- | --- | --- | --- | --- | --- |
+| A: `<name>` | `<mechanism>` | `<benefit>` | `<risk>` | `<impact>` | selected / rejected |
+| B: `<name>` | `<mechanism>` | `<benefit>` | `<risk>` | `<impact>` | selected / rejected |
+| C: `<name>` | `<mechanism>` | `<benefit>` | `<risk>` | `<impact>` | optional |
+
+- selected option:
+- selection rule:
+- rejected options and concrete rejection evidence:
+- unresolved branch that could change owner, mechanism, or validation:
+
+### Independent review of alternatives
+
+- independent reviewer:
+- review scope and source snapshot:
+- selected option readback:
+- rejected option evidence:
+- conflict intent preserved by the selection:
+
+## Adversarial review
+
+選択した design の boundary を壊すつもりで review します。
+
+- hidden assumption or missing precondition:
+- wrong owner / helper-sprawl risk:
+- dependency cycle or public-surface leak:
+- partial write, stale artifact, or rollback hazard:
+- malformed input, timeout, resource exhaustion, or hostile caller:
+- alternative that would pass a superficial test but violate the contract:
+- reviewer decision: pass / revise / escalate:
+- required repair before implementation:
+
+## Reconstruction and implementation trace
+
+- clean checkout / branch precondition:
+- source paths and exact sections to read:
+- implementation sequence:
+- generated artifacts and their producer:
+- command to reconstruct the design evidence:
+- command to reconstruct the implementation state:
+- expected clean/dirty and ownership checks:
+
+## Stable Design Clause Registry And Bidirectional Trace
+
+設計判断には安定した clause ID を付け、実装・generated evidence の両方向から同じ clause を
+read back します。ID は行番号ではなく、設計文書の version をまたいで意味を維持する名前にします。
+
+| clause ID | design decision / invariant | owner | acceptance evidence |
+| --- | --- | --- | --- |
+| `DES-001` | `<public contract or state invariant>` | `<owner>` | `<evidence path or command>` |
+| `DES-002` | `<dependency or side-effect boundary>` | `<owner>` | `<evidence path or command>` |
+| `DES-003` | `<failure or oracle rule>` | `<owner>` | `<evidence path or command>` |
+
+### Forward trace: design to implementation and generated evidence
+
+| clause ID | implementation path / section | generated artifact or projection | validation readback |
+| --- | --- | --- | --- |
+| `DES-001` | `<source path:section>` | `<generated path:section or not_applicable>` | `<command / reviewer>` |
+| `DES-002` | `<source path:section>` | `<generated path:section or not_applicable>` | `<command / reviewer>` |
+
+### Reverse trace: implementation evidence to design clause
+
+| evidence ID | implementation / generated evidence | reverse-linked clause ID | owner adjudication |
+| --- | --- | --- | --- |
+| `EVID-001` | `<diff, artifact, output, or projection>` | `DES-001` | `<covered / gap / escalate>` |
+| `EVID-002` | `<diff, artifact, output, or projection>` | `DES-002` | `<covered / gap / escalate>` |
+
+- forward trace completeness: `<every selected clause has implementation and evidence coverage>`
+- reverse trace completeness: `<every changed implementation/evidence item names its design clause>`
+- unmapped evidence and resolution owner: `<not_applicable or explicit owner>`
+
+## Acceptance and validation
+
+| acceptance condition | evidence / oracle | command or review action | result |
+| --- | --- | --- | --- |
+| public contract | `<checker / reviewer>` | `<command>` | pending |
+| responsibility boundary | `<checker / static evidence>` | `<command>` | pending |
+| dependency closure | `<dependency review>` | `<command>` | pending |
+| side effect / failure semantics | `<targeted scenario>` | `<command>` | pending |
+| reconstruction | `<readback>` | `<command>` | pending |
+
+- acceptance owner:
+- required evidence artifact:
+- known limitations:
+- close condition:
+
+### Necessary-and-sufficient oracle boundary
+
+- necessary observations:
+- sufficient observations:
+- oracle owner:
+- what the oracle does not prove:
+- test activation condition:
+- static / targeted validation route:
+
+## Evidence and assumption ledger
+
+| id | kind | claim / assumption | source path and line | confidence | how falsified |
+| --- | --- | --- | --- | --- | --- |
+| E1 | observation / assumption | `<claim>` | `<path:line>` | high / medium / low | `<check>` |
+
+この template を埋めた設計文書は、承認後に実装へ投影します。run-local report、
+raw log、生成済み mirror はこの文書の正本ではありません。
+
+## Formatter, readback, and lifecycle
+
+- Markdown/math/Mermaid command: `tools/bin/agent-canon docs check <paths...>`
+- formatter/fixer command when needed:
+- post-format source readback:
+- generated projection readback:
+- artifact retention path and owner:
+- cleanup command, timing, and reconstructibility evidence:

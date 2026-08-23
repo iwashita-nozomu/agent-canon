@@ -1,0 +1,243 @@
+# @dependency-start
+# contract reference
+# responsibility Maps canonical tools to same-named explanatory documents.
+# upstream design README.md tool documentation placement policy
+# upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
+# upstream design visualization_contract.md canonical visualization contract/checker documentation
+# downstream implementation ../../tools/agent_tools/tool_catalog.py validates one-to-one tool docs
+# downstream implementation ../../tests/agent_tools/test_tool_catalog.py validates visualization tool-doc registration
+# @dependency-end
+
+catalog_kind = "agent_canon_tool_docs"
+version = 1
+
+[[tool]]
+id = "route"
+tool = "tools/agent_tools/route.py"
+doc = "documents/tools/route.md"
+language = "python"
+summary = "Short task-routing tool documentation."
+
+[[tool]]
+id = "html-artifact-access"
+tool = "tools/experiments/html_artifact_access.py"
+doc = "documents/tools/html_artifact_access.md"
+language = "python"
+summary = "Remote HTML artifact browser-access command documentation."
+
+[[tool]]
+id = "oop-python-readability"
+tool = "tools/oop/python/readability.py"
+doc = "documents/tools/oop/python/readability.md"
+language = "python"
+summary = "Python OOP readability checker documentation."
+
+[[tool]]
+id = "oop-python-rule-inventory"
+tool = "tools/oop/python/rule_inventory.py"
+doc = "documents/tools/oop/python/rule_inventory.md"
+language = "python"
+summary = "Python OOP rule inventory documentation."
+
+[[tool]]
+id = "oop-cpp-readability"
+tool = "tools/oop/cpp/readability.py"
+doc = "documents/tools/oop/cpp/readability.md"
+language = "cpp"
+summary = "C++ OOP readability checker documentation."
+
+[[tool]]
+id = "oop-cpp-rule-inventory"
+tool = "tools/oop/cpp/rule_inventory.py"
+doc = "documents/tools/oop/cpp/rule_inventory.md"
+language = "cpp"
+summary = "C++ OOP rule inventory documentation."
+
+[[tool]]
+id = "semantic-index"
+tool = "rust/agent-canon/src/semantic_index/mod.rs"
+doc = "documents/tools/semantic_index.md"
+language = "rust"
+summary = "Semantic vector index and Eval harness documentation."
+
+[[tool]]
+id = "semantic-provider-html-report"
+tool = "tools/agent_tools/semantic_provider_html_report.py"
+doc = "documents/tools/semantic_provider_html_report.md"
+language = "python"
+summary = "HTML renderer for semantic-index provider comparison evidence."
+
+[[tool]]
+id = "prose-reasoning-graph"
+tool = "tools/agent_tools/prose_reasoning_graph.py"
+doc = "documents/tools/prose_reasoning_graph.md"
+language = "python"
+summary = "SQLite-backed prose structure graph and external-runtime artifact boundary, diagnostics, explanation, and skill handoff documentation."
+
+[[tool]]
+id = "repo-structure-contract"
+tool = "tools/agent_tools/repo_structure_contract.py"
+doc = "documents/tools/repo_structure_contract.md"
+language = "python"
+summary = "Repository tree versus AgentCanon structure contract checker documentation."
+
+[[tool]]
+id = "agent-canon-cli"
+tool = "tools/bin/agent-canon"
+doc = "documents/tools/agent-canon.md"
+language = "rust"
+summary = "Unified Rust CLI including Markdown documentation formatting and checks."
+
+[[tool]]
+id = "test-design-check"
+tool = "rust/agent-canon/src/test_design.rs"
+doc = "documents/tools/test_design.md"
+language = "rust"
+summary = "Rust test design resilience diagnostics."
+
+[[tool]]
+id = "github-publish"
+tool = "tools/agent_tools/github_publish.py"
+doc = "documents/tools/github_publish.md"
+language = "python"
+summary = "gh-backed GitHub branch and PR publish tool documentation."
+
+[[tool]]
+id = "wiki-publish"
+tool = "tools/agent_tools/wiki_publish.py"
+doc = "documents/tools/wiki_publish.md"
+language = "python"
+summary = "Deterministic AgentCanon wiki publication to repo.wiki.git with default-branch-only and source-commit binding."
+
+[[tool]]
+id = "visualization-contract"
+tool = "tools/agent_tools/visualization_contract.py"
+doc = "documents/tools/visualization_contract.md"
+language = "python"
+summary = "Typed visualization universe, ToolCall, projection coverage, and post-format readback checker documentation."
+
+[[tool]]
+id = "render-dependency-manifest-graph"
+tool = "tools/agent_tools/render_dependency_manifest_graph.py"
+doc = "documents/tools/render_dependency_manifest_graph.md"
+language = "python"
+summary = "Dependency manifest graph Markdown, DOT, and HTML renderer documentation."
+
+[[tool]]
+id = "git-dependency-diff-summary"
+tool = "tools/agent_tools/git_dependency_diff_summary.py"
+doc = "documents/tools/git_dependency_diff_summary.md"
+language = "python"
+summary = "Git diff and dependency expansion summary documentation."
+
+[[tool]]
+id = "check-design-doc-claims"
+tool = "tools/agent_tools/check_design_doc_claims.py"
+doc = "documents/tools/check_design_doc_claims.md"
+language = "python"
+summary = "Design-document claim evidence checker documentation."
+
+[[tool]]
+id = "check-semantic-responsibility-contract"
+tool = "tools/agent_tools/check_semantic_responsibility_contract.py"
+doc = "documents/tools/check_semantic_responsibility_contract.md"
+language = "python"
+summary = "Semantic responsibility contract schema, identity, and reference checker documentation."
+
+[[tool]]
+id = "repository-topic-clone"
+tool = "tools/agent_tools/repository_topic_clone.py"
+doc = "documents/tools/repository_topic_clone.md"
+language = "python"
+summary = "Generic repository topic clone lifecycle and reconstructibility cleanup documentation."
+
+[[tool]]
+id = "dependency-module-change"
+tool = "tools/agent_tools/dependency_module_change.py"
+doc = "documents/tools/dependency_module_change.md"
+language = "python"
+summary = "Dependency policy decorator for the generic repository topic clone lifecycle."
+
+[[tool]]
+id = "classify-path-risk"
+tool = "tools/agent_tools/classify_path_risk.py"
+doc = "documents/tools/classify_path_risk.md"
+language = "python"
+summary = "Path/risk check matrix classifier documentation."
+
+[[tool]]
+id = "formal-proof"
+tool = "tools/agent_tools/formal_proof.py"
+doc = "documents/tools/formal_proof.md"
+language = "python"
+summary = "Formal proof scaffold planner documentation, including natural-language, Python AST, and package-retained trace routes."
+
+[[tool]]
+id = "lean-proof-env"
+tool = "tools/agent_tools/lean_proof_env.py"
+doc = "documents/tools/lean_proof_env.md"
+language = "python"
+summary = "Lean Mathlib/Aesop proof environment setup and checker routing documentation."
+
+[[tool]]
+id = "tool-proof-coverage"
+tool = "tools/agent_tools/tool_proof_coverage.py"
+doc = "documents/tools/tool_proof_coverage.md"
+language = "python"
+summary = "Tool behavior and performance Lean proof-obligation coverage checker documentation."
+
+[[tool]]
+id = "jit-canonical-ir"
+tool = "tools/agent_tools/jit_canonical_ir.py"
+doc = "documents/tools/jit_canonical_ir.md"
+language = "python"
+summary = "JIT root to StableHLO-derived operational IR and backend trace documentation."
+
+[[tool]]
+id = "cpp-source-canonical-ir"
+tool = "tools/agent_tools/cpp_source_canonical_ir.py"
+doc = "documents/tools/cpp_source_canonical_ir.md"
+language = "python"
+summary = "C++ source-only operational IR wrapper documentation."
+
+[[tool]]
+id = "cpp-template-to-lean"
+tool = "tools/agent_tools/cpp_template_to_lean.py"
+doc = "documents/tools/cpp_template_to_lean.md"
+language = "python"
+summary = "Full C++ template source root to complete Lean evidence route documentation."
+
+[[tool]]
+id = "operational-ir-to-lean"
+tool = "tools/agent_tools/operational_ir_to_lean.py"
+doc = "documents/tools/operational_ir_to_lean.md"
+language = "python"
+summary = "Shared thin operational IR to Lean evidence renderer documentation."
+
+[[tool]]
+id = "jit-ir-to-lean"
+tool = "rust/agent-canon/src/jit_ir_to_lean.rs"
+doc = "documents/tools/jit_ir_to_lean.md"
+language = "rust"
+summary = "JIT-canonical IR to Lean evidence-catalog documentation."
+
+[[tool]]
+id = "check-proof-trace-alignment"
+tool = "tools/agent_tools/check_proof_trace_alignment.py"
+doc = "documents/tools/check_proof_trace_alignment.md"
+language = "python"
+summary = "Proof trace code-path and proposition alignment checker documentation."
+
+[[tool]]
+id = "lsp-code-analysis"
+tool = "tools/agent_tools/lsp_code_analysis.py"
+doc = "documents/tools/lsp_code_analysis.md"
+language = "python"
+summary = "Canonical LSP 3.17 code-analysis protocol, report schema, and legacy adapter documentation."
+
+[[tool]]
+id = "extract-docx"
+tool = "tools/docs/extract_docx.py"
+doc = "documents/tools/extract_docx.md"
+language = "python"
+summary = "Standard-library DOCX decomposition into searchable and auditable reference bundles."

@@ -1,0 +1,262 @@
+# @dependency-start
+# contract reference
+# responsibility Defines required and optional repository path existence and filesystem kinds.
+# upstream design README.md repository entrypoint and shared surface overview
+# upstream design ../runtime/SHARED_RUNTIME_SURFACES.md standalone runtime surface policy
+# upstream design ../runtime/shared-runtime-surfaces.toml machine-readable runtime inventory
+# upstream design ../../responsibility-scope.toml canonical path owner and class relation
+# downstream implementation ../../tools/agent_tools/repo_structure_contract.py compares observed trees against this contract
+# downstream implementation ../../tests/agent_tools/test_repo_structure_contract.py tests structure contract validation
+# @dependency-end
+
+catalog_kind = "agent_canon_repo_structure_contract"
+version = 1
+
+# This contract owns only required/optional existence, filesystem kind, and
+# profile detection. Path owner/class belongs exclusively to the
+# repository's top-level responsibility-scope.toml.
+
+[defaults]
+ignore_names = [
+  ".agent-canon",
+  ".git",
+  ".mypy_cache",
+  ".pytest_cache",
+  ".ruff_cache",
+  ".state",
+  ".venv",
+  "__pycache__",
+  "build",
+  "node_modules",
+  "reports",
+  "target",
+]
+ignore_globs = [
+  "experiments/*/result",
+  "experiments/*/result/**",
+  "*/__pycache__",
+  "rust/agent-canon/target",
+  "rust/agent-canon/target/**",
+  "tools/**/__pycache__",
+]
+
+[[profile]]
+id = "agent_canon_standalone"
+summary = "Standalone AgentCanon repository checkout."
+detect_all = [
+  "ROOT_AGENTS.md",
+  "agents/TASK_WORKFLOWS.md",
+  "documents/runtime/shared-runtime-surfaces.toml",
+  "tools/catalog.yaml",
+  "rust/agent-canon/Cargo.toml",
+]
+[[profile.required]]
+path = "README.md"
+kind = "file"
+
+[[profile.required]]
+path = "ROOT_AGENTS.md"
+kind = "file"
+
+[[profile.required]]
+path = "AGENTS.md"
+kind = "file"
+
+[[profile.required]]
+path = "agents"
+kind = "dir"
+
+[[profile.required]]
+path = "templates"
+kind = "dir"
+
+[[profile.required]]
+path = "templates/README.md"
+kind = "file"
+
+[[profile.required]]
+path = "agents/skills"
+kind = "dir"
+
+[[profile.required]]
+path = "agents/internal-routines"
+kind = "dir"
+
+[[profile.required]]
+path = "agents/workflows"
+kind = "dir"
+
+[[profile.required]]
+path = "agents/canonical"
+kind = "dir"
+
+[[profile.required]]
+path = "agents/TASK_WORKFLOWS.md"
+kind = "file"
+
+[[profile.required]]
+path = "documents"
+kind = "dir"
+
+[[profile.required]]
+path = "documents/rule"
+kind = "dir"
+
+[[profile.required]]
+path = "documents/rule/README.md"
+kind = "file"
+
+[[profile.required]]
+path = "documents/rule/naming.md"
+kind = "file"
+
+[[profile.required]]
+path = "documents/rule/directory-structure.md"
+kind = "file"
+
+[[profile.required]]
+path = "documents/tools"
+kind = "dir"
+
+[[profile.required]]
+path = "documents/runtime/shared-runtime-surfaces.toml"
+kind = "file"
+
+[[profile.required]]
+path = "documents/structure/repo-structure-contract.toml"
+kind = "file"
+
+[[profile.required]]
+path = "tools"
+kind = "dir"
+
+[[profile.required]]
+path = "tools/catalog.yaml"
+kind = "file"
+
+[[profile.required]]
+path = "tools/agent_tools"
+kind = "dir"
+
+[[profile.required]]
+path = "tools/agent_tools/update_lifecycle_contract.py"
+kind = "file"
+
+[[profile.required]]
+path = "tools/user"
+kind = "dir"
+
+[[profile.required]]
+path = "tools/internal"
+kind = "dir"
+
+[[profile.required]]
+path = "tools/ci"
+kind = "dir"
+
+[[profile.required]]
+path = "rust/agent-canon"
+kind = "dir"
+
+[[profile.required]]
+path = "rust/agent-canon/Cargo.toml"
+kind = "file"
+
+[[profile.required]]
+path = "tests/agent_tools"
+kind = "dir"
+
+[[profile.required]]
+path = "memory"
+kind = "dir"
+
+[[profile.required]]
+path = "documents/notes"
+kind = "dir"
+
+[[profile.required]]
+path = "issues"
+kind = "dir"
+
+[[profile.optional]]
+path = "references"
+kind = "dir"
+
+[[profile.optional]]
+path = "PHILOSOPHY.md"
+kind = "file"
+
+[[profile.optional]]
+path = "experiments"
+kind = "dir"
+
+[[profile.optional]]
+path = "vendor"
+kind = "dir"
+
+[[profile.optional]]
+path = ".agent-canon/update-lifecycle"
+kind = "dir"
+
+[[profile]]
+id = "template_or_derived_repo"
+summary = "Template or derived repository that consumes AgentCanon as vendor/agent-canon."
+detect_all = [
+  ".gitmodules",
+  "vendor/agent-canon",
+]
+[[profile.required]]
+path = "README.md"
+kind = "file"
+
+[[profile.required]]
+path = "AGENTS.md"
+kind = "any"
+
+[[profile.required]]
+path = ".gitmodules"
+kind = "file"
+
+[[profile.required]]
+path = "vendor/agent-canon"
+kind = "dir"
+
+[[profile.required]]
+path = "tools"
+kind = "any"
+
+[[profile.required]]
+path = ".codex"
+kind = "dir"
+
+[[profile.required]]
+path = ".devcontainer"
+kind = "any"
+
+[[profile.optional]]
+path = ".devcontainer/parent-environment.sh"
+kind = "file"
+
+[[profile.optional]]
+path = ".devcontainer/parent-environment.toml"
+kind = "file"
+
+[[profile.required]]
+path = "documents/README.md"
+kind = "file"
+
+[[profile.optional]]
+path = "docker"
+kind = "dir"
+
+[[profile.optional]]
+path = "cpp"
+kind = "dir"
+
+[[profile.optional]]
+path = "python"
+kind = "dir"
+
+[[profile.optional]]
+path = ".agent-canon/update-lifecycle"
+kind = "dir"

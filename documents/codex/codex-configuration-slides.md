@@ -1,0 +1,534 @@
+<!--
+@dependency-start
+contract reference
+responsibility Documents Codex Configuration Slides for this repository.
+upstream design ./codex-configuration-reference.md source reference for the slide deck
+upstream implementation ../../.codex/config.toml current shared template Codex config
+@dependency-end
+-->
+
+# Codex Configuration Slides
+
+このスライドは `documents/codex/codex-configuration-reference.md` の要点から作成した Markdown deck です。実際の slide / presentation production は `agents/workflows/slide-production-workflow.md` に従い、固定 template と layout review を優先します。
+
+## この文書の読み方
+
+この deck は、Codex 設定の全体像、根拠、設定 surface、template の現在値、未設定項目、CLI override、主要 key、subagents、MCP、hooks、skills、AGENTS.md discovery を順に説明します。発表や説明資料を作るときは前半の全体像から読み、設定変更の根拠確認には詳細 reference である `codex-configuration-reference.md` に戻ります。この文書自体は slide 派生物であり、設定正本ではありません。
+
+---
+
+# Codex 設定の全体像
+
+Codex の設定は 1 ファイルではなく、複数の runtime surface で構成されます。
+
+- `config.toml`: runtime の機械的設定
+- `AGENTS.md`: repo 内の作業規律
+- hooks: セッションと tool 実行の決定的処理
+- MCP: 外部 tool / repo tool 接続
+- skills: 再利用可能な workflow
+- subagents: role と model/sandbox の分離
+
+---
+
+# この資料の根拠
+
+- 公式 OpenAI Codex docs
+- 公式 `config-schema.json`
+- ローカル `codex --help`
+- ローカル `codex exec --help`
+- ローカル `.codex/config.toml`
+- agent-canon の runtime entrypoint
+
+結論: repo に残す設定は「長期運用に必要なもの」だけに絞り、臨時操作は CLI override / profile へ逃がします。
+
+---
+
+# 設定の置き場所
+
+| Surface | Scope | 役割 |
+| ------- | ----- | ---- |
+| `~/.codex/config.toml` | user | 個人の既定値 |
+| `.codex/config.toml` | repo | project runtime policy |
+| `-c key=value` | run | 一時 override |
+| `.codex/agents/*.toml` | repo/user | custom subagent |
+| `.agents/skills` | dir/repo/user | workflow package |
+| `AGENTS.md` | repo tree | 作業規律 |
+| hooks | repo/user | 起動・tool 実行時の強制処理 |
+
+---
+
+# 覚えるべき分担
+
+- `AGENTS.md`: 何を必ず守るか
+- `.codex/config.toml`: runtime をどう動かすか
+- `.codex/agents/*.toml`: role ごとの model / sandbox / MCP / skills
+- `hooks.json`: deterministic startup と tool gate
+- `reports/agents/<run-id>/`: task 固有の証跡
+
+この分担を崩すと、設定が増えるほど agent が読むべき正本を見失います。
+
+---
+
+# Template の現在値
+
+`.codex/config.toml` の代表部分です。全 skill / agent registry は正本を参照します。
+
+```toml
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
+review_model = "gpt-5.6-luna"
+model_context_window = 1000000
+tool_output_token_limit = 4096
+
+[agents]
+max_threads = 27
+max_depth = 2
+job_max_runtime_seconds = 3600
+```
+
+---
+
+# Template 設定の意味
+
+- approval は `on-request`
+- filesystem sandbox は `workspace-write`
+- 親 orchestrator は `gpt-5.6-sol/high`
+- named child の model / effort / capability / context / return schema は
+  `agents/model_profiles.toml` が所有し、role TOML は generated view
+- 1 tool output の context 取り込みは 4096 token まで
+- stable runtime feature は Codex の既定を使う
+- repo-owned skill は `.agents/skills/` から自動探索し、child-agent registry だけを config に置く
+- topology-derived request は direct `21` + nested `6` = `27`。platform-effective
+  / current-available capacity は別入力で、27 を platform cap とは主張しない
+- AgentCanon の repo-local deterministic checks は Rust CLI / Python tool が所有する
+- Codex は project trust、hook context、apps / external connectors / session tool availability を所有する
+
+---
+
+# Template に入っていないもの
+
+現在の `.codex/config.toml` が共有正本として持つ top-level surface は次です。
+
+- `approval_policy`
+- `sandbox_mode`
+- `model`
+- `model_reasoning_effort`
+- `review_model`
+- `model_context_window`
+- `tool_output_token_limit`
+- `agents`
+
+それ以外の official schema key は「Codex が受け付けても、この template
+では共有していない設定」です。
+
+---
+
+# 未設定 top-level の代表カテゴリ
+
+- additional model / provider / reasoning options
+- approvals reviewer / permissions / sandbox detail
+- project doc discovery / injected context
+- inline hooks / tools / apps / plugins
+- MCP OAuth / credential stores
+- UI / history / logs / notifications
+- memory / OTEL / ghost snapshots
+- realtime / audio / JS REPL / Windows
+- experimental overrides
+- profiles / personality
+
+---
+
+# 未設定は不足とは限らない
+
+未設定の理由を分類します。
+
+- user config に置くべきもの: model、provider、profile
+- machine-local なもの: TUI、history、audio、notice、Windows onboarding
+- secret を含み得るもの: provider auth、headers、OAuth、credential stores
+- repo では別 surface のもの: hooks は `hooks.json`、skills は `.agents/skills`
+- 危険・不安定なもの: `experimental_*`
+
+---
+
+# Feature flags
+
+この template で有効なのは `hooks` と `goals` です。
+
+schema には他にも多くの flag があります。
+例:
+
+- `multi_agent`, `multi_agent_v2`
+- `web_search`, `web_search_cached`, `search_tool`
+- `image_generation`, `apps`, `plugins`
+- `tool_search`, `tool_suggest`
+- `memories`, `memory_tool`
+- `unified_exec`, `shell_tool`
+- `experimental_use_freeform_apply_patch`
+
+---
+
+# Nested で未設定のもの
+
+`[agents]`:
+
+- 未設定: `max_depth`
+- 未設定: inline role entries
+
+`[mcp_servers.<name>]`:
+
+- 未設定: `url`, `cwd`, `env`, `env_vars`
+- 未設定: `enabled_tools`, `disabled_tools`, `tools`
+- 未設定: HTTP headers / bearer token / OAuth
+- 未設定: `supports_parallel_tool_calls`
+
+---
+
+# CLI override
+
+```bash
+codex -c model='"<model-id-from-openai-docs>"'
+codex -c model_reasoning_effort='"high"'
+codex --enable hooks
+codex --disable some_feature
+codex --search
+codex exec --json "run review"
+```
+
+CLI override は一時操作に使います。repo の正本へ残すのは、全員が再現すべき設定だけです。
+
+---
+
+# CLI command map
+
+| Command | 用途 |
+| ------- | ---- |
+| `codex` | interactive session |
+| `codex exec` | non-interactive run |
+| `codex review` | non-interactive code review |
+| `codex mcp` | MCP server 管理 |
+| `codex plugin` | plugin 管理 |
+| `codex apply` | latest diff の適用 |
+| `codex resume` / `fork` | session 継続・分岐 |
+| `codex features` | feature flags 確認 |
+
+---
+
+# 最重要 top-level keys
+
+- `model`
+- `model_provider`
+- `model_reasoning_effort`
+- `model_verbosity`
+- `approval_policy`
+- `sandbox_mode`
+- `profiles`（user-level config に置く）
+- `mcp_servers`
+- `agents`
+- `skills`
+- `hooks`
+- `tools`
+- `web_search`
+- `project_doc_*`
+
+---
+
+# Model / Provider
+
+| Key | 使い方 |
+| --- | ------ |
+| `model` | 通常 turn の model |
+| `review_model` | review 専用 model |
+| `model_reasoning_effort` | reasoning budget |
+| `plan_mode_reasoning_effort` | plan mode 専用 budget |
+| `model_verbosity` | GPT-5 output detail |
+| `model_provider` | provider key |
+| `model_providers` | custom provider map |
+
+---
+
+# Model 選択の実務
+
+OpenAI / Codex の最新 model guidance は `$openai-docs` で確認します。
+repo runtime は `.codex/config.toml` と role TOML の現在値から開始し、task
+名や見積もり規模で profile を先に選びません。
+
+- parent: `.codex/config.toml` の `gpt-5.6-sol/high`
+- named child: `agents/model_profiles.toml` から生成した role view の model / effort
+- profile 変更: 観測済み token、latency、model-effort、tool-output evidence が原因 surface を示した後
+- current model support: `$openai-docs` で確認
+
+---
+
+# Approval / Sandbox
+
+| Key | 目的 |
+| --- | ---- |
+| `approval_policy` | command approval の基本方針 |
+| `approvals_reviewer` | approval の宛先 |
+| `sandbox_mode` | filesystem / command sandbox |
+| `sandbox_workspace_write` | workspace-write の詳細 |
+| `permissions` | granular permission profile |
+| `default_permissions` | 既定 profile |
+
+---
+
+# Sandbox modes
+
+- `read-only`: review / exploration に向く
+- `workspace-write`: repo 編集に向く
+
+この template は `workspace-write` を既定にし、追加権限は実行時の承認で扱います。
+
+---
+
+# Subagents
+
+`[agents]` は capacity 設定です。
+
+| Field | 意味 |
+| ----- | ---- |
+| `max_threads` | topology-derived requested/configured readback。effective / available capacity は別入力 |
+| `max_depth` | nested spawn depth |
+| `job_max_runtime_seconds` | worker timeout |
+
+品質を決めるのは thread 数ではなく、owner、input packet、write scope、review gate です。
+
+---
+
+# Custom agents
+
+Custom agents は次に置けます。
+
+- `~/.codex/agents/`
+- `.codex/agents/`
+
+各 role で上書きできる代表例:
+
+- `model`
+- `model_reasoning_effort`
+- `sandbox_mode`
+- `mcp_servers`
+- instructions
+
+---
+
+# MCP
+
+MCP は Codex が外部 tool や認可済み workspace data を呼ぶ接続面です。
+AgentCanon の repo-local deterministic checks は MCP server ではなく CLI
+tool と structured output を正本にします。
+
+---
+
+# MCP field map
+
+- `command`, `args`, `cwd`
+- `url`
+- `env`, `env_vars`
+- `http_headers`, `env_http_headers`
+- `bearer_token_env_var`
+- `enabled`, `required`
+- `startup_timeout_sec`, `tool_timeout_sec`
+- `enabled_tools`, `disabled_tools`, `tools`
+- `default_tools_approval_mode`
+- `supports_parallel_tool_calls`
+
+---
+
+# Hooks
+
+Hook events:
+
+- `SessionStart`
+- `UserPromptSubmit`
+- `PreToolUse`
+- `PostToolUse`
+- `PermissionRequest`
+- `Stop`
+
+Hook には「毎回確実に動いてほしい deterministic 処理」を置きます。
+
+---
+
+# Hooks の使いどころ
+
+- MCP inventory の boot / check
+- repo runtime context の注入
+- 禁止 tool の事前 block
+- OOP guard の中間 block と呼び出しログ
+- notebook-as-test misuse の中間 block と呼び出しログ
+- skill usage の `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/skill_usage.jsonl` 追記
+- tool 結果の監査ログ化
+- permission request の追加 review
+
+長時間処理や曖昧な判断は hook に押し込まず、workflow / agent に持たせます。
+
+---
+
+# Skills
+
+Skills は reusable workflow package です。
+
+Codex は skill metadata で候補を選び、選択後に該当 `SKILL.md` を読みます。
+
+重要:
+
+- description は短く明確にする
+- frontmatter を壊すと skill が load されない
+- workflow は skill、repo policy は `AGENTS.md`
+- plugin は配布単位、skill は実行単位
+
+---
+
+# Skills discovery
+
+```text
+.agents/skills/
+  dependency-analysis/
+    SKILL.md
+```
+
+Codex は repository の `.agents/skills/` を自動探索します。project config に
+同じ inventory を列挙せず、命名と説明を簡潔に保ちます。
+
+---
+
+# AGENTS.md discovery
+
+関連 key:
+
+- `project_doc_max_bytes`
+- `project_doc_fallback_filenames`
+- `project_root_markers`
+- `include_environment_context`
+- `include_permissions_instructions`
+- `include_apps_instructions`
+
+`AGENTS.md` は agent が読む作業規律の正本です。設定値の一覧表を置く場所ではありません。
+
+---
+
+# User-Level Profiles
+
+Profiles は operator mode を切り替えるための機構です。
+current Codex では project-local `.codex/config.toml` の `profiles` は warning 対象なので、`~/.codex/config.toml` か `$CODEX_HOME/config.toml` に置きます。
+AgentCanon は user profile の名前や値を二重管理せず、task label から profile
+を先に決めません。観測 evidence に基づく変更は fresh session で適用します。
+
+---
+
+# Tools / Web Search
+
+| Key | 目的 |
+| --- | ---- |
+| `tools.view_image` | local image inspection |
+| `tools.web_search` | web search tool config |
+| `web_search` | disabled / cached / live |
+| `tool_output_token_limit` | tool output context budget |
+| `tool_suggest` | discoverable tool suggestions |
+
+current facts や公式 docs 確認では live search を使い、通常の repo 作業では不要に外部依存させません。
+
+---
+
+# UI / History / Local State
+
+Machine-local に寄せるべきもの:
+
+- `tui.*`
+- `history.*`
+- `log_dir`
+- `sqlite_home`
+- `notify`
+- `file_opener`
+- `notice.*`
+- `audio.*`
+- `windows_wsl_setup_acknowledged`
+
+これらは原則として shared repo policy ではありません。
+
+---
+
+# Observability
+
+`[otel]`:
+
+- `environment`
+- `trace_exporter`
+- `metrics_exporter`
+- `exporter`
+- `log_user_prompt`
+
+prompt / repo data を trace に載せるかは security decision です。既定で広く有効化しない方が安全です。
+
+---
+
+# Sensitive settings
+
+特に注意:
+
+- `experimental_bearer_token`
+- literal `http_headers`
+- `env_http_headers`
+- `shell_environment_policy`
+- `mcp_oauth_*`
+- provider auth
+- `otel.log_user_prompt`
+- 追加 writable roots / network permission
+
+credential は committed config に直書きしません。
+
+---
+
+# Experimental settings
+
+次は通常運用では避けます。
+
+- `experimental_*`
+- realtime websocket override
+- thread config/store endpoint
+- app-server related settings
+- schema description が空の unstable field
+
+必要な場合は task scope と rollback plan を明記します。
+
+---
+
+# 設定変更 checklist
+
+1. 変更 surface を決める
+2. 公式 schema で key 名を確認する
+3. repo policy と runtime mechanics を分離する
+4. canon 変更なら standalone AgentCanon source clone を編集する
+5. parent root view は作らず、必要なら `bootstrap.sh` の isolated runtime を使う
+6. dependency header を追加する
+7. dependency / docs / static checks を通す
+
+---
+
+# Agent-canon での推奨設計
+
+- `.codex/config.toml`: 責務を追える形に保つ
+- `AGENTS.md`: workflow gate と closeout policy
+- `.codex/agents/*.toml`: role behavior
+- `.agents/skills`: reusable workflow
+- hooks: deterministic startup
+- MCP: repo tool inventory
+- `reports/agents`: task evidence
+
+---
+
+# まとめ
+
+Codex 設定は「便利な knobs の集合」ではなく、agent が確実に同じ作業境界で動くための runtime contract です。
+
+最小原則:
+
+- durable policy は repo に残す
+- temporary override は CLI / profile
+- tool startup は hooks / MCP
+- workflow は skills / AGENTS.md
+- evidence は run bundle

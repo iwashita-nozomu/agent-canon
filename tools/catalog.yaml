@@ -1,0 +1,2345 @@
+# @dependency-start
+# contract registry
+# responsibility Defines the structured AgentCanon tool catalog.
+# upstream design README.md shared tool family ownership
+# upstream design ../documents/tools/repo-local-tool-imports.md legacy import disposition ledger
+# upstream design ../documents/tools/visualization_contract.md canonical visualization coverage and readback tool contract
+# downstream implementation agent_tools/tool_catalog.py validates this catalog
+# downstream implementation agent_tools/tool_drift.py checks catalog drift contracts
+# downstream implementation agent_tools/check_design_doc_claims.py validates design-document evidence claims
+# downstream design ../documents/tools/tool-docs.toml maps same-named tool docs
+# downstream implementation ../tests/agent_tools/test_tool_catalog.py validates canonical visualization tool registration
+# @dependency-end
+
+version: 1
+catalog_kind: agent_canon_tool_catalog
+scope: shared_canon
+
+# The legacy catalog shape remains version 1 for the existing catalog checker.
+# Runtime dispatch is an additive, independently versioned contract.  Entries
+# may provide a ``dispatch`` mapping; entries without one use these typed
+# defaults. The versioned parity fixture is still required before execution.
+runtime_schema:
+  version: 2
+  # A catalog entry is not cut over merely because it is listed.  Every
+  # verified entry must carry an explicit dispatch.parity value and an
+  # observed v2 fixture row; otherwise the legacy owner remains authoritative.
+  default_parity: legacy
+  runtimes:
+    - python
+    - rust
+  execution_planes:
+    - tool-container
+  cwd_policies:
+    - source-root
+    - task-root
+    - explicit
+  env_policies:
+    - allowlisted
+    - clean
+  io_policies:
+    - inherited
+    - captured
+  exit_policies:
+    - propagate
+    - normalize-signal
+  side_effect_policies:
+    - read-only
+    - external-artifact
+    - explicit-target-write
+  output_roots:
+    - none
+    - external-runtime
+    - explicit-target
+  parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
+  # Commands exposed by rust/agent-canon/src/main.rs that do not have a
+  # one-file catalog entry below. Keeping this inventory here prevents the
+  # dispatcher from silently dropping a first-class Rust route.
+  rust_public_commands:
+    - id: rust-version
+      selector: --version
+      path: rust/agent-canon/src/main.rs
+    - id: rust-rust-migration-audit
+      selector: rust-migration-audit
+      path: rust/agent-canon/src/migration_audit.rs
+    - id: rust-rust-migration-plan
+      selector: rust-migration-plan
+      path: rust/agent-canon/src/rust_migration_plan.rs
+    - id: rust-docs
+      selector: docs
+      path: rust/agent-canon/src/docs.rs
+      writes: true
+    - id: rust-memory
+      selector: memory
+      path: rust/agent-canon/src/memory.rs
+      writes: true
+    - id: rust-structured-analysis
+      selector: structured-analysis
+      path: rust/agent-canon/src/structured_analysis.rs
+      writes: true
+    - id: rust-python-structure-hash
+      selector: python-structure-hash
+      path: rust/agent-canon/src/python_structure_hash.rs
+    - id: rust-python-structure-hash-report
+      selector: python-structure-hash-report
+      path: rust/agent-canon/src/python_structure_hash_report.rs
+      writes: true
+    - id: rust-python-structure-hash-impact
+      selector: python-structure-hash-impact
+      path: rust/agent-canon/src/python_structure_hash_impact.rs
+      writes: true
+    - id: rust-python-structure-hash-scope-plan
+      selector: python-structure-hash-scope-plan
+      path: rust/agent-canon/src/python_structure_hash_scope_plan.rs
+      writes: true
+    - id: rust-python-module-groups-check
+      selector: python-module-groups-check
+      path: rust/agent-canon/src/python_module_groups.rs
+
+status_values:
+  - canonical
+  - compatibility_wrapper
+  - optional
+  - maintainer_only
+  - retired
+
+family_values:
+  - agent_tools
+  - ci
+  - docs
+  - oop_python
+  - oop_cpp
+  - data
+  - hlo
+  - audit
+  - experiments
+  - validation
+  - root
+
+role_values:
+  - audit
+  - catalog
+  - checker
+  - compatibility
+  - docs
+  - experiment
+  - helper
+  - inventory
+  - runner
+  - sync
+  - workflow
+
+audience_values:
+  - user
+  - agent
+  - skill
+  - workflow
+  - maintainer
+  - internal
+
+placement_values:
+  - user_entrypoint
+  - skill_helper
+  - workflow_helper
+  - validation_checker
+  - ci_gate
+  - compatibility_wrapper
+  - support_library
+
+families:
+  agent_tools:
+    root: tools/agent_tools
+    summary: Agent workflow, dependency, convention, review, and runtime helpers.
+    audience: agent
+    placement: workflow_helper
+  ci:
+    root: tools/ci
+    summary: CI, GitHub workflow, container, and repository readiness entrypoints.
+    audience: user
+    placement: ci_gate
+  docs:
+    root: tools/docs
+    summary: Markdown, link, design-document, and skill-shim maintenance helpers.
+    audience: skill
+    placement: skill_helper
+  oop_python:
+    root: tools/oop/python
+    summary: Python-specific OOP readability and rule inventory tools.
+    audience: user
+    placement: validation_checker
+  oop_cpp:
+    root: tools/oop/cpp
+    summary: C++-specific OOP readability and rule inventory tools.
+    audience: user
+    placement: validation_checker
+  data:
+    root: tools/data
+    summary: Portable result-data transformations.
+    audience: agent
+    placement: support_library
+  hlo:
+    root: tools/hlo
+    summary: HLO result summarization helpers.
+    audience: agent
+    placement: support_library
+  audit:
+    root: tools/audit
+    summary: Portable audit log schema and writer helpers.
+    audience: internal
+    placement: support_library
+  experiments:
+    root: tools/experiments
+    summary: Shared experiment scaffold, registry, and managed-run helpers.
+    audience: user
+    placement: user_entrypoint
+  validation:
+    root: tools/validation
+    summary: Generic validation helpers used by compatibility wrappers.
+    audience: agent
+    placement: validation_checker
+  root:
+    root: tools
+    summary: Top-level shared automation entrypoints and compatibility wrappers.
+    audience: user
+    placement: user_entrypoint
+
+default_wiring_docs:
+  - tools/README.md
+  - documents/tools/README.md
+  - documents/tools/tool-docs.toml
+
+entries:
+  - id: audit-and-fix-links
+    summary: Compatibility wrapper for the canonical Rust Markdown link checker; source apply requires an explicit mutation capability.
+    path: tools/docs/audit_and_fix_links.py
+    family: docs
+    role: compatibility
+    status: compatibility_wrapper
+    audience: maintainer
+    placement: compatibility_wrapper
+    command: python3 tools/docs/audit_and_fix_links.py --check
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/README.md
+    tests:
+      - tests/tools/test_audit_and_fix_links.py
+
+  - id: find-redundant-designs
+    summary: Finds exact duplicate design documents and writes an external runtime report.
+    path: tools/docs/find_redundant_designs.py
+    family: docs
+    role: docs
+    status: maintainer_only
+    audience: maintainer
+    placement: workflow_helper
+    command: python3 tools/docs/find_redundant_designs.py --runtime-root <external-runtime>
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/README.md
+    tests:
+      - tests/tools/test_design_doc_runtime_boundaries.py
+
+  - id: find-similar-designs
+    summary: Finds similar design documents and writes an external runtime report.
+    path: tools/docs/find_similar_designs.py
+    family: docs
+    role: docs
+    status: maintainer_only
+    audience: maintainer
+    placement: workflow_helper
+    command: python3 tools/docs/find_similar_designs.py --runtime-root <external-runtime>
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/README.md
+    tests:
+      - tests/tools/test_design_doc_runtime_boundaries.py
+
+  - id: organize-designs
+    summary: Plans design-document organization and requires an explicit mutation capability to apply it.
+    path: tools/docs/organize_designs.py
+    family: docs
+    role: docs
+    status: maintainer_only
+    audience: maintainer
+    placement: workflow_helper
+    command: python3 tools/docs/organize_designs.py --runtime-root <external-runtime>
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/README.md
+    tests:
+      - tests/tools/test_design_doc_runtime_boundaries.py
+
+  - id: tool-catalog
+    summary: Validates the structured tool catalog and renders the tool crosswalk.
+    path: tools/agent_tools/tool_catalog.py
+    family: agent_tools
+    role: catalog
+    status: canonical
+    command: python3 tools/agent_tools/tool_catalog.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_tool_catalog.py
+
+  - id: tool-drift
+    summary: Checks dependency-manifest trace links between tools, workflows, and docs.
+    path: tools/agent_tools/tool_drift.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/tool_drift.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_tool_drift.py
+
+  - id: responsibility-scope
+    summary: Validates responsibility scopes, owner classes, and protecting tool coverage.
+    path: tools/agent_tools/responsibility_scope.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/responsibility_scope.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/design/responsibility-scope-management.md
+      - responsibility-scope.toml
+      - templates/documents/responsibility-scope.template.toml
+    tests:
+      - tests/agent_tools/test_responsibility_scope.py
+
+  - id: runtime-surface-inventory
+    summary: Validates AgentCanon-owned standalone runtime, tool, eval, and archive surface classification.
+    path: tools/agent_tools/surface_manifest.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/surface_manifest.py --root . --prefix . --manifest documents/runtime/shared-runtime-surfaces.toml normalized-snapshot
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/runtime/SHARED_RUNTIME_SURFACES.md
+      - documents/runtime/shared-runtime-surfaces.toml
+    tests:
+      - tests/agent_tools/test_surface_manifest.py
+
+  - id: visualization-contract
+    summary: Validates typed visualization source universes, projection manifests, canonical ToolCalls, and post-format readback coverage.
+    path: tools/agent_tools/visualization_contract.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    audience: skill
+    placement: validation_checker
+    command: python3 tools/agent_tools/visualization_contract.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/visualization_contract.md
+    tests:
+      - tests/agent_tools/test_visualization_contract.py
+
+  - id: render-dependency-manifest-graph
+    summary: Renders dependency manifest graph TSV artifacts into repo-local Graph IR JSON with directory containment, Markdown, DOT, and HTML projection reports under the shared Graph DSL Core projection contract.
+    path: tools/agent_tools/render_dependency_manifest_graph.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/render_dependency_manifest_graph.md
+      - documents/design/dependency-manifest-design.md
+      - documents/structured-analysis/graph-dsl.md
+      - documents/prose-reasoning-graph/dsl-spec.md
+    tests:
+      - tests/agent_tools/test_render_dependency_manifest_graph.py
+
+  - id: git-dependency-diff-summary
+    summary: Summarizes Git diff paths, line counts, code dependency edges, and dependency-header edit-scope artifacts.
+    path: tools/agent_tools/git_dependency_diff_summary.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/git_dependency_diff_summary.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/git_dependency_diff_summary.md
+      - documents/design/dependency-manifest-design.md
+    tests:
+      - tests/agent_tools/test_git_dependency_diff_summary.py
+
+  - id: classify-path-risk
+    summary: Classifies changed paths into runtime profiles and targeted validation checks.
+    path: tools/agent_tools/classify_path_risk.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/classify_path_risk.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/classify_path_risk.md
+      - documents/runtime/runtime-profiles-and-check-matrix.md
+    tests:
+      - tests/agent_tools/test_classify_path_risk.py
+
+  - id: formal-proof
+    summary: Builds natural-language or Python AST-sourced formal-proof scaffold plans, Python-package trace modules, existing-proof search queries, and checker commands.
+    path: tools/agent_tools/formal_proof.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: python3 tools/agent_tools/formal_proof.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/formal_proof.md
+      - documents/tools/lean_capability_matrix.md
+      - agents/skills/formal-proof-workflow.md
+      - references/agent-canon-technology-bibliography.md
+    tests:
+      - tests/agent_tools/test_formal_proof.py
+
+  - id: lean-proof-env
+    summary: Creates and checks reusable Lean 4 proof environments with Mathlib/Aesop for formal-proof workflows.
+    path: tools/agent_tools/lean_proof_env.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: python3 tools/agent_tools/lean_proof_env.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/lean_proof_env.md
+      - documents/tools/lean_capability_matrix.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_lean_proof_env.py
+
+  - id: tool-proof-coverage
+    summary: Reports behavior and performance proof-obligation coverage for every cataloged tool without claiming unverified Lean proofs.
+    path: tools/agent_tools/tool_proof_coverage.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    audience: maintainer
+    placement: validation_checker
+    command: python3 tools/agent_tools/tool_proof_coverage.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/tool_proof_coverage.md
+      - documents/tools/lean_capability_matrix.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_tool_proof_coverage.py
+
+  - id: jit-canonical-ir
+    summary: Extracts StableHLO-derived JIT-canonical IR records and backend traces from a JIT root.
+    path: tools/agent_tools/jit_canonical_ir.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: python3 tools/agent_tools/jit_canonical_ir.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/jit_canonical_ir.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_jit_canonical_ir.py
+
+  - id: stablehlo-value-closure
+    summary: Traces scoped StableHLO SSA value dependencies from JIT-canonical operational IR.
+    path: tools/agent_tools/stablehlo_value_closure.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: python3 tools/agent_tools/stablehlo_value_closure.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/stablehlo_value_closure.md
+      - documents/tools/jit_canonical_ir.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_stablehlo_value_closure.py
+
+  - id: cpp-source-canonical-ir
+    summary: Extracts source-only C++ records into the shared thin operational IR.
+    path: tools/agent_tools/cpp_source_canonical_ir.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    audience: internal
+    placement: support_library
+    command: python3 tools/agent_tools/cpp_source_canonical_ir.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/cpp_source_canonical_ir.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_cpp_source_canonical_ir.py
+
+  - id: cpp-template-to-lean
+    summary: Fully expands C++ template source roots into complete Lean evidence definitions.
+    path: tools/agent_tools/cpp_template_to_lean.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: python3 tools/agent_tools/cpp_template_to_lean.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/cpp_template_to_lean.md
+      - documents/tools/cpp_source_canonical_ir.md
+      - documents/tools/operational_ir_to_lean.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_cpp_template_to_lean.py
+
+  - id: operational-ir-to-lean
+    summary: Renders shared thin operational IR records into Lean evidence definitions.
+    path: tools/agent_tools/operational_ir_to_lean.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    audience: internal
+    placement: support_library
+    command: python3 tools/agent_tools/operational_ir_to_lean.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/operational_ir_to_lean.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_operational_ir_to_lean.py
+
+  - id: jit-ir-to-lean
+    summary: Lowers JIT-canonical IR records into generated Lean evidence definitions.
+    path: rust/agent-canon/src/jit_ir_to_lean.rs
+    family: agent_tools
+    role: helper
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: tools/bin/agent-canon jit-ir-to-lean
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/jit_ir_to_lean.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - rust/agent-canon/src/jit_ir_to_lean.rs
+
+  - id: check-proof-trace-alignment
+    summary: Checks package-retained proof trace contracts against implementation source paths, AST anchors, and retained checked theorem names.
+    path: tools/agent_tools/check_proof_trace_alignment.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: python3 tools/agent_tools/check_proof_trace_alignment.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/check_proof_trace_alignment.md
+      - agents/skills/formal-proof-workflow.md
+    tests:
+      - tests/agent_tools/test_check_proof_trace_alignment.py
+
+  - id: repo-structure-contract
+    summary: Compares an observed repository tree with the AgentCanon structure contract.
+    path: tools/agent_tools/repo_structure_contract.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/repo_structure_contract.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/repo_structure_contract.md
+      - documents/structure/repo-structure-contract.toml
+    tests:
+      - tests/agent_tools/test_repo_structure_contract.py
+
+  - id: import-responsibility
+    summary: Checks Python imports for unused aliases and responsibility-scope boundary violations.
+    path: tools/agent_tools/import_responsibility.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/import_responsibility.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/design/responsibility-scope-management.md
+      - documents/conventions/coding-conventions-python.md
+      - responsibility-scope.toml
+    tests:
+      - tests/agent_tools/test_import_responsibility.py
+
+  - id: issue-sync
+    summary: Validates local AgentCanon issue files and checks or syncs GitHub Issue mirrors.
+    path: tools/agent_tools/issue_sync.py
+    family: agent_tools
+    role: sync
+    status: canonical
+    command: python3 tools/agent_tools/issue_sync.py
+    writes: true
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - issues/README.md
+      - documents/design/responsibility-scope-management.md
+    tests:
+      - tests/agent_tools/test_issue_sync.py
+
+  - id: github-publish
+    summary: Publishes verified GitHub branches, pull requests, and PR checks through gh with explicit user-task evidence and verified remote policy.
+    path: tools/agent_tools/github_publish.py
+    family: agent_tools
+    role: sync
+    status: canonical
+    command: python3 tools/agent_tools/github_publish.py --help
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/github_publish.md
+      - agents/workflows/agent-canon-pr-workflow.md
+      - documents/agent-canon/agent-canon-github-remote.md
+    tests:
+      - tests/agent_tools/test_github_publish.py
+
+  - id: wiki-publish
+    summary: Publishes one markdown wiki page to the dedicated repo.wiki.git sidecar using default-branch-only clone, format gates, source commit binding, and exact readback identity.
+    path: tools/agent_tools/wiki_publish.py
+    family: agent_tools
+    role: sync
+    status: canonical
+    command: python3 tools/agent_tools/wiki_publish.py --help
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/wiki_publish.md
+      - documents/agent-canon/agent-canon-github-remote.md
+      - agents/skills/wiki-publication.md
+    tests:
+      - tests/agent_tools/test_wiki_publish.py
+
+  - id: eval-accumulation-check
+    summary: Validates append-only AgentCanon hook results and registered eval-family accumulation.
+    path: tools/agent_tools/eval_accumulation_check.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/eval_accumulation_check.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - evidence/agent-evals/README.md
+      - documents/runtime/runtime-log-archive.md
+      - documents/runtime/runtime-log-archive-migration.md
+    tests:
+      - tests/agent_tools/test_eval_accumulation_check.py
+
+  - id: generated-artifact-guard
+    summary: Rejects mechanically regenerated report outputs left in the source tree.
+    path: tools/agent_tools/generated_artifact_guard.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/generated_artifact_guard.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/canonical/ARTIFACT_PLACEMENT.md
+      - templates/agents/closeout_gate.md
+    tests:
+      - tests/agent_tools/test_generated_artifact_guard.py
+
+  - id: run-accumulated-agent-evals
+    summary: Runs registered AgentCanon eval producers with append-only accumulation before archive validation.
+    path: tools/agent_tools/run_accumulated_agent_evals.py
+    family: agent_tools
+    role: runner
+    status: canonical
+    command: python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id <run-id>
+    writes: true
+    default_wiring:
+      ci: true
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - evidence/agent-evals/README.md
+      - agents/workflows/agent-canon-pr-workflow.md
+      - documents/runtime/runtime-log-archive.md
+    tests:
+      - tests/agent_tools/test_run_accumulated_agent_evals.py
+
+  - id: runtime-log-archive-git
+    summary: Produces immutable native context certificates, materializes prepared runtime artifacts with confirmed outcome receipts, and checkpoints atomic hook-event spool files through one prepared archive transaction.
+    path: tools/agent_tools/runtime_log_archive_git.py
+    family: agent_tools
+    role: sync
+    status: canonical
+    command: python3 tools/agent_tools/runtime_log_archive_git.py <append-context-discovery|materialize-runtime-event|check-hook-hot-path|sync>
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/runtime/runtime-log-archive.md
+      - documents/runtime/runtime-log-archive-migration.md
+      - agents/canonical/ARTIFACT_PLACEMENT.md
+    tests:
+      - tests/agent_tools/test_hook_event_log.py
+      - tests/agent_tools/test_runtime_log_archive_git.py
+
+  - id: workflow-monitor
+    summary: Appends typed workflow behavior and wave evidence to an agent run bundle.
+    path: tools/agent_tools/workflow_monitor.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    command: python3 tools/agent_tools/workflow_monitor.py --report-dir <report-dir>
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_workflow_monitor.py
+
+  - id: waterfall-gate-check
+    summary: Checks the next approved waterfall gate against the prepared run bundle.
+    path: tools/agent_tools/waterfall_gate_check.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    command: python3 tools/agent_tools/waterfall_gate_check.py --report-dir <report-dir> --gate <gate>
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_waterfall_gate_check.py
+
+  - id: agent-canon-graph
+    summary: Builds and serves the one-build dependency graph with an optional persisted runtime-evidence snapshot.
+    path: rust/agent-canon/src/graph.rs
+    family: root
+    role: runner
+    status: canonical
+    command: tools/bin/agent-canon graph <build|status|query|context> --root <repo-root> --format json
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/canonical/CLI_ENTRYPOINTS.md
+      - documents/design/dependency-manifest-design.md
+    tests:
+      - tests/agent_tools/test_check_dependency_headers.py
+      - tests/agent_tools/test_check_design_doc_claims.py
+
+  - id: graph-client
+    summary: Provides the typed consume-only Python adapter for graph status, query, and context responses.
+    path: tools/agent_tools/graph_client.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    command: tools/bin/agent-canon graph <status|query|context> --root <repo-root> --format json
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/canonical/CLI_ENTRYPOINTS.md
+    tests:
+      - tests/agent_tools/test_check_dependency_headers.py
+      - tests/agent_tools/test_check_design_doc_claims.py
+
+  - id: workflow-selection-eval
+    summary: Validates deterministic prompt-to-workflow routing cases.
+    path: tools/agent_tools/evaluate_workflow_selection.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/evaluate_workflow_selection.py
+    writes: true
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - evidence/agent-evals/README.md
+      - evidence/agent-evals/workflow_selection_eval.toml
+      - documents/runtime/runtime-log-archive.md
+    tests:
+      - tests/agent_tools/test_evaluate_workflow_selection.py
+
+  - id: report-quality-eval
+    summary: Validates report-writing skill quality checklist and report reviewer routing.
+    path: tools/agent_tools/evaluate_report_quality.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/evaluate_report_quality.py
+    writes: true
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - evidence/agent-evals/README.md
+      - evidence/agent-evals/report_quality_eval.toml
+      - documents/runtime/runtime-log-archive.md
+      - agents/skills/report-writing.md
+    tests:
+      - tests/agent_tools/test_evaluate_report_quality.py
+
+  - id: test-design-check
+    summary: Runs Rust-native diagnostics for brittle, redundant, or under-specified test design before code changes.
+    path: rust/agent-canon/src/test_design.rs
+    family: root
+    role: checker
+    status: canonical
+    command: tools/bin/agent-canon test-design check <test-paths...>
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/test_design.md
+      - documents/conventions/coding-conventions-testing.md
+      - references/test-design-flexibility.md
+      - agents/skills/test-design.md
+    tests:
+      - rust/agent-canon/src/test_design.rs
+
+  - id: agent-search
+    summary: Coordinates purpose-based search across text, semantic cards, vector search, tool catalog, dependency headers, and code facts.
+    path: tools/agent_tools/search.py
+    family: agent_tools
+    role: inventory
+    status: canonical
+    command: python3 tools/agent_tools/search.py --purpose "<goal>"
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/search-coordination.md
+    tests:
+      - tests/agent_tools/test_search.py
+
+  - id: lsp-code-analysis
+    summary: Runs one-shot LSP 3.17 code analysis and emits deterministic symbols, relations, diagnostics, lexical candidates, lifecycle, and provenance.
+    path: tools/agent_tools/lsp_code_analysis.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/lsp_code_analysis.py analyze --root . --format json
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/lsp_code_analysis.md
+      - documents/structured-analysis/code-analysis.md
+    tests:
+      - tests/agent_tools/test_lsp_code_analysis.py
+
+  - id: search-index
+    summary: Builds repo-local ignored semantic cards for coordinated search.
+    path: tools/agent_tools/search_index.py
+    family: agent_tools
+    role: inventory
+    status: canonical
+    command: python3 tools/agent_tools/search_index.py build
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/search-coordination.md
+      - .gitignore
+    tests:
+      - tests/agent_tools/test_search.py
+
+  - id: semantic-index
+    summary: Builds ignored SQLite semantic-vector indexes, adds provider-scoped embeddings, and reports search, bounded context-pack, directory responsibility-tree coverage, merge, natural-relation, discourse-relation, thin-doc, provider-comparison, and Eval results.
+    path: rust/agent-canon/src/semantic_index/mod.rs
+    family: root
+    role: inventory
+    status: canonical
+    command: tools/bin/agent-canon semantic-index build --include documents --include agents
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/search-coordination.md
+      - documents/tools/semantic_index.md
+      - .gitignore
+    tests:
+      - rust/agent-canon/src/semantic_index/tests.rs
+
+  - id: semantic-provider-html-report
+    summary: Renders semantic-index compare-providers JSON into a self-contained HTML projection report with the provider-delta-to-shared-candidate-logic figure.
+    path: tools/agent_tools/semantic_provider_html_report.py
+    family: agent_tools
+    role: docs
+    status: canonical
+    command: python3 tools/agent_tools/semantic_provider_html_report.py --compare-json reports/agents/<run-id>/semantic_provider_compare.json --output reports/agents/<run-id>/semantic_provider_compare.html
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/semantic_provider_html_report.md
+      - agents/skills/html-output.md
+      - documents/tools/semantic_index.md
+      - documents/prose-reasoning-graph/dsl-spec.md
+    tests:
+      - tests/agent_tools/test_semantic_provider_html_report.py
+
+  - id: prose-reasoning-graph
+    summary: Builds SQLite-backed prose structure graphs and related projections in an explicit external runtime, with diagnostics, explanations, edit-operation plans, writing-skill handoff packets, and combined document checks with structured-analysis.
+    path: tools/agent_tools/prose_reasoning_graph.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    command: python3 tools/agent_tools/prose_reasoning_graph.py --help
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/prose_reasoning_graph.md
+      - documents/structured-analysis/graph-dsl.md
+      - documents/prose-reasoning-graph/dsl-spec.md
+      - agents/skills/prose-reasoning-graph.md
+      - agents/skills/structure-planning.md
+    tests:
+      - tests/agent_tools/test_prose_reasoning_graph.py
+
+  - id: route
+    summary: Maps long proposed tool/skill names to short task-routing areas and owns deterministic prompt skill routing.
+    path: tools/agent_tools/route.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    command: python3 tools/agent_tools/route.py
+    writes: false
+    dispatch:
+      runtime: python
+      argv: [python3, tools/agent_tools/route.py]
+      execution_plane: tool-container
+      cwd: source-root
+      env: allowlisted
+      stdin: inherited
+      stdout: inherited
+      stderr: inherited
+      exit: propagate
+      signal: propagate
+      side_effect: read-only
+      output_root: none
+      written_paths: []
+      parity: verified
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/route.md
+      - documents/design/tool-skill-routing-refactor.md
+    tests:
+      - tests/agent_tools/test_route.py
+
+  - id: check-convention-compliance
+    summary: Verifies convention sources and workflow gate wiring stay connected.
+    path: tools/agent_tools/check_convention_compliance.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_convention_compliance.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_check_convention_compliance.py
+
+  - id: run-repo-dependency-review
+    summary: Runs full dependency-manifest scan, format, and graph review.
+    path: tools/agent_tools/run_repo_dependency_review.sh
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: bash tools/agent_tools/run_repo_dependency_review.sh
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/design/dependency-manifest-design.md
+    tests:
+      - tests/agent_tools/test_dependency_manifest_tools.py
+
+  - id: check-design-doc-claims
+    summary: Checks design-document claims against dependency-header, implementation, and parent-document evidence.
+    path: tools/agent_tools/check_design_doc_claims.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_design_doc_claims.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/check_design_doc_claims.md
+      - documents/design/README.md
+      - documents/design/dependency-manifest-design.md
+    tests:
+      - tests/agent_tools/test_check_design_doc_claims.py
+      - tests/agent_tools/test_dependency_manifest_tools.py
+
+  - id: check-semantic-responsibility-contract
+    summary: Validates semantic responsibility contract schema, identity, and references.
+    path: tools/agent_tools/check_semantic_responsibility_contract.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_semantic_responsibility_contract.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/check_semantic_responsibility_contract.md
+      - documents/design/semantic-responsibility-contract.md
+    tests:
+      - tests/agent_tools/test_check_semantic_responsibility_contract.py
+
+  - id: scan-dependency-headers
+    summary: Scans repository text files for dependency manifest coverage.
+    path: tools/agent_tools/scan_dependency_headers.sh
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: bash tools/agent_tools/scan_dependency_headers.sh
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/design/dependency-manifest-design.md
+    tests:
+      - tests/agent_tools/test_dependency_manifest_tools.py
+
+  - id: check-dependency-header-format
+    summary: Validates dependency manifest syntax, paths, edge fields, and registered contract kind metadata.
+    path: tools/agent_tools/check_dependency_header_format.sh
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: bash tools/agent_tools/check_dependency_header_format.sh
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/design/dependency-manifest-design.md
+      - documents/design/dependency-contract-kinds.toml
+    tests:
+      - tests/agent_tools/test_dependency_manifest_tools.py
+
+  - id: check-dependency-headers
+    summary: Checks changed files for required dependency manifests and registered contract kinds.
+    path: tools/agent_tools/check_dependency_headers.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_dependency_headers.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/design/dependency-manifest-design.md
+      - documents/design/dependency-contract-kinds.toml
+    tests:
+      - tests/agent_tools/test_check_dependency_headers.py
+
+  - id: check-dependency-graph
+    summary: Builds and validates the dependency manifest graph.
+    path: tools/agent_tools/check_dependency_graph.sh
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: bash tools/agent_tools/check_dependency_graph.sh
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/design/dependency-manifest-design.md
+    tests:
+      - tests/agent_tools/test_dependency_manifest_tools.py
+
+  - id: scan-code-dependencies
+    summary: Extracts import, include, and shell source dependency edges.
+    path: tools/agent_tools/scan_code_dependencies.sh
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: bash tools/agent_tools/scan_code_dependencies.sh
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/design/dependency-manifest-design.md
+    tests:
+      - tests/agent_tools/test_dependency_manifest_tools.py
+
+  - id: check-github-workflows
+    summary: Validates GitHub Actions and PR template surfaces.
+    path: tools/ci/check_github_workflows.py
+    family: ci
+    role: checker
+    status: canonical
+    command: python3 tools/ci/check_github_workflows.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/workflows/agent-canon-pr-workflow.md
+    tests:
+      - tests/tools/test_check_github_workflows.py
+
+  - id: run-gpu-container
+    summary: Runs an admitted GPU container through one entrypoint and internally selects exact CDI or --gpus all injection.
+    path: tools/ci/run_gpu_container.sh
+    family: ci
+    role: runner
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: bash tools/ci/run_gpu_container.sh --image <image> -- <argv...>
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/skills/gpu-execution.md
+      - documents/experiments/gpu-direct-command.md
+    tests:
+      - tests/tools/test_run_gpu_container.py
+
+  - id: orphan-lifecycle
+    summary: Inventories semantic branch, PR-head, and worktree lifecycle state and authorizes exact cleanup candidates without performing mutation.
+    path: tools/agent_tools/orphan_lifecycle.py
+    family: agent_tools
+    role: inventory
+    status: canonical
+    audience: agent
+    placement: workflow_helper
+    command: python3 tools/agent_tools/orphan_lifecycle.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/operations/orphan-lifecycle.md
+      - documents/operations/worktree-lifecycle.md
+    tests:
+      - tests/agent_tools/test_orphan_lifecycle.py
+
+  - id: repository-topic-clone
+    summary: Owns the generic workspace topic clone, branch reuse, origin/main merge, publication readback, and reconstructibility cleanup lifecycle.
+    path: tools/agent_tools/repository_topic_clone.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: python3 tools/agent_tools/repository_topic_clone.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/repository_topic_clone.md
+      - documents/rule/repository-topic-clone.md
+    tests:
+      - tests/agent_tools/test_repository_topic_clone.py
+
+  - id: dependency-module-change
+    summary: Decorates generic repository topic clones with .gitmodules, gitlink, pin, and projection policy.
+    path: tools/agent_tools/dependency_module_change.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: python3 tools/agent_tools/dependency_module_change.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/dependency_module_change.md
+      - documents/rule/dependency-module-changes.md
+    tests:
+      - tests/agent_tools/test_dependency_module_change.py
+
+  - id: agent-canon-cli
+    summary: Stable wrapper for the AgentCanon Rust CLI, migration audit, migration plan, docs, search, and analysis tools.
+    path: tools/bin/agent-canon
+    family: root
+    role: runner
+    status: canonical
+    command: tools/bin/agent-canon --version
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/agent-canon.md
+      - documents/design/rust-agent-tool-migration.md
+      - .codex/README.md
+    tests: []
+    test_exempt_reason: Validated by rust/agent-canon cargo tests and devcontainer smoke.
+
+  - id: materialize-agent-canon-pr-g2
+    summary: Materializes the canonical G2 receipt from the ordered passing AgentCanon generated-completeness checks.
+    path: tools/ci/check_agent_canon_pr.py
+    family: ci
+    role: checker
+    status: canonical
+    audience: workflow
+    placement: workflow_helper
+    command: python3 tools/ci/check_agent_canon_pr.py --g1-bundle <path> --source-root .
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/agent-canon/agent-canon-update-route.md
+      - agents/workflows/agent-canon-pr-workflow.md
+    tests:
+      - tests/agent_tools/test_github_publish.py
+
+  - id: check-agent-canon-pr
+    summary: Runs the standalone AgentCanon PR readiness checklist.
+    path: tools/ci/check_agent_canon_pr.sh
+    family: ci
+    role: checker
+    status: canonical
+    command: bash tools/ci/check_agent_canon_pr.sh
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/workflows/agent-canon-pr-workflow.md
+    tests:
+      - tests/tools/test_check_github_workflows.py
+
+  - id: scan-secrets
+    summary: Runs gitleaks, trufflehog, and detect-secrets against current tree and git history.
+    path: tools/ci/scan_secrets.sh
+    family: ci
+    role: checker
+    status: canonical
+    command: bash tools/ci/scan_secrets.sh
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - CONTAINER_OPERATIONS.md
+    tests: []
+    test_exempt_reason: Thin wrapper over third-party scanners; validated by command help and local security-audit runs.
+
+  - id: run-all-checks
+    summary: Runs the main shared quick CI and static validation suite.
+    path: tools/ci/run_all_checks.sh
+    family: ci
+    role: runner
+    status: canonical
+    command: bash tools/ci/run_all_checks.sh
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests: []
+    test_exempt_reason: Orchestrates other tested tools and repo-wide checks.
+
+  - id: run-python-quality-checks
+    summary: Runs the shared Python quality gate used by CI and pre-review wrappers.
+    path: tools/ci/run_python_quality_checks.sh
+    family: ci
+    role: runner
+    status: canonical
+    command: bash tools/ci/run_python_quality_checks.sh
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - tools/ci/PRE_REVIEW_GUIDE.md
+    tests:
+      - tests/tools/test_run_all_checks_script.py
+
+  - id: pydocstyle-review
+    summary: Runs explicit AgentCanon Docstring review with source-root-bound canonical D213 configuration.
+    path: tools/agent_tools/pydocstyle_review.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: tools/bin/agent-canon pydocstyle-review --target <repo-relative.py>
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/conventions/DOCSTRING_GUIDE.md
+      - tools/ci/PRE_REVIEW_GUIDE.md
+      - agents/skills/python-review.md
+    tests:
+      - tests/agent_tools/test_pydocstyle_review.py
+
+  - id: agent-canon-update-todos
+    summary: Routes parent readback tasks after a standalone AgentCanon source merge.
+    path: tools/agent_tools/agent_canon_update_todos.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    command: python3 tools/agent_tools/agent_canon_update_todos.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/agent-canon/agent-canon-parent-repo-latest-checklist.md
+    tests:
+      - tests/agent_tools/test_agent_canon_update_todos.py
+
+  - id: check-agent-runtime-alignment
+    summary: Verifies runtime entrypoints and agent config mirrors stay aligned.
+    path: tools/agent_tools/check_agent_runtime_alignment.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_agent_runtime_alignment.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/canonical/CODEX_WORKFLOW.md
+    tests:
+      - tests/agent_tools/test_check_agent_runtime_alignment.py
+
+  - id: check-execution-time-aware-orchestration
+    summary: Enforces the canonical execution-time-aware orchestration owner contract and consumer projections.
+    path: tools/agent_tools/check_execution_time_aware_orchestration.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_execution_time_aware_orchestration.py --root .
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/skills/agent-orchestration.md
+    tests:
+      - tests/agent_tools/test_execution_time_aware_orchestration_contract.py
+
+  - id: check-skill-frontmatter
+    summary: Validates runtime skill SKILL.md YAML frontmatter for Codex loading.
+    path: tools/agent_tools/check_skill_frontmatter.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_skill_frontmatter.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/canonical/skills.md
+    tests:
+      - tests/agent_tools/test_check_skill_frontmatter.py
+
+  - id: skill-tool-commands
+    summary: Materializes and checks runtime skill Tool Commands packets.
+    path: tools/agent_tools/skill_tool_commands.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/skill_tool_commands.py check
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/skills/task-routing.md
+    tests:
+      - tests/agent_tools/test_skill_tool_commands.py
+
+  - id: vendor-skill-adapters
+    summary: Validates and materializes third-party skill adapters from AgentCanon internal vendor storage.
+    path: tools/agent_tools/vendor_skill_adapters.py
+    family: agent_tools
+    role: sync
+    status: canonical
+    command: python3 tools/agent_tools/vendor_skill_adapters.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_vendor_skill_adapters.py
+
+  - id: reference-materializer
+    summary: Converts consulted PDF or HTML references into Markdown files under references/.
+    path: tools/agent_tools/reference_materializer.py
+    family: agent_tools
+    role: sync
+    status: canonical
+    command: python3 tools/agent_tools/reference_materializer.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - references/README.md
+    tests:
+      - tests/agent_tools/test_reference_materializer.py
+
+  - id: smoke-test-research-perspective-pack
+    summary: Smoke-tests the research perspective role packet.
+    path: tools/agent_tools/smoke_test_research_perspective_pack.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/smoke_test_research_perspective_pack.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_smoke_test_research_perspective_pack.py
+
+  - id: evaluate-codex-agent-roles
+    summary: Evaluates and optionally accumulates Codex subagent role behavior, routing, model settings, and runtime metrics.
+    path: tools/agent_tools/evaluate_codex_agent_roles.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/evaluate_codex_agent_roles.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: true
+    docs:
+      - evidence/agent-evals/README.md
+      - agents/canonical/CODEX_SUBAGENTS.md
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_evaluate_codex_agent_roles.py
+
+  - id: check-experiment-registry
+    summary: Validates the shared experiment registry contract.
+    path: tools/ci/check_experiment_registry.py
+    family: ci
+    role: checker
+    status: canonical
+    command: python3 -m tools.ci.check_experiment_registry
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/experiments/experiment-registry.md
+    tests: []
+    test_exempt_reason: Registry contract is exercised through repo-wide CI smoke checks.
+
+  - id: check-hardcoded-numbers
+    summary: Rejects unexplained numeric literals in Python and C++ sources.
+    path: tools/agent_tools/check_hardcoded_numbers.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_hardcoded_numbers.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/conventions/common/01_principles.md
+    tests:
+      - tests/agent_tools/test_check_hardcoded_numbers.py
+
+  - id: check-static-any
+    summary: Rejects explicit Python Any usage outside allowed boundaries.
+    path: tools/agent_tools/check_static_any.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_static_any.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/conventions/python/04_type_annotations.md
+    tests:
+      - tests/agent_tools/test_check_static_any.py
+
+  - id: check-solid-evidence
+    summary: Checks SOLID-sensitive Python changes have path-covered OOP readability evidence.
+    path: tools/agent_tools/check_solid_evidence.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_solid_evidence.py --changed --evidence <oop-readability-report>
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/conventions/coding-conventions-python.md
+      - agents/skills/oop-readability-check.md
+    tests:
+      - tests/agent_tools/test_check_solid_evidence.py
+
+  - id: check-log-helper-names
+    summary: Checks logging helper functions use the required name prefix.
+    path: tools/agent_tools/check_log_helper_names.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_log_helper_names.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/conventions/coding-conventions-logging.md
+    tests:
+      - tests/agent_tools/test_check_log_helper_names.py
+
+  - id: check-run-log-contract
+    summary: Checks that run-log summaries resolve from amp.Info and avoid direct writer surfaces.
+    path: tools/agent_tools/check_run_log_contract.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/check_run_log_contract.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/conventions/coding-conventions-logging.md
+    tests:
+      - tests/agent_tools/test_check_run_log_contract.py
+
+  - id: python-algorithm-contract-check
+    summary: Validates amp algorithm module public surface, callable Algorithm, nested ownership, and concrete Info schema with Rust analysis over Python AST JSON.
+    path: rust/agent-canon/src/python_algorithm_contract.rs
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: tools/bin/agent-canon python-algorithm-contract-check
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - documents/tools/README.md
+      - tools/README.md
+      - documents/design/jax_util/algorithm_module_contract.md
+      - tools/ci/run_all_checks.sh
+    tests:
+      - rust/agent-canon/src/python_algorithm_contract.rs
+      - rust/agent-canon/tests/python_algorithm_contract_cli.rs
+
+  - id: oop-python-readability
+    summary: Scores Python OOP readability risks.
+    path: tools/oop/python/readability.py
+    family: oop_python
+    role: checker
+    status: canonical
+    command: python3 tools/oop/python/readability.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/oop/python/readability.md
+      - documents/conventions/object-oriented-design.md
+    tests:
+      - tests/agent_tools/test_analyze_oop_readability.py
+
+  - id: oop-python-rule-inventory
+    summary: Inventories Python OOP policy, tool, document, and test surfaces.
+    path: tools/oop/python/rule_inventory.py
+    family: oop_python
+    role: inventory
+    status: canonical
+    command: python3 tools/oop/python/rule_inventory.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/oop/python/rule_inventory.md
+      - documents/conventions/object-oriented-design.md
+    tests:
+      - tests/agent_tools/test_oop_rule_inventory.py
+
+  - id: oop-cpp-readability
+    summary: Scores C++ OOP readability risks.
+    path: tools/oop/cpp/readability.py
+    family: oop_cpp
+    role: checker
+    status: canonical
+    command: python3 tools/oop/cpp/readability.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/oop/cpp/readability.md
+      - documents/conventions/object-oriented-design.md
+    tests:
+      - tests/agent_tools/test_analyze_oop_readability.py
+
+  - id: oop-cpp-rule-inventory
+    summary: Inventories C++ OOP policy, tool, document, and test surfaces.
+    path: tools/oop/cpp/rule_inventory.py
+    family: oop_cpp
+    role: inventory
+    status: canonical
+    command: python3 tools/oop/cpp/rule_inventory.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/oop/cpp/rule_inventory.md
+      - documents/conventions/object-oriented-design.md
+    tests:
+      - tests/agent_tools/test_oop_rule_inventory.py
+
+  - id: review-backlog-scan
+    summary: Runs root plus AgentCanon cross-repo inspection, semantic review artifacts, and optional provider-comparison reports into a run-bundle report.
+    path: tools/agent_tools/review_backlog_scan.sh
+    family: agent_tools
+    role: runner
+    status: canonical
+    command: bash tools/agent_tools/review_backlog_scan.sh --report-dir <external-runtime>/reports/<run-id>/cross_repo_inspection
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_review_backlog_scan.py
+
+  - id: vector-search
+    summary: Provides dependency-free TF-IDF search plus dependency-aware context expansion.
+    path: tools/agent_tools/vector_search.py
+    family: agent_tools
+    role: inventory
+    status: canonical
+    command: python3 tools/agent_tools/vector_search.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_vector_search.py
+
+  - id: file-surface-inventory
+    summary: Classifies root, submodule, and AgentCanon source file surfaces.
+    path: tools/agent_tools/file_surface_inventory.py
+    family: agent_tools
+    role: inventory
+    status: canonical
+    command: python3 tools/agent_tools/file_surface_inventory.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_file_surface_inventory.py
+
+  - id: structured-document-inventory
+    summary: Builds the structured-analysis SQLite cache, emits and validates the Graph DSL Core storage contract, writes a separate warning DB, and finds document-canon cleanup candidates.
+    path: rust/agent-canon/src/structured_analysis.rs
+    family: root
+    role: inventory
+    status: canonical
+    command: tools/bin/agent-canon structured-analysis build --root . --profile manual
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/structured-analysis/README.md
+      - documents/structured-analysis/graph-dsl.md
+      - documents/structured-analysis/database-design.md
+      - documents/structured-analysis/document-canon-analysis.md
+      - documents/design/rust-agent-tool-migration.md
+      - agents/skills/document-canon-cleanup.md
+    tests:
+      - rust/agent-canon/src/structured_analysis.rs
+
+  - id: helper-function-inventory
+    summary: Inventories Python helper functions/classes with functional AST facts and role/action name tokens.
+    path: tools/agent_tools/helper_function_inventory.py
+    family: agent_tools
+    role: inventory
+    status: canonical
+    command: python3 tools/agent_tools/helper_function_inventory.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/conventions/coding-conventions-python.md
+    tests:
+      - tests/agent_tools/test_helper_function_inventory.py
+
+  - id: log-surface-inventory
+    summary: Inventories hook, skill, and tool machine-readable output fields.
+    path: tools/agent_tools/log_surface_inventory.py
+    family: agent_tools
+    role: inventory
+    status: canonical
+    command: python3 tools/agent_tools/log_surface_inventory.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - evidence/agent-evals/README.md
+      - documents/runtime/runtime-log-archive.md
+    tests:
+      - tests/agent_tools/test_log_surface_inventory.py
+
+  - id: tool-rejection-preflight
+    summary: Predicts edit-time responsibility, hook, tool, skill, protocol, and catalog rejection gates for handoff packets.
+    path: tools/agent_tools/tool_rejection_preflight.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    command: python3 tools/agent_tools/tool_rejection_preflight.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/COMMUNICATION_PROTOCOL.md
+      - agents/skills/codex-task-workflow.md
+      - .agents/skills/codex-task-workflow/SKILL.md
+    tests:
+      - tests/agent_tools/test_tool_rejection_preflight.py
+
+  - id: bootstrap-agent-run
+    summary: Bootstraps a staged agent run bundle from a task request.
+    path: tools/agent_tools/bootstrap_agent_run.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    command: python3 tools/agent_tools/bootstrap_agent_run.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/canonical/CODEX_WORKFLOW.md
+    tests:
+      - tests/agent_tools/test_bootstrap_and_close.py
+
+  - id: task-close
+    summary: Checks closeout evidence before task completion.
+    path: tools/agent_tools/task_close.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    command: python3 tools/agent_tools/task_close.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/canonical/CODEX_WORKFLOW.md
+    tests:
+      - tests/agent_tools/test_bootstrap_and_close.py
+
+  - id: evaluate-agent-run
+    summary: Evaluates an agent run bundle for workflow and evidence completeness.
+    path: tools/agent_tools/evaluate_agent_run.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/evaluate_agent_run.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_evaluate_agent_run.py
+
+  - id: evaluate-skill-workflow-prompts
+    summary: Runs frozen prompt evals for skill and workflow surfaces.
+    path: tools/agent_tools/evaluate_skill_workflow_prompts.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/evaluate_skill_workflow_prompts.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_evaluate_skill_workflow_prompts.py
+
+  - id: generate-agent-improvement-guide
+    summary: Generates PR and push-time guidance from memory, eval, hook, and issue evidence.
+    path: tools/agent_tools/generate_agent_improvement_guide.py
+    family: agent_tools
+    role: docs
+    status: canonical
+    command: python3 tools/agent_tools/generate_agent_improvement_guide.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - evidence/agent-evals/README.md
+      - documents/runtime/runtime-log-archive.md
+    tests:
+      - tests/agent_tools/test_generate_agent_improvement_guide.py
+
+  - id: generate-agent-runtime-dashboard
+    summary: Generates read-only dashboards and compact token-light summaries for AgentCanon runtime logs and eval results.
+    path: tools/agent_tools/generate_agent_runtime_dashboard.py
+    family: agent_tools
+    role: docs
+    status: canonical
+    command: python3 tools/agent_tools/generate_agent_runtime_dashboard.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - evidence/agent-evals/README.md
+      - documents/runtime/runtime-log-archive.md
+    tests:
+      - tests/agent_tools/test_generate_agent_runtime_dashboard.py
+
+  - id: compare-agent-run-paths
+    summary: Compares two run bundles for route and static-feedback differences.
+    path: tools/agent_tools/compare_agent_run_paths.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/compare_agent_run_paths.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_compare_agent_run_paths.py
+
+  - id: compare-codex-token-footprints
+    summary: Compares Codex session token footprints for efficiency review.
+    path: tools/agent_tools/compare_codex_token_footprints.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/compare_codex_token_footprints.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_compare_codex_token_footprints.py
+
+  - id: worktree-scope-lint
+    summary: Checks worktree scope and action-log discipline.
+    path: tools/agent_tools/worktree_scope_lint.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/worktree_scope_lint.py
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_worktree_scope_lint.py
+
+  - id: jsonl-to-md
+    summary: Converts JSONL result logs into Markdown tables.
+    path: tools/data/jsonl_to_md.py
+    family: data
+    role: helper
+    status: canonical
+    command: python3 tools/data/jsonl_to_md.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/experiments/result-log-retention-and-visualization.md
+    tests:
+      - tests/tools/test_result_log_tools.py
+
+  - id: summarize-hlo-jsonl
+    summary: Summarizes HLO JSONL dialect, tag, and operation counts.
+    path: tools/hlo/summarize_hlo_jsonl.py
+    family: hlo
+    role: helper
+    status: canonical
+    command: python3 tools/hlo/summarize_hlo_jsonl.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/experiments/result-log-retention-and-visualization.md
+    tests:
+      - tests/tools/test_result_log_tools.py
+
+  - id: audit-log-schema
+    summary: Defines the portable audit log schema.
+    path: tools/audit/audit_log_schema.py
+    family: audit
+    role: audit
+    status: canonical
+    command: python3 tools/audit/audit_log_schema.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests: []
+    test_exempt_reason: Library-style schema support used by audit_logger.py.
+
+  - id: audit-logger
+    summary: Writes portable automation events to JSONL audit logs.
+    path: tools/audit/audit_logger.py
+    family: audit
+    role: audit
+    status: canonical
+    command: python3 tools/audit/audit_logger.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests: []
+    test_exempt_reason: Portable helper; covered by repo-local audit use.
+
+  - id: run-managed-experiment
+    summary: Creates and tracks shared managed experiment runs.
+    path: tools/experiments/run_managed_experiment.py
+    family: experiments
+    role: experiment
+    status: canonical
+    command: python3 -m tools.experiments.run_managed_experiment
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/experiments/experiment-registry.md
+    tests:
+      - tests/tools/test_run_managed_experiment.py
+
+  - id: html-artifact-access
+    summary: Prints SSH tunnel and static-server commands for remote HTML artifacts.
+    path: tools/experiments/html_artifact_access.py
+    family: experiments
+    role: helper
+    status: canonical
+    command: python3 tools/experiments/html_artifact_access.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/html_artifact_access.md
+      - documents/experiments/result-log-retention-and-visualization.md
+    tests:
+      - tests/tools/test_html_artifact_access.py
+
+  - id: update-latest-result
+    summary: Updates LATEST pointers for experiment result roots.
+    path: tools/experiments/update_latest_result.py
+    family: experiments
+    role: experiment
+    status: canonical
+    command: python3 -m tools.experiments.update_latest_result
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/experiments/result-log-retention-and-visualization.md
+    tests:
+      - tests/tools/test_update_latest_result.py
+
+  - id: save-experiment-result-annex
+    summary: Saves one experiment result as one deterministic git-annex archive.
+    path: tools/experiments/save_experiment_result_annex.py
+    family: experiments
+    role: experiment
+    status: canonical
+    command: python3 -m tools.experiments.save_experiment_result_annex
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/experiments/result-log-retention-and-visualization.md
+      - agents/workflows/experiment-workflow.md
+    tests:
+      - tests/tools/test_save_experiment_result_annex.py
+
+  - id: triplet-validator
+    summary: Validates source, document, and test triplets.
+    path: tools/validation/triplet_validator.py
+    family: validation
+    role: checker
+    status: canonical
+    command: python3 tools/validation/triplet_validator.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+    tests: []
+    test_exempt_reason: No dedicated unit test exists; command is currently exercised through `run_comprehensive_review.sh`.
+
+
+  - id: notebook-quality
+    summary: Validates notebooks as readable runnable demos instead of fine-grained tests.
+    path: tools/validation/notebook_quality.py
+    family: validation
+    role: checker
+    status: canonical
+    command: python3 tools/validation/notebook_quality.py --all
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/tools/test_notebook_quality.py
+
+  - id: extract-docx
+    summary: Decomposes an authorized DOCX into a searchable and auditable reference bundle.
+    path: tools/docs/extract_docx.py
+    family: docs
+    role: helper
+    status: canonical
+    audience: user
+    placement: user_entrypoint
+    command: python3 tools/docs/extract_docx.py INPUT.docx --output-dir OUTPUT_DIR
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/extract_docx.md
+    tests:
+      - tests/tools/test_extract_docx.py

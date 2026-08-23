@@ -1,0 +1,52 @@
+# @dependency-start
+# contract reference
+# responsibility Provides the empty run-local semantic responsibility contract instance shape.
+# upstream design ../../documents/design/semantic-responsibility-contract.md semantic responsibility contract
+# downstream implementation ../../tools/agent_tools/check_semantic_responsibility_contract.py schema, identity, and reference validator
+# downstream design ../../agents/COMMUNICATION_PROTOCOL.md active design packet reference
+# @dependency-end
+
+# Reader map: この run-local instance は semantic delta、obligation、一次検証 owner、hard-edge
+# grouping を active design packet から受け取る。tests より前の mechanism、necessary/sufficient
+# oracle、failure cause、conflict intent、cleanup は対応する owner packet で read back する。
+
+schema = "agent-canon.semantic_responsibility_contract.v1"
+instance_kind = "template"
+policy_ref = "documents/design/semantic-responsibility-contract.md"
+active_design_packet_ref = ""
+run_id = ""
+task_id = ""
+responsibility_id = ""
+allocation_phase = "pre_implementation"
+test_designer_activation = "post_implementation_unresolved_test_owned_runtime_risk"
+hard_edge_kinds = [
+  "invariant",
+  "atomic_transition",
+  "transaction",
+  "lifecycle",
+  "effect",
+  "consistency",
+  "substitutability",
+]
+semantic_grouping = ""
+structural_mandates = []
+
+# Replace this placeholder table with one or more populated semantic deltas.
+[[semantic_delta]]
+id = ""
+summary = ""
+implementation_action = ""
+design_refs = []
+
+[[semantic_delta.obligation]]
+id = ""
+claim = ""
+verification_owner_kind = ""
+verification_owner = ""
+primary_verification_ref = ""
+contract_ref = ""
+changed_mechanism_ref = ""
+observable_assertion = ""
+decidable_oracle = ""
+removal_witness = ""
+supporting_evidence = []

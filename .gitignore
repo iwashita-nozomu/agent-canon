@@ -1,0 +1,41 @@
+# @dependency-start
+# contract reference
+# responsibility Defines AgentCanon-local ignored generated artifacts.
+# upstream design documents/conventions/coding-conventions-project.md repository hygiene rules
+# @dependency-end
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Test/tool cache
+.pytest_cache/
+.ruff_cache/
+.state/agent-eval-runs/
+.agent-canon/search-index/
+.agent-canon/semantic-index/
+.agent-canon/log-archive/
+.agent-canon/knowledge-graph/
+rust/agent-canon/target/
+
+# Local run artifacts
+reports/agents/
+reports/agent-eval-runs/
+reports/agent-improvement-guide/
+reports/agent-runtime-dashboard/
+reports/dependency-review/
+reports/review/
+reports/hooks/
+reports/.cache/
+reports/*.json
+reports/*.txt
+reports/*.patch
+
+# Local environments
+.venv/
+venv/
+workspace/
+
+# OS/editor noise
+.DS_Store
+.ipynb_checkpoints/

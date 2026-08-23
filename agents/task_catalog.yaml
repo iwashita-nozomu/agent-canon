@@ -1,0 +1,811 @@
+# @dependency-start
+# contract registry
+# responsibility Maps task identifiers to workflow and review defaults.
+# upstream design skills/agent-orchestration.md execution-time-aware work-conservation owner
+# downstream design canonical/CODEX_WORKFLOW.md workflow consumes task routing catalog
+# downstream design canonical/CODEX_SUBAGENTS.md Codex subagent inventory consumes task routing
+# downstream design ../templates/agents/schedule.md execution-time-aware schedule projection
+# downstream implementation ../.codex/config.toml Codex runtime config consumes task routing
+# @dependency-end
+version: 2
+
+review_activation_policy:
+  mode: candidate_only
+  owner_gate_cardinality: one_gate_per_replaceable_responsibility
+  review_dispatch_owner: change_reviewer
+  domain_validators:
+    - python_reviewer
+    - cpp_reviewer
+  domain_validator_mode: bounded_claims_only
+  specialist_activation: distinct_unresolved_claim_or_risk_only
+  task_default_specialists: candidate_only
+  default_review_packs: candidate_only
+  test_design:
+    activation: post_implementation_unresolved_oracle_or_failure_risk_only
+    test_plan_required: only_when_activation_required
+    existing_tests: evidence_not_first_edit_surface
+    checker_owned_properties: route_to_static_or_deterministic_checker
+    private_helpers_and_incidental_apis: do_not_freeze
+  review_finding_rework:
+    initial_review: one_per_candidate_epoch_with_stable_blocking_finding_ids
+    focused_recheck: addressed_blockers_and_invalidated_evidence_only
+    rework_when: stable_blocker_closure_or_typed_new_epoch_evidence
+    record_without_new_wave: advisory_duplicate_stylistic_already_covered_or_evidence_free
+    same_state_action: non_convergent_cycle
+  validation:
+    owner_ref: "agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary"
+    route_source: parent_packet.validation_route
+    order: static_then_targeted
+    full_suite_or_remote_ci: see_owner_ref
+  artifacts:
+    empty_reviewer_or_template_files: do_not_materialize
+    selected_outputs_only: true
+
+execution_time_policy:
+  owner_ref: "agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract"
+  applies_to: repo-changing execution
+  projection: templates/agents/schedule.md#Execution-Time-Aware Plan
+  graph_activation: only_when_selected_ordering_or_collision_edges_exist
+  graph_scope: selected_dependency_and_collision_edges_only
+  executable_fields:
+    - dependency_dag
+    - responsibility_completeness
+    - correctness
+    - decision_relevant_total_work
+    - makespan_objective
+    - critical_path
+    - ready_set
+    - context_reuse
+    - affected_evidence_invalidation
+    - candidate_epoch
+    - blocking_finding_ids
+    - focused_recheck
+    - terminal_state
+
+role_topology_defaults: &standard_role_topology
+  capacity_derivation: declared_team_peak_plus_nested_reservations_v1
+  role_families:
+    intake:
+      - requirements_organizer
+      - explorer
+      - execution_planner
+    planning:
+      - execution_planner
+      - plan_reviewer
+    design:
+      - detailed_designer
+      - detailed_design_reviewer
+      - document_flow_reviewer
+    implementation:
+      - worker
+      - spark_worker
+    test_design:
+      - test_designer
+    review:
+      - python_reviewer
+      - cpp_reviewer
+      - diff_triage_reviewer
+      - reviewer
+      - ship_reviewer
+    perspective_review:
+      - reproducibility_reviewer
+      - artifact_reviewer
+      - benchmark_reviewer
+      - fair_data_reviewer
+      - ml_science_reviewer
+      - scientific_computing_reviewer
+    cross_cutting:
+      - terra
+    skill_evaluation:
+      - skill_evaluator
+  same_role_parallel_instances:
+    status: allowed_with_distinct_packets
+    identity_key: role_id+instance_id+agent_type
+    read_only: allowed_when_input_packets_or_review_focus_are_distinct
+    write_capable: allowed_only_for_worker_or_spark_worker
+    current_checkout_parallel_requirements: disjoint_paths+no_shared_git_index_or_head+no_generated_or_formatter_effects
+    collision_policy: serialize_current_checkout_waves
+    isolated_worktree_policy: explicit_alternative_implementation_experiment_only
+    runtime_threads_are_cardinality_source: false
+  stage_waves:
+    - id: intake
+      stage_class: producer
+      role_ids:
+        - manager
+    - id: skill_evaluation
+      stage_class: producer
+      role_ids:
+        - skill_evaluator
+    - id: intake_review
+      stage_class: reviewer
+      role_ids:
+        - manager_reviewer
+    - id: research
+      stage_class: producer
+      role_ids:
+        - researcher
+    - id: research_review
+      stage_class: reviewer
+      role_ids:
+        - research_reviewer
+        - reproducibility_reviewer
+        - scientific_computing_reviewer
+        - benchmark_reviewer
+        - artifact_reviewer
+        - fair_data_reviewer
+        - ml_science_reviewer
+    - id: scheduling
+      stage_class: producer
+      role_ids:
+        - scheduler
+    - id: schedule_review
+      stage_class: reviewer
+      role_ids:
+        - schedule_reviewer
+    - id: platform_planning
+      stage_class: producer
+      role_ids:
+        - infra_steward
+    - id: platform_review
+      stage_class: reviewer
+      role_ids:
+        - infra_reviewer
+    - id: integration_assessment
+      stage_class: reviewer
+      role_ids:
+        - project_reviewer
+        - docs_workflow_steward
+        - prompt_config_reviewer
+    - id: cross_owner_integration
+      stage_class: reviewer
+      activation: conditional_cross_owner_evidence
+      role_ids:
+        - terra
+    - id: design
+      stage_class: producer
+      role_ids:
+        - designer
+    - id: design_review
+      stage_class: reviewer
+      role_ids:
+        - design_reviewer
+    - id: document_flow_review
+      stage_class: reviewer
+      role_ids:
+        - document_flow_reviewer
+        - citation_evidence_reviewer
+        - notation_definition_reviewer
+        - logic_gap_reviewer
+    - id: experiment
+      stage_class: producer
+      role_ids:
+        - experimenter
+    - id: experiment_review
+      stage_class: reviewer
+      role_ids:
+        - experiment_reviewer
+        - report_reviewer
+    - id: implementation
+      stage_class: producer
+      role_ids:
+        - implementer
+    - id: test_design
+      stage_class: reviewer
+      role_ids:
+        - test_designer
+    - id: implementation_review
+      stage_class: reviewer
+      role_ids:
+        - change_reviewer
+        - python_reviewer
+        - cpp_reviewer
+      owner_gate: change_reviewer
+      domain_validators_are_bounded: true
+    - id: final_review
+      stage_class: final
+      role_ids:
+        - final_reviewer
+    - id: verification_closeout
+      stage_class: final
+      role_ids:
+        - verifier
+        - auditor
+
+workflow_families:
+  - id: owner_bounded_change
+    name: Owner-Bounded Change
+    subagent_prompt:
+      purpose: Prompt packet for owner-bounded fixes whose replaceable unit, local validation route, and external public API/behavior/schema unchanged readback are already evidenced.
+      prompt_preamble:
+        - Treat this as an owner-bounded fix only while `external public API/behavior/schema unchanged`; route every public-surface addition, contraction, removal, rename, restriction, deprecation, or semantic change to `scoped_change` or a broader route and form `dependency/consumer/migration/docs closure`.
+        - Start from the structured handoff; use user_request_contract.md, schedule.md, and team_manifest.yaml only when the selected coordination or resumption route materializes them.
+        - Include request_clause_ids, expected artifact path, parent-assigned write scope, the exact parent-assigned validation commands, and next review gate in every handoff; those commands are the closed trust boundary defined by `agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary`.
+      workflow_focus:
+        - Treat catalog intake roles, `worker`, `explorer`, language-specific reviewers, and review packs as candidates. For semantic deltas, reference the run-local semantic_responsibility_contract.toml from the active design packet and allocate one action plus obligation owners before implementation. Activate only the owner-critical implementation route or a distinct unresolved claim/risk. Add `test_designer` only after the owning mechanism is established or repaired and an unresolved oracle/specification/regression/failure-mode risk remains outside static analysis, checkers, and targeted validation; select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>` recorded in stdout and the manifest.
+        - Keep this route only when the run's abstract responsibility frame derives a bounded implementation slice with public interface unchanged, meaning `external public API/behavior/schema unchanged`, no dependency change, no specification interpretation, and local validation. File count and nearby ownership are not enough to select or keep this route.
+        - Activate design, document-flow, and broad review only when an unresolved owner/design/reader-facing claim requires it. A produced design artifact does not by itself create a separate review wave; one owning review gate may cover the responsibility.
+        - Escalate to `scoped_change` when any external public API, behavior, or schema delta exists, the owner boundary is non-obvious, validation is cross-module, or the diff-triage reviewer returns escalate; public deltas carry `dependency/consumer/migration/docs closure` into scope.
+      reviewer_prompt:
+        - Prefer language-specific and diff-triage findings before broad review.
+        - Block completion if public-surface invariance is missing, validation is missing, request clauses are not mapped, or write scope expanded beyond the owner-bounded route.
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
+    role_topology: *standard_role_topology
+    roles:
+      always_on:
+        - manager
+        - implementer
+        - verifier
+        - auditor
+      specialists:
+        - change_reviewer
+        - test_designer
+        - python_reviewer
+        - cpp_reviewer
+        - docs_workflow_steward
+        - terra
+    tasks:
+      - T1
+      - T2
+
+  - id: scoped_change
+    name: Scoped Change
+    subagent_prompt:
+      purpose: Prompt packet for owner-bounded repo changes whose selected owner gate needs more than the local route.
+      prompt_preamble:
+        - Treat this template repository as the default implementation starting point; do not route work to another repository unless the parent explicitly says so.
+        - Start from the structured handoff; use the run bundle, user_request_contract.md, schedule.md, and team_manifest.yaml only when selected coordination or resumption requires them.
+        - Include request_clause_ids, expected artifact path, parent-assigned write scope, the exact parent-assigned validation commands, and next review gate in every handoff; those commands are the closed trust boundary defined by `agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary`.
+      workflow_focus:
+        - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide their named findings, while the parent owns integration and final approval.
+        - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
+        - Keep the diff tied to the assigned responsibility boundary. Test design is a conditional post-implementation stage, not a default pre-implementation gate; activate it only when an explicit unresolved oracle, specification, regression, or failure-mode risk remains outside static analysis, checkers, and targeted validation.
+        - When fix-surface selection is non-obvious, run hypothesis-validation workflow before implementation.
+        - Prefer existing names, helpers, tests, and docs over new surfaces; record why reuse is insufficient before proposing new files.
+        - Treat one fix, chunk, or checkpoint as internal progress until every active clause and planned work unit is complete.
+      reviewer_prompt:
+        - Verify behavior, tests, docs, and request-clause coverage rather than only checking style.
+        - Rework only findings that change requested behavior, owner/design boundary, correctness, validation, or publication state. Record duplicate, stylistic, already-covered, or evidence-free findings without opening a new wave; block completion only when an active claim remains unvalidated or unresolved.
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
+    role_topology: *standard_role_topology
+    roles:
+      always_on:
+        - manager
+        - designer
+        - implementer
+        - verifier
+        - auditor
+      specialists:
+        - manager_reviewer
+        - design_reviewer
+        - document_flow_reviewer
+        - change_reviewer
+        - final_reviewer
+        - scheduler
+        - schedule_reviewer
+        - docs_workflow_steward
+        - test_designer
+        - python_reviewer
+        - cpp_reviewer
+        - terra
+    tasks:
+      - T3
+
+  - id: research_driven_change
+    name: Research-Driven Change
+    subagent_prompt:
+      purpose: Prompt packet for research-backed implementation, experiment, benchmark, report, and academic-writing tasks.
+      prompt_preamble:
+        - Treat this template repository as the default implementation starting point; external sources inform the work but do not replace repo-local artifacts.
+        - Emit the skill call sequence with literature-survey before research-workflow when primary sources, prior art, official docs, or source-backed implementation claims are used; carry the source packet and adoption/exclusion decisions into design, implementation, benchmark, and report handoffs.
+        - Start from the structured handoff; use the run bundle, user_request_contract.md, schedule.md, research_notes.md, cited sources, and team_manifest.yaml only when the selected research or coordination route requires them.
+        - Separate correctness evidence, performance evidence, and reporting claims in the handoff.
+      workflow_focus:
+        - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide their named findings, while the parent owns integration and final approval.
+        - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
+        - Use primary sources or official docs for external claims, and record search terms, source class, limitations, and contradictory evidence.
+        - Treat literature-survey as the source packet owner and research-workflow as the outer loop owner; do not let implementation, experiment, report, or follow-up branches close source-backed claims without source packet evidence, limitations, and adoption/exclusion decisions.
+        - Use hypothesis-validation workflow when analysis must decide the code or document surface to modify before the experiment or implementation slice.
+        - Keep experiment protocol, code change, runtime flag change, and report interpretation separated unless one explicit clause authorizes combining them.
+        - Preserve provenance: commands, seeds, environment, raw result paths, and rerun instructions.
+      reviewer_prompt:
+        - Block overclaims, spot/debug/partial evidence used as formal evidence, missing baselines, and missing reproducibility artifacts.
+        - For paper-like work, split citation/evidence, notation, logic, and document-flow review only when each is a distinct unresolved claim; otherwise one owning review gate may cover the responsibility.
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
+    role_topology: *standard_role_topology
+    roles:
+      always_on:
+        - manager
+        - designer
+        - implementer
+        - verifier
+        - auditor
+      specialists:
+        - manager_reviewer
+        - design_reviewer
+        - document_flow_reviewer
+        - change_reviewer
+        - final_reviewer
+        - researcher
+        - research_reviewer
+        - scheduler
+        - schedule_reviewer
+        - report_reviewer
+        - citation_evidence_reviewer
+        - test_designer
+        - python_reviewer
+        - cpp_reviewer
+        - notation_definition_reviewer
+        - logic_gap_reviewer
+        - experimenter
+        - experiment_reviewer
+        - reproducibility_reviewer
+        - scientific_computing_reviewer
+        - benchmark_reviewer
+        - artifact_reviewer
+        - fair_data_reviewer
+        - ml_science_reviewer
+        - terra
+    tasks:
+      - T4
+      - T5
+      - T9
+      - T10
+
+  - id: large_delivery
+    name: Large Delivery
+    subagent_prompt:
+      purpose: Prompt packet for multi-surface delivery, new feature work, and large refactors.
+      prompt_preamble:
+        - Treat this template repository as the default implementation starting point and keep durable product state in canonical current-tree paths only.
+        - Start from the structured handoff; use the run bundle, user_request_contract.md, schedule.md, design_brief.md, and team_manifest.yaml only when selected coordination or resumption requires them.
+        - Name the milestone, chunk, request_clause_ids, write scope, rollback point, and next gate in each handoff.
+      workflow_focus:
+        - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide their named findings, while the parent owns integration and final approval.
+        - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
+        - Define milestone and chunk boundaries before implementation; chunks are not user-facing completion.
+        - Use hypothesis-validation workflow to justify the selected refactor or feature surface before moving code.
+        - For refactors, require behavior contract, allowed structural delta, forbidden semantic delta, files to remove or move, and path mapping before editing.
+        - Sweep stale references after renames or structure changes before closeout.
+      reviewer_prompt:
+        - Block hidden semantic changes, incomplete path mapping, stale docs, and parallel durable truth surfaces.
+        - Verify every chunk maps back to the umbrella completion boundary.
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
+    role_topology: *standard_role_topology
+    roles:
+      always_on:
+        - manager
+        - designer
+        - implementer
+        - verifier
+        - auditor
+      specialists:
+        - manager_reviewer
+        - design_reviewer
+        - document_flow_reviewer
+        - change_reviewer
+        - final_reviewer
+        - scheduler
+        - schedule_reviewer
+        - test_designer
+        - project_reviewer
+        - docs_workflow_steward
+        - python_reviewer
+        - cpp_reviewer
+        - terra
+    tasks:
+      - T6
+      - T7
+
+  - id: platform_and_environment
+    name: Platform And Environment
+    subagent_prompt:
+      purpose: Prompt packet for Docker, CI, dependency, runtime, and development-environment changes.
+      prompt_preamble:
+        - Treat this template repository as the default implementation starting point; environment changes must support the template workflow first.
+        - Start from the structured handoff; use the run bundle, environment_change_proposal.md, user_request_contract.md, schedule.md, and team_manifest.yaml only when selected coordination or resumption requires them.
+        - State the triggering code requirement, blocked command, source-of-truth surface, rollback path, and the exact parent-assigned validation commands in every handoff; those commands are the closed trust boundary defined by `agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary`.
+      workflow_focus:
+        - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide their named findings, while the parent owns integration and final approval.
+        - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
+        - Prefer existing dependency surfaces and canonical environment helpers over ad hoc setup.
+        - Do not create repo-local virtual environments on host runtime; use the canonical environment policy.
+        - Keep Docker, CI, lock/dependency, and runtime-doc changes consistent.
+      reviewer_prompt:
+        - Block environment changes without a code requirement, rollback path, or validation evidence.
+        - Verify docs, CI, Docker packs, and local developer commands remain aligned.
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
+    role_topology: *standard_role_topology
+    roles:
+      always_on:
+        - manager
+        - designer
+        - implementer
+        - verifier
+        - auditor
+      specialists:
+        - manager_reviewer
+        - design_reviewer
+        - document_flow_reviewer
+        - change_reviewer
+        - final_reviewer
+        - infra_steward
+        - infra_reviewer
+        - scheduler
+        - schedule_reviewer
+        - docs_workflow_steward
+        - test_designer
+        - python_reviewer
+        - cpp_reviewer
+        - terra
+    tasks:
+      - T8
+
+  - id: comprehensive_development
+    name: Comprehensive Development
+    subagent_prompt:
+      purpose: Prompt packet for repo-wide workflow, tooling, runtime, docs, and canon rearchitecture.
+      prompt_preamble:
+        - Treat this template repository as the default implementation starting point and the integration reference for derived repos.
+        - Start from the structured handoff; use the run bundle, user_request_contract.md, schedule.md, project_review.md, docs_workflow_review.md, and team_manifest.yaml only when selected coordination or resumption requires them.
+        - Name all affected surfaces, request_clause_ids, canonical paths, expected validation, and next review gate in every handoff.
+      workflow_focus:
+        - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide their named findings, while the parent owns integration and final approval.
+        - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
+        - Review repo-wide integration risk through compact tool output, dependency-expanded path lists, and bounded canon slices; do not hand agents the whole repository as their read scope.
+        - For AgentCanon tasks, classify whether the change is standalone AgentCanon source, template parent gitlink, root shared-surface sync, or derived repo proposal before editing.
+        - For analysis-heavy changes, require separate code dependency and header dependency evidence before design approval.
+        - Update docs, tests, runtime helpers, skill shims, mirrors, and validation tools together when the behavior crosses those surfaces.
+        - Use `prompt_config_reviewer` before editing prompt, routing, or subagent-config policy surfaces.
+        - Preserve parent-managed write-scope discipline; concurrent write-capable agents require disjoint paths in the current checkout, and colliding writers must be serialized into later waves instead of moved to separate worktrees.
+      reviewer_prompt:
+        - Block changes that work only for the touched diff but leave task catalog, starter tools, mirrors, docs, tests, or runtime validation stale.
+        - Verify all workflow families and task ids still bootstrap with usable prompt, packet, role, and validation metadata.
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
+    role_topology: *standard_role_topology
+    roles:
+      always_on:
+        - manager
+        - designer
+        - implementer
+        - verifier
+        - auditor
+      specialists:
+        - manager_reviewer
+        - design_reviewer
+        - document_flow_reviewer
+        - change_reviewer
+        - final_reviewer
+        - scheduler
+        - schedule_reviewer
+        - researcher
+        - research_reviewer
+        - infra_steward
+        - infra_reviewer
+        - project_reviewer
+        - docs_workflow_steward
+        - prompt_config_reviewer
+        - test_designer
+        - python_reviewer
+        - cpp_reviewer
+        - report_reviewer
+        - terra
+    tasks:
+      - T11
+      - T12
+
+  - id: adaptive_improvement_loop
+    name: Adaptive Improvement Loop
+    subagent_prompt:
+      purpose: Prompt packet for backlog-driven tuning, exploration, and repeated experiment-backed improvement.
+      prompt_preamble:
+        - Treat this template repository as the default implementation starting point; each improvement pass must still be a traceable waterfall slice.
+        - Start from the structured handoff; use the run bundle, backlog or decision-state artifact, user_request_contract.md, schedule.md, and team_manifest.yaml only when selected coordination or resumption requires them.
+        - State backlog item, hypothesis, run protocol, success metric, stopping rule, and next decision gate in every handoff.
+      workflow_focus:
+        - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide their named findings, while the parent owns integration and final approval.
+        - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
+        - Keep the adaptive outer loop separate from one implementation slice; one iteration is not whole-loop completion.
+        - Do not mix code change, experiment protocol change, runtime flag change, and claim/report rewrite in one iteration without an explicit clause.
+        - Promote only validated lessons into notes or memory; keep failed attempts traceable.
+      reviewer_prompt:
+        - Block progress claims from spot runs, partial runs, raw failure counts, or unreviewed protocol changes.
+        - Verify the backlog, decision state, reproducibility evidence, and carry-over notes are current.
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
+    role_topology: *standard_role_topology
+    roles:
+      always_on:
+        - manager
+        - designer
+        - implementer
+        - verifier
+        - auditor
+      specialists:
+        - manager_reviewer
+        - design_reviewer
+        - document_flow_reviewer
+        - change_reviewer
+        - final_reviewer
+        - researcher
+        - research_reviewer
+        - scheduler
+        - schedule_reviewer
+        - experimenter
+        - experiment_reviewer
+        - report_reviewer
+        - test_designer
+        - python_reviewer
+        - cpp_reviewer
+        - reproducibility_reviewer
+        - scientific_computing_reviewer
+        - benchmark_reviewer
+        - artifact_reviewer
+        - fair_data_reviewer
+        - ml_science_reviewer
+        - terra
+    tasks:
+      - T13
+
+  - id: skill_evaluation
+    name: Skill Evaluation
+    subagent_prompt:
+      purpose: Prompt packet for explicit empirical skill evaluation with a fresh, read-only evaluator.
+      prompt_preamble:
+        - Treat this as an evaluation-only route for one explicit frozen Scenario Packet.
+        - The parent derives the frozen Scenario Packet from run-local workflow evidence; keep that run bundle, user_request_contract.md, schedule.md, team_manifest.yaml, prior answers, and prior reports outside evaluator context.
+        - The evaluator starts only from the frozen Scenario Packet and its explicit read allowlist.
+        - Do not materialize implementation or reviewer roles unless the parent packet separately enables them.
+      workflow_focus:
+        - Materialize the catalog-owned initial skill_evaluation stage with skill_evaluator only.
+        - Keep skill_evaluator fresh, read-only, artifact-only, and scoped to the packet-listed scenario.
+        - The parent owns the standard run-coordination and closeout artifacts, scoring, iteration, convergence, and any implementation follow-up; those artifacts remain outside evaluator context.
+      reviewer_prompt:
+        - Verify that the evaluation route has no default worker, spark_worker, or reviewer wave.
+        - Verify that the evaluator model and read-only/fresh policy remain unchanged.
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
+    role_topology: *standard_role_topology
+    roles:
+      always_on: []
+      specialists:
+        - skill_evaluator
+    tasks:
+      - T14
+
+tasks:
+  - id: T1
+    name: local bug fix
+    family: owner_bounded_change
+    specialists:
+      - python_reviewer
+  - id: T2
+    name: CI or flaky test fix
+    family: owner_bounded_change
+    specialists:
+      - python_reviewer
+  - id: T3
+    name: docs and test sync
+    family: scoped_change
+    specialists:
+      - scheduler
+      - schedule_reviewer
+      - docs_workflow_steward
+      - python_reviewer
+  - id: T4
+    name: research-backed implementation change
+    family: research_driven_change
+    specialists:
+      - researcher
+      - research_reviewer
+      - scheduler
+      - schedule_reviewer
+      - experimenter
+      - experiment_reviewer
+      - report_reviewer
+      - python_reviewer
+  - id: T5
+    name: benchmark or experiment-driven optimization
+    family: research_driven_change
+    specialists:
+      - researcher
+      - research_reviewer
+      - scheduler
+      - schedule_reviewer
+      - experimenter
+      - experiment_reviewer
+      - report_reviewer
+      - python_reviewer
+  - id: T6
+    name: large refactor
+    family: large_delivery
+    specialists:
+      - scheduler
+      - schedule_reviewer
+      - project_reviewer
+      - docs_workflow_steward
+      - python_reviewer
+  - id: T7
+    name: new feature or API delivery
+    family: large_delivery
+    specialists:
+      - scheduler
+      - schedule_reviewer
+      - python_reviewer
+  - id: T8
+    name: environment, CI, Docker, or dependency update
+    family: platform_and_environment
+    specialists:
+      - infra_steward
+      - infra_reviewer
+      - scheduler
+      - schedule_reviewer
+      - docs_workflow_steward
+      - python_reviewer
+  - id: T9
+    name: research workflow, artifact policy, or reporting policy change
+    family: research_driven_change
+    specialists:
+      - scheduler
+      - schedule_reviewer
+      - researcher
+      - research_reviewer
+      - experimenter
+      - experiment_reviewer
+      - report_reviewer
+      - reproducibility_reviewer
+      - artifact_reviewer
+  - id: T10
+    name: academic paper, thesis chapter, or scholarly note
+    family: research_driven_change
+    specialists:
+      - scheduler
+      - schedule_reviewer
+      - researcher
+      - research_reviewer
+      - report_reviewer
+      - citation_evidence_reviewer
+      - notation_definition_reviewer
+      - logic_gap_reviewer
+  - id: T11
+    name: repo-wide integrated delivery across code docs tools and runtime
+    family: comprehensive_development
+    specialists:
+      - scheduler
+      - schedule_reviewer
+      - project_reviewer
+      - docs_workflow_steward
+      - prompt_config_reviewer
+      - python_reviewer
+      - infra_steward
+      - infra_reviewer
+  - id: T12
+    name: agent workflow tooling, AgentCanon submodule flow, or canon rearchitecture
+    family: comprehensive_development
+    specialists:
+      - scheduler
+      - schedule_reviewer
+      - project_reviewer
+      - docs_workflow_steward
+      - prompt_config_reviewer
+  - id: T13
+    name: adaptive tuning exploration and experiment-driven improvement loop
+    family: adaptive_improvement_loop
+    specialists:
+      - researcher
+      - research_reviewer
+      - scheduler
+      - schedule_reviewer
+      - experimenter
+      - experiment_reviewer
+      - report_reviewer
+      - python_reviewer
+      - reproducibility_reviewer
+      - artifact_reviewer
+  - id: T14
+    name: explicit empirical skill evaluation
+    family: skill_evaluation
+    specialists:
+      - skill_evaluator
+
+review_packs:
+  - id: research_perspective_review
+    name: Research Perspective Review
+    specialists:
+      - reproducibility_reviewer
+      - scientific_computing_reviewer
+      - benchmark_reviewer
+      - artifact_reviewer
+      - fair_data_reviewer
+      - ml_science_reviewer
+    default_for_tasks: []
+    optional_for_tasks:
+      - T4
+      - T5
+      - T9
+      - T13
+    when: full research perspective review is explicitly requested, or triage shows methodology, benchmark, FAIR-data, ML-science, or scientific-computing risk
+  - id: research_perspective_triage
+    name: Research Perspective Triage
+    specialists:
+      - reproducibility_reviewer
+      - artifact_reviewer
+    default_for_tasks:
+      - T4
+      - T5
+      - T9
+      - T13
+    when: experiment logs, runtime artifacts, or reporting evidence need a minimum reproducibility and artifact-readiness check before selecting extra perspective reviewers
+  - id: academic_writing_review
+    name: Academic Writing Review
+    specialists:
+      - citation_evidence_reviewer
+      - notation_definition_reviewer
+      - logic_gap_reviewer
+    default_for_tasks:
+      - T10
+    optional_for_tasks:
+      - T4
+      - T5
+      - T9
+    when: paper-like writing, thesis prose, symbol-dense text, or claim-heavy academic exposition needs separate citation/evidence, notation, and logic review
+  - id: repo_integration_review
+    name: Repo Integration Review
+    specialists:
+      - project_reviewer
+      - docs_workflow_steward
+      - python_reviewer
+    default_for_tasks:
+      - T11
+    optional_for_tasks:
+      - T3
+      - T6
+      - T7
+      - T8
+      - T12
+    when: repo-wide delivery needs integration review across code, docs, workflow, and runtime surfaces

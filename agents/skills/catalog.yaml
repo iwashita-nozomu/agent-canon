@@ -1,0 +1,2187 @@
+version: 1
+# @dependency-start
+# contract registry
+# responsibility Catalogs the complete public skill identity set and descriptions.
+# upstream design code-visualization.md sole public visualization owner and typed projection contract
+# downstream design ./skill-dependencies.yaml owns prerequisites, successors, order constraints, and parallel-independent relations
+# downstream design ../canonical/CODEX_WORKFLOW.md consumes the skill catalog during task routing
+# downstream implementation ../../tools/agent_tools/skill_route_catalog.py parses complete rule and capability metadata
+# downstream implementation ../../tools/agent_tools/route.py consumes routing and dependency-derived skill order
+# downstream implementation ../../tools/agent_tools/skill_tool_commands.py prints skill command packets with dependency-derived candidates
+# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates public skill catalog consistency
+# downstream implementation ../../tests/agent_tools/test_route.py tests canonical visualization capability routing
+# @dependency-end
+
+# Runtime tool dispatch is deliberately a namespaced route. Skill entries may
+# continue to document their normal command, while the shared container uses
+# ``agent-canon tool run <catalog-id> -- <args...>`` when a v2 parity record is
+# available. This mapping is descriptive only; it does not create flat
+# executables or silently replace a legacy command.
+tool_runtime:
+  schema_version: 2
+  catalog: tools/catalog.yaml
+  command: agent-canon tool run <catalog-id> -- <args...>
+  execution: bootstrap exec typed request into the shared tool container
+  environment: exact allowlist only; AGENT_CANON_* wildcard inheritance is forbidden
+  parity_fields: [argv, cwd, stdin, stdout, stderr, exit, signal, written_paths]
+  parity_policy: verified-only
+  legacy_policy: retain-until-parity
+
+skill_families:
+  # Public user-facing skill ids use plain hyphen-case. Runtime-internal skill
+  # shims use .agents/skills/_<name>/SKILL.md and stay owner-routed.
+  - id: agent-orchestration
+    purpose: Mandatory routing skill for repository tasks; selects workflow family, skills, review roles, and runtime entrypoints before execution.
+    canonical_doc: agents/skills/agent-orchestration.md
+    shim: .agents/skills/agent-orchestration/SKILL.md
+    discovery:
+      name: agent-orchestration
+      description: "Mandatory routing skill for repository tasks. Use before selecting workflow family, skills, review roles, subagents, model/team policy, runtime entrypoints, or run bundles for Codex routing."
+    tool_commands:
+      required:
+      - python3 tools/agent_tools/check_execution_time_aware_orchestration.py --root .
+      conditional:
+      - python3 tools/agent_tools/search.py --query-file <request.txt> --providers text,semantic,vector,tool,header-deps,code-deps
+        --format json
+      - agent-canon structured-analysis document-inventory
+      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      - python3 tools/agent_tools/check_convention_compliance.py
+      - agent-canon docs
+      - ./bootstrap.sh --control-parent-root <parent> --runtime-root <runtime> status
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: workflow, skill, subagent, or stage routing is part of the request
+      triggers:
+        - ["どのスキル"]
+        - ["どのskill"]
+        - ["スキル選択"]
+        - ["skill selection"]
+        - ["routing", "skill"]
+        - ["ルーティング", "スキル"]
+        - ["マルチエージェント"]
+        - ["サブエージェント", "起動"]
+        - ["subagent", "routing"]
+        - ["workflow=", "skills="]
+        - ["根本", "設計", "見直"]
+  - id: repo-onboarding
+    purpose: Fast safe entry path for an unfamiliar repository or subdirectory.
+    canonical_doc: agents/skills/repo-onboarding.md
+    shim: .agents/skills/repo-onboarding/SKILL.md
+    discovery:
+      name: repo-onboarding
+      description: "Use when entering an unfamiliar repository or subdirectory and you need the fastest safe path to the repo overview, commands, conventions, and agent canon."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+  - id: task-routing
+    purpose: Resolve long proposed tool or skill names into short routing areas and compact commands.
+    canonical_doc: agents/skills/task-routing.md
+    shim: .agents/skills/task-routing/SKILL.md
+    discovery:
+      name: task-routing
+      description: "Use when choosing short AgentCanon tool, skill, profile, check, runtime, closeout, or evidence routes from long candidate names, broad workflow text, routing misses, over-constrained related-skill candidates, public/system skill delegation, skill splitting, or skill/tool routing refactors."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/route.py --name <candidate>
+      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      - python3 tools/agent_tools/route.py --area <area> --changed <paths...>
+      - python3 tools/agent_tools/route.py --prompt
+      - python3 tools/agent_tools/route.py --area checks --changed <path>
+      - python3 tools/agent_tools/route.py --name profile_surface_resolver.py
+      - python3 tools/agent_tools/skill_dependency_map.py check --root .
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: skill/tool routing architecture or route contract design is in scope
+      triggers:
+        - ["ルーティング", "改善"]
+        - ["ルーティング", "リファクタ"]
+        - ["routing", "redesign"]
+        - ["routing", "architecture"]
+        - ["route", "contract"]
+        - ["skill", "tool", "routing"]
+        - ["skill", "走査"]
+        - ["skill", "scan"]
+        - ["スキル", "走査"]
+        - ["スキル", "動線"]
+        - ["スキル", "ツール", "欠落"]
+        - ["自作ツール"]
+        - ["repo", "tool", "routing"]
+        - ["repository", "tool", "routing"]
+        - ["tool", "automatic", "routing"]
+        - ["ツール", "自動", "ルーティング"]
+        - ["自動ルーティング"]
+        - ["ツール", "逐次"]
+        - ["逐次", "呼ぶ"]
+        - ["動的", "ルーティング"]
+        - ["動的", "スキル"]
+        - ["スキル内", "起動コマンド"]
+        - ["スキル", "起動コマンド"]
+        - ["tool", "command", "skill"]
+        - ["スキル", "一つずつ"]
+        - ["スキル選択", "ルーティング"]
+        - ["スキル", "ツール", "ルーティング"]
+        - ["スキル", "命名"]
+        - ["skill", "naming"]
+        - ["スキル", "細分化"]
+        - ["スキル", "分割"]
+        - ["スキル", "重い"]
+        - ["スキル", "二重管理"]
+        - ["設定", "スキル", "二重管理"]
+        - ["skill", "duplicate", "management"]
+        - ["settings", "skills", "duplicate"]
+        - ["skill", "catalog", "ownership"]
+        - [".agents", "skills"]
+        - ["関連スキル"]
+        - ["関連スキル", "狭"]
+        - ["スキル", "呼ばれ"]
+        - ["スキル", "呼ばれない"]
+        - ["スキル", "call"]
+        - ["skill", "called"]
+        - ["skill", "invoke"]
+        - ["skill", "invoked"]
+        - ["skill", "split"]
+        - ["skill", "granular"]
+        - ["related", "skill"]
+        - ["ハードコード", "スキル"]
+        - ["hardcode", "skill"]
+        - ["userfacing", "skill"]
+        - ["private", "skill"]
+        - ["公式", "スキル"]
+        - ["system", "skill"]
+        - ["official", "skill"]
+        - ["host-provided"]
+        - ["openai-docs"]
+        - ["skill-creator"]
+        - ["skill-installer"]
+        - ["imagegen"]
+        - ["plugin-creator"]
+        - ["公式", "委譲"]
+        - ["スキル", "委譲"]
+        - ["スキル", "移譲"]
+        - ["根本", "設計", "見直"]
+        - ["validation", "route"]
+        - ["check", "profile"]
+        - ["profile", "route"]
+        - ["closeout", "route"]
+        - ["evidence", "route"]
+        - ["長い", "候補名"]
+        - ["long", "candidate", "names"]
+  - id: start-repository
+    purpose: Start a repository from the template clone through the project-owned source-free bootstrap.
+    canonical_doc: agents/skills/start-repository.md
+    shim: .agents/skills/start-repository/SKILL.md
+    discovery:
+      name: start-repository
+      description: "Use when starting a repository from this template after clone, including project identity setup, source-free static-seed validation, and destination-remote setup without live AgentCanon integration."
+    tool_commands:
+      required: []
+      conditional:
+      - git clone <template> <new-project>
+      - git status --short --branch
+      - bash scripts/start_repository.sh --project-slug <slug> --display-name "<name>"
+      - bash scripts/start_repository.sh --validate-only
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+  - id: codex-task-workflow
+    purpose: Execute repository tasks with a context-independent Codex flow.
+    canonical_doc: agents/skills/codex-task-workflow.md
+    shim: .agents/skills/codex-task-workflow/SKILL.md
+    discovery:
+      name: codex-task-workflow
+      description: "Use when Codex needs a context-independent execution path for a repository task, from intake and workflow selection through artifact placement, implementation, validation, and closeout."
+    tool_commands:
+      required: []
+      conditional:
+      - tools/bin/agent-canon docs check <changed-markdown-paths>
+      - python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt>
+        --providers text,semantic,vector,tool,header-deps,code-deps --format json
+      - python3 tools/agent_tools/check_solid_evidence.py --changed --evidence <oop-readability-report>
+      - python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>
+      - python3 tools/agent_tools/check_dependency_headers.py --changed
+      - bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing
+      - bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header
+      - bash tools/agent_tools/check_dependency_graph.sh --print-edges
+      - python3 tools/agent_tools/check_convention_compliance.py
+      - python3 tools/agent_tools/bootstrap_agent_run.py ... --task-id <T*>
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+  - id: subagent-bootstrap
+    purpose: Start the right specialist run bundle and make stage subagents explicit before implementation.
+    canonical_doc: agents/skills/subagent-bootstrap.md
+    shim: .agents/skills/subagent-bootstrap/SKILL.md
+    discovery:
+      name: subagent-bootstrap
+      description: "Use when a task needs specialist delegation, run-bundle bootstrap, explicit stage subagents, or Codex implementation routing."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/workflow_monitor.py --subagent-wave ...
+      - python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>
+      - python3 tools/agent_tools/bootstrap_agent_run.py
+      - git worktree
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: deferred
+      reason: repo-changing implementation, patch, doc-edit, or explicit subagent execution requires write-capable handoff routing
+      triggers:
+        - ["implementation"]
+        - ["implement"]
+        - ["実装"]
+        - ["patch"]
+        - ["パッチ"]
+        - ["doc-edit"]
+        - ["doc", "edit"]
+        - ["docs", "edit"]
+        - ["document", "edit"]
+        - ["ドキュメント", "編集"]
+        - ["文書", "編集"]
+        - ["文書", "修正"]
+        - ["マルチエージェント"]
+        - ["サブエージェント"]
+        - ["subagent"]
+        - ["multi-agent"]
+  - id: direct-luna-communication
+    purpose: Exchange a bounded typed packet with a directly selected Luna subagent and verify its effective runtime identity.
+    canonical_doc: agents/skills/direct-luna-communication.md
+    shim: .agents/skills/direct-luna-communication/SKILL.md
+    discovery:
+      name: direct-luna-communication
+      description: "Use after orchestration selects a Luna execution profile and needs bounded context, explicit authority, effective model/effort readback, and typed handback without a role-specific physical alias."
+    tool_commands:
+      required: []
+      conditional: []
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: deferred
+      reason: logical role, Skill set, Luna profile, and authority must be selected before direct communication
+      triggers:
+        - ["direct luna"]
+        - ["gpt-5.6-luna", "subagent"]
+        - ["luna", "fork_turns"]
+        - ["luna", "effective model"]
+        - ["luna", "model override"]
+  - id: change-review
+    purpose: Review diffs for regressions, missing validation, and stale docs.
+    canonical_doc: agents/skills/change-review.md
+    shim: .agents/skills/change-review/SKILL.md
+    discovery:
+      name: change-review
+      description: "Use for code review, doc review, or AI-generated diff review when you need findings-first output focused on bugs, regressions, missing tests, and broken assumptions."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths>
+        --evidence <oop-readability-report>
+      - python3 tools/agent_tools/issue_sync.py --root .
+      - bash tools/agent_tools/run_repo_dependency_review.sh
+      - git diff --stat
+      - git diff --name-only
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: review findings or implementation changes need findings-first review
+      triggers:
+        - ["レビューしてください"]
+        - ["変更レビュー"]
+        - ["全体", "レビュー"]
+        - ["review", "findings"]
+        - ["findings-first"]
+        - ["review-only"]
+        - ["do-not-edit-review"]
+        - ["change-review"]
+        - ["doc-review"]
+        - ["generated-diff-review"]
+        - ["diff", "review"]
+        - ["コード", "レビュー"]
+        - ["根本", "設計", "レビュー"]
+  - id: python-review
+    purpose: Review Python diffs with pyright, pytest, ruff, type-boundary awareness, API behavior, and OOP readability evidence when a Python diff already owns it.
+    canonical_doc: agents/skills/python-review.md
+    shim: .agents/skills/python-review/SKILL.md
+    discovery:
+      name: python-review
+      description: "Python 差分を pyright、pytest、ruff、型境界、API 挙動、OOP 可読性根拠で厳密に確認する。"
+    tool_commands:
+      required: []
+      conditional:
+      - ruff check python tests --select D,E,F,I,UP --ignore E501
+      - python3 tools/agent_tools/check_convention_compliance.py
+      - python3 tools/oop/python/readability.py
+      - python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths>
+        --evidence <oop-readability-report>
+      - bash tools/ci/run_python_quality_checks.sh
+      - python3 tools/oop/python/readability.py --root . --language python <changed-python-paths>
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: deferred
+      reason: Python implementation review is in scope
+      triggers:
+        - ["Python", "review"]
+        - ["Python", "コードレビュー"]
+        - ["Python", "レビュー"]
+        - ["pyright"]
+        - ["ruff"]
+        - ["pytest", "Python"]
+        - ["コードファイル", "順序"]
+        - ["定義順"]
+        - ["関数", "順序"]
+        - ["class", "順序"]
+  - id: cpp-review
+    purpose: Review C and C++ diffs with build evidence, header-boundary awareness, and ownership checks.
+    canonical_doc: agents/skills/cpp-review.md
+    shim: .agents/skills/cpp-review/SKILL.md
+    discovery:
+      name: cpp-review
+      description: "Use when C or C++ code changes need strict review for build evidence, header boundaries, ownership, and native-code behavior."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: deferred
+      reason: C or C++ changed-path evidence selects the native review route.
+      triggers:
+        - ["cpp-review"]
+        - ["cpp/CMakeLists.txt"]
+        - ["cpp/src"]
+        - ["cpp/include"]
+        - ["cpp/tests"]
+        - ["cpp/experiments"]
+        - ["C++", "review"]
+  - id: oop-readability-check
+    purpose: Run the OOP readability checker, produce mechanical SOLID/OOP report tables, and optionally add separate agent analysis.
+    canonical_doc: agents/skills/oop-readability-check.md
+    shim: .agents/skills/oop-readability-check/SKILL.md
+    discovery:
+      name: oop-readability-check
+      description: "Use when the user asks to run the OOP readability checker, SOLID check, OOP check, readability check, produce a mechanical OOP report table, or interpret/prioritize OOP readability results; keep mechanical tool output separate from agent analysis."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/oop/python/readability.py --root . --language all <paths>
+      - python3 tools/oop/python/readability.py
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: OOP readability or readability guard evidence is in scope
+      triggers:
+        - ["oop", "readability"]
+        - ["oop", "可読"]
+        - ["オブジェクト指向", "可読"]
+        - ["readability", "guard"]
+        - ["readability", "check"]
+        - ["可読性", "class"]
+        - ["可読性", "method"]
+        - ["SOLID"]
+        - ["SRP"]
+        - ["OCP"]
+        - ["LSP"]
+        - ["ISP"]
+        - ["DIP"]
+        - ["Single responsibility"]
+        - ["Open/closed"]
+        - ["Liskov"]
+        - ["Interface segregation"]
+        - ["Dependency inversion"]
+        - ["責務", "class"]
+        - ["Protocol", "境界"]
+  - id: oop-type-design
+    purpose: Write pre-implementation OOP designs with explicit types, invariants, state transitions, ownership, composition, and API/external boundaries.
+    canonical_doc: agents/skills/oop-type-design.md
+    shim: .agents/skills/oop-type-design/SKILL.md
+    discovery:
+      name: oop-type-design
+      description: "Use before implementation to define language-neutral OOP/type contracts, responsibility boundaries, and explicit capability-owned design packets."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/route.py --capability oop_type_design
+      - python3 tools/agent_tools/check_static_any.py --submodule-aware
+      - bash tools/agent_tools/run_repo_dependency_review.sh --report-dir <run-dir>/dependency-review
+        --fail-missing
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: explicit pre-implementation OOP/type design capability owns responsibility and boundary modeling
+      capabilities:
+        - id: oop_type_design
+          owner: pre_implementation_oop_type_design
+          phase: pre_implementation_design
+          activation: explicit_capability
+          exclusive: true
+  - id: result-artifact-writeout
+    purpose: Write tool, hook, eval, skill, and experiment results as durable raw artifacts, summaries, and manifests without accidental overwrite.
+    canonical_doc: agents/skills/result-artifact-writeout.md
+    shim: .agents/skills/result-artifact-writeout/SKILL.md
+    discovery:
+      name: result-artifact-writeout
+      description: "Use when writing, exporting, saving, accumulating, or reporting tool/checker/hook/skill/eval/experiment results; creates durable raw and summary artifacts with unique IDs and no accidental overwrite."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<run_name>
+        --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
+      - python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir
+        reports/agents/<run-id>
+      - python3 tools/agent_tools/runtime_log_archive_git.py push
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: raw results, reports, manifests, or accumulated evidence must be written out
+      triggers:
+        - ["save", "result"]
+        - ["export", "result"]
+        - ["durable", "artifact"]
+        - ["checker", "result"]
+        - ["raw", "summary"]
+        - ["結果保存"]
+        - ["結果書き出し"]
+        - ["結果を書き出"]
+        - ["result writeout"]
+        - ["artifact", "evidence"]
+        - ["artifact", "report"]
+        - ["run bundle", "evidence"]
+        - ["蓄積分析", "レポート"]
+        - ["ログ", "レポート", "残"]
+  - id: result-visualize
+    purpose: Design reusable result visualizations by binding each figure to explicit calculations, coverage rules, denominators, and chart geometry.
+    canonical_doc: agents/skills/result-visualize.md
+    shim: .agents/skills/result-visualize/SKILL.md
+    discovery:
+      name: result-visualize
+      description: "Use when designing reusable result visualizations that bind each figure to its exact calculation, coverage, and chart geometry in one contract."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: result figure design, metric calculation, coverage denominator handling, or reusable visualization planning is in scope
+      triggers:
+        - ["result", "visualization"]
+        - ["result", "visualise"]
+        - ["result", "aggregation"]
+        - ["result", "figure", "calculation"]
+        - ["計算方法", "可視化"]
+        - ["図", "可視化"]
+        - ["図", "集約"]
+        - ["結果", "可視化"]
+        - ["可視化", "集計"]
+        - ["figure", "pooling"]
+        - ["visualize", "results"]
+        - ["figure", "inventory"]
+        - ["result", "figure", "inventory"]
+  - id: tool-finding-report
+    purpose: Run tools and checkers to discover findings, preserve raw and structured full artifacts, mechanically rank every finding, and produce complete finding packets for implementation or refactor planning; compare impact only when requested.
+    canonical_doc: agents/skills/tool-finding-report.md
+    shim: .agents/skills/tool-finding-report/SKILL.md
+    discovery:
+      name: tool-finding-report
+      description: "Use when running tools, checkers, hooks, static analysis, or structural analyzers to find problems, preserve raw and structured full finding artifacts, mechanically rank every finding, and produce a complete finding report for implementation or refactor planning; before/after impact is optional when explicitly requested."
+    tool_commands:
+      required: []
+      conditional:
+      - tools/oop/<language>/readability.py --format json
+      - python3 tools/agent_tools/workflow_monitor.py
+      - python3 tools/agent_tools/evaluate_skill_workflow_prompts.py
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: tool warning, checker finding, hardcoded guard, or static-analysis finding must become a typed finding packet
+      triggers:
+        - ["警告", "tool"]
+        - ["警告", "checker"]
+        - ["ad hoc", "warning"]
+        - ["adhoc", "warning"]
+        - ["ad hoc", "警告"]
+        - ["adhoc", "警告"]
+        - ["ハードコード", "警告"]
+        - ["hardcode", "warning"]
+        - ["checker", "finding"]
+        - ["tool", "finding"]
+        - ["static analysis", "finding"]
+        - ["finding", "packet"]
+        - ["complete", "report"]
+        - ["検出結果"]
+        - ["run_repo_dependency_review.sh", "dependency", "graph"]
+        - ["run_repo_dependency_review.sh", "修正先"]
+  - id: issue-finding-report
+    purpose: Convert observed defects or accumulated evidence into cause-qualified durable Issues, and reorganize related open and closed Issues into cohesive responsibility units without clause loss.
+    canonical_doc: agents/skills/issue-finding-report.md
+    shim: .agents/skills/issue-finding-report/SKILL.md
+    discovery:
+      name: issue-finding-report
+      description: "Use when creating, splitting, merging, re-parenting, reopening, or superseding Issues by owner, decision, mechanism, validation, and completion responsibility; investigates cause hypotheses without overclaiming, preserves unique clauses, and can also convert accumulated runtime evidence into durable AgentCanon Issues."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
+      - python3 tools/agent_tools/generate_agent_runtime_dashboard.py
+      - git grep -n "<cause keywords>" -- issues memory documents/notes/failures documents agents
+      - python3 tools/agent_tools/issue_sync.py --root .
+      - bash tools/agent_tools/run_repo_dependency_review.sh
+      - python3 tools/agent_tools/check_dependency_headers.py --changed
+      - bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing
+      - bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: a finding or related Issue set needs cause-qualified publication or responsibility reorganization
+      triggers:
+        - ["issue", "切り分け"]
+        - ["issue", "責務", "切り直"]
+        - ["issue", "再編"]
+        - ["issue", "分割"]
+        - ["issue", "reorganize"]
+        - ["issue", "re-parent"]
+        - ["原因", "調査", "issue"]
+        - ["スキル", "issue"]
+        - ["skill", "issue"]
+        - ["ログ", "issue"]
+        - ["runbundle", "issue"]
+        - ["run bundle", "issue"]
+        - ["過去", "やり取り", "issue"]
+        - ["抽象原因"]
+        - ["原因", "抽象"]
+        - ["durable", "issue"]
+        - ["issue", "finding"]
+  - id: agent-log-analysis
+    purpose: Analyze accumulated skill, tool, workflow, hook, and eval logs through a compact generated summary before reading raw evidence.
+    canonical_doc: agents/skills/agent-log-analysis.md
+    shim: .agents/skills/agent-log-analysis/SKILL.md
+    discovery:
+      name: agent-log-analysis
+      description: "Use when analyzing accumulated AgentCanon skill/tool/workflow/hook/eval logs, missed or late skill invocation, routing misses, weak skills, over-constrained related-skill coverage, or selection gaps; first convert raw logs into a structured dashboard summary with AgentCanon source generate_agent_runtime_dashboard.py before reading or interpreting evidence."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/runtime_log_archive_git.py ensure
+      - python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
+      - python3 tools/agent_tools/runtime_log_archive_git.py sync
+      - python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
+      - python3 tools/agent_tools/generate_agent_runtime_dashboard.py
+      - python3 tools/agent_tools/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json
+        --format text
+      - git grep -n
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: skill/tool/workflow routing misses or selection coverage require runtime log analysis
+      triggers:
+        - ["ログ", "すべて", "解析"]
+        - ["頻発", "作業", "スキル"]
+        - ["routing miss"]
+        - ["selection gap"]
+        - ["routing", "coverage"]
+        - ["toolcall", "skillcall", "coverage"]
+        - ["toolcall", "skillcall", "routing"]
+        - ["toolcall", "skillcall", "miss"]
+        - ["toolcall", "skillcall", "50"]
+        - ["toolcall", "skillcall", "されない"]
+        - ["ルーティング", "ログ"]
+        - ["ログ", "確認"]
+        - ["ログ", "スキル", "修正"]
+        - ["ログ", "弱い", "スキル"]
+        - ["ログ", "skill"]
+        - ["ログ", "tool"]
+        - ["log", "skill", "repair"]
+        - ["logs", "skill", "fix"]
+        - ["toolcall", "skillcall", "ルーティング"]
+        - ["スキル", "呼ばれ"]
+        - ["スキル", "呼ばれない"]
+        - ["適切", "スキル", "呼"]
+        - ["skill", "not", "called"]
+        - ["skill", "not", "invoked"]
+        - ["skill", "missed"]
+        - ["runbundle", "agent", "レポート"]
+        - ["run bundle", "agent", "report"]
+        - ["codex", "report"]
+        - ["codex", "レポとか"]
+        - ["runtime", "dashboard"]
+        - ["compact", "dashboard"]
+        - ["agent-runtime-dashboard"]
+        - ["runbundle", "ログ"]
+        - ["runbundle", "レポート"]
+        - ["過去", "agent", "レポート"]
+        - ["過去", "runbundle"]
+        - ["過去", "run bundle"]
+        - ["欠落", "スキル"]
+        - ["弱い", "動線"]
+        - ["エージェント", "成長"]
+  - id: runtime-log-repair
+    purpose: Turn AgentCanon runtime dashboard priority repair evidence into owner-routed Runtime Log Repair Packets and closeout verification.
+    canonical_doc: agents/skills/runtime-log-repair.md
+    shim: .agents/skills/runtime-log-repair/SKILL.md
+    discovery:
+      name: runtime-log-repair
+      description: "Use when AgentCanon runtime dashboard evidence should be turned into owner-routed repair work, including dashboard next actions, repair failing hook evidence, hook entries status=fail, missing actual wave rows, workflow attribution gaps, consulted source URLs, reference missing URLs, AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL, AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING, or AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: structured runtime dashboard evidence needs owner-routed repair work
+      triggers:
+        - ["runtime", "log", "repair"]
+        - ["runtime-log", "repair"]
+        - ["runtime", "dashboard", "next", "actions"]
+        - ["agent-runtime-dashboard"]
+        - ["dashboard", "repair", "failing", "hook", "evidence"]
+        - ["runtime", "log", "repair", "failing", "hook"]
+        - ["runtime", "dashboard", "hook", "entries", "status=fail"]
+        - ["runtime", "dashboard", "missing", "actual", "wave"]
+        - ["runtime", "dashboard", "workflow", "attribution"]
+        - ["runtime", "dashboard", "consulted", "source", "urls"]
+        - ["runtime", "dashboard", "reference", "missing", "urls"]
+        - ["ログ", "解析", "スキルミス"]
+        - ["ログ", "解析", "原因", "修正"]
+        - ["スキルミス", "原因", "修正"]
+        - ["頻発", "作業", "スキル"]
+        - ["skill", "miss", "repair"]
+        - ["skill", "misses", "repair"]
+        - ["selection", "miss", "repair"]
+        - ["AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL"]
+        - ["AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING"]
+        - ["AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS"]
+  - id: agent-eval-accumulation
+    purpose: Repair missing, stale, or failing AgentCanon accumulated eval evidence by running registered producers, validating family accumulation, and archiving append-only reports.
+    canonical_doc: agents/skills/agent-eval-accumulation.md
+    shim: .agents/skills/agent-eval-accumulation/SKILL.md
+    discovery:
+      name: agent-eval-accumulation
+      description: "Use when accumulated AgentCanon eval evidence is missing, stale, or failing; runs registered eval producers, validates eval family accumulation, and stores evidence through the log archive instead of hand-writing reports."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json
+        --format text
+      - python3 tools/agent_tools/run_accumulated_agent_evals.py --root . --run-id <run-id>
+        --report-dir reports/agents/<run-id>
+      - python3 tools/agent_tools/runtime_log_archive_git.py sync
+      - python3 tools/agent_tools/generated_artifact_guard.py --root .
+      - python3 tools/agent_tools/eval_accumulation_check.py
+      - python3 tools/agent_tools/run_accumulated_agent_evals.py
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+  - id: agent-canon-update
+    purpose: Update and publish standalone AgentCanon source and its shared bootstrap runtime through a qualified source PR.
+    canonical_doc: agents/skills/agent-canon-update.md
+    shim: .agents/skills/agent-canon-update/SKILL.md
+    discovery:
+      name: agent-canon-update
+      description: "Use when updating standalone AgentCanon source, its bootstrap/runtime, skills, eval/archive route, or publishing a qualified AgentCanon branch and PR."
+    tool_commands:
+      required: []
+      conditional:
+      - ./bootstrap.sh --control-parent-root <parent> --runtime-root <parent>/workspace/agent-canon-runtime/<installation> status
+      - git status --short --branch
+      - git diff --check
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: Standalone AgentCanon source, bootstrap, runtime, eval, or source PR workflow is in scope
+      triggers:
+        - ["standalone", "agent-canon"]
+        - ["agent-canon", "source", "update"]
+        - ["agent-canon", "bootstrap"]
+        - ["agent-canon", "runtime", "container"]
+        - ["agent-canon", "eval"]
+        - ["agentcanon", "standalone", "最新"]
+        - ["agent-canon", "pr"]
+        - ["agentcanon", "ソース", "更新"]
+  - id: agent-canon-bootstrap
+    purpose: Own the explicit host-controlled lifecycle of one shared non-root AgentCanon Python, Rust, and LSP tool runtime, including target admission, typed tool dispatch, eval collection, and task-owned cleanup.
+    canonical_doc: agents/skills/agent-canon-bootstrap.md
+    shim: .agents/skills/agent-canon-bootstrap/SKILL.md
+    discovery:
+      name: agent-canon-bootstrap
+      description: "Use when AgentCanon's shared Python, Rust, or LSP tool runtime must be installed, started, targeted, inspected, updated, evaluated, or removed; project builds and tests remain in the project Docker/test-runner plane."
+    tool_commands:
+      required:
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime status
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime target add --root <project-root> --mode read-only
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime tool run <catalog-id> -- <args...>
+      conditional:
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime install
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime start
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime exec -- <argv...>
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime eval collect --root <project-root> --run-id <run-id>
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime eval sync --run-id <run-id>
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime stop
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime gc --dry-run
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: AgentCanon shared tool-runtime lifecycle, target admission, typed dispatch, eval archive, or cleanup is in scope
+      triggers:
+        - ["agent-canon", "bootstrap"]
+        - ["agentcanon", "bootstrap"]
+        - ["bootstrap.sh", "agent-canon"]
+        - ["shared", "tool", "runtime"]
+        - ["resident", "tool", "container"]
+        - ["agent-canon", "tool", "run"]
+        - ["target", "registry", "agent-canon"]
+        - ["agent-canon", "LSP", "container"]
+        - ["agent-canon-log", "eval"]
+        - ["AgentCanon", "副作用", "分離"]
+        - ["AgentCanon", "ツール", "コンテナ"]
+        - ["AgentCanon", "評価", "収集"]
+  - id: repository-topic-clone
+    purpose: Prepare, reuse, merge, publish-readback, and reconstructibly clean one generic repository topic clone before repository-kind policy decoration.
+    canonical_doc: agents/skills/repository-topic-clone.md
+    shim: .agents/skills/repository-topic-clone/SKILL.md
+    discovery:
+      name: repository-topic-clone
+      description: "Use for any parent, dependency, or standalone repository topic clone lifecycle under workspace/<topic>/<repo>; repository kind is a post-clone policy decorator."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/repository_topic_clone.py prepare --url <url> --repo-name <repo> --workspace-root <root> --topic <topic> --branch <branch> --owner-evidence <path>
+      - python3 tools/agent_tools/repository_topic_clone.py merge-main --url <url> --repo-name <repo> --workspace-root <root> --topic <topic> --branch <branch> --owner-evidence <path>
+      - python3 tools/agent_tools/repository_topic_clone.py cleanup --url <url> --repo-name <repo> --workspace-root <root> --topic <topic> --branch <branch> --owner-evidence <path> [--candidate-cas <path> --pr-lifecycle <path> [--publication-readback <path>]] [--apply]
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: a requested repository clone, branch reuse, origin/main merge, or reconstructibility cleanup operation is in scope
+      triggers:
+        - ["repository", "topic", "clone"]
+        - ["workspace", "topic", "repo", "clone"]
+        - ["existing", "branch", "reuse"]
+        - ["origin/main", "merge", "topic"]
+        - ["reconstructibility", "clone", "cleanup"]
+        - ["repository", "clone", "lifecycle"]
+        - ["repository", "clone", "cleanup"]
+        - ["topic", "clone", "cleanup"]
+        - ["repository", "クローン"]
+        - ["topic", "clone"]
+  - id: dependency-module-change
+    purpose: Decorate the generic repository topic clone lifecycle with .gitmodules, gitlink, pin, and projection policy.
+    canonical_doc: agents/skills/dependency-module-change.md
+    shim: .agents/skills/dependency-module-change/SKILL.md
+    discovery:
+      name: dependency-module-change
+      description: "Use when a dependency source change, topic branch clone, or reconstructibility-based clone cleanup is required."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare --topic <topic> --module <path> --branch <branch> --owner-evidence <path>
+      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> merge-main --topic <topic> --module <path> --branch <branch> --owner-evidence <path>
+      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> status --topic <topic> [--module <path>]
+      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup --topic <topic> --module <path> --branch <branch> --owner-evidence <path> [--candidate-cas <path> --pr-lifecycle <path> [--publication-readback <path>]] [--apply]
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: dependency module identity, gitlink, pin, or projection policy decorates a generic repository topic clone lifecycle
+      triggers:
+        - ["dependency", "module", "change"]
+        - ["dependency", "source", "clone"]
+        - ["source", "clone", "cleanup"]
+        - [".gitmodules", "topic", "workspace"]
+        - ["依存", "モジュール", "変更"]
+        - ["依存", "source", "clone"]
+        - ["独立", "source", "clone"]
+        - ["モジュール", "cleanup"]
+  - id: pr-processing
+    purpose: Process GitHub pull request and issue queues by inventorying state, preserving PR Essence in bodies and run bundles, checking mutation authority, resolving conflicts, ordering merges, validating gates, triaging issues, and syncing AgentCanon source PRs with parent pin PRs.
+    canonical_doc: agents/skills/pr-processing.md
+    shim: .agents/skills/pr-processing/SKILL.md
+    discovery:
+      name: pr-processing
+      description: "Use when processing GitHub pull requests or issue queues: inventory open PRs, preserve PR Essence in bodies and run bundles, resolve conflicts, order merges, update branch protection evidence, merge only with authority, triage stale issues, and sync AgentCanon source PRs with parent pin PRs."
+    tool_commands:
+      required: []
+      conditional:
+      - gh pr list --state open --json number,title,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup,updatedAt
+      - gh issue list --state open --json number,title,labels,updatedAt,url
+      - gh pr view
+      - gh pr checks
+      - ./bootstrap.sh --control-parent-root <parent> --runtime-root <parent>/workspace/agent-canon-runtime/<installation> status
+      - python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --owner codex
+        --workspace-root "$PWD"
+      - gh pr view <n> --json ...
+      - gh pr checks <n>
+      - git merge origin/<base>
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: pull request, merge queue, conflict repair, or issue triage processing is in scope
+      triggers:
+        - ["open", "prs"]
+        - ["open", "pr"]
+        - ["pr", "checks"]
+        - ["gh", "pr"]
+        - ["pr", "review", "comments"]
+        - ["requested", "changes"]
+        - ["queue", "cleanup"]
+        - ["ready", "pr"]
+        - ["stale", "pr"]
+        - ["PRを片付け"]
+        - ["PR", "片付け"]
+        - ["Local", "Main", "追従"]
+        - ["pr", "処理"]
+        - ["pr", "merge"]
+        - ["pr", "マージ"]
+        - ["pr", "取り込"]
+        - ["pr", "片づ"]
+        - ["pull request"]
+        - ["pull request", "merge"]
+        - ["PR Essence"]
+        - ["PR", "本質"]
+        - ["PR", "本文", "本質"]
+        - ["merge queue"]
+        - ["conflict", "解消"]
+        - ["コンフリクト", "解消"]
+        - ["issue", "triage"]
+        - ["issue", "処理"]
+        - ["branch protection"]
+        - ["required checks"]
+  - id: agent-update-branch
+    purpose: Isolate memory, eval result, AgentCanon pin, and other agent-runtime updates on template-derived update branches before controlled integration.
+    canonical_doc: agents/skills/agent-update-branch.md
+    shim: .agents/skills/agent-update-branch/SKILL.md
+    discovery:
+      name: agent-update-branch
+      description: "Use when Memory, eval results, AgentCanon pins, or other agent-runtime updates should be isolated on template-derived update branches and later integrated through a controlled branch workflow."
+    tool_commands:
+      required: []
+      conditional:
+      - bash tools/agent_tools/agent_update_branch.sh validate <lane>
+      - bash tools/agent_tools/agent_update_branch.sh push <lane> <branch>
+      - ./bootstrap.sh --control-parent-root <parent> --runtime-root <runtime> status
+      - bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+  - id: report-writing
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.document_mermaid
+    argument_schema: agent_canon.visualization.arguments.document_mermaid.v1
+    purpose: Draft reader-facing reports, experiment summaries, decision briefs, and presentation/PPT storyboards from evidence with explicit source packets, visual asset plans, limitations, actionability, and quality checklist gates.
+    canonical_doc: agents/skills/report-writing.md
+    shim: .agents/skills/report-writing/SKILL.md
+    discovery:
+      name: report-writing
+      description: "Use when drafting or revising reader-facing reports, decision briefs, experiment summaries, presentation narratives, PPT/storyboard plans, or slide-ready visual asset plans from tool, hook, eval, experiment, review, audit, or operational evidence; separates raw-result writeout from report narrative and applies the report quality checklist."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: reader-facing report, decision brief, evaluation summary, or presentation narrative is in scope
+      triggers:
+        - ["reader-facing", "synthesis"]
+        - ["audit", "findings"]
+        - ["finding", "route", "packet"]
+        - ["implementation", "plan"]
+        - ["改善提案"]
+        - ["レポート"]
+        - ["報告書"]
+        - ["評価", "報告"]
+        - ["報告", "作"]
+        - ["レポート", "作"]
+        - ["report", "write"]
+        - ["report", "draft"]
+        - ["report", "quality"]
+        - ["decision", "brief"]
+        - ["audit", "report"]
+        - ["status", "report"]
+        - ["experiment", "report"]
+        - ["evaluation", "report"]
+        - ["reader-facing", "report"]
+        - ["presentation", "narrative"]
+        - ["ppt", "storyboard"]
+  - id: prose-reasoning-graph
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.knowledge_graph
+    argument_schema: agent_canon.visualization.arguments.knowledge_graph.v1
+    purpose: Convert prose into a SQLite-backed structure graph under an explicit external runtime, diagnose discourse/argument/evidence/experiment gaps, explain findings, and emit writing-skill handoff packets without source-tree or HOME cache fallback.
+    canonical_doc: agents/skills/prose-reasoning-graph.md
+    shim: .agents/skills/prose-reasoning-graph/SKILL.md
+    discovery:
+      name: prose-reasoning-graph
+      description: "Use when existing prose should be converted into a SQLite-backed structure graph under an explicit external runtime, diagnosed for discourse/argument/evidence/experiment gaps, explained in natural language, and handed off to writing or review skills with split/merge/bridge/reorder rewrite packets."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/prose_reasoning_graph.py ingest <source.md> --stats-out
+        <ingest.stats.json>
+      - python3 tools/agent_tools/prose_reasoning_graph.py analyze --db <graph.sqlite>
+        --profile <writing|logic|experiment|report|academic|paper|all> --stats-out <analyze.stats.json>
+      - python3 tools/agent_tools/prose_reasoning_graph.py check-document <source.md>
+        --out-dir <artifact-dir> --profile <profile> --stats-out <stats.json>
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: deferred
+      reason: prose structure graphing, diagnostics, or rewrite handoff is in scope
+      triggers:
+        - ["文章構造", "graph"]
+        - ["文章構造", "グラフ"]
+        - ["段落", "接続"]
+        - ["段落", "統合"]
+        - ["dsl", "文章"]
+        - ["prose", "graph"]
+        - ["prose", "reasoning"]
+        - ["rewrite", "packet"]
+        - ["claim", "evidence", "graph"]
+  - id: structure-planning
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.document_mermaid
+    argument_schema: agent_canon.visualization.arguments.document_mermaid.v1
+    purpose: Build structure contracts for reports, experiments, presentations/PPT decks, documents, papers, HTML views, and refactors before prose, rendering, interpretation, runs, or edits.
+    canonical_doc: agents/skills/structure-planning.md
+    shim: .agents/skills/structure-planning/SKILL.md
+    discovery:
+      name: structure-planning
+      description: "Use when a report, experiment plan, Eval output, presentation storyboard, PPT/deck plan, document, paper, HTML view, or refactor needs a structure contract before prose, rendering, interpretation, follow-up runs, or edits."
+    tool_commands:
+      required: []
+      conditional:
+      - agent-canon semantic-index discourse-relations --profile <general|experiment-report|methods-protocol|academic-argument|refactor-design>
+        --format jsonl
+      - agent-canon semantic-index discourse-relations
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: nontrivial design or document structure must be fixed before edits
+      triggers:
+        - ["構造解析"]
+        - ["文書", "構造", "解析"]
+        - ["設計", "構造"]
+        - ["structure", "contract"]
+        - ["根本", "設計", "構造"]
+  - id: code-visualization
+    visualization_owner: code-visualization
+    visualization_role: owner
+    tool_id: agent_canon.visualization.coverage
+    argument_schema: agent_canon.visualization.arguments.coverage.v1
+    purpose: Infer the context question and embedding context, then select the appropriate diagram type, source evidence, owner skill or tool, and renderer for code, repository, or document-embedded visualization.
+    canonical_doc: agents/skills/code-visualization.md
+    shim: .agents/skills/code-visualization/SKILL.md
+    discovery:
+      name: code-visualization
+      description: "Sole public visualization owner for code, repository structure, runtime behavior, state, data movement, dependencies, types, proof state, interactive graphs, and document diagrams; builds the complete typed universe and coverage manifest before delegating renderer-only projection."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope
+        full --bundle-dir reports/dependency-graph --format json
+      - python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope
+        changed --bundle-dir reports/dependency-graph --format json
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      triggers:
+      - [visualization]
+      - [visualize]
+      - [diagram]
+      - [dependency, graph]
+      - [可視化]
+      - [図示]
+      reason: Codex skill metadata selection or an explicit public skill id owns route activation; prose remains context evidence
+      capabilities:
+        - id: dependency_manifest_graph
+          owner: code_visualization
+          phase: repo_changing
+          activation: explicit_capability
+          exclusive: true
+  - id: html-output
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.repository_graph
+    argument_schema: agent_canon.visualization.arguments.repository_graph.v1
+    purpose: Produce polished browser-readable HTML artifacts only when HTML is explicit, including layout gates, optional ImageGen assets, and local/external browser server publication.
+    canonical_doc: agents/skills/html-output.md
+    shim: .agents/skills/html-output/SKILL.md
+    discovery:
+      name: html-output
+      description: "Use when the user explicitly asks for HTML output, a browser-readable page, dashboard/report HTML, external browser publication, or local preview server; defaults reports to Markdown unless HTML is explicit."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: explicit HTML or browser-readable output is in scope
+      triggers:
+        - ["html", "output"]
+        - ["html", "report"]
+        - ["html", "eval", "report"]
+        - ["browser-readable"]
+        - ["browser", "readable"]
+        - ["ブラウザ"]
+  - id: test-design
+    purpose: After the owning implementation mechanism exists, classify explicit unresolved oracle, specification, regression, or failure-mode risk beyond static analysis, existing checkers, and targeted validation.
+    canonical_doc: agents/skills/test-design.md
+    shim: .agents/skills/test-design/SKILL.md
+    discovery:
+      name: test-design
+      description: "Use after the owning implementation mechanism exists to proactively design a logically minimal test set; classify unresolved oracle, specification, regression, and failure-mode risk before adding cases."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: explicit unresolved oracle, specification, regression, or failure-mode risk remains after the owning implementation mechanism exists
+      triggers:
+        - ["unresolved", "oracle"]
+        - ["unresolved", "spec"]
+        - ["oracle", "risk"]
+        - ["spec", "risk"]
+        - ["regression", "risk"]
+        - ["failure-mode", "risk"]
+        - ["test-design"]
+        - ["test", "design"]
+        - ["テスト", "設計"]
+        - ["numerical", "test"]
+        - ["numeric", "test"]
+        - ["unnecessary", "test"]
+        - ["heavy", "test"]
+        - ["brittle", "test"]
+        - ["test oracle"]
+        - ["oracle", "mismatch"]
+        - ["spec mismatch", "test"]
+        - ["tolerance", "test"]
+        - ["seed", "test"]
+  - id: refactor-loop
+    purpose: Run large refactors as behavior-preserving looped structural change with explicit safety contracts and repair slices.
+    canonical_doc: agents/skills/refactor-loop.md
+    shim: .agents/skills/refactor-loop/SKILL.md
+    discovery:
+      name: refactor-loop
+      description: "Use when a large refactor should run as a behavior-preserving refactor loop with explicit path mapping, semantic-delta controls, repair slices, and strong review gates."
+    tool_commands:
+      required: []
+      conditional:
+      - agent-canon python-structure-hash-scope-plan --input <report.json> --dependency-report-dir
+        <dependency-review-dir> --output <change-impact-packet.json>
+      - git diff
+      - python3 tools/ci/check_merge_structure.py ...
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: behavior-preserving refactor work needs an explicit loop and review gates
+      triggers:
+        - ["large", "refactor"]
+        - ["large", "refactoring"]
+        - ["large-delivery", "refactor"]
+        - ["looped", "refactor"]
+        - ["refactor", "loop"]
+        - ["refactor-loop"]
+        - ["staged", "refactor"]
+        - ["milestone", "refactor"]
+        - ["multi-surface", "refactor"]
+        - ["multiple", "chunk", "refactor"]
+        - ["all", "skills", "refactor"]
+        - ["skill", "scan", "refactor"]
+        - ["large", "リファクタ"]
+        - ["大規模", "リファクタ"]
+        - ["大規模", "構造変更"]
+        - ["複数", "chunk", "refactor"]
+        - ["一つずつ", "リファクタ"]
+        - ["すべて", "リファクタ"]
+        - ["behavior-preserving"]
+        - ["repair slice"]
+        - ["抽象化", "リファクタ"]
+  - id: structure-refactor
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.repository_graph
+    argument_schema: agent_canon.visualization.arguments.repository_graph.v1
+    purpose: Refactor repository directory structure from recursive directory README responsibilities, dependency manifests, path mappings, and responsibility-scope validation.
+    canonical_doc: agents/skills/structure-refactor.md
+    shim: .agents/skills/structure-refactor/SKILL.md
+    discovery:
+      name: structure-refactor
+      description: "Use when repository structure review, repo-refactor requests, expected AgentCanon layout, directory responsibilities, canonical README ownership, path layout, root views, project .codex/.agents views, personal ~/.codex runtime boundaries, or responsibility-scope maps must be reviewed, repaired, or refactored using structure contracts, recursive directory README analysis, source/view ownership checks, stale-surface sweeps, dependency manifests, and behavior-preserving move/rename gates."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/route.py --prompt "<request>" --format json
+      - python3 tools/agent_tools/route.py --name <candidate>
+      - python3 tools/agent_tools/repo_structure_contract.py --root <root> --format json
+        > <run>/repo_structure_contract.json
+      - python3 tools/agent_tools/responsibility_scope.py --root <root> --format json
+        > <run>/responsibility_scope.json
+      - python3 tools/agent_tools/import_responsibility.py --root <root> --format json
+        > <run>/import_responsibility.json
+      - ./bootstrap.sh --control-parent-root <parent> --runtime-root <parent>/workspace/agent-canon-runtime/<installation> status
+      - agent-canon structured-analysis document-inventory --root <root>
+      - python3 tools/agent_tools/responsibility_scope.py --root <root> --format json
+      - python3 tools/agent_tools/prose_reasoning_graph.py check-document <readme-path>
+        --out-dir <run>/prose/<readme-id> --profile all --stats-out <run>/prose/<readme-id>.stats.json
+      - python3 tools/agent_tools/check_design_doc_claims.py --root <root> <design-doc>
+      - python3 tools/agent_tools/responsibility_scope.py --root <root>
+      - python3 tools/agent_tools/import_responsibility.py --root <root>
+      - python3 tools/agent_tools/repo_structure_contract.py --root <root> --format json
+      - python3 tools/agent_tools/repo_structure_contract.py --root <root>
+      - python3 tools/agent_tools/import_responsibility.py --root <root> --format json
+      - python3 tools/agent_tools/prose_reasoning_graph.py check-document <readme-path>
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: repository structure, source ownership, path responsibility, or Codex runtime surface boundaries are in scope
+      triggers:
+        - ["レポ", "リファクタ"]
+        - ["レポ", "ルール", "読み込み"]
+        - ["レポ", "ルール", "構造"]
+        - ["repo", "refactor"]
+        - ["repository", "refactor"]
+        - ["repo", "structure"]
+        - ["repository", "structure"]
+        - ["repo", "optimization"]
+        - ["repository", "optimization"]
+        - ["レポの", "最適化"]
+        - ["codex", "読み込み", "優先"]
+        - ["codex", "読み込み", "プライオリティ"]
+        - ["codex", "loading", "priority"]
+        - ["agents.md", "読み込み"]
+        - ["agents.md", "priority"]
+        - ["responsibility-scope"]
+        - ["ディレクトリ", "構成"]
+        - ["directory", "structure"]
+        - ["directory", "layout"]
+        - ["directory", "readme"]
+        - ["path", "layout"]
+        - ["path", "responsibility"]
+        - ["source", "ownership"]
+        - ["structure", "drift"]
+        - ["構造", "レビュー"]
+        - ["構造", "review"]
+        - ["structure", "review"]
+        - ["structural", "review"]
+        - ["構造", "スキル", "弱"]
+        - ["構成", "考え直"]
+        - ["~/.codex"]
+        - [".codex", "config"]
+        - ["codex", "personal", "runtime"]
+        - ["personal", "runtime", "surface"]
+        - ["agents.md", "重複"]
+        - ["skill", "重複"]
+        - ["スキル", "二重管理"]
+        - ["設定", "スキル", "二重管理"]
+        - ["skill", "duplicate", "management"]
+        - ["settings", "skills", "duplicate"]
+        - ["skill", "catalog", "ownership"]
+        - [".codex", ".agents"]
+        - [".agents", "skills"]
+        - ["責務", "重複"]
+        - ["責務重複"]
+        - ["過剰", "分割"]
+        - ["過剰分割"]
+        - ["レポ全体", "責務"]
+        - ["repo-wide", "responsibility"]
+        - ["責務", "移行"]
+        - ["すべてのスキル", "修正"]
+        - ["全", "skill", "command"]
+  - id: user-guided-debugging
+    purpose: Debug or repair one issue at a time when the user explicitly asks for visible problem statements before each edit and the next issue after each fix.
+    canonical_doc: agents/skills/user-guided-debugging.md
+    shim: .agents/skills/user-guided-debugging/SKILL.md
+    discovery:
+      name: user-guided-debugging
+      description: "Use when the user explicitly asks to debug, repair, or refactor one issue at a time with visible problem statements before each edit and a next-issue prompt after each scoped fix."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: user explicitly asks for one-issue-at-a-time debugging or visible problem statements before each edit
+      triggers:
+        - ["repo-changing", "debugging"]
+        - ["one issue at a time"]
+        - ["user-guided debugging"]
+        - ["user-guided", "cadence"]
+        - ["refactor", "cadence", "one concrete issue"]
+        - ["問題ごと"]
+        - ["一件ずつ"]
+        - ["一つずつ"]
+        - ["原因説明"]
+        - ["visible problem statements"]
+        - ["problem statement", "before", "edit"]
+        - ["problem statement", "before", "patch"]
+        - ["next issue", "after", "fix"]
+        - ["scoped fix"]
+        - ["1", "issue", "1", "fix"]
+        - ["1", "problem", "1", "patch"]
+        - ["1件", "ずつ"]
+        - ["1 件", "ずつ"]
+        - ["1個", "ずつ"]
+        - ["1 個", "ずつ"]
+        - ["一つずつ", "デバッグ"]
+        - ["一件", "ずつ", "修正"]
+        - ["問題", "提示", "修正"]
+        - ["問題点", "提示", "patch"]
+        - ["問題点", "出して", "直"]
+        - ["ユーザー主導", "デバッグ"]
+        - ["ユーザー主導", "リファクタ"]
+  - id: long-form-writing
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.document_mermaid
+    argument_schema: agent_canon.visualization.arguments.document_mermaid.v1
+    purpose: Project graph/DSL structure into general explanatory repository prose for README, workflow, guide, migration, and specification responsibilities.
+    canonical_doc: agents/skills/long-form-writing.md
+    shim: .agents/skills/long-form-writing/SKILL.md
+    discovery:
+      name: long-form-writing
+      description: "Use as the general explanatory-doc DSL-to-prose adapter for README, workflow, guide, migration, or specification documents whose file responsibility is reader-facing explanation; do not select this skill by text length alone."
+    tool_commands:
+      required: []
+      conditional:
+      - agent-canon semantic-index discourse-relations --profile general
+      - python3 tools/agent_tools/doc_start.py --kind long-form ...
+      - tools/bin/agent-canon docs check
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+  - id: academic-writing
+    purpose: Draft academic documents with explicit claim mapping and mandatory multi-agent review for notation and logic.
+    canonical_doc: agents/skills/academic-writing.md
+    shim: .agents/skills/academic-writing/SKILL.md
+    discovery:
+      name: academic-writing
+      description: "Use when drafting a paper, thesis chapter, scholarly note, or other academic document that needs mandatory multi-agent review for notation, logic, and reader flow."
+    tool_commands:
+      required: []
+      conditional:
+      - agent-canon semantic-index discourse-relations --profile academic-argument
+      - tools/bin/agent-canon docs check
+      - python3 tools/agent_tools/doc_start.py
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: academic or scholarly writing needs notation, logic, and evidence review
+      triggers:
+        - ["academic", "writing"]
+        - ["notation", "logic"]
+        - ["記法", "論理"]
+        - ["citation", "evidence"]
+        - ["logic", "gap"]
+        - ["scholarly", "note"]
+        - ["学術文章"]
+        - ["投稿論文"]
+        - ["thesis", "chapter"]
+        - ["paper", "draft"]
+  - id: paper-writing
+    purpose: Draft papers and thesis chapters with section contracts and mandatory citation/evidence review.
+    canonical_doc: agents/skills/paper-writing.md
+    shim: .agents/skills/paper-writing/SKILL.md
+    discovery:
+      name: paper-writing
+      description: "Use when drafting a submission paper, thesis chapter, or other paper-style manuscript that needs section contracts, citation-evidence review, notation review, and logic-gap review."
+    tool_commands:
+      required: []
+      conditional:
+      - agent-canon semantic-index discourse-relations --profile academic-argument
+      - tools/bin/agent-canon docs check
+      - python3 tools/agent_tools/doc_start.py
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+  - id: md-style-check
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.document_mermaid
+    argument_schema: agent_canon.visualization.arguments.document_mermaid.v1
+    purpose: Check Markdown formatting, heading structure, and link hygiene for format-only docs work; pair substantive document edits with prose-reasoning-graph and structure-planning.
+    canonical_doc: agents/skills/md-style-check.md
+    shim: .agents/skills/md-style-check/SKILL.md
+    discovery:
+      name: md-style-check
+      description: "Use when Markdown files changed, docs formatter/fixer output must be checked, or `agent-canon docs` formatting, heading, math, Mermaid, and link checks are in scope."
+    tool_commands:
+      required: []
+      conditional:
+      - agent-canon docs
+      - tools/bin/agent-canon docs check <paths...>
+      - tools/bin/agent-canon docs format <paths...>
+      - tools/bin/agent-canon docs -h
+      - tools/bin/agent-canon docs fix-math <paths...>
+      - tools/bin/agent-canon docs fix-mermaid <paths...>
+      - tools/bin/agent-canon docs check
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: Markdown style, links, headings, or docs lint are in scope
+      triggers:
+        - ["md-style"]
+        - ["docs-check"]
+        - ["docs", "check", "失敗"]
+        - ["docs check", "失敗"]
+        - ["docs check", "failed"]
+        - ["agent-canon", "docs"]
+        - ["docs", "format"]
+        - ["docs", "check"]
+        - ["markdownlint"]
+        - ["markdown", "lint"]
+        - ["markdown", "heading"]
+        - ["markdown", "link"]
+        - ["markdown", "formatter"]
+        - ["formatter", "adjacent"]
+        - ["フォーマッタ"]
+        - ["フォーマット", "周辺"]
+        - ["通してすらない"]
+        - ["マークダウン", "体裁"]
+        - ["マークダウン", "リンク"]
+  - id: mvp-skeleton
+    purpose: Keep MVP, prototype, v0, and thin-slice implementation skeletal by fixing one core loop, stubbing nonessential work, and reporting deferrals.
+    canonical_doc: agents/skills/mvp-skeleton.md
+    shim: .agents/skills/mvp-skeleton/SKILL.md
+    discovery:
+      name: mvp-skeleton
+      description: "Use when creating, scaffolding, planning, or implementing an MVP, prototype, runnable vertical slice, product skeleton, v0, or thin vertical slice and the agent must prevent overbuilding. Trigger for MVP作成, プロトタイプ, 骨格だけ, core runnable path, thin vertical slice, scope creep, over-polish, and cases where early implementation is getting unnecessary UI, architecture, features, or tests."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+  - id: document-canon-cleanup
+    purpose: Find non-canonical documents and route edits to source canon instead of mirrors, generated evidence, or stale copies.
+    canonical_doc: agents/skills/document-canon-cleanup.md
+    shim: .agents/skills/document-canon-cleanup/SKILL.md
+    discovery:
+      name: document-canon-cleanup
+      description: "Use when organizing repository documents, finding non-canonical docs, separating source canon from generated reports, eval results, closed issues, duplicate headings, or stale document paths."
+    tool_commands:
+      required: []
+      conditional:
+      - agent-canon structured-analysis document-inventory
+      - agent-canon structured-analysis document-inventory --root .
+      - bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
+      - python3 tools/agent_tools/check_convention_compliance.py
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: Document-canon cleanup, stale docs, old docs, or generated-report/document inventory cleanup is in scope
+      triggers:
+        - ["document-canon"]
+        - ["document", "cleanup"]
+        - ["docs", "cleanup"]
+        - ["stale", "docs"]
+        - ["old", "docs"]
+        - ["non-canonical", "document"]
+        - ["noncanonical", "document"]
+        - ["document", "inventory"]
+        - ["怪文書"]
+        - ["上位文書", "怪文書"]
+        - ["文書", "正本", "優先"]
+        - ["document", "canon", "priority"]
+        - ["文書", "掃除"]
+        - ["文書", "整理"]
+        - ["文書", "最適化"]
+        - ["文書", "棚卸"]
+        - ["docs", "inventory"]
+        - ["documents", "optimize"]
+        - ["古い", "文書"]
+        - ["古い", "ツール"]
+        - ["旧", "文書"]
+        - ["生成", "文書"]
+  - id: parent-repository-audit
+    purpose: Audit a complete parent tracked tree by canonical responsibility units and close findings through owner repair and readback.
+    canonical_doc: agents/skills/parent-repository-audit.md
+    shim: .agents/skills/parent-repository-audit/SKILL.md
+    discovery:
+      name: parent-repository-audit
+      description: "Use when auditing an AgentCanon-consuming parent repository across structure, ownership, environment, dependencies, code and types, OOP, tests, docs and design trace, CI/hooks/skills, templates, or Git/PR lifecycle, with owner-routed repair and finding closure."
+    tool_commands:
+      required:
+      - python3 tools/agent_tools/parent_repository_audit.py list --root <parent-root> --format text
+      conditional:
+      - python3 tools/agent_tools/parent_repository_audit.py check --root <parent-root> --format text
+      - python3 tools/agent_tools/skill_tool_commands.py show --skill parent-repository-audit --format json
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: parent repository audit capability requires deterministic unit selection and owner-routed finding closure
+      capabilities:
+      - id: parent_repository_audit
+        owner: parent_repository_audit
+        phase: repo_changing_audit
+        activation: explicit_capability
+        exclusive: true
+  - id: dependency-analysis
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.dependency_manifest
+    argument_schema: agent_canon.visualization.arguments.dependency_manifest.v1
+    purpose: Run dependency manifest and code-dependency tools, then package change impact and repair-planning context for editing, review, or subagent handoff.
+    canonical_doc: agents/skills/dependency-analysis.md
+    shim: .agents/skills/dependency-analysis/SKILL.md
+    discovery:
+      name: dependency-analysis
+      description: "Use when checking, validating, or diagnosing repository dependency manifests, expanding code/header/search dependencies into a change-impact packet, or preparing repair-planning and subagent handoff context before editing, review, or closeout."
+    tool_commands:
+      required: []
+      conditional:
+      - git grep -l
+      - bash tools/agent_tools/scan_code_dependencies.sh --changed
+      - python3 tools/agent_tools/helper_function_inventory.py --changed --all-functions
+        --format json
+      - python3 tools/agent_tools/check_dependency_headers.py --changed
+      - bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing
+      - bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header
+      - bash tools/agent_tools/check_dependency_graph.sh --changed --print-edges
+      - agent-canon semantic-index context-pack
+      - git grep -l "search phrase" -- <responsibility-scoped dirs> > reports/search_hits.txt
+      - bash tools/agent_tools/run_repo_dependency_review.sh
+      - python3 tools/agent_tools/check_design_doc_claims.py
+      - agent-canon python-structure-hash-scope-plan
+      - bash tools/agent_tools/check_dependency_graph.sh --changed --print-edges --check-bidirectional
+      - bash tools/agent_tools/scan_dependency_headers.sh
+      - bash tools/agent_tools/check_dependency_graph.sh --print-edges
+      - git grep
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+  - id: worktree-start
+    purpose: Diagnose stale worktree, WORKTREE_SCOPE.md, and action-log state as legacy cleanup evidence; not for new worktree kickoff, recreation, or resume.
+    canonical_doc: agents/skills/worktree-start.md
+    shim: .agents/skills/worktree-start/SKILL.md
+    discovery:
+      name: worktree-start
+      description: "Legacy cleanup only. Use when inspecting or retiring stale WORKTREE_SCOPE.md/action-log state; do not use to create, recreate, resume, or move work into a git worktree."
+    tool_commands:
+      required: []
+      conditional:
+      - git worktree
+      - python3 tools/agent_tools/worktree_scope_lint.py --current
+      - git status --short --branch
+      - git worktree list --porcelain
+      - bash tools/docs/check_worktree_scopes.sh
+      - python3 tools/agent_tools/work_log.py ...
+      - bash tools/worktree_start.sh --current
+      - python3 tools/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message
+        "<what changed>" --next "<next>"
+      - python3 tools/agent_tools/worktree_start.py --current
+      - python3 tools/experiments/sync_experiment_registry_context.py --topic <topic>
+        --branch <branch>
+      - python3 tools/agent_tools/work_log.py --kind cleanup --message "<legacy worktree
+        state>" --next "<carry-over or remove>"
+      - python3 tools/agent_tools/work_log.py --kind edit --request-clause-id R1 --message
+        "..." --next "..."
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+  - id: worktree-health
+    purpose: Review worktree scope, drift, and cleanup readiness.
+    canonical_doc: agents/skills/worktree-health.md
+    shim: .agents/skills/worktree-health/SKILL.md
+    discovery:
+      name: worktree-health
+      description: "Use this skill to review current checkout authority, run-bundle drift, legacy worktree cleanup evidence, and cleanup readiness."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/worktree_scope_lint.py --current
+      - git status --short --branch
+      - git diff --name-only
+      - git worktree list --porcelain
+      - git branch --show-current
+      - bash tools/docs/check_worktree_scopes.sh
+      - python3 tools/agent_tools/validate_role_write_scope.py --report-dir reports/agents/<run-id>
+        --workspace-root . --role <role-id>
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+  - id: experiment-lifecycle
+    purpose: Run a single experiment protocol, then branch through review, rewrite, extra validation, or rerun.
+    canonical_doc: agents/skills/experiment-lifecycle.md
+    shim: .agents/skills/experiment-lifecycle/SKILL.md
+    discovery:
+      name: experiment-lifecycle
+      description: "Use this skill when preparing, running, or validating experiments."
+    tool_commands:
+      required:
+      - python3 tools/experiments/create_experiment_topic.py <topic>
+      conditional:
+      - python3 -m tools.ci.check_experiment_registry
+      - python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant
+        <variant> -- python3 experiments/<topic>/run.py
+      - python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<run_name>
+        --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
+      - python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>
+      - python3 -m pytest tests/tools/test_run_managed_experiment.py -q
+      - agent-canon semantic-index discourse-relations --profile experiment-report
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: experiment run, lifecycle, artifacts, results, or rerun workflow is in scope
+      triggers:
+        - ["experiment run"]
+        - ["experiment lifecycle"]
+        - ["experiment artifacts"]
+        - ["experiment rerun"]
+        - ["experiment results"]
+        - ["experiment", "result"]
+        - ["experiment", "report"]
+        - ["experiment", "evidence"]
+        - ["比較実験"]
+        - ["実験実行"]
+        - ["実験", "実行"]
+        - ["実験結果"]
+        - ["実験", "結果"]
+  - id: experiment-review
+    purpose: Review experiment topics for the managed runner route and run.py inner entrypoint, GPU/JAX environment ownership, artifact schemas, visualization.py renderer, and README run contracts.
+    canonical_doc: agents/skills/experiment-review.md
+    shim: .agents/skills/experiment-review/SKILL.md
+    discovery:
+      name: experiment-review
+      description: "Use when reviewing experiment topics, run.py files, experiment registries, GPU/JAX environment ownership, visualization.py artifacts, or experiment README/report readiness."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant
+        <variant> -- python3 experiments/<topic>/run.py
+      - git grep -n -E "ExperimentRunner|EXPERIMENT_RUN_DIR|JAX_|XLA_|CUDA_VISIBLE|PREALLOC|prealloc|gpu_max_slots|max_workers|subprocess|ProcessPool|multiprocessing|env="
+        --
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: experiment topic review, managed runner route, environment ownership, artifact schema, or visualization.py readiness is in scope
+      triggers:
+        - ["実験", "レビュー"]
+        - ["実験", "review"]
+        - ["experiment", "review"]
+        - ["topic", "review"]
+        - ["ExperimentRunner"]
+        - ["run.py", "experiment"]
+        - ["先取無効"]
+        - ["preallocation", "experiment"]
+        - ["visualization.py", "artifact", "experiment"]
+  - id: gpu-execution
+    purpose: Route GPU/CUDA/JAX/XLA/IREE execution through provider-independent full-UUID admission by default, with the managed ExperimentRunner adapter only for managed experiment lifecycle contracts.
+    canonical_doc: agents/skills/gpu-execution.md
+    shim: .agents/skills/gpu-execution/SKILL.md
+    discovery:
+      name: gpu-execution
+      description: "Use when planning, running, validating, or diagnosing GPU/CUDA/JAX/XLA/IREE execution, free-GPU admission, full UUID or MIG selection, nvidia-smi evidence, arbitrary pytest/benchmark/diagnostic argv, managed ExperimentRunner runs, GPU validation blockers, or preallocation-disabled JAX/XLA execution."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/experiments/run_gpu_command.py --gpu-count 1 --min-free-memory <bytes> -- <argv...>
+      - bash tools/ci/run_gpu_container.sh --image <image> -- <argv...>
+      - python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant <variant> -- <inner argv...>
+      - python3 -m pytest tests/tools/test_run_gpu_command.py -q
+      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: GPU/CUDA/JAX/XLA execution, provider-independent direct admission, managed experiment execution, or preallocation-disabled validation is in scope
+      triggers:
+        - ["gpu", "実行"]
+        - ["gpu", "利用"]
+        - ["gpu", "検証"]
+        - ["gpu", "空き"]
+        - ["free gpu"]
+        - ["gpu", "command"]
+        - ["run_gpu_command"]
+        - ["cuda", "実行"]
+        - ["cuda", "backend"]
+        - ["jax", "gpu"]
+        - ["xla", "gpu"]
+        - ["iree", "gpu"]
+        - ["nvidia-smi"]
+        - ["cuda_visible_devices"]
+        - ["gpu_validation_blocker"]
+        - ["experimentrunner"]
+        - ["experiment_runner"]
+        - ["python", "experimentrunner"]
+        - ["python", "実行", "experimentrunner"]
+        - ["pytest", "gpu"]
+        - ["benchmark", "gpu"]
+        - ["preallocation", "disable"]
+        - ["preallocate", "false"]
+        - ["xla_python_client_preallocate"]
+        - ["先取", "無効"]
+        - ["先取り", "無効"]
+  - id: computational-optimization
+    purpose: Fix mathematical and validation contracts for numerical optimization, solvers, preconditioners, convergence, derivatives, KKT conditions, tolerances, and optimization benchmarks.
+    canonical_doc: agents/skills/computational-optimization.md
+    shim: .agents/skills/computational-optimization/SKILL.md
+    discovery:
+      name: computational-optimization
+      description: "Use when designing, implementing, reviewing, or diagnosing numerical optimization, solvers, preconditioners, convergence, gradients, Jacobians, Hessians, KKT conditions, tolerances, or optimization benchmarks; fixes the mathematical and validation contract before code or experiment changes."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: numerical optimization, solver, convergence, derivative, or KKT validation contract is in scope
+      triggers:
+        - ["computational optimization"]
+        - ["計算最適化"]
+        - ["数値最適化"]
+        - ["optimizer"]
+        - ["optimization", "solver"]
+        - ["preconditioner"]
+        - ["kkt"]
+        - ["gradient", "hessian"]
+        - ["jacobian"]
+        - ["convergence", "tolerance"]
+        - ["収束", "tolerance"]
+        - ["solver", "residual"]
+        - ["residual"]
+        - ["アルゴリズム", "修正"]
+        - ["アルゴリズム", "テストから"]
+        - ["algorithm", "repair"]
+        - ["algorithm", "test", "first"]
+  - id: adaptive-improvement-loop
+    purpose: Manage experiments, research, tuning, and iterative code changes as one backlog-driven outer loop.
+    canonical_doc: agents/skills/adaptive-improvement-loop.md
+    shim: .agents/skills/adaptive-improvement-loop/SKILL.md
+    discovery:
+      name: adaptive-improvement-loop
+      description: "Use when experiments, research, tuning, and iterative code improvement must be managed as one backlog-driven agile outer loop."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml
+      - python3 tools/agent_tools/workflow_monitor.py --report-dir <run> --runtime-feedback
+        "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op>"
+      - python3 tools/agent_tools/workflow_monitor.py --report-dir <run> --behavior-event
+        "..."
+      - python3 tools/agent_tools/compare_agent_run_paths.py --baseline-run <run-a> --candidate-run
+        <run-b>
+      - python3 tools/agent_tools/evaluate_agent_run.py --report-dir <run> --behavior-manifest
+        evidence/agent-evals/agent_behavior_eval.toml --write
+      - python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml
+        --accumulate --run-id <run-id> --skill-used <skill>
+      - tools/agent_tools/compare_agent_run_paths.py --baseline-run <run-a> --candidate-run
+        <run-b>
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: backlog-driven iterative experiment, tuning, or code improvement loop is in scope
+      triggers:
+        - ["adaptive-improvement-loop"]
+        - ["next_action"]
+        - ["backlog"]
+        - ["iteration"]
+        - ["反復実行"]
+        - ["継続反復"]
+        - ["改善ループ"]
+        - ["改善", "backlog"]
+        - ["実験", "改善", "反復"]
+        - ["実験", "チューニング", "継続"]
+        - ["調査", "チューニング", "反復"]
+        - ["code change", "run", "継続反復"]
+        - ["iterative", "code improvement"]
+        - ["iterative", "tuning"]
+        - ["backlog-driven", "outer loop"]
+        - ["adaptive", "improvement", "loop"]
+        - ["experiment", "tuning", "loop"]
+        - ["research", "tuning", "improvement"]
+  - id: literature-survey
+    purpose: Search for primary sources, prior art, contradictory evidence, and reusable bibliography structure.
+    canonical_doc: agents/skills/literature-survey.md
+    shim: .agents/skills/literature-survey/SKILL.md
+    discovery:
+      name: literature-survey
+      description: "Use when a task needs paper search, prior-art mapping, contradictory-source hunting, or a reusable bibliography."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+  - id: formal-proof-workflow
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.algorithm_flowchart
+    argument_schema: agent_canon.visualization.arguments.algorithm_flowchart.v1
+    purpose: Convert natural-language mathematical claims or JIT-canonical implementation claims into formal-proof obligations, existing-proof search packets, proof-assistant scaffolds, and checker-gated evidence.
+    canonical_doc: agents/skills/formal-proof-workflow.md
+    shim: .agents/skills/formal-proof-workflow/SKILL.md
+    discovery:
+      name: formal-proof-workflow
+      description: "Use when natural-language mathematical claims, JIT-canonical implementation claims, proof sketches, or theory assumptions should be converted into formal-proof obligations, generated Lean evidence, theorem-graph targets, and checker-gated evidence."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/formal_proof.py
+      - python3 tools/agent_tools/jit_canonical_ir.py --python-symbol <path.py::qualname>
+        --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir>
+        --backend-trace-dir <dir> --backend-trace-out <backend.json>
+      - python3 tools/agent_tools/cpp_template_to_lean.py --cpp-symbol <path.hpp::qualname>
+        --namespace <Lean.Namespace> --out <Generated.lean> --record-out <record.json>
+      - tools/bin/agent-canon jit-ir-to-lean
+      - python3 tools/agent_tools/cpp_template_to_lean.py
+      - make a theorem or validation claim pass. A backend-specific theorem is valid
+      - tools/bin/agent-canon jit-ir-to-lean --jit-ir <ir.json> --namespace <Lean.Namespace>
+        --module-name <name> --out <Generated.lean>
+      - python3 tools/agent_tools/cpp_template_to_lean.py --cpp-symbol <path.hpp::qualname>
+        --namespace <Lean.Namespace> --module-name <name> --out <Generated.lean> --record-out
+        <record.json>
+      - lake build
+      - python3 tools/agent_tools/lean_proof_env.py all-smoke|smoke|agent-smoke|counterexample-smoke|check-file
+        --env-dir reports/formal-proof/lean-proof-env
+      - python3 tools/agent_tools/check_proof_trace_alignment.py --trace-module <trace.py>
+      - python3 tools/agent_tools/jit_canonical_ir.py
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+  - id: lean-algorithm-design
+    purpose: Design candidate algorithms directly in Lean before production implementation, prove or refute the mathematical design contract, and hand checked definitions to implementation.
+    canonical_doc: agents/skills/lean-algorithm-design.md
+    shim: .agents/skills/lean-algorithm-design/SKILL.md
+    discovery:
+      name: lean-algorithm-design
+      description: "Use when an algorithm should be designed and checked in Lean before production implementation; models candidate algorithms independently of existing code paths, proves or refutes convergence, stopping, certificate, filter/restoration, and inner-solver contracts, then hands a checked design contract to implementation or implementation-derived proof workflows."
+    tool_commands:
+      required: []
+      conditional:
+      - lake build
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+  - id: algorithm-proof-exploration
+    purpose: Explore algorithm choices under proof obligations by building JIT-canonical IR, theorem graphs, algorithmic blocker frontiers, and algorithm-change handoffs for formal-proof adoption.
+    canonical_doc: agents/skills/algorithm-proof-exploration.md
+    shim: .agents/skills/algorithm-proof-exploration/SKILL.md
+    discovery:
+      name: algorithm-proof-exploration
+      description: "Use when exploring, refactoring, or choosing an algorithm under proof obligations; builds JIT-canonical IR, lemma dependency graphs, algorithmic blocker frontiers, and algorithm-change guidance before handing terminal proof work to formal-proof-workflow."
+    tool_commands:
+      required: []
+      conditional:
+      - tools/bin/agent-canon jit-ir-to-lean
+      - python3 tools/agent_tools/jit_canonical_ir.py
+      - python3 tools/agent_tools/jit_canonical_ir.py --python-symbol <path.py::qualname>
+        --input-factory <path.py::factory> --out <ir.json> --stablehlo-out <root.mlir>
+        --backend-trace-dir <dir> --backend-trace-out <backend.json>
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: algorithm repair, proof obligations, theorem frontiers, or algorithm-change guidance are in scope
+      triggers:
+        - ["algorithm", "proof"]
+        - ["algorithm", "repair"]
+        - ["algorithm", "change"]
+        - ["アルゴリズム", "修正"]
+        - ["アルゴリズム", "証明"]
+        - ["アルゴリズム", "テストから"]
+  - id: algorithm-flowchart
+    visualization_owner: code-visualization
+    visualization_role: adapter
+    tool_id: agent_canon.visualization.adapter.algorithm_flowchart
+    argument_schema: agent_canon.visualization.arguments.algorithm_flowchart.v1
+    purpose: Render JIT-canonical IR, generated Lean evidence modules, and theorem graph overlays into Mermaid block charts for algorithm/proof-state review.
+    canonical_doc: agents/skills/algorithm-flowchart.md
+    shim: .agents/skills/algorithm-flowchart/SKILL.md
+    discovery:
+      name: algorithm-flowchart
+      description: "Use when rendering JIT-canonical IR records, generated Lean evidence modules, and theorem-graph proof overlays into Mermaid block charts that show the implemented iterative algorithm and proof state."
+    tool_commands:
+      required: []
+      conditional:
+      - tools/bin/agent-canon docs format <artifact.md>
+      - python3 tools/agent_tools/jit_canonical_ir.py --python-symbol <path.py::qualname>
+        --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir>
+        --backend-trace-dir <dir> --backend-trace-out <backend.json>
+      - tools/bin/agent-canon jit-ir-to-lean --jit-ir <ir.json> --namespace <Namespace>
+        --module-name <Name> --out <Generated.lean>
+      - python3 tools/agent_tools/jit_canonical_ir.py
+      - tools/bin/agent-canon jit-ir-to-lean
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+  - id: research-workflow
+    purpose: Manage the outer loop of question framing, external research, iterative changes, runs, and explicit review decisions.
+    canonical_doc: agents/skills/research-workflow.md
+    shim: .agents/skills/research-workflow/SKILL.md
+    discovery:
+      name: research-workflow
+      description: "Use when a task needs external research, comparison design, iterative implementation and runs, and explicit review decisions before claims are accepted."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: research-backed, prior-art, benchmark, or external research workflow is in scope
+      triggers:
+        - ["external", "research"]
+        - ["research-backed"]
+        - ["research", "workflow"]
+        - ["research-driven-change"]
+        - ["benchmark", "compare"]
+        - ["benchmark", "result"]
+        - ["prior", "art"]
+        - ["先行研究"]
+        - ["比較実験"]
+        - ["外部調査"]
+  - id: comprehensive-development
+    purpose: Run repo-wide integrated delivery across code, docs, tools, workflows, and runtime with explicit subagent routing.
+    canonical_doc: agents/skills/comprehensive-development.md
+    shim: .agents/skills/comprehensive-development/SKILL.md
+    discovery:
+      name: comprehensive-development
+      description: "Use when a repo-wide task spans code, docs, tools, workflows, and runtime surfaces and needs explicit subagent routing."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/bootstrap_agent_run.py
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: deferred
+      reason: repo-wide architecture redesign spans workflow, tools, docs, runtime, or validation
+      triggers:
+        - ["根本", "設計", "ルーティング"]
+        - ["根本", "設計", "routing"]
+        - ["全体", "レビュー", "修正"]
+        - ["レポ全体", "レビュー"]
+        - ["repo-wide", "review"]
+        - ["architecture", "redesign"]
+        - ["workflow", "tools", "docs"]
+        - ["repo-wide", "routing"]
+        - ["スキル", "動線", "ツール"]
+        - ["エージェント", "成長"]
+        - ["agent", "growth"]
+        - ["すべてのスキル", "修正"]
+        - ["all", "skills", "command"]
+  - id: dependency-design
+    purpose: Define and validate the typed declarative devcontainer dependency design packet before environment maintenance.
+    canonical_doc: agents/skills/dependency-design.md
+    shim: .agents/skills/dependency-design/SKILL.md
+    discovery:
+      name: dependency-design
+      description: "Define and validate the typed declarative devcontainer dependency design packet before changing mounted developer or agent tools, manifests, bootstrap, or dependency installation order."
+    tool_commands:
+      required:
+      - python3 tools/agent_tools/devcontainer_dependencies.py validate --workspace .
+        --format text
+      conditional:
+      - python3 tools/agent_tools/devcontainer_dependencies.py validate --workspace .
+        --vendor-root . --format text
+      - python3 tools/agent_tools/devcontainer_dependencies.py dry-run --workspace . --vendor-root
+        . --format json
+      - bash tools/docker_dependency_validator.sh
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: declarative devcontainer dependency design must precede environment maintenance
+      triggers:
+        - ["dependency", "design"]
+        - ["dependency", "manifest"]
+        - ["dependencies.toml"]
+        - ["devcontainer", "dependency"]
+        - ["developer", "tools", "manifest"]
+        - ["agent", "tools", "manifest"]
+        - ["依存", "設計"]
+        - ["依存", "manifest"]
+  - id: devcontainer-exec
+    purpose: Preserve a narrow compatibility route for targeted commands inside an explicitly selected existing project Dev Container; AgentCanon tools route to agent-canon-bootstrap.
+    canonical_doc: agents/skills/devcontainer-exec.md
+    shim: .agents/skills/devcontainer-exec/SKILL.md
+    discovery:
+      name: devcontainer-exec
+      description: "Use only when an explicitly selected existing project Dev Container needs a targeted command through devcontainer exec; AgentCanon's shared tools and LSPs use agent-canon-bootstrap, and project tests use the project Docker/test runner."
+    tool_commands:
+      required: []
+      conditional:
+      - devcontainer exec --workspace-folder <root> zsh -lc '<command>'
+      - devcontainer exec --workspace-folder <root> zsh -lic '<command>'
+      - devcontainer exec --workspace-folder <root> zsh -l
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: explicit compatibility execution belongs in an already-running project Dev Container; AgentCanon runtime work belongs in agent-canon-bootstrap
+      triggers:
+        - ["devcontainer", "exec"]
+        - ["project", "devcontainer", "exec"]
+        - ["existing", "project", "container"]
+        - ["project", "container", "zsh"]
+        - ["project", "container", "testing"]
+        - ["プロジェクト", "コンテナ", "テスト"]
+        - ["既存", "プロジェクト", "コンテナ"]
+  - id: environment-maintenance
+    purpose: Update Docker, CI, dependencies, and runtime guidance coherently.
+    canonical_doc: agents/skills/environment-maintenance.md
+    shim: .agents/skills/environment-maintenance/SKILL.md
+    discovery:
+      name: environment-maintenance
+      description: "Use when touching Docker, CI, dependencies, runtime compatibility, or repository-level development environment instructions."
+    tool_commands:
+      required: []
+      conditional:
+      - tools/ci/python_env_policy.py --runtime container --create
+      - bash tools/docker_dependency_validator.sh
+      - python3 -m pytest -q tests/tools/test_bootstrap_container_contract.py
+      - python3 -m pytest -q tests/bootstrap/test_bootstrap_runtime.py
+      - make docker-build-check
+      - make docker-build-check-host-docker
+      - python3 tools/ci/run_container_pack.py --print-only
+      - make server-check
+      - make ci-quick
+      - make ci
+      - tools/bin/agent-canon docs check
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: Docker, CI, dependency, or runtime environment maintenance is in scope
+      triggers:
+        - ["docker"]
+        - ["devcontainer", "config"]
+        - ["devcontainer", "configuration"]
+        - ["devcontainer", "build"]
+        - ["devcontainer", "update"]
+        - ["devcontainer", "dependency"]
+        - ["github", "actions"]
+        - ["ci"]
+        - ["lockfile"]
+        - ["dependency", "upgrade"]
+        - ["container", "runtime"]
+        - ["environment-maintenance"]
+        - ["環境メンテ"]
+  - id: agent-learning
+    purpose: Curate searchable problem-solving memory records and learn from runtime agent behavior, interaction lessons, routing misses, and task retrospectives with evidence.
+    canonical_doc: agents/skills/agent-learning.md
+    shim: .agents/skills/agent-learning/SKILL.md
+    discovery:
+      name: agent-learning
+      description: "Use when problem-solving memory curation or runtime agent behavior learning should capture recurrence evidence without mixing it into user preferences."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/workflow_monitor.py --report-dir reports/agents/<run-id>
+        --behavior-event "..."
+      - python3 tools/agent_tools/workflow_monitor.py --report-dir reports/agents/<run-id>
+        --runtime-feedback "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval>
+        action=<prompt_repair|eval_update|memory_record|no_op>"
+      - python3 tools/agent_tools/evaluate_agent_run.py --report-dir reports/agents/<run-id>
+        --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write
+      - python3 tools/agent_tools/memory_record.py search --root . --search-path <owner> --failure-evidence <evidence>
+      - python3 tools/agent_tools/memory_record.py plan --root . --record-id <record-id> --search-path <owner> --recurrence-decision <decision>
+      - python3 tools/agent_tools/memory_record.py create --root . --record-id <record-id> --title <title> --problem <problem> --symptom <symptom> --context <context> --root-cause <cause> --effective-resolution <resolution> --failed-approaches <failed> --applicability-limits <limits> --evidence-source <source> --owner-ref <owner>
+      - python3 tools/agent_tools/memory_record.py update --root . --record-id <record-id> --section <section> --text <replacement>
+      - python3 tools/agent_tools/memory_record.py promote --root . --record-id <record-id> --owner-ref <owner> --reason <reason>
+      - python3 tools/agent_tools/memory_record.py validate --root .
+      - python3 tools/agent_tools/evaluate_agent_run.py
+      - python3 tools/agent_tools/workflow_monitor.py
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: deferred
+      reason: user feedback or recurrence prevention should become durable agent learning
+      triggers:
+        - ["人間からのフィードバック"]
+        - ["runtime feedback"]
+        - ["再発防止"]
+        - ["こういう止まり方"]
+        - ["フィードバック", "修正"]
+        - ["feedback", "repair"]
+        - ["アルゴリズム", "テストから"]
+        - ["アルゴリズム", "テスト", "やめ"]
+        - ["algorithm", "test", "first"]
+        - ["algorithm", "repair", "feedback"]
+        - ["memory", "feedback"]
+        - ["エージェント", "成長"]
+        - ["agent", "growth"]
+        - ["スキル", "呼ばれ"]
+        - ["スキル", "呼ばれない"]
+        - ["skill", "not", "called"]
+        - ["skill", "not", "invoked"]
+        - ["起動コマンド", "ミス"]
+        - ["ミス", "多発"]
+
+  - id: wiki-publication
+    purpose: Publishes AgentCanon wiki pages only through the dedicated wiki sidecar using default-branch-only pushes and source commit binding.
+    canonical_doc: agents/skills/wiki-publication.md
+    shim: .agents/skills/wiki-publication/SKILL.md
+    discovery:
+      name: wiki-publication
+      description: "Use this when publishing AgentCanon wiki pages to a dedicated wiki sidecar with default-branch-only, source-bound publication checks."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/wiki_publish.py
+      - tools/bin/agent-canon docs format
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+  - id: responsibility-cleanup
+    purpose: Route responsibility-unit cleanup from tree observation through owner dispatch, integration, and re-review.
+    canonical_doc: agents/skills/responsibility-cleanup.md
+    shim: .agents/skills/responsibility-cleanup/SKILL.md
+    discovery:
+      name: responsibility-cleanup
+      description: "Use when cleanup requires tree observation, source/view/generated/project/personal boundary classification, dependency closure, responsibility-unit dispatch, integration, or re-review."
+    tool_commands:
+      required:
+      - tree -a -J --noreport
+      conditional:
+      - python3 tools/agent_tools/repo_structure_contract.py --root . --contract documents/structure/repo-structure-contract.toml
+      - python3 tools/agent_tools/responsibility_scope.py --root .
+      - python3 tools/agent_tools/skill_dependency_map.py check --root .
+    routing:
+      stage_policy: active
+      reason: responsibility-unit cleanup, ownership boundary, dependency closure, or specialist dispatch is in scope
+  - id: environment-cleanup
+    purpose: Route environment dependency and runtime-capability cleanup through dependency design and environment maintenance.
+    canonical_doc: agents/skills/environment-cleanup.md
+    shim: .agents/skills/environment-cleanup/SKILL.md
+    discovery:
+      name: environment-cleanup
+      description: "Use when environment dependencies or runtime capabilities need cleanup through dependency-design and environment-maintenance with version, scope, security, and rollback evidence."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/devcontainer_dependencies.py validate --workspace . --format text
+      - python3 tools/agent_tools/devcontainer_dependencies.py dry-run --workspace . --vendor-root . --format json
+    routing:
+      stage_policy: active
+      reason: environment dependency or runtime-capability cleanup is in scope
+  - id: code-cleanup
+    purpose: Route public and module code cleanup by responsibility and reachability through dependency analysis, refactor loop, and change review.
+    canonical_doc: agents/skills/code-cleanup.md
+    shim: .agents/skills/code-cleanup/SKILL.md
+    discovery:
+      name: code-cleanup
+      description: "Use when public or module code cleanup must be bounded by responsibility and reachability, then passed through dependency-analysis, refactor-loop, and change-review."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/check_dependency_headers.py --changed
+      - bash tools/agent_tools/scan_code_dependencies.sh --changed
+      - bash tools/agent_tools/run_repo_dependency_review.sh
+    routing:
+      stage_policy: active
+      reason: public/module responsibility, reachability, or behavior-preserving code cleanup is in scope
+  - id: skill-cleanup
+    purpose: Route canonical skill and generated runtime cleanup as one source-to-readback unit.
+    canonical_doc: agents/skills/skill-cleanup.md
+    shim: .agents/skills/skill-cleanup/SKILL.md
+    discovery:
+      name: skill-cleanup
+      description: "Use when canonical skill docs, catalog, dependency DAG, routes, tool commands, generated shims, host config, graph, or readback must be cleaned as one unit."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/check_agent_runtime_alignment.py
+      - python3 tools/agent_tools/skill_shim_materializer.py materialize --root . --all
+      - python3 tools/agent_tools/skill_shim_materializer.py readback --root . --all
+      - python3 tools/agent_tools/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>
+      - python3 tools/agent_tools/skill_dependency_map.py graph --root . --output documents/runtime/skill-dependency-graph.md --runtime-root <external-runtime-root> --source-mutation-capability-json <exact-two-path-capability.json>
+      - python3 tools/agent_tools/check_skill_tool_invocation_graph.py --root .
+    routing:
+      stage_policy: active
+      reason: canonical skill, catalog, route, generated shim, host config, graph, or readback cleanup is in scope

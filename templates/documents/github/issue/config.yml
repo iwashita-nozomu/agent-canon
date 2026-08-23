@@ -1,0 +1,17 @@
+# @dependency-start
+# contract configuration
+# responsibility Configures GitHub issue template entrypoints for AgentCanon maintenance.
+# upstream design ../../../../documents/operations/issue-label-taxonomy.md issue labels and template routing.
+# upstream design ../../../../issues/README.md durable operational issue storage policy.
+# upstream design ../../../../.github/AGENTS.md GitHub subtree instructions.
+# upstream design ../../README.md canonical template owner.
+# downstream implementation ../../../../tools/ci/check_github_workflows.py validates GitHub surface conventions.
+# @dependency-end
+
+# Canonical source and checked-in standalone target: update templates/documents/github/issue/config.yml and .github/ISSUE_TEMPLATE/config.yml together.
+
+blank_issues_enabled: true
+contact_links:
+  - name: AgentCanon 保守 runbook
+    url: https://github.com/iwashita-nozomu/agent-canon/tree/main/documents
+    about: 運用 runbook の更新は documents index の canonical owner を確認してください。

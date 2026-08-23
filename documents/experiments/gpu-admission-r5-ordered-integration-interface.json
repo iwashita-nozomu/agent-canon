@@ -1,0 +1,53 @@
+{
+  "schema": "agent-canon.gpu-admission-r5.ordered-integration-interface.v1",
+  "source_packet_sha256": "607d1c291a2a31f319973406786f6813c9399d2fa8228a1efd74f98308052523",
+  "managed_run_executable": "experiment-runner-admitted",
+  "provider_repository": "https://github.com/iwashita-nozomu/experiment-runner",
+  "provider_commit": "71b3630266151703bdf88b11741b7492eca92fb4",
+  "provider_contract_path": "documents/experiment-runner-admission.md",
+  "provider_contract_sha256": "2de2b63aac3076e6aacdf1ff10b2c35a0235e835504aeff2db92a7750a720d85",
+  "provider_invocation": "experiment-runner-admitted --request <path> --result <path>",
+  "request_schema": "agentcanon-managed-run/v1",
+  "result_schema": "agentcanon-managed-run-result/v1",
+  "request_fields": [
+    "schema",
+    "run_id",
+    "task",
+    "cases",
+    "environment",
+    "capacity",
+    "resource_estimate",
+    "selected_gpu_ids",
+    "fingerprint",
+    "metadata"
+  ],
+  "result_fields": [
+    "schema",
+    "request_fingerprint",
+    "run_id",
+    "worker_pid",
+    "worker_pids",
+    "lifecycle",
+    "quiescence",
+    "exit",
+    "exit_code",
+    "error",
+    "completions"
+  ],
+  "route": [
+    "SourceFreezeOwner.freeze",
+    "RuntimeIdentityReader.read",
+    "NvidiaInventoryProbe.observe",
+    "GpuProcessOccupancyProbe.observe",
+    "GpuReservationTransaction.try_reserve",
+    "immutable_plan",
+    "AdmittedEnvironmentBuilder.build",
+    "experiment-runner-admitted --request <path> --result <path>",
+    "RunGpuAdmissionContext.reverse_release",
+    "ManagedGpuOutcomeReducer.reduce_terminal",
+    "CompletionCoverageAdapter.record_once",
+    "PostToolUseProjectionReducer.project"
+  ],
+  "composition_root": "execute_managed_run",
+  "alternate_managed_routes": []
+}

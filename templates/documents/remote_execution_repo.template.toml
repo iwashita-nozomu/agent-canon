@@ -1,0 +1,25 @@
+# @dependency-start
+# contract reference
+# responsibility Provides the remote execution repo.template configuration template.
+# @dependency-end
+
+# Reader map: この file は repo identity、runtime profile、artifact root、再現用 source/env/result
+# provenance を保持する。owner は remote execution contract、generated/run-local result は別 surface。
+# algorithm/oracle/failure semantics は topic contract 側で記録し、ここへ固定しない。
+
+[repository]
+id = "project-template"
+label = "project-template"
+clone_url = "git@github.com:example/project-template.git"
+default_branch = "main"
+default_runtime_profile = "default"
+artifact_root = "reports/remote-execution"
+commit_resolution = "server_side_branch_to_commit_sha"
+
+[runtime_profiles.default]
+docker_pack = "docker/packs/default.toml"
+requires_gpu = false
+
+[runtime_profiles.host-docker]
+docker_pack = "docker/packs/default-host-docker.toml"
+requires_gpu = false

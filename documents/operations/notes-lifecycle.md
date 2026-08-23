@@ -1,0 +1,101 @@
+# Notes Lifecycle
+<!--
+@dependency-start
+contract reference
+responsibility Documents Notes Lifecycle for this repository.
+upstream design README.md durable document index
+@dependency-end
+-->
+
+
+この文書は、`documents/notes/` を使うほど充実する形に保つための正本です。
+action log、実験メモ、知識メモ、theme note、failure note を別々に持ちつつ、closeout ごとに昇格先を決めます。
+
+## この文書の読み方
+
+- この文書は、`documents/notes/` の実行中メモ、review/closeout 昇格、promotion
+  rules、最小 closeout questions、template を定めます。
+- 主な順路は、Purpose、Default Flow、Promotion Rules、
+  Minimum Closeout Questions、Templates です。
+- run-local 観測を repo-wide knowledge へ昇格するか判断するときに読みます。
+- 境界: notes の lifecycle 正本であり、個別 task の action log そのものではありません。
+
+## Purpose
+
+- worktree 中の局所ログを、`main` から辿れる再利用知識へ育てる
+- run-local な観測と repo-wide な知見を混ぜない
+- 「残したが再利用されない note」を減らす
+- closeout 時に notes を更新する判断を既定動作にする
+
+## Default Flow
+
+### 1. During Execution
+
+- 一挙手一投足は `documents/notes/worktrees/` の action log に残します。
+- 実験 topic の結果要約は `documents/notes/experiments/` に残します。
+- branch / worktree の入口整理は `documents/notes/branches/` に残します。
+
+### 2. At Review / Closeout
+
+closeout 前に、action log と report を見て次のどれへ昇格するかを決めます。
+
+- `documents/notes/knowledge/`
+  - 何度も参照する短い横断知識
+- `documents/notes/themes/`
+  - 複数 run から得た topic-level synthesis
+- `memory/README.md` と `memory/records/*.md`
+  - 同じ問題に再遭遇したときに検索して使う、owner ref 付きの self-contained knowledge
+- `documents/notes/failures/`
+  - 再発防止のために残す failure pattern
+- `documents/`
+  - repo 正本として固定すべき rule
+
+### 3. Keep The Worktree Log Thin
+
+- action log は時系列と quick reference を担当します。
+- 長く残る一般化は `knowledge` / `themes` / `failures` へ抜きます。
+- action log 自体を巨大な最終成果物にしません。
+
+## Promotion Rules
+
+### Promote To `documents/notes/knowledge/`
+
+- 同じ command、path、environment rule、tool behavior を今後も参照しそう
+- 1 topic の短い practical memo に落とせる
+
+### Promote To `documents/notes/themes/`
+
+- 複数 run、複数 experiment、複数文献をまたいで言える
+- `Known`, `Likely`, `Open`, `Worked`, `Did Not Work` で整理できる
+
+### Promote To `documents/notes/failures/`
+
+- 同じ失敗を次回も踏みやすい
+- trigger と safe alternative が書ける
+
+### Promote To `documents/`
+
+- repo-wide rule、workflow、review gate、environment contract として固定すべき
+
+## Minimum Closeout Questions
+
+closeout ごとに最低限次を確認します。
+
+1. 今回の action log から、再利用知識に昇格すべき項目はあるか
+1. 失敗として残すべきものはあるか
+1. 既存 note を追記すべきか、新規 note を起こすべきか
+1. 文書正本へ上げるべき rule change はあるか
+1. 今回の観測を既存 record の update、独立 record の create、owner への明示変更、
+   issue/failure/evidence のどれに分類したか
+1. record が必要なら selected context で search-before-create を行ったか
+1. `agent-canon memory validate --root .` と owner ref readback が pass したか
+1. stable preference や permanent rule を対象 owner へ直接昇格したか
+
+## Templates
+
+- `documents/notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
+- `documents/notes/branches/BRANCH_NOTE_TEMPLATE.md`
+- `documents/notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md`
+- `documents/notes/themes/THEME_NOTE_TEMPLATE.md`
+- `memory/records/<domain>--<problem-slug>.md`
+- `documents/notes/failures/FAILURE_NOTE_TEMPLATE.md`

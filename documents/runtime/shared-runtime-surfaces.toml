@@ -1,0 +1,38 @@
+# @dependency-start
+# contract reference
+# responsibility Defines AgentCanon-owned standalone runtime, tool, eval, and archive surfaces.
+# upstream design ./SHARED_RUNTIME_SURFACES.md bootstrap runtime surface policy
+# downstream implementation ../../tools/agent_tools/surface_manifest.py parses this inventory
+# downstream implementation ../../rust/agent-canon/src/dependency_manifest.rs uses normalized source classifications
+# @dependency-end
+
+version = 1
+prefix = "."
+integration_mode = "agent-canon-runtime"
+default_consumer = false
+selection = "explicit-opt-in"
+projection_forbidden_roots = ["rust"]
+
+[[surface]]
+path = "bootstrap"
+mode = "runtime"
+source = "bootstrap"
+projection_producer = "agent-canon-bootstrap"
+projection_kind = "runtime_surface"
+local_override_allowed = false
+
+[[surface]]
+path = "tools/agent_tools"
+mode = "tool"
+source = "tools/agent_tools"
+projection_producer = "agent-canon"
+projection_kind = "tool_surface"
+local_override_allowed = false
+
+[[surface]]
+path = "evidence/agent-evals"
+mode = "eval"
+source = "evidence/agent-evals"
+projection_producer = "agent-canon-log"
+projection_kind = "eval_surface"
+local_override_allowed = false

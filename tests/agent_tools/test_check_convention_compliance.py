@@ -1,0 +1,1872 @@
+"""Tests for convention compliance wiring verifier."""
+
+# @dependency-start
+# contract test
+# responsibility Tests convention compliance verifier behavior.
+# upstream implementation ../../tools/agent_tools/check_convention_compliance.py verifier  # noqa: E501
+# upstream design ../../documents/conventions/README.md convention index
+# @dependency-end
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+from tools.agent_tools.check_convention_compliance import (
+    BRANCH_WORKTREE_CREATION_GUARD_MARKERS,
+    DESIGN_INTEGRITY_GATE_MARKERS,
+    DOCUMENT_CLAIM_GROUNDING_MARKERS,
+    DOCUMENT_SPLIT_DECISION_MARKERS,
+    DOCUMENT_STRUCTURE_ROUTING_MARKERS,
+    EXIT_BLOCKER_POLICY_MARKERS,
+    EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS,
+    HOOK_GUARDRAIL_POLICY_MARKERS,
+    IMPLEMENTATION_GUARDRAIL_MARKERS,
+    LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
+    MATHEMATICAL_NECESSITY_MARKERS,
+    REFACTOR_SEQUENCE_MARKERS,
+    RESPONSIBILITY_PREFLIGHT_GATE_MARKERS,
+    REVIEW_ISSUE_ROUTING_MARKERS,
+    SOLID_CODING_CONTRACT_MARKERS,
+    SOURCE_FILE_DEFINITION_ORDER_MARKERS,
+    STATIC_READ_VALIDATION_POLICY_MARKERS,
+    TEST_CONTRACT_ROUTING_MARKERS,
+    TOOL_GATES,
+    VALIDATION_FAILURE_RESPONSE_MARKERS,
+)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "check_convention_compliance.py"
+
+
+MINIMAL_REPO_FILES: dict[str, str] = {
+    "tools/catalog.yaml": """
+path: tools/agent_tools/run_repo_dependency_review.sh
+path: tools/agent_tools/scan_code_dependencies.sh
+path: tools/agent_tools/check_hardcoded_numbers.py
+path: tools/agent_tools/check_static_any.py
+path: tools/agent_tools/check_log_helper_names.py
+path: tools/validation/notebook_quality.py
+path: tools/oop/python/readability.py
+path: tools/oop/cpp/readability.py
+path: tools/agent_tools/evaluate_skill_workflow_prompts.py
+path: tools/agent_tools/evaluate_agent_run.py
+path: tools/agent_tools/check_skill_frontmatter.py
+path: tools/agent_tools/check_convention_compliance.py
+path: tools/agent_tools/tool_catalog.py
+path: tools/agent_tools/tool_drift.py
+path: tools/agent_tools/import_responsibility.py
+path: tools/ci/check_github_workflows.py
+""",
+    "documents/runtime/bootstrap-runtime.md": "bootstrap runtime owner\n",
+    "bootstrap/container/Dockerfile": "FROM scratch\n# bootstrap_runtime\n",
+    "tests/tools/test_bootstrap_container_contract.py": "# bootstrap_runtime\ndef test_bootstrap_container_contract(): pass\n",
+    "tests/bootstrap/test_bootstrap_runtime.py": "# bootstrap_runtime\ndef test_bootstrap_runtime(): pass\n",
+    "documents/conventions/README.md": "conventions\n",
+    "documents/conventions/common/01_principles.md": "check_hardcoded_numbers.py\n",
+    "documents/rule/naming.md": "check_log_helper_names.py\n",
+    "documents/conventions/common/03_comments.md": "comments\n",
+    "documents/conventions/common/04_operators.md": "operators\n",
+    "documents/conventions/common/05_docs.md": (
+        "docs claim grounding program contract public entrypoint "
+        "return projection proof obligation provisional wording "
+        "check_convention_compliance.py mathematical necessity gate "
+        "Judgment / Mathematical Role / Necessity Evidence / Owner / Validation Route "
+        "necessary-and-sufficient condition non-contractual mathematical judgment "
+        "Document Split Decision document_split_decision document_unit split_when "
+        "merge_when invalid_split_boundaries task_close.py\n"
+    ),
+    "documents/conventions/python/01_scope.md": "scope\n",
+    "documents/conventions/python/04_type_annotations.md": "check_static_any.py\n",
+    "documents/conventions/python/06_comments.md": "comments\n",
+    "documents/conventions/python/07_type_checker.md": "check_static_any.py\n",
+    "documents/conventions/python/09_file_roles.md": (
+        "roles 読者順序 依存順序 公開契約 公開入口 内部補助関数 "
+        "check_convention_compliance.py\n"
+    ),
+    "documents/conventions/python/11_naming.md": "naming\n",
+    "documents/conventions/python/15_jax_rules.md": "jax\n",
+    "documents/conventions/python/20_benchmark_policy.md": "benchmark\n",
+    "documents/conventions/python/30_experiment_directory_structure.md": "experiments\n",
+    "documents/conventions/coding-conventions-python.md": (
+        "python import_responsibility.py\n"
+        "SOLID 設計契約 Single responsibility Open/closed Liskov substitution "
+        "Interface segregation Dependency inversion "
+        "tools/oop/python/readability.py tools/oop/shared/readability_core.py "
+        "tools/agent_tools/check_solid_evidence.py SOLID principle signal scanned_paths "
+        "SOLID_PRINCIPLES_BY_KIND readability.py\n"
+    ),
+    "documents/conventions/coding-conventions-cpp.md": "cpp\n",
+    "documents/conventions/coding-conventions-project.md": (
+        "project bootstrap/container/Dockerfile claim grounding program contract "
+        "proof obligation run-local planning evidence\n"
+    ),
+    "documents/conventions/coding-conventions-house-style.md": (
+        "house compatibility-preservation drift duplicate implementation "
+        "canonical owner caller migration contract-complete implementation "
+        "acceptance contract design_issue_blocker implementation shortcut "
+        "two-stage refactor forced migration usage-surface repair "
+        "return-gate validation 読者順序 公開契約 公開入口 内部補助関数 "
+        "単一公開入口 "
+        "check_convention_compliance.py\n"
+    ),
+    "documents/conventions/coding-conventions-testing.md": (
+        "testing contract-only wrapper static contract validation "
+        "static-analysis-duplicate-test canonical command Validation repair scope "
+        "Validation test/check "
+        "mathematical necessity gate Numerical Trigger Non-Numerical Alternative "
+        "checker-owned property SOLID / OOP boundary assertion "
+        "$oop-readability-check tools/oop/python/readability.py "
+        "tools/oop/cpp/readability.py import_responsibility.py "
+        "failing_contract cause_classification intent_preservation "
+        "documents/runtime/runtime-profiles-and-check-matrix.json "
+        "documents/runtime/runtime-profiles-and-check-matrix.md\n"
+    ),
+    "documents/conventions/coding-conventions-reviews.md": "reviews\n",
+    "documents/conventions/coding-conventions-experiments.md": "experiments\n",
+    "documents/conventions/coding-conventions-logging.md": "check_log_helper_names.py\n",
+    "documents/design/algorithm-implementation-boundary.md": "algorithm\n",
+    "documents/conventions/object-oriented-design.md": (
+        "readability.py SOLID との対応 Single responsibility Open/closed "
+        "Liskov substitution Interface segregation Dependency inversion "
+        "tools/oop/shared/readability_core.py SOLID_PRINCIPLES_BY_KIND "
+        "import_responsibility.py\n"
+    ),
+    "documents/experiments/experiment-registry.md": (
+        "experiment_execution_surface_guard tool_rejection_preflight.py "
+        "check_experiment_registry.py tests/tools/test_run_managed_experiment.py\n"
+    ),
+    "documents/conventions/REVIEW_PROCESS.md": (
+        "review structure-planning prose-reasoning-graph md-style-check "
+        "structure_contract=skipped Review Finding Issue Routing issue_route "
+        "issues/open/ issue_sync.py github_mirror\n"
+    ),
+    "documents/runtime/runtime-profiles-and-check-matrix.md": (
+        "Static analysis and reading evidence primary validation evidence "
+        "operation checks supplemental evidence unresolved static/read findings "
+        "runtime behavior\n"
+    ),
+    "documents/operations/TROUBLESHOOTING.md": (
+        "validation test/check failure failing_contract cause_classification "
+        "intent_preservation documents/runtime/runtime-profiles-and-check-matrix.json "
+        "documents/runtime/runtime-profiles-and-check-matrix.md\n"
+    ),
+    "documents/codex/codex-configuration-reference.md": (
+        "## Hook Severity Policy\n"
+        "fail-open Active dispatcher failures warning/evidence secret\n"
+        "*_FORWARDER=deprecated *_FORWARDER_SEVERITY=fix-now "
+        "caller chain canonical command\n"
+    ),
+    "documents/design/responsibility-scope-management.md": "import_responsibility.py responsibility_scope.py\n",
+    "documents/tools/README.md": (
+        "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py "
+        "tool_rejection_preflight.py responsibility_scope responsibility-scope.toml "
+        "protecting tools\n"
+    ),
+    "documents/notes/guardrails/engineering_avoidances.md": (
+        "compatibility-preservation drift duplicate implementation canonical owner "
+        "contract-complete implementation acceptance contract design_issue_blocker "
+        "implementation shortcut\n"
+    ),
+    "tools/README.md": (
+        "tool_catalog.py tool_drift.py notebook_quality.py import_responsibility.py "
+        "check_runtime_profile_inventory.py tool_rejection_preflight.py "
+        "responsibility_scope responsibility-scope.toml protecting tools\n"
+    ),
+    "tools/agent_tools/tool_rejection_preflight.py": (
+        "RESPONSIBILITY_SCOPE_COMMAND responsibility_scope_gate scope_covers "
+        'protecting_tools gate="responsibility_scope" '
+        "EXPERIMENT_EXECUTION_SURFACE_PATHS experiment_execution_surface_guard "
+        "experiment_execution_surface_path check_experiment_registry.py "
+        "test_run_managed_experiment.py\n"
+    ),
+    "agents/COMMUNICATION_PROTOCOL.md": (
+        "responsibility_scope responsibility-scope.toml owner class protecting tools "
+        "planned path Parent-Direct Context Note "
+        "external public API/behavior/schema unchanged\n"
+    ),
+    "agents/canonical/CODEX_WORKFLOW.md": (
+        "Completion Readiness\n"
+        "Design Integrity Gate owning responsibility model "
+        "Abstract Design Frame Design-To-Implementation Trace "
+        "owner, replaceable unit replaceable unit mechanism validation route unresolved branch "
+        "design_issue_blocker implementation shortcut\n"
+        "user-facing completion\n"
+        "repo_wide_static_analysis_complete\n"
+        "repo_wide_dependency_tools_complete\n"
+        "run_repo_dependency_review.sh\n"
+        "bounded route existing tool targeted validation follow-up context\n"
+        "external public API/behavior/schema unchanged scoped_change "
+        "dependency/consumer/migration/docs closure\n"
+        "contract-only wrapper static contract validation canonical command evidence "
+        "validation tool\n"
+        "静的解析・読み取り 主証跡 reading evidence 動作確認 broad execution "
+        "静的解析、読み取り確認、docs / targeted tests / agent checks "
+        "Runtime evidence distinct unresolved claim/risk\n"
+        "legacy-route drift duplicate implementation canonical owner "
+        "caller migration contract-complete implementation acceptance contract "
+        "design_issue_blocker implementation shortcut\n"
+        "Branch Reuse Default tools/agent_tools/hook_safety.py user が別 branch を明示 "
+        "AgentCanon branch / PR workflow "
+        "branch_creation_reason=<reason> worktree_creation_reason=<reason> "
+        "proven exact task ownership session restart "
+        "Git authority は操作リスクで分けます。 "
+        "通常の branch create / worktree add "
+        "creation authority/reason のみを要求し "
+        "force-create または ref overwrite "
+        "creation と destructive authority/reason の両方を要求 "
+        "既存 branch の checkout/switch "
+        "destructive authority/reason を要求します "
+        "`latest` / `apply` / merge update wrapper "
+        "worktree の remove/move/repair/prune/force-add "
+        "ambient 変数や prior segment は authority になりません。\n"
+    ),
+    "agents/canonical/CODEX_SUBAGENTS.md": "subagents\n",
+    "agents/workflows/example-workflow.md": (
+        "Before closeout, run "
+        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+    ),
+    "agents/workflows/long-form-writing-workflow.md": (
+        "$structure-planning $prose-reasoning-graph $md-style-check "
+        "structure_contract=skipped\n"
+        "Before closeout, run "
+        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+    ),
+    "agents/workflows/pr-queue-cleanup-workflow.md": (
+        "PR Essence problem / user request design intent canonical owner "
+        "behavior or contract delta evidence route\n"
+        "Before closeout, run "
+        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+    ),
+    "agents/skills/agent-orchestration.md": (
+        "$agent-orchestration $codex-task-workflow $subagent-bootstrap "
+        "literature-survey research-workflow 先に source packet adoption/exclusion "
+        "静的解析・読み取り evidence 未解決 signal 実行が必要な未解決 signal 動作確認 smoke run "
+        "重いコマンド "
+        "Design Integrity Gate responsibility model Decision sufficiency is semantic "
+        "owner, replaceable unit implementation mechanism validation route "
+        "unresolved branch Abstract Design Frame "
+        "design_issue_blocker implementation shortcut "
+        "bounded owner route "
+        "task-shape skill check_convention_compliance.py vertical dynamic wave "
+        "write-capable handoff prose-reasoning-graph structure-planning "
+        "md-style-check format-only structure_contract=skipped "
+        "existing-tool route targeted validation Owner-Bounded Change "
+        "parent-direct SKILL.md external public API/behavior/schema unchanged "
+        "scoped_change dependency/consumer/migration/docs closure "
+        "selected_agent_type write_capable_handoff_blocker evidence "
+        "parent_packet_ref status=blocked explicit_approval_evidence "
+        "router_unavailable_blocker "
+        "revised parent packet\n"
+    ),
+    "agents/skills/codex-task-workflow.md": (
+        "codex task workflow prose-reasoning-graph structure-planning "
+        "literature-survey research-workflow 設計 Implementation Source Packet "
+        "adoption/exclusion "
+        "静的解析・読み取り evidence primary validation evidence "
+        "supplemental evidence 動作確認 runtime behavior 未解決 finding "
+        "Design Integrity Gate 責務 model responsibility model 差し替え可能な単位 "
+        "実装 scope validation route unresolved branch Abstract Design Frame "
+        "design_issue_blocker implementation shortcut "
+        "md-style-check format-only structure_contract=skipped "
+        "existing-tool route targeted validation Owner-Bounded Change "
+        "parent-direct SKILL.md "
+        "external public API/behavior/schema unchanged scoped_change "
+        "dependency/consumer/migration/docs closure "
+        "tool_rejection_preflight.py "
+        "contract-complete implementation acceptance contract design_issue_blocker "
+        "implementation shortcut "
+        "selected_agent_type write_capable_handoff_blocker evidence "
+        "parent_packet_ref status=blocked canonical_rerun_pass "
+        "durable_blocker_or_issue router_unavailable_blocker new state evidence "
+        "revised parent packet\n"
+        "$oop-readability-check SOLID principle signal OOP dimension finding kind "
+        "tools/oop/shared/readability_core.py check_solid_evidence.py scanned_paths "
+        "class Protocol responsibility_scope owner scope protecting tools "
+        "実装ディレクトリ\n"
+    ),
+    "agents/skills/refactor-loop.md": (
+        "two-stage refactor forced migration usage-surface repair "
+        "return-gate validation\n"
+    ),
+    "agents/skills/change-review.md": (
+        "issue_route issues/open/ issue_sync.py new_local_issue github_mirror "
+        "python-review $oop-readability-check tools/agent_tools/check_solid_evidence.py "
+        "SOLID principle signal OOP readability report class Protocol\n"
+    ),
+    "agents/skills/pr-processing.md": (
+        "single-candidate fast path base/head/diff/check/authority "
+        "dependency evidence\n"
+    ),
+    "agents/skills/subagent-bootstrap.md": (
+        "selected_agent_type write_capable_handoff_blocker evidence "
+        "parent_packet_ref status=blocked canonical_rerun_pass "
+        "durable_blocker_or_issue router_unavailable_blocker new state evidence "
+        "explicit revised packet\n"
+    ),
+    "agents/skills/tool-finding-report.md": (
+        "tool_warning_exit_status resolved deferred_with_issue "
+        "accepted_with_reason explicit_approval_evidence\n"
+    ),
+    "agents/skills/md-style-check.md": (
+        "prose-reasoning-graph structure-planning bounded owner route format-only "
+        "structure_contract=skipped existing-tool route targeted validation\n"
+    ),
+    "agents/skills/structure-planning.md": (
+        "document_unit document_split_decision split_when merge_when "
+        "invalid_split_boundaries\n"
+    ),
+    "agents/skills/test-design.md": (
+        "contract-only wrapper static contract validation canonical command evidence "
+        "observable behavior validation repair scope mathematical necessity gate "
+        "Numerical Trigger Non-Numerical Alternative checker-owned property "
+        "failing contract observation level cause classification approved intent "
+        "escalation oracle weakening documents/runtime/runtime-profiles-and-check-matrix.json "
+        "documents/runtime/runtime-profiles-and-check-matrix.md\n"
+    ),
+    "agents/skills/experiment-lifecycle.md": (
+        "experiment_execution_surface_guard tool_rejection_preflight.py "
+        "test-design check_experiment_registry.py "
+        "tests/tools/test_run_managed_experiment.py\n"
+    ),
+    "agents/skills/worktree-health.md": (
+        "agents/canonical/CODEX_WORKFLOW.md Branch Reuse Default "
+        "tools/agent_tools/hook_safety.py "
+        "branch_creation_reason=<reason> "
+        "worktree_creation_reason=<reason> git worktree list --porcelain "
+        "git branch --show-current\n"
+    ),
+    "agents/skills/computational-optimization.md": (
+        "mathematical necessity gate iteration map stopping scalar failure semantics\n"
+    ),
+    "agents/skills/long-form-writing.md": (
+        "数学的 claim program contract proof obligation $formal-proof-workflow "
+        "provisional wording existing-tool route targeted validation "
+        "typo format-only SKILL.md document_split_decision owner reader path "
+        "source map validation route chunking convenience\n"
+    ),
+    "agents/skills/python-review.md": (
+        "SOLID 原則シグナル OOP 可読性レポート "
+        "tools/oop/python/readability.py tools/agent_tools/check_solid_evidence.py "
+        "Single responsibility Open/closed "
+        "Liskov substitution Interface segregation Dependency inversion "
+        "readability.py scanned_paths 定義順 読者順序 "
+        "公開入口 内部補助関数 check_convention_compliance.py\n"
+    ),
+    "agents/skills/oop-readability-check.md": (
+        "SOLID Single responsibility Open/closed Liskov substitution "
+        "Interface segregation Dependency inversion "
+        "tools/oop/shared/readability_core.py SOLID route owner mechanical projections "
+        "readability.py\n"
+    ),
+    "agents/workflows/implementation-waterfall-workflow.md": (
+        "Design Integrity Gate owning responsibility model Abstract Design Frame "
+        "replaceable unit mechanism validation route unresolved branch "
+        "design_issue_blocker implementation shortcut\n"
+        "Before closeout, run "
+        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+    ),
+    "agents/skills/formal-proof-workflow.md": (
+        "program contract public entrypoint return projection proof obligation "
+        "mathematical necessity gate theorem surface\n"
+    ),
+    "agents/skills/README.md": (
+        "bounded owner route existing tool targeted validation .codex/config.toml "
+        "prose-reasoning-graph structure-planning md-style-check "
+        "structure_contract=skipped external public API/behavior/schema unchanged "
+        "scoped_change dependency/consumer/migration/docs closure\n"
+    ),
+    "agents/skills/catalog.yaml": (
+        "skill catalog routing entry skill format-only docs work "
+        "literature-survey research-workflow "
+        "prose-reasoning-graph structure-planning SOLID SRP OCP LSP ISP DIP "
+        "Single responsibility Open/closed Liskov Interface segregation "
+        "Dependency inversion Protocol コードファイル 順序 定義順 関数 class\n"
+        "bounded owner route bounded owner targeted validation Owner-Bounded Change "
+        "external public API/behavior/schema unchanged scoped_change "
+        "dependency/consumer/migration/docs closure\n"
+        '- ["SOLID"]\n'
+        '- ["SRP"]\n'
+        '- ["Dependency inversion"]\n'
+    ),
+    "agents/skills/skill-dependencies.yaml": (
+        "research-workflow literature-survey routing_candidates order_constraints\n"
+    ),
+    "agents/task_catalog.yaml": (
+        "literature-survey research-workflow source packet adoption/exclusion "
+        "Research-Driven Change owner_bounded_change public interface unchanged "
+        "external public API/behavior/schema unchanged scoped_change "
+        "dependency/consumer/migration/docs closure\n"
+    ),
+    "tools/agent_tools/agent_team.py": (
+        "$literature-survey $research-workflow research_driven_change selected.append\n"
+    ),
+    ".codex/agents/python_reviewer.toml": (
+        "check_solid_evidence.py OOP readability report SOLID principle signal "
+        "Single responsibility Open/closed Liskov substitution Interface segregation "
+        "Dependency inversion path-covered\n"
+    ),
+    ".codex/agents/reviewer.toml": (
+        "check_solid_evidence.py OOP readability report SOLID principle signal "
+        "path-covered return revise\n"
+    ),
+    ".codex/agents/diff_triage_reviewer.toml": (
+        "python_reviewer check_solid_evidence.py OOP readability report "
+        "SOLID principle signal escalate\n"
+    ),
+    "agents/agents_config.json": (
+        "python_reviewer OOP readability report SOLID principle signal "
+        "check_solid_evidence.py path-coverage\n"
+    ),
+    "agents/skills/mvp-skeleton.md": "mvp core loop vertical slice\n",
+    "agents/TASK_WORKFLOWS.md": (
+        "## Workflow Contract Owners\n\n"
+        "| Contract | Owner Surface |\n"
+        "| -------- | ------------- |\n"
+        "| workflow family and spawn budget | `agents/task_catalog.yaml` |\n"
+        "| role topology and same-role instance schema | `agents/task_catalog.yaml` |\n"
+        "| default specialists and review packs | "
+        "`agents/task_catalog.yaml`; `agents/agents_config.json` |\n"
+        "| run bundle, declared workflow / skills / review, and dynamic wave ledger | "
+        "`bootstrap_agent_run.py`; `workflow_monitor.py` |\n"
+        "| skill selection | `agents/skills/catalog.yaml`; "
+        "`python3 tools/agent_tools/route.py --prompt` |\n"
+        "| implementation stage gate | "
+        "`agents/workflows/implementation-waterfall-workflow.md` |\n"
+        "| active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; "
+        "`agents/agents_config.json#artifacts.active_design_packet` |\n"
+        "| closeout authority | `task_close.py`; `report_artifact_checks.py` |\n\n"
+        "## Workflow Family Reader Paths\n\n"
+        "| Family | Owner Row |\n"
+        "| ------ | --------- |\n"
+        "| Scoped Change | `agents/task_catalog.yaml` "
+        "`workflow_families[].id=scoped_change` |\n\n"
+        "## Design Artifact Shape\n\n"
+        "Implementation design uses the four-entry active design packet.\n"
+    ),
+    "templates/agents/test_plan.md": "validation route behavior-owned cases\n",
+    "evidence/agent-evals/skill_workflow_prompt_eval.toml": (
+        "check_convention_compliance.py CONVENTION-WORKFLOW CONVENTION-SKILL "
+        "write-capable handoff ORCH-SHIM-TOOLCALL-1 WORKFLOW-GENERIC-1\n"
+        "evaluate_skill_workflow_prompts.py\n"
+    ),
+    "evidence/agent-evals/agent_behavior_eval.toml": "behavior evaluate_agent_run.py\n",
+    "agents/USER_GUIDE_JA.md": (
+        "structure-planning prose-reasoning-graph md-style-check "
+        "Document Structure Evidence structure_contract=skipped "
+        "existing tool targeted validation 読了 gate なし "
+        "external public API/behavior/schema unchanged scoped_change "
+        "dependency/consumer/migration/docs closure\n"
+    ),
+    "templates/agents/closeout_gate.md": (
+        "evaluate_agent_run.py run_repo_dependency_review.sh\n"
+        "Document Structure Evidence document_structure_status structure_planning "
+        "prose_graph md_style_check format_only_reason document_split_decision "
+        "keep:<reason> split:<new-owner-boundary> "
+        "not_applicable:format-only:<reason>\n"
+    ),
+    "templates/agents/workflow_monitoring.md": (
+        "tool_warning_exit_status resolved deferred_with_issue "
+        "accepted_with_reason explicit_approval_evidence\n"
+    ),
+    "agents/workflows/hypothesis-validation-workflow.md": (
+        "scan_code_dependencies.sh\n"
+        "Before closeout, run "
+        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+    ),
+    "agents/workflows/comprehensive-refactoring-workflow.md": (
+        "readability.py check_convention_compliance.py\n"
+        "compatibility-preservation drift duplicate implementation canonical owner "
+        "Removal and Caller Migration Plan two-stage refactor forced migration "
+        "usage-surface repair return-gate validation\n"
+        "Before closeout, run "
+        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+    ),
+    "agents/workflows/adaptive-improvement-workflow.md": (
+        "evaluate_skill_workflow_prompts.py check_convention_compliance.py\n"
+        "Before closeout, run "
+        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+    ),
+    "agents/workflows/agent-canon-pr-workflow.md": (
+        "check_github_workflows.py\n"
+        "PR Essence problem / user request design intent canonical owner "
+        "behavior or contract delta evidence route\n"
+        "Before closeout, run "
+        "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
+    ),
+    ".github/PULL_REQUEST_TEMPLATE.md": (
+        "## PR Essence\n"
+        "Problem / user request:\n"
+        "Canonical owner / responsibility unit:\n"
+        "Behavior or contract delta:\n"
+        "Evidence route:\n"
+    ),
+    ".github/PULL_REQUEST_TEMPLATE/agent_canon.md": (
+        "## PR Essence\n"
+        "Problem / user request:\n"
+        "Canonical owner / responsibility unit:\n"
+        "Behavior or contract delta:\n"
+        "Evidence route:\n"
+    ),
+    "tools/ci/run_all_checks.sh": (
+        "check_static_any.py "
+        "check_log_helper_names.py import_responsibility.py check_convention_compliance.py "
+        "check_skill_frontmatter.py "
+        "tool_catalog.py tool_drift.py notebook_quality.py "
+        "check_github_workflows.py bootstrap_runtime.py check_runtime_profile_inventory.py\n"
+    ),
+    "tools/ci/check_agent_canon_pr.sh": (
+        'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json\n'
+        "python3 tools/ci/check_github_workflows.py\n"
+    ),
+    "rust/agent-canon/src/docs.rs": "runtime profile inventory\n",
+    "documents/tools/agent-canon.md": "docs\n",
+    "bootstrap.sh": "runtime boundary\n",
+    "agents/skills/environment-maintenance.md": (
+        "tests/tools/test_bootstrap_container_contract.py "
+        "tests/bootstrap/test_bootstrap_runtime.py bootstrap_runtime.py\n"
+    ),
+    ".codex/README.md": (
+        "active events active/inactive legacy `Stop` fail-open retired child tombstones bounded redacted\n"
+    ),
+    ".codex/hooks/hook_dispatcher.py": (
+        "HOOK_EVENT_CONTRACTS HookEventContract ACTIVE_HOOK_HANDLERS "
+        "UserPromptSubmit PreToolUse PostToolUse Stop hook_safety "
+        "validate_projection_bytes record_hook_invocation HookLogContext "
+        "RETIRED_CHILD_TOMBSTONES MOVED_SOURCE_ABSENCES\n"
+    ),
+    "tools/agent_tools/hook_safety.py": (
+        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "
+        "AGENT_CANON_BRANCH_WORKTREE_REASON AGENT_CANON_DESTRUCTIVE_GIT_REASON "
+        "explicit_user_approval user_request agent_canon_workflow same-segment "
+        "branch_block_payload operation command_sha256 DESTRUCTIVE_GIT_GUARD=block "
+        "BRANCH_WORKTREE_CREATION_GUARD=block\n"
+    ),
+    "tools/agent_tools/task_close.py": (
+        "changed_markdown_paths Document Structure Evidence "
+        "document_structure_evidence DOCUMENT_STRUCTURE_REQUIRED "
+        "document_split_decision DOCUMENT_SPLIT_DECISION_EVIDENCE "
+        "document_split_decision_ready\n"
+    ),
+    "ROOT_AGENTS.md": (
+        "Multiple chats or sessions unknown dirty Proven exact task ownership "
+        "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
+        "AGENT_CANON_DESTRUCTIVE_GIT_REASON "
+        "Design Integrity Gate responsibility model owning responsibility model "
+        "owner, replaceable unit implementation mechanism validation route "
+        "unresolved branch Abstract Design Frame "
+        "Design-To-Implementation Trace design_issue_blocker "
+        "implementation shortcut\n"
+        "## Runtime Owner Map\n\n"
+        "| Contract | Owner Surface | Evidence / Checker |\n"
+        "| -------- | ------------- | ------------------ |\n"
+        "| workflow family, spawn budget, role topology | "
+        "`vendor/agent-canon/agents/task_catalog.yaml` | "
+        "`check_agent_runtime_alignment.py` |\n"
+        "| task bootstrap and CLI entrypoints | "
+        "`vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md` | "
+        "`bootstrap_agent_run.py` |\n"
+        "| subagent lifecycle, same-role instances, wave ledger | "
+        "`vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md` | "
+        "`workflow_monitor.py` |\n"
+        "| role behavior and stage conditions | "
+        "`vendor/agent-canon/.codex/agents/*.toml` | "
+        "`check_agent_runtime_alignment.py` |\n"
+        "| skill routing and public skill surface | "
+        "`vendor/agent-canon/agents/skills/catalog.yaml` | "
+        "`python3 tools/agent-canon/agent_tools/route.py --prompt` |\n"
+        "| report and closeout structure | `task_close.py` | closeout gate |\n"
+    ),
+    "AGENTS.md": (
+        "Multiple chats or sessions unknown dirty Proven exact task ownership "
+        "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
+        "AGENT_CANON_DESTRUCTIVE_GIT_REASON\n"
+        "## Runtime Owner Map\n\n"
+        "| Contract | Owner Surface | Validation |\n"
+        "| -------- | ------------- | ---------- |\n"
+        "| root runtime entrypoint | `ROOT_AGENTS.md` | "
+            "`bash bootstrap.sh --help` |\n"
+        "| workflow family, spawn budget, role topology | "
+        "`agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |\n"
+        "| public skill registry | `agents/skills/catalog.yaml` | "
+        "`check_agent_runtime_alignment.py` |\n"
+        "| AgentCanon update transaction | "
+        "`documents/agent-canon/agent-canon-update-route.md` | "
+        "`update_lifecycle_contract.py` |\n"
+    ),
+}
+
+MINIMAL_AGENT_TOOLS = (
+    "run_repo_dependency_review.sh",
+    "scan_code_dependencies.sh",
+    "check_hardcoded_numbers.py",
+    "check_static_any.py",
+    "check_log_helper_names.py",
+    "import_responsibility.py",
+    "evaluate_skill_workflow_prompts.py",
+    "evaluate_agent_run.py",
+    "check_convention_compliance.py",
+    "check_skill_frontmatter.py",
+    "tool_catalog.py",
+    "tool_drift.py",
+    "check_runtime_profile_inventory.py",
+    "bootstrap_runtime.py",
+)
+
+MINIMAL_PYTHON_TOOLS = (
+    "tools/oop/python/readability.py",
+    "tools/oop/cpp/readability.py",
+    "tools/validation/notebook_quality.py",
+)
+
+
+class CheckConventionComplianceTest(unittest.TestCase):
+    """Verify convention compliance checker behavior."""
+
+    def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+        """Run the checker against a root."""
+        return subprocess.run(
+            [sys.executable, str(CHECKER), "--root", str(root), *args],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    def test_generated_skill_content_is_outside_convention_policy(self) -> None:
+        """Generated shim prose is validated by its dedicated readback gates."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / ".agents" / "skills" / "mvp-skeleton" / "SKILL.md"
+            skill.parent.mkdir(parents=True)
+            skill.write_text("# mvp-skeleton\n\nmvp core loop\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertNotIn(
+                "missing-positive-convention-compliance-command",
+                result.stdout,
+            )
+            self.assertNotIn(".agents/skills", result.stdout)
+
+    def test_policy_source_tables_exclude_generated_skill_shims(self) -> None:
+        """Every skill policy source resolves to its canonical prose owner."""
+        source_tables = (
+            DESIGN_INTEGRITY_GATE_MARKERS,
+            DOCUMENT_CLAIM_GROUNDING_MARKERS,
+            DOCUMENT_SPLIT_DECISION_MARKERS,
+            DOCUMENT_STRUCTURE_ROUTING_MARKERS,
+            EXIT_BLOCKER_POLICY_MARKERS,
+            EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS,
+            IMPLEMENTATION_GUARDRAIL_MARKERS,
+            LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
+            MATHEMATICAL_NECESSITY_MARKERS,
+            REFACTOR_SEQUENCE_MARKERS,
+            RESPONSIBILITY_PREFLIGHT_GATE_MARKERS,
+            REVIEW_ISSUE_ROUTING_MARKERS,
+            SOLID_CODING_CONTRACT_MARKERS,
+            SOURCE_FILE_DEFINITION_ORDER_MARKERS,
+            STATIC_READ_VALIDATION_POLICY_MARKERS,
+        )
+        paths = {path for table in source_tables for path in table}
+        tool_references = {
+            path for _, references in TOOL_GATES.values() for path in references
+        }
+
+        self.assertFalse(
+            any(path.startswith(".agents/skills/") for path in paths | tool_references)
+        )
+
+    def test_missing_workflow_hook_fails(self) -> None:
+        """The canonical source gate cannot omit convention verification."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            workflow.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "workflow_hook:tools/ci/check_agent_canon_pr.sh",
+                result.stdout,
+            )
+            self.assertIn("missing-convention-compliance-gate", result.stdout)
+
+    def test_workflow_hook_requires_positive_command(self) -> None:
+        """A stale mention without a run command is rejected."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            workflow.write_text(
+                "#!/usr/bin/env bash\n# Mention check_convention_compliance.py only.\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-positive-convention-compliance-command",
+                result.stdout,
+            )
+
+    def test_workflow_hook_positive_quoted_canonical_command(self) -> None:
+        """A canonical quoted root/format invocation satisfies the positive command check."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            workflow.write_text(
+                "#!/usr/bin/env bash\n"
+                'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py"'
+                ' --root "${WORKSPACE_ROOT}" --format json\n',
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertNotIn(
+                "missing-positive-convention-compliance-command",
+                result.stdout,
+            )
+
+    def test_workflow_hook_requires_no_trailing_whitespace(self) -> None:
+        """A positive command with trailing space is rejected."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            workflow.write_text(
+                "#!/usr/bin/env bash\n"
+                'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py"'
+                ' --root "${WORKSPACE_ROOT}" --format json \n',
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-positive-convention-compliance-command",
+                result.stdout,
+            )
+
+    def test_workflow_hook_rejects_suppression(self) -> None:
+        """A workflow must not be able to pass by saying not to run the gate."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            workflow.write_text(
+                "#!/usr/bin/env bash\n"
+                "python3 tools/agent_tools/check_convention_compliance.py\n"
+                "# Do not run check_convention_compliance.py for quick tasks.\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "forbidden-convention-compliance-suppression",
+                result.stdout,
+            )
+
+    def test_json_output_is_machine_readable(self) -> None:
+        """JSON output exposes status and finding records."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            manifest = (
+                root / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+            )
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                "version = 1\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root, "--format", "json")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["status"], "fail")
+            self.assertTrue(payload["findings"])
+
+    def test_parent_root_sync_adapter_delegates_to_vendored_source(self) -> None:
+        """A parent root adapter may delegate all sync internals to AgentCanon."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "vendor" / "agent-canon"
+            self.copy_minimal_repo(source)
+            adapter = root / "tools" / "sync_agent_canon.sh"
+            adapter.parent.mkdir(parents=True)
+            adapter.write_text(
+                "#!/usr/bin/env bash\n"
+                'exec env PYTHONPATH="vendor/agent-canon/tools:tools" \\\n'
+                "  python3 -m agent_tools.agent_canon_source_root exec \\\n"
+                '  tools/sync_agent_canon.sh "$@"\n',
+                encoding="utf-8",
+            )
+
+            findings = []
+
+            self.assertEqual(findings, [])
+
+    def test_parent_without_root_sync_adapter_uses_vendored_projection(self) -> None:
+        """Parent mode without root adapter still passes when vendored projection is present."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "vendor" / "agent-canon"
+            self.copy_minimal_repo(source)
+
+            findings = []
+
+            self.assertEqual(findings, [])
+
+    def test_parent_root_sync_adapter_is_outside_convention_scope(self) -> None:
+        """Retired parent adapters are not checked by convention wiring."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "vendor" / "agent-canon"
+            self.copy_minimal_repo(source)
+            adapter = root / "tools" / "sync_agent_canon.sh"
+            adapter.parent.mkdir(parents=True)
+            adapter.write_text(
+                "#!/usr/bin/env bash\n"
+                'exec env PYTHONPATH="vendor/agent-canon/tools:tools" '
+                "python3 -m agent_tools.agent_canon_source_root exec "
+                'tools/update_agent_canon.sh "$@"\n',
+                encoding="utf-8",
+            )
+
+            findings = []
+
+            self.assertEqual(findings, [])
+
+    def test_hook_guardrail_policy_marker_fails(self) -> None:
+        """Every stable dispatcher contract marker remains mechanically required."""
+        path = ".codex/hooks/hook_dispatcher.py"
+        fixture = MINIMAL_REPO_FILES[path]
+        for marker in HOOK_GUARDRAIL_POLICY_MARKERS[path]:
+            with self.subTest(marker=marker), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                self.copy_minimal_repo(root)
+                (root / path).write_text(
+                    fixture.replace(marker, ""),
+                    encoding="utf-8",
+                )
+
+                result = self.run_checker(root)
+
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn(
+                    f"hook_guardrail_policy:{path}:missing-marker:{marker}",
+                    result.stdout,
+                )
+
+    def test_hook_safety_policy_marker_fails(self) -> None:
+        """Safety leaf policy must keep destructive-git authority and redaction context."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            (root / "tools" / "agent_tools" / "hook_safety.py").write_text(
+                "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "
+                "explicit_user_approval\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "hook_guardrail_policy:tools/agent_tools/hook_safety.py", result.stdout
+            )
+            self.assertIn("missing-marker:operation", result.stdout)
+
+    def test_parent_repo_can_keep_shared_docs_only_in_vendor_canon(self) -> None:
+        """A parent repo may keep AgentCanon docs out of root documents."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            for source in sorted((root / "documents").rglob("*")):
+                if not source.is_file():
+                    continue
+                target = root / "vendor" / "agent-canon" / source.relative_to(root)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                source.rename(target)
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("CONVENTION_COMPLIANCE=pass", result.stdout)
+
+    def test_normative_convention_without_verification_route_fails(self) -> None:
+        """A convention source with normative assertions needs a verification route."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            (
+                root / "documents" / "conventions" / "coding-conventions-python.md"
+            ).write_text(
+                "# Python\n\n- 公開関数には型注釈が必須です。\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("normative-lines-without-verification-route", result.stdout)
+
+    def test_runtime_boundary_wording_is_not_a_blanket_checker_gate(self) -> None:
+        """Reachability boundaries may use negative wording without a style gate."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            root_agents = root / "ROOT_AGENTS.md"
+            root_agents.write_text(
+                root_agents.read_text(encoding="utf-8")
+                + "\n- do not activate a reviewer when no unresolved risk changes the route.\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("CONVENTION_COMPLIANCE=pass", result.stdout)
+
+    def test_legacy_forwarder_requires_caller_action_warning(self) -> None:
+        """Legacy forwarders must identify callers and migration action."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            forwarder = root / "tools" / "agent_tools" / "legacy_forwarder.py"
+            forwarder.write_text(
+                "LEGACY_FORWARDER_WARNING_REQUIRED = True\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("legacy_forwarder_warning", result.stdout)
+            self.assertIn("missing-marker:FORWARDER_CALLER", result.stdout)
+            self.assertIn("missing-marker:FORWARDER_ACTION", result.stdout)
+
+    def test_skill_routing_requires_codex_task_workflow_marker(self) -> None:
+        """Skill routing prompts must keep execution-stage skill markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / "agents" / "skills" / "agent-orchestration.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8").replace(
+                    "$codex-task-workflow ",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("skill_routing", result.stdout)
+            self.assertIn("missing-marker:$codex-task-workflow", result.stdout)
+
+    def test_skill_routing_requires_subagent_bootstrap_marker(self) -> None:
+        """Skill routing prompts must keep handoff-stage skill markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / "agents" / "skills" / "agent-orchestration.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8").replace(
+                    "$subagent-bootstrap ",
+                    "",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("skill_routing", result.stdout)
+            self.assertIn("missing-marker:$subagent-bootstrap", result.stdout)
+
+    def test_fallback_exit_policy_rejects_parent_direct_alternate_route(self) -> None:
+        """Fallback route wording must point at explicit exit evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / "agents" / "skills" / "codex-task-workflow.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8")
+                + "\nrecord blocker before falling back to a parent-direct alternate route\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("skill_exit_blocker_policy", result.stdout)
+            self.assertIn("forbidden-fallback-completion-wording", result.stdout)
+
+    def test_fallback_exit_policy_requires_exit_markers(self) -> None:
+        """Fallback route surfaces keep positive blocker evidence markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / "agents" / "skills" / "codex-task-workflow.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8").replace(
+                    " status=blocked",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("skill_exit_blocker_policy", result.stdout)
+            self.assertIn("missing-marker:status=blocked", result.stdout)
+
+    def test_fallback_exit_policy_requires_event_driven_wait_recovery_markers(
+        self,
+    ) -> None:
+        """Timeout recovery requires status + new-state or revised-packet evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / "agents" / "skills" / "codex-task-workflow.md"
+            updated = skill.read_text(encoding="utf-8").replace(
+                "new state evidence", "", 1
+            )
+            skill.write_text(updated, encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("skill_exit_blocker_policy", result.stdout)
+            self.assertIn("missing-marker:new state evidence", result.stdout)
+
+    def test_warning_acceptance_requires_explicit_approval_evidence(self) -> None:
+        """Accepted warning closeout requires approval evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / "agents" / "skills" / "tool-finding-report.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8").replace(
+                    " explicit_approval_evidence",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("skill_exit_blocker_policy", result.stdout)
+            self.assertIn(
+                "accepted-without-explicit-approval-evidence",
+                result.stdout,
+            )
+
+    def test_minimal_fixture_covers_fallback_exit_policy_surfaces(self) -> None:
+        """The minimal test fixture includes every fallback exit policy surface."""
+        missing = sorted(
+            path
+            for path in EXIT_BLOCKER_POLICY_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_document_structure_routing_requires_structure_planning(self) -> None:
+        """Document edit routing must keep structure analysis markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "agents" / "skills" / "codex-task-workflow.md"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "structure-planning",
+                    "structure-route-missing",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("document_structure_routing", result.stdout)
+            self.assertIn("missing-marker:structure-planning", result.stdout)
+
+    def test_document_structure_routing_requires_format_skip_evidence(self) -> None:
+        """Format-only Markdown routes must keep the skip evidence marker."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill_doc = root / "agents" / "skills" / "md-style-check.md"
+            skill_doc.write_text(
+                skill_doc.read_text(encoding="utf-8").replace(
+                    "structure_contract=skipped",
+                    "structure-contract-record",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("document_structure_routing", result.stdout)
+            self.assertIn("missing-marker:structure_contract=skipped", result.stdout)
+
+    def test_minimal_fixture_covers_document_structure_routing_surfaces(self) -> None:
+        """The minimal test fixture includes every docs structure routing surface."""
+        missing = sorted(
+            path
+            for path in DOCUMENT_STRUCTURE_ROUTING_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_document_split_decision_requires_policy_markers(self) -> None:
+        """Document split decisions must stay wired into source policy."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            policy_doc = root / "documents" / "conventions" / "common" / "05_docs.md"
+            policy_doc.write_text(
+                policy_doc.read_text(encoding="utf-8").replace(
+                    "document_split_decision",
+                    "document split decision missing",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("document_split_decision", result.stdout)
+            self.assertIn("missing-marker:document_split_decision", result.stdout)
+
+    def test_minimal_fixture_covers_document_split_decision_surfaces(self) -> None:
+        """The fixture includes every document split decision surface."""
+        missing = sorted(
+            path
+            for path in DOCUMENT_SPLIT_DECISION_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_design_integrity_gate_requires_markers(self) -> None:
+        """Design guidance must keep implementation tied to responsibility model."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "agents" / "canonical" / "CODEX_WORKFLOW.md"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "owning responsibility model",
+                    "nearby file route",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("design_integrity_gate", result.stdout)
+            self.assertIn(
+                "missing-marker:owning responsibility model",
+                result.stdout,
+            )
+
+    def test_design_integrity_gate_contract_is_manifest_backed(self) -> None:
+        """Design-integrity surfaces are loaded from the marker manifest."""
+        self.assertNotIn("ROOT_AGENTS.md", DESIGN_INTEGRITY_GATE_MARKERS)
+        self.assertIn(
+            "agents/skills/agent-orchestration.md",
+            DESIGN_INTEGRITY_GATE_MARKERS,
+        )
+        self.assertIn(
+            "agents/workflows/implementation-waterfall-workflow.md",
+            DESIGN_INTEGRITY_GATE_MARKERS,
+        )
+        self.assertIn(
+            "owner, replaceable unit",
+            DESIGN_INTEGRITY_GATE_MARKERS["agents/skills/agent-orchestration.md"],
+        )
+        self.assertNotIn(
+            "Abstract Design Frame",
+            DESIGN_INTEGRITY_GATE_MARKERS["agents/skills/agent-orchestration.md"],
+        )
+        self.assertNotIn(
+            "Design-To-Implementation Trace",
+            DESIGN_INTEGRITY_GATE_MARKERS["agents/skills/agent-orchestration.md"],
+        )
+
+    def test_minimal_fixture_covers_design_integrity_gate_surfaces(self) -> None:
+        """The fixture includes every design-integrity gate surface."""
+        missing = sorted(
+            path
+            for path in DESIGN_INTEGRITY_GATE_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_literature_backed_skill_call_order_contract_is_manifest_backed(
+        self,
+    ) -> None:
+        """Literature-backed skill-call order surfaces are manifest-backed."""
+        self.assertNotIn(
+            ".agents/skills/agent-orchestration/SKILL.md",
+            LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
+        )
+        self.assertIn(
+            "agents/skills/agent-orchestration.md",
+            LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
+        )
+        self.assertIn(
+            "tools/agent_tools/agent_team.py",
+            LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
+        )
+
+    def test_minimal_fixture_covers_literature_backed_skill_call_order_surfaces(
+        self,
+    ) -> None:
+        """The fixture includes every literature-backed skill-call order surface."""
+        missing = sorted(
+            path
+            for path in LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_static_read_validation_policy_requires_markers(self) -> None:
+        """Validation policy must keep static/read evidence primary."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "agents" / "skills" / "codex-task-workflow.md"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "primary validation evidence",
+                    "runtime confirmation",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("static_read_validation_policy", result.stdout)
+            self.assertIn("missing-marker:primary validation evidence", result.stdout)
+
+    def test_static_read_validation_policy_contract_is_manifest_backed(self) -> None:
+        """Static/read validation policy surfaces are manifest-backed."""
+        self.assertNotIn(
+            "documents/runtime/runtime-profiles-and-check-matrix.md",
+            STATIC_READ_VALIDATION_POLICY_MARKERS,
+        )
+        self.assertIn(
+            "primary validation evidence",
+            STATIC_READ_VALIDATION_POLICY_MARKERS[
+                "agents/skills/codex-task-workflow.md"
+            ],
+        )
+        self.assertFalse(
+            any(
+                path.startswith(".agents/skills/")
+                for path in STATIC_READ_VALIDATION_POLICY_MARKERS
+            )
+        )
+        self.assertNotIn(
+            "動作確認",
+            STATIC_READ_VALIDATION_POLICY_MARKERS[
+                "agents/skills/codex-task-workflow.md"
+            ],
+        )
+
+    def test_minimal_fixture_covers_static_read_validation_policy_surfaces(
+        self,
+    ) -> None:
+        """The fixture includes every static/read validation policy surface."""
+        missing = sorted(
+            path
+            for path in STATIC_READ_VALIDATION_POLICY_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_responsibility_preflight_gate_requires_markers(self) -> None:
+        """Pre-edit routing must keep responsibility-scope markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            protocol = root / "agents" / "COMMUNICATION_PROTOCOL.md"
+            protocol.write_text(
+                protocol.read_text(encoding="utf-8").replace(
+                    "responsibility_scope",
+                    "scope route",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("responsibility_preflight_gate", result.stdout)
+            self.assertIn("missing-marker:responsibility_scope", result.stdout)
+
+    def test_minimal_fixture_covers_responsibility_preflight_gate_surfaces(
+        self,
+    ) -> None:
+        """The minimal test fixture includes every responsibility preflight surface."""
+        missing = sorted(
+            path
+            for path in RESPONSIBILITY_PREFLIGHT_GATE_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_experiment_execution_surface_guard_requires_markers(self) -> None:
+        """Experiment execution surfaces keep lifecycle preflight markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / "agents" / "skills" / "experiment-lifecycle.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8").replace(
+                    "experiment_execution_surface_guard",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("experiment_execution_surface_guard", result.stdout)
+            self.assertIn(
+                "missing-marker:experiment_execution_surface_guard",
+                result.stdout,
+            )
+
+    def test_minimal_fixture_covers_experiment_execution_guard_surfaces(self) -> None:
+        """The minimal test fixture includes every experiment execution surface."""
+        missing = sorted(
+            path
+            for path in EXPERIMENT_EXECUTION_SURFACE_GUARD_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_branch_worktree_creation_guard_requires_markers(self) -> None:
+        """Branch/worktree creation stays connected to the critical guard."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "agents" / "canonical" / "CODEX_WORKFLOW.md"
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    "tools/agent_tools/hook_safety.py",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("branch_worktree_creation_guard", result.stdout)
+            self.assertIn(
+                "missing-marker:tools/agent_tools/hook_safety.py", result.stdout
+            )
+
+    def test_minimal_fixture_covers_branch_worktree_guard_surfaces(self) -> None:
+        """The minimal test fixture includes every branch/worktree guard surface."""
+        fixture = "\n".join(MINIMAL_REPO_FILES.values())
+        fixture_paths = set(MINIMAL_REPO_FILES.keys())
+        missing = sorted(
+            marker
+            for marker in BRANCH_WORKTREE_CREATION_GUARD_MARKERS
+            if marker not in fixture and marker not in fixture_paths
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_document_claim_grounding_requires_markers(self) -> None:
+        """Canonical docs must keep prose-claim grounding markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            docs_policy = root / "documents" / "conventions" / "common" / "05_docs.md"
+            docs_policy.write_text(
+                "docs check_convention_compliance.py\n", encoding="utf-8"
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("document_claim_grounding", result.stdout)
+            self.assertIn("missing-marker:claim grounding", result.stdout)
+            self.assertIn("missing-marker:program contract", result.stdout)
+            self.assertIn("missing-marker:proof obligation", result.stdout)
+
+    def test_document_claim_grounding_rejects_provisional_canon(self) -> None:
+        """Provisional wording in canonical docs needs an evidence route."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill_doc = root / "agents" / "skills" / "long-form-writing.md"
+            skill_doc.write_text(
+                skill_doc.read_text(encoding="utf-8")
+                + "\n- まずは近い文書へ claim を入れる。\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("document_claim_grounding", result.stdout)
+            self.assertIn("provisional-wording-without-grounding", result.stdout)
+
+    def test_minimal_fixture_covers_document_claim_grounding_surfaces(self) -> None:
+        """The minimal test fixture includes every claim grounding surface."""
+        missing = sorted(
+            path
+            for path in DOCUMENT_CLAIM_GROUNDING_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_test_contract_routing_requires_contract_only_wrapper_markers(self) -> None:
+        """Testing policy must route contract-only wrappers to static validation."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            testing_policy = (
+                root / "documents" / "conventions" / "coding-conventions-testing.md"
+            )
+            testing_policy.write_text("testing canonical command\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("test_contract_routing", result.stdout)
+            self.assertIn("missing-marker:contract-only wrapper", result.stdout)
+            self.assertIn("missing-marker:static contract validation", result.stdout)
+
+    def test_minimal_fixture_covers_test_contract_routing_surfaces(self) -> None:
+        """The minimal test fixture includes every test contract routing surface."""
+        missing = sorted(
+            path
+            for path in TEST_CONTRACT_ROUTING_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_validation_failure_response_rejects_stale_owner_projection_set(
+        self,
+    ) -> None:
+        """Validation-failure slug ownership must stay on runtime-profile JSON."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            troubleshooting = root / "documents" / "operations" / "TROUBLESHOOTING.md"
+            troubleshooting.write_text(
+                troubleshooting.read_text(encoding="utf-8")
+                + "\n`documents/runtime/runtime-profiles-and-check-matrix.md`、"
+                "`agents/canonical/CODEX_WORKFLOW.md`、"
+                "`agents/canonical/CODEX_SUBAGENTS.md`、"
+                "`documents/conventions/REVIEW_PROCESS.md` の slug set を参照します。\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("validation_failure_response", result.stdout)
+            self.assertIn("stale-taxonomy-owner", result.stdout)
+
+    def test_minimal_fixture_covers_validation_failure_response_surfaces(self) -> None:
+        """The minimal fixture includes every validation failure response surface."""
+        missing = sorted(
+            path
+            for path in VALIDATION_FAILURE_RESPONSE_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_mathematical_necessity_gate_requires_markers(self) -> None:
+        """Mathematical judgment surfaces keep necessity-gate markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            proof_skill = root / "agents" / "skills" / "formal-proof-workflow.md"
+            proof_skill.write_text(
+                "program contract public entrypoint proof obligation\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("mathematical_necessity_gate", result.stdout)
+            self.assertIn("missing-marker:mathematical necessity gate", result.stdout)
+            self.assertIn("missing-marker:theorem surface", result.stdout)
+
+    def test_minimal_fixture_covers_mathematical_necessity_surfaces(self) -> None:
+        """The minimal test fixture includes every math necessity surface."""
+        missing = sorted(
+            path
+            for path in MATHEMATICAL_NECESSITY_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_implementation_guardrails_require_markers(self) -> None:
+        """Implementation policy keeps compatibility and duplicate guards visible."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            house_style = (
+                root / "documents" / "conventions" / "coding-conventions-house-style.md"
+            )
+            house_style.write_text(
+                "house canonical owner check_convention_compliance.py\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("implementation_guardrails", result.stdout)
+            self.assertIn(
+                "missing-marker:compatibility-preservation drift",
+                result.stdout,
+            )
+            self.assertIn("missing-marker:duplicate implementation", result.stdout)
+            self.assertIn("missing-marker:caller migration", result.stdout)
+            self.assertIn(
+                "missing-marker:contract-complete implementation",
+                result.stdout,
+            )
+            self.assertIn("missing-marker:acceptance contract", result.stdout)
+            self.assertIn("missing-marker:design_issue_blocker", result.stdout)
+            self.assertIn("missing-marker:implementation shortcut", result.stdout)
+
+    def test_workflow_guardrails_require_legacy_route_marker(self) -> None:
+        """The workflow owner uses the semantic legacy-route marker."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            workflow = root / "agents" / "canonical" / "CODEX_WORKFLOW.md"
+            workflow.write_text(
+                MINIMAL_REPO_FILES["agents/canonical/CODEX_WORKFLOW.md"].replace(
+                    "legacy-route drift ", ""
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "implementation_guardrails:agents/canonical/CODEX_WORKFLOW.md:"
+                "missing-marker:legacy-route drift",
+                result.stdout,
+            )
+            self.assertNotIn(
+                "implementation_guardrails:agents/canonical/CODEX_WORKFLOW.md:"
+                "missing-marker:compatibility-preservation drift",
+                result.stdout,
+            )
+
+    def test_minimal_fixture_covers_implementation_guardrail_surfaces(self) -> None:
+        """The minimal test fixture includes every implementation guardrail surface."""
+        missing = sorted(
+            path
+            for path in IMPLEMENTATION_GUARDRAIL_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_refactor_sequence_requires_two_stage_markers(self) -> None:
+        """Refactor workflow keeps the forced-migration usage-repair sequence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            refactor_skill = root / "agents" / "skills" / "refactor-loop.md"
+            refactor_skill.write_text("refactor workflow only\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("refactor_sequence", result.stdout)
+            self.assertIn("missing-marker:two-stage refactor", result.stdout)
+            self.assertIn("missing-marker:forced migration", result.stdout)
+            self.assertIn("missing-marker:usage-surface repair", result.stdout)
+            self.assertIn("missing-marker:return-gate validation", result.stdout)
+
+    def test_minimal_fixture_covers_refactor_sequence_surfaces(self) -> None:
+        """The minimal test fixture includes every refactor sequence surface."""
+        missing = sorted(
+            path for path in REFACTOR_SEQUENCE_MARKERS if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_review_issue_routing_is_conditional_and_keeps_owner_markers(self) -> None:
+        """Only durable review follow-up uses issue routing markers."""
+        self.assertNotIn(
+            "agents/skills/change-review.md",
+            REVIEW_ISSUE_ROUTING_MARKERS,
+        )
+        self.assertIn(
+            "documents/conventions/REVIEW_PROCESS.md",
+            REVIEW_ISSUE_ROUTING_MARKERS,
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            review_skill = root / "agents" / "skills" / "change-review.md"
+            review_skill.write_text("review findings only\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            review_process = root / "documents" / "conventions" / "REVIEW_PROCESS.md"
+            review_process.write_text("review policy without durable follow-up\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("review_issue_routing", result.stdout)
+            self.assertIn("missing-marker:issue_route", result.stdout)
+            self.assertIn("missing-marker:issue_sync.py", result.stdout)
+
+    def test_minimal_fixture_covers_review_issue_routing_surfaces(self) -> None:
+        """The minimal test fixture includes every review issue route surface."""
+        missing = sorted(
+            path
+            for path in REVIEW_ISSUE_ROUTING_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_solid_coding_contract_requires_oop_checker_route_markers(self) -> None:
+        """SOLID coding guidance stays wired to OOP readability evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            python_policy = (
+                root / "documents" / "conventions" / "coding-conventions-python.md"
+            )
+            python_policy.write_text(
+                python_policy.read_text(encoding="utf-8").replace(
+                    "SOLID_PRINCIPLES_BY_KIND",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("solid_coding_contract", result.stdout)
+            self.assertIn("missing-marker:SOLID_PRINCIPLES_BY_KIND", result.stdout)
+
+    def test_solid_canonical_skill_requires_route_owner_marker(self) -> None:
+        """Canonical OOP skill keeps the SOLID route owner visible."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            skill = root / "agents" / "skills" / "oop-readability-check.md"
+            skill.write_text(
+                skill.read_text(encoding="utf-8").replace(
+                    "SOLID route owner",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("solid_coding_contract", result.stdout)
+            self.assertIn("missing-marker:SOLID route owner", result.stdout)
+
+    def test_solid_catalog_requires_trigger_marker(self) -> None:
+        """Skill catalog keeps the direct SOLID trigger marker."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            catalog = root / "agents" / "skills" / "catalog.yaml"
+            catalog.write_text(
+                catalog.read_text(encoding="utf-8").replace(
+                    '- ["SOLID"]\n',
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("solid_coding_contract", result.stdout)
+            self.assertIn('missing-marker:- ["SOLID"]', result.stdout)
+
+    def test_solid_contract_requires_default_reviewer_evidence_gate(self) -> None:
+        """Default reviewers keep SOLID evidence verification wired."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            reviewer = root / ".codex" / "agents" / "reviewer.toml"
+            reviewer.write_text(
+                reviewer.read_text(encoding="utf-8").replace(
+                    "check_solid_evidence.py",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("solid_coding_contract", result.stdout)
+            self.assertIn("missing-marker:check_solid_evidence.py", result.stdout)
+
+    def test_minimal_fixture_covers_solid_coding_contract_surfaces(self) -> None:
+        """The minimal test fixture includes every SOLID coding contract surface."""
+        missing = sorted(
+            path
+            for path in SOLID_CODING_CONTRACT_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def test_source_file_definition_order_is_owned_by_conventions_not_python_review(
+        self,
+    ) -> None:
+        """Definition-order guidance remains in its semantic convention owners."""
+        self.assertNotIn(
+            "agents/skills/python-review.md",
+            SOURCE_FILE_DEFINITION_ORDER_MARKERS,
+        )
+        self.assertIn(
+            "documents/conventions/python/09_file_roles.md",
+            SOURCE_FILE_DEFINITION_ORDER_MARKERS,
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            python_review = root / "agents" / "skills" / "python-review.md"
+            python_review.write_text(
+                python_review.read_text(encoding="utf-8").replace(
+                    "定義順",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            file_roles = root / "documents" / "conventions" / "python" / "09_file_roles.md"
+            file_roles.write_text("python file roles without ordering owner\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("source_file_definition_order", result.stdout)
+            self.assertIn("missing-marker:読者順序", result.stdout)
+
+    def test_source_file_definition_order_requires_catalog_trigger(self) -> None:
+        """Source definition order feedback stays visible in deterministic routing."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            catalog = root / "agents" / "skills" / "catalog.yaml"
+            catalog.write_text(
+                catalog.read_text(encoding="utf-8").replace(
+                    "コードファイル",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("source_file_definition_order", result.stdout)
+            self.assertIn("missing-marker:コードファイル", result.stdout)
+
+    def test_minimal_fixture_covers_source_file_definition_order_surfaces(self) -> None:
+        """The minimal fixture includes every source definition order surface."""
+        missing = sorted(
+            path
+            for path in SOURCE_FILE_DEFINITION_ORDER_MARKERS
+            if path not in MINIMAL_REPO_FILES
+        )
+
+        self.assertEqual(missing, [])
+
+    def copy_minimal_repo(self, root: Path) -> None:
+        """Create the minimum tree needed by the checker."""
+        for path, text in MINIMAL_REPO_FILES.items():
+            target = root / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text, encoding="utf-8")
+        for tool in MINIMAL_AGENT_TOOLS:
+            target = root / "tools" / "agent_tools" / tool
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+        for tool_path in MINIMAL_PYTHON_TOOLS:
+            target = root / tool_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+        github_checker = root / "tools" / "ci" / "check_github_workflows.py"
+        github_checker.parent.mkdir(parents=True, exist_ok=True)
+        github_checker.write_text(
+            "#!/usr/bin/env python3\ncheck_skill_frontmatter.py\n",
+            encoding="utf-8",
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

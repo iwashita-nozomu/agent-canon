@@ -1,0 +1,20 @@
+{
+  "schema": "agent_canon.skill_runtime_shim.host_observation",
+  "version": 1,
+  "scenario_id": "boundary-and-negative",
+  "packet_id": "shim-boundary-and-negative-v1",
+  "packet_class": "full",
+  "iteration_id": "fresh-generated-01",
+  "skill_id": "task-routing",
+  "variant": "generated",
+  "prompt": "Consider three repository requests: an unrelated task, a task delegated to a host-provided\nsystem skill, and a request to change canonical skill prose. Inspect the public discovery\nadapter and owner surfaces, then report which local skill surface is relevant and which\nrequests remain outside its authority. Keep the evaluation read-only.\n",
+  "prompt_digest": "95c636dd3b8567ab94b0d28700d4460cf77335b5c5184ef3dca28e3d37b24e1b",
+  "input_tokens": 586,
+  "canonical_followup_input_tokens": 175,
+  "cache_fields_observed": {},
+  "category": "boundary-and-negative",
+  "model_id": "gpt-5.4-mini",
+  "host_profile": "medium",
+  "method": "fresh_read_only",
+  "observation_status": "pass"
+}

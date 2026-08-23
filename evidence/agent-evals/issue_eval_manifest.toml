@@ -1,0 +1,392 @@
+# @dependency-start
+# contract data
+# responsibility Registers issue-derived AgentCanon behavior eval cases.
+# upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md defines eval taxonomy and close conditions.
+# upstream design ../../issues/README.md defines durable operational issue storage.
+# downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py consumes skill/workflow eval patterns.
+# downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval accumulation surfaces.
+# @dependency-end
+
+catalog_kind = "agent_canon_issue_eval_manifest"
+version = 1
+
+[[eval]]
+id = "helper-change-authority-before-helper"
+category = "helper-sprawl"
+source_issue = 102
+oracle_type = "machine"
+protects = [
+  "no helper addition without path and qualname authority",
+  "no unrelated docs/test/issue edits as helper-first bypass",
+]
+expected_route = [
+  "inspect existing helpers",
+  "record helper_change authority with owner, caller, existing-helper gap, and tests",
+]
+forbidden_route = [
+  "add helper-like function with only unrelated boundary evidence",
+]
+linked_rules = [
+  "tools/agent_tools/responsibility_scope.py",
+  "tools/agent_tools/task_authority.py",
+]
+
+[[eval]]
+id = "api-surface-before-negative-conclusion"
+category = "api-surface-miss"
+source_issue = 97
+oracle_type = "rubric"
+protects = [
+  "negative capability claims cite inspected public path",
+  "nested public config factories are inspected before helper/library changes",
+]
+expected_route = [
+  "inspect imports, exports, signatures, nested public config fields, examples",
+  "name exact missing selector if capability is absent",
+]
+forbidden_route = [
+  "create helper before public API traversal",
+  "edit library before caller-side extension point search",
+]
+linked_rules = [
+  "documents/design/api-surface-traversal-policy.md",
+  "agents/workflows/hypothesis-validation-workflow.md",
+]
+
+[[eval]]
+id = "repo-document-responsibility-boundary"
+category = "responsibility-boundary"
+source_issue = 98
+oracle_type = "rubric"
+protects = [
+  "AgentCanon-generic policy is not hidden in template-only docs",
+  "template-specific operations are not pushed into AgentCanon canon",
+]
+expected_route = [
+  "classify template-local, AgentCanon-generic, and target-repo-local surfaces",
+  "cite ownership document before editing",
+]
+forbidden_route = [
+  "close issue with markdown-only note and no eval decision",
+]
+linked_rules = [
+  "documents/runtime/SHARED_RUNTIME_SURFACES.md",
+  "documents/operations/issue-label-taxonomy.md",
+]
+
+[[eval]]
+id = "update-route-entrypoint-consistency"
+category = "workflow-bypass"
+source_issue = 99
+oracle_type = "rubric"
+protects = [
+  "normal parent repo update uses plan/latest",
+  "apply and ensure-latest are not presented as competing canonical routes",
+]
+expected_route = [
+  "bootstrap.sh --control-parent-root <parent> --runtime-root <runtime> status",
+  "AgentCanon source PR and merged main readback",
+]
+forbidden_route = [
+  "plan -> apply -> merge-main-into-current as a parent projection sequence",
+]
+linked_rules = [
+  "documents/agent-canon/agent-canon-update-route.md",
+]
+
+[[eval]]
+id = "check-agent-canon-latest-readonly-default"
+category = "workflow-bypass"
+source_issue = 99
+oracle_type = "machine"
+protects = [
+  "check-named latest gate does not stage parent gitlink by default",
+]
+expected_route = [
+  "AGENT_CANON_LATEST_AUTO_REPAIR=skipped_read_only_check",
+  "NEXT_ACTION tells operator to use the standalone AgentCanon PR route",
+]
+forbidden_route = [
+  "git add from check_agent_canon_latest.sh default path",
+]
+linked_rules = [
+  "tools/ci/check_agent_canon_latest.sh",
+]
+
+[[eval]]
+id = "agentcanon-pr-versus-parent-pin-route"
+category = "responsibility-boundary"
+source_issue = 99
+oracle_type = "rubric"
+protects = [
+  "local AgentCanon source commits route to AgentCanon PR",
+  "parent pin update remains a separate lane after merge",
+]
+expected_route = [
+  "merge-main-into-current only on local AgentCanon source branch",
+  "post-merge parent validates its own tree without an AgentCanon sync command",
+]
+forbidden_route = [
+  "hide AgentCanon source edit inside template-only pin PR",
+]
+linked_rules = [
+  "documents/agent-canon/agent-canon-update-route.md",
+  "agents/skills/agent-update-branch.md",
+]
+
+[[eval]]
+id = "hook-output-does-not-hide-observation"
+category = "workflow-bypass"
+source_issue = 83
+oracle_type = "machine"
+protects = [
+  "read-only and GitStatus-style hook paths do not hide command output",
+  "noncritical hook findings use warning or systemMessage surfaces",
+]
+expected_route = [
+  "run hook dispatcher skip/downgrade cases",
+  "preserve user-visible command output for observation commands",
+]
+forbidden_route = [
+  "block generic shell/read-only command output for noncritical hook advice",
+]
+linked_rules = [
+  ".codex/hooks/hook_dispatcher.py",
+  "tests/agent_tools/test_codex_hooks.py",
+]
+
+[[eval]]
+id = "role-write-policy-hook-connected"
+category = "scope-creep"
+source_issue = 100
+oracle_type = "machine"
+protects = [
+  "artifact-only or read-only roles cannot leave repo edits unnoticed",
+  "active role must be explicit for repo-changing events",
+]
+expected_route = [
+  "resolve AGENT_CANON_ACTIVE_ROLE or task_authority active_role",
+  "run role_write_policy_guard before completion",
+]
+forbidden_route = [
+  "reviewer or artifact-only role edits repo files without a blocking finding",
+]
+linked_rules = [
+  "tools/agent_tools/task_authority.py",
+  "tools/agent_tools/task_authority.py",
+  "tests/agent_tools/test_codex_hooks.py",
+]
+
+[[eval]]
+id = "first-party-library-change-requires-authority"
+category = "upstream-mutation"
+source_issue = 101
+oracle_type = "machine"
+protects = [
+  "first-party reusable source/API paths require explicit authority",
+  "task-local adapters stay available when reusable surface edits are not needed",
+]
+expected_route = [
+  "check responsibility-scope first-party patterns",
+  "require first_party_library_change authority with reason, callers, and tests",
+]
+forbidden_route = [
+  "modify python/src/include/lib reusable code without request-local authority",
+]
+linked_rules = [
+  "tools/agent_tools/task_authority.py",
+  "tools/agent_tools/task_authority.py",
+  "tests/agent_tools/test_codex_hooks.py",
+]
+
+[[eval]]
+id = "task-authority-schema-before-repo-edits"
+category = "scope-creep"
+source_issue = 103
+oracle_type = "machine"
+protects = [
+  "request-local allowed paths and risky authorities are schema checked",
+  "repo-changing hooks do not proceed with malformed authority",
+]
+expected_route = [
+  "create task_authority.yaml in every run bundle",
+  "block missing or malformed authority when changed files exist",
+]
+forbidden_route = [
+  "infer allowed paths only from chat or unstated subagent role",
+]
+linked_rules = [
+  "tools/agent_tools/task_authority.py",
+  "tools/agent_tools/task_authority.py",
+  "tools/agent_tools/agent_team.py",
+]
+
+[[eval]]
+id = "parent-repo-readiness-doctor-route"
+category = "responsibility-boundary"
+source_issue = 104
+oracle_type = "machine"
+protects = [
+  "derived repo root views, hooks, scopes, and submodule pin are checked together",
+]
+expected_route = [
+  "run parent_repo_readiness.py for template or derived repo adoption",
+  "report root view, hook, shared surface, and container findings together",
+]
+forbidden_route = [
+  "diagnose only one copied root file while ignoring shared root view state",
+]
+linked_rules = [
+  "tools/agent_tools/parent_repo_readiness.py",
+  "tests/agent_tools/test_parent_repo_readiness.py",
+]
+
+[[eval]]
+id = "derived-repo-bootstrap-runbook-present"
+category = "insufficient-evidence"
+source_issue = 106
+oracle_type = "rubric"
+protects = [
+  "new derived repositories have a minimal AgentCanon adoption path",
+  "bootstrap evidence names fresh clone, submodule, root views, and validation",
+]
+expected_route = [
+  "follow documents/contracts/derived-repo-bootstrap-runbook.md",
+  "record parent repo readiness and path/risk checks",
+]
+forbidden_route = [
+  "tell operators to copy scattered files without submodule/root-view validation",
+]
+linked_rules = [
+  "documents/contracts/derived-repo-bootstrap-runbook.md",
+  "tools/agent_tools/parent_repo_readiness.py",
+]
+
+[[eval]]
+id = "path-risk-check-matrix-smoke"
+category = "workflow-bypass"
+source_issue = 114
+oracle_type = "machine"
+protects = [
+  "changed path sets map to explicit validation profiles and commands",
+  "GitHub manual smoke can exercise the classifier",
+]
+expected_route = [
+  "run classify_path_risk.py on changed paths",
+  "run .github/workflows/path-risk-check-matrix-smoke.yml when GitHub smoke is needed",
+]
+forbidden_route = [
+  "choose PR validation only from intuition after path changes",
+]
+linked_rules = [
+  "tools/agent_tools/classify_path_risk.py",
+  ".github/workflows/path-risk-check-matrix-smoke.yml",
+  "tests/agent_tools/test_classify_path_risk.py",
+]
+
+[[eval]]
+id = "tool-catalog-schema-validation"
+category = "insufficient-evidence"
+source_issue = 115
+oracle_type = "machine"
+protects = [
+  "tools/catalog.yaml entries remain schema validated",
+  "tool docs and catalog drift are visible before PR closeout",
+]
+expected_route = [
+  "run tool_catalog.py and tool_drift.py",
+  "add tests when catalog schema expectations change",
+]
+forbidden_route = [
+  "add tool catalog rows without machine validation",
+]
+linked_rules = [
+  "tools/agent_tools/tool_catalog.py",
+  "tools/agent_tools/tool_drift.py",
+  "tests/agent_tools/test_tool_catalog.py",
+]
+
+[[eval]]
+id = "agentcanon-source-readback-boundary"
+category = "wrong-artifact"
+source_issue = 117
+oracle_type = "rubric"
+protects = [
+  "source readback separates AgentCanon publication from parent project validation",
+  "runtime and archive evidence remain external to the source checkout",
+]
+expected_route = [
+  "follow documents/agent-canon/agent-canon-update-route.md",
+  "read back merged AgentCanon main before parent validation",
+]
+forbidden_route = [
+  "restore a vendor checkout, submodule, or root projection",
+]
+linked_rules = [
+  "documents/agent-canon/agent-canon-update-route.md",
+]
+
+[[eval]]
+id = "dependency-manifest-graph-report-artifact"
+category = "insufficient-evidence"
+source_issue = 118
+oracle_type = "machine"
+protects = [
+  "dependency graph review uses compact Markdown/DOT artifacts",
+  "known cycle debt is visible without dumping raw graph output into chat",
+]
+expected_route = [
+  "run run_repo_dependency_review.sh --report-dir",
+  "render dependency_graph.tsv with render_dependency_manifest_graph.py",
+]
+forbidden_route = [
+  "read raw full graph output as the only review artifact",
+]
+linked_rules = [
+  "tools/agent_tools/render_dependency_manifest_graph.py",
+  "tools/agent_tools/run_repo_dependency_review.sh",
+  "tests/agent_tools/test_render_dependency_manifest_graph.py",
+]
+
+[[eval]]
+id = "prompt-skill-eval-change-checklist"
+category = "insufficient-evidence"
+source_issue = 119
+oracle_type = "rubric"
+protects = [
+  "skill and prompt changes include role, route, behavior, and evidence checks",
+  "eval closeout distinguishes self-report from observable behavior",
+]
+expected_route = [
+  "use documents/codex/prompt-skill-evaluation-checklist.md before prompt or skill closeout",
+  "add or cite issue-derived eval cases for observed failures",
+]
+forbidden_route = [
+  "close prompt/skill change with prose-only confidence",
+]
+linked_rules = [
+  "documents/codex/prompt-skill-evaluation-checklist.md",
+  "evidence/agent-evals/issue_eval_manifest.toml",
+]
+
+[[eval]]
+id = "maintenance-issue-template-label-taxonomy"
+category = "insufficient-evidence"
+source_issue = 120
+oracle_type = "machine"
+protects = [
+  "AgentCanon maintenance and eval capture issues have structured intake",
+  "label taxonomy documents triage meaning",
+]
+expected_route = [
+  "use AgentCanon maintenance or eval capture issue form",
+  "classify labels with documents/operations/issue-label-taxonomy.md",
+]
+forbidden_route = [
+  "create free-form maintenance issue with no affected surface or validation field",
+]
+linked_rules = [
+  ".github/ISSUE_TEMPLATE/agentcanon-maintenance.yml",
+  ".github/ISSUE_TEMPLATE/eval-capture.yml",
+  "documents/operations/issue-label-taxonomy.md",
+]

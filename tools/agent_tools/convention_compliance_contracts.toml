@@ -1,0 +1,219 @@
+# @dependency-start
+# contract tool
+# responsibility Declares canonical-source marker contracts consumed by convention compliance checks.
+# upstream design ../../agents/skills/oop-readability-check.md SOLID checker route ownership
+# upstream design ../../agents/canonical/CODEX_WORKFLOW.md branch reuse and checkout continuity policy
+# upstream design ../../documents/design/entrypoint-owner-map.md root entrypoint responsibility boundary
+# downstream implementation ./check_convention_compliance.py loads marker contracts
+# downstream implementation ./check_entrypoint_owner_map.py rejects operational marker ownership in root entrypoints
+# downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py verifies marker contracts
+# @dependency-end
+
+schema_version = 1
+
+# Skill policy markers belong to agents/skills/<skill>.md canonical prose owners.
+# Generated .agents/skills/<skill>/SKILL.md adapters use dedicated shim readback gates.
+# AGENTS.md and ROOT_AGENTS.md are reader maps; operational marker contracts stay in owners.
+
+[[contracts]]
+id = "design_integrity_gate"
+description = "Implementation starts from an owning responsibility model and semantic decision sufficiency: owner, replaceable unit, implementation mechanism, validation route, unresolved branch, and design_issue_blocker."
+
+[[contracts.surfaces]]
+path = "agents/skills/agent-orchestration.md"
+markers = ["Design Integrity Gate", "Decision sufficiency is semantic", "owner, replaceable unit", "implementation mechanism", "validation route", "unresolved branch", "design_issue_blocker"]
+
+[[contracts.surfaces]]
+path = "agents/skills/codex-task-workflow.md"
+markers = ["Design Integrity Gate", "責務 model", "差し替え可能な単位", "実装 scope", "validation route", "unresolved branch", "design_issue_blocker"]
+
+[[contracts.surfaces]]
+path = "agents/canonical/CODEX_WORKFLOW.md"
+markers = ["Design Integrity Gate", "owning responsibility model", "replaceable unit", "mechanism", "validation route", "unresolved branch", "design_issue_blocker"]
+
+[[contracts.surfaces]]
+path = "agents/workflows/implementation-waterfall-workflow.md"
+markers = ["Design Integrity Gate", "owning responsibility model", "replaceable unit", "mechanism", "validation route", "unresolved branch", "design_issue_blocker"]
+
+[[contracts]]
+id = "static_read_validation_policy"
+description = "Validation keeps static/read evidence primary, adds targeted runtime evidence only for changed behavior or integration risk, and records unresolved runtime or static risk before broader execution."
+
+[[contracts.surfaces]]
+path = "agents/skills/codex-task-workflow.md"
+markers = ["静的解析・読み取り evidence", "primary validation evidence", "supplemental evidence", "runtime behavior", "未解決 finding"]
+
+[[contracts.surfaces]]
+path = "agents/canonical/CODEX_WORKFLOW.md"
+markers = ["静的解析、読み取り確認、docs / targeted tests / agent checks", "Runtime evidence", "distinct unresolved claim/risk"]
+
+[[contracts]]
+id = "literature_backed_skill_call_order"
+description = "Research-backed implementation skill-call sequences place literature-survey before research-workflow, design, implementation, benchmark, and report claims."
+
+[[contracts.surfaces]]
+path = "agents/skills/agent-orchestration.md"
+markers = ["literature-survey", "research-workflow", "先に", "source packet", "adoption/exclusion"]
+
+[[contracts.surfaces]]
+path = "agents/skills/codex-task-workflow.md"
+markers = ["literature-survey", "research-workflow", "設計", "Implementation Source Packet", "adoption/exclusion"]
+
+[[contracts.surfaces]]
+path = "agents/skills/skill-dependencies.yaml"
+markers = ["literature-survey", "research-workflow", "routing_candidates", "order_constraints"]
+
+[[contracts.surfaces]]
+path = "agents/task_catalog.yaml"
+markers = ["literature-survey", "research-workflow", "source packet", "adoption/exclusion"]
+
+[[contracts.surfaces]]
+path = "tools/agent_tools/agent_team.py"
+markers = ["$literature-survey", "$research-workflow", "research_driven_change", "selected.append"]
+
+[[contracts]]
+id = "responsibility_preflight_gate"
+description = "Pre-edit routing keeps planned paths tied to responsibility-scope.toml owner scopes before implementation directories are selected."
+
+[[contracts.surfaces]]
+path = "tools/agent_tools/tool_rejection_preflight.py"
+markers = ["RESPONSIBILITY_SCOPE_COMMAND", "responsibility_scope_gate", "scope_covers", "protecting_tools", "gate=\"responsibility_scope\""]
+
+[[contracts.surfaces]]
+path = "agents/COMMUNICATION_PROTOCOL.md"
+markers = ["responsibility_scope", "responsibility-scope.toml", "owner", "class", "protecting tools", "planned path"]
+
+[[contracts.surfaces]]
+path = "agents/skills/codex-task-workflow.md"
+markers = ["tool_rejection_preflight", "responsibility_scope", "owner scope", "protecting tools", "実装ディレクトリ"]
+
+[[contracts]]
+id = "experiment_execution_surface_guard"
+description = "Managed experiment execution surfaces route through lifecycle and test-design validation before runner or registry semantics change."
+
+[[contracts.surfaces]]
+path = "tools/agent_tools/tool_rejection_preflight.py"
+markers = ["EXPERIMENT_EXECUTION_SURFACE_PATHS", "experiment_execution_surface_guard", "experiment_execution_surface_path", "check_experiment_registry.py", "test_run_managed_experiment.py"]
+
+[[contracts.surfaces]]
+path = "agents/skills/experiment-lifecycle.md"
+markers = ["experiment_execution_surface_guard", "tool_rejection_preflight.py", "test-design", "check_experiment_registry.py", "tests/tools/test_run_managed_experiment.py"]
+
+[[contracts.surfaces]]
+path = "documents/experiments/experiment-registry.md"
+markers = ["experiment_execution_surface_guard", "tool_rejection_preflight.py", "check_experiment_registry.py", "tests/tools/test_run_managed_experiment.py"]
+
+[[contracts]]
+id = "branch_worktree_creation_guard"
+description = "Shared-checkout Git mutations and branch/worktree creation stay routed through explicit authority and the critical PreToolUse guard."
+
+[[contracts.surfaces]]
+path = "tools/agent_tools/hook_safety.py"
+markers = [
+    "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY",
+    "AGENT_CANON_BRANCH_WORKTREE_REASON",
+    "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY",
+    "AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+    "agent_canon_workflow",
+    "branch_block_payload",
+    "command_sha256",
+    "explicit_user_approval",
+    "operation",
+    "same-segment",
+    "user_request",
+]
+
+[[contracts.surfaces]]
+path = ".codex/hooks/hook_dispatcher.py"
+markers = ["HOOK_EVENT_CONTRACTS", "HookEventContract", "ACTIVE_HOOK_HANDLERS", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop", "hook_safety", "validate_projection_bytes", "record_hook_invocation", "HookLogContext", "RETIRED_CHILD_TOMBSTONES", "MOVED_SOURCE_ABSENCES"]
+
+[[contracts.surfaces]]
+path = "agents/canonical/CODEX_WORKFLOW.md"
+markers = [
+    "Branch Reuse Default",
+    "tools/agent_tools/hook_safety.py",
+    "user が別 branch を明示",
+    "AgentCanon branch / PR workflow",
+    "branch_creation_reason=<reason>",
+    "worktree_creation_reason=<reason>",
+    "proven exact task ownership",
+    "session restart",
+    "Git authority は操作リスクで分けます。",
+    "通常の branch create / worktree add",
+    "creation authority/reason のみを要求し",
+    "force-create または ref overwrite",
+    "creation と destructive authority/reason の両方を要求",
+    "既存 branch の checkout/switch",
+    "destructive authority/reason を要求します",
+    "`latest` / `apply` / merge update wrapper",
+    "worktree の remove/move/repair/prune/force-add",
+    "ambient 変数や prior segment は authority になりません",
+]
+
+[[contracts.surfaces]]
+path = ".codex/README.md"
+markers = ["active events", "legacy `Stop`", "fail-open", "retired child tombstones", "bounded", "redacted"]
+
+[[contracts.surfaces]]
+path = "agents/skills/worktree-health.md"
+markers = ["agents/canonical/CODEX_WORKFLOW.md", "Branch Reuse Default", "tools/agent_tools/hook_safety.py", "branch_creation_reason=<reason>", "worktree_creation_reason=<reason>", "git worktree list --porcelain", "git branch --show-current"]
+
+[[contracts]]
+id = "solid_coding_contract"
+description = "SOLID guidance stays routed to OOP readability checker evidence instead of prose-only review."
+
+[[contracts.surfaces]]
+path = "documents/conventions/coding-conventions-python.md"
+markers = ["SOLID 設計契約", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "tools/oop/python/readability.py", "tools/oop/shared/readability_core.py", "tools/agent_tools/check_solid_evidence.py", "SOLID principle signal", "SOLID_PRINCIPLES_BY_KIND", "scanned_paths"]
+
+[[contracts.surfaces]]
+path = "documents/conventions/object-oriented-design.md"
+markers = ["SOLID との対応", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "tools/oop/shared/readability_core.py", "SOLID_PRINCIPLES_BY_KIND", "import_responsibility.py"]
+
+[[contracts.surfaces]]
+path = "documents/conventions/coding-conventions-testing.md"
+markers = ["SOLID / OOP boundary assertion", "$oop-readability-check", "tools/oop/python/readability.py", "tools/oop/cpp/readability.py", "import_responsibility.py"]
+
+[[contracts.surfaces]]
+path = "agents/skills/codex-task-workflow.md"
+markers = ["$oop-readability-check", "SOLID principle signal", "OOP dimension", "finding kind", "tools/oop/shared/readability_core.py", "check_solid_evidence.py", "scanned_paths", "class", "Protocol"]
+
+[[contracts.surfaces]]
+path = ".codex/agents/python_reviewer.toml"
+markers = ["check_solid_evidence.py", "OOP readability report", "SOLID principle signal", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "path-covered"]
+
+[[contracts.surfaces]]
+path = ".codex/agents/reviewer.toml"
+markers = ["check_solid_evidence.py", "OOP readability report", "SOLID principle signal", "path-covered", "return revise"]
+
+[[contracts.surfaces]]
+path = ".codex/agents/diff_triage_reviewer.toml"
+markers = ["python_reviewer", "check_solid_evidence.py", "OOP readability report", "SOLID principle signal", "escalate"]
+
+[[contracts.surfaces]]
+path = "agents/agents_config.json"
+markers = ["python_reviewer", "OOP readability report", "SOLID principle signal", "check_solid_evidence.py", "path-coverage"]
+
+[[contracts.surfaces]]
+path = "agents/skills/oop-readability-check.md"
+markers = ["SOLID", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "tools/oop/shared/readability_core.py", "SOLID route owner", "mechanical projections", "readability.py"]
+
+[[contracts.surfaces]]
+path = "agents/skills/catalog.yaml"
+markers = ["SOLID", "SRP", "OCP", "LSP", "ISP", "DIP", "Single responsibility", "Open/closed", "Liskov", "Interface segregation", "Dependency inversion", "Protocol", "- [\"SOLID\"]", "- [\"SRP\"]", "- [\"Dependency inversion\"]"]
+
+[[contracts]]
+id = "source_file_definition_order"
+description = "Python source files keep readable definition order visible in conventions, routing, and review surfaces."
+
+[[contracts.surfaces]]
+path = "documents/conventions/python/09_file_roles.md"
+markers = ["読者順序", "依存順序", "公開契約", "公開入口", "内部補助関数", "check_convention_compliance.py"]
+
+[[contracts.surfaces]]
+path = "documents/conventions/coding-conventions-house-style.md"
+markers = ["読者順序", "公開契約", "公開入口", "内部補助関数", "単一公開入口"]
+
+[[contracts.surfaces]]
+path = "agents/skills/catalog.yaml"
+markers = ["コードファイル", "順序", "定義順", "関数", "class"]

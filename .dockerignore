@@ -1,0 +1,31 @@
+# The standalone image is built with the repository root as context:
+#   docker build -f bootstrap/container/Dockerfile .
+# Keep the context deny-by-default while explicitly exposing every Dockerfile
+# COPY source.  In particular, do not rely on the removed .devcontainer tree.
+**
+!bootstrap/
+!bootstrap/container/
+!bootstrap/container/**
+!agents/
+!agents/**
+!documents/
+!documents/runtime/
+!documents/runtime/**
+!tools/
+!tools/**
+tools/ci/**
+!tools/ci/run_standalone_static_gate_unit.sh
+tools/experiments/**
+tools/run_gpu_container.sh
+tools/run_comprehensive_review.sh
+tools/run_pytest_with_logs.sh
+tools/docker_dependency_validator.sh
+!tools/agent_tools/parent_root_side_effects.py
+!rust/
+!rust/agent-canon/
+!rust/agent-canon/**
+rust/agent-canon/target
+rust/agent-canon/target/**
+**/__pycache__
+**/__pycache__/**
+**/*.pyc

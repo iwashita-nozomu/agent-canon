@@ -1,0 +1,144 @@
+# @dependency-start
+# contract template
+# responsibility Seeds the canonical total single-owner relation for tracked paths in template-derived repositories.
+# upstream design ../../documents/design/responsibility-scope-management.md scope ownership policy
+# upstream design ../../documents/structure/repo-structure-contract.toml separate path existence and kind contract
+# upstream implementation ../../tools/agent_tools/responsibility_scope.py validates this schema
+# downstream implementation ../../responsibility-scope.toml is the rendered project-local contract
+# @dependency-end
+
+catalog_kind = "agent_canon_responsibility_scope"
+version = 1
+
+owner_values = [
+  "template",
+  "derived-project",
+  "github",
+  "external-vendor",
+]
+
+class_values = [
+  "shared_runtime",
+  "shared_policy",
+  "active_contract",
+  "durable_state",
+  "evidence",
+  "tooling",
+  "github_surface",
+  "external_dependency",
+]
+
+[[import_rule]]
+source = "parent-repo-active-contract"
+targets = [
+  "parent-repo-active-contract",
+  "project-durable-state",
+  "parent-github-automation",
+  "external-vendor",
+]
+
+[[import_rule]]
+source = "project-durable-state"
+targets = [
+  "project-durable-state",
+  "parent-repo-active-contract",
+]
+
+[[import_rule]]
+source = "parent-github-automation"
+targets = [
+  "parent-github-automation",
+  "parent-repo-active-contract",
+]
+
+[[import_rule]]
+source = "external-vendor"
+targets = [
+  "external-vendor",
+]
+
+[[scope]]
+id = "parent-repo-active-contract"
+owner = "derived-project"
+class = "active_contract"
+description = "Parent-owned active code, configuration, documentation, tests, editor state, and local runtime entrypoints."
+paths = [
+  "AGENTS.md",
+  ".agents/**",
+  ".codex/**",
+  ".devcontainer/**",
+  ".dockerignore",
+  ".gitattributes",
+  ".gitignore",
+  ".gitmodules",
+  ".markdownlint.json",
+  ".vscode/**",
+  "bootstrap.sh",
+  "LICENSE",
+  "Makefile",
+  "README.md",
+  "QUICK_START.md",
+  "agents/**",
+  "cpp/**",
+  "docker/**",
+  "documents/**",
+  "examples/**",
+  "pyproject.toml",
+  "pyrightconfig.json",
+  "python/**",
+  "responsibility-scope.toml",
+  "scripts/**",
+  "tests/**",
+  "tools/**",
+]
+exclude_paths = []
+protecting_tools = [
+  "tools/agent_tools/responsibility_scope.py",
+  "tools/agent_tools/import_responsibility.py",
+]
+issues = []
+
+[[scope]]
+id = "project-durable-state"
+owner = "derived-project"
+class = "durable_state"
+description = "Project-owned experiments, evidence, memory, notes, references, and other durable records."
+paths = [
+  "experiments/**",
+  "evidence/**",
+  "memory/**",
+  "documents/notes/**",
+  "references/**",
+]
+protecting_tools = [
+  "tools/agent_tools/task_close.py",
+  "tools/agent_tools/responsibility_scope.py",
+]
+issues = []
+
+[[scope]]
+id = "parent-github-automation"
+owner = "github"
+class = "github_surface"
+description = "Parent-owned GitHub Actions, issue templates, PR templates, and repository automation."
+paths = [
+  ".github/**",
+]
+protecting_tools = [
+  "tools/ci/check_github_workflows.py",
+  "tools/agent_tools/github_status_lifecycle.py",
+]
+issues = []
+
+[[scope]]
+id = "external-vendor"
+owner = "external-vendor"
+class = "external_dependency"
+description = "Vendored dependencies owned by the derived project."
+paths = [
+  "vendor/**",
+]
+protecting_tools = [
+  "tools/agent_tools/task_authority.py",
+]
+issues = []

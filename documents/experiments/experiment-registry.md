@@ -1,0 +1,181 @@
+# Experiment Registry
+<!--
+@dependency-start
+contract reference
+responsibility Documents Experiment Registry for this repository.
+upstream design README.md durable document index
+upstream design ./gpu-admission-r5-source-packet.md exact registry closure and frozen topic adapter contract
+downstream implementation ../../tools/ci/check_experiment_registry.py validates registry schema
+downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py predicts managed execution surface guardrails
+@dependency-end
+-->
+
+
+この文書は、`experiments/registry.toml` を使って experiment topic を集中管理する契約を定めます。
+server 上でどの実験コードを正式に実行するかを、topic ごとに 1 か所へ固定するのが目的です。
+
+## この文書の読み方
+
+- この文書は、experiment topic の正本 entrypoint、実行 command、成果物入口を
+  `experiments/registry.toml` に集約する契約を扱います。
+- 主な順路は、役割、正本ファイル、branch-only topics、branch / worktree
+  metadata、update rule、server 実行ルール、validation です。
+- 実験 topic を追加、移動、正式実行するときに読みます。
+- 境界: branch 名は補助情報であり、topic 名と registry entry が正本です。
+
+## 役割
+
+- experiment topic の正本 entrypoint を固定する
+- smoke / formal run の canonical inner command を固定する
+- `README.md`、`result/`、`report/` を固定し、topic README を通じて `visualization.py` renderer の入口を固定する
+- branch / worktree と実験 topic の対応を補助 metadata として残す
+
+branch 名は補助情報です。主キーにはしません。
+durable な正本は常に topic 名です。
+
+run の主キーは topic だけではなく、`(topic, variant, run_name)` の順序付き tuple です。
+値は `agentcanon.experiment-run-identity/v2` の nested `identity` object として
+manifest、report、result pointer に一度だけ記録します。managed run root の canonical path は
+`experiments/<topic>/result/<run-id>/` とし、topic-produced artifact はその run root の
+`raw/` と `summary/` に分けます。report は
+`experiments/<topic>/report/<run-id>.md`、archive は annex worktree の
+`experiments/<topic>/result/<run-id>.tar.gz` です。旧 topic-only layout は
+新しい runner、annex retention、LATEST updater から読み替えません。
+
+## 正本ファイル
+
+- `experiments/registry.toml`
+
+この exact path は managed run の必須 source closure です。存在しない場合は
+`gpu_source_path_registry_missing` で launch 前に失敗します。optional registry、
+別名 file、direct command、または compatibility fallback はありません。
+
+この file では、少なくとも次を topic ごとに持ちます。
+
+- `name`
+- `status`
+- `topic_dir`
+- `topic_readme`
+- `canonical_entrypoint`
+- `result_root`
+- `report_root`
+- `default_variant`
+- `smoke_inner_command`
+- `formal_inner_command`
+- 必要なら `required_eval_artifacts`
+- 必要なら `optional_eval_artifacts`
+
+`topic_readme` は、実験内容、問い、比較対象、標準コマンド、設定正本、`visualization.py` renderer、
+出力 schema、run_name 規則を辿る入口です。`result_root` は
+`result/<run-id>/` だけでなく、各 run の `result/<run-id>/logs/` も含む
+runtime artifact surface として扱います。
+
+`smoke_inner_command` と `formal_inner_command` は `{run_dir}` に加えて `{config_path}` を含めます。
+checked-in 設定正本は topic の `config.yaml` に置きます。managed runner は run 開始前に
+`result/<run-id>/config.json` と `result/<run-id>/config_source.yaml` を書き出し、inner command はその
+snapshot から今回 run の設定を復元します。必要な topic では `{config_source_path}`、
+`{stdout_log_path}`、`{stderr_log_path}`、`{startup_log_path}` も registered command で参照できます。
+
+command は Python interpreter の直後に exact canonical
+`experiments/<topic>/run.py` を置きます。managed adapter は placeholder 解決後の
+残り argv と entrypoint を fd-bound source snapshot に置き換え、snapshot の
+`main()` を 1 つの generic ff97 case として実行します。registry command が topic
+作成 tool、managed runner 自身、別 scheduler、または live source callable を再帰
+呼び出ししてはいけません。
+
+## branch-only topics
+
+main に実験実装を残さず、隔離 branch だけで保持する実験は
+`[[branch_topics]]` に登録します。
+
+`[[branch_topics]]` は branch 管理用の index であり、main tree 上に
+`topic_dir` や `canonical_entrypoint` を要求しません。main に残すのは、
+実験名、保存 branch、主要 note、必要なら branch 内 entrypoint や result root
+だけです。これにより、main は実験 framework と registry だけを持ち、
+branch 固有の探索コード、notebook、生成結果を持ちません。
+
+少なくとも次を持ちます。
+
+- `name`
+- `status`
+- `remote_branch`
+- `primary_note`
+- 必要なら `source_commit`
+- 必要なら `branch_note`
+- 必要なら `branch_entrypoint`
+- 必要なら `result_root`
+
+## branch / worktree metadata
+
+必要な場合だけ次を持てます。
+
+- `active_branch`
+- `active_worktree`
+- `scope_file`
+- `branch_note`
+
+これらは「今どこで触っているか」を補助する metadata であり、実験 topic の identity ではありません。
+
+## update rule
+
+- 新しい topic を追加したら、`experiments/registry.toml` に entry を追加します。
+- topic の canonical entrypoint を変えたら、registry を同じ変更で更新します。
+- formal run のコマンドを変えたら、registry と topic README を同じ変更で更新します。
+- 実験 topic を隔離 branch / worktree で扱う場合だけ、`active_branch` や `scope_file` を更新します。
+- branch を閉じたら、stale な `active_branch` や `active_worktree` を整理します。
+- branch にだけ残す実験は、main から implementation tree を削除し、
+  `[[branch_topics]]` だけで辿れるようにします。
+
+新規 topic は、実験名を固定してから canonical create tool を実行します。
+tool が runnable scaffold、canonical な `README.md` / `provenance.toml`、および
+registry entry を一つの route で配置します。`templates/experiments/_template/` の直接コピーは
+利用者向けの作成手順にしません。
+
+```bash
+python3 tools/experiments/create_experiment_topic.py <topic>
+```
+
+実行、publication、LATEST 更新には variant を必ず明示します。
+
+```bash
+python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py
+python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<run-id> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
+python3 -m tools.experiments.update_latest_result experiments/<topic>/result --variant <variant>
+```
+
+## server 実行ルール
+
+- project `Makefile` は registry の smoke / formal command へ到達する target を持ちます。標準名は `make experiment-smoke TOPIC=<topic>` と `make experiment-formal TOPIC=<topic>` です。
+- formal run は `tools/experiments/run_managed_experiment.py` を使います。
+- 可能なら Make target の内側で `--use-registered-command formal` を使い、registry の formal command をそのまま実行します。
+- GPU run では full physical/MIG UUID admission environment が generic runner
+  construction 前に確定します。CPU/index/prefix/direct/compatibility fallback は
+  formal evidence になりません。
+- `run_manifest.json` には registry snapshot を残し、あとで「どの topic のどの正本 command を使ったか」を辿れるようにします。
+- checked-in 設定正本は topic の `config.yaml` に置きます。managed runner は `config.json` に今回 run の設定 dictionary と path map を残し、`config_source.yaml` に checked-in `config.yaml` のコピーを残します。`run_manifest.json` からも `config_path` と `config_source_path` を辿れるようにします。
+- run 開始時点の再現情報は managed runner が `command.json`、`environment.json`、`source_snapshot.json` に保存します。`command.json` は placeholder 解決後の command と cwd、`environment.json` は全 environment key を記録し secret-like key の値を redaction します。`source_snapshot.json` は topic source、registry、command source、runner source、dirty source file の bytes / sha256 と git status を持ちます。
+- 各 managed run は `result/<run-id>/logs/` を持ちます。top-level `run.log` は runner が管理する互換ログで、追加の stdout / stderr、tool log、diagnostic log は `logs/` 配下へ置きます。
+- managed runner は標準で `logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` を作ります。`config.yaml` 欠落 preflight、command 起動失敗、子 process の非ゼロ終了は failed run として `run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、対応する `logs/` artifact に残します。
+- run 終了時には `artifact_manifest.json` を書き、`result/<run-id>/` 内の managed file、raw result、summary、log の relative path、bytes、sha256 を記録します。`artifact_manifest.json` 自身は digest 対象から外します。
+- 可視化は `experiments/<topic>/visualization.py` の renderer を入口にします。renderer は `summary/` の compact artifact と `raw/` の必要な入力を読み、HTML/画像を生成します。formal run の起動や設定正本にはしません。既定 template は notebook を生成しません。
+- `required_eval_artifacts` と `optional_eval_artifacts` は managed run root から自動収集したい eval artifact pattern を表します。topic template の既定 required eval は `summary/summary.json` と `summary/cases.jsonl` とし、旧 root-level path へ fallback しません。managed file と managed log (`run_manifest.json`、`eval_manifest.json`、`run.log`、`artifact_manifest.json`、`command.json`、`config_source.yaml`、`environment.json`、`source_snapshot.json`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log`) は `artifact_manifest.json` で辿ります。
+
+## validation
+
+```bash
+python3 -m tools.ci.check_experiment_registry
+make experiment-check
+```
+
+この checker は、path の存在、必須 field、command の placeholder、branch / worktree metadata の妥当性を確認します。
+registered command から `{config_path}` が欠ける場合も fail します。
+
+実験実行面の変更では、`tool_rejection_preflight.py` の
+`experiment_execution_surface_guard` を patch 前の routing evidence にします。
+対象は managed runner、registry checker、この registry contract、experiment
+workflow、project `experiments/registry.toml` です。検証は
+project `experiments/registry.toml` がある checkout では
+`python3 -m tools.ci.check_experiment_registry` を実行し、
+runner / registry checker behavior は
+`python3 -m pytest tests/tools/test_run_managed_experiment.py -q` を標準にし、
+formal run は実験計画の実行段階で扱います。
