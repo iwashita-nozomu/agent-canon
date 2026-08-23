@@ -42,7 +42,7 @@ import urllib.request
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 SCHEMA_STATE = "agent-canon.bootstrap-state.v2"
 SCHEMA_RECEIPT = "agent-canon.bootstrap-receipt.v2"
@@ -68,7 +68,6 @@ REGISTRY_DESTINATION = "/var/lib/agent-canon/mount-registry.toml"
 REQUIRED_LABELS = frozenset(
     {
         "io.agent-canon.runtime=shared-v1",
-        "io.agent-canon.owner-uid",
         "io.agent-canon.control-root-digest",
     }
 )
@@ -865,11 +864,12 @@ class DockerAdapter:
         dockerfile: Path,
         tag: str,
         labels: Mapping[str, str],
+        force_build: bool = False,
     ) -> dict[str, Any]:
         """Build or adopt one manifest-tagged image with ownership labels."""
         record = self.inspect_image(tag)
         self.last_image_created = record is None
-        if record is not None:
+        if record is not None and not force_build:
             self.validate_image(record, labels)
             # A matching pre-existing tag is a protected resource. Adopt its
             # exact ID and leave it untouched; rebuilding to the same tag would
@@ -920,7 +920,7 @@ class DockerAdapter:
             else _inspect_object(result.stdout, field="container")
         )
 
-    def owned_container_ids(self, uid: int) -> list[str]:
+    def owned_container_ids(self, control_digest: str) -> list[str]:
         """List container IDs selected by the runtime ownership labels."""
         result = self.run(
             [
@@ -931,7 +931,7 @@ class DockerAdapter:
                 "--filter",
                 "label=io.agent-canon.runtime=shared-v1",
                 "--filter",
-                f"label=io.agent-canon.owner-uid={uid}",
+                f"label=io.agent-canon.control-root-digest={control_digest}",
                 "--no-trunc",
                 "--quiet",
             ],
@@ -943,7 +943,7 @@ class DockerAdapter:
             else []
         )
 
-    def owned_image_ids(self, uid: int, control_digest: str) -> list[str]:
+    def owned_image_ids(self, control_digest: str) -> list[str]:
         """List exact image IDs owned by the shared runtime labels."""
         result = self.run(
             [
@@ -953,13 +953,11 @@ class DockerAdapter:
                 "--filter",
                 "label=io.agent-canon.runtime=shared-v1",
                 "--filter",
-                f"label=io.agent-canon.owner-uid={uid}",
-                "--filter",
                 f"label=io.agent-canon.control-root-digest={control_digest}",
                 "--no-trunc",
                 "--quiet",
             ],
-            check=False,
+            check=True,
         )
         return (
             list(dict.fromkeys(line.strip() for line in result.stdout.splitlines() if line.strip()))
@@ -1051,6 +1049,7 @@ class DockerAdapter:
                 "GIT_CONFIG_COUNT",
                 "GIT_CONFIG_KEY_0",
                 "GIT_CONFIG_VALUE_0",
+                "AGENT_CANON_OUTPUT_ROOT",
             }:
                 raise BootstrapError("environment_rejected", key)
             command.extend(("--env", f"{key}={value}"))
@@ -1234,7 +1233,6 @@ class BootstrapRuntime:
         self.manifest, policy_digest = load_manifest(self.manifest_path)
         self.manifest_digest = policy_digest
         self.control_digest = sha256_text(str(control))
-        self.uid = os.geteuid() if hasattr(os, "geteuid") else os.getuid()
         self.docker = docker or DockerAdapter(
             os.environ.get("AGENT_CANON_DOCKER", "docker"),
             timeout=int(self.manifest["container"]["task_timeout_seconds"]),
@@ -1274,17 +1272,6 @@ class BootstrapRuntime:
     def _enforce_private_directory(self, path: Path) -> None:
         """Make an owned Host control directory private and verify readback."""
         try:
-            status = os.stat(path, follow_symlinks=False)
-        except OSError as exc:
-            raise BootstrapError(
-                "runtime_directory_invalid", f"cannot inspect runtime directory: {path}"
-            ) from exc
-        if status.st_uid != self.uid:
-            raise BootstrapError(
-                "runtime_directory_owner_mismatch",
-                f"runtime directory is owned by uid {status.st_uid}, expected {self.uid}",
-            )
-        try:
             os.chmod(path, 0o700, follow_symlinks=False)
         except OSError as exc:
             raise BootstrapError(
@@ -1315,7 +1302,6 @@ class BootstrapRuntime:
             "runtime_root": str(self.paths.runtime_root),
             "control_root_digest": self.control_digest,
             "manifest_digest": self.manifest_digest,
-            "owner_uid": self.uid,
             "state": "uninstalled",
             "active_task_count": 0,
             "current_generation": None,
@@ -1327,6 +1313,7 @@ class BootstrapRuntime:
             "resources": {},
             "managed_paths": [],
             "managed_links": [],
+            "managed_agents_link": None,
             "updated_at": _now(),
         }
 
@@ -1382,27 +1369,25 @@ class BootstrapRuntime:
                 "control_root_digest": self.control_digest,
                 "control_parent_root": str(self.paths.control_parent_root),
                 "runtime_root": str(self.paths.runtime_root),
-                "owner_uid": self.uid,
                 "manifest_digest": state.get("manifest_digest", self.manifest_digest),
             },
         )
 
     def _image_tag(self) -> str:
         return (
-            f"agent-canon-tools:{self.uid}-{self.control_digest[:16]}-"
+            f"agent-canon-tools:{self.control_digest[:16]}-"
             f"{self.manifest_digest[:16]}"
         )
 
     def _labels(self) -> dict[str, str]:
         return {
             "io.agent-canon.runtime": "shared-v1",
-            "io.agent-canon.owner-uid": str(self.uid),
             "io.agent-canon.control-root-digest": self.control_digest,
         }
 
     def _resource_records(self) -> dict[str, Any]:
         name = str(self.manifest["container"]["name_template"]).replace(
-            "<effective-uid>", str(self.uid)
+            "<effective-uid>", self.control_digest[:16]
         )
         return {
             "image": {
@@ -1441,7 +1426,6 @@ class BootstrapRuntime:
             "operation": operation,
             "status": status,
             "code": code,
-            "owner_uid": self.uid,
             "control_root_digest": self.control_digest,
             "manifest_digest": (
                 state.get("manifest_digest", self.manifest_digest)
@@ -1473,12 +1457,13 @@ class BootstrapRuntime:
             result["receipt_path"] = str(self._write_receipt(result))
         return result
 
-    def _image(self, state: dict[str, Any]) -> dict[str, Any]:
+    def _image(self, state: dict[str, Any], *, force_build: bool = False) -> dict[str, Any]:
         image = self.docker.ensure_image(
             repository_root=self.repository_root,
             dockerfile=self.repository_root / "bootstrap" / "container" / "Dockerfile",
             tag=self._image_tag(),
             labels=self._labels(),
+            force_build=force_build,
         )
         image_id = _required_string(image.get("Id"), "image.Id")
         resources = state.setdefault("resources", self._resource_records())
@@ -1554,7 +1539,6 @@ class BootstrapRuntime:
         )
         required_label_keys = {
             "io.agent-canon.runtime",
-            "io.agent-canon.owner-uid",
             "io.agent-canon.control-root-digest",
         }
         if (
@@ -1566,7 +1550,6 @@ class BootstrapRuntime:
             )
             or expected_labels.get("io.agent-canon.control-root-digest")
             != self.control_digest
-            or expected_labels.get("io.agent-canon.owner-uid") != str(self.uid)
         ):
             raise BootstrapError(
                 "docker_readback_invalid",
@@ -1871,14 +1854,26 @@ class BootstrapRuntime:
         """Return safe Docker readback fields and omit Env/raw inspect data."""
         if record is None:
             return None
-        state = record.get("State") if isinstance(record.get("State"), dict) else {}
-        health = state.get("Health") if isinstance(state.get("Health"), dict) else {}
-        host = (
-            record.get("HostConfig")
+        state: Mapping[str, Any] = (
+            cast(Mapping[str, Any], record.get("State"))
+            if isinstance(record.get("State"), dict)
+            else {}
+        )
+        health: Mapping[str, Any] = (
+            cast(Mapping[str, Any], state.get("Health"))
+            if isinstance(state.get("Health"), dict)
+            else {}
+        )
+        host: Mapping[str, Any] = (
+            cast(Mapping[str, Any], record.get("HostConfig"))
             if isinstance(record.get("HostConfig"), dict)
             else {}
         )
-        mounts = record.get("Mounts") if isinstance(record.get("Mounts"), list) else []
+        mounts = (
+            cast(list[Any], record.get("Mounts"))
+            if isinstance(record.get("Mounts"), list)
+            else []
+        )
         summarized_mounts: list[dict[str, Any]] = []
         for mount in mounts:
             if not isinstance(mount, dict):
@@ -1919,42 +1914,158 @@ class BootstrapRuntime:
         }
 
     def install(self) -> dict[str, Any]:
-        """Build or adopt the verified image and initialize runtime state."""
+        """Install the initial image or reconcile an existing runtime."""
         with self.locked():
             state = self._read_state(allow_manifest_drift=True)
-            if state.get("manifest_digest") != self.manifest_digest:
-                if state.get("state") != "uninstalled":
-                    raise BootstrapError(
-                        "manifest_mismatch",
-                        "uninstall the previous runtime generation before installing changed inputs",
+            if state.get("state") != "uninstalled":
+                result = self._update_locked(state, "install")
+                # codex_prepare runs after the lifecycle lock is released.
+                pass
+            else:
+                if state.get("manifest_digest") != self.manifest_digest:
+                    state = self._new_state()
+                self._ensure_agents_link(state)
+                before = state["state"]
+                self._image(state)
+                state["state"] = "installed"
+                state.setdefault("resources", self._resource_records()).setdefault(
+                    "container", self._resource_records()["container"]
+                )
+                state["managed_paths"] = [
+                    STATE_FILE,
+                    OWNER_FILE,
+                    "mounts.toml",
+                    *KNOWN_SUBDIRS,
+                    CONTAINER_RUNTIME_DIR,
+                ]
+                self._write_mounts(state)
+                self._write_state(state)
+                result = self._result(
+                    self._receipt(
+                        "install",
+                        "ok",
+                        "installed",
+                        before=before,
+                        after=state["state"],
+                        details={"image_id": state["resources"]["image"]["id"]},
+                        state=state,
                     )
-                state = self._new_state()
-            before = state["state"]
-            self._image(state)
-            state["state"] = "installed"
-            state.setdefault("resources", self._resource_records()).setdefault(
-                "container", self._resource_records()["container"]
+                )
+        self.codex_prepare()
+        return result
+
+    def _update_locked(self, state: dict[str, Any], operation: str) -> dict[str, Any]:
+        """Reconcile current checkout/image inputs with existing v2 lifecycle state."""
+        self._ensure_agents_link(state)
+        if state.get("active_task_count", 0):
+            raise BootstrapError(
+                "mount_update_blocked",
+                "active tasks prevent update; candidate build was not started",
+                evidence={"active_task_count": state.get("active_task_count", 0)},
             )
-            state["managed_paths"] = [
-                STATE_FILE,
-                OWNER_FILE,
-                "mounts.toml",
-                *KNOWN_SUBDIRS,
-                CONTAINER_RUNTIME_DIR,
-            ]
-            self._write_mounts(state)
+        resources = state.get("resources", {})
+        image = resources.get("image", {}) if isinstance(resources, dict) else {}
+        if image.get("owned") is not True:
             self._write_state(state)
             return self._result(
                 self._receipt(
-                    "install",
+                    operation,
                     "ok",
-                    "installed",
-                    before=before,
+                    "up_to_date",
+                    before=state["state"],
                     after=state["state"],
-                    details={"image_id": state["resources"]["image"]["id"]},
+                    details={"changed": False, "reason": "pre_existing_image"},
                     state=state,
                 )
             )
+        old_state = json.loads(_json(state))
+        before = state["state"]
+        old_container_running = bool(
+            old_state.get("resources", {}).get("container", {}).get("id")
+            or before in {"ready", "running"}
+        )
+        try:
+            self._image(state, force_build=True)
+            state["manifest_digest"] = self.manifest_digest
+            state["state"] = "maintenance_pending"
+            self._write_state(state)
+            self._stop_owned_container(state)
+            if old_container_running:
+                self._ensure_container(state, start=True)
+                state["state"] = "ready"
+            else:
+                state["state"] = "installed"
+            self._write_state(state)
+            return self._result(
+                self._receipt(
+                    operation,
+                    "ok",
+                    "updated",
+                    before=before,
+                    after=state["state"],
+                    details={
+                        "image_id": state["resources"]["image"]["id"],
+                    },
+                    state=state,
+                )
+            )
+        except BootstrapError as exc:
+            candidate_image = state.get("resources", {}).get("image", {})
+            old_image = old_state.get("resources", {}).get("image", {})
+            candidate_image_id = candidate_image.get("id") if isinstance(candidate_image, dict) else None
+            old_image_id = old_image.get("id") if isinstance(old_image, dict) else None
+            if candidate_image_id and candidate_image_id != old_image_id:
+                inspected_image = self.docker.inspect_image(str(candidate_image_id))
+                if inspected_image is not None:
+                    self.docker.validate_image(inspected_image, self._labels())
+                    self.docker.remove_image(str(candidate_image_id))
+            state.clear()
+            state.update(old_state)
+            recovery_error: BootstrapError | None = None
+            try:
+                self._write_mounts(state)
+                if old_container_running:
+                    self._ensure_container(state, start=True)
+                state["state"] = before
+                self._write_state(state)
+            except BootstrapError as restore_error:
+                recovery_error = restore_error
+                state["state"] = "runtime_unavailable"
+                self._write_state(state)
+            receipt = self._result(
+                self._receipt(
+                    operation,
+                    "error",
+                    "runtime_unavailable" if recovery_error else exc.code,
+                    before=before,
+                    after=state["state"],
+                    details={
+                        "recovery_error": recovery_error.code if recovery_error else None,
+                    },
+                    state=state,
+                )
+            )
+            if recovery_error:
+                raise BootstrapError(
+                    "runtime_unavailable",
+                    "update failed and old runtime recovery failed",
+                    evidence={"cause": exc.code, "recovery": recovery_error.code, "receipt_path": receipt["receipt_path"]},
+                ) from exc
+            raise BootstrapError(
+                exc.code,
+                exc.detail,
+                evidence={**exc.evidence, "receipt_path": receipt["receipt_path"], "recovered": True},
+            ) from exc
+
+    def update(self) -> dict[str, Any]:
+        """Reconcile only the current checkout; never acquires a Git revision."""
+        with self.locked():
+            state = self._read_state(allow_manifest_drift=True)
+            if state.get("state") == "uninstalled":
+                raise BootstrapError("not_installed", "install must complete before update")
+            result = self._update_locked(state, "update")
+        self.codex_prepare()
+        return result
 
     def _ensure_container(
         self, state: dict[str, Any], *, start: bool
@@ -1977,7 +2088,7 @@ class BootstrapRuntime:
             self._validate_container(existing, state)
             c["id"] = _required_string(existing.get("Id"), "container.Id")
         else:
-            owners = self.docker.owned_container_ids(self.uid)
+            owners = self.docker.owned_container_ids(self.control_digest)
             if len(owners) > 1:
                 raise BootstrapError(
                     "multiple_owned_containers",
@@ -2115,6 +2226,7 @@ class BootstrapRuntime:
                         "docker_container": self._container_summary(inspected),
                         "runtime_bytes": _dir_bytes(self.paths.runtime_root),
                         "manifest_drift": manifest_drift,
+                        "managed_agents_link": self._agents_link_readback(state),
                     },
                     state=state,
                 )
@@ -2534,10 +2646,51 @@ class BootstrapRuntime:
                 )
             )
 
+    def _validate_source_adapters(self) -> None:
+        """Read back tracked .agents adapters before runtime convergence."""
+        source = self.repository_root / ".agents"
+        skills = source / "skills"
+        if source.is_symlink() or not source.is_dir() or skills.is_symlink() or not skills.is_dir():
+            raise BootstrapError("source_adapters_invalid", "tracked .agents/skills is missing or not regular")
+        skill_files = sorted(skills.glob("*/SKILL.md"))
+        if not skill_files or any(path.is_symlink() or not path.is_file() for path in skill_files):
+            raise BootstrapError("source_adapters_invalid", "tracked .agents skill adapters failed readback")
+
+    def _ensure_agents_link(self, state: dict[str, Any]) -> dict[str, str]:
+        """Converge exactly one control-root .agents link without touching global home."""
+        self._validate_source_adapters()
+        link = self.paths.control_parent_root / ".agents"
+        source = self.repository_root / ".agents"
+        if link.exists() or link.is_symlink():
+            if not link.is_symlink() or link.resolve() != source.resolve():
+                raise BootstrapError("agents_link_collision", f"managed .agents path already exists: {link}")
+        else:
+            link.symlink_to(source, target_is_directory=True)
+        record = {
+            "path": str(link),
+            "target": str(source),
+            "owned": "true",
+        }
+        state["managed_agents_link"] = record
+        return record
+
+    def _agents_link_readback(self, state: Mapping[str, Any]) -> dict[str, Any]:
+        record = state.get("managed_agents_link")
+        if not isinstance(record, dict):
+            return {"path": str(self.paths.control_parent_root / ".agents"), "state": "absent"}
+        path = Path(str(record["path"]))
+        target = Path(str(record["target"]))
+        return {
+            "path": str(path),
+            "target": str(target),
+            "exists": path.is_symlink(),
+            "exact": path.is_symlink() and path.resolve() == target.resolve(),
+        }
+
     def _managed_links(self) -> list[dict[str, str]]:
         entries: list[dict[str, str]] = []
         for surface, source in (
-            ("skills", self.repository_root / "agents" / "skills"),
+            ("skills", self.repository_root / ".agents" / "skills"),
             ("agents", self.repository_root / ".codex" / "agents"),
             ("hooks", self.repository_root / ".codex" / "hooks"),
             ("config", self.repository_root / ".codex" / "config.toml"),
@@ -2573,8 +2726,32 @@ class BootstrapRuntime:
         with self.locked():
             state = self._read_state()
             _ensure_directory(self.paths.codex_home)
+            desired = self._managed_links()
+            desired_targets = {
+                str(self.paths.codex_home / entry["surface"] / entry["relative"])
+                for entry in desired
+            }
+            previous_entries: list[Mapping[str, Any]] = []
+            previous_manifest = self.paths.codex_home / "manifest.json"
+            if previous_manifest.is_file() and not previous_manifest.is_symlink():
+                try:
+                    previous_payload = json.loads(previous_manifest.read_text(encoding="utf-8"))
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    raise BootstrapError("codex_manifest_invalid", "runtime-local Codex manifest is invalid") from exc
+                raw_previous = previous_payload.get("links", []) if isinstance(previous_payload, dict) else []
+                if isinstance(raw_previous, list):
+                    previous_entries = [entry for entry in raw_previous if isinstance(entry, dict)]
+            stale_links: list[str] = []
+            for entry in previous_entries:
+                target = Path(str(entry.get("target", "")))
+                source = Path(str(entry.get("source", "")))
+                if str(target) in desired_targets or entry.get("managed") is not True:
+                    continue
+                if target.is_symlink() and target.resolve() == source.resolve():
+                    target.unlink()
+                    stale_links.append(str(target))
             links: list[dict[str, Any]] = []
-            for entry in self._managed_links():
+            for entry in desired:
                 target = self.paths.codex_home / entry["surface"] / entry["relative"]
                 _ensure_directory(target.parent)
                 if target.exists() or target.is_symlink():
@@ -2603,6 +2780,8 @@ class BootstrapRuntime:
                 {
                     "schema": SCHEMA_SKILLS,
                     "source_root": str(self.repository_root),
+                    "manifest_digest": self.manifest_digest,
+                    "stale_links_removed": stale_links,
                     "links": links,
                 },
             )
@@ -2654,7 +2833,13 @@ class BootstrapRuntime:
             )
         return prepared
 
-    def exec(self, root: Path, argv: Sequence[str]) -> dict[str, Any]:
+    def exec(
+        self,
+        root: Path,
+        argv: Sequence[str],
+        *,
+        extra_environment: Mapping[str, str] | None = None,
+    ) -> dict[str, Any]:
         """Execute a typed argv in a registered target and collect a receipt."""
         _validate_tool_plane_argv(root, self.repository_root, argv)
         target = self._target_record(root, "read-only")
@@ -2677,17 +2862,19 @@ class BootstrapRuntime:
             self._admit_task_locked(state, task_id, target_root=root)
             try:
                 c = self._ensure_container(state, start=True)
+                environment = {
+                    "AGENT_CANON_TARGET_ROOT": f"/targets/{target['digest']}",
+                    "AGENT_CANON_TASK_ROOT": f"/targets/{target['digest']}",
+                    "GIT_CONFIG_COUNT": "1",
+                    "GIT_CONFIG_KEY_0": "safe.directory",
+                    "GIT_CONFIG_VALUE_0": f"/targets/{target['digest']}",
+                }
+                environment.update(extra_environment or {})
                 result = self.docker.exec_container(
                     str(c["id"]),
                     cwd=f"/targets/{target['digest']}",
                     argv=list(argv),
-                    environment={
-                        "AGENT_CANON_TARGET_ROOT": f"/targets/{target['digest']}",
-                        "AGENT_CANON_TASK_ROOT": f"/targets/{target['digest']}",
-                        "GIT_CONFIG_COUNT": "1",
-                        "GIT_CONFIG_KEY_0": "safe.directory",
-                        "GIT_CONFIG_VALUE_0": f"/targets/{target['digest']}",
-                    },
+                    environment=environment,
                     embedding_exchange=self.paths.container_runtime,
                     embedding_allowed_endpoints={
                         value.strip()
@@ -2709,6 +2896,7 @@ class BootstrapRuntime:
                     "argv": _redact_argv(argv),
                     "cwd": str(root),
                     "exit": result.returncode,
+                    "execution_plane": "agentcanon_tool_container",
                     **io,
                 }
                 if mutation_before is not None:
@@ -2775,7 +2963,12 @@ class BootstrapRuntime:
                 self._release_task_locked(state, task_id)
 
     def tool_run(
-        self, catalog_id: str, argv: Sequence[str], *, root: Path | None = None
+        self,
+        catalog_id: str,
+        argv: Sequence[str],
+        *,
+        root: Path | None = None,
+        environment: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
         """Dispatch a catalog command through the resident AgentCanon CLI."""
         _slug(catalog_id)
@@ -2810,6 +3003,37 @@ class BootstrapRuntime:
                 "--",
                 *list(argv),
             ],
+            extra_environment=environment,
+        )
+
+    def template_export(
+        self, root: Path, profile: str, output: str
+    ) -> dict[str, Any]:
+        """Export a template profile through the resident tool-container catalog."""
+        _slug(profile)
+        relative = Path(output)
+        if relative.is_absolute() or ".." in relative.parts or not relative.parts:
+            raise BootstrapError("template_output_invalid", "output must be runtime-relative")
+        target = self._target_record(root, "read-only")
+        host_output = self.paths.runtime_root / "template-exports" / relative
+        if host_output.exists() or host_output.is_symlink():
+            raise BootstrapError("template_output_exists", str(host_output))
+        container_output = f"{CONTAINER_RUNTIME_DESTINATION}/template-exports/{relative.as_posix()}"
+        return self.tool_run(
+            "template-bundle",
+            [
+                "export",
+                "--source-root",
+                f"/targets/{target['digest']}",
+                "--source-ref",
+                "HEAD",
+                "--profile",
+                profile,
+                "--output",
+                container_output,
+            ],
+            root=root,
+            environment={"AGENT_CANON_OUTPUT_ROOT": container_output},
         )
 
     def eval_collect(self, root: Path, run_id: str) -> dict[str, Any]:
@@ -3306,9 +3530,7 @@ class BootstrapRuntime:
                 and state.get("resources", {}).get("container", {}).get("state") == "running"
             )
             current_image = state.get("resources", {}).get("image", {}).get("id")
-            owned_images = self.docker.owned_image_ids(
-                self.uid, self.control_digest
-            )
+            owned_images = self.docker.owned_image_ids(self.control_digest)
             max_images = int(self.manifest["container"].get("max_image_generations", 2))
             stale_images = [image for image in owned_images if image != current_image][
                 : max(0, len(owned_images) - max_images)
@@ -3399,7 +3621,6 @@ class BootstrapRuntime:
                         inspected,
                         {
                             "io.agent-canon.runtime": "shared-v1",
-                            "io.agent-canon.owner-uid": str(self.uid),
                             "io.agent-canon.control-root-digest": self.control_digest,
                         },
                     )
@@ -3459,6 +3680,13 @@ class BootstrapRuntime:
             self._clear_exchange_in_container(state)
             self._stop_owned_container(state)
             self._remove_exchange()
+            agents_record = state.get("managed_agents_link")
+            if isinstance(agents_record, dict):
+                agents_path = Path(str(agents_record.get("path", "")))
+                agents_target = Path(str(agents_record.get("target", "")))
+                if agents_path.is_symlink() and agents_path.resolve() == agents_target.resolve():
+                    agents_path.unlink()
+                state["managed_agents_link"] = None
             for entry in state.get("managed_links", []):
                 target = Path(entry["target"])
                 if (
@@ -3520,7 +3748,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--runtime-root", required=True)
     parser.add_argument("--manifest")
     sub = parser.add_subparsers(dest="operation", required=True)
-    for operation in ("install", "start", "status", "stop", "rollback", "uninstall"):
+    for operation in ("install", "update", "start", "status", "stop", "rollback", "uninstall"):
         sub.add_parser(operation)
     gc_parser = sub.add_parser("gc")
     gc_parser.add_argument("--dry-run", action="store_true")
@@ -3543,6 +3771,12 @@ def build_parser() -> argparse.ArgumentParser:
     tool_run.add_argument("--root")
     tool_run.add_argument("catalog_id")
     tool_run.add_argument("command", nargs=argparse.REMAINDER)
+    template = sub.add_parser("template")
+    template_sub = template.add_subparsers(dest="template_operation", required=True)
+    template_export = template_sub.add_parser("export")
+    template_export.add_argument("--root", required=True)
+    template_export.add_argument("--profile", required=True)
+    template_export.add_argument("--output", required=True)
     codex = sub.add_parser("codex")
     codex_sub = codex.add_subparsers(dest="codex_operation")
     codex_sub.add_parser("prepare")
@@ -3573,6 +3807,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     operation = args.operation
     if operation == "install":
         return runtime.install()
+    if operation == "update":
+        return runtime.update()
     if operation == "start":
         return runtime.start()
     if operation == "status":
@@ -3634,6 +3870,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             args.catalog_id,
             command,
             root=Path(args.root) if args.root else None,
+        )
+    if operation == "template" and args.template_operation == "export":
+        return runtime.template_export(
+            Path(args.root), args.profile, args.output
         )
     if operation == "codex":
         if args.codex_operation == "prepare":

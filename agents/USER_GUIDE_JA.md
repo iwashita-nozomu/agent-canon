@@ -25,6 +25,7 @@ RUNTIME="$ROOT/workspace/agent-canon-runtime/<installation>"
 BOOTSTRAP=/path/to/agent-canon/bootstrap.sh
 
 "$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" install
+"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" update
 "$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" start
 "$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" \
   target add --root <project-root> --mode read-only
@@ -46,8 +47,13 @@ control root と runtime root は必須です。runtime root は control root �
 `prepare` は runtime root 内の isolated `codex-home/` に manifest 管理の skill、agent、
 hook、設定リンクを作ります。global `$CODEX_HOME` は変更しません。衝突する既存パスは
 fail closed で、uninstall が削除できるのはこの installation が作成したリンクだけです。
-install / update 後は新しい Codex session を起動し、manifest、link target、source digest
-を readback してください。
+install / update 後は新しい Codex session を起動し、manifest と link target を
+readback してください。
+
+install / update は明示された control root の `.agents` を、AgentCanon source の
+tracked `.agents` への exact symlink として管理します。global `~/.agents` と global
+`.codex` は暗黙には管理しません。control root に `$HOME` を明示した場合だけ
+`~/.agents` が管理対象になります。regular pathや別symlinkが存在する場合は collision として停止します。
 
 ## Tool を呼ぶ
 
@@ -68,13 +74,7 @@ Python tool は flat な global executable にしません。schema-v2 parity fi
 ```
 
 parity は argv、cwd、stdin/stdout/stderr、exit/signal、written paths を比較します。
-未確認の entry は legacy の正確なコマンドを、登録済み target に対する `exec` または
-既存 workflow から実行します。
-
-```bash
-"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" \
-  exec --root <project-root> -- <existing-command> <args...>
-```
+未確認の内部Python entryはpublic bootstrap commandとして公開されません。
 
 shell string、未知の catalog id、internal Python file の自動公開は許可しません。
 

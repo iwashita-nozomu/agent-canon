@@ -66,7 +66,7 @@ class ToolDispatchTest(unittest.TestCase):
         self.assertEqual(schema["default_parity"], "legacy")
         self.assertEqual(
             {spec.tool_id for spec in specs.values() if spec.parity == "verified"},
-            {"route"},
+            {"route", "template-bundle"},
         )
 
     def test_unknown_dispatch_option_is_rejected_before_catalog_lookup(self) -> None:
