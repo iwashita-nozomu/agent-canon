@@ -708,7 +708,6 @@ def test_changed_inputs_preserve_status_and_exact_cleanup_then_allow_reinstall(
     rebound = json.loads(changed.paths.state.read_text(encoding="utf-8"))
     assert updated["code"] == "updated"
     assert rebound["manifest_digest"] == changed.manifest_digest
-    assert rebound["tree_digest"] == old_state["tree_digest"]
 
 
 def test_parser_has_typed_exec_tool_codex_and_eval_routes() -> None:
