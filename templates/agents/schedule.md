@@ -44,6 +44,24 @@ upstream design ../../agents/skills/agent-orchestration.md execution-time-aware 
 - Focused recheck:
 - Terminal state:
 
+### Distributed owner correspondence
+
+Scheduling fields are local work-convergence state; they do not create a
+guarantee or approval authority. Each mechanism owner records one causal
+owner-local receipt with its authority/witness, mechanism transition,
+`not_guaranteed` boundary, execution plane, bounded tool input, and exactly one
+primary observation. Reuse the tuple
+`(candidate_digest, property_ref, owner_ref, execution_plane,
+tool_input_locator)` and invalidate only the owner receipt plus existing
+dependency-edge descendants affected by a mechanism/input/source change.
+The parent transports and orders packets. Integration consumes receipt
+presence/compatibility/DAG closure and does not rerun owner commands.
+
+- Owner receipt references:
+- Invalidation packets along existing edges:
+- Integration missing/incompatible receipts:
+- Unaffected receipts reused:
+
 | DAG Node | Depends On | Conflict Scope | Status | Evidence |
 | -------- | ---------- | -------------- | ------ | -------- |
 

@@ -7,6 +7,7 @@
 # upstream implementation ./capacity_handshake.py owns lifecycle state, reservations, and postorder release
 # upstream implementation ./report_artifact_checks.py validates schedule and work log artifacts
 # upstream implementation ./update_lifecycle_contract.py owns gate, cleanup, handback, and terminal ToolCall identities.
+# upstream implementation ./packets.py owns owner-local receipt normalization and compatibility.
 # upstream design ../../templates/agents/closeout_gate.md defines closeout status contract
 # upstream design ../../templates/agents/agent_evaluation.md defines evaluation contract
 # upstream design ../../documents/design/request-intent-and-update-relation.md cleanup/readback receipt closeout projection
@@ -91,6 +92,7 @@ from update_lifecycle_contract import (
     validate_gate_chain,
 )
 from autonomous_convergence import validate_closeout_projection
+from packets import normalize_owner_guarantee_packet, owner_receipt_is_compatible, owner_receipt_key
 
 STATIC_ANALYSIS_COMPLETE_STATUSES = {"yes", "profile_selected"}
 DOCUMENT_STRUCTURE_MISSING_VALUES = {"", "missing", "none", "not_applicable"}
@@ -105,6 +107,82 @@ DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX = "not_applicable:format-only:"
 DOCUMENT_STRUCTURE_ACTIVATIONS = {"required", "not_required", "format_only"}
 DOCUMENT_STRUCTURE_VALUE_MISSING = {"", "missing", "none", "not_applicable"}
 COMPLETION_COVERAGE_ARTIFACT_NAME = "completion_coverage.json"
+OWNER_GUARANTEE_RECEIPTS_ARTIFACT_NAME = "owner_guarantee_receipts.json"
+
+
+def owner_receipt_closeout_consumer(
+    report_dir: Path,
+    *,
+    candidate_digest: str | None = None,
+    required_owner_refs: Sequence[str] = (),
+    dependency_edges: Sequence[str] = (),
+) -> dict[str, object]:
+    """Consume owner receipts without rerunning owner commands or checks."""
+    artifact_path = report_dir / OWNER_GUARANTEE_RECEIPTS_ARTIFACT_NAME
+    if not artifact_path.is_file():
+        return {"ready": True, "applicable": False, "reason": "not_applicable"}
+    try:
+        raw = json.loads(artifact_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {"ready": False, "applicable": True, "reason": f"unreadable:{exc}"}
+    if isinstance(raw, dict):
+        receipts = raw.get("owner_receipts")
+        artifact_candidate = raw.get("candidate_digest")
+        artifact_edges = raw.get("dependency_edges", ())
+        artifact_required = raw.get("required_owner_refs", ())
+    else:
+        receipts = raw
+        artifact_candidate = None
+        artifact_edges = ()
+        artifact_required = ()
+    if candidate_digest is None and isinstance(artifact_candidate, str):
+        candidate_digest = artifact_candidate
+    if not required_owner_refs and isinstance(artifact_required, list):
+        required_owner_refs = tuple(str(value) for value in artifact_required)
+    if not dependency_edges and isinstance(artifact_edges, list):
+        dependency_edges = tuple(str(value) for value in artifact_edges)
+    if not isinstance(receipts, list):
+        return {"ready": False, "applicable": True, "reason": "receipts_not_list"}
+    keys: set[tuple[str, str, str, str, str]] = set()
+    owner_refs: set[str] = set()
+    receipt_refs: list[str] = []
+    declared_edges: set[str] = set()
+    failures: list[str] = []
+    for index, receipt in enumerate(receipts):
+        try:
+            packet = normalize_owner_guarantee_packet(receipt, f"owner_receipts[{index}]")
+        except (RuntimeError, TypeError, ValueError) as exc:
+            failures.append(str(exc))
+            continue
+        key = owner_receipt_key(packet)
+        if key in keys:
+            continue
+        keys.add(key)
+        if packet["correspondence_state"] != "verified" or packet["observation_outcome"] != "observed_pass":
+            continue
+        if not owner_receipt_is_compatible(packet, candidate_digest=candidate_digest):
+            failures.append(f"incompatible:{packet['primary_observation_ref']}")
+            continue
+        owner_refs.add(str(packet["owner_ref"]))
+        receipt_refs.append(str(packet["primary_observation_ref"]))
+        declared_edges.update(str(edge) for edge in packet["downstream_edges"])
+    failures.extend(
+        f"missing_owner:{owner}"
+        for owner in required_owner_refs
+        if owner not in owner_refs
+    )
+    failures.extend(
+        f"missing_dependency_edge:{edge}"
+        for edge in dependency_edges
+        if edge not in declared_edges
+    )
+    return {
+        "ready": not failures,
+        "applicable": True,
+        "reason": "pass" if not failures else ";".join(failures),
+        "owner_receipt_refs": receipt_refs,
+        "dependency_edges": list(dependency_edges),
+    }
 
 
 def _resolve_report_root(
@@ -1284,6 +1362,7 @@ def main() -> int:
     report_artifact_blockers = report_artifact_placement_blockers(workspace, report_dir)
     completion_decision = completion_coverage_consumer(report_dir)
     convergence_decision = validate_closeout_projection(review_convergence)
+    owner_receipt_decision = owner_receipt_closeout_consumer(report_dir)
     update_lifecycle_decision = update_lifecycle_closeout_consumer(report_dir)
     wave_reconciliation = wave_reconciliation_blockers(
         schedule_text,
@@ -1306,6 +1385,7 @@ def main() -> int:
         "validation_complete": closeout.get("validation_complete") == "yes",
         "request_contract_complete": closeout.get("request_contract_complete") == "yes",
         "completion_coverage_consumer": completion_decision.get("ready") is True,
+        "owner_receipts_consumer": owner_receipt_decision.get("ready") is True,
         "capacity_lifecycle_closeout": capacity_lifecycle_ready,
         "update_lifecycle_closeout_consumer": update_lifecycle_decision.get("ready")
         is True,
@@ -1525,6 +1605,14 @@ def main() -> int:
     print(f"COMPLETION_COVERAGE_ARTIFACT={report_dir / COMPLETION_COVERAGE_ARTIFACT_NAME}")
     print(f"COMPLETION_COVERAGE_CONSUMER_READY={completion_decision.get('ready', False)}")
     print(f"COMPLETION_COVERAGE_CONSUMER_REASON={completion_decision.get('reason', '')}")
+    print(
+        "OWNER_RECEIPTS_CONSUMER="
+        f"{'yes' if owner_receipt_decision.get('ready') else 'no'}"
+    )
+    print(
+        "OWNER_RECEIPTS_CONSUMER_REASON="
+        f"{owner_receipt_decision.get('reason', '')}"
+    )
     print(
         "CAPACITY_LIFECYCLE_CLOSEOUT="
         f"{'yes' if capacity_lifecycle_ready else 'no'}"

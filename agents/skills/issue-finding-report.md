@@ -538,6 +538,26 @@ Do not call an Issue complete when occurrence locations are missing or broad,
 when a material cause alternative remains hidden, when clauses lack a canonical
 destination, or when completion requires unrelated Issue responsibilities.
 
+## Distributed Clause Routing
+
+An Issue is a routing envelope, not an authority or a guarantee registry. Split
+`problem`, `required_action`, `done`, and `close_condition` by the mechanism
+owner before implementation or closeout. Each projected clause carries its
+owner, bounded clause reference, original authority/witness, and (when
+available) the owner's local receipt. A clause is `grounded` only when its
+authority is a user request, pre-existing public contract, reproduced failure,
+or external decision and its owner can point to the relevant mechanism and
+observation. A problem without an observed artifact/path is `unproven`; an
+action or completion condition without that root is `advisory`.
+
+Issue authorship, labels, PR references, open/closed state, approval text,
+copied agent claims, and repeated comments do not upgrade a clause. During
+pre-close revalidation, retain grounded clauses and downgrade unsupported
+`done`/`close_condition` text; do not discard a mixed Issue or create a new
+blocker. `issue_sync.py` exposes this projection through
+`project_issue_clauses()` and only mirrors it; the mechanism owner supplies the
+receipt and decides correspondence.
+
 ## Output Packet
 
 Write a run-local `Issue Finding And Reorganization Packet` when the task asks

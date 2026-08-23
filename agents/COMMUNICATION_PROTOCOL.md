@@ -120,6 +120,32 @@ not infer generic certificate guarantees from that hook projection. Skill,
 subagent, task, eval, experiment, and PR-publication adapters remain with their
 existing owners; this boundary does not add adapter-specific regeneration.
 
+## Owner and invalidation packets
+
+For distributed mechanism work, direct peer delivery and durable parent relay
+carry the same owner-local packet. The packet names the external authority or
+witness, owner, candidate/property, causal mechanism transition,
+`not_guaranteed` boundary, failure semantics, execution plane, bounded tool
+input, and exactly one primary observation. Its reuse key is the existing tuple
+`(candidate_digest, property_ref, owner_ref, execution_plane,
+tool_input_locator)`; this is a lookup tuple, not a generated ID or registry.
+
+When a mechanism, effect/dependency closure, input, or source snapshot changes,
+the owner sends an invalidation packet only across an existing dependency edge:
+`from_owner`, `to_owner`, `candidate_digest`, `changed_mechanism_ref`,
+`invalidated_property_ref`, `invalidated_receipt_ref`, `reason`,
+`affected_edge`, and `owner_action=reevaluate_local_correspondence`. The packet
+invalidates evidence, not requirements. The downstream owner decides whether its
+own receipt is affected and records reuse/not-applicable when it is not; the
+parent only transports, orders, and reports status.
+
+An integration owner consumes receipt presence, compatibility, and dependency
+closure and returns missing/incompatible references. It does not rerun the
+owner command. `verified` is local causal correspondence, not approval, and a
+reviewer, Issue, merge state, label, copied claim, or handoff cannot substitute
+for the owner receipt. If direct peer transport is unavailable, the durable
+relay preserves these semantics and reports the transport limitation honestly.
+
 Before the generic runtime-event artifact exists, the sole context handoff is
 the immutable `agent_canon.context_discovery_certificate.v1` produced by
 `runtime_log_archive_git.py append-context-discovery`. The producer reads the

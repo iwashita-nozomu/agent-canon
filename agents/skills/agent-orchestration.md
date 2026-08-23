@@ -406,6 +406,32 @@ publication evidence are complete. This contract is state- and
 dependency-driven; prompt keywords, arbitrary serial waits, and hard-coded
 durations cannot replace a real ordering or collision decision.
 
+## Distributed owner correspondence
+
+The scheduling state above is a local work-convergence utility. Its finding IDs,
+review status, and terminal projection do not create a guarantee or publication
+authority. A mechanism owner must instead emit one owner-local receipt containing
+the external authority/witness, causal mechanism transition, `not_guaranteed`
+boundary, failure semantics, execution plane, tool input, and exactly one primary
+observation. The receipt is reusable by the tuple
+`(candidate_digest, property_ref, owner_ref, execution_plane, tool_input_locator)`;
+it has no global ID, registry, approval, counter, or time threshold.
+
+Independent owner streams may run in parallel when their write scopes and
+validation oracles are disjoint. The parent transports typed packets, orders
+existing dependency edges, reports status, and performs remote readback. It does
+not combine child claims into a guarantee. When a mechanism or its effect/input
+closure changes, the owner sends an invalidation packet only along existing
+dependency edges. Each downstream owner decides whether its own receipt is
+affected; unaffected receipts are reused without rerunning their commands.
+
+The publication/integration owner consumes receipt presence, candidate/property/
+owner compatibility, and dependency closure. It reports a bounded
+`missing_or_incompatible` list and never reruns Docker, link, eval, project-test,
+or owner commands. `verified` means owner-local causal correspondence, not
+approval. Reviewer, Issue, merge, label, and copied-agent claims remain
+intermediate references; unsupported claims are `advisory` or `unproven`.
+
 ### Canonical Skill Invocation Order
 
 `agents/skills/catalog.yaml` enumerates public skill identities and owns prompt
