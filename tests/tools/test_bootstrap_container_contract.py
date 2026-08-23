@@ -2,7 +2,7 @@
 
 # @dependency-start
 # contract test
-# responsibility Verifies the shared tool image is non-root, bounded, source-free at runtime, and LSP/Rust scoped.
+# responsibility Verifies the shared tool image boundary, runtime invariants, and LSP/Rust scope.
 # upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared tool image contract
 # upstream implementation ../../bootstrap/container/Dockerfile image definition
 # upstream implementation ../../bootstrap/container/entrypoint.sh health and dispatch entrypoint
@@ -57,15 +57,13 @@ def test_container_definition_has_only_expected_files() -> None:
     assert {"Dockerfile", "dependencies.toml", "entrypoint.sh"} <= names
 
 
-def test_dockerfile_is_digest_pinned_and_uses_non_root_runtime() -> None:
+def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
-    assert "FROM --platform=linux/amd64 node:22.14.0-bullseye-slim@sha256:" in text
-    assert "FROM --platform=linux/amd64 ubuntu:22.04@sha256:" in text
-    assert "ARG AGENT_CANON_RUNTIME_UID=1000" in text
-    assert "ARG AGENT_CANON_RUNTIME_GID=1000" in text
-    assert "AGENT_CANON_RUNTIME_UID must be a nonzero decimal" in text
-    assert "AGENT_CANON_RUNTIME_GID must be a nonzero decimal" in text
-    assert "USER agentcanon" in text
+    assert "FROM node:22.14.0-bullseye-slim@sha256:" in text
+    assert "FROM ubuntu:22.04@sha256:" in text
+    assert "AGENT_CANON_RUNTIME_UID" not in text
+    assert "AGENT_CANON_RUNTIME_GID" not in text
+    assert "USER agentcanon" not in text
     assert "ENTRYPOINT [\"/usr/local/bin/agent-canon-container-entrypoint\"]" in text
     assert 'CMD ["resident"]' in text
     assert "rootless" not in text.lower()
@@ -145,10 +143,11 @@ def test_dockerfile_declares_run_side_contract_and_healthcheck() -> None:
         assert forbidden not in text
 
 
-def test_dockerfile_supports_the_ubuntu_python_tomli_fallback() -> None:
+def test_dockerfile_does_not_duplicate_dependency_manifest_validation() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
-    assert "except ModuleNotFoundError:" in text
-    assert "import tomli as tomllib" in text
+    assert "container.platform must be linux/amd64" not in text
+    assert "AGENT_CANON_RUNTIME_UID" not in text
+    assert "AGENT_CANON_RUNTIME_GID" not in text
 
 
 def test_dockerfile_does_not_pull_project_or_host_tooling() -> None:
@@ -176,7 +175,7 @@ def test_entrypoint_is_executable_and_has_strict_health_dispatch() -> None:
     assert "set -euo pipefail" in text
     assert 'case "${1:-}" in' in text
     assert "health|--healthcheck)" in text
-    assert '[[ "${uid}" == "0" ]]' in text
+    assert '[[ "${uid}" == "0" ]]' not in text
     assert 'exec /usr/local/bin/agent-canon-tool "$@"' in text
     assert 'usage: $0 health | resident | tool run <catalog-id> -- [args...]' in text
     assert 'exec "$@"' not in text
@@ -223,11 +222,7 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
     document = tomllib.loads(DEPENDENCIES.read_text(encoding="utf-8"))
     assert document["schema"] == "agent-canon.tool-dependencies"
     assert document["schema_version"] == 2
-    assert document["container"] == {
-        "platform": "linux/amd64",
-        "uid": 1000,
-        "gid": 1000,
-    }
+    assert "container" not in document
     records = document["records"]
     ids = {record["id"] for record in records}
     assert ids == {

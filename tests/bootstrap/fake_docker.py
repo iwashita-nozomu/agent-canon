@@ -62,8 +62,10 @@ def main(argv: list[str]) -> int:
         return 0
     if argv[:1] == ["build"]:
         tag = argv[argv.index("--tag") + 1]
+        image_number = int(state.get("next_image", 1))
+        state["next_image"] = image_number + 1
         record = {
-            "Id": "sha256:fake-image-1",
+            "Id": f"sha256:fake-image-{image_number}",
             "RepoTags": [tag],
             "Config": {"Labels": labels(argv)},
         }
@@ -83,6 +85,15 @@ def main(argv: list[str]) -> int:
             found[1]["health_polls"] = int(found[1].get("health_polls", 0)) + 1
             if found[1]["health_polls"] > polls:
                 health["Status"] = "healthy"
+                drift = os.environ.get("FAKE_DOCKER_DRIFT_ON_HEALTH")
+                if drift and not found[1].get("drift_applied"):
+                    if drift == "network":
+                        found[1]["HostConfig"]["NetworkMode"] = "bridge"
+                    elif drift == "labels":
+                        found[1]["Config"]["Labels"][
+                            "io.agent-canon.control-root-digest"
+                        ] = "foreign-control-root"
+                    found[1]["drift_applied"] = True
             save(state)
         print(json.dumps([found[1]]))
         return 0
@@ -122,7 +133,6 @@ def main(argv: list[str]) -> int:
             "Name": "/" + name,
             "Config": {
                 "Labels": labels(argv),
-                "User": argv[argv.index("--user") + 1],
             },
             "State": {"Running": False, "Health": {"Status": "starting"}},
             "HostConfig": {

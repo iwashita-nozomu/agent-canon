@@ -3692,7 +3692,9 @@ class DependencyModelTests(unittest.TestCase):
         self.assertIn("python3-packaging", dockerfile)
         self.assertIn("build-essential", dockerfile)
         self.assertIn("ninja-build", dockerfile)
-        self.assertIn("USER agentcanon", dockerfile)
+        self.assertNotIn("USER agentcanon", dockerfile)
+        self.assertNotIn("AGENT_CANON_RUNTIME_UID", dockerfile)
+        self.assertNotIn("AGENT_CANON_RUNTIME_GID", dockerfile)
         self.assertIn('io.agent-canon.run.network="none"', dockerfile)
 
     def test_project_extras_are_ordered_and_installed_then_checked(self) -> None:

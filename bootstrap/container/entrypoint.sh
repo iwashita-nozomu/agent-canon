@@ -9,12 +9,6 @@
 set -euo pipefail
 
 health() {
-    local uid
-    uid="$(id -u)"
-    if [[ "${uid}" == "0" ]]; then
-        echo "agent-canon-container: root process is forbidden" >&2
-        return 1
-    fi
     [[ -x /usr/local/bin/agent-canon ]] || {
         echo "agent-canon-container: agent-canon CLI is missing" >&2
         return 1

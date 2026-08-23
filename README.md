@@ -66,9 +66,12 @@ tools only. The project owns its own Docker/test runner; AgentCanon never mounts
 project test directories into the tool runtime and does not create a project-
 specific image, container, virtualenv, Cargo toolchain, or volume.
 
-The daemon may be rootful or rootless; bootstrap does not branch on that fact.
-The container process always uses a non-root UID. Host state, credentials, Git
-metadata, and global Codex configuration are not mounted into the container.
+Bootstrap treats the Docker CLI/daemon as an available host capability and
+reports Docker's exit code and stderr when a command fails. Container process
+identity, UID/GID mapping, and root/rootless policy belong to the host and
+caller environment; AgentCanon does not create a user, pass `--user`, or
+validate those settings. Host state, credentials, Git metadata, and global
+Codex configuration are not mounted into the container.
 
 ## Source and artifact boundary
 

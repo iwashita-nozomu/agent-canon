@@ -9,14 +9,6 @@
 schema = "agent-canon.tool-dependencies"
 schema_version = 2
 
-# The image is intentionally amd64-only. UID/GID are non-root defaults; the
-# bootstrap may replace them with the invoking non-root Host identity without
-# branching on rootless/rootful daemon mode.
-[container]
-platform = "linux/amd64"
-uid = 1000
-gid = 1000
-
 # The shared image intentionally excludes project dependencies, Codex, GitHub
 # CLI, editor integrations, GPU tooling, and lifecycle helpers.
 
