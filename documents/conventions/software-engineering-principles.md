@@ -270,6 +270,33 @@ validation は変更した property と reachable risk に対応させます。
 - remote CI は clean replay または remote-only property を観測するために使い、local checker の別名にしない。
 - 選ばれなかった full check、diagnostic、report に negative receipt を作らない。
 
+#### SEP-11A Guarantee-first mechanism selection
+
+保証を選ぶ順序は、外部に根ざした要求または観測された witness、そこから
+到達できる因果的 mechanism、mechanism が保証しない残余境界、そして一次観測
+owner の順です。設計文書、reviewer の主張、Issue 本文、approval、merge 状態、
+label、PR 参照、または同じ主張の繰り返しは、単独では authority や guarantee
+になりません。
+
+各 owner は次を一つの local correspondence として保持します。
+
+`authority -> mechanism transition -> not-guaranteed boundary -> primary observation -> local receipt`
+
+同じ `(candidate_digest, property_ref, owner_ref, execution_plane,
+tool_input_locator)` の receipt は再利用します。mechanism、effect/dependency
+closure、入力、source snapshot が変わった場合だけ、その owner の receipt と
+既存 DAG の到達可能な下流 evidence を無効化します。無関係な owner の receipt
+や、同じ property を見る別名の check は再実行しません。
+
+integration/publication owner は receipt の存在、candidate/property/owner の
+互換性、既存 dependency edge の閉包だけを消費し、owner の command を再実行
+しません。`verified` は owner が因果対応を観測した状態であって承認ではなく、
+`advisory` / `unproven` / `refuted` は要求や blocker を生成しません。
+
+この選択規則は checklist、承認ゲート、registry、counter、時間制限、最低 check
+回数を追加するものではありません。選択した mechanism と、その property を
+初めて観測する oracle だけを実装し、別境界を観測しない同型の検証は作りません。
+
 ### SEP-12 Determinism, idempotency, and reproducibility
 
 決定性が contract の surface は、同じ canonical input、version、configuration から同じ ordering、identity、

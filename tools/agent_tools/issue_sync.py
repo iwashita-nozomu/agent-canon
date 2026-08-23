@@ -58,6 +58,15 @@ OPEN_STATUSES = {"open", "in_progress", "deferred"}
 CLOSED_STATUSES = {"resolved", "wontfix", "deferred"}
 ISSUE_ID_RE = re.compile(r"^AC-\d{8}-[a-z0-9]+(?:-[a-z0-9]+)*$")
 FIELD_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$")
+ISSUE_CLAUSE_KINDS = (
+    "problem",
+    "required_action",
+    "done",
+    "close_condition",
+)
+ISSUE_AUTHORITY_KINDS = frozenset(
+    {"user_request", "preexisting_public_contract", "reproduced_failure", "external_decision"}
+)
 
 
 def _write_issue_output(path: Path, payload: bytes, purpose: str) -> None:
@@ -376,6 +385,49 @@ def compact_issue_sections(text: str) -> dict[str, str]:
     if heading is not None:
         sections[heading] = "\n".join(content).strip()
     return sections
+
+
+def project_issue_clauses(issue: IssueRecord) -> tuple[dict[str, object], ...]:
+    """Project Issue clauses to owner-local, non-authoritative trace records.
+
+    Problem/action/completion prose is retained for routing, but only an
+    external authority and owner receipt can ground a clause.  Issue state,
+    labels, authorship, PR references, and repeated agent text do not upgrade
+    an ``advisory`` or ``unproven`` clause.
+    """
+    sections = compact_issue_sections(issue.body)
+    owner_ref = issue.fields.get("owner_ref", issue.fields.get("owner", "")).strip()
+    authority_kind = issue.fields.get("authority_kind", "").strip()
+    authority_ref = issue.fields.get("authority_ref", "").strip()
+    receipt_ref = issue.fields.get("owner_receipt_ref", "").strip()
+    projected: list[dict[str, object]] = []
+    for clause_kind in ISSUE_CLAUSE_KINDS:
+        text = issue.fields.get(clause_kind, "").strip() or sections.get(clause_kind, "")
+        if not text:
+            continue
+        grounded = (
+            bool(owner_ref)
+            and authority_kind in ISSUE_AUTHORITY_KINDS
+            and bool(authority_ref)
+            and (clause_kind != "problem" or bool(issue.fields.get("evidence", "").strip()))
+            and (clause_kind == "problem" or bool(receipt_ref))
+        )
+        state = "grounded" if grounded else ("advisory" if clause_kind != "problem" else "unproven")
+        projected.append(
+            {
+                "issue_repository": issue.fields.get("issue_repository", "").strip(),
+                "issue_number": issue.fields.get("issue_number", "").strip(),
+                "owner_ref": owner_ref,
+                "clause_ref": f"{issue.path.as_posix()}#{clause_kind}",
+                "clause_kind": clause_kind,
+                "clause_text": text,
+                "authority_kind": authority_kind,
+                "authority_ref": authority_ref,
+                "owner_receipt_ref": receipt_ref,
+                "state": state,
+            }
+        )
+    return tuple(projected)
 
 
 def issue_files(root: Path) -> tuple[Path, ...]:
@@ -768,6 +820,7 @@ def render_json(report: IssueSyncReport) -> str:
                     "directory_state": issue.directory_state,
                     "issue_id": issue.issue_id,
                     "github_issue": issue.github_issue,
+                    "clauses": list(project_issue_clauses(issue)),
                 }
                 for issue in report.issues
             ],
