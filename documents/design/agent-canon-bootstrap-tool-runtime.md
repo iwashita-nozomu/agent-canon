@@ -96,6 +96,7 @@ mutation tool は明示 target capability を受けた場合だけ source を変
 ```bash
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> install
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> update
+./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> update
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> start
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> status
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> target add --root <project-a> --mode read-only
@@ -124,7 +125,7 @@ checkout lease、publication receipt だけを所有します。
 
 ```toml
 [container]
-name_template = "agent-canon-tools-<effective-uid>"
+name_template = "agent-canon-tools"
 max_instances = 1
 cpus = 2
 memory_bytes = 4294967296
@@ -140,7 +141,7 @@ archive_lease_quota_bytes = 2147483648
 idle_stop_seconds = 3600
 max_image_generations = 2
 network = "none"
-labels = ["io.agent-canon.runtime=shared-v1", "io.agent-canon.owner-uid", "io.agent-canon.control-root-digest"]
+labels = ["io.agent-canon.runtime=shared-v1", "io.agent-canon.control-root-digest"]
 
 [skills]
 strategy = "managed-links"
@@ -400,6 +401,7 @@ unhealthy、archive publish failure、rollback、session restart、cleanup readb
 | Operation | Resulting state | Completion evidence |
 | --- | --- | --- |
 | `install` | verified image/manifest generation | image digest, manifest fingerprint |
+| `update` | current checkout reconciled in existing v2 lifecycle | source commit/tree digest, image-input/manifest digest, Docker IDs |
 | `start` | exactly one healthy container | inspect, limits, mounts, generation |
 | `target add` | new mount generation active | lock, zero tasks, health, mount readback |
 | `exec` | exact command completed | argv/cwd/I/O/exit/source before-after |
