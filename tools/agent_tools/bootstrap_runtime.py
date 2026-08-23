@@ -3095,7 +3095,7 @@ class BootstrapRuntime:
                 container_output,
             ],
             root=root,
-            environment={"AGENT_CANON_OUTPUT_ROOT": str(host_output)},
+            environment={"AGENT_CANON_OUTPUT_ROOT": container_output},
         )
 
     def eval_collect(self, root: Path, run_id: str) -> dict[str, Any]:
