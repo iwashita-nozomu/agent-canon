@@ -28,13 +28,11 @@ jobs:
       AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
       AGENT_CANON_ACTIVE_REPOSITORY_ROOT: ${{ github.workspace }}
       AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}
+      AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/workspace/agent-canon-runtime/issue-mirror
     permissions:
       contents: read
       issues: write
     steps:
-      - name: Configure external runtime root
-        run: echo "AGENT_CANON_RUNTIME_ROOT=${RUNNER_TEMP}/agent-canon-runtime" >> "${GITHUB_ENV}"
-
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -58,6 +56,13 @@ jobs:
             --sync-github \
             --summary-file "${summary_file}"
           cat "${summary_file}" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Remove workflow runtime
+        if: always()
+        run: |
+          if [ -d "${AGENT_CANON_RUNTIME_ROOT}" ]; then
+            find "${AGENT_CANON_RUNTIME_ROOT}" -depth -delete
+          fi
 
   issue-mirror-check:
     if: always()
