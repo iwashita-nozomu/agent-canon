@@ -161,6 +161,15 @@ archive branch mismatch fails closed. Resolve the owning lease or branch
 explicitly, then retry `eval sync`; do not silently fall back to source-local
 storage.
 
+Bootstrap `eval sync` supplies a repository-qualified source identity.
+`archive-eval` selects that stable branch while holding the archive transaction
+lock, so one shared runtime can publish sequentially for multiple registered
+repositories. Branch selection still fetches first and reuses the clean/
+managed-dirty reconciliation owner; foreign dirty state, an active lease,
+conflicts, or failed remote readback remain fail-closed and retain the spool.
+A branch mismatch outside this transaction-owned eval route still requires
+explicit owner resolution.
+
 At closeout, choose one state explicitly:
 
 - `published`: remote ref/tree/blob readback passed;
