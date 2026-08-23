@@ -332,7 +332,7 @@ AREA_DATA: tuple[AreaData, ...] = (
     (
         "agents",
         "agent mode",
-        "Choose parent-direct, read-only scout, or staged agents by risk.",
+        "Choose write-capable child, read-only scout, or staged agents by risk.",
         "select_agent_mode",
         ("python3 tools/agent_tools/route.py --area agents",),
         (

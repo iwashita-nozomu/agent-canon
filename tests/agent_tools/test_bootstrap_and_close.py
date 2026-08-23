@@ -456,7 +456,7 @@ def ready_closeout_evidence_lines(
         "- dynamic_spawn_policy_status: applied",
         "- subagent_closeout_status: closed",
         "- open_subagent_instances: none",
-        "- close_agent_evidence: parent_direct_no_open_subagents",
+        "- close_agent_evidence: orchestrator_no_open_subagents",
         "",
         "## Diff-Check Agent Evidence",
         "- diff_check_agent_role: reviewer",
@@ -2265,8 +2265,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
             self.assertNotIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
             self.assertNotIn("PARENT_REPO_EDITS_ALLOWED=no", result.stdout)
-            self.assertNotIn("PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes", result.stdout)
-            self.assertNotIn("PARENT_DIRECT_WRITE_EXCEPTION=-", result.stdout)
             manifest_text = (
                 report_root / "test-review-only-no-edit" / "team_manifest.yaml"
             ).read_text(encoding="utf-8")
@@ -2274,8 +2272,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             contract_policy = manifest["run"]["contract_complete_implementation_policy"]
             self.assertNotIn("implementation_handoff_required", contract_policy)
             self.assertNotIn("parent_repo_edits_allowed", contract_policy)
-            self.assertNotIn("parent_direct_write_exception_required", contract_policy)
-            self.assertNotIn("parent_direct_write_exception", contract_policy)
+            self.assertNotIn("parent_orchestration_only", contract_policy)
 
     def test_academic_route_uses_current_bounded_dynamic_waves(self) -> None:
         """Academic routing follows the current bounded designer/worker sequence."""
@@ -2719,16 +2716,16 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "no",
             )
             self.assertEqual(
-                contract_complete_implementation_policy[
-                    "parent_direct_write_exception_required"
-                ],
+                contract_complete_implementation_policy["parent_orchestration_only"],
                 "yes",
             )
             self.assertEqual(
-                contract_complete_implementation_policy[
-                    "parent_direct_write_exception"
-                ],
-                "-",
+                contract_complete_implementation_policy["write_capable_child_required"],
+                "yes",
+            )
+            self.assertEqual(
+                contract_complete_implementation_policy["parent_blocked_route"],
+                "typed_blocked_retry_or_user_report",
             )
             self.assertEqual(
                 default_quality_check_policy["candidate_roles"],
@@ -3538,7 +3535,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 closeout_path.read_text(encoding="utf-8")
                 .replace("- subagents_closed: yes", "- subagents_closed: no")
                 .replace(
-                    "- close_agent_evidence: parent_direct_no_open_subagents",
+                    "- close_agent_evidence: orchestrator_no_open_subagents",
                     "- close_agent_evidence: none",
                 ),
                 encoding="utf-8",

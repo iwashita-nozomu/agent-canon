@@ -233,9 +233,9 @@ EXIT_BLOCKER_POLICY_MARKERS = {
 EXIT_BLOCKER_FORBIDDEN_RE = re.compile(
     r"(?i)(?:"
     r"sole basis for path selection|"
-    r"falling back to a parent-direct alternate route|"
-    r"parent-direct[^\n.。]{0,120}alternate route|"
-    r"parent-direct\s*代替|"
+    r"falling back to a parent write alternate route|"
+    r"parent write[^\n.。]{0,120}alternate route|"
+    r"parent write\s*代替|"
     r"worker[^\n.。]{0,80}alternate route)"
 )
 DOCUMENT_STRUCTURE_ROUTING_MARKERS = {

@@ -350,9 +350,11 @@ IMPLEMENTATION_HANDOFF_REQUIRED = "yes"
 
 PARENT_REPO_EDITS_ALLOWED = "no"
 
-PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED = "yes"
+PARENT_ORCHESTRATION_ONLY = "yes"
 
-PARENT_DIRECT_WRITE_EXCEPTION = "-"
+WRITE_CAPABLE_CHILD_REQUIRED = "yes"
+
+PARENT_BLOCKED_ROUTE = "typed_blocked_retry_or_user_report"
 
 REPO_TOOL_ROUTING_POLICY_SOURCE = "agents/skills/task-routing.md#Standard Command"
 
@@ -416,7 +418,7 @@ PRE_HANDOFF_SCOPE_HANDOFF_RULE = (
 )
 
 PRE_HANDOFF_GATE_STATUS_SOURCE = (
-    "agents/COMMUNICATION_PROTOCOL.md#Handoff Packet and Parent-Direct Context Note"
+    "agents/COMMUNICATION_PROTOCOL.md#Handoff Packet"
 )
 
 PRE_HANDOFF_GATE_STATUS_DEFAULT = "pending_design_review_gate_check"
@@ -664,9 +666,9 @@ def contract_complete_implementation_policy_output_lines(
         handoff_lines = (
             f"IMPLEMENTATION_HANDOFF_REQUIRED={IMPLEMENTATION_HANDOFF_REQUIRED}",
             f"PARENT_REPO_EDITS_ALLOWED={PARENT_REPO_EDITS_ALLOWED}",
-            "PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED="
-            f"{PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED}",
-            f"PARENT_DIRECT_WRITE_EXCEPTION={PARENT_DIRECT_WRITE_EXCEPTION}",
+            f"PARENT_ORCHESTRATION_ONLY={PARENT_ORCHESTRATION_ONLY}",
+            f"WRITE_CAPABLE_CHILD_REQUIRED={WRITE_CAPABLE_CHILD_REQUIRED}",
+            f"PARENT_BLOCKED_ROUTE={PARENT_BLOCKED_ROUTE}",
         )
     return (
         *handoff_lines,
@@ -1610,8 +1612,7 @@ def manifest_run_lines(
             "      - closeout_gate.md Subagent Lifecycle Evidence planned-vs-actual wave status"
         )
         lines.append(
-            "      - closed selected run-local agent ids, or the applicable structured "
-            "parent handoff / recorded parent-direct exception evidence"
+            "      - closed selected run-local agent ids and auditor closeout artifact"
         )
         lines.append("  write_scope_policy:")
         lines.append("    parent_managed: true")
@@ -1654,9 +1655,9 @@ def manifest_contract_complete_implementation_policy_lines(
         ] = [
             f"    implementation_handoff_required: {IMPLEMENTATION_HANDOFF_REQUIRED!r}",
             f"    parent_repo_edits_allowed: {PARENT_REPO_EDITS_ALLOWED!r}",
-            "    parent_direct_write_exception_required: "
-            f"{PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED!r}",
-            f"    parent_direct_write_exception: {PARENT_DIRECT_WRITE_EXCEPTION!r}",
+            f"    parent_orchestration_only: {PARENT_ORCHESTRATION_ONLY!r}",
+            f"    write_capable_child_required: {WRITE_CAPABLE_CHILD_REQUIRED!r}",
+            f"    parent_blocked_route: {PARENT_BLOCKED_ROUTE!r}",
         ]
     for field in CONTRACT_COMPLETE_IMPLEMENTATION_REQUIRED_INPUTS:
         lines.append(f"      - {field}")

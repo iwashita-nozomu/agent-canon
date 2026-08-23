@@ -20,8 +20,8 @@ required_any = ["skill_invocation=", "skill_invocation_not_required"]
 [[criteria]]
 name = "stage_and_subagent_behavior_recorded"
 max_score = 5
-feedback = "Record stage ownership and subagent routing or explicit parent-direct rationale as behavior evidence."
-required_any = ["subagent_routing=", "stage owner", "parent_direct_reason", "trivial_direct_edit"]
+feedback = "Record stage ownership and mandatory write-capable child routing as behavior evidence."
+required_any = ["write_capable_child=yes", "write-capable child", "read_only_conversation=not_applicable"]
 
 [[criteria]]
 name = "tool_gate_behavior_recorded"
@@ -180,12 +180,13 @@ required_any = [
 [[criteria]]
 name = "subagent_lifecycle_behavior_recorded"
 max_score = 5
-feedback = "Record fresh subagent lifecycle policy and closeout evidence, or explicit no-subagent justification."
+feedback = "Record fresh write-capable child lifecycle policy and closeout evidence, or explicit read-only conversation scope."
 required_any = [
   "subagents_closed=yes",
   "fresh_subagents_required",
   "subagent_lifecycle=closed",
-  "parent_direct_reason",
+  "write_capable_child=yes",
+  "read_only_conversation=not_applicable",
 ]
 
 [[criteria]]

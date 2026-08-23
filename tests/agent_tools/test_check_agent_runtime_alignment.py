@@ -119,6 +119,10 @@ def test_missing_report_bundle_path_uses_existing_git_parent(tmp_path: Path) -> 
 class AgentRuntimeAlignmentTest(unittest.TestCase):
     """Verify that the runtime alignment checker passes on the checked-in canon."""
 
+    def test_parent_orchestration_contract_has_no_retired_direct_route(self) -> None:
+        """The alignment owner enforces child-only repository writes."""
+        runtime_alignment.validate_parent_orchestration_contract()
+
     @staticmethod
     def write_minimal_dependency_map(root: Path) -> None:
         """Write the typed dependency record required by route catalog loading."""
@@ -194,7 +198,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         config = load_team_config()
         subagents_path = PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md"
         text = subagents_path.read_text(encoding="utf-8")
-        text_without_verifier = text.replace("| `verifier` | parent validation runner |\n", "")
+        text_without_verifier = text.replace("| `verifier` | prescribed validation runner |\n", "")
 
         with self.assertRaisesRegex(
             RuntimeError,

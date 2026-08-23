@@ -243,6 +243,28 @@ path, for example
 
 ## Handoff Packet
 
+### Parent Orchestration-Only Contract
+
+For every repository-changing task, including a bounded owner/path/validation
+request, the parent is an orchestrator only. The parent may select and launch
+agents, relay packets without changing their claims, manage dependency and
+integration order, monitor status, and return final external readback. The
+parent must not investigate, design, implement, run tests, review diffs, draft
+or publish Issues/PRs, score evaluations, decide convergence, resolve merge
+conflicts, or interpret validation/finding results.
+
+A write-capable child is mandatory for every repository edit. Missing spawn
+authorization, tool access, or another launch gate produces a typed
+`status=blocked` / retry / user-report packet; it never authorizes a parent
+write. Decision-owning reviewers or ship reviewers accept/reject findings and
+choose the next action. A verifier runs prescribed validation, an auditor
+creates the closeout artifact, an integration executor performs merge and
+conflict resolution, a publisher or PR-processing child performs Issue/PR
+writes, and an evaluation reviewer owns scoring and convergence.
+
+Read-only conversational answers remain outside this repository-changing
+route and do not create a write handoff.
+
 Implementation handoffs project the canonical TargetStateContract and
 ImplementationExecutionContract: complete owner/type/API/config/schema/path/
 dependency/transition/deletion/validation structure, immutable packet identity,
@@ -371,34 +393,6 @@ Raw search hits, chat memory, and a list of nearest files are not sufficient.
 If the packet is missing, implementation returns to investigation instead of
 guessing an edit path.
 
-## Parent-Direct Context Note
-
-For an approved parent-direct exception whose owner boundary, replaceable unit,
-validation route, and `external public API/behavior/schema unchanged` readback
-are already evidenced, the full
-Pre-Edit Repository Investigation Packet can be replaced by a short
-Parent-Direct Context Note. Routine docs, Focused code, typo/link/format-only,
-or other bounded work still needs the exception rationale when the work is
-repo-changing implementation / patch / doc-edit. File count alone is not enough
-to choose this note.
-
-The note records:
-
-- `owner`
-- `target_path`
-- `request_clause`
-- `parent_direct_exception_rationale`
-- `reuse_basis`
-- `design_oop_boundary`
-- `pre_handoff_gate_status`
-- `validation_route`
-- `llm_visible_context`
-- `local_tool_context`
-- `durable_memory_refs`
-
-The note is still a context-construction artifact. Raw search hits, nearest
-editable files, and chat context alone are not enough.
-
 ## Fresh Subagent Context Capsule
 
 Subagents are fresh per launch and do not inherit accumulated context. Each
@@ -470,7 +464,7 @@ edits, the parent runs or cites:
 python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>
 ```
 
-The handoff or parent-direct work log includes the resulting
+The handoff work log includes the resulting
 `TOOL_REJECTION_PREDICTED_GATE` lines or an explicit
 `TOOL_REJECTION_PREFLIGHT=pass` observation. If a predicted gate names OOP
 readability, helper inventory, dependency headers, GitHub workflow checks, hook

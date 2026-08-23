@@ -203,6 +203,54 @@ SUBAGENT_PROTOCOL_DOCS = (
     ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md",
     ROOT / "agents" / "TASK_WORKFLOWS.md",
 )
+PARENT_ORCHESTRATION_DOCS = {
+    ROOT / "agents" / "COMMUNICATION_PROTOCOL.md": (
+        "Parent Orchestration-Only Contract",
+        "A write-capable child is mandatory",
+        "status=blocked",
+        "parent must not investigate",
+        "Decision-owning reviewers",
+        "A verifier runs prescribed validation",
+        "an auditor",
+        "an integration executor",
+        "a publisher or PR-processing child",
+        "an evaluation reviewer",
+        "Read-only conversational answers remain outside",
+    ),
+    ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md": (
+        "parent agent は orchestrator only",
+        "write-capable implementer handoff first",
+        "packet relay",
+        "decision-owning reviewer",
+    ),
+    ROOT / "agents" / "canonical" / "CODEX_WORKFLOW.md": (
+        "write-capable",
+        "typed blocked/retry/user-report evidence",
+        "integration executor",
+        "decision-owning reviewer",
+    ),
+    ROOT / "agents" / "skills" / "agent-orchestration.md": (
+        "write-capable child",
+        "parent is an orchestrator only",
+        "typed blocker",
+    ),
+    ROOT / "agents" / "skills" / "codex-task-workflow.md": (
+        "write-capable implementer even for bounded requests",
+        "parent does not",
+    ),
+    ROOT / "agents" / "skills" / "subagent-bootstrap.md": (
+        "write-capable child route",
+        "typed blocked/retry/user-report packet",
+        "parent remains orchestrator only",
+    ),
+}
+FORBIDDEN_PARENT_DIRECT_MARKERS = (
+    "Parent-Direct Context Note",
+    "parent-direct",
+    "parent_direct",
+    "PARENT_DIRECT",
+    "parent_direct_reason",
+)
 TOOL_RESULT_ROUTE_MARKERS = (
     "raw checker/stat artifacts -> artifact_reviewer",
     "reader-facing narrative interpretation -> report_reviewer",
@@ -1550,6 +1598,16 @@ def validate_subagent_protocol_docs() -> None:
     validate_permanent_team_mapping(load_team_config(), subagents_text)
 
 
+def validate_parent_orchestration_contract() -> None:
+    """Require child-only repo writes and remove the retired parent route."""
+    for path, markers in PARENT_ORCHESTRATION_DOCS.items():
+        text = path.read_text(encoding="utf-8")
+        for marker in markers:
+            ensure(marker in text, f"{path} missing parent orchestration marker: {marker}")
+        for marker in FORBIDDEN_PARENT_DIRECT_MARKERS:
+            ensure(marker not in text, f"{path} retains retired parent route: {marker}")
+
+
 def parse_permanent_team_mapping_roles(markdown_text: str) -> set[str]:
     """Return role IDs listed in the CODEX_SUBAGENTS permanent-team mapping table."""
     in_mapping = False
@@ -1721,6 +1779,32 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
     run = require_mapping(
         manifest.get("run"), f"task {task_id} manifest missing run mapping"
     )
+    implementation_policy = require_mapping(
+        run.get("contract_complete_implementation_policy"),
+        f"task {task_id} manifest missing contract-complete implementation policy",
+    )
+    if "implementation_handoff_required" in implementation_policy:
+        ensure(
+            implementation_policy.get("parent_orchestration_only") == "yes",
+            f"task {task_id} manifest must require parent orchestration only",
+        )
+        ensure(
+            implementation_policy.get("write_capable_child_required") == "yes",
+            f"task {task_id} manifest must require a write-capable child",
+        )
+        ensure(
+            implementation_policy.get("parent_blocked_route")
+            == "typed_blocked_retry_or_user_report",
+            f"task {task_id} manifest must expose typed child-launch blocker route",
+        )
+        for retired_field in (
+            "parent_direct_write_exception_required",
+            "parent_direct_write_exception",
+        ):
+            ensure(
+                retired_field not in implementation_policy,
+                f"task {task_id} manifest retains retired field: {retired_field}",
+            )
     spawn_budget = require_mapping(
         run.get("spawn_budget"),
         f"task {task_id} manifest missing run.spawn_budget",
@@ -2361,6 +2445,7 @@ def main() -> int:
     validate_dynamic_wave_policy()
     validate_public_skill_shims()
     validate_subagent_protocol_docs()
+    validate_parent_orchestration_contract()
     validate_vendor_skill_adapters()
     validate_bundle_outputs()
     print("AGENT_RUNTIME_ALIGNMENT=pass")

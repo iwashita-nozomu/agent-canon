@@ -626,7 +626,12 @@ def orchestration_evidence_present(evidence: RunEvidence) -> bool:
         )
         and has_any(
             signals_text,
-            ("subagent", "stage owner", "parent_direct_reason", "trivial_direct_edit"),
+            (
+                "write_capable_child",
+                "write-capable child",
+                "write_capable_handoff",
+                "WRITE_SUBAGENT_AUTHORIZATION=required",
+            ),
         )
         and has_any(
             signals_text,
@@ -737,7 +742,7 @@ def build_workflow_execution_criteria(
             "orchestration_and_pre_design_intake",
             ORCHESTRATION_INTAKE_SCORE,
             orchestration_evidence_present(evidence),
-            "Record skills, stage/subagent or parent-direct routing, MCP preflight "
+            "Record skills, write-capable child routing, MCP preflight "
             "or explicit opt-out, repo dependency intake, web research decision, "
             "review status, validation status, and drift risk before implementation.",
         ),
