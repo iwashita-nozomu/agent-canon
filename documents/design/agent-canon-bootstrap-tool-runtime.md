@@ -95,6 +95,7 @@ mutation tool は明示 target capability を受けた場合だけ source を変
 
 ```bash
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> install
+./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> update
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> start
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> status
 ./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> target add --root <project-a> --mode read-only

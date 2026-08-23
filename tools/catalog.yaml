@@ -785,6 +785,23 @@ entries:
     tests:
       - tests/agent_tools/test_generated_artifact_guard.py
 
+  - id: template-bundle
+    summary: Exports one canonical template profile to a fresh external directory.
+    path: tools/agent_tools/template_bundle.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    command: python3 tools/agent_tools/template_bundle.py export --source-root <root> --source-ref <commit> --profile <profile> --output <fresh-directory>
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - templates/README.md
+      - documents/contracts/template-bundle-manifest.toml
+    tests:
+      - tests/agent_tools/test_template_bundle.py
+
   - id: run-accumulated-agent-evals
     summary: Runs registered AgentCanon eval producers with append-only accumulation before archive validation.
     path: tools/agent_tools/run_accumulated_agent_evals.py

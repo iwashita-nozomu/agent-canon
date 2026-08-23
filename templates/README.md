@@ -33,6 +33,10 @@ regular file と最小 provenance だけです。
 
 ## Source-view index
 
+Profile path ownership is defined by
+`documents/contracts/template-bundle-manifest.toml`. The exporter writes only
+to a fresh external directory and records the source commit and bundle digest.
+
 | Source view | Responsibility | Materialization rule |
 | --- | --- | --- |
 | `templates/agents/` | task-start、run bundle、review、closeout の artifact template | AgentCanon source 内で agent team が render する |

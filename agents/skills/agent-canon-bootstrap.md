@@ -98,7 +98,7 @@ bash bootstrap.sh \
   tool run --root <project-root> <catalog-id> -- <args...>
 ```
 
-Use `install`, `start`, `stop`, `rollback`, `uninstall`, and `gc --dry-run`
+Use `install`, `update`, `start`, `stop`, `rollback`, `uninstall`, and `gc --dry-run`
 only with the same explicit roots and task lifecycle evidence. `eval collect`
 and `eval sync --run-id <run-id>` are the only bootstrap eval routes. Any
 non-zero result remains a typed failure; do not retry through a project

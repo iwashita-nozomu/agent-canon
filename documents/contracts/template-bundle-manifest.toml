@@ -1,0 +1,19 @@
+# Canonical template bundle profiles owned by AgentCanon.
+version = 1
+source_index = "templates/README.md"
+
+[profiles.agent-artifacts]
+roots = ["templates/agents"]
+
+[profiles.document-artifacts]
+roots = ["templates/documents"]
+
+[profiles.code-scaffold]
+roots = ["templates/code"]
+
+[profiles.experiment-scaffold]
+roots = ["templates/experiments/_template"]
+
+[profiles.static-seed]
+roots = []
+producer = "tools/agent_tools/export_static_seed.py"

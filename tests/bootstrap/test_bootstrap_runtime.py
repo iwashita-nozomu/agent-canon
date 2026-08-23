@@ -704,20 +704,11 @@ def test_changed_inputs_preserve_status_and_exact_cleanup_then_allow_reinstall(
     status = changed.status()
     assert status["details"]["manifest_drift"] is True
     assert status["resource_ids"]["container"]["id"] == old_state["resources"]["container"]["id"]
-    with pytest.raises(BootstrapError, match="manifest_mismatch"):
-        changed.install()
-
-    changed.stop()
-    changed.uninstall()
-    uninstalled = json.loads(changed.paths.state.read_text(encoding="utf-8"))
-    assert uninstalled["state"] == "uninstalled"
-    assert uninstalled["manifest_digest"] == old_state["manifest_digest"]
-
-    reinstalled = changed.install()
+    updated = changed.update()
     rebound = json.loads(changed.paths.state.read_text(encoding="utf-8"))
-    assert reinstalled["code"] == "installed"
+    assert updated["code"] == "updated"
     assert rebound["manifest_digest"] == changed.manifest_digest
-    assert rebound["manifest_digest"] != old_state["manifest_digest"]
+    assert rebound["tree_digest"] == old_state["tree_digest"]
 
 
 def test_parser_has_typed_exec_tool_codex_and_eval_routes() -> None:

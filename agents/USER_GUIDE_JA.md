@@ -25,6 +25,7 @@ RUNTIME="$ROOT/workspace/agent-canon-runtime/<installation>"
 BOOTSTRAP=/path/to/agent-canon/bootstrap.sh
 
 "$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" install
+"$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" update
 "$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" start
 "$BOOTSTRAP" --control-parent-root "$ROOT" --runtime-root "$RUNTIME" \
   target add --root <project-root> --mode read-only

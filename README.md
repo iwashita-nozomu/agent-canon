@@ -43,6 +43,7 @@ BOOTSTRAP=./bootstrap.sh
 COMMON=(--control-parent-root "$ROOT" --runtime-root "$RUNTIME")
 
 "$BOOTSTRAP" "${COMMON[@]}" install
+"$BOOTSTRAP" "${COMMON[@]}" update
 "$BOOTSTRAP" "${COMMON[@]}" start
 "$BOOTSTRAP" "${COMMON[@]}" target add --root <project-root> --mode read-only
 "$BOOTSTRAP" "${COMMON[@]}" status

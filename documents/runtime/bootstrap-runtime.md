@@ -44,6 +44,7 @@ The command family is:
 
 ```bash
 "$BOOTSTRAP" "${COMMON[@]}" install
+"$BOOTSTRAP" "${COMMON[@]}" update
 "$BOOTSTRAP" "${COMMON[@]}" start
 "$BOOTSTRAP" "${COMMON[@]}" status
 "$BOOTSTRAP" "${COMMON[@]}" target add --root <project-root> --mode read-only
@@ -82,6 +83,13 @@ by the host/caller environment; AgentCanon does not create a user, pass
 `--user`, or validate that policy. A matching pre-existing image tag is adopted
 by exact ID without overwrite; an unowned pre-existing image remains outside
 uninstall.
+
+`update` reads only the current AgentCanon checkout. It never fetches,
+checks out, merges, rebases, resets, or pulls Git state. If source tree content,
+image inputs, or the manifest are unchanged, it is a no-op and does not build.
+When they change, one ordinary Docker build is performed; health or build
+failure restores the existing v2 generation, container, and image in the same
+handled call. Source acquisition remains the downstream dotfiles responsibility.
 
 The container is bounded by the manifest: two CPUs, 4 GiB memory, 512 PIDs,
 network disabled, read-only root filesystem, all Linux capabilities dropped,

@@ -42,7 +42,7 @@ import urllib.request
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 SCHEMA_STATE = "agent-canon.bootstrap-state.v2"
 SCHEMA_RECEIPT = "agent-canon.bootstrap-receipt.v2"
@@ -68,7 +68,6 @@ REGISTRY_DESTINATION = "/var/lib/agent-canon/mount-registry.toml"
 REQUIRED_LABELS = frozenset(
     {
         "io.agent-canon.runtime=shared-v1",
-        "io.agent-canon.owner-uid",
         "io.agent-canon.control-root-digest",
     }
 )
@@ -257,6 +256,36 @@ def _source_snapshot(root: Path) -> dict[str, Any]:
         "tree_digest": digest.hexdigest(),
         "file_count": file_count,
     }
+
+
+def _image_input_digest(root: Path) -> str:
+    """Digest the AgentCanon paths copied into the shared image build context."""
+    roots = (
+        ".dockerignore", "AGENTS.md", "ROOT_AGENTS.md", ".agents", ".codex",
+        "bootstrap/container", "tools", "agents", "documents", "evidence/agent-evals",
+        "references", "templates", "rust/agent-canon",
+    )
+    digest = hashlib.sha256()
+    files: list[Path] = []
+    for relative in roots:
+        path = root / relative
+        if path.is_file() or path.is_symlink():
+            files.append(path)
+        elif path.is_dir():
+            files.extend(
+                item for item in path.rglob("*")
+                if (item.is_file() or item.is_symlink())
+                and "__pycache__" not in item.parts
+                and item.suffix != ".pyc"
+            )
+    for path in sorted(set(files)):
+        relative = path.relative_to(root).as_posix().encode("utf-8")
+        payload = os.readlink(path).encode("utf-8") if path.is_symlink() else path.read_bytes()
+        digest.update(relative)
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(payload).digest())
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def _changed_source_paths(root: Path) -> set[str]:
@@ -920,7 +949,7 @@ class DockerAdapter:
             else _inspect_object(result.stdout, field="container")
         )
 
-    def owned_container_ids(self, uid: int) -> list[str]:
+    def owned_container_ids(self, control_digest: str) -> list[str]:
         """List container IDs selected by the runtime ownership labels."""
         result = self.run(
             [
@@ -931,7 +960,7 @@ class DockerAdapter:
                 "--filter",
                 "label=io.agent-canon.runtime=shared-v1",
                 "--filter",
-                f"label=io.agent-canon.owner-uid={uid}",
+                f"label=io.agent-canon.control-root-digest={control_digest}",
                 "--no-trunc",
                 "--quiet",
             ],
@@ -943,7 +972,7 @@ class DockerAdapter:
             else []
         )
 
-    def owned_image_ids(self, uid: int, control_digest: str) -> list[str]:
+    def owned_image_ids(self, control_digest: str) -> list[str]:
         """List exact image IDs owned by the shared runtime labels."""
         result = self.run(
             [
@@ -953,7 +982,6 @@ class DockerAdapter:
                 "--filter",
                 "label=io.agent-canon.runtime=shared-v1",
                 "--filter",
-                f"label=io.agent-canon.owner-uid={uid}",
                 "--filter",
                 f"label=io.agent-canon.control-root-digest={control_digest}",
                 "--no-trunc",
@@ -1234,7 +1262,8 @@ class BootstrapRuntime:
         self.manifest, policy_digest = load_manifest(self.manifest_path)
         self.manifest_digest = policy_digest
         self.control_digest = sha256_text(str(control))
-        self.uid = os.geteuid() if hasattr(os, "geteuid") else os.getuid()
+        self.source_identity = _source_snapshot(self.repository_root)
+        self.image_input_digest = _image_input_digest(self.repository_root)
         self.docker = docker or DockerAdapter(
             os.environ.get("AGENT_CANON_DOCKER", "docker"),
             timeout=int(self.manifest["container"]["task_timeout_seconds"]),
@@ -1274,17 +1303,6 @@ class BootstrapRuntime:
     def _enforce_private_directory(self, path: Path) -> None:
         """Make an owned Host control directory private and verify readback."""
         try:
-            status = os.stat(path, follow_symlinks=False)
-        except OSError as exc:
-            raise BootstrapError(
-                "runtime_directory_invalid", f"cannot inspect runtime directory: {path}"
-            ) from exc
-        if status.st_uid != self.uid:
-            raise BootstrapError(
-                "runtime_directory_owner_mismatch",
-                f"runtime directory is owned by uid {status.st_uid}, expected {self.uid}",
-            )
-        try:
             os.chmod(path, 0o700, follow_symlinks=False)
         except OSError as exc:
             raise BootstrapError(
@@ -1315,7 +1333,9 @@ class BootstrapRuntime:
             "runtime_root": str(self.paths.runtime_root),
             "control_root_digest": self.control_digest,
             "manifest_digest": self.manifest_digest,
-            "owner_uid": self.uid,
+            "source_commit": None,
+            "tree_digest": None,
+            "image_input_digest": None,
             "state": "uninstalled",
             "active_task_count": 0,
             "current_generation": None,
@@ -1382,27 +1402,27 @@ class BootstrapRuntime:
                 "control_root_digest": self.control_digest,
                 "control_parent_root": str(self.paths.control_parent_root),
                 "runtime_root": str(self.paths.runtime_root),
-                "owner_uid": self.uid,
                 "manifest_digest": state.get("manifest_digest", self.manifest_digest),
             },
         )
 
     def _image_tag(self) -> str:
         return (
-            f"agent-canon-tools:{self.uid}-{self.control_digest[:16]}-"
+            f"agent-canon-tools:{self.control_digest[:16]}-"
+            f"{self.source_identity['head'][:16]}-{self.source_identity['tree_digest'][:16]}-"
+            f"{self.image_input_digest[:16]}-"
             f"{self.manifest_digest[:16]}"
         )
 
     def _labels(self) -> dict[str, str]:
         return {
             "io.agent-canon.runtime": "shared-v1",
-            "io.agent-canon.owner-uid": str(self.uid),
             "io.agent-canon.control-root-digest": self.control_digest,
         }
 
     def _resource_records(self) -> dict[str, Any]:
         name = str(self.manifest["container"]["name_template"]).replace(
-            "<effective-uid>", str(self.uid)
+            "<effective-uid>", self.control_digest[:16]
         )
         return {
             "image": {
@@ -1441,13 +1461,17 @@ class BootstrapRuntime:
             "operation": operation,
             "status": status,
             "code": code,
-            "owner_uid": self.uid,
             "control_root_digest": self.control_digest,
             "manifest_digest": (
                 state.get("manifest_digest", self.manifest_digest)
                 if state is not None
                 else self.manifest_digest
             ),
+            "source": {
+                "commit": self.source_identity.get("head"),
+                "tree_digest": self.source_identity.get("tree_digest"),
+                "image_input_digest": self.image_input_digest,
+            },
             "before_state": before,
             "after_state": after,
             "resource_ids": json.loads(_json(resources)),
@@ -1474,6 +1498,7 @@ class BootstrapRuntime:
         return result
 
     def _image(self, state: dict[str, Any]) -> dict[str, Any]:
+        self._refresh_source_identity()
         image = self.docker.ensure_image(
             repository_root=self.repository_root,
             dockerfile=self.repository_root / "bootstrap" / "container" / "Dockerfile",
@@ -1495,7 +1520,15 @@ class BootstrapRuntime:
             "labels": self._labels(),
             "state": "present",
         }
+        state["source_commit"] = self.source_identity.get("head")
+        state["tree_digest"] = self.source_identity.get("tree_digest")
+        state["image_input_digest"] = self.image_input_digest
         return image
+
+    def _refresh_source_identity(self) -> None:
+        """Read current checkout identity without acquiring or changing Git state."""
+        self.source_identity = _source_snapshot(self.repository_root)
+        self.image_input_digest = _image_input_digest(self.repository_root)
 
     def _mounts(self, targets: Mapping[str, Mapping[str, Any]]) -> list[dict[str, str]]:
         mounts = [
@@ -1554,7 +1587,6 @@ class BootstrapRuntime:
         )
         required_label_keys = {
             "io.agent-canon.runtime",
-            "io.agent-canon.owner-uid",
             "io.agent-canon.control-root-digest",
         }
         if (
@@ -1566,7 +1598,6 @@ class BootstrapRuntime:
             )
             or expected_labels.get("io.agent-canon.control-root-digest")
             != self.control_digest
-            or expected_labels.get("io.agent-canon.owner-uid") != str(self.uid)
         ):
             raise BootstrapError(
                 "docker_readback_invalid",
@@ -1871,14 +1902,26 @@ class BootstrapRuntime:
         """Return safe Docker readback fields and omit Env/raw inspect data."""
         if record is None:
             return None
-        state = record.get("State") if isinstance(record.get("State"), dict) else {}
-        health = state.get("Health") if isinstance(state.get("Health"), dict) else {}
-        host = (
-            record.get("HostConfig")
+        state: Mapping[str, Any] = (
+            cast(Mapping[str, Any], record.get("State"))
+            if isinstance(record.get("State"), dict)
+            else {}
+        )
+        health: Mapping[str, Any] = (
+            cast(Mapping[str, Any], state.get("Health"))
+            if isinstance(state.get("Health"), dict)
+            else {}
+        )
+        host: Mapping[str, Any] = (
+            cast(Mapping[str, Any], record.get("HostConfig"))
             if isinstance(record.get("HostConfig"), dict)
             else {}
         )
-        mounts = record.get("Mounts") if isinstance(record.get("Mounts"), list) else []
+        mounts = (
+            cast(list[Any], record.get("Mounts"))
+            if isinstance(record.get("Mounts"), list)
+            else []
+        )
         summarized_mounts: list[dict[str, Any]] = []
         for mount in mounts:
             if not isinstance(mount, dict):
@@ -1919,15 +1962,12 @@ class BootstrapRuntime:
         }
 
     def install(self) -> dict[str, Any]:
-        """Build or adopt the verified image and initialize runtime state."""
+        """Install the initial image or reconcile an existing runtime."""
         with self.locked():
             state = self._read_state(allow_manifest_drift=True)
+            if state.get("state") != "uninstalled":
+                return self._update_locked(state, "install")
             if state.get("manifest_digest") != self.manifest_digest:
-                if state.get("state") != "uninstalled":
-                    raise BootstrapError(
-                        "manifest_mismatch",
-                        "uninstall the previous runtime generation before installing changed inputs",
-                    )
                 state = self._new_state()
             before = state["state"]
             self._image(state)
@@ -1956,6 +1996,123 @@ class BootstrapRuntime:
                 )
             )
 
+    def _update_locked(self, state: dict[str, Any], operation: str) -> dict[str, Any]:
+        """Reconcile current checkout/image inputs with existing v2 lifecycle state."""
+        self._refresh_source_identity()
+        if state.get("active_task_count", 0):
+            raise BootstrapError(
+                "mount_update_blocked",
+                "active tasks prevent update; candidate build was not started",
+                evidence={"active_task_count": state.get("active_task_count", 0)},
+            )
+        resources = state.get("resources", {})
+        image = resources.get("image", {}) if isinstance(resources, dict) else {}
+        expected_tag = self._image_tag()
+        same_inputs = (
+            state.get("source_commit") == self.source_identity.get("head")
+            and state.get("tree_digest") == self.source_identity.get("tree_digest")
+            and state.get("image_input_digest") == self.image_input_digest
+            and state.get("manifest_digest") == self.manifest_digest
+            and image.get("tag") == expected_tag
+            and image.get("id") is not None
+            and self.docker.inspect_image(str(image.get("id"))) is not None
+        )
+        if same_inputs:
+            return self._result(
+                self._receipt(
+                    operation,
+                    "ok",
+                    "up_to_date",
+                    before=state["state"],
+                    after=state["state"],
+                    details={"changed": False},
+                    state=state,
+                )
+            )
+        old_state = json.loads(_json(state))
+        before = state["state"]
+        old_container_running = bool(
+            old_state.get("resources", {}).get("container", {}).get("id")
+            or before in {"ready", "running"}
+        )
+        try:
+            self._image(state)
+            state["manifest_digest"] = self.manifest_digest
+            state["state"] = "maintenance_pending"
+            self._write_state(state)
+            self._stop_owned_container(state)
+            if old_container_running:
+                self._ensure_container(state, start=True)
+                state["state"] = "ready"
+            else:
+                state["state"] = "installed"
+            self._write_state(state)
+            return self._result(
+                self._receipt(
+                    operation,
+                    "ok",
+                    "updated",
+                    before=before,
+                    after=state["state"],
+                    details={
+                        "source_commit": self.source_identity.get("head"),
+                        "tree_digest": self.source_identity.get("tree_digest"),
+                        "image_input_digest": self.image_input_digest,
+                        "image_id": state["resources"]["image"]["id"],
+                    },
+                    state=state,
+                )
+            )
+        except BootstrapError as exc:
+            state.clear()
+            state.update(old_state)
+            recovery_error: BootstrapError | None = None
+            try:
+                self._write_mounts(state)
+                if old_container_running:
+                    self._ensure_container(state, start=True)
+                state["state"] = before
+                self._write_state(state)
+            except BootstrapError as restore_error:
+                recovery_error = restore_error
+                state["state"] = "runtime_unavailable"
+                self._write_state(state)
+            receipt = self._result(
+                self._receipt(
+                    operation,
+                    "error",
+                    "runtime_unavailable" if recovery_error else exc.code,
+                    before=before,
+                    after=state["state"],
+                    details={
+                        "source_commit": self.source_identity.get("head"),
+                        "tree_digest": self.source_identity.get("tree_digest"),
+                        "image_input_digest": self.image_input_digest,
+                        "recovery_error": recovery_error.code if recovery_error else None,
+                    },
+                    state=state,
+                )
+            )
+            if recovery_error:
+                raise BootstrapError(
+                    "runtime_unavailable",
+                    "update failed and old runtime recovery failed",
+                    evidence={"cause": exc.code, "recovery": recovery_error.code, "receipt_path": receipt["receipt_path"]},
+                ) from exc
+            raise BootstrapError(
+                exc.code,
+                exc.detail,
+                evidence={**exc.evidence, "receipt_path": receipt["receipt_path"], "recovered": True},
+            ) from exc
+
+    def update(self) -> dict[str, Any]:
+        """Reconcile only the current checkout; never acquires a Git revision."""
+        with self.locked():
+            state = self._read_state(allow_manifest_drift=True)
+            if state.get("state") == "uninstalled":
+                raise BootstrapError("not_installed", "install must complete before update")
+            return self._update_locked(state, "update")
+
     def _ensure_container(
         self, state: dict[str, Any], *, start: bool
     ) -> dict[str, Any]:
@@ -1977,7 +2134,7 @@ class BootstrapRuntime:
             self._validate_container(existing, state)
             c["id"] = _required_string(existing.get("Id"), "container.Id")
         else:
-            owners = self.docker.owned_container_ids(self.uid)
+            owners = self.docker.owned_container_ids(self.control_digest)
             if len(owners) > 1:
                 raise BootstrapError(
                     "multiple_owned_containers",
@@ -3306,9 +3463,7 @@ class BootstrapRuntime:
                 and state.get("resources", {}).get("container", {}).get("state") == "running"
             )
             current_image = state.get("resources", {}).get("image", {}).get("id")
-            owned_images = self.docker.owned_image_ids(
-                self.uid, self.control_digest
-            )
+            owned_images = self.docker.owned_image_ids(self.control_digest)
             max_images = int(self.manifest["container"].get("max_image_generations", 2))
             stale_images = [image for image in owned_images if image != current_image][
                 : max(0, len(owned_images) - max_images)
@@ -3399,7 +3554,6 @@ class BootstrapRuntime:
                         inspected,
                         {
                             "io.agent-canon.runtime": "shared-v1",
-                            "io.agent-canon.owner-uid": str(self.uid),
                             "io.agent-canon.control-root-digest": self.control_digest,
                         },
                     )
@@ -3520,7 +3674,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--runtime-root", required=True)
     parser.add_argument("--manifest")
     sub = parser.add_subparsers(dest="operation", required=True)
-    for operation in ("install", "start", "status", "stop", "rollback", "uninstall"):
+    for operation in ("install", "update", "start", "status", "stop", "rollback", "uninstall"):
         sub.add_parser(operation)
     gc_parser = sub.add_parser("gc")
     gc_parser.add_argument("--dry-run", action="store_true")
@@ -3573,6 +3727,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     operation = args.operation
     if operation == "install":
         return runtime.install()
+    if operation == "update":
+        return runtime.update()
     if operation == "start":
         return runtime.start()
     if operation == "status":
