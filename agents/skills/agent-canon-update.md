@@ -40,6 +40,61 @@ Keep the source checkout clean at the start. Preserve unrelated dirty state;
 do not reset, clean, or delete an unknown path. Record the source remote,
 current branch, HEAD, and issue/PR identity before editing.
 
+## Source-Free Parent Migration Boundary
+
+A request to remove a parent repository's vendored/live AgentCanon integration
+authorizes migration of AgentCanon management edges only. It does not authorize
+a parent environment, product runtime, numerical stack, test, permission,
+mount, GPU, dependency, or CI semantics refactor merely because those surfaces
+refer to AgentCanon.
+
+Before any parent edit, add this bounded readback to the existing task scope
+update. It is not a new schema or durable packet:
+
+```text
+source_free_parent_issue=<repository-qualified Issue>
+management_write_set=<exact path + operation + AgentCanon edge + owner evidence, one row per path>
+immutable_parent_surfaces=<matched parent-owned paths or semantics>
+mixed_file_limit=<exact AgentCanon dispatch/reference span only>
+migration_status=unresolved|ready|parent_owner_handoff_required
+```
+
+Every write-set row names one existing exact path and, for a mixed file, the
+exact dispatch/reference span. Placeholders, directory-wide globs, and
+unresolved paths are not write authority. Keep `migration_status=unresolved`
+and perform no parent mutation until every proposed row is exact.
+Do not place an unresolved candidate in `management_write_set` even with a
+"no authority" annotation; report it only as an unresolved item in the task
+update.
+
+The management write set may contain only evidenced operations from this list:
+
+- remove an AgentCanon gitlink/submodule and its matching `.gitmodules` entry;
+- remove AgentCanon-owned root projections, source symlinks, or updater state;
+- remove or replace the exact AgentCanon dispatch edge in a mixed parent-owned
+  entrypoint, preserving the existing parent command and behavior;
+- update parent instructions/docs only to describe the source-free boundary,
+  qualified ignored development clone, and external bootstrap route.
+
+Treat `docker/**`, `.devcontainer/**`, product/numerical tests and code,
+UID/GID/sudo/`safe.directory`, bind mounts and rootless policy, GPU behavior,
+product dependencies/runtime semantics, parent acceptance criteria, and parent
+CI other than an exact AgentCanon dispatch edge as immutable by default. A
+reference from one of these surfaces to AgentCanon permits removal of that
+dispatch/reference span only; it does not transfer ownership of the containing
+surface.
+
+If the migration cannot complete without another change, stop before that edit
+and hand the exact path, required operation, owner, and validation route to the
+parent owner under a separate Issue/approval. Do not widen
+`management_write_set` to absorb the blocker.
+
+Report two separate validation results: `source_free_boundary` proves every
+changed path/hunk belongs to the management write set and immutable surfaces
+are unchanged; `parent_product_validation` is selected and interpreted only by
+the parent owner. A parent product test result cannot authorize an out-of-scope
+migration edit, and a source-free boundary pass cannot claim product behavior.
+
 ## Runtime bootstrap
 
 The only lifecycle entrypoint is top-level `bootstrap.sh`. It requires an
@@ -126,26 +181,28 @@ archive state into the AgentCanon source checkout.
 
 1. Resolve the owning Issue and read the current remote/main, open PRs, and
    relevant runtime documents. Keep #841 and #821 separate.
-2. Inspect the existing owner and implementation before proposing a change.
+2. For a source-free parent migration, freeze the exact management write set
+   and immutable parent surfaces above before inspecting implementation.
+3. Inspect the existing owner and implementation before proposing a change.
    Search beyond the first failing checker and identify source-side effects,
    impossible branches, duplicate gates, and downstream consumers.
-3. Record a contract-complete design: user command family, host/container
+4. Record a contract-complete design: user command family, host/container
    boundary, target mode, state roots, resource cap, failure/rollback, eval
    archive route, cleanup, and validation oracle.
-4. Implement in the owning AgentCanon clone. Keep docs, manifest, code, tests,
+5. Implement in the owning AgentCanon clone. Keep docs, manifest, code, tests,
    and dependency headers aligned. Do not modify a parent checkout from this
    skill.
-5. Run focused tests first. For runtime/container changes, verify exact owned
+6. Run focused tests first. For runtime/container changes, verify exact owned
    Docker image/container IDs and remove task-created resources at closeout;
    never run `docker system prune`.
-6. Run the canonical AgentCanon PR checks selected by the changed runtime
+7. Run the canonical AgentCanon PR checks selected by the changed runtime
    profile. Confirm source tree unchanged by eval and archive collection, and
    confirm external artifact paths and archive readback.
-7. Commit with the owning Issue reference, push the topic branch, open/update
+8. Commit with the owning Issue reference, push the topic branch, open/update
    the AgentCanon PR, and publish a concise evidence comment to the same Issue.
    The PR body must state what changed, why, scope, validation, and remaining
    limitation.
-8. After merge, fetch and read back the merge commit on AgentCanon `main`.
+9. After merge, fetch and read back the merge commit on AgentCanon `main`.
    Only then update a parent revision. A parent must not consume an unmerged
    branch or restore a vendor/submodule route.
 
@@ -186,3 +243,4 @@ Before closeout, verify:
 - [Container Operations](../../CONTAINER_OPERATIONS.md)
 - [Runtime Log Archive](../../documents/runtime/runtime-log-archive.md)
 - [AgentCanon PR workflow](../workflows/agent-canon-pr-workflow.md)
+- [Source-free parent bootstrap runbook](../../documents/contracts/derived-repo-bootstrap-runbook.md)

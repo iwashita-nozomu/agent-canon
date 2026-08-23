@@ -2104,6 +2104,12 @@ critical = true
 description = "Requires external eval/archive evidence and exact resource cleanup."
 required_regex = ["eval collect", "eval sync", "iwashita-nozomu/agent-canon-log", "source tree unchanged", "docker system prune", "exact task-owned resources"]
 
+[[evals.checklist]]
+id = "AGENT-CANON-UPDATE-PARENT-SCOPE-1"
+critical = true
+description = "A source-free parent migration freezes only exact AgentCanon management edges and hands parent semantics back to their owner."
+required_regex = ["Source-Free Parent Migration Boundary", "management_write_set=", "immutable_parent_surfaces=", "mixed_file_limit=", "migration_status=unresolved\\|ready\\|parent_owner_handoff_required", "Placeholders, directory-wide globs", "Do not place an unresolved candidate", "perform no parent mutation", "docker/\\*\\*", "numerical tests", "UID/GID", "safe\\.directory", "bind mounts", "GPU behavior", "source_free_boundary", "parent_product_validation"]
+
 [[evals]]
 id = "agent-canon-update-route-doc"
 target = "agents/skills/agent-canon-update.md"
@@ -2121,6 +2127,24 @@ id = "AGENT-CANON-UPDATE-DOC-2"
 critical = true
 description = "Publishes the owning source PR before any parent consumption and keeps Issue identities qualified."
 required_regex = ["Commit with the owning Issue reference", "push the topic branch", "open/update", "After merge", "Only then update a parent revision", "iwashita-nozomu/agent-canon#"]
+
+[[evals]]
+id = "source-free-parent-migration-scope"
+target = "documents/contracts/derived-repo-bootstrap-runbook.md"
+kind = "workflow"
+description = "The source-free migration runbook limits writes to AgentCanon management edges and preserves parent product/environment ownership."
+
+[[evals.checklist]]
+id = "SOURCE-FREE-PARENT-SCOPE-1"
+critical = true
+description = "Defines the exact allowed migration set and default immutable parent surfaces."
+required_regex = ["Migration write boundary", "management_write_set", "placeholders and directory globs", "reported outside", "migration_status=unresolved", "gitlink/submodule", "exact AgentCanon dispatch/reference spans", "docker/\\*\\*", "product/numerical code and tests", "UID/GID", "safe\\.directory", "bind-mount", "GPU behavior", "parent_owner_handoff_required"]
+
+[[evals.checklist]]
+id = "SOURCE-FREE-PARENT-RECEIPT-1"
+critical = true
+description = "Keeps source-free boundary evidence separate from parent product validation."
+required_regex = ["source_free_boundary", "parent_product_validation", "neither receipt substitutes"]
 
 [[evals]]
 id = "p5-generated-runtime-profile-projection"

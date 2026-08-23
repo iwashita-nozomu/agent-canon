@@ -48,6 +48,43 @@ project implementation and tests are run through the parent-owned Docker/test
 entrypoint. No parent command may restore a vendor checkout or submodule as a
 fallback.
 
+## Migration write boundary
+
+Migrating an existing parent from a vendored/live AgentCanon integration is a
+management-edge removal, not a project environment refactor. Before editing,
+the current task scope update lists each authorized path with its operation,
+the exact AgentCanon edge being removed/replaced, and owner evidence. This
+`management_write_set` is the complete migration write authority.
+Every row uses an existing exact path and, for a mixed file, an exact span;
+placeholders and directory globs leave `migration_status=unresolved` and grant
+no edit authority.
+An unresolved candidate is reported outside `management_write_set`; annotating
+an inexact row as non-authoritative does not make it a valid row.
+
+Authorized changes are limited to an evidenced AgentCanon gitlink/submodule
+and `.gitmodules` entry, AgentCanon-owned root projections/source symlinks/
+updater state, exact AgentCanon dispatch/reference spans in mixed parent files,
+and docs/instructions that describe the new source-free/bootstrap route.
+
+The following remain parent-owned and immutable unless their own owner and a
+separate Issue/approval explicitly authorize a semantic change:
+
+- `docker/**`, `.devcontainer/**`, image/build definitions, and dependency set;
+- product/numerical code and tests;
+- UID/GID, sudoers, `safe.directory`, permission, bind-mount, and rootless policy;
+- GPU behavior and product runtime semantics;
+- project acceptance criteria and parent CI beyond an exact AgentCanon dispatch edge.
+
+For a mixed file, remove or reconnect only the exact AgentCanon span while
+preserving the surrounding parent behavior. If another change is necessary,
+set `migration_status=parent_owner_handoff_required` and stop before editing
+that surface; do not expand the migration write set.
+
+Closeout reports `source_free_boundary` and `parent_product_validation`
+separately. The former proves the exact migration hunks and unchanged immutable
+surfaces. The latter belongs to the parent owner and neither receipt substitutes
+for the other.
+
 ## Failure triage
 
 | Symptom | First check |
