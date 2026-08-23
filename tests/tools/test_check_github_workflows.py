@@ -129,15 +129,16 @@ def test_no_submodule_checkout_helper_remains() -> None:
     assert "checkout_agent_canon_submodule" not in CHECKER.read_text(encoding="utf-8")
 
 
-def test_issue_mirror_resolves_runner_temp_after_job_admission() -> None:
-    """The runner context is not valid while GitHub evaluates job-level env."""
+def test_issue_mirror_runtime_stays_below_authorized_parent() -> None:
+    """Issue publication writes its report below the authorized repository."""
     path = ROOT / ".github" / "workflows" / "issue-mirror.yml"
     workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
-    for job in workflow["jobs"].values():
-        assert "runner.temp" not in str(job.get("env", {}))
-    sync_steps = workflow["jobs"]["issue-mirror-sync"]["steps"]
-    configure = next(
-        step for step in sync_steps if step.get("name") == "Configure external runtime root"
+    sync_job = workflow["jobs"]["issue-mirror-sync"]
+    runtime = sync_job["env"]["AGENT_CANON_RUNTIME_ROOT"]
+    assert runtime == "${{ github.workspace }}/workspace/agent-canon-runtime/issue-mirror"
+    assert "RUNNER_TEMP" not in path.read_text(encoding="utf-8")
+    cleanup = next(
+        step for step in sync_job["steps"] if step.get("name") == "Remove workflow runtime"
     )
-    assert "RUNNER_TEMP" in configure["run"]
-    assert "GITHUB_ENV" in configure["run"]
+    assert cleanup["if"] == "always()"
+    assert 'find "${AGENT_CANON_RUNTIME_ROOT}" -depth -delete' in cleanup["run"]
