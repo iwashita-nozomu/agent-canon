@@ -97,6 +97,7 @@ else:
 if __package__:
     from .manifest_rendering import (
         contract_complete_implementation_policy_output_lines,
+        coordination_capability_policy_output_lines,
         default_quality_check_policy_output_lines,
         format_subagent_role_instance_wave_chunks,
         format_subagent_wave,
@@ -115,6 +116,7 @@ if __package__:
 else:
     from manifest_rendering import (
         contract_complete_implementation_policy_output_lines,
+        coordination_capability_policy_output_lines,
         default_quality_check_policy_output_lines,
         format_subagent_role_instance_wave_chunks,
         format_subagent_wave,
@@ -627,6 +629,8 @@ def emit_bootstrap_output(
         print("TASK_ID_ROUTE_RECOMMENDED_TASK_IDS=T11,T12")
         print("SUBAGENT_FANOUT_EXPECTATION=blocked_until_task_id_or_explicit_family")
     for line in pre_handoff_scope_policy_output_lines():
+        print(line)
+    for line in coordination_capability_policy_output_lines():
         print(line)
     for line in pre_handoff_gate_status_output_lines():
         print(line)

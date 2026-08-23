@@ -127,6 +127,11 @@ else:
     from manifest_rendering import required_output_templates_missing
 
 if __package__:
+    from .subagent_selection import COLLABORATION_OPERATIONS
+else:
+    from subagent_selection import COLLABORATION_OPERATIONS  # type: ignore[no-redef]
+
+if __package__:
     from .packets import (
         resolve_active_design_packet_config,
         resolve_cross_cutting_document_packet,
@@ -587,6 +592,14 @@ def validate_project_hooks() -> None:
         ensure(isinstance(event_contract.get("matchers"), list), f"hook contract {event} matchers must be a list")
         ensure(isinstance(event_contract.get("failure"), str) and event_contract["failure"], f"hook contract {event} failure must be non-empty")
         ensure(isinstance(event_contract.get("telemetry"), str) and event_contract["telemetry"], f"hook contract {event} telemetry must be non-empty")
+    post_tool_matcher = (
+        "Bash|apply_patch|python|python3|Task|spawn_agent|send_input|wait_agent|"
+        "close_agent|resume_agent|" + "|".join(COLLABORATION_OPERATIONS)
+    )
+    ensure(
+        event_contracts["PostToolUse"].get("matchers") == [post_tool_matcher],
+        "PostToolUse matcher must observe the complete subagent collaboration operation set",
+    )
     retired = require_list(contract.get("retired_child_tombstones", []), "retired child tombstones must be a list")
     moved = require_list(contract.get("moved_source_absences", []), "moved source absences must be a list")
     ensure(len(retired) == 23 and len(moved) == 1, "hook retirement contract counts must be exact")
@@ -1743,6 +1756,61 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
     ensure(
         spawn_budget.get("max_write_subagents_scope") == "write-capable subagents only",
         f"task {task_id} manifest run.spawn_budget max_write scope unclear",
+    )
+    capability = require_mapping(
+        run.get("coordination_capability_handshake"),
+        f"task {task_id} manifest missing run.coordination_capability_handshake",
+    )
+    ensure(
+        capability.get("source") == "direct_runtime_collaboration_namespace",
+        f"task {task_id} coordination capability source must be direct runtime namespace",
+    )
+    ensure(
+        capability.get("status") in {"available", "unavailable", "unverified"},
+        f"task {task_id} coordination capability status is invalid",
+    )
+    ensure(
+        capability.get("effective_operations") == [],
+        f"task {task_id} generated manifest must not invent effective operations",
+    )
+    ensure(
+        capability.get("evidence_ref") == "",
+        f"task {task_id} generated manifest must not invent capability evidence",
+    )
+    ensure(
+        capability.get("matcher_is_not_capability_evidence") is True,
+        f"task {task_id} manifest must separate matchers from capability readback",
+    )
+    ensure(
+        capability.get("forbidden_capability_source") == "functions.exec.ALL_TOOLS",
+        f"task {task_id} manifest must reject exec tool inventories as capability evidence",
+    )
+    transport_policy = require_mapping(
+        capability.get("transport_by_status"),
+        f"task {task_id} coordination capability transport policy is missing",
+    )
+    ensure(
+        transport_policy.get("available") == "direct_peer"
+        and transport_policy.get("unavailable") == "parent_relay_or_durable_artifact"
+        and transport_policy.get("unverified") == "parent_relay_or_durable_artifact",
+        f"task {task_id} coordination transport policy is inconsistent",
+    )
+    receipt_policy = require_mapping(
+        run.get("coordination_receipt_policy"),
+        f"task {task_id} manifest missing run.coordination_receipt_policy",
+    )
+    ensure(
+        receipt_policy.get("operation_observation") == list(COLLABORATION_OPERATIONS),
+        f"task {task_id} coordination receipt operation observation is incomplete",
+    )
+    ensure(
+        receipt_policy.get("direct_peer_requires")
+        == "available_status_and_operation_evidence",
+        f"task {task_id} direct peer receipt gate is missing",
+    )
+    ensure(
+        receipt_policy.get("parent_relay_is_not_direct_peer") is True,
+        f"task {task_id} parent relay must remain distinct from direct peer",
     )
     delegated_spawn_policy = require_mapping(
         run.get("delegated_spawn_policy"),

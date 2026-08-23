@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Assembles, deduplicates, and appends one canonical behavior event per eligible hook invocation.
 # upstream design ../../documents/design/agentcanon-hook-simplification-wave3.md owns event identity, cardinality, and write order.
+# upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns coordination receipt semantics.
 # upstream implementation ./prompt_capture.py owns prompt evidence.
 # upstream implementation ./prompt_classifier.py owns pure prompt routing.
 # upstream implementation ./tool_selection.py owns tool evidence.
@@ -53,7 +54,9 @@ PARITY_FIELDS = (
     "tool_input_fingerprint", "tool_input_key_count", "tool_input_keys", "tool_command_verb", "selected_tools", "selected_tool_count",
     "subagent_invoked", "subagent_event_kind", "subagent_tool_name", "subagent_agent_type", "subagent_target", "subagent_targets",
     "subagent_target_count", "subagent_model", "subagent_reasoning_effort", "subagent_fork_context", "subagent_prompt_fingerprint",
-    "subagent_prompt_char_count", "subagent_item_count", "prompt_feedback_detected", "feedback_labels", "feedback_targets", "feedback_action",
+    "subagent_prompt_char_count", "subagent_item_count", "coordination_capability_status", "coordination_effective_operations",
+    "coordination_evidence_ref", "coordination_mode", "prompt_feedback_detected", "feedback_labels", "feedback_targets", "feedback_action",
+    "coordination_receipt_status",
     "skill_source_fields", "observed_text_field_count", "observed_text_value_count", "payload_key_count", "payload_fingerprint",
     "tool_input_fingerprint", "workflow_monitor_event_count", "workflow_monitor_feedback_count", "workflow_monitor_subagent_event_count",
     "workflow_monitor_report_dir",
@@ -212,7 +215,7 @@ def _assemble_fields(parts: HookInvocationParts) -> dict[str, object]:
         "candidate_workflows": list(classifier.candidate_workflows), "candidate_workflow_count": len(classifier.candidate_workflows), "candidate_tools": list(classifier.candidate_tools), "candidate_tool_count": len(classifier.candidate_tools),
         "prompt_capture_status": prompt_capture_status, "prompt_excerpt_redacted": prompt.excerpt_redacted if prompt_capture_status == "present" else "", "prompt_fingerprint": prompt.fingerprint if prompt_capture_status == "present" else "", "prompt_char_count": prompt.char_count if prompt_capture_status == "present" else 0, "prompt_excerpt_truncated": prompt.truncated if prompt_capture_status == "present" else False,
         "tool_name": tool.tool_name, "tool_selection_kind": tool.selection_kind, "tool_input_fingerprint": tool.tool_input_fingerprint, "tool_input_key_count": tool.tool_input_key_count, "tool_input_keys": list(tool.tool_input_keys), "tool_command_verb": tool.command_verb, "selected_tools": list(tool.selected_tools), "selected_tool_count": len(tool.selected_tools),
-        "subagent_invoked": subagent.invoked, "subagent_event_kind": subagent.action, "subagent_tool_name": subagent.tool_name, "subagent_agent_type": subagent.agent_type, "subagent_target": subagent.target, "subagent_targets": list(subagent.targets), "subagent_target_count": len(subagent.targets) + int(bool(subagent.target)), "subagent_model": subagent.model, "subagent_reasoning_effort": subagent.reasoning_effort, "subagent_fork_context": subagent.fork_context, "subagent_prompt_fingerprint": subagent.prompt_fingerprint, "subagent_prompt_char_count": subagent.prompt_char_count, "subagent_item_count": subagent.item_count,
+        "subagent_invoked": subagent.invoked, "subagent_event_kind": subagent.action, "subagent_tool_name": subagent.tool_name, "subagent_agent_type": subagent.agent_type, "subagent_target": subagent.target, "subagent_targets": list(subagent.targets), "subagent_target_count": len(subagent.targets) + int(bool(subagent.target)), "subagent_model": subagent.model, "subagent_reasoning_effort": subagent.reasoning_effort, "subagent_fork_context": subagent.fork_context, "subagent_prompt_fingerprint": subagent.prompt_fingerprint, "subagent_prompt_char_count": subagent.prompt_char_count, "subagent_item_count": subagent.item_count, "coordination_capability_status": subagent.capability_status, "coordination_effective_operations": list(subagent.effective_operations), "coordination_evidence_ref": subagent.evidence_ref, "coordination_mode": subagent.coordination_mode, "coordination_receipt_status": subagent.receipt_status,
         "prompt_feedback_detected": bool(classifier.feedback_labels), "feedback_labels": list(classifier.feedback_labels), "feedback_targets": list(classifier.feedback_targets()), "feedback_action": classifier.feedback_action,
         "payload_key_count": len(payload), "payload_fingerprint": parts.payload_fingerprint or _fingerprint(payload), "workflow_monitor_report_dir": str(parts.report_dir) if parts.report_dir is not None else "",
     })

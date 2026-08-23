@@ -408,7 +408,7 @@ class CodexHooksTest(unittest.TestCase):
         )
         self.assertEqual(
             post_tool_group["matcher"],
-            "Bash|apply_patch|python|python3|Task|spawn_agent|send_input|wait_agent|close_agent|resume_agent",
+            "Bash|apply_patch|python|python3|Task|spawn_agent|send_input|wait_agent|close_agent|resume_agent|send_message|followup_task|list_agents|interrupt_agent",
         )
         self.assertEqual(
             [hook["command"] for hook in cast("list[dict[str, object]]", post_tool_group["hooks"])],

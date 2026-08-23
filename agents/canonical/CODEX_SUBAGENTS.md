@@ -33,6 +33,16 @@ agent context の再利用を優先し、owner/write-scope/DAG evidence が disj
 必要な並列 handoff を作ります。descendant close、reservation release、terminal handback
 はこの owner の既存 lifecycle evidence と `close_agent` receipt を使います。
 
+Runtime collaboration capability and coordination receipts are owned by
+`agents/COMMUNICATION_PROTOCOL.md#Runtime Collaboration Capability Handshake`.
+This document only projects the route: read capability from the direct runtime
+collaboration namespace, use `direct_peer` only after an `available` readback,
+and use an honest `parent_relay` or `durable_artifact` path for
+`unavailable`/`unverified` runtimes. Matcher names and `functions.exec` tool
+inventories are not capability evidence. Child waves record the operation and
+receipt reference in their handback; parent relay is never relabeled as peer
+communication.
+
 Compatibility evidence のある update operation は既存 agent context を reuse-ready state
 へ更新し、active packet readback を完了 evidence にします。disjoint owner/write-scope/
 dependency-order evidence のある update operation は必要な parallel handoff を

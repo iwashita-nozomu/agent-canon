@@ -194,6 +194,13 @@ that decision.
 
 ### Local Capability Priority
 
+Subagent communication capability and coordination receipts follow the sole
+contract in `agents/COMMUNICATION_PROTOCOL.md#Runtime Collaboration Capability
+Handshake`; this route does not duplicate that schema. Read the direct runtime
+collaboration namespace before selecting `direct_peer`. Matcher/tool inventory
+names are not capability evidence, so `unavailable`/`unverified` routes remain
+`parent_relay` or `durable_artifact`.
+
 Local Capability Priority (LCP) の全文規則はこの節だけが所有します。LCP が
 競合する候補 operation、`issue_defer`、または `split` を含む作業として選択された
 場合だけ、既存の scope / handoff record に operation mapping を記録します。

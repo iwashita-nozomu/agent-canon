@@ -71,6 +71,56 @@ cleanup executors retain their existing owners and receipt formats.
   置換した clause、捨てた clause と理由を artifact に残します。
 - scope や permission の変更は `manager` に戻します。
 
+## Runtime Collaboration Capability Handshake
+
+This section is the sole owner of the runtime collaboration capability and
+coordination receipt contract. Generated manifests and hook events reference
+this contract; they do not redefine its schema or infer platform capability.
+
+The capability source is the direct runtime collaboration namespace exposed to
+the current agent. `functions.exec` and its `ALL_TOOLS` inventory are never
+capability evidence. A handshake has the following closed fields:
+
+- `schema`: `agent-canon.communication-capability-handshake.v1`
+- `status`: exactly `available`, `unavailable`, or `unverified`
+- `effective_operations`: operations explicitly returned by the direct runtime
+  readback, not merely names recognized by a matcher
+- `evidence_ref`: a durable artifact or runtime readback reference; it is
+  required for `available` and must not be fabricated when the runtime cannot
+  expose it
+- `source`: exactly `direct_runtime_collaboration_namespace`
+
+The effective transport is derived from the handshake:
+
+| status | allowed coordination mode | meaning |
+| --- | --- | --- |
+| `available` | `direct_peer` | the named operation was read back from the direct namespace |
+| `unavailable` | `parent_relay` or `durable_artifact` | the parent or an artifact carries the message; no peer claim |
+| `unverified` | `parent_relay` or `durable_artifact` | capability was not observed and remains unknown |
+
+An operation matcher is observation only. Seeing `send_message`,
+`followup_task`, `list_agents`, or `interrupt_agent` in an event does not change
+`unavailable` or `unverified` into `available`.
+
+### Coordination Receipt
+
+Every coordination attempt emits one coordination receipt through the
+existing event/artifact route. Its closed fields are:
+
+- `schema`: `agent-canon.coordination-receipt.v1`
+- `operation`: the observed operation
+- `capability_status`: the handshake status used for the decision
+- `transport`: `direct_peer`, `parent_relay`, or `durable_artifact`
+- `evidence_ref`: the handshake evidence or an explicit artifact reference
+- `status`: the operation result
+
+`transport=direct_peer` is valid only with `capability_status=available` and
+an evidence reference that names the operation. A parent relay is always
+recorded as `parent_relay`; it must never be rewritten as direct peer
+communication. If the runtime cannot return the direct namespace, use
+`durable_artifact` and preserve the honest `unverified` or `unavailable`
+status.
+
 ## 主要な通信面
 
 1. `reports/agents/<run-id>/` の role artifact

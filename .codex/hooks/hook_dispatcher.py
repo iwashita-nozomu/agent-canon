@@ -2,6 +2,7 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Dispatches the bounded active hook contract in-process without child processes, Git, or network access.
+# upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns coordination capability and receipt semantics.
 # upstream implementation ../hooks.json invokes this dispatcher once per active event.
 # upstream implementation ../../tools/agent_tools/hook_safety.py owns pure secret and destructive Git safety leaves.
 # upstream implementation ../../tools/agent_tools/execution_resource_projection.py validates producer projection bytes.
@@ -145,7 +146,7 @@ HOOK_EVENT_CONTRACTS: dict[str, HookEventContract] = {
     ),
     "PostToolUse": HookEventContract(
         active=True,
-        matchers=("Bash|apply_patch|python|python3|Task|spawn_agent|send_input|wait_agent|close_agent|resume_agent",),
+        matchers=("Bash|apply_patch|python|python3|Task|spawn_agent|send_input|wait_agent|close_agent|resume_agent|send_message|followup_task|list_agents|interrupt_agent",),
         failure="invalid_projection=fail_open; malformed_payload=fail_open; spool_failure=fail_open",
         telemetry="one bounded fingerprint-only local spool event",
     ),

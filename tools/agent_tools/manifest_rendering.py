@@ -2,6 +2,7 @@
 # contract tool
 # responsibility AgentTeam manifest rendering owner module.
 # upstream design ../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
+# upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns coordination capability and receipt semantics.
 # upstream implementation ./team_config.py provides rendering configuration inputs.
 # upstream implementation ./packets.py provides rendering packet inputs.
 # upstream implementation ./workspace_scope.py provides rendering paths.
@@ -92,6 +93,11 @@ else:
         resolve_role_write_scope,
         schedule_wave_row,
     )
+
+if __package__:
+    from .subagent_selection import COLLABORATION_OPERATIONS
+else:
+    from subagent_selection import COLLABORATION_OPERATIONS  # type: ignore[no-redef]
 
 if __package__:
     from .team_config import (
@@ -535,6 +541,14 @@ SAME_ROLE_SUBAGENT_REQUIRED_FIELDS = (
     "review_gate",
 )
 
+COORDINATION_CAPABILITY_CONTRACT_REF = (
+    "agents/COMMUNICATION_PROTOCOL.md#Runtime Collaboration Capability Handshake"
+)
+COORDINATION_RECEIPT_CONTRACT_REF = (
+    "agents/COMMUNICATION_PROTOCOL.md#Coordination Receipt"
+)
+COORDINATION_OPERATION_OBSERVATION = COLLABORATION_OPERATIONS
+
 SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE = (
     "python3 tools/agent_tools/workflow_monitor.py --report-dir {report_dir} "
     '--subagent-wave "wave_id=<WAVE-N> parent_or_delegate=<parent-or-role> '
@@ -588,6 +602,17 @@ def same_role_subagent_policy_output_lines() -> tuple[str, ...]:
         f"SAME_ROLE_SUBAGENT_INSTANCE_KEY={SAME_ROLE_SUBAGENT_INSTANCE_POLICY['identity_key']}",
         "SAME_ROLE_SUBAGENT_REQUIRED_FIELDS="
         f"{','.join(SAME_ROLE_SUBAGENT_REQUIRED_FIELDS)}",
+    )
+
+
+def coordination_capability_policy_output_lines() -> tuple[str, ...]:
+    """Return manifest lines for the explicit runtime capability handshake."""
+    return (
+        "COORDINATION_CAPABILITY_SOURCE=direct_runtime_collaboration_namespace",
+        "COORDINATION_CAPABILITY_STATUS=unverified",
+        "COORDINATION_CAPABILITY_EFFECTIVE_OPERATIONS=none",
+        "COORDINATION_CAPABILITY_EVIDENCE_REF=none",
+        "COORDINATION_CAPABILITY_TRANSPORT=durable_artifact",
     )
 
 
@@ -1352,6 +1377,31 @@ def manifest_run_lines(
     for field in EVALUATOR_PROMPT_MUST_INCLUDE:
         lines.insert(insert_index, f"      - {field}")
         insert_index += 1
+    lines.extend(
+        [
+            "  coordination_capability_handshake:",
+            f"    contract_ref: {COORDINATION_CAPABILITY_CONTRACT_REF!r}",
+            "    source: direct_runtime_collaboration_namespace",
+            "    status: unverified",
+            "    effective_operations: []",
+            "    evidence_ref: ''",
+            "    matcher_is_not_capability_evidence: true",
+            "    forbidden_capability_source: functions.exec.ALL_TOOLS",
+            "    transport_by_status:",
+            "      available: direct_peer",
+            "      unavailable: parent_relay_or_durable_artifact",
+            "      unverified: parent_relay_or_durable_artifact",
+            "  coordination_receipt_policy:",
+            f"    contract_ref: {COORDINATION_RECEIPT_CONTRACT_REF!r}",
+            "    operation_observation:",
+            *(
+                f"      - {operation}"
+                for operation in COORDINATION_OPERATION_OBSERVATION
+            ),
+            "    direct_peer_requires: available_status_and_operation_evidence",
+            "    parent_relay_is_not_direct_peer: true",
+        ]
+    )
     communication_protocol = spec.config.team.get("communication_protocol")
     if communication_protocol is not None:
         lines.append(

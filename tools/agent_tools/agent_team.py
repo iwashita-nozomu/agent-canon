@@ -212,6 +212,7 @@ else:
 if __package__:
     from .manifest_rendering import (
         contract_complete_implementation_policy_output_lines,
+        coordination_capability_policy_output_lines,
         default_quality_check_policy_output_lines,
         format_subagent_role_instance_wave_chunks,
         format_subagent_wave,
@@ -231,6 +232,7 @@ if __package__:
 else:
     from manifest_rendering import (
         contract_complete_implementation_policy_output_lines,
+        coordination_capability_policy_output_lines,
         default_quality_check_policy_output_lines,
         format_subagent_role_instance_wave_chunks,
         format_subagent_wave,
@@ -529,6 +531,7 @@ __all__ = (
     "default_review_pack_ids_for_task",
     "default_quality_check_policy_output_lines",
     "contract_complete_implementation_policy_output_lines",
+    "coordination_capability_policy_output_lines",
     "pre_handoff_gate_status_output_lines",
     "pre_handoff_scope_policy_output_lines",
     "repo_tool_routing_policy_output_lines",

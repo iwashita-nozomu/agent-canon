@@ -59,6 +59,15 @@ config policy の第二の正本にはしません。
 - `agents/internal-routines/subagent-startup.md`
 - `tools/agent_tools/bootstrap_agent_run.py`
 
+Runtime collaboration capability and coordination receipts are defined only by
+`agents/COMMUNICATION_PROTOCOL.md#Runtime Collaboration Capability Handshake`.
+This skill projects the launch route: capability must be read from the direct
+runtime collaboration namespace before `direct_peer` communication is chosen.
+When the status is `unavailable` or `unverified`, record `parent_relay` or
+`durable_artifact`; a matcher or `functions.exec` inventory is not evidence.
+The handoff and closeout packets carry the operation and receipt reference
+without copying the protocol schema.
+
 ## Standard Command
 
 Use this command only when coordination, cross-agent transfer, or resumption
