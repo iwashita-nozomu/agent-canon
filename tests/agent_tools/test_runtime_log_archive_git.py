@@ -1664,6 +1664,115 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertTrue(second_path.exists())
             self.assertEqual(self.source_snapshot(source), source_before)
 
+    def test_archive_eval_switches_repository_branch_inside_shared_transaction(self) -> None:
+        """Sequential eval publication selects each source branch under one lease."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            canon = root / "agent-canon"
+            canon.mkdir()
+            runtime_root = self.runtime_root(root)
+            remote = self.make_remote(root)
+
+            sources = (root / "source-a", root / "source-b")
+            remotes = (
+                "https://github.com/test/source-a.git",
+                "https://github.com/test/source-b.git",
+            )
+            branches: list[str] = []
+            for index, (source, source_remote) in enumerate(
+                zip(sources, remotes, strict=True),
+                start=1,
+            ):
+                source.mkdir()
+                run_id = f"eval-source-{index}"
+                spool = runtime_root / "spool" / run_id
+                results = spool / "eval-results" / "fixture"
+                logs = spool / "producer-logs"
+                results.mkdir(parents=True)
+                logs.mkdir(parents=True)
+                (results / "result.md").write_text(
+                    f"source={index}\n",
+                    encoding="utf-8",
+                )
+                (logs / "producer.stdout.txt").write_text(
+                    f"producer={index}\n",
+                    encoding="utf-8",
+                )
+                (spool / "collection.json").write_text(
+                    json.dumps(
+                        {
+                            "schema": "agent_canon.eval_collection.v1",
+                            "run_id": run_id,
+                        },
+                        separators=(",", ":"),
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+
+                published = self.run_tool(
+                    "archive-eval",
+                    "--spool-root",
+                    str(spool),
+                    "--run-id",
+                    run_id,
+                    source_root=source,
+                    canon_root=canon,
+                    remote=remote,
+                    runtime_root=runtime_root,
+                    extra_env={
+                        "AGENT_CANON_SOURCE_REPOSITORY_REMOTE": source_remote,
+                    },
+                )
+                self.assertEqual(
+                    published.returncode,
+                    0,
+                    published.stdout + published.stderr,
+                )
+                branch = f"logs/{stable_source_repository_id(source_remote)}"
+                branches.append(branch)
+                self.assertIn(
+                    f"RUNTIME_LOG_ARCHIVE_EVAL_REMOTE_REF=refs/heads/{branch}",
+                    published.stdout,
+                )
+
+            duplicate = self.run_tool(
+                "archive-eval",
+                "--spool-root",
+                str(runtime_root / "spool" / "eval-source-2"),
+                "--run-id",
+                "eval-source-2",
+                source_root=sources[1],
+                canon_root=canon,
+                remote=remote,
+                runtime_root=runtime_root,
+                extra_env={
+                    "AGENT_CANON_SOURCE_REPOSITORY_REMOTE": remotes[1],
+                },
+            )
+            self.assertEqual(
+                duplicate.returncode,
+                0,
+                duplicate.stdout + duplicate.stderr,
+            )
+            self.assertIn(
+                "RUNTIME_LOG_ARCHIVE_EVAL_STATUS=duplicate_noop",
+                duplicate.stdout,
+            )
+            for branch in branches:
+                subprocess.run(
+                    [
+                        "git",
+                        "--git-dir",
+                        str(remote),
+                        "show-ref",
+                        "--verify",
+                        f"refs/heads/{branch}",
+                    ],
+                    check=True,
+                    capture_output=True,
+                )
+
     def test_import_legacy_copies_and_deletes_old_jsonl(self) -> None:
         """import-legacy should move old in-tree hook JSONL to the archive."""
         with tempfile.TemporaryDirectory() as temp_dir:

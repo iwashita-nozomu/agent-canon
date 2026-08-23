@@ -5758,7 +5758,14 @@ def _prepare_eval_bundle(
 def command_archive_eval(context: ArchiveContext, args: argparse.Namespace) -> int:
     """Publish one bootstrap eval spool through the canonical archive owner."""
     run_id = safe_run_id(str(args.run_id))
-    with prepare_archive_transaction(context, fetch=True) as transaction:
+    # A shared runtime serves multiple registered source repositories. Select
+    # this source's stable branch while holding the archive transaction lock;
+    # ensure_archive still rejects foreign dirty state before switching.
+    with prepare_archive_transaction(
+        context,
+        fetch=True,
+        allow_branch_switch=True,
+    ) as transaction:
         required_paths, new_count = _prepare_eval_bundle(transaction, args)
         if new_count == 0:
             # A duplicate replay is a successful no-op only after the current
