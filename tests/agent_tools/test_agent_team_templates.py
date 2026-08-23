@@ -602,6 +602,14 @@ class AgentTeamTemplateTest(unittest.TestCase):
             dispatch.close_agent_token.arguments,
             {"terminal_agent_id": "spark-1"},
         )
+        blocked = dispatch_fixed_implementation(
+            request,
+            "materialize P3",
+            lambda role, prompt: None,
+            workspace_root=PROJECT_ROOT,
+        )
+        self.assertEqual(blocked.status, "blocked")
+        self.assertEqual(blocked.owner_gate_id, "WRITE_SUBAGENT_AUTHORIZATION=required")
 
     def test_closeout_provider_orders_child_before_parent(self) -> None:
         """The public closeout validator enforces provider child-before-parent order."""

@@ -269,8 +269,8 @@ local patch returns to cause/scope analysis rather than opening a repair wave.
 1. まず static checks と targeted validation を実行し、full repository
    dependency review、full suite、remote CI は最終候補の契約が選択した場合だけ一度実行します。
 1. findings を hypothesis として priority 順に並べ、current snapshot、reachable
-   path、contract、witness/static proof を付けます。parent / integration owner が
-   accept または reject を adjudicate します。
+   path、contract、witness/static proof を付けます。decision-owning reviewer または
+   ship_reviewer が accept または reject を adjudicate します。
 1. `required_action` または solution proposal は、activated finding では
    cause-evidence note/receipt の `Selected Cause` と `Expected Mechanism` から、
    straightforward finding では direct cause proof から導出します。各 finding に

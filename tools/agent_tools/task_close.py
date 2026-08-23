@@ -23,7 +23,7 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -182,6 +182,24 @@ def _child_closeout_evidence(
     else:
         mutation_events = parent_evidence.get("mutation_event_ids")
         source_events = parent_evidence.get("source_event_ids")
+        ledger_ref = parent_evidence.get("event_ledger_ref")
+        ledger_ids: set[str] = set()
+        ledger_mutations: list[Mapping[str, object]] = []
+        if isinstance(ledger_ref, str):
+            ledger_path = Path(ledger_ref)
+            if not ledger_path.is_absolute() and ".." not in ledger_path.parts:
+                ledger_target = (report_dir / ledger_path).resolve()
+                if report_dir.resolve() in ledger_target.parents and ledger_target.is_file():
+                    try:
+                        for line in ledger_target.read_text(encoding="utf-8").splitlines():
+                            item = json.loads(line)
+                            if isinstance(item, dict) and isinstance(item.get("hook_run_id"), str):
+                                ledger_ids.add(item["hook_run_id"])
+                                control = item.get("mutation_control")
+                                if isinstance(control, Mapping):
+                                    ledger_mutations.append(control)
+                    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                        pass
         if (
             closeout["parent_mutation_status"] != "no_parent_mutation"
             or parent_evidence.get("status") != "no_parent_mutation"
@@ -189,6 +207,9 @@ def _child_closeout_evidence(
             or mutation_events
             or not isinstance(source_events, list)
             or not source_events
+            or not isinstance(ledger_ref, str)
+            or not set(source_events).issubset(ledger_ids)
+            or any(control.get("status") == "allowed" for control in ledger_mutations)
         ):
             blockers.append("parent_mutation_provenance_mismatch")
     return not blockers, tuple(blockers)

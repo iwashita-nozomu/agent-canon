@@ -66,6 +66,23 @@ def write_identity(
     target.write_text(json.dumps(value, sort_keys=True), encoding="utf-8")
 
 
+def write_spawn_event(root: Path) -> None:
+    identity = json.loads((root / "runtime" / "agent_identity.json").read_text(encoding="utf-8"))
+    target = root / "spawn.json"
+    target.write_text(
+        json.dumps(
+            {
+                "subagent_event_kind": "spawn",
+                "subagent_target": identity["agent_id"],
+                "subagent_agent_type": "worker",
+                "mutation_scope_digest": identity["scope_digest"],
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+
 class MutationAuthorityTest(unittest.TestCase):
     def env(self, *, agent_id: str = "child-1", role_id: str = "implementer", parent_agent_id: str = "parent-1") -> dict[str, str]:
         return {
@@ -91,6 +108,7 @@ class MutationAuthorityTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             write_identity(root, role_id="implementer")
+            write_spawn_event(root)
             payload = {
                 "tool_name": "apply_patch",
                 "tool_input": {"patch": "*** Begin Patch\n*** Update File: src/owned.py\n*** End Patch\n"},
@@ -100,6 +118,7 @@ class MutationAuthorityTest(unittest.TestCase):
                 report_dir=root,
                 active_root=root,
                 environment=self.env(),
+                hook_spool_root=root,
             )
             self.assertEqual(decision.status, "allowed")
             outside = evaluate_mutation_authority(
@@ -107,6 +126,7 @@ class MutationAuthorityTest(unittest.TestCase):
                 report_dir=root,
                 active_root=root,
                 environment=self.env(),
+                hook_spool_root=root,
             )
             self.assertEqual(outside.status, "blocked")
             self.assertEqual(outside.reason, "mutation_scope_outside_child_receipt")
@@ -133,6 +153,24 @@ class MutationAuthorityTest(unittest.TestCase):
                 environment={},
             )
             self.assertEqual(readback.status, "not_applicable")
+
+    def test_wrappers_and_interpreters_are_not_read_only(self) -> None:
+        """Wrapper/interpreter routes require child authority just like direct writes."""
+        commands = (
+            "python3 script.py",
+            "python -c 'open(\"x\", \"w\").write(\"x\")'",
+            "bash -lc 'touch x'",
+            "sh -c 'echo x > x'",
+        )
+        for command in commands:
+            with self.subTest(command=command):
+                decision = evaluate_mutation_authority(
+                    {"tool_name": "Bash", "tool_input": {"command": command}},
+                    report_dir=None,
+                    active_root=Path("."),
+                    environment={},
+                )
+                self.assertEqual(decision.status, "blocked")
 
 
 if __name__ == "__main__":

@@ -463,7 +463,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                         "skipped_roles=none allowed_paths=reports/agents/run-1,team_manifest.yaml "
                         "do_not_read=.agent-canon/log-archive,reports/agents/other "
                         "write_scope=read_only validation_route=parent_review "
-                        "review_gate=parent_integration "
+                        "review_gate=integration_executor "
                         "handoff_artifacts=team_manifest.yaml#run.spawn_wave_recommendation "
                         "status=completed"
                     ),
@@ -511,7 +511,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                         "role_instances=python_reviewer:triage:test_plan.md "
                         "skipped_roles=none allowed_paths=tests/agent_tools "
                         "do_not_read=reports/agents/other write_scope=read_only "
-                        "validation_route=pytest review_gate=parent_integration "
+                        "validation_route=pytest review_gate=integration_executor "
                         "handoff_artifacts=reports/agents/run-1/triage_packet.md "
                         "status=completed"
                     ),
@@ -574,7 +574,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                         "role_instances=test_designer:triage:test_plan.md "
                         "skipped_roles=none allowed_paths=tests/agent_tools "
                         "do_not_read=reports/agents/other write_scope=read_only "
-                        "validation_route=pytest review_gate=parent_integration "
+                        "validation_route=pytest review_gate=integration_executor "
                         "handoff_artifacts=reports/agents/run-1/triage_packet.md "
                         "status=completed"
                     ),
@@ -647,7 +647,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                         "skipped_roles=none allowed_paths=tests/agent_tools "
                         "do_not_read=reports/agents/other "
                         "write_scope=read_only_until_cause_identified "
-                        "validation_route=pytest review_gate=parent_integration "
+                        "validation_route=pytest review_gate=integration_executor "
                         "handoff_artifacts=reports/agents/run-1/triage_packet.md "
                         "status=completed"
                     ),

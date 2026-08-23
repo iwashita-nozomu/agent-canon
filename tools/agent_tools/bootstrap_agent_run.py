@@ -112,6 +112,7 @@ if __package__:
         subagent_wave_record_command,
         suggested_public_skills,
         user_facing_language_policy_output_lines,
+        implementation_handoff_required,
     )
 else:
     from manifest_rendering import (
@@ -131,6 +132,7 @@ else:
         subagent_wave_record_command,
         suggested_public_skills,
         user_facing_language_policy_output_lines,
+        implementation_handoff_required,
     )
 
 if __package__:
@@ -405,6 +407,17 @@ def resolve_bootstrap_context(
     repository_roots: object | None = None,
 ) -> BootstrapRunContext:
     """Resolve workflow family, specialists, and report paths for one run."""
+    if implementation_handoff_required(args.task):
+        implementer_roles = [
+            role
+            for role in (*config.always_on_roles, *config.specialist_roles)
+            if role.id == "implementer" and role.codex_agents
+        ]
+        if not implementer_roles:
+            raise RuntimeError(
+                "WRITE_SUBAGENT_AUTHORIZATION=required;"
+                "PARENT_BLOCKED_ROUTE=typed_blocked_retry_or_user_report"
+            )
     created_at = datetime.now(UTC).replace(microsecond=0)
     created_at_iso = created_at.isoformat().replace("+00:00", "Z")
     # The parent capability authorizes the eventual write; it does not replace

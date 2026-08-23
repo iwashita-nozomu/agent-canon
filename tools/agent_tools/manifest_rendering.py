@@ -526,7 +526,7 @@ SAME_ROLE_SUBAGENT_INSTANCE_POLICY = {
     "status": "allowed_with_distinct_packets",
     "identity_key": "role_id+instance_id+agent_type",
     "parallel_read_only": "allowed_when_input_packets_or_review_focus_are_distinct",
-    "parallel_write": "allowed_only_with_disjoint_write_scopes_and_parent_integration_order",
+    "parallel_write": "allowed_only_with_disjoint_write_scopes_and_integration_executor_order",
     "collision_policy": "serialize_current_checkout_waves",
 }
 

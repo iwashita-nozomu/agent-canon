@@ -57,7 +57,10 @@ from report_artifact_checks import (  # noqa: E402
     project_completion_coverage,
 )
 from task_authority import hash_baseline_bytes  # noqa: E402
-from task_close import update_lifecycle_closeout_consumer  # noqa: E402
+from task_close import (  # noqa: E402
+    _child_closeout_evidence,
+    update_lifecycle_closeout_consumer,
+)
 from team_config import (  # noqa: E402
     AgentTypeSelection,
     load_task_catalog,
@@ -935,6 +938,7 @@ def write_ready_closeout_bundle(
         "parent_agent_id": "parent-1",
         "source_event_ids": ["mutation-event-1"],
         "mutation_event_ids": [],
+        "event_ledger_ref": "runtime/hook_events.jsonl",
         "receipt_sha256": "",
     }
     parent_unsigned = dict(parent_evidence)
@@ -944,6 +948,17 @@ def write_ready_closeout_bundle(
     ).hexdigest()
     (runtime_dir / "parent_mutation_evidence.json").write_text(
         json.dumps(parent_evidence, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    (runtime_dir / "hook_events.jsonl").write_text(
+        json.dumps(
+            {
+                "hook_run_id": "mutation-event-1",
+                "mutation_control": {"status": "not_applicable", "mutation": False},
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
     )
     (report_dir / "user_request_contract.md").write_text(
         "\n".join(
@@ -3111,15 +3126,18 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 verifier.read_text(encoding="utf-8").replace("verifier-1", "forged"),
                 encoding="utf-8",
             )
-            result = subprocess.run(
-                [sys.executable, str(TASK_CLOSE_SCRIPT), "--report-dir", str(report_dir)],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
+            ready, blockers = _child_closeout_evidence(
+                report_dir,
+                {
+                    "verifier_role_id": "verifier",
+                    "verifier_runtime_agent_id": "verifier-1",
+                    "verifier_receipt_ref": "runtime/verifier_receipt.json",
+                    "parent_mutation_status": "no_parent_mutation",
+                    "parent_mutation_evidence_ref": "runtime/parent_mutation_evidence.json",
+                },
             )
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("verifier_child_provenance", result.stdout)
+            self.assertFalse(ready)
+            self.assertIn("runtime_verifier_receipt_invalid", blockers)
 
     def test_task_close_accepts_profile_selected_targeted_static_analysis(self) -> None:
         """task_close should allow targeted static analysis selected by the risk profile."""

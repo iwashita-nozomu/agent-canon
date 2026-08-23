@@ -484,16 +484,6 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
                 status = "invalid_projection"
     root_state = hook_root()
     report_dir = resolve_report_target(root_state)
-    mutation_decision = evaluate_mutation_authority(
-        payload,
-        report_dir=report_dir,
-        active_root=root_state.active_root,
-        environment=os.environ,
-    ) if event == "PreToolUse" else None
-    if mutation_decision is not None and mutation_decision.status == "blocked":
-        if output is None:
-            output = official_payload(event, mutation_block_payload(mutation_decision))
-            status = "blocked_parent_mutation"
     spool_entry, context = spool_event(
         event,
         raw_payload,
@@ -501,6 +491,17 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
         root_state.active_root,
         **telemetry,
     )
+    mutation_decision = evaluate_mutation_authority(
+        payload,
+        report_dir=report_dir,
+        active_root=root_state.active_root,
+        environment=os.environ,
+        hook_spool_root=context.spool_root(),
+    ) if event == "PreToolUse" else None
+    if mutation_decision is not None and mutation_decision.status == "blocked":
+        if output is None:
+            output = official_payload(event, mutation_block_payload(mutation_decision))
+            status = "blocked_parent_mutation"
     if mutation_decision is not None:
         spool_entry["mutation_control"] = mutation_decision.as_dict()
         spool_entry["status"] = status
@@ -520,6 +521,14 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
     )
     if receipt is not None:
         spool_entry["coordination_receipt"] = receipt
+    if (
+        subagent_selection is not None
+        and subagent_selection.action == "spawn"
+        and isinstance(payload, dict)
+        and isinstance(payload.get("tool_input"), dict)
+        and isinstance(payload["tool_input"].get("scope_digest"), str)
+    ):
+        spool_entry["mutation_scope_digest"] = payload["tool_input"]["scope_digest"]
     behavior = record_hook_invocation(parts)
     if behavior is not None:
         spool_entry.update(behavior.as_dict())

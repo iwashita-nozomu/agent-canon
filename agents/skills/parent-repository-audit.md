@@ -128,8 +128,8 @@ completion report には少なくとも次を残します。
 - finding、repair、target readback、実行した validation
 - 未実行/検証不能事項と次の owner action
 
-blocked または unresolved があれば全体を pass とせず、parent-only integration decision を
-残します。
+blocked または unresolved があれば全体を pass とせず、integration_executor または
+decision-owning reviewer へ typed next action を返します。
 
 ## Tool Commands
 

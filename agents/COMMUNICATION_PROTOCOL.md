@@ -402,7 +402,7 @@ enough to execute the role and owned enough to avoid unrelated repo reading.
 - `objective`: one sentence with active non-goals
 - `request_clause_ids`: clauses the subagent owns
 - `state_snapshot`: branch, relevant commit or run-id, current stage, and
-  parent integration owner
+  integration executor owner
 - `read_before_work`: exact files or sections to read within role-owned
   surfaces
 - `context_artifacts`: router output, dashboard summary, checker finding

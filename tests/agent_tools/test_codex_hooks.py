@@ -564,6 +564,23 @@ class CodexHooksTest(unittest.TestCase):
             run_dir = root / "run"
             run_dir.mkdir()
             self._write_identity_receipt(run_dir, "implementer")
+            identity = json.loads(
+                (run_dir / "runtime" / "agent_identity.json").read_text(encoding="utf-8")
+            )
+            spool = root / "hook-results" / ".event-spool"
+            spool.mkdir(parents=True)
+            (spool / "spawn.json").write_text(
+                json.dumps(
+                    {
+                        "subagent_event_kind": "spawn",
+                        "subagent_target": "child-hook",
+                        "subagent_agent_type": "worker",
+                        "mutation_scope_digest": identity["scope_digest"],
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
             result = self._run_hook_in_root(
                 root,
                 "PreToolUse",
@@ -577,6 +594,7 @@ class CodexHooksTest(unittest.TestCase):
                     "AGENT_CANON_RUNTIME_AGENT_ID": "child-hook",
                     "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
                     "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-hook",
+                    "AGENT_CANON_HOOK_RESULTS_DIR": str(root / "hook-results"),
                 },
             )
             self.assertEqual(result.stdout, "")

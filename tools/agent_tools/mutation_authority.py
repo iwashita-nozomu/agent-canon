@@ -25,7 +25,7 @@ RUNTIME_AGENT_ID_ENV = "AGENT_CANON_RUNTIME_AGENT_ID"
 RUNTIME_ROLE_ID_ENV = "AGENT_CANON_RUNTIME_ROLE_ID"
 RUNTIME_PARENT_AGENT_ID_ENV = "AGENT_CANON_RUNTIME_PARENT_AGENT_ID"
 IDENTITY_RECEIPT_RELATIVE = Path("runtime") / "agent_identity.json"
-PARENT_ROLE_IDS = frozenset({"parent", "manager", "manager_reviewer"})
+PARENT_ROLE_IDS = frozenset({"parent", "sol_parent", "manager", "manager_reviewer"})
 MUTATING_TOOLS = frozenset({"apply_patch", "python", "python3", "Bash", "bash"})
 READONLY_COMMANDS = frozenset(
     {
@@ -46,7 +46,7 @@ READONLY_GIT_SUBCOMMANDS = frozenset(
     {"branch", "diff", "log", "ls-files", "remote", "rev-parse", "show", "status"}
 )
 MUTATING_COMMANDS = frozenset(
-    {"apply_patch", "cargo", "chmod", "cp", "docker", "make", "mkdir", "mv", "perl", "pytest", "rm", "sed", "tee", "touch"}
+    {"apply_patch", "cargo", "chmod", "cp", "docker", "make", "mkdir", "mv", "perl", "pytest", "python", "python3", "rm", "sed", "tee", "touch"}
 )
 PATCH_PATH_RE = re.compile(r"^\*\*\*\s+(?:Update|Add|Delete) File:\s*(.+?)\s*$", re.MULTILINE)
 
@@ -194,6 +194,14 @@ def _bash_mutation(command: str) -> tuple[bool, tuple[str, ...], str]:
                 continue
             paths.extend(token for token in sub_args if not token.startswith("-"))
             return True, tuple(paths), f"git_{subcommand or 'unknown'}"
+        if verb in {"bash", "sh", "zsh"}:
+            wrapper_args = segment[command_index + 1 :]
+            command_flag = next((index for index, token in enumerate(wrapper_args) if token in {"-c", "-lc", "--command"}), None)
+            if command_flag is None or command_flag + 1 >= len(wrapper_args):
+                return True, tuple(paths), "shell_wrapper_unresolved"
+            inner = " ".join(wrapper_args[command_flag + 1 :])
+            inner_mutation, inner_paths, inner_reason = _bash_mutation(inner)
+            return inner_mutation, inner_paths, f"{verb}_wrapper_{inner_reason}"
         if verb in MUTATING_COMMANDS:
             paths.extend(token for token in segment[command_index + 1 :] if not token.startswith("-"))
             return True, tuple(paths), f"command_{verb}"
@@ -235,6 +243,7 @@ def evaluate_mutation_authority(
     report_dir: Path | None,
     active_root: Path,
     environment: Mapping[str, str],
+    hook_spool_root: Path | None = None,
 ) -> MutationAuthorityDecision:
     """Correlate actor identity, child scope, and one real mutation request."""
     if not isinstance(payload, dict):
@@ -258,11 +267,31 @@ def evaluate_mutation_authority(
         return MutationAuthorityDecision("blocked", "runtime_identity_mismatch", True, actor_id, role_id, parent_agent_id, str(identity.get("scope_digest", "")), paths, evidence_ref, command_sha)
     if role_id in PARENT_ROLE_IDS or identity.get("authority") != "write_capable_child":
         return MutationAuthorityDecision("blocked", "parent_mutation_forbidden", True, actor_id, role_id, parent_agent_id, str(identity.get("scope_digest", "")), paths, evidence_ref, command_sha)
+    if hook_spool_root is None or not any(
+        _spawn_event_matches(path, actor_id, role_id, str(identity.get("scope_digest", "")))
+        for path in hook_spool_root.glob("**/*.json")
+    ):
+        return MutationAuthorityDecision("blocked", "child_spawn_evidence_missing", True, actor_id, role_id, parent_agent_id, str(identity.get("scope_digest", "")), paths, evidence_ref, command_sha)
     allowed_files = _relative_paths(identity.get("allowed_files")) or ()
     allowed_directories = _relative_paths(identity.get("allowed_directories")) or ()
     if not paths or not all(_allowed_path(path, active_root, allowed_files, allowed_directories) for path in paths):
         return MutationAuthorityDecision("blocked", "mutation_scope_outside_child_receipt", True, actor_id, role_id, parent_agent_id, str(identity.get("scope_digest", "")), paths, evidence_ref, command_sha)
     return MutationAuthorityDecision("allowed", "child_scope_verified", True, actor_id, role_id, parent_agent_id, str(identity.get("scope_digest", "")), paths, evidence_ref, command_sha)
+
+
+def _spawn_event_matches(path: Path, actor_id: str, role_id: str, scope_digest: str) -> bool:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    if not isinstance(value, dict):
+        return False
+    return (
+        value.get("subagent_event_kind") == "spawn"
+        and value.get("subagent_target") == actor_id
+        and value.get("subagent_agent_type") in {role_id, "worker", "spark_worker"}
+        and value.get("mutation_scope_digest") == scope_digest
+    )
 
 
 def mutation_block_payload(decision: MutationAuthorityDecision) -> dict[str, object]:

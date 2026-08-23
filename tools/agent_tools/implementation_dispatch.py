@@ -623,10 +623,10 @@ def dispatch_fixed_implementation(
                 prompt,
                 None,
                 None,
-                route_result.next_gate,
+                "WRITE_SUBAGENT_AUTHORIZATION=required",
                 1,
                 spawn_count,
-                "queued",
+                "blocked",
             )
         if capacity_runtime is not None:
             spawned_item = capacity_handshake.ReadyWorkItem(

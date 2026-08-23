@@ -774,7 +774,7 @@ checkpoint, or subpass remains an internal progress observation.
 W2-20 is ordered as W2 design `APPROVE`, exactly one isolated-branch writer
 release with collision preservation and
 `branch_creation_reason=convergence_w2_gate_completion_authority`, source
-freeze/review, then W3/parent integration. `routing_gate=verified` is observed at
+freeze/review, then W3/integration-executor integration. `routing_gate=verified` is observed at
 later integration/publication, while writer release authority remains the W2
 design `APPROVE` plus isolated branch release.
 

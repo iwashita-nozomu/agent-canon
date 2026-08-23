@@ -1614,7 +1614,7 @@ an exact registry enum list, not illustrative prose:
 
 | Profile ID | Allowed context kinds | Excluded context kinds | Reasoning expectation | Verbosity | Return selector | Checkpoint policy |
 | --- | --- | --- | --- | --- | --- | --- |
-| `sol_parent_high` | `request_clauses`, `full_target_state`, `implementation_execution_contract`, `full_decision_sufficiency`, `upstream_evidence_identities`, `accumulated_context_refs`, `full_descendant_topology`, `capacity_snapshot`, `route_decisions`, `child_results` | `child_private_reasoning`, `unselected_raw_search`, `untrusted_history`, `tool_pseudocommands` | `parent_integration_and_route_decision_high` | `compact` | `ParentDecision` | `sol_stage_entry_child_handoff_integration_closeout_v1` |
+| `sol_parent_high` | `request_clauses`, `full_target_state`, `implementation_execution_contract`, `full_decision_sufficiency`, `upstream_evidence_identities`, `accumulated_context_refs`, `full_descendant_topology`, `capacity_snapshot`, `route_decisions`, `child_results` | `child_private_reasoning`, `unselected_raw_search`, `untrusted_history`, `tool_pseudocommands` | `parent_orchestration_and_route_readback_high` | `compact` | `ParentDecision` | `sol_stage_entry_child_handoff_closeout_v1` |
 | `luna_reasoning_high` | `request_clauses`, `target_state_or_revision`, `implementation_execution_contract`, `bounded_divergent_states`, `authorized_evidence_request`, `causal_evidence`, `cross_owner_graph`, `assigned_artifact_or_diff`, `accumulated_context_refs`, `upstream_evidence_identities` | `unbounded_history`, `unselected_raw_search`, `unowned_write_context`, `hidden_parent_reasoning`, `tool_pseudocommands` | `causal_design_or_independent_findings_high` | `findings_first` | `return_schema_by_role` | `luna_reasoning_by_return_schema_v1` |
 | `luna_implementation_xhigh` | `request_clauses`, `approved_target_state`, `implementation_execution_contract`, `cross_owner_graph`, `immutable_source_anchors`, `validation_contracts`, `assigned_review_findings`, `accumulated_context_refs`, `upstream_evidence_identities` | `unbounded_history`, `unowned_paths`, `unapproved_target_alternatives`, `compatibility_fallbacks`, `micro_slice_plans`, `tool_pseudocommands` | `reasoned_complete_cross_owner_materialization_xhigh` | `compact` | `ReasoningImplementationResult` | `luna_packet_unit_validation_integration_v1` |
 | `luna_ship_xhigh` | `request_clauses`, `approved_target_state`, `final_candidate_diff`, `validation_readback`, `deletion_readback`, `lineage_closeout_readback`, `upstream_evidence_identities` | `broad_history`, `hidden_parent_reasoning`, `unapproved_alternatives`, `unrelated_modules`, `tool_pseudocommands` | `independent_ship_judgment_xhigh` | `findings_first` | `ShipReviewDecision` | `ship_packet_ack_decision_v1` |
@@ -4487,7 +4487,7 @@ editing. Spark is assigned only the four rows whose profile is
 | `P4_team_lifecycle_integration` | `8e553ed3f87e49c8cdaa383f4fd1c23ae868d0b2edd882f4d481acb15aa06e13` | `luna_cross_owner_integration` / Luna | `team_lifecycle_integration_gate` |
 | `P5_runtime_profile_projection` | `194b2e5c9ae5d35cbe459411346bcfcd1e35ae9c9bfdb7e19a4f919c44c652cf` | `luna_cross_owner_integration` / Luna | `runtime_profile_projection_gate` |
 | `P6_policy_document_projection` | `7754108de66a3a2dfd29b470e1a159ad06f2010efada4ac289a496f5220317a2` | `docs_workflow_steward` / Luna | `document_projection_gate` |
-| `P7_final_integration_readback` | `e56d23df675c25817b4763607a660c1f312d1656cc7ae0976630ea1c41814ef9` | `sol_parent` / Sol | `final_integration_readback_gate` |
+| `P7_final_integration_readback` | `e56d23df675c25817b4763607a660c1f312d1656cc7ae0976630ea1c41814ef9` | `integration_executor` / worker | `final_integration_readback_gate` |
 
 The set is not a list instructing Spark to re-read every upstream document.
 Each Spark row is a minimal immutable worker projection. `P0` is the first
@@ -4803,7 +4803,7 @@ Spark 実装 routing 契約に対するユーザー明示の後続契約であ�
 
 | ID | 契約 | owner / evidence |
 | --- | --- | --- |
-| TERRA-01 | Sol parent は routing、integration、final authority を保持する。 | Sol; `agents/agents_config.json` |
+| TERRA-01 | Sol parent は routing、packet relay、status、external readback を保持し、integration_executor と ship_reviewer が integration/final authority を持つ。 | Sol/integration_executor/ship_reviewer; `agents/agents_config.json` |
 | TERRA-02 | Terra は canonical 登録された conditional read-only cross-cutting specialist candidate とし、always-on、coordinator、general worker にはしない。task-id のない fallback でも activation evidence なしには選択しない。 | Terra; `agents/agents_config.json` |
 | TERRA-03 | Terra の capability は `cross_owner_integration`、`context_reconstruction`、`adversarial_contradiction_validation` の三つに限定する。ユーザー提示済み、または既存 finding 内の alternative architecture は adversarial comparison 入力として許可し、Terra 自身による未要求の新規案生成、採用、final decision は許可しない。 | Terra profile; `agents/model_profiles.toml` |
 | TERRA-04 | Luna は design、review、ordinary ambiguous implementation を保持し、Spark は fixed mechanical leaf を保持する。 | Luna / Spark; `agents/canonical/CODEX_SUBAGENTS.md` |
