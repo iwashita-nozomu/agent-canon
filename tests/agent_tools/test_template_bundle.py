@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -37,3 +39,14 @@ def test_bundle_identity_has_profile_and_manifest_inputs() -> None:
     assert agent["source_commit"] == documents["source_commit"]
     assert agent["manifest_digest"] == documents["manifest_digest"]
     assert agent["bundle_digest"] != documents["bundle_digest"]
+
+
+def test_template_bundle_imports_on_runtime_python() -> None:
+    result = subprocess.run(
+        [sys.executable, "-c", "from tools.agent_tools.template_bundle import bundle_identity; print(bundle_identity.__name__)"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "bundle_identity"
