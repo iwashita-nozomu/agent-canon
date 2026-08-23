@@ -339,7 +339,7 @@ surface id、source commit/digest、target、created/pre-existing を記録し�
 `.codex`、symlink、vendor source を materialize しません。AgentCanon clone から
 Codex を起動することも要求しません。install/update 後は現在 session が
 自動更新されないことを表示し、launcher が開く新 session で skill/agent/hook/config
-inventory、link target、source digest を readback します。
+inventory と link target を readback します。
 
 `tools/agent_tools/bootstrap_runtime.py` は isolated Codex homeのskill/agent surfaceを cross-repository
 discovery entry とし、project-local `AGENTS.md` は親 repository の責務のままと
@@ -400,7 +400,7 @@ unhealthy、archive publish failure、rollback、session restart、cleanup readb
 | Operation | Resulting state | Completion evidence |
 | --- | --- | --- |
 | `install` | verified image/manifest generation | image digest, manifest fingerprint |
-| `update` | current checkout reconciled in existing v2 lifecycle | source commit/tree digest, image-input/manifest digest, Docker IDs |
+| `update` | current checkout reconciled in existing v2 lifecycle | ordinary Docker result and existing state/container readback |
 | `start` | exactly one healthy container | inspect, limits, mounts, generation |
 | `target add` | new mount generation active | lock, zero tasks, health, mount readback |
 | `tool run` | typed catalog dispatch | `tools/agent_tools/tool_dispatch.py` receipt |

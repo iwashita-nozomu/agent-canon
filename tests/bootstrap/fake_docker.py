@@ -64,6 +64,12 @@ def main(argv: list[str]) -> int:
         return 0
     if argv[:1] == ["build"]:
         tag = argv[argv.index("--tag") + 1]
+        previous = state["images"].get(tag)
+        if previous is not None:
+            state["images"][f"untagged:{previous['Id']}"] = {
+                **previous,
+                "RepoTags": [],
+            }
         image_number = int(state.get("next_image", 1))
         state["next_image"] = image_number + 1
         record = {

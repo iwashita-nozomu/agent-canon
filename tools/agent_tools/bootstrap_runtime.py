@@ -258,36 +258,6 @@ def _source_snapshot(root: Path) -> dict[str, Any]:
     }
 
 
-def _image_input_digest(root: Path) -> str:
-    """Digest the AgentCanon paths copied into the shared image build context."""
-    roots = (
-        ".dockerignore", "AGENTS.md", "ROOT_AGENTS.md", ".agents", ".codex",
-        "bootstrap/container", "tools", "agents", "documents", "evidence/agent-evals",
-        "references", "templates", "rust/agent-canon",
-    )
-    digest = hashlib.sha256()
-    files: list[Path] = []
-    for relative in roots:
-        path = root / relative
-        if path.is_file() or path.is_symlink():
-            files.append(path)
-        elif path.is_dir():
-            files.extend(
-                item for item in path.rglob("*")
-                if (item.is_file() or item.is_symlink())
-                and "__pycache__" not in item.parts
-                and item.suffix != ".pyc"
-            )
-    for path in sorted(set(files)):
-        relative = path.relative_to(root).as_posix().encode("utf-8")
-        payload = os.readlink(path).encode("utf-8") if path.is_symlink() else path.read_bytes()
-        digest.update(relative)
-        digest.update(b"\0")
-        digest.update(hashlib.sha256(payload).digest())
-        digest.update(b"\0")
-    return digest.hexdigest()
-
-
 def _changed_source_paths(root: Path) -> set[str]:
     """Return tracked and non-ignored untracked paths changed from HEAD."""
     tracked = subprocess.run(
@@ -894,11 +864,12 @@ class DockerAdapter:
         dockerfile: Path,
         tag: str,
         labels: Mapping[str, str],
+        force_build: bool = False,
     ) -> dict[str, Any]:
         """Build or adopt one manifest-tagged image with ownership labels."""
         record = self.inspect_image(tag)
         self.last_image_created = record is None
-        if record is not None:
+        if record is not None and not force_build:
             self.validate_image(record, labels)
             # A matching pre-existing tag is a protected resource. Adopt its
             # exact ID and leave it untouched; rebuilding to the same tag would
@@ -1262,8 +1233,6 @@ class BootstrapRuntime:
         self.manifest, policy_digest = load_manifest(self.manifest_path)
         self.manifest_digest = policy_digest
         self.control_digest = sha256_text(str(control))
-        self.source_identity = _source_snapshot(self.repository_root)
-        self.image_input_digest = _image_input_digest(self.repository_root)
         self.docker = docker or DockerAdapter(
             os.environ.get("AGENT_CANON_DOCKER", "docker"),
             timeout=int(self.manifest["container"]["task_timeout_seconds"]),
@@ -1333,9 +1302,6 @@ class BootstrapRuntime:
             "runtime_root": str(self.paths.runtime_root),
             "control_root_digest": self.control_digest,
             "manifest_digest": self.manifest_digest,
-            "source_commit": None,
-            "tree_digest": None,
-            "image_input_digest": None,
             "state": "uninstalled",
             "active_task_count": 0,
             "current_generation": None,
@@ -1410,8 +1376,6 @@ class BootstrapRuntime:
     def _image_tag(self) -> str:
         return (
             f"agent-canon-tools:{self.control_digest[:16]}-"
-            f"{self.source_identity['head'][:16]}-{self.source_identity['tree_digest'][:16]}-"
-            f"{self.image_input_digest[:16]}-"
             f"{self.manifest_digest[:16]}"
         )
 
@@ -1468,11 +1432,6 @@ class BootstrapRuntime:
                 if state is not None
                 else self.manifest_digest
             ),
-            "source": {
-                "commit": self.source_identity.get("head"),
-                "tree_digest": self.source_identity.get("tree_digest"),
-                "image_input_digest": self.image_input_digest,
-            },
             "before_state": before,
             "after_state": after,
             "resource_ids": json.loads(_json(resources)),
@@ -1498,13 +1457,13 @@ class BootstrapRuntime:
             result["receipt_path"] = str(self._write_receipt(result))
         return result
 
-    def _image(self, state: dict[str, Any]) -> dict[str, Any]:
-        self._refresh_source_identity()
+    def _image(self, state: dict[str, Any], *, force_build: bool = False) -> dict[str, Any]:
         image = self.docker.ensure_image(
             repository_root=self.repository_root,
             dockerfile=self.repository_root / "bootstrap" / "container" / "Dockerfile",
             tag=self._image_tag(),
             labels=self._labels(),
+            force_build=force_build,
         )
         image_id = _required_string(image.get("Id"), "image.Id")
         resources = state.setdefault("resources", self._resource_records())
@@ -1521,15 +1480,7 @@ class BootstrapRuntime:
             "labels": self._labels(),
             "state": "present",
         }
-        state["source_commit"] = self.source_identity.get("head")
-        state["tree_digest"] = self.source_identity.get("tree_digest")
-        state["image_input_digest"] = self.image_input_digest
         return image
-
-    def _refresh_source_identity(self) -> None:
-        """Read current checkout identity without acquiring or changing Git state."""
-        self.source_identity = _source_snapshot(self.repository_root)
-        self.image_input_digest = _image_input_digest(self.repository_root)
 
     def _mounts(self, targets: Mapping[str, Mapping[str, Any]]) -> list[dict[str, str]]:
         mounts = [
@@ -2005,7 +1956,6 @@ class BootstrapRuntime:
 
     def _update_locked(self, state: dict[str, Any], operation: str) -> dict[str, Any]:
         """Reconcile current checkout/image inputs with existing v2 lifecycle state."""
-        self._refresh_source_identity()
         self._ensure_agents_link(state)
         if state.get("active_task_count", 0):
             raise BootstrapError(
@@ -2015,17 +1965,7 @@ class BootstrapRuntime:
             )
         resources = state.get("resources", {})
         image = resources.get("image", {}) if isinstance(resources, dict) else {}
-        expected_tag = self._image_tag()
-        same_inputs = (
-            state.get("source_commit") == self.source_identity.get("head")
-            and state.get("tree_digest") == self.source_identity.get("tree_digest")
-            and state.get("image_input_digest") == self.image_input_digest
-            and state.get("manifest_digest") == self.manifest_digest
-            and image.get("tag") == expected_tag
-            and image.get("id") is not None
-            and self.docker.inspect_image(str(image.get("id"))) is not None
-        )
-        if same_inputs:
+        if image.get("owned") is not True:
             self._write_state(state)
             return self._result(
                 self._receipt(
@@ -2034,7 +1974,7 @@ class BootstrapRuntime:
                     "up_to_date",
                     before=state["state"],
                     after=state["state"],
-                    details={"changed": False},
+                    details={"changed": False, "reason": "pre_existing_image"},
                     state=state,
                 )
             )
@@ -2045,7 +1985,7 @@ class BootstrapRuntime:
             or before in {"ready", "running"}
         )
         try:
-            self._image(state)
+            self._image(state, force_build=True)
             state["manifest_digest"] = self.manifest_digest
             state["state"] = "maintenance_pending"
             self._write_state(state)
@@ -2064,15 +2004,21 @@ class BootstrapRuntime:
                     before=before,
                     after=state["state"],
                     details={
-                        "source_commit": self.source_identity.get("head"),
-                        "tree_digest": self.source_identity.get("tree_digest"),
-                        "image_input_digest": self.image_input_digest,
                         "image_id": state["resources"]["image"]["id"],
                     },
                     state=state,
                 )
             )
         except BootstrapError as exc:
+            candidate_image = state.get("resources", {}).get("image", {})
+            old_image = old_state.get("resources", {}).get("image", {})
+            candidate_image_id = candidate_image.get("id") if isinstance(candidate_image, dict) else None
+            old_image_id = old_image.get("id") if isinstance(old_image, dict) else None
+            if candidate_image_id and candidate_image_id != old_image_id:
+                inspected_image = self.docker.inspect_image(str(candidate_image_id))
+                if inspected_image is not None:
+                    self.docker.validate_image(inspected_image, self._labels())
+                    self.docker.remove_image(str(candidate_image_id))
             state.clear()
             state.update(old_state)
             recovery_error: BootstrapError | None = None
@@ -2094,9 +2040,6 @@ class BootstrapRuntime:
                     before=before,
                     after=state["state"],
                     details={
-                        "source_commit": self.source_identity.get("head"),
-                        "tree_digest": self.source_identity.get("tree_digest"),
-                        "image_input_digest": self.image_input_digest,
                         "recovery_error": recovery_error.code if recovery_error else None,
                     },
                     state=state,
@@ -2727,7 +2670,6 @@ class BootstrapRuntime:
             "path": str(link),
             "target": str(source),
             "owned": "true",
-            "tree_digest": str(self.source_identity.get("tree_digest", "")),
         }
         state["managed_agents_link"] = record
         return record
@@ -2783,7 +2725,6 @@ class BootstrapRuntime:
         """Install only manifest-managed links into isolated ``CODEX_HOME``."""
         with self.locked():
             state = self._read_state()
-            self._refresh_source_identity()
             _ensure_directory(self.paths.codex_home)
             desired = self._managed_links()
             desired_targets = {
@@ -2839,9 +2780,6 @@ class BootstrapRuntime:
                 {
                     "schema": SCHEMA_SKILLS,
                     "source_root": str(self.repository_root),
-                    "source_commit": self.source_identity.get("head"),
-                    "tree_digest": self.source_identity.get("tree_digest"),
-                    "image_input_digest": self.image_input_digest,
                     "manifest_digest": self.manifest_digest,
                     "stale_links_removed": stale_links,
                     "links": links,

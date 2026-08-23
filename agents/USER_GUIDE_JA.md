@@ -47,8 +47,8 @@ control root と runtime root は必須です。runtime root は control root �
 `prepare` は runtime root 内の isolated `codex-home/` に manifest 管理の skill、agent、
 hook、設定リンクを作ります。global `$CODEX_HOME` は変更しません。衝突する既存パスは
 fail closed で、uninstall が削除できるのはこの installation が作成したリンクだけです。
-install / update 後は新しい Codex session を起動し、manifest、link target、source digest
-を readback してください。
+install / update 後は新しい Codex session を起動し、manifest と link target を
+readback してください。
 
 install / update は明示された control root の `.agents` を、AgentCanon source の
 tracked `.agents` への exact symlink として管理します。global `~/.agents` と global

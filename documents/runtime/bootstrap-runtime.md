@@ -85,11 +85,10 @@ by exact ID without overwrite; an unowned pre-existing image remains outside
 uninstall.
 
 `update` reads only the current AgentCanon checkout. It never fetches,
-checks out, merges, rebases, resets, or pulls Git state. If source tree content,
-image inputs, or the manifest are unchanged, it is a no-op and does not build.
-When they change, one ordinary Docker build is performed; health or build
-failure restores the existing v2 generation, container, and image in the same
-handled call. Source acquisition remains the downstream dotfiles responsibility.
+checks out, merges, rebases, resets, or pulls Git state. It performs one
+ordinary Docker build for the current checkout; a handled build or health
+failure restores the existing v2 generation, container, and image. Source
+acquisition remains the downstream dotfiles responsibility.
 `install` and `update` also converge `<control-parent-root>/.agents` to an
 exact symlink targeting the tracked source `.agents`. A regular file, directory,
 or different symlink at that path is a typed collision. `uninstall` removes only
@@ -110,7 +109,7 @@ manifest-managed, isolated `codex-home/` beneath the selected runtime root.
 overwrite global skills, agents, hooks, or configuration. Existing conflicting
 paths fail closed; only links recorded as owned by this installation can be
 removed by `uninstall`. Start a new Codex session after an install or update
-and use `codex prepare` readback to verify the link and source digest.
+and use `codex prepare` readback to verify link targets.
 
 ## Targets, generations, and failure recovery
 
