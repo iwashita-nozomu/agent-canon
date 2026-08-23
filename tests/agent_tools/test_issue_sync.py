@@ -605,6 +605,20 @@ class IssueSyncTest(unittest.TestCase):
             self.assertIn("## Issue Mirror Check", text)
             self.assertIn("missing_github_links: `1`", text)
 
+    def test_summary_file_outside_parent_is_rejected(self) -> None:
+        """The summary writer does not treat an external runtime as parent-owned."""
+        with tempfile.TemporaryDirectory() as parent_dir, tempfile.TemporaryDirectory() as external_dir:
+            root = Path(parent_dir)
+            summary = Path(external_dir) / "summary.md"
+            self.write_issue(root, "open", "AC-20260517-test-issue")
+
+            result = self.run_checker(root, "--summary-file", str(summary))
+
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("symlink_escape", result.stderr)
+            self.assertIn("outside parent root", result.stderr)
+            self.assertFalse(summary.exists())
+
     def test_group_findings_reuses_one_owner_root_cause_fix(self) -> None:
         """Duplicate observations become one issue candidate without fan-out."""
         grouped = issue_sync.group_findings(
