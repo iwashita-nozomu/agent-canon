@@ -110,16 +110,6 @@ def test_start_accepts_daemon_canonical_mount_readback(
     assert manager.start()["after_state"] == "ready"
 
 
-def test_effective_root_is_allowed_but_manifest_container_uid_is_nonzero(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fake_docker: DockerAdapter
-) -> None:
-    """Keep host UID policy separate from the non-root container policy."""
-    monkeypatch.setattr(os, "geteuid", lambda: 0)
-    manager = runtime(tmp_path, fake_docker)
-    assert manager.uid == 0
-    assert manager.container_uid > 0 and manager.container_gid > 0
-
-
 def test_install_tightens_preexisting_runtime_control_directories(
     tmp_path: Path, fake_docker: DockerAdapter
 ) -> None:
@@ -147,6 +137,7 @@ def test_install_start_status_readback_and_single_container(
     manager = runtime(tmp_path, fake_docker)
     installed = manager.install()
     assert installed["code"] == "installed"
+    install_commands = list(fake_docker.commands)
     started = manager.start()
     assert started["after_state"] == "ready"
     status = manager.status()["details"]
@@ -158,11 +149,11 @@ def test_install_start_status_readback_and_single_container(
         Path(installed["receipt_path"]).read_text(encoding="utf-8")
     )
     assert install_receipt["resource_ids"]["image"]["id"] is not None
+    build = next(command for command in install_commands if command[1] == "build")
+    assert "--build-arg" not in build
+    assert not any(command[1:3] == ["container", "ls"] for command in install_commands)
     create = next(command for command in fake_docker.commands if command[1] == "create")
-    assert (
-        create.count("--user") == 1
-        and create[create.index("--user") + 1].split(":")[0] != "0"
-    )
+    assert "--user" not in create
     assert (
         sum(
             command[1:3] == ["container", "inspect"] for command in fake_docker.commands
@@ -186,6 +177,41 @@ def test_install_start_status_readback_and_single_container(
     assert str(manager.paths.state) not in exchange
 
 
+def test_preseeded_image_tag_is_adopted_without_overwrite_or_cleanup(
+    tmp_path: Path, fake_docker: DockerAdapter
+) -> None:
+    """Protect an existing matching image tag from replacement and deletion."""
+    manager = runtime(tmp_path, fake_docker)
+    image_tag = manager._image_tag()
+    state_path = Path(os.environ["FAKE_DOCKER_STATE"])
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {
+                    image_tag: {
+                        "Id": "sha256:preseeded-image",
+                        "RepoTags": [image_tag],
+                        "Config": {"Labels": manager._labels()},
+                    }
+                },
+                "containers": {},
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    installed = manager.install()
+    image = installed["resource_ids"]["image"]
+    assert image["id"] == "sha256:preseeded-image"
+    assert image["owned"] is False
+    assert not any(command[1] == "build" for command in fake_docker.commands)
+
+    manager.uninstall()
+    assert manager.docker.inspect_image(image_tag) is not None
+    assert not any(command[1:3] == ["image", "rm"] for command in fake_docker.commands)
+
+
 def test_health_polling_waits_for_starting_container(
     tmp_path: Path, fake_docker: DockerAdapter, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -194,14 +220,31 @@ def test_health_polling_waits_for_starting_container(
     manager = runtime(tmp_path, fake_docker)
     manager.install()
     manager.start()
+    inspect_count_before_status = sum(
+        command[1:3] == ["container", "inspect"] for command in fake_docker.commands
+    )
+    # name lookup + post-create readback + three health polls + one final
+    # immutable readback; no immutable validation happens inside the polls.
+    assert inspect_count_before_status == 6
     state = manager.status()["details"]["docker_container"]
     assert state["health"] == "healthy"
-    assert (
-        sum(
-            command[1:3] == ["container", "inspect"] for command in fake_docker.commands
-        )
-        >= 4
-    )
+
+
+def test_health_final_readback_catches_security_drift_after_polling(
+    tmp_path: Path, fake_docker: DockerAdapter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Catch a resource drift once after health becomes healthy."""
+    monkeypatch.setenv("FAKE_DOCKER_DRIFT_ON_HEALTH", "network")
+    manager = runtime(tmp_path, fake_docker)
+    manager.install()
+    with pytest.raises(BootstrapError, match="docker_readback_invalid"):
+        manager.start()
+
+    state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    container = state["resources"]["container"]
+    assert container["state"] == "quarantined"
+    assert container["id"]
+    assert manager.docker.inspect_container(container["id"]) is None
 
 
 def test_health_timeout_quarantines_and_removes_container(
@@ -261,6 +304,36 @@ def test_second_control_root_cannot_adopt_existing_runtime(
     )
     with pytest.raises(BootstrapError, match="shared_runtime_owned_elsewhere"):
         second.status()
+
+
+def test_start_refuses_foreign_named_container_without_adopting_or_cleaning(
+    tmp_path: Path, fake_docker: DockerAdapter
+) -> None:
+    """Keep a same-name container owned by another control root untouched."""
+    first_control = tmp_path / "first-control"
+    first_control.mkdir()
+    first = BootstrapRuntime(
+        first_control,
+        first_control / "runtime",
+        repository_root=REPOSITORY_ROOT,
+        docker=fake_docker,
+    )
+    first.install()
+    first.start()
+
+    second_control = tmp_path / "second-control"
+    second_control.mkdir()
+    second = BootstrapRuntime(
+        second_control,
+        second_control / "runtime",
+        repository_root=REPOSITORY_ROOT,
+        docker=fake_docker,
+    )
+    second.install()
+    with pytest.raises(BootstrapError, match="shared_runtime_owned_elsewhere"):
+        second.start()
+
+    first.uninstall()
 
 
 def test_multi_target_registry_and_admission_race_guard(

@@ -149,11 +149,16 @@ target = "runtime-root/codex-home/skills"
 remote = "git@github.com:iwashita-nozomu/agent-canon-log.git"
 ```
 
-Bootstrap は Host の effective UID や Docker daemon が rootless かどうかを判定しません。
-container process だけを manifest の非root UID/GID で実行し、Host UIDが0の
-場合は安全な非root既定UID/GIDを使います。container name
-と label は同じ effective UID に対する共有 runtime を1個に制限し、
-control-root digest と manifest digest が一致しない adopt を拒否します。
+`tools/agent_tools/bootstrap_runtime.py` は Docker CLI/daemon の版、daemon
+mode、buildx、context、host architecture、rootless/rootful、UID/GID を事前
+検証しません。`DockerAdapter.run` の Docker command failure はその exit code と
+stderr を結果に残します。`bootstrap/container/Dockerfile` と
+`bootstrap/container/entrypoint.sh` の container process identity と UID/GID
+mapping は Host/caller の責務であり、`tests/tools/test_bootstrap_container_contract.py`
+で契約化しています。AgentCanon は user 作成、`--user` 指定、UID/GID readback を行いません。
+container name と label
+は同じ effective UID に対する共有 runtime を1個に制限し、control-root
+digest と manifest digest が一致しない adopt を拒否します。
 
 `bootstrap/manifest.toml` は current、rollback、in-use、pre-existing、gc-eligible を区別します。
 runtime/cache/archive は 80% high-water mark で GC を開始し、completed かつ
@@ -224,10 +229,12 @@ task ごとの cwd、TMPDIR、lock、report、log、receipt を分離します�
 cancel は SIGTERM 後10秒で SIGKILL とし、stale process / lock を task receipt と
 照合して回収します。
 
-rootless/rootful daemon の分岐は持ちません。Host-only state/lock/archive/Codex home は
-0700 runtime root に残し、container へは `container-runtime/` だけを rw bind します。
-この exchange は sticky 01777 とし、sanitized target registry と task I/O だけを置き、
-credential、Git state、control manifest は置きません。container UID は常に非rootです。
+rootless/rootful daemon の分岐や Docker capability preflight は持ちません。
+Host-only state/lock/archive/Codex home は 0700 runtime root に残し、container
+へは `container-runtime/` だけを rw bind します。この exchange は sticky
+01777 とし、sanitized target registry と task I/O だけを置き、credential、Git
+state、control manifest は置きません。container process identity は Host/caller
+環境が決めます。
 
 ## Command Compatibility And Catalog Cutover
 
@@ -491,7 +498,7 @@ source-local runtime default docs/tests
 | evidence | image and typed entrypoint | `tests/tools/test_bootstrap_container_contract.py` |
 | evidence | catalog parity | `tools/fixtures/tool_dispatch/public-command-parity.json` |
 | evidence | eval archive publication | `tests/agent_tools/test_runtime_log_archive_git.py` |
-| assumption | Docker platform | `bootstrap/manifest.toml` explicitly supports `linux/amd64`; other platforms fail typed preflight |
+| boundary | Docker build/runtime capability | Docker CLI/daemon is a host capability; AgentCanon reports Docker exit/stderr and does not preflight host architecture or UID/GID |
 | assumption | remote embedding authority | `AGENT_CANON_EMBEDDING_ALLOWED_ENDPOINTS` is explicit and empty by default |
 
 ## Reviewer Finding Closure
