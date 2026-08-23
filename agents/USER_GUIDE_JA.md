@@ -50,6 +50,10 @@ fail closed で、uninstall が削除できるのはこの installation が作�
 install / update 後は新しい Codex session を起動し、manifest、link target、source digest
 を readback してください。
 
+install / update は明示された control root の `.agents` を、AgentCanon source の
+tracked `.agents` への exact symlink として管理します。global `~/.agents` と global
+`.codex` は管理しません。regular pathや別symlinkが存在する場合は collision として停止します。
+
 ## Tool を呼ぶ
 
 Rust の既存 first-class command は公開形を保ちます。

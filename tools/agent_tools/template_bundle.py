@@ -15,9 +15,13 @@ import hashlib
 import json
 import subprocess
 import sys
-import tomllib
 from pathlib import Path, PurePosixPath
 from typing import Any
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10 image/runtime
+    import tomli as tomllib  # type: ignore[no-redef]
 
 MANIFEST = "documents/contracts/template-bundle-manifest.toml"
 

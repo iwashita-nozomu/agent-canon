@@ -982,12 +982,11 @@ class DockerAdapter:
                 "--filter",
                 "label=io.agent-canon.runtime=shared-v1",
                 "--filter",
-                "--filter",
                 f"label=io.agent-canon.control-root-digest={control_digest}",
                 "--no-trunc",
                 "--quiet",
             ],
-            check=False,
+            check=True,
         )
         return (
             list(dict.fromkeys(line.strip() for line in result.stdout.splitlines() if line.strip()))
@@ -1347,6 +1346,7 @@ class BootstrapRuntime:
             "resources": {},
             "managed_paths": [],
             "managed_links": [],
+            "managed_agents_link": None,
             "updated_at": _now(),
         }
 
@@ -1966,39 +1966,46 @@ class BootstrapRuntime:
         with self.locked():
             state = self._read_state(allow_manifest_drift=True)
             if state.get("state") != "uninstalled":
-                return self._update_locked(state, "install")
-            if state.get("manifest_digest") != self.manifest_digest:
-                state = self._new_state()
-            before = state["state"]
-            self._image(state)
-            state["state"] = "installed"
-            state.setdefault("resources", self._resource_records()).setdefault(
-                "container", self._resource_records()["container"]
-            )
-            state["managed_paths"] = [
-                STATE_FILE,
-                OWNER_FILE,
-                "mounts.toml",
-                *KNOWN_SUBDIRS,
-                CONTAINER_RUNTIME_DIR,
-            ]
-            self._write_mounts(state)
-            self._write_state(state)
-            return self._result(
-                self._receipt(
-                    "install",
-                    "ok",
-                    "installed",
-                    before=before,
-                    after=state["state"],
-                    details={"image_id": state["resources"]["image"]["id"]},
-                    state=state,
+                result = self._update_locked(state, "install")
+                # codex_prepare runs after the lifecycle lock is released.
+                pass
+            else:
+                if state.get("manifest_digest") != self.manifest_digest:
+                    state = self._new_state()
+                self._ensure_agents_link(state)
+                before = state["state"]
+                self._image(state)
+                state["state"] = "installed"
+                state.setdefault("resources", self._resource_records()).setdefault(
+                    "container", self._resource_records()["container"]
                 )
-            )
+                state["managed_paths"] = [
+                    STATE_FILE,
+                    OWNER_FILE,
+                    "mounts.toml",
+                    *KNOWN_SUBDIRS,
+                    CONTAINER_RUNTIME_DIR,
+                ]
+                self._write_mounts(state)
+                self._write_state(state)
+                result = self._result(
+                    self._receipt(
+                        "install",
+                        "ok",
+                        "installed",
+                        before=before,
+                        after=state["state"],
+                        details={"image_id": state["resources"]["image"]["id"]},
+                        state=state,
+                    )
+                )
+        self.codex_prepare()
+        return result
 
     def _update_locked(self, state: dict[str, Any], operation: str) -> dict[str, Any]:
         """Reconcile current checkout/image inputs with existing v2 lifecycle state."""
         self._refresh_source_identity()
+        self._ensure_agents_link(state)
         if state.get("active_task_count", 0):
             raise BootstrapError(
                 "mount_update_blocked",
@@ -2018,6 +2025,7 @@ class BootstrapRuntime:
             and self.docker.inspect_image(str(image.get("id"))) is not None
         )
         if same_inputs:
+            self._write_state(state)
             return self._result(
                 self._receipt(
                     operation,
@@ -2111,7 +2119,9 @@ class BootstrapRuntime:
             state = self._read_state(allow_manifest_drift=True)
             if state.get("state") == "uninstalled":
                 raise BootstrapError("not_installed", "install must complete before update")
-            return self._update_locked(state, "update")
+            result = self._update_locked(state, "update")
+        self.codex_prepare()
+        return result
 
     def _ensure_container(
         self, state: dict[str, Any], *, start: bool
@@ -2272,6 +2282,7 @@ class BootstrapRuntime:
                         "docker_container": self._container_summary(inspected),
                         "runtime_bytes": _dir_bytes(self.paths.runtime_root),
                         "manifest_drift": manifest_drift,
+                        "managed_agents_link": self._agents_link_readback(state),
                     },
                     state=state,
                 )
@@ -2691,6 +2702,48 @@ class BootstrapRuntime:
                 )
             )
 
+    def _validate_source_adapters(self) -> None:
+        """Read back tracked .agents adapters before runtime convergence."""
+        source = self.repository_root / ".agents"
+        skills = source / "skills"
+        if source.is_symlink() or not source.is_dir() or skills.is_symlink() or not skills.is_dir():
+            raise BootstrapError("source_adapters_invalid", "tracked .agents/skills is missing or not regular")
+        skill_files = sorted(skills.glob("*/SKILL.md"))
+        if not skill_files or any(path.is_symlink() or not path.is_file() for path in skill_files):
+            raise BootstrapError("source_adapters_invalid", "tracked .agents skill adapters failed readback")
+
+    def _ensure_agents_link(self, state: dict[str, Any]) -> dict[str, str]:
+        """Converge exactly one control-root .agents link without touching global home."""
+        self._validate_source_adapters()
+        link = self.paths.control_parent_root / ".agents"
+        source = self.repository_root / ".agents"
+        if link.exists() or link.is_symlink():
+            if not link.is_symlink() or link.resolve() != source.resolve():
+                raise BootstrapError("agents_link_collision", f"managed .agents path already exists: {link}")
+        else:
+            link.symlink_to(source, target_is_directory=True)
+        record = {
+            "path": str(link),
+            "target": str(source),
+            "owned": "true",
+            "tree_digest": str(self.source_identity.get("tree_digest", "")),
+        }
+        state["managed_agents_link"] = record
+        return record
+
+    def _agents_link_readback(self, state: Mapping[str, Any]) -> dict[str, Any]:
+        record = state.get("managed_agents_link")
+        if not isinstance(record, dict):
+            return {"path": str(self.paths.control_parent_root / ".agents"), "state": "absent"}
+        path = Path(str(record["path"]))
+        target = Path(str(record["target"]))
+        return {
+            "path": str(path),
+            "target": str(target),
+            "exists": path.is_symlink(),
+            "exact": path.is_symlink() and path.resolve() == target.resolve(),
+        }
+
     def _managed_links(self) -> list[dict[str, str]]:
         entries: list[dict[str, str]] = []
         for surface, source in (
@@ -2729,9 +2782,34 @@ class BootstrapRuntime:
         """Install only manifest-managed links into isolated ``CODEX_HOME``."""
         with self.locked():
             state = self._read_state()
+            self._refresh_source_identity()
             _ensure_directory(self.paths.codex_home)
+            desired = self._managed_links()
+            desired_targets = {
+                str(self.paths.codex_home / entry["surface"] / entry["relative"])
+                for entry in desired
+            }
+            previous_entries: list[Mapping[str, Any]] = []
+            previous_manifest = self.paths.codex_home / "manifest.json"
+            if previous_manifest.is_file() and not previous_manifest.is_symlink():
+                try:
+                    previous_payload = json.loads(previous_manifest.read_text(encoding="utf-8"))
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    raise BootstrapError("codex_manifest_invalid", "runtime-local Codex manifest is invalid") from exc
+                raw_previous = previous_payload.get("links", []) if isinstance(previous_payload, dict) else []
+                if isinstance(raw_previous, list):
+                    previous_entries = [entry for entry in raw_previous if isinstance(entry, dict)]
+            stale_links: list[str] = []
+            for entry in previous_entries:
+                target = Path(str(entry.get("target", "")))
+                source = Path(str(entry.get("source", "")))
+                if str(target) in desired_targets or entry.get("managed") is not True:
+                    continue
+                if target.is_symlink() and target.resolve() == source.resolve():
+                    target.unlink()
+                    stale_links.append(str(target))
             links: list[dict[str, Any]] = []
-            for entry in self._managed_links():
+            for entry in desired:
                 target = self.paths.codex_home / entry["surface"] / entry["relative"]
                 _ensure_directory(target.parent)
                 if target.exists() or target.is_symlink():
@@ -2764,6 +2842,7 @@ class BootstrapRuntime:
                     "tree_digest": self.source_identity.get("tree_digest"),
                     "image_input_digest": self.image_input_digest,
                     "manifest_digest": self.manifest_digest,
+                    "stale_links_removed": stale_links,
                     "links": links,
                 },
             )
@@ -3617,6 +3696,13 @@ class BootstrapRuntime:
             self._clear_exchange_in_container(state)
             self._stop_owned_container(state)
             self._remove_exchange()
+            agents_record = state.get("managed_agents_link")
+            if isinstance(agents_record, dict):
+                agents_path = Path(str(agents_record.get("path", "")))
+                agents_target = Path(str(agents_record.get("target", "")))
+                if agents_path.is_symlink() and agents_path.resolve() == agents_target.resolve():
+                    agents_path.unlink()
+                state["managed_agents_link"] = None
             for entry in state.get("managed_links", []):
                 target = Path(entry["target"])
                 if (

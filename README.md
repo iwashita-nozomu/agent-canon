@@ -179,3 +179,6 @@ container, bootstrap, or archive changes.
 
 AgentCanon is licensed under Apache License 2.0. See [LICENSE](LICENSE) and
 [the licensing policy](documents/agent-canon/agent-canon-licensing-policy.md).
+`install` and `update` own only the exact `<control-parent-root>/.agents` link to
+the tracked source adapters. Global `~/.agents` and global `.codex` remain
+outside AgentCanon ownership.

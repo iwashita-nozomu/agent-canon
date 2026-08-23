@@ -58,6 +58,8 @@ def main(argv: list[str]) -> int:
         print(json.dumps([found[1]]))
         return 0
     if argv[:2] == ["image", "ls"]:
+        if os.environ.get("FAKE_DOCKER_FAIL_IMAGE_LS") == "1":
+            return 1
         print("\n".join(dict.fromkeys(record["Id"] for record in state["images"].values())))
         return 0
     if argv[:1] == ["build"]:

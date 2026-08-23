@@ -90,6 +90,10 @@ image inputs, or the manifest are unchanged, it is a no-op and does not build.
 When they change, one ordinary Docker build is performed; health or build
 failure restores the existing v2 generation, container, and image in the same
 handled call. Source acquisition remains the downstream dotfiles responsibility.
+`install` and `update` also converge `<control-parent-root>/.agents` to an
+exact symlink targeting the tracked source `.agents`. A regular file, directory,
+or different symlink at that path is a typed collision. `uninstall` removes only
+that exact owned link; it does not touch global `~/.agents` or `.codex`.
 
 The container is bounded by the manifest: two CPUs, 4 GiB memory, 512 PIDs,
 network disabled, read-only root filesystem, all Linux capabilities dropped,
