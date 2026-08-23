@@ -41,3 +41,8 @@ Use `python3 tools/agent_tools/route.py --prompt ...` or the canonical changed-p
 ## Boundary
 
 Routing chooses owners; selected skills own their execution and validation. The full LCP policy is owned by [`agent-orchestration.md#Local Capability Priority`](./agent-orchestration.md#local-capability-priority). `DEFERRED_SKILLS` remains a skill candidate projection, not operation disposition.
+Before source reading, the selected route is consumed by
+[`agent-orchestration.md#Owner-First Read Trace`](./agent-orchestration.md#owner-first-read-trace):
+the selected Skill body, and only the upstream owner to which it delegates an
+unresolved decision, must resolve before a `downstream implementation` edge is
+opened.

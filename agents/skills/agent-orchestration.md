@@ -11,6 +11,7 @@ upstream design agent-orchestration.execution-contract.toml machine-readable exe
 upstream design ./skill-dependencies.yaml typed public-skill prerequisites, successors, ordering, and parallel relations
 upstream design ../internal-routines/design-implementation-correspondence.md universal design-to-implementation correspondence route
 upstream design ../../documents/design/request-intent-and-update-relation.md compact question, write-clause, and update-overlay flow
+upstream design ../../documents/tools/search-coordination.md unresolved owner/path search fallback
 downstream implementation ../../tools/agent_tools/check_execution_time_aware_orchestration.py execution contract checker
 downstream implementation ../../tools/agent_tools/skill_route_catalog.py derives canonical invocation order
 downstream implementation ../../tools/agent_tools/skill_dependency_map.py validates and projects the dependency graph
@@ -93,6 +94,58 @@ task を workflow family に分類し、skill set、handoff、review、runtime e
 - `agents/canonical/CODEX_SUBAGENTS.md`
 - `agents/skills/skill-dependencies.yaml`
 - `agents/skills/direct-luna-communication.md`
+
+## Owner-First Read Trace
+
+Repository source is not the first discovery surface. Before opening an
+implementation file, test, hook, checker, or generated artifact, use this
+fixed route:
+
+1. Start at the active root `AGENTS.md` Reader Map and select the task Skill.
+   Resolve its canonical path from `agents/skills/catalog.yaml`; do not guess
+   from a nearby filename or a text-search hit.
+   The root row only needs to identify the routing owner; it does not need one
+   row per public Skill. Record the bridge as `Reader Map row -> routing owner
+   -> selected Skill` when `task-routing` performs the final selection.
+2. Read that canonical Skill completely. The Skill body is the first
+   operational owner. If its body resolves the responsibility, operation, and
+   validation route, record the owning section and do not follow a registry or
+   rationale edge merely to fill the trace. Follow a task-relevant `upstream
+   design` edge from its `@dependency-start` header only when the Skill body
+   delegates a decision there or one of those three items remains unresolved.
+   Never open a `downstream implementation` edge first.
+3. Present the following short working update before implementation reading.
+   It is a transient readback in the existing task update, not a new packet,
+   schema, artifact, or closeout gate.
+
+   ```text
+   owner_trace_start=<active AGENTS.md Reader Map row>
+   selected_skill=<agents/skills/catalog.yaml id -> canonical_doc>
+   operational_owner=<selected Skill section or delegated upstream path + section>
+   owner_route=<skill-body section or header edge description>
+   docs_first_status=resolved|unresolved
+   implementation_read=locked|ready
+   ```
+
+4. Set `implementation_read=ready` only when the Skill body and any owner it
+   explicitly delegates to have been read and resolve the responsibility,
+   intended operation, and validation route. Merely naming a delegated path
+   leaves `docs_first_status=unresolved` and `implementation_read=locked` until
+   that owner is read. A known source path is not sufficient by itself.
+   `ready` is an admission state, not a claim that source was already opened;
+   a read-only planner or evaluator can report `ready` while leaving the
+   implementation unread.
+5. If the Skill body and its task-relevant delegated edge do not resolve one
+   operational owner, report the unresolved item and use the bounded purpose search in
+   `documents/tools/search-coordination.md`. Search results nominate an owner;
+   they do not unlock implementation until the selected Skill/upstream-owner
+   trace is resolved.
+
+When the Skill body resolves the owner, do not build a semantic index, sweep
+the repository, or traverse every dependency-header edge. This keeps the route
+short enough for low-reasoning agents while preserving the Skill body as the
+operational owner and the existing dependency header as the only delegated
+edge owner.
 
 ## Decision Order
 
