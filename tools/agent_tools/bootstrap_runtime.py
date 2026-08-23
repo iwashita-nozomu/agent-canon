@@ -10,8 +10,9 @@
 
 DockerAdapter is the only owner of Docker and accepts argv arrays only.
 BootstrapRuntime owns durable state and performs state/path readback under an
-external lifecycle lock. A successful Docker command is not accepted until
-inspect returns the expected ID, labels, health, mounts, and resource limits.
+external lifecycle lock. Build results are Docker results; immutable container
+ownership and security invariants are checked once after create/adopt, while
+health polling reads only the mutable Running/Health fields.
 """
 
 from __future__ import annotations
@@ -23,7 +24,6 @@ import fcntl
 import hashlib
 import json
 import os
-import platform
 import re
 import secrets
 import shutil
@@ -111,51 +111,6 @@ def sha256_bytes(value: bytes) -> str:
 def sha256_text(value: str) -> str:
     """Return the SHA-256 digest of UTF-8 text."""
     return sha256_bytes(value.encode("utf-8"))
-
-
-def _image_input_digest(repository_root: Path) -> str:
-    """Bind the image identity to every admitted repository build input."""
-    roots = (
-        repository_root / ".dockerignore",
-        repository_root / "AGENTS.md",
-        repository_root / "ROOT_AGENTS.md",
-        repository_root / ".agents",
-        repository_root / ".codex" / "agents",
-        repository_root / ".codex" / "config.toml",
-        repository_root / "bootstrap" / "container",
-        repository_root / "tools",
-        repository_root / "agents",
-        repository_root / "documents",
-        repository_root / "evidence" / "agent-evals",
-        repository_root / "references",
-        repository_root / "templates",
-        repository_root / "rust" / "agent-canon",
-    )
-    files: list[Path] = []
-    for root in roots:
-        if root.is_file():
-            files.append(root)
-            continue
-        for path in root.rglob("*"):
-            relative_parts = path.relative_to(repository_root).parts
-            if "target" in relative_parts or "__pycache__" in relative_parts:
-                continue
-            if (path.is_file() or path.is_symlink()) and path.suffix != ".pyc":
-                files.append(path)
-    digest = hashlib.sha256()
-    for path in sorted(files):
-        relative = path.relative_to(repository_root).as_posix()
-        digest.update(relative.encode("utf-8"))
-        digest.update(b"\0")
-        status = path.lstat()
-        digest.update(f"{stat.S_IMODE(status.st_mode):04o}".encode("ascii"))
-        digest.update(b"\0")
-        payload = (
-            os.readlink(path).encode("utf-8") if path.is_symlink() else path.read_bytes()
-        )
-        digest.update(hashlib.sha256(payload).digest())
-        digest.update(b"\0")
-    return digest.hexdigest()
 
 
 def _redact_output(value: str) -> str:
@@ -794,14 +749,6 @@ def load_manifest(path: Path) -> tuple[dict[str, Any], str]:
             raise BootstrapError(
                 "manifest_invalid", f"container.{key} must be positive"
             )
-    uid, gid = (
-        int(container.get("runtime_uid", 1000)),
-        int(container.get("runtime_gid", 1000)),
-    )
-    if uid <= 0 or gid <= 0:
-        raise BootstrapError(
-            "manifest_invalid", "container runtime UID/GID must be nonzero"
-        )
     return payload, sha256_bytes(raw)
 
 
@@ -918,30 +865,29 @@ class DockerAdapter:
         dockerfile: Path,
         tag: str,
         labels: Mapping[str, str],
-        runtime_uid: int,
-        runtime_gid: int,
     ) -> dict[str, Any]:
-        """Build at most one manifest-tagged image and verify its labels."""
+        """Build or adopt one manifest-tagged image with ownership labels."""
         record = self.inspect_image(tag)
         self.last_image_created = record is None
-        if record is None:
-            argv = [
-                self.executable,
-                "build",
-                "--file",
-                str(dockerfile),
-                "--tag",
-                tag,
-                "--build-arg",
-                f"AGENT_CANON_RUNTIME_UID={runtime_uid}",
-                "--build-arg",
-                f"AGENT_CANON_RUNTIME_GID={runtime_gid}",
-            ]
-            for key, value in sorted(labels.items()):
-                argv.extend(("--label", f"{key}={value}"))
-            argv.append(str(repository_root))
-            self.run(argv)
-            record = self.inspect_image(tag)
+        if record is not None:
+            self.validate_image(record, labels)
+            # A matching pre-existing tag is a protected resource. Adopt its
+            # exact ID and leave it untouched; rebuilding to the same tag would
+            # make ownership of the replacement ambiguous.
+            return record
+        argv = [
+            self.executable,
+            "build",
+            "--file",
+            str(dockerfile),
+            "--tag",
+            tag,
+        ]
+        for key, value in sorted(labels.items()):
+            argv.extend(("--label", f"{key}={value}"))
+        argv.append(str(repository_root))
+        self.run(argv)
+        record = self.inspect_image(tag)
         if record is None:
             raise BootstrapError(
                 "docker_readback_invalid", "built image disappeared before inspect"
@@ -1026,22 +972,18 @@ class DockerAdapter:
         *,
         name: str,
         image: str,
-        uid: int,
-        gid: int,
         labels: Mapping[str, str],
         cpus: int,
         memory_bytes: int,
         pids: int,
         mounts: Sequence[Mapping[str, str]],
     ) -> str:
-        """Create one constrained non-root container and return its ID."""
+        """Create one constrained container and return its ID."""
         argv = [
             self.executable,
             "create",
             "--name",
             name,
-            "--user",
-            f"{uid}:{gid}",
             "--read-only",
             "--cap-drop",
             "ALL",
@@ -1290,36 +1232,12 @@ class BootstrapRuntime:
         ).resolve()
         self.manifest_path = _manifest_path(self.repository_root, manifest_path)
         self.manifest, policy_digest = load_manifest(self.manifest_path)
-        expected_platform = self.manifest["container"].get("platform")
-        observed_platform = (
-            "linux/amd64"
-            if sys.platform.startswith("linux")
-            and platform.machine().lower() in {"x86_64", "amd64"}
-            else f"{sys.platform}/{platform.machine().lower()}"
-        )
-        if expected_platform != observed_platform:
-            raise BootstrapError(
-                "unsupported_platform",
-                f"shared image requires {expected_platform}, observed {observed_platform}",
-            )
-        self.image_input_digest = _image_input_digest(self.repository_root)
-        self.manifest_digest = sha256_text(f"{policy_digest}:{self.image_input_digest}")
+        self.manifest_digest = policy_digest
         self.control_digest = sha256_text(str(control))
         self.uid = os.geteuid() if hasattr(os, "geteuid") else os.getuid()
         self.docker = docker or DockerAdapter(
             os.environ.get("AGENT_CANON_DOCKER", "docker"),
             timeout=int(self.manifest["container"]["task_timeout_seconds"]),
-        )
-        host_gid = os.getegid() if hasattr(os, "getegid") else os.getgid()
-        self.container_uid = (
-            self.uid
-            if self.uid != 0
-            else int(self.manifest["container"].get("runtime_uid", 1000))
-        )
-        self.container_gid = (
-            host_gid
-            if host_gid != 0
-            else int(self.manifest["container"].get("runtime_gid", 1000))
         )
 
     def _ensure_layout(self) -> None:
@@ -1397,7 +1315,6 @@ class BootstrapRuntime:
             "runtime_root": str(self.paths.runtime_root),
             "control_root_digest": self.control_digest,
             "manifest_digest": self.manifest_digest,
-            "image_input_digest": self.image_input_digest,
             "owner_uid": self.uid,
             "state": "uninstalled",
             "active_task_count": 0,
@@ -1467,21 +1384,20 @@ class BootstrapRuntime:
                 "runtime_root": str(self.paths.runtime_root),
                 "owner_uid": self.uid,
                 "manifest_digest": state.get("manifest_digest", self.manifest_digest),
-                "image_input_digest": state.get(
-                    "image_input_digest", self.image_input_digest
-                ),
             },
         )
 
     def _image_tag(self) -> str:
-        return f"agent-canon-tools:{self.uid}-{self.manifest_digest[:16]}"
+        return (
+            f"agent-canon-tools:{self.uid}-{self.control_digest[:16]}-"
+            f"{self.manifest_digest[:16]}"
+        )
 
     def _labels(self) -> dict[str, str]:
         return {
             "io.agent-canon.runtime": "shared-v1",
             "io.agent-canon.owner-uid": str(self.uid),
             "io.agent-canon.control-root-digest": self.control_digest,
-            "io.agent-canon.image-input-digest": self.image_input_digest,
         }
 
     def _resource_records(self) -> dict[str, Any]:
@@ -1563,18 +1479,8 @@ class BootstrapRuntime:
             dockerfile=self.repository_root / "bootstrap" / "container" / "Dockerfile",
             tag=self._image_tag(),
             labels=self._labels(),
-            runtime_uid=self.container_uid,
-            runtime_gid=self.container_gid,
         )
         image_id = _required_string(image.get("Id"), "image.Id")
-        observed_input = _image_input_digest(self.repository_root)
-        if observed_input != self.image_input_digest:
-            if self.docker.last_image_created:
-                self.docker.remove_image(image_id)
-            raise BootstrapError(
-                "image_input_changed",
-                "repository build inputs changed during image construction",
-            )
         resources = state.setdefault("resources", self._resource_records())
         previous = resources.get("image", {})
         owned = (
@@ -1650,7 +1556,6 @@ class BootstrapRuntime:
             "io.agent-canon.runtime",
             "io.agent-canon.owner-uid",
             "io.agent-canon.control-root-digest",
-            "io.agent-canon.image-input-digest",
         }
         if (
             not isinstance(expected_labels, dict)
@@ -1680,12 +1585,9 @@ class BootstrapRuntime:
                 )
 
     def _validate_container(
-        self,
-        record: Mapping[str, Any],
-        state: Mapping[str, Any],
-        *,
-        require_running: bool,
+        self, record: Mapping[str, Any], state: Mapping[str, Any]
     ) -> None:
+        """Validate immutable post-create/adopt ownership and run invariants."""
         labels = (
             record.get("Config", {}).get("Labels", {})
             if isinstance(record.get("Config"), dict)
@@ -1696,14 +1598,6 @@ class BootstrapRuntime:
         ):
             raise BootstrapError(
                 "docker_readback_invalid", "container labels do not match the owner"
-            )
-        config = record.get("Config")
-        if (
-            not isinstance(config, dict)
-            or config.get("User") != f"{self.container_uid}:{self.container_gid}"
-        ):
-            raise BootstrapError(
-                "docker_readback_invalid", "container UID/GID readback mismatch"
             )
         observed_id = _required_string(record.get("Id"), "container.Id")
         expected_id = state.get("resources", {}).get("container", {}).get("id")
@@ -1722,20 +1616,12 @@ class BootstrapRuntime:
             raise BootstrapError(
                 "docker_readback_invalid", "container.State is missing"
             )
-        if require_running and state_info.get("Running") is not True:
-            raise BootstrapError("container_unhealthy", "container is not running")
-        health = state_info.get("Health")
-        if require_running and (
-            not isinstance(health, dict) or health.get("Status") != "healthy"
-        ):
-            raise BootstrapError(
-                "container_unhealthy", "container health probe is not healthy"
-            )
         host = record.get("HostConfig")
         if not isinstance(host, dict):
             raise BootstrapError(
                 "docker_readback_invalid", "container HostConfig is missing"
             )
+
         c = self.manifest["container"]
         for key, expected in (
             ("ReadonlyRootfs", True),
@@ -1821,6 +1707,18 @@ class BootstrapRuntime:
                 },
             )
 
+    @staticmethod
+    def _validate_container_health(record: Mapping[str, Any]) -> None:
+        """Validate only the mutable health fields during a health poll."""
+        state_info = record.get("State")
+        if not isinstance(state_info, dict) or state_info.get("Running") is not True:
+            raise BootstrapError("container_unhealthy", "container is not running")
+        health = state_info.get("Health")
+        if not isinstance(health, dict) or health.get("Status") != "healthy":
+            raise BootstrapError(
+                "container_unhealthy", "container health probe is not healthy"
+            )
+
     def _container_inspect(
         self, state: dict[str, Any], *, require_running: bool
     ) -> dict[str, Any] | None:
@@ -1830,7 +1728,9 @@ class BootstrapRuntime:
             return None
         record = self.docker.inspect_container(str(identifier))
         if record is not None:
-            self._validate_container(record, state, require_running=require_running)
+            self._validate_container(record, state)
+            if require_running:
+                self._validate_container_health(record)
         return record
 
     def _verify_registry_mount(
@@ -1879,7 +1779,6 @@ class BootstrapRuntime:
                     "container disappeared during health polling",
                     evidence={"container_id": container_id},
                 )
-            self._validate_container(inspected, state, require_running=False)
             last = inspected
             state_info = inspected.get("State", {})
             health = (
@@ -1891,7 +1790,6 @@ class BootstrapRuntime:
                 and isinstance(health, dict)
                 and health.get("Status") == "healthy"
             ):
-                self._validate_container(inspected, state, require_running=True)
                 return inspected
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -1973,7 +1871,6 @@ class BootstrapRuntime:
         """Return safe Docker readback fields and omit Env/raw inspect data."""
         if record is None:
             return None
-        config = record.get("Config") if isinstance(record.get("Config"), dict) else {}
         state = record.get("State") if isinstance(record.get("State"), dict) else {}
         health = state.get("Health") if isinstance(state.get("Health"), dict) else {}
         host = (
@@ -2006,7 +1903,6 @@ class BootstrapRuntime:
             "name": record.get("Name"),
             "running": state.get("Running"),
             "health": health.get("Status"),
-            "user": config.get("User"),
             "resource_limits": {
                 "readonly_rootfs": host.get("ReadonlyRootfs"),
                 "network": host.get("NetworkMode"),
@@ -2034,19 +1930,6 @@ class BootstrapRuntime:
                     )
                 state = self._new_state()
             before = state["state"]
-            for container_id in self.docker.owned_container_ids(self.uid):
-                record = self.docker.inspect_container(container_id)
-                labels = (
-                    record.get("Config", {}).get("Labels", {})
-                    if isinstance(record, dict)
-                    and isinstance(record.get("Config"), dict)
-                    else {}
-                )
-                if labels.get("io.agent-canon.control-root-digest") != self.control_digest:
-                    raise BootstrapError(
-                        "shared_runtime_owned_elsewhere",
-                        "the effective UID already has a shared AgentCanon runtime; use its control root",
-                    )
             self._image(state)
             state["state"] = "installed"
             state.setdefault("resources", self._resource_records()).setdefault(
@@ -2081,7 +1964,17 @@ class BootstrapRuntime:
         name = str(c["name"])
         existing = self.docker.inspect_container(c.get("id") or name)
         if existing is not None:
-            self._validate_container(existing, state, require_running=False)
+            labels = (
+                existing.get("Config", {}).get("Labels", {})
+                if isinstance(existing.get("Config"), dict)
+                else {}
+            )
+            if labels.get("io.agent-canon.control-root-digest") != self.control_digest:
+                raise BootstrapError(
+                    "shared_runtime_owned_elsewhere",
+                    "the shared AgentCanon container name belongs to another control root",
+                )
+            self._validate_container(existing, state)
             c["id"] = _required_string(existing.get("Id"), "container.Id")
         else:
             owners = self.docker.owned_container_ids(self.uid)
@@ -2117,8 +2010,6 @@ class BootstrapRuntime:
             c["id"] = self.docker.create_container(
                 name=name,
                 image=image_ref,
-                uid=self.container_uid,
-                gid=self.container_gid,
                 labels=self._labels(),
                 cpus=int(self.manifest["container"]["cpus"]),
                 memory_bytes=int(self.manifest["container"]["memory_bytes"]),
@@ -2132,7 +2023,7 @@ class BootstrapRuntime:
                     "docker_readback_invalid",
                     "created container disappeared before inspect",
                 )
-            self._validate_container(existing, state, require_running=False)
+            self._validate_container(existing, state)
         if start:
             existing_state = (
                 existing.get("State", {}) if isinstance(existing, dict) else {}
@@ -2145,6 +2036,13 @@ class BootstrapRuntime:
             self._wait_for_healthy(state, str(c["id"]))
             container_id = str(c["id"])
             try:
+                final = self.docker.inspect_container(container_id)
+                if final is None:
+                    raise BootstrapError(
+                        "docker_readback_invalid",
+                        "container disappeared during final readback",
+                    )
+                self._validate_container(final, state)
                 self._verify_registry_mount(state, container_id)
             except BootstrapError:
                 try:
@@ -2246,7 +2144,9 @@ class BootstrapRuntime:
     def _clear_exchange_in_container(self, state: dict[str, Any]) -> None:
         """Remove user-namespace-owned exchange children before container stop."""
         container = state.get("resources", {}).get("container", {})
-        identifier = container.get("id") or container.get("name")
+        # A missing state ID means there is no owned container to clean. Do not
+        # inspect the manifest name: another control root may own that name.
+        identifier = container.get("id")
         if not identifier:
             return
         inspected = self.docker.inspect_container(str(identifier))

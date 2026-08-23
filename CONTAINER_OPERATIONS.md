@@ -40,10 +40,11 @@ and language-server tools. It receives exact allowlisted target mounts and a
 task-scoped exchange directory; it does not receive a Docker socket, SSH agent,
 GitHub token, host home, arbitrary Git state, or a general network.
 
-The Docker daemon can be rootful or rootless. Bootstrap does not detect or
-branch on daemon mode. The image starts its tool process with a non-root UID;
-if the host effective UID is 0, the image still uses its configured safe
-non-zero UID. Rootfulness of the daemon is not a permission model for tools.
+Bootstrap treats the Docker CLI/daemon as available. It does not run Docker
+version, daemon, buildx, context, architecture, rootless, rootful, or UID/GID
+preflights. Docker command failures are returned with Docker's exit code and
+stderr. Container process identity and UID/GID mapping are host/caller policy;
+AgentCanon does not create a user or pass `--user`.
 
 ## Shared image and resident container
 
@@ -52,10 +53,13 @@ It reuses dependency planning and installs the configured Python, Rust, and
 LSP tools once. It does not contain editor post-create behavior, project
 dependencies, project tests, GPU setup, or a Compose workspace lifecycle.
 
-`install` builds or verifies a manifest-owned image generation and records its
-digest. `start` creates or starts at most one resident container per effective
-owner and control-root digest. Docker labels and manifest readback prevent a
-second bootstrap installation from adopting or deleting another installation.
+`install` invokes the ordinary Docker build for the manifest-owned image and
+records its result. It does not enumerate containers or hash the full source
+tree before the build. `start` creates or starts at most one resident container
+per effective owner and control-root digest. Docker labels and manifest
+readback prevent a second bootstrap installation from adopting or deleting
+another installation. A matching pre-existing image tag is adopted by exact ID
+without overwrite; an unowned pre-existing image remains outside uninstall.
 The runtime uses one image/container across registered projects; task
 separation is provided by exact target mounts and runtime-root task directories.
 
@@ -93,8 +97,8 @@ The container image has no host credentials and has no network at runtime.
 Dependency downloads occur during the explicit image installation route and
 are represented by the dependency manifest and image receipt.
 
-The image's final process is non-root and the final root filesystem is
-read-only. The runtime exchange is the only writable bind mount. It contains
+The final root filesystem is read-only. The runtime exchange is the only
+writable bind mount. It contains
 sanitized task requests/responses and task I/O, with owner/mode/nonce/deadline
 validation. Control manifests, credentials, Git metadata, and archive state
 are host-owned and stay outside the exchange.

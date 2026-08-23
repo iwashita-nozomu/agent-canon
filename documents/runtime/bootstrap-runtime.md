@@ -14,7 +14,7 @@ downstream design runtime-log-archive.md archive publication
 
 `agent-canon` is a source repository and a reusable tool runtime. It is not a
 project dependency directory. The supported user path is a host bootstrap
-which builds or adopts one shared, bounded, non-root tool container and then
+which builds or adopts one shared, bounded tool container and then
 launches tools against explicitly registered targets.
 
 The bootstrap owns lifecycle and host adapters. The container owns Python,
@@ -70,13 +70,18 @@ the operation has a generation or ownership boundary.
 
 ## What is installed and where
 
-`install` builds or verifies one image generation from
-`bootstrap/container/Dockerfile`, records the manifest and digest, and creates
-the runtime state directories. `start` creates or starts at most one
-manifest-owned container. The image contains the Rust CLI, Python tools,
-configured LSP servers, and the AgentCanon-owned eval definitions/configuration
-needed to evaluate a source-free target. The container process UID is always non-zero; the host Docker daemon may itself be
-rootful or rootless and is not probed or branched on.
+`install` invokes the ordinary Docker build from
+`bootstrap/container/Dockerfile`, records the Docker result and manifest, and
+creates the runtime state directories. It does not enumerate containers,
+perform a host architecture gate, or hash the full source tree before the
+build. `start` creates or starts at most one manifest-owned container. The
+image contains the Rust CLI, Python tools, configured LSP servers, and the
+AgentCanon-owned eval definitions/configuration needed to evaluate a
+source-free target. Container process identity and UID/GID mapping are owned
+by the host/caller environment; AgentCanon does not create a user, pass
+`--user`, or validate that policy. A matching pre-existing image tag is adopted
+by exact ID without overwrite; an unowned pre-existing image remains outside
+uninstall.
 
 The container is bounded by the manifest: two CPUs, 4 GiB memory, 512 PIDs,
 network disabled, read-only root filesystem, all Linux capabilities dropped,

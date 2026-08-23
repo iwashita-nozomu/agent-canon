@@ -25,7 +25,9 @@ evidence.
   `--repository-root`, `--control-parent-root`, and `--runtime-root`; the
   control root must be the authorized parent workspace and the runtime root a
   child of it. Do not fall back to the source tree or a global `$HOME` path.
-- One shared, non-root AgentCanon tool container owns Python/Rust/LSP tools.
+- One shared AgentCanon tool container owns Python/Rust/LSP tools. Docker
+  command availability is assumed; container process identity and UID/GID
+  mapping remain host/caller policy and are not validated here.
   It is not a project container, does not receive the Docker socket or
   credentials, and does not own project dependencies, builds, or tests.
 - Register a project root with `target add` before using it. Target admission
