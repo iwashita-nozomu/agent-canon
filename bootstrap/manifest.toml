@@ -3,7 +3,7 @@
 # explicit runtime root selected by bootstrap.sh.
 
 [container]
-name_template = "agent-canon-tools-<effective-uid>"
+name_template = "agent-canon-tools"
 max_instances = 1
 cpus = 2
 memory_bytes = 4294967296
@@ -22,7 +22,7 @@ archive_lease_quota_bytes = 2147483648
 idle_stop_seconds = 3600
 max_image_generations = 2
 network = "none"
-labels = ["io.agent-canon.runtime=shared-v1", "io.agent-canon.owner-uid", "io.agent-canon.control-root-digest"]
+labels = ["io.agent-canon.runtime=shared-v1", "io.agent-canon.control-root-digest"]
 
 [skills]
 strategy = "managed-links"

@@ -44,6 +44,7 @@ The command family is:
 
 ```bash
 "$BOOTSTRAP" "${COMMON[@]}" install
+"$BOOTSTRAP" "${COMMON[@]}" update
 "$BOOTSTRAP" "${COMMON[@]}" start
 "$BOOTSTRAP" "${COMMON[@]}" status
 "$BOOTSTRAP" "${COMMON[@]}" target add --root <project-root> --mode read-only
@@ -83,6 +84,18 @@ by the host/caller environment; AgentCanon does not create a user, pass
 by exact ID without overwrite; an unowned pre-existing image remains outside
 uninstall.
 
+`update` reads only the current AgentCanon checkout. It never fetches,
+checks out, merges, rebases, resets, or pulls Git state. It performs one
+ordinary Docker build for the current checkout; a handled build or health
+failure restores the existing v2 generation, container, and image. Source
+acquisition remains the downstream dotfiles responsibility.
+`install` and `update` also converge `<control-parent-root>/.agents` to an
+exact symlink targeting the tracked source `.agents`. A regular file, directory,
+or different symlink at that path is a typed collision. `uninstall` removes only
+that exact owned link; it never creates an implicit home link and does not touch
+global `.codex`. When the caller explicitly selects `$HOME` as control root,
+the owned path is deliberately `$HOME/.agents`.
+
 The container is bounded by the manifest: two CPUs, 4 GiB memory, 512 PIDs,
 network disabled, read-only root filesystem, all Linux capabilities dropped,
 no-new-privileges, and a writable `/tmp` tmpfs. The default maximum is two
@@ -96,7 +109,7 @@ manifest-managed, isolated `codex-home/` beneath the selected runtime root.
 overwrite global skills, agents, hooks, or configuration. Existing conflicting
 paths fail closed; only links recorded as owned by this installation can be
 removed by `uninstall`. Start a new Codex session after an install or update
-and use `codex prepare` readback to verify the link and source digest.
+and use `codex prepare` readback to verify link targets.
 
 ## Targets, generations, and failure recovery
 
@@ -136,11 +149,9 @@ gain flat global executables. A catalog entry is runnable through
 cwd, standard streams, exit/signal behavior, and written paths. The
 dispatcher rejects shell command strings and unknown catalog entries.
 
-Until parity is verified, use the existing exact command through
-`bootstrap ... exec --root <registered-target> -- <command...>` or its owning
-workflow. Bootstrap does not silently rewrite a legacy command, and a failed
-parity check leaves the legacy route authoritative. Do not infer that an
-internal Python file is a public catalog command.
+Until parity is verified, an internal Python file is not exposed through the
+public bootstrap command family. Do not infer that an internal Python file is
+a public catalog command.
 
 ## Evaluation and archive route
 
@@ -176,7 +187,7 @@ The normal movement is:
 
 ```text
 install -> start -> target add -> status -> codex prepare -> codex launch
-  -> tool run / exec -> eval collect -> eval sync -> stop -> gc -> uninstall
+  -> tool run -> template export / eval collect -> eval sync -> stop -> gc -> uninstall
 ```
 
 Use a distinct `<installation>` or task id when an independent lifecycle is
