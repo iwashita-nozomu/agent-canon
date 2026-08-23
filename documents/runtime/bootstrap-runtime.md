@@ -73,8 +73,9 @@ the operation has a generation or ownership boundary.
 `install` builds or verifies one image generation from
 `bootstrap/container/Dockerfile`, records the manifest and digest, and creates
 the runtime state directories. `start` creates or starts at most one
-manifest-owned container. The image contains the Rust CLI, Python tools, and
-configured LSP servers. The container process UID is always non-zero; the host Docker daemon may itself be
+manifest-owned container. The image contains the Rust CLI, Python tools,
+configured LSP servers, and the AgentCanon-owned eval definitions/configuration
+needed to evaluate a source-free target. The container process UID is always non-zero; the host Docker daemon may itself be
 rootful or rootless and is not probed or branched on.
 
 The container is bounded by the manifest: two CPUs, 4 GiB memory, 512 PIDs,
@@ -144,6 +145,12 @@ records run and task identity, target repository and HEAD, AgentCanon/tool
 digest, family status, metrics, and a source-unchanged result. Eval output,
 hook events, dashboards, summaries, and task reports never default to
 AgentCanon `reports/`, `.agent-canon/`, `target/`, or another source path.
+Producer code, role configuration, and eval manifests resolve from the
+image-owned AgentCanon snapshot. `--root <project-root>` supplies only the
+observed read-only target identity; the target is not required to copy
+`agents/`, `.codex/`, or `evidence/agent-evals/`. Producer failure is recorded
+before export, and the Host adapter exports the pre-created output/log trees
+without replacing that failure with a missing-path error.
 
 `eval sync` hands the external spool to the existing archive owner,
 `iwashita-nozomu/agent-canon-log`, through the typed host Git adapter. The

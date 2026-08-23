@@ -15,11 +15,12 @@ import hashlib
 import re
 import stat
 import subprocess
+from pathlib import Path
+
 try:
     import tomllib
 except ModuleNotFoundError:
     import tomli as tomllib  # type: ignore[no-redef]
-from pathlib import Path
 
 from tools.agent_tools import tool_dispatch
 
@@ -73,6 +74,10 @@ def test_dockerfile_is_digest_pinned_and_uses_non_root_runtime() -> None:
     assert "--manifest /opt/agent-canon/bootstrap/container/dependencies.toml" in text
     assert "COPY bootstrap/container/dependencies.toml" in text
     assert "COPY tools /usr/local/share/agent-canon/runtime/tools" in text
+    assert "COPY .agents /usr/local/share/agent-canon/runtime/.agents" in text
+    assert "COPY .codex/agents /usr/local/share/agent-canon/runtime/.codex/agents" in text
+    assert "COPY evidence/agent-evals /usr/local/share/agent-canon/runtime/evidence/agent-evals" in text
+    assert "COPY AGENTS.md ROOT_AGENTS.md /usr/local/share/agent-canon/runtime/" in text
     assert "COPY agents /usr/local/share/agent-canon/runtime/agents" in text
     assert "tools/catalog.yaml" in text
     assert "tools/agent_tools/tool_dispatch.py" in text
@@ -151,7 +156,8 @@ def test_dockerfile_does_not_pull_project_or_host_tooling() -> None:
     for forbidden in (
         "compose",
         "gpu",
-        "codex",
+        "codex-cli",
+        "@openai/codex",
         "github cli",
         "sudo",
         "project_uid",
@@ -274,6 +280,11 @@ def test_repository_root_dockerignore_exposes_every_copy_source() -> None:
     assert "**" in lines
     for source in (
         "!bootstrap/container/**",
+        "!.agents/**",
+        "!.codex/agents/**",
+        "!evidence/agent-evals/**",
+        "!references/**",
+        "!templates/**",
         "!tools/**",
         "!tools/ci/run_standalone_static_gate_unit.sh",
         "!rust/agent-canon/**",

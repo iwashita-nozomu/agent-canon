@@ -3,14 +3,28 @@
 # Keep the context deny-by-default while explicitly exposing every Dockerfile
 # COPY source.  In particular, do not rely on the removed .devcontainer tree.
 **
+!AGENTS.md
+!ROOT_AGENTS.md
+!.agents/
+!.agents/**
+!.codex/
+!.codex/agents/
+!.codex/agents/**
+!.codex/config.toml
 !bootstrap/
 !bootstrap/container/
 !bootstrap/container/**
 !agents/
 !agents/**
 !documents/
-!documents/runtime/
-!documents/runtime/**
+!documents/**
+!evidence/
+!evidence/agent-evals/
+!evidence/agent-evals/**
+!references/
+!references/**
+!templates/
+!templates/**
 !tools/
 !tools/**
 tools/ci/**

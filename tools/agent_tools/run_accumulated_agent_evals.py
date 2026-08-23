@@ -70,6 +70,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument(
+        "--target-root",
+        type=Path,
+        help="Observed read-only project target; producer definitions stay under --root.",
+    )
+    parser.add_argument(
         "--runtime-root",
         type=Path,
         help="Explicit external runtime root; required for eval output and logs.",
@@ -238,6 +243,7 @@ def run_producers(
     root: Path,
     producers: Sequence[EvalProducer],
     log_dir: Path,
+    target_root: Path | None = None,
     runtime_root: Path | str | None = None,
     runner: Runner = subprocess_runner,
 ) -> tuple[EvalProducerResult, ...]:
@@ -247,7 +253,7 @@ def run_producers(
     child_env = root_capability_environment(
         source_root=root,
         runtime_root=boundary.root,
-        target_root=root,
+        target_root=target_root or root,
     )
     results: list[EvalProducerResult] = []
     for index, producer in enumerate(producers, start=1):
@@ -286,7 +292,7 @@ def relative(root: Path, path: Path) -> str:
 
 def render_results(root: Path, results: Sequence[EvalProducerResult]) -> str:
     """Render bounded machine-readable status lines."""
-    lines = []
+    lines: list[str] = []
     for result in results:
         status = "pass" if result.returncode == 0 else "fail"
         lines.append(
@@ -305,11 +311,16 @@ def render_results(root: Path, results: Sequence[EvalProducerResult]) -> str:
 def run(args: argparse.Namespace, runner: Runner = subprocess_runner) -> int:
     """Run accumulated eval producers from parsed args."""
     root = Path(str(args.root)).resolve()
+    target_root = (
+        Path(str(args.target_root)).resolve() if args.target_root is not None else root
+    )
     runtime_root = args.runtime_root
     boundary = runtime_artifact_boundary(root, runtime_root)
+    boundary.ensure_directory("eval-results")
     report_dir = boundary.resolve(args.report_dir) if args.report_dir else None
     prompt_eval_manifest = resolve_path(root, args.prompt_eval_manifest)
     log_dir = resolve_log_dir(root, args.log_dir, str(args.run_id), runtime_root)
+    boundary.ensure_directory(log_dir.relative_to(boundary.root))
     producers = build_producers(
         root=root,
         run_id=str(args.run_id),
@@ -323,6 +334,7 @@ def run(args: argparse.Namespace, runner: Runner = subprocess_runner) -> int:
         root=root,
         producers=producers,
         log_dir=log_dir,
+        target_root=target_root,
         runtime_root=runtime_root,
         runner=runner,
     )

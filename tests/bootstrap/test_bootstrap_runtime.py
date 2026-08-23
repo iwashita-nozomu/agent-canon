@@ -803,6 +803,21 @@ def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
     assert collection["source_tree_unchanged"] is True
     assert len(collection["producer_matrix"]) == 4
     assert collection["tool_image_digest"] == "sha256:fake-image-1"
+    eval_command = next(
+        command
+        for command in fake_docker.commands
+        if "/usr/local/share/agent-canon/runtime/tools/agent_tools/run_accumulated_agent_evals.py"
+        in command
+    )
+    assert eval_command[eval_command.index("--root") + 1] == (
+        "/usr/local/share/agent-canon/runtime"
+    )
+    observed_target = eval_command[eval_command.index("--target-root") + 1]
+    assert observed_target.startswith("/targets/")
+    assert eval_command[eval_command.index("--prompt-eval-manifest") + 1] == (
+        "/usr/local/share/agent-canon/runtime/evidence/agent-evals/"
+        "skill_workflow_prompt_eval.toml"
+    )
     spool = manager.paths.runtime_root / "spool" / "eval-e2e"
     assert (spool / "collection.json").is_file()
     assert (source / "README.md").read_bytes() == before
@@ -821,3 +836,46 @@ def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
         text=True,
     )
     assert "eval-results/skill-workflow-prompt/skill-eval-20260101T000000000000Z-0123456789-pass-bootstrap.md" in branch_result.stdout
+
+
+def test_eval_producer_failure_is_not_masked_by_missing_export(
+    tmp_path: Path,
+    fake_docker: DockerAdapter,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Preserve producer failure evidence before attempting Host export."""
+    source = tmp_path / "source-free-parent"
+    source.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=source, check=True)
+    (source / "README.md").write_text("source-free fixture\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=source, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Eval Fixture",
+            "-c",
+            "user.email=eval@example.invalid",
+            "commit",
+            "-qm",
+            "fixture",
+        ],
+        cwd=source,
+        check=True,
+    )
+    manager = runtime(tmp_path, fake_docker)
+    manager.install()
+    manager.start()
+    manager.target_add(source)
+    monkeypatch.setenv("FAKE_EVAL_FAIL", "1")
+
+    with pytest.raises(BootstrapError) as failure:
+        manager.eval_collect(source, "producer-failure")
+
+    assert failure.value.code == "eval_producer_failed"
+    spool = manager.paths.runtime_root / "spool" / "producer-failure"
+    collection = json.loads((spool / "collection.json").read_text(encoding="utf-8"))
+    assert collection["status"] == "failed"
+    assert collection["failure"] == "eval_producer_failed"
+    assert len(collection["producer_matrix"]) == 4
+    assert (spool / "producer-logs").is_dir()

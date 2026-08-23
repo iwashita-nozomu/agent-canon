@@ -58,6 +58,9 @@ symlink.
 
 `eval collect` runs existing producers in the shared tool container and writes
 an `agent_canon.eval_collection.v1` bundle and receipt under the runtime spool.
+The producer definitions, role/config surfaces, and eval manifests are part of
+the image-owned AgentCanon snapshot. The registered repository is a separate
+read-only observation target and does not need AgentCanon source files.
 The bundle records at least:
 
 - run and task id;
