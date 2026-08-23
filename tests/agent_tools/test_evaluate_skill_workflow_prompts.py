@@ -245,6 +245,8 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
                 "ORCH-SHIM-POINTER-1",
                 "ORCH-SHIM-TOOLCALL-1",
                 "ORCH-SHIM-DISCOVERY-1",
+                "ORCH-DOCS-FIRST-BOUNDED-1",
+                "ORCH-DOCS-FIRST-AMBIGUOUS-1",
             },
         )
         orchestration_checks = cast(
@@ -269,6 +271,14 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         ):
             checklists = cast(list[dict[str, object]], by_id[eval_id]["checklist"])
             self.assertTrue(all(bool(item["critical"]) for item in checklists))
+        codex_check_ids = {
+            str(item["id"])
+            for item in cast(
+                list[dict[str, object]],
+                by_id["codex-task-workflow-convention-gate"]["checklist"],
+            )
+        }
+        self.assertIn("CODEX-TASK-OWNER-FIRST-1", codex_check_ids)
 
     def test_default_manifest_contains_exact_decision_sufficiency_scenarios(
         self,

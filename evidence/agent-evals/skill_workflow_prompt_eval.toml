@@ -1053,6 +1053,18 @@ critical = true
 description = "Keeps the generated skill-tool command block as discovery while route execution stays token-owned."
 required_regex = ["## Tool Commands", "skill-tool-commands:start", "skill_tool_commands\\.py show --skill agent-orchestration"]
 
+[[evals.checklist]]
+id = "ORCH-DOCS-FIRST-BOUNDED-1"
+critical = true
+description = "A bounded request uses the selected Skill body as the first operational owner and follows delegated owners only when needed."
+required_regex = ["Owner-First Read Trace", "agents/skills/catalog\\.yaml", "Reader Map row -> routing owner", "does not need one", "Skill body is the first", "do not follow a registry or", "operational_owner=", "owner_route=", "docs_first_status=resolved\\|unresolved", "implementation_read=locked\\|ready", "ready` is an admission state", "do not build a semantic index"]
+
+[[evals.checklist]]
+id = "ORCH-DOCS-FIRST-AMBIGUOUS-1"
+critical = true
+description = "A delegated path remains unresolved until read; an unresolved owner stays locked and uses bounded coordinated search."
+required_regex = ["Merely naming a delegated path", "docs_first_status=unresolved", "implementation_read=locked", "documents/tools/search-coordination\\.md", "Search results nominate an owner", "do not unlock implementation"]
+
 [[evals]]
 id = "codex-task-workflow-convention-gate"
 target = ".agents/skills/codex-task-workflow/SKILL.md"
@@ -1083,6 +1095,12 @@ id = "CODEX-TASK-LITERATURE-FIRST-1"
 critical = true
 description = "Requires literature survey source packets in the skill call order before research workflow, design, and implementation for source-backed claims."
 required_regex = ["\\$literature-survey", "\\$research-workflow", "before design", "Implementation Source Packet", "adoption/exclusion"]
+
+[[evals.checklist]]
+id = "CODEX-TASK-OWNER-FIRST-1"
+critical = true
+description = "Transports the selected Skill and upstream-owner readback before the implementation stage."
+required_regex = ["Owner-First Readback", "agent-orchestration\\.md#Owner-First-Read-Trace", "docs_first_status=resolved", "implementation_read=ready", "implementation remains locked", "new durable packet"]
 
 [[evals]]
 id = "adaptive-improvement-loop-skill-shim"
