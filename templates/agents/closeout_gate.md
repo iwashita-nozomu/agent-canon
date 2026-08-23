@@ -29,6 +29,11 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 
 - verifier_status: pending
 - auditor_status: pending
+- verifier_role_id: <verifier-child-role>
+- verifier_runtime_agent_id: <runtime-agent-id>
+- verifier_receipt_ref: runtime/verifier_receipt.json
+- parent_mutation_status: no_parent_mutation
+- parent_mutation_evidence_ref: runtime/parent_mutation_evidence.json
 - required_reviews_complete: not_applicable
 - validation_complete: no
 - request_contract_complete: no

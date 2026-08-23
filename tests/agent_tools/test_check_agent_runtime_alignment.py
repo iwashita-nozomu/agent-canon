@@ -123,6 +123,21 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         """The alignment owner enforces child-only repository writes."""
         runtime_alignment.validate_parent_orchestration_contract()
 
+    def test_integration_and_publisher_roles_reuse_worker_explicitly(self) -> None:
+        """Integration and publication are executable child mappings, not parent routes."""
+        config = load_team_config()
+        specialist_roles = {
+            str(role["id"]): role
+            for role in cast(list[dict[str, object]], config.raw["specialist_roles"])
+        }
+        for role_id in ("integration_executor", "publisher"):
+            self.assertEqual(specialist_roles[role_id]["codex_agents"], ["worker"])
+        catalog = loaded_task_catalog_raw()
+        topology = cast(dict[str, object], catalog["role_topology_defaults"])
+        families = cast(dict[str, list[str]], topology["role_families"])
+        self.assertIn("integration_executor", families["integration"])
+        self.assertIn("publisher", families["publication"])
+
     @staticmethod
     def write_minimal_dependency_map(root: Path) -> None:
         """Write the typed dependency record required by route catalog loading."""

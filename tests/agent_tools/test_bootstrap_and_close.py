@@ -911,6 +911,40 @@ def write_ready_closeout_bundle(
         ),
         encoding="utf-8",
     )
+    runtime_dir = report_dir / "runtime"
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    verifier_receipt = {
+        "schema": "agent-canon.verifier-receipt.v1",
+        "role_id": "verifier",
+        "runtime_agent_id": "verifier-1",
+        "status": "pass",
+        "source_event_ids": ["verification-event-1"],
+        "receipt_sha256": "",
+    }
+    verifier_unsigned = dict(verifier_receipt)
+    verifier_unsigned.pop("receipt_sha256")
+    verifier_receipt["receipt_sha256"] = hashlib.sha256(
+        json.dumps(verifier_unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+    ).hexdigest()
+    (runtime_dir / "verifier_receipt.json").write_text(
+        json.dumps(verifier_receipt, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    parent_evidence = {
+        "schema": "agent-canon.parent-mutation-evidence.v1",
+        "status": "no_parent_mutation",
+        "parent_agent_id": "parent-1",
+        "source_event_ids": ["mutation-event-1"],
+        "mutation_event_ids": [],
+        "receipt_sha256": "",
+    }
+    parent_unsigned = dict(parent_evidence)
+    parent_unsigned.pop("receipt_sha256")
+    parent_evidence["receipt_sha256"] = hashlib.sha256(
+        json.dumps(parent_unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+    ).hexdigest()
+    (runtime_dir / "parent_mutation_evidence.json").write_text(
+        json.dumps(parent_evidence, sort_keys=True) + "\n", encoding="utf-8"
+    )
     (report_dir / "user_request_contract.md").write_text(
         "\n".join(
             [
@@ -934,6 +968,11 @@ def write_ready_closeout_bundle(
                 "",
                 "- verifier_status: pass",
                 "- auditor_status: resolved",
+                "- verifier_role_id: verifier",
+                "- verifier_runtime_agent_id: verifier-1",
+                "- verifier_receipt_ref: runtime/verifier_receipt.json",
+                "- parent_mutation_status: no_parent_mutation",
+                "- parent_mutation_evidence_ref: runtime/parent_mutation_evidence.json",
                 "- required_reviews_complete: yes",
                 "- validation_complete: yes",
                 "- request_contract_complete: yes",
@@ -3057,6 +3096,30 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
+
+    def test_task_close_rejects_forged_verifier_or_parent_evidence(self) -> None:
+        """Closeout cannot pass with a forged child receipt or mutation claim."""
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-forged-child-evidence"
+            report_dir = report_root / run_id
+            report_root.mkdir(parents=True, exist_ok=True)
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id)
+            verifier = report_dir / "runtime" / "verifier_receipt.json"
+            verifier.write_text(
+                verifier.read_text(encoding="utf-8").replace("verifier-1", "forged"),
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(TASK_CLOSE_SCRIPT), "--report-dir", str(report_dir)],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("verifier_child_provenance", result.stdout)
 
     def test_task_close_accepts_profile_selected_targeted_static_analysis(self) -> None:
         """task_close should allow targeted static analysis selected by the risk profile."""

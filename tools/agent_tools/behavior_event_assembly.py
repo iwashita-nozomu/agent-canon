@@ -158,7 +158,7 @@ def _signal_bundle(parts: HookInvocationParts) -> tuple[PromptCapture, PromptInt
 def eligible_hook_invocation(parts: HookInvocationParts) -> bool:
     if parts.hook_event_name not in ACTIVE_EVENTS:
         return False
-    if parts.payload_status != "parsed" or parts.handler_result.status in {"malformed_payload", "blocked_secret", "blocked_destructive_git", "invalid_projection"}:
+    if parts.payload_status != "parsed" or parts.handler_result.status in {"malformed_payload", "blocked_secret", "blocked_destructive_git", "blocked_parent_mutation", "invalid_projection"}:
         return False
     prompt, classifier, tool, subagent, context = _signal_bundle(parts)
     return bool(prompt.should_log() or classifier.should_log() or tool.should_log() or subagent.should_log() or context.has_workflow())

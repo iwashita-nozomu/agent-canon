@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import re
@@ -175,6 +176,47 @@ RESIDUAL_CHECKER_FAILURE_CAUSES = validation_failure_taxonomy_slug_subset(
     VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES,
     ("fixture_environment_issue", "pre_existing_unrelated_failure"),
 )
+CHILD_EXECUTION_RECEIPT_SCHEMA = "agent-canon.child-execution-receipts.v1"
+
+
+def child_execution_receipts_valid(report_dir: Path) -> bool:
+    """Require one hashed child spawn/mutation/close correlation artifact."""
+    path = report_dir / "runtime" / "child_execution_receipts.json"
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    if not isinstance(value, dict) or value.get("schema") != CHILD_EXECUTION_RECEIPT_SCHEMA:
+        return False
+    receipt_sha = value.get("receipt_sha256")
+    if not isinstance(receipt_sha, str):
+        return False
+    unsigned = dict(value)
+    unsigned.pop("receipt_sha256", None)
+    if hashlib.sha256(
+        json.dumps(unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+    ).hexdigest() != receipt_sha:
+        return False
+    spawn = value.get("spawn")
+    close = value.get("close")
+    mutations = value.get("mutations")
+    if not isinstance(spawn, dict) or not isinstance(close, dict) or not isinstance(mutations, list) or not mutations:
+        return False
+    actor_id = spawn.get("agent_id")
+    role_id = spawn.get("role_id")
+    scope_digest = spawn.get("scope_digest")
+    if not all(isinstance(item, str) and item for item in (actor_id, role_id, scope_digest)):
+        return False
+    if close.get("agent_id") != actor_id or close.get("status") != "closed":
+        return False
+    return all(
+        isinstance(item, dict)
+        and item.get("actor_id") == actor_id
+        and item.get("role_id") == role_id
+        and item.get("scope_digest") == scope_digest
+        and item.get("status") in {"allowed", "blocked"}
+        for item in mutations
+    )
 
 
 @dataclass(frozen=True)
@@ -205,6 +247,7 @@ class BehaviorCriterion:
 class RunEvidence:
     """Text and status evidence collected from one run bundle."""
 
+    report_dir: Path
     missing_artifacts: tuple[str, ...]
     request_contract: dict[str, str]
     verification: dict[str, str]
@@ -479,6 +522,7 @@ def read_run_evidence(report_dir: Path) -> RunEvidence:
         "## Tool Warnings",
     )
     return RunEvidence(
+        report_dir=report_dir,
         missing_artifacts=tuple(missing),
         request_contract=parse_markdown_status(
             report_dir / "user_request_contract.md"
@@ -619,6 +663,8 @@ def orchestration_evidence_present(evidence: RunEvidence) -> bool:
     signals_text = evidence.signals_text
     behavior_events_text = evidence.behavior_events_text
     return (
+        child_execution_receipts_valid(evidence.report_dir)
+        and
         has_any(signals_text, ("skills=", "$agent-orchestration"))
         and has_any(
             behavior_events_text,

@@ -608,6 +608,8 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 | `document_flow_reviewer` | `document_flow_reviewer` |
 | `test_designer` | `test_designer` |
 | `implementer` | `worker` by default; `spark_worker` only for a bounded slice selected by `--select-agent-type implementer=spark_worker:<evidence>` and recorded in stdout / manifest. Both roles may commit/push and return local head/check evidence; publisher/pr-processing owns Issue/PR writes and integration_executor owns merge/conflict resolution. |
+| `integration_executor` | existing `worker` executable with explicit integration scope; owns merge/conflict resolution and branch/tree readback |
+| `publisher` | existing `worker` executable with explicit publication scope; owns authorized Issue/PR writes and remote readback |
 | `change_reviewer` | `diff_triage_reviewer` by default; `python_reviewer`, `cpp_reviewer`, then `reviewer` only with language or broad-review eligibility evidence |
 | `final_reviewer` | `ship_reviewer` checks final diff traceability to the Abstract Design Frame and approved packet; then `reviewer` / `project_reviewer` when final gate escalation is needed |
 | `verifier` | prescribed validation runner |

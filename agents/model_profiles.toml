@@ -55,6 +55,8 @@ spark_worker = "spark_implementation_low"
 test_designer = "luna_reasoning_high"
 terra = "terra_cross_cutting_read_only"
 worker = "luna_implementation_xhigh"
+integration_executor = "luna_implementation_xhigh"
+publisher = "luna_implementation_xhigh"
 
 [role_sandbox_bindings]
 artifact_reviewer = "read-only"
@@ -92,6 +94,8 @@ spark_worker = "workspace-write"
 test_designer = "read-only"
 terra = "read-only"
 worker = "workspace-write"
+integration_executor = "workspace-write"
+publisher = "workspace-write"
 
 [role_instruction_templates]
 
@@ -121,6 +125,16 @@ sandbox_mode = "workspace-write"
 logical_role_id = "oop_readability_reviewer"
 role_contract_ref = "agents/model_profiles.toml#/standalone_role_metadata/oop_readability_reviewer"
 sandbox_mode = "read-only"
+
+[standalone_role_metadata.integration_executor]
+logical_role_id = "integration_executor"
+role_contract_ref = "agents/agents_config.json#/specialist_roles/integration_executor"
+sandbox_mode = "workspace-write"
+
+[standalone_role_metadata.publisher]
+logical_role_id = "publisher"
+role_contract_ref = "agents/agents_config.json#/specialist_roles/publisher"
+sandbox_mode = "workspace-write"
 
 [[model_profiles]]
 id = "sol_parent_high"
@@ -208,9 +222,9 @@ close_tool_target_binding = "terminal_agent_id"
 
 [[model_profiles.role_instructions]]
 id = "luna_impl"
-text = "Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. For this role, execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop."
+text = "Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only the assigned child action within authority bounds: worker implements, integration_executor merges/resolves conflicts, and publisher performs authorized Issue/PR publication. ship_reviewer owns final approval; the parent only relays packets, dependency order, status, and external readback."
 priority = 1
-consumer_static_text = "Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Execute only implement, commit, and push actions within assigned authority; parent owns pull-request, admin-override, base-integration, and final editorial decisions."
+consumer_static_text = "Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback."
 static_obligations = ["validation_owner", "parent_assignment", "parent_authority", "stop_handback"]
 
 [[model_profiles]]
@@ -294,9 +308,9 @@ close_tool_target_binding = "terminal_agent_id"
 
 [[model_profiles.role_instructions]]
 id = "spark_impl"
-text = "Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Repair only assigned stable blocking finding IDs; do not repeat the same packet and evidence or restart broad review. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop."
+text = "Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Repair only assigned stable blocking finding IDs; do not repeat the same packet and evidence or restart broad review. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback."
 priority = 1
-consumer_static_text = "Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Repair only assigned stable blocking finding IDs; do not repeat the same packet and evidence or restart broad review. Execute only implement, commit, and push actions within assigned authority; parent owns pull-request, admin-override, base-integration, and final editorial decisions."
+consumer_static_text = "Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Repair only assigned stable blocking finding IDs; do not repeat the same packet and evidence or restart broad review. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback."
 static_obligations = ["validation_owner", "parent_assignment", "parent_authority", "stop_handback"]
 
 [[model_profiles]]

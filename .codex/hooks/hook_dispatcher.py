@@ -67,6 +67,10 @@ from parent_root_side_effects import (  # noqa: E402
     attest_parent_root,
 )
 from prompt_classifier import PromptClassifierInputs, freeze  # noqa: E402
+from mutation_authority import (  # noqa: E402
+    evaluate_mutation_authority,
+    mutation_block_payload,
+)
 from subagent_selection import (  # noqa: E402
     SubagentSelection,
     build_coordination_receipt,
@@ -480,6 +484,16 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
                 status = "invalid_projection"
     root_state = hook_root()
     report_dir = resolve_report_target(root_state)
+    mutation_decision = evaluate_mutation_authority(
+        payload,
+        report_dir=report_dir,
+        active_root=root_state.active_root,
+        environment=os.environ,
+    ) if event == "PreToolUse" else None
+    if mutation_decision is not None and mutation_decision.status == "blocked":
+        if output is None:
+            output = official_payload(event, mutation_block_payload(mutation_decision))
+            status = "blocked_parent_mutation"
     spool_entry, context = spool_event(
         event,
         raw_payload,
@@ -487,6 +501,9 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
         root_state.active_root,
         **telemetry,
     )
+    if mutation_decision is not None:
+        spool_entry["mutation_control"] = mutation_decision.as_dict()
+        spool_entry["status"] = status
     parts, subagent_selection = prepare_parts(
         event,
         payload,

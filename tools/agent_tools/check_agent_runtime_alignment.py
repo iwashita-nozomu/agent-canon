@@ -436,7 +436,7 @@ def validate_project_config() -> None:
         == "explicit_alternative_implementation_experiment_only",
         "isolated worktrees are reserved for explicit alternative implementation experiments",
     )
-    repository_writers = {"worker", "spark_worker"}
+    repository_writers = {"worker", "spark_worker", "integration_executor", "publisher"}
     for role_id, sandbox in registry.role_sandbox_bindings.items():
         expected_sandbox = "workspace-write" if role_id in repository_writers else "read-only"
         ensure(

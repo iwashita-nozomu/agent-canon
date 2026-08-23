@@ -103,17 +103,17 @@ STATIC_OBLIGATION_TABLE: tuple[StaticObligation, ...] = (
     StaticObligation(
         schema_id=SCHEMA_IDS["consumer_static_obligation"],
         obligation_id="validation_owner",
-        fragment="follow the parent-selected closed validation route",
+        fragment="follow the selected closed validation route",
     ),
     StaticObligation(
         schema_id=SCHEMA_IDS["consumer_static_obligation"],
         obligation_id="parent_assignment",
-        fragment="act only on the parent packet and assigned scope",
+        fragment="act only on the assigned child packet and scope",
     ),
     StaticObligation(
         schema_id=SCHEMA_IDS["consumer_static_obligation"],
         obligation_id="parent_authority",
-        fragment="do not perform parent-only integration or final decisions",
+        fragment="respect child-owned integration publication and final-review decisions",
     ),
     StaticObligation(
         schema_id=SCHEMA_IDS["consumer_static_obligation"],

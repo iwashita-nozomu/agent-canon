@@ -21,7 +21,7 @@ required_any = ["skill_invocation=", "skill_invocation_not_required"]
 name = "stage_and_subagent_behavior_recorded"
 max_score = 5
 feedback = "Record stage ownership and mandatory write-capable child routing as behavior evidence."
-required_any = ["write_capable_child=yes", "write-capable child", "read_only_conversation=not_applicable"]
+required_any = ["child_execution_receipts=pass", "read_only_conversation=not_applicable"]
 
 [[criteria]]
 name = "tool_gate_behavior_recorded"
@@ -185,7 +185,7 @@ required_any = [
   "subagents_closed=yes",
   "fresh_subagents_required",
   "subagent_lifecycle=closed",
-  "write_capable_child=yes",
+  "child_execution_receipts=pass",
   "read_only_conversation=not_applicable",
 ]
 
