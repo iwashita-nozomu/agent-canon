@@ -3234,7 +3234,12 @@ class BootstrapRuntime:
 
     def _host_private_feedback_sync(self) -> dict[str, Any] | None:
         """Publish a container-created private sync request on the host."""
-        request = self.paths.runtime_root / "spool" / "private-feedback" / "sync-request.json"
+        # The container's /var/lib/agent-canon/runtime is the existing
+        # container-runtime bind mount.  Keep request discovery and adapter
+        # consumption on that one host-side path; the control runtime root is
+        # host-only and never contains container feedback payloads.
+        container_runtime = self.paths.container_runtime
+        request = container_runtime / "spool" / "private-feedback" / "sync-request.json"
         if not request.is_file() or request.is_symlink():
             return None
         adapter = self.repository_root / "tools" / "agent_tools" / "private_feedback.py"
@@ -3245,7 +3250,7 @@ class BootstrapRuntime:
                 sys.executable,
                 str(adapter),
                 "--runtime-root",
-                str(self.paths.runtime_root),
+                str(container_runtime),
                 "--log-root",
                 str(self.paths.control_parent_root / "agent-canon-log"),
                 "host-sync",

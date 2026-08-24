@@ -177,3 +177,35 @@ def test_sync_request_host_readback_and_private_log_mount_are_separate(tmp_path:
     manager._ensure_layout()
     mount = next(item for item in manager._mounts({}) if item["destination"] == PRIVATE_LOG_DESTINATION)
     assert mount["mode"] == "read-only"
+
+
+def test_bootstrap_consumes_container_runtime_private_feedback_spool(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bootstrap consumes the request from the host-side bind-mapped spool."""
+    remote, _seed = _local_remote(tmp_path)
+    control = tmp_path / "control"
+    control.mkdir()
+    runtime = control / "runtime"
+    manager = BootstrapRuntime(
+        control, runtime, repository_root=Path(__file__).resolve().parents[2]
+    )
+    manager._ensure_layout()
+    container_runtime = manager.paths.container_runtime
+    assert (
+        invoke(container_runtime, "k", "add", "mapped", "consume this", "--task", "t1")
+        == 0
+    )
+    assert invoke(container_runtime, "k", "sync") == 0
+    request = container_runtime / "spool/private-feedback/sync-request.json"
+    assert request.is_file()
+    assert not (runtime / "spool/private-feedback/sync-request.json").exists()
+
+    monkeypatch.setenv("AGENT_CANON_LOG_REMOTE", f"file://{remote}")
+    result = manager._host_private_feedback_sync()
+
+    assert result is not None
+    assert result["status"] == "synced"
+    assert not request.exists()
+    assert not list((container_runtime / "spool/private-feedback").rglob("*.md"))
+    assert (control / "agent-canon-log/knowledge/topics/mapped/candidate.md").is_file()
