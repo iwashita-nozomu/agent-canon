@@ -30,3 +30,11 @@ target = "runtime-root/codex-home/skills"
 
 [archive]
 remote = "git@github.com:iwashita-nozomu/agent-canon-log.git"
+
+[registry]
+image = "ghcr.io/iwashita-nozomu/agent-canon"
+source_branch = "main"
+
+[update]
+sync_interval_seconds = 900
+sync_on_boot_delay_seconds = 300

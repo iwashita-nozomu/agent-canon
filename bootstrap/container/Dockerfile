@@ -16,18 +16,11 @@ FROM ubuntu:22.04@sha256:79676deb51ebb02885b0b9d33788e78a37cf1045ad79d1bb04c6a22
 
 ENV PYTHONDONTWRITEBYTECODE=1
 
-LABEL org.opencontainers.image.title="AgentCanon shared tool runtime" \
-      io.agent-canon.runtime="shared-v1" \
-      io.agent-canon.role="shared-tool" \
-      io.agent-canon.container.max-instances="1" \
-      io.agent-canon.run.read-only-rootfs="true" \
-      io.agent-canon.run.network="none" \
-      io.agent-canon.run.cap-drop="ALL" \
-      io.agent-canon.run.no-new-privileges="true" \
-      io.agent-canon.run.cpus="2" \
-      io.agent-canon.run.memory="4g" \
-      io.agent-canon.run.pids-limit="512" \
-      io.agent-canon.run.tmpfs="/tmp"
+LABEL org.opencontainers.image.title="AgentCanon shared tool runtime"
+
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETVARIANT
 
 RUN set -eux; \
     apt-get update; \
@@ -62,10 +55,15 @@ RUN ln -sfn ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -sfn ../lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
 
 RUN set -eux; \
+    case "$TARGETOS/$TARGETARCH" in \
+      linux/amd64) rustup_target=x86_64-unknown-linux-gnu; rustup_sha=20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c ;; \
+      linux/arm64) rustup_target=aarch64-unknown-linux-gnu; rustup_sha=e3853c5a252fca15252d07cb23a1bdd9377a8c6f3efa01531109281ae47f841c ;; \
+      *) echo "unsupported_target_arch=$TARGETOS/$TARGETARCH" >&2; exit 2 ;; \
+    esac; \
     curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
       --output /usr/local/bin/rustup-init \
-      https://static.rust-lang.org/rustup/archive/1.28.2/x86_64-unknown-linux-gnu/rustup-init; \
-    echo '20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c  /usr/local/bin/rustup-init' | sha256sum --check --strict; \
+      "https://static.rust-lang.org/rustup/archive/1.28.2/${rustup_target}/rustup-init"; \
+    echo "$rustup_sha  /usr/local/bin/rustup-init" | sha256sum --check --strict; \
     chmod 0555 /usr/local/bin/rustup-init; \
     /usr/local/bin/rustup-init --version | grep -F '1.28.2' >/dev/null
 

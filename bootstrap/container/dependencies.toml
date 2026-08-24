@@ -39,7 +39,6 @@ id = "jq"
 package = "jq"
 method = "apt-package"
 version = "1.6-2.1ubuntu3.2"
-platform = "linux/amd64"
 source = "ubuntu:22.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -51,7 +50,6 @@ id = "tree"
 package = "tree"
 method = "apt-package"
 version = "2.0.2-1"
-platform = "linux/amd64"
 source = "ubuntu:22.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -63,7 +61,6 @@ id = "clang-format"
 package = "clang-format"
 method = "apt-package"
 version = "1:14.0-55~exp2"
-platform = "linux/amd64"
 source = "ubuntu:22.04"
 executable_owner_packages = ["clang-format", "clang-format-14"]
 verification = { kind = "apt-package", executable = "clang-format", args = ["--version"], output_contains = "Ubuntu clang-format version 14.0.0-1ubuntu1.1" }
@@ -76,13 +73,13 @@ id = "clangd-language-server"
 package = "clangd-18"
 method = "apt-repository"
 version = "1:18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144"
-platform = "linux/amd64"
+platforms = ["linux/amd64", "linux/arm64"]
 source = "https://apt.llvm.org/jammy/"
 repository_suite = "llvm-toolchain-jammy-18"
 repository_components = ["main"]
-repository_packages_sha256 = "380ae90b5df8029aca2e30302427949f0a384d4970b156d843eeb0cea7fc4da2"
-repository_package_url = "https://apt.llvm.org/jammy/pool/main/l/llvm-toolchain-18/clangd-18_18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144_amd64.deb"
-repository_package_sha256 = "05ba173847cca9a3362155b9b7b59b3a7968195cde17dfa5e26bd777d9558660"
+repository_packages_sha256s = { amd64 = "380ae90b5df8029aca2e30302427949f0a384d4970b156d843eeb0cea7fc4da2", arm64 = "25d56767602929ec977f5700586cc46476fced81826322685aa171ee32b5a71f" }
+repository_package_urls = { amd64 = "https://apt.llvm.org/jammy/pool/main/l/llvm-toolchain-18/clangd-18_18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144_amd64.deb", arm64 = "https://apt.llvm.org/jammy/pool/main/l/llvm-toolchain-18/clangd-18_18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144_arm64.deb" }
+repository_package_sha256s = { amd64 = "05ba173847cca9a3362155b9b7b59b3a7968195cde17dfa5e26bd777d9558660", arm64 = "c98c785017ed4c0d1e45ee42d78fabe4eda569c28e67d5811da49cec8d528599" }
 key_url = "https://apt.llvm.org/llvm-snapshot.gpg.key"
 key_fingerprint = "6084F3CF814B57C1CF12EFD515CF4D18AF4F7421"
 verification = { kind = "apt-repository", executable = "clangd-18", args = ["--version"], output_contains = "clangd version 18.1.8" }
@@ -97,6 +94,7 @@ method = "rust-toolchain"
 version = "1.89.0"
 source = "https://static.rust-lang.org"
 components = ["rust-src", "rustfmt", "clippy", "rust-analyzer"]
+checksums = { x86_64 = "20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c", aarch64 = "e3853c5a252fca15252d07cb23a1bdd9377a8c6f3efa01531109281ae47f841c" }
 verification = { kind = "rust-toolchain" }
 deps = ["rustup-init", "build-essential", "curl"]
 provides = ["rust", "cargo", "rustfmt", "clippy", "rust-analyzer"]

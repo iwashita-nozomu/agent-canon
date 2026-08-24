@@ -44,6 +44,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
+
 SCHEMA_STATE = "agent-canon.bootstrap-state.v2"
 SCHEMA_RECEIPT = "agent-canon.bootstrap-receipt.v2"
 SCHEMA_MOUNTS = "agent-canon.mount-registry.v2"
@@ -795,7 +796,13 @@ class DockerAdapter:
         self.last_image_created = False
 
     def run(
-        self, argv: Sequence[str], *, check: bool = True, timeout: int | None = None
+        self,
+        argv: Sequence[str],
+        *,
+        check: bool = True,
+        timeout: int | None = None,
+        environment: Mapping[str, str] | None = None,
+        stdin: str | None = None,
     ) -> subprocess.CompletedProcess[str]:
         """Run one allowlisted Docker argv and return its captured result."""
         if (
@@ -819,6 +826,8 @@ class DockerAdapter:
                 check=False,
                 capture_output=True,
                 text=True,
+                input=stdin,
+                env={**os.environ, **dict(environment or {})},
                 timeout=timeout or self.timeout,
             )
         except subprocess.TimeoutExpired as exc:
@@ -857,6 +866,57 @@ class DockerAdapter:
             None if result.returncode else _inspect_object(result.stdout, field="image")
         )
 
+    def pull_image(
+        self,
+        ref: str,
+        *,
+        docker_config: Path | None = None,
+    ) -> dict[str, Any]:
+        """Pull one immutable registry reference and return native-platform inspect."""
+        environment = {"DOCKER_CONFIG": str(docker_config)} if docker_config else None
+        self.run([self.executable, "pull", ref], environment=environment)
+        record = self.inspect_image(ref)
+        if record is None:
+            raise BootstrapError("docker_readback_invalid", "pulled image disappeared before inspect")
+        return record
+
+    @staticmethod
+    def validate_registry_image(
+        record: Mapping[str, Any], *, source_head: str, image_ref: str
+    ) -> dict[str, Any]:
+        """Validate OCI revision and native platform for one pulled image."""
+        _required_string(record.get("Id"), "image.Id")
+        config = record.get("Config")
+        labels = config.get("Labels", {}) if isinstance(config, dict) else {}
+        if not isinstance(labels, dict) or labels.get("org.opencontainers.image.revision") != source_head:
+            raise BootstrapError(
+                "image_source_mismatch",
+                "registry image revision does not match staged source HEAD",
+                evidence={"image_ref": image_ref, "source_head": source_head},
+            )
+        observed_os = record.get("Os")
+        observed_arch = record.get("Architecture")
+        if observed_os != "linux" or observed_arch not in {"amd64", "arm64"}:
+            raise BootstrapError(
+                "unsupported_image_platform",
+                "registry image is not a supported native Linux variant",
+                evidence={"os": observed_os, "architecture": observed_arch},
+            )
+        repo_digests = record.get("RepoDigests", [])
+        digest = next(
+            (value for value in repo_digests if isinstance(value, str) and "@sha256:" in value),
+            None,
+        )
+        if digest is None:
+            raise BootstrapError("image_digest_missing", "registry image has no RepoDigest")
+        return {
+            "image_id": record["Id"],
+            "image_repo_digest": digest,
+            "image_os": observed_os,
+            "image_architecture": observed_arch,
+            "image_revision": labels["org.opencontainers.image.revision"],
+        }
+
     def ensure_image(
         self,
         *,
@@ -866,11 +926,11 @@ class DockerAdapter:
         labels: Mapping[str, str],
         force_build: bool = False,
     ) -> dict[str, Any]:
-        """Build or adopt one manifest-tagged image with ownership labels."""
+        """Build or adopt one manifest-tagged image without install labels."""
         record = self.inspect_image(tag)
         self.last_image_created = record is None
         if record is not None and not force_build:
-            self.validate_image(record, labels)
+            self.validate_image(record, {})
             # A matching pre-existing tag is a protected resource. Adopt its
             # exact ID and leave it untouched; rebuilding to the same tag would
             # make ownership of the replacement ambiguous.
@@ -883,8 +943,6 @@ class DockerAdapter:
             "--tag",
             tag,
         ]
-        for key, value in sorted(labels.items()):
-            argv.extend(("--label", f"{key}={value}"))
         argv.append(str(repository_root))
         self.run(argv)
         record = self.inspect_image(tag)
@@ -892,7 +950,7 @@ class DockerAdapter:
             raise BootstrapError(
                 "docker_readback_invalid", "built image disappeared before inspect"
             )
-        self.validate_image(record, labels)
+        self.validate_image(record, {})
         return record
 
     @staticmethod
@@ -1210,6 +1268,31 @@ class RuntimePaths:
         """Return the writable, credential-free container exchange directory."""
         return self.runtime_root / CONTAINER_RUNTIME_DIR
 
+    @property
+    def source_sync(self) -> Path:
+        """Return source/image correspondence state."""
+        return self.runtime_root / "source-sync.json"
+
+    @property
+    def source_staging(self) -> Path:
+        """Return the fixed owned source staging path."""
+        return self.runtime_root / "source-staging" / "agent-canon"
+
+    @property
+    def source_backup(self) -> Path:
+        """Return the fixed owned live-source backup path."""
+        return self.runtime_root / "source-backup" / "agent-canon"
+
+    @property
+    def docker_config(self) -> Path:
+        """Return the temporary registry authentication directory."""
+        return self.runtime_root / "docker-config"
+
+    @property
+    def scheduler_root(self) -> Path:
+        """Return rendered scheduler units below the runtime root."""
+        return self.runtime_root / "scheduler" / "systemd" / "user"
+
 
 class BootstrapRuntime:
     """Persistent, lock-serialized lifecycle with one Docker container."""
@@ -1287,6 +1370,12 @@ class BootstrapRuntime:
     def locked(self) -> Iterator[None]:
         """Serialize lifecycle transitions using the external lock file."""
         self._ensure_layout()
+        if os.environ.get("AGENT_CANON_LOCK_HELD") == "1":
+            # SourceSync owns the lock while handing the verified candidate to
+            # the new checkout. The child bootstrap must not deadlock on the
+            # same transaction; the marker is set only for that child.
+            yield
+            return
         handle = os.fdopen(os.open(self.paths.lock, os.O_RDWR | os.O_NOFOLLOW), "r+")
         try:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
@@ -1477,10 +1566,130 @@ class BootstrapRuntime:
             "id": image_id,
             "tag": self._image_tag(),
             "owned": owned,
-            "labels": self._labels(),
+            "labels": {},
             "state": "present",
         }
         return image
+
+    def _adopt_registry_image_locked(
+        self,
+        state: dict[str, Any],
+        image_ref: str,
+        image_record: Mapping[str, Any],
+        source_head: str,
+    ) -> dict[str, Any]:
+        """Adopt one already-pulled immutable image without invoking Docker build."""
+        if state.get("state") == "uninstalled":
+            raise BootstrapError("not_installed", "install must complete before registry image adoption")
+        if state.get("active_task_count", 0):
+            raise BootstrapError(
+                "mount_update_blocked",
+                "active tasks prevent registry image adoption",
+                evidence={"active_task_count": state.get("active_task_count", 0)},
+            )
+        image_id = _required_string(image_record.get("Id"), "registry image.Id")
+        old_state = json.loads(_json(state))
+        before = str(state.get("state"))
+        old_container_running = bool(
+            old_state.get("resources", {}).get("container", {}).get("id")
+            or before in {"ready", "running"}
+        )
+        old_image = old_state.get("resources", {}).get("image", {})
+        try:
+            state.setdefault("resources", self._resource_records())["image"] = {
+                "id": image_id,
+                "tag": image_ref,
+                "owned": True,
+                "labels": {},
+                "state": "present",
+                "repo_digest": next(
+                    (
+                        value
+                        for value in image_record.get("RepoDigests", [])
+                        if isinstance(value, str) and "@sha256:" in value
+                    ),
+                    None,
+                ),
+                "os": image_record.get("Os"),
+                "architecture": image_record.get("Architecture"),
+                "source_head": source_head,
+            }
+            state["state"] = "maintenance_pending"
+            self._write_state(state)
+            self._stop_owned_container(state)
+            if old_container_running:
+                self._ensure_container(state, start=True)
+                state["state"] = "ready"
+            else:
+                state["state"] = "installed"
+            self._write_state(state)
+            return self._result(
+                self._receipt(
+                    "update_registry_image",
+                    "ok",
+                    "updated",
+                    before=before,
+                    after=state["state"],
+                    details={
+                        "image_ref": image_ref,
+                        "image_id": image_id,
+                        "source_head": source_head,
+                        "image_repo_digest": state["resources"]["image"].get("repo_digest"),
+                        "image_os": state["resources"]["image"].get("os"),
+                        "image_architecture": state["resources"]["image"].get("architecture"),
+                    },
+                    state=state,
+                )
+            )
+        except BootstrapError as exc:
+            candidate = state.get("resources", {}).get("image", {})
+            candidate_id = candidate.get("id") if isinstance(candidate, dict) else None
+            old_id = old_image.get("id") if isinstance(old_image, dict) else None
+            if candidate_id and candidate_id != old_id:
+                if self.docker.inspect_image(str(candidate_id)) is not None:
+                    self.docker.remove_image(str(candidate_id))
+            state.clear()
+            state.update(old_state)
+            recovery_error: BootstrapError | None = None
+            try:
+                self._write_mounts(state)
+                if old_container_running:
+                    self._ensure_container(state, start=True)
+                state["state"] = before
+                self._write_state(state)
+            except BootstrapError as restore_error:
+                recovery_error = restore_error
+                state["state"] = "runtime_unavailable"
+                self._write_state(state)
+            receipt = self._result(
+                self._receipt(
+                    "update_registry_image",
+                    "error",
+                    "runtime_unavailable" if recovery_error else exc.code,
+                    before=before,
+                    after=state["state"],
+                    details={"recovery_error": recovery_error.code if recovery_error else None},
+                    state=state,
+                )
+            )
+            raise BootstrapError(
+                "runtime_unavailable" if recovery_error else exc.code,
+                "registry image adoption failed" if recovery_error else exc.detail,
+                evidence={**exc.evidence, "receipt_path": receipt["receipt_path"], "recovered": recovery_error is None},
+            ) from exc
+
+    def update_registry_image(
+        self,
+        image_ref: str,
+        image_record: Mapping[str, Any],
+        source_head: str,
+    ) -> dict[str, Any]:
+        """Adopt an already-pulled registry image; this route never builds locally."""
+        with self.locked():
+            state = self._read_state(allow_manifest_drift=True)
+            result = self._adopt_registry_image_locked(state, image_ref, image_record, source_head)
+        self.codex_prepare()
+        return result
 
     def _mounts(self, targets: Mapping[str, Mapping[str, Any]]) -> list[dict[str, str]]:
         mounts = [
@@ -1530,6 +1739,10 @@ class BootstrapRuntime:
             raise BootstrapError(
                 "docker_readback_invalid", f"{kind} ID differs from pinned state"
             )
+        if kind == "image" and not resource.get("labels"):
+            # Registry images intentionally carry only OCI publication labels;
+            # the exact pulled ID in state is the install ownership receipt.
+            return
         expected_labels = resource.get("labels")
         observed_config = record.get("Config")
         observed_labels = (
@@ -1926,7 +2139,46 @@ class BootstrapRuntime:
                     state = self._new_state()
                 self._ensure_agents_link(state)
                 before = state["state"]
-                self._image(state)
+                shallow = False
+                try:
+                    shallow = (
+                        (self.repository_root / ".git").exists()
+                        and subprocess.run(
+                            ["git", "-C", str(self.repository_root), "rev-parse", "--is-shallow-repository"],
+                            check=False,
+                            capture_output=True,
+                            text=True,
+                        ).stdout.strip()
+                        == "true"
+                    )
+                except OSError:
+                    shallow = False
+                registry = self.manifest.get("registry", {})
+                if shallow and isinstance(registry, dict) and registry.get("image"):
+                    try:
+                        from .source_sync import SourceSync
+                    except ImportError:
+                        from source_sync import SourceSync  # type: ignore[no-redef]
+                    source_head = _source_snapshot(self.repository_root)["head"]
+                    image_ref = f"{registry['image']}:sha-{source_head}"
+                    image_record = SourceSync(self, self.repository_root)._pull(image_ref)
+                    correspondence = self.docker.validate_registry_image(
+                        image_record, source_head=source_head, image_ref=image_ref
+                    )
+                    state["resources"] = self._resource_records()
+                    state["resources"]["image"] = {
+                        "id": correspondence["image_id"],
+                        "tag": image_ref,
+                        "owned": True,
+                        "labels": {},
+                        "state": "present",
+                        "repo_digest": correspondence["image_repo_digest"],
+                        "os": correspondence["image_os"],
+                        "architecture": correspondence["image_architecture"],
+                        "source_head": source_head,
+                    }
+                else:
+                    self._image(state)
                 state["state"] = "installed"
                 state.setdefault("resources", self._resource_records()).setdefault(
                     "container", self._resource_records()["container"]
@@ -1952,7 +2204,88 @@ class BootstrapRuntime:
                     )
                 )
         self.codex_prepare()
+        try:
+            self.scheduler_enable()
+        except BootstrapError as exc:
+            if exc.code != "systemd_user_unavailable":
+                raise
         return result
+
+    def _systemctl(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+        """Run one user-systemd lifecycle command without a daemon wrapper."""
+        result = subprocess.run(
+            ["systemctl", "--user", *args],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if check and result.returncode:
+            raise BootstrapError("systemd_user_unavailable", "systemd user manager is unavailable")
+        return result
+
+    def _scheduler_paths(self) -> tuple[Path, Path]:
+        root = Path.home() / ".config" / "systemd" / "user"
+        return root / "agent-canon-sync.service", root / "agent-canon-sync.timer"
+
+    def scheduler_enable(self) -> dict[str, Any]:
+        """Install and enable the one-shot user timer when systemd is available."""
+        self._systemctl("show-environment")
+        template_root = self.repository_root / "bootstrap" / "systemd" / "user"
+        service_template = template_root / "agent-canon-sync.service.in"
+        timer_template = template_root / "agent-canon-sync.timer.in"
+        if not service_template.is_file() or not timer_template.is_file():
+            raise BootstrapError("scheduler_template_missing", "systemd scheduler templates are missing")
+        service_path, timer_path = self._scheduler_paths()
+        service_path.parent.mkdir(parents=True, exist_ok=True)
+        replacements = {
+            "@BOOTSTRAP@": str(self.repository_root / "bootstrap.sh"),
+            "@CONTROL_ROOT@": str(self.paths.control_parent_root),
+            "@RUNTIME_ROOT@": str(self.paths.runtime_root),
+            "@INSTALL_ROOT@": str(self.repository_root),
+            "@REMOTE@": "origin",
+            "@BRANCH@": str(self.manifest.get("registry", {}).get("source_branch", "main")),
+            "@ON_BOOT@": str(self.manifest.get("update", {}).get("sync_on_boot_delay_seconds", 300)),
+            "@INTERVAL@": str(self.manifest.get("update", {}).get("sync_interval_seconds", 900)),
+        }
+        for template, destination in ((service_template, service_path), (timer_template, timer_path)):
+            text = template.read_text(encoding="utf-8")
+            for token, value in replacements.items():
+                text = text.replace(token, value)
+            destination.write_text(text, encoding="utf-8")
+            os.chmod(destination, 0o644)
+        self._systemctl("daemon-reload")
+        self._systemctl("enable", "--now", "agent-canon-sync.timer")
+        return {"code": "scheduler_enabled", "timer": str(timer_path)}
+
+    def scheduler_disable(self) -> dict[str, Any]:
+        """Disable the exact AgentCanon timer if user systemd is available."""
+        self._systemctl("disable", "--now", "agent-canon-sync.timer")
+        return {"code": "scheduler_disabled"}
+
+    def scheduler_status(self) -> dict[str, Any]:
+        """Read the exact timer state without creating an alternate scheduler."""
+        result = self._systemctl("show", "agent-canon-sync.timer", "--property=ActiveState,UnitFileState", check=False)
+        if result.returncode:
+            raise BootstrapError("systemd_user_unavailable", "AgentCanon timer is not available")
+        return {"code": "scheduler_status", "output": result.stdout.strip()}
+
+    def scheduler_uninstall(self) -> dict[str, Any]:
+        """Disable and remove only the managed user units."""
+        try:
+            self.scheduler_disable()
+        except BootstrapError as exc:
+            if exc.code != "systemd_user_unavailable":
+                raise
+        service_path, timer_path = self._scheduler_paths()
+        for path in (service_path, timer_path):
+            if path.is_symlink():
+                raise BootstrapError("scheduler_path_rejected", f"scheduler path is a symlink: {path}")
+            path.unlink(missing_ok=True)
+        try:
+            self._systemctl("daemon-reload")
+        except BootstrapError:
+            pass
+        return {"code": "scheduler_uninstalled"}
 
     def _update_locked(self, state: dict[str, Any], operation: str) -> dict[str, Any]:
         """Reconcile current checkout/image inputs with existing v2 lifecycle state."""
@@ -2017,7 +2350,7 @@ class BootstrapRuntime:
             if candidate_image_id and candidate_image_id != old_image_id:
                 inspected_image = self.docker.inspect_image(str(candidate_image_id))
                 if inspected_image is not None:
-                    self.docker.validate_image(inspected_image, self._labels())
+                    self.docker.validate_image(inspected_image, {})
                     self.docker.remove_image(str(candidate_image_id))
             state.clear()
             state.update(old_state)
@@ -2057,13 +2390,25 @@ class BootstrapRuntime:
                 evidence={**exc.evidence, "receipt_path": receipt["receipt_path"], "recovered": True},
             ) from exc
 
-    def update(self) -> dict[str, Any]:
+    def update(self, image_ref: str | None = None) -> dict[str, Any]:
         """Reconcile only the current checkout; never acquires a Git revision."""
         with self.locked():
             state = self._read_state(allow_manifest_drift=True)
             if state.get("state") == "uninstalled":
                 raise BootstrapError("not_installed", "install must complete before update")
-            result = self._update_locked(state, "update")
+            if image_ref:
+                image_record = self.docker.inspect_image(image_ref)
+                if image_record is None:
+                    raise BootstrapError("image_missing", f"registry image is not pulled: {image_ref}")
+                source_head = _source_snapshot(self.repository_root)["head"]
+                self.docker.validate_registry_image(
+                    image_record, source_head=source_head, image_ref=image_ref
+                )
+                result = self._adopt_registry_image_locked(
+                    state, image_ref, image_record, source_head
+                )
+            else:
+                result = self._update_locked(state, "update")
         self.codex_prepare()
         return result
 
@@ -3670,6 +4015,7 @@ class BootstrapRuntime:
 
     def uninstall(self) -> dict[str, Any]:
         """Remove exact owned Docker resources and managed Codex links."""
+        self.scheduler_uninstall()
         with self.locked():
             state = self._read_state(allow_manifest_drift=True)
             before = state["state"]
@@ -3748,8 +4094,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--runtime-root", required=True)
     parser.add_argument("--manifest")
     sub = parser.add_subparsers(dest="operation", required=True)
-    for operation in ("install", "update", "start", "status", "stop", "rollback", "uninstall"):
+    for operation in ("install", "start", "status", "stop", "rollback", "uninstall"):
         sub.add_parser(operation)
+    update_parser = sub.add_parser("update")
+    update_parser.add_argument("--image-ref")
+    sync_parser = sub.add_parser("sync")
+    sync_parser.add_argument("--install-root", required=True)
+    sync_parser.add_argument("--remote", default="origin")
+    sync_parser.add_argument("--branch", default="main")
+    scheduler = sub.add_parser("scheduler")
+    scheduler_sub = scheduler.add_subparsers(dest="scheduler_operation", required=True)
+    for scheduler_operation in ("enable", "disable", "status", "uninstall"):
+        scheduler_sub.add_parser(scheduler_operation)
     gc_parser = sub.add_parser("gc")
     gc_parser.add_argument("--dry-run", action="store_true")
     target = sub.add_parser("target")
@@ -3808,7 +4164,28 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if operation == "install":
         return runtime.install()
     if operation == "update":
-        return runtime.update()
+        return runtime.update(image_ref=args.image_ref)
+    if operation == "sync":
+        try:
+            from .source_sync import SourceSync  # type: ignore[import-not-found]
+        except ImportError:
+            from source_sync import SourceSync  # type: ignore[no-redef]
+
+        return SourceSync(
+            runtime,
+            Path(args.install_root),
+            remote=args.remote,
+            branch=args.branch,
+        ).sync()
+    if operation == "scheduler":
+        if args.scheduler_operation == "enable":
+            return runtime.scheduler_enable()
+        if args.scheduler_operation == "disable":
+            return runtime.scheduler_disable()
+        if args.scheduler_operation == "status":
+            return runtime.scheduler_status()
+        if args.scheduler_operation == "uninstall":
+            return runtime.scheduler_uninstall()
     if operation == "start":
         return runtime.start()
     if operation == "status":

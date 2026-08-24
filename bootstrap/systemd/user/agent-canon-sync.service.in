@@ -1,0 +1,8 @@
+[Unit]
+Description=AgentCanon one-shot source and runtime sync
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=@BOOTSTRAP@ --control-parent-root @CONTROL_ROOT@ --runtime-root @RUNTIME_ROOT@ sync --install-root @INSTALL_ROOT@ --remote @REMOTE@ --branch @BRANCH@

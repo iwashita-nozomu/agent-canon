@@ -1,0 +1,11 @@
+[Unit]
+Description=AgentCanon periodic source and runtime sync
+
+[Timer]
+OnBootSec=@ON_BOOT@s
+OnUnitActiveSec=@INTERVAL@s
+Persistent=true
+Unit=agent-canon-sync.service
+
+[Install]
+WantedBy=timers.target

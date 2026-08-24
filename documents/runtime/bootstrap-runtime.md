@@ -14,7 +14,8 @@ downstream design runtime-log-archive.md archive publication
 
 `agent-canon` is a source repository and a reusable tool runtime. It is not a
 project dependency directory. The supported user path is a host bootstrap
-which builds or adopts one shared, bounded tool container and then
+which adopts one shared, bounded tool container from the published
+multi-architecture GHCR image and then
 launches tools against explicitly registered targets.
 
 The bootstrap owns lifecycle and host adapters. The container owns Python,
@@ -45,6 +46,9 @@ The command family is:
 ```bash
 "$BOOTSTRAP" "${COMMON[@]}" install
 "$BOOTSTRAP" "${COMMON[@]}" update
+"$BOOTSTRAP" "${COMMON[@]}" sync --install-root "$HOME/agent-canon" --remote origin --branch main
+"$BOOTSTRAP" "${COMMON[@]}" scheduler enable
+"$BOOTSTRAP" "${COMMON[@]}" scheduler status
 "$BOOTSTRAP" "${COMMON[@]}" start
 "$BOOTSTRAP" "${COMMON[@]}" status
 "$BOOTSTRAP" "${COMMON[@]}" target add --root <project-root> --mode read-only
@@ -71,24 +75,38 @@ the operation has a generation or ownership boundary.
 
 ## What is installed and where
 
-`install` invokes the ordinary Docker build from
-`bootstrap/container/Dockerfile`, records the Docker result and manifest, and
-creates the runtime state directories. It does not enumerate containers,
-perform a host architecture gate, or hash the full source tree before the
-build. `start` creates or starts at most one manifest-owned container. The
-image contains the Rust CLI, Python tools, configured LSP servers, and the
-AgentCanon-owned eval definitions/configuration needed to evaluate a
-source-free target. Container process identity and UID/GID mapping are owned
-by the host/caller environment; AgentCanon does not create a user, pass
-`--user`, or validate that policy. A matching pre-existing image tag is adopted
-by exact ID without overwrite; an unowned pre-existing image remains outside
-uninstall.
+`install` creates the runtime state directories and adopts the published GHCR
+image when the source was installed by the distribution route. Development
+and CI checkouts may still use the ordinary Docker build from
+`bootstrap/container/Dockerfile`; live `sync` never builds locally. The image
+is one OCI index for `linux/amd64` and `linux/arm64`; Docker selects the native
+variant without a user platform selector. `start` creates or starts at most
+one manifest-owned container. The image contains the Rust CLI, Python tools,
+configured LSP servers, and the AgentCanon-owned eval definitions/configuration
+needed to evaluate a source-free target. Container process identity and
+UID/GID mapping are owned by the host/caller environment; AgentCanon does not
+create a user, pass `--user`, or validate that policy. A matching pre-existing
+image tag is adopted by exact ID without overwrite; an unowned pre-existing
+image remains outside uninstall.
 
 `update` reads only the current AgentCanon checkout. It never fetches,
-checks out, merges, rebases, resets, or pulls Git state. It performs one
-ordinary Docker build for the current checkout; a handled build or health
-failure restores the existing v2 generation, container, and image. Source
-acquisition remains the downstream dotfiles responsibility.
+checks out, merges, rebases, resets, or pulls Git state. Without `--image-ref`
+it performs one ordinary Docker build; with an immutable `--image-ref` it
+adopts only an already-pulled registry image. A handled build or health
+failure restores the existing v2 generation, container, and image.
+`sync` is the one-shot source/update route. It uses `git ls-remote` for
+`origin/main`, treats equal HEAD as a no-op, clones a fresh depth-one checkout
+under runtime staging, pulls `:sha-<full-commit>`, verifies the OCI revision,
+RepoDigest, and native platform, then atomically swaps the shallow checkout and
+runs `update --image-ref`, `start`, and `codex prepare`. A pull, health, or
+candidate bootstrap failure restores the previous checkout and runtime.
+`main` and `latest` are discovery labels only and are never runtime identity.
+
+On Linux and WSL with a usable systemd user manager, `install` enables the
+one-shot `agent-canon-sync.timer`; its service exits after one sync. The timer
+is owned by `scheduler enable`, `disable`, `status`, and `uninstall`. Hosts
+without systemd user support, macOS, and native Windows remain one-shot-only;
+no daemon, webhook listener, cron route, or `loginctl enable-linger` is added.
 `install` and `update` also converge `<control-parent-root>/.agents` to an
 exact symlink targeting the tracked source `.agents`. A regular file, directory,
 or different symlink at that path is a typed collision. `uninstall` removes only

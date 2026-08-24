@@ -2609,8 +2609,8 @@ class DependencyModelTests(unittest.TestCase):
         ):
             self.assertNotIn(removed, ids)
 
-    def test_canonical_apt_records_are_jammy_amd64_owned(self) -> None:
-        """The shared apt tool records target the canonical Ubuntu 22.04 base."""
+    def test_canonical_apt_records_are_jammy_multiarch_owned(self) -> None:
+        """Shared apt records target Jammy without pinning one host architecture."""
         plan = load_plan(
             ROOT,
             manifest=ROOT / "bootstrap" / "container" / "dependencies.toml",
@@ -2620,36 +2620,37 @@ class DependencyModelTests(unittest.TestCase):
         ]
 
         self.assertTrue(apt_records)
-        self.assertTrue(
-            all(item.platform == "linux/amd64" for item in apt_records)
-        )
+        self.assertTrue(all(item.platform is None for item in apt_records))
         self.assertTrue(all(item.source == "ubuntu:22.04" for item in apt_records))
         self.assertFalse(any(item.source == "ubuntu:24.04" for item in apt_records))
 
-    def test_install_identity_accepts_ubuntu22_amd64(self) -> None:
-        """The canonical install gate accepts only the selected base identity."""
+    def test_install_identity_accepts_ubuntu22_multiarch(self) -> None:
+        """The canonical install gate accepts both supported OCI variants."""
         parsed = parse_record(
             record(
                 "jammy-tool",
                 method="apt-package",
                 source="ubuntu:22.04",
-                platform="linux/amd64",
+                platforms=["linux/amd64", "linux/arm64"],
             ),
             path=Path("identity.toml"),
             index=0,
         )
         plan = build_plan((loaded_manifest(Path("identity.toml"), (parsed,)),))
-        identity = RuntimeIdentity("ubuntu", "22.04", "linux/amd64")
-        self.assertEqual(validate_runtime_identity(plan, identity), identity)
+        for identity in (
+            RuntimeIdentity("ubuntu", "22.04", "linux/amd64"),
+            RuntimeIdentity("ubuntu", "22.04", "linux/arm64"),
+        ):
+            self.assertEqual(validate_runtime_identity(plan, identity), identity)
 
     def test_install_identity_rejects_wrong_release_or_arch_before_runner(self) -> None:
-        """Jammy/amd64 identity failures happen before Installer runner calls."""
+        """Unsupported identities fail before Installer runner calls."""
         parsed = parse_record(
             record(
                 "jammy-tool",
                 method="apt-package",
                 source="ubuntu:22.04",
-                platform="linux/amd64",
+                platforms=["linux/amd64", "linux/arm64"],
             ),
             path=Path("identity.toml"),
             index=0,
@@ -2657,7 +2658,7 @@ class DependencyModelTests(unittest.TestCase):
         plan = build_plan((loaded_manifest(Path("identity.toml"), (parsed,)),))
         for identity in (
             RuntimeIdentity("ubuntu", "24.04", "linux/amd64"),
-            RuntimeIdentity("ubuntu", "22.04", "linux/arm64"),
+            RuntimeIdentity("ubuntu", "22.04", "linux/riscv64"),
         ):
             runner = FakeRunner()
             with self.assertRaises(DependencyError):
@@ -3695,7 +3696,9 @@ class DependencyModelTests(unittest.TestCase):
         self.assertNotIn("USER agentcanon", dockerfile)
         self.assertNotIn("AGENT_CANON_RUNTIME_UID", dockerfile)
         self.assertNotIn("AGENT_CANON_RUNTIME_GID", dockerfile)
-        self.assertIn('io.agent-canon.run.network="none"', dockerfile)
+        self.assertIn("ARG TARGETARCH", dockerfile)
+        self.assertIn("linux/arm64", dockerfile)
+        self.assertNotIn('io.agent-canon.run.network="none"', dockerfile)
 
     def test_project_extras_are_ordered_and_installed_then_checked(self) -> None:
         workspace = Path(tempfile.mkdtemp())
