@@ -1,0 +1,31 @@
+name: Issue 877 source export
+
+on:
+  push:
+    branches:
+      - fix/877-wsl-probe-accounting-scope
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Upload focused source checkout
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-877-source
+          path: |
+            tools/experiments
+            tests/tools/test_execution_resource_plan.py
+            tests/tools/test_run_gpu_command.py
+            tests/fixtures/nvidia
+            pyproject.toml
+          if-no-files-found: error
+          retention-days: 1
