@@ -7,12 +7,14 @@
 # @dependency-end
 
 # The Node provider is copied into the fixed Ubuntu image so npm LSP tools stay
-# image-owned. Both base images are digest pinned; no project checkout is used
-# as an image build input other than the canonical Rust CLI source, public tool
+# image-owned. Both base images are pinned to immutable multi-platform OCI
+# indexes and selected for the target platform; no project checkout is used as
+# an image build input other than the canonical Rust CLI source, public tool
 # assets, and this standalone dependency manifest.
-FROM node:22.14.0-bullseye-slim@sha256:8659cc49becb19c40c67f9c69a475bdd4101b7afe2ac982d68ed3037653f9d8e AS node-provider
+ARG TARGETPLATFORM
+FROM --platform=$TARGETPLATFORM node:22.14.0-bullseye-slim@sha256:73a9dfbb6c761aebdf4666cce2627635a30d1d4c20f67ff642d01b8f09e709a3 AS node-provider
 
-FROM ubuntu:22.04@sha256:79676deb51ebb02885b0b9d33788e78a37cf1045ad79d1bb04c6a222c3556b3d
+FROM --platform=$TARGETPLATFORM ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc
 
 ENV PYTHONDONTWRITEBYTECODE=1
 
