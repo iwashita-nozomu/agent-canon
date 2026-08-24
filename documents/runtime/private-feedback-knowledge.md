@@ -29,9 +29,12 @@ Runtime data is first written below the external runtime root:
 <runtime-root>/spool/private-feedback/
 ```
 
-The host archive adapter performs fetch, non-force publication, compare/readback
-and spool retention on conflict. The container has no Git credentials and does
-not publish directly.
+`k/f sync` in the tool container writes a typed, body-free request below the
+external spool. Bootstrap invokes the host archive adapter after the container
+command. The adapter performs fetch, non-force publication, compare/readback
+and spool retention on conflict. The operational checkout is mounted into the
+container read-only for search/read/status; the container has no Git
+credentials and never publishes or mutates that checkout.
 
 ## Commands
 

@@ -19,6 +19,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from tools.agent_tools import private_feedback
+from tools.agent_tools.bootstrap_runtime import BootstrapRuntime, PRIVATE_LOG_DESTINATION
 
 
 def invoke(runtime: Path, *argv: str, log_root: Path | None = None) -> int:
@@ -97,7 +98,8 @@ def test_no_annex_remote_keeps_raw_spool_pending(tmp_path: Path) -> None:
     raw = runtime / "spool/private-feedback/raw/topic/payload.bin"
     raw.parent.mkdir(parents=True)
     raw.write_bytes(b"payload")
-    assert invoke(runtime, "--remote", f"file://{remote}", "k", "sync", log_root=tmp_path / "log") == 1
+    assert invoke(runtime, "k", "sync", log_root=tmp_path / "log") == 0
+    assert invoke(runtime, "--remote", f"file://{remote}", "host-sync", log_root=tmp_path / "log") == 1
     assert raw.is_file()
     assert not (tmp_path / "log/raw/topic/payload.bin").exists()
 
@@ -106,8 +108,9 @@ def test_sync_failure_retains_spool(tmp_path: Path) -> None:
     """Remote/network failure preserves private content for retry."""
     runtime = tmp_path / "runtime"
     invoke(runtime, "f", "add", "retry", "retain this", "--task", "t1")
+    assert invoke(runtime, "f", "sync", log_root=tmp_path / "log") == 0
     with pytest.raises((private_feedback.PrivateFeedbackError, subprocess.CalledProcessError), match="git_failed|clone|does-not-exist"):
-        invoke(runtime, "--remote", "file:///tmp/private-feedback-does-not-exist.git", "f", "sync", log_root=tmp_path / "log")
+        invoke(runtime, "--remote", "file:///tmp/private-feedback-does-not-exist.git", "host-sync", log_root=tmp_path / "log")
     assert list((runtime / "spool/private-feedback/feedback").rglob("*.md"))
 
 
@@ -118,7 +121,8 @@ def test_operational_clone_migration_observes_old_archive_before_new_clone(tmp_p
     subprocess.run(["git", "clone", str(remote), str(legacy)], check=True, capture_output=True)
     runtime = tmp_path / "runtime"
     invoke(runtime, "f", "add", "migration", "keep archive", "--task", "t1")
-    assert invoke(runtime, "--remote", f"file://{remote}", "f", "sync", log_root=tmp_path / "log") == 0
+    assert invoke(runtime, "f", "sync", log_root=tmp_path / "log") == 0
+    assert invoke(runtime, "--remote", f"file://{remote}", "host-sync", log_root=tmp_path / "log") == 0
     payload = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert payload["migration"] == "legacy-readback-observed"
     assert legacy.is_dir()
@@ -135,3 +139,41 @@ def test_memory_migration_is_non_destructive(tmp_path: Path) -> None:
     assert invoke(runtime, "k", "migrate-memory", "--root", str(source)) == 0
     assert record.is_file()
     assert list((runtime / "spool/private-feedback/knowledge/topics").rglob("candidate.md"))
+
+
+def test_sync_request_host_readback_and_private_log_mount_are_separate(tmp_path: Path) -> None:
+    """The container request is consumed by host Git and its checkout is RO-mounted."""
+    remote, _seed = _local_remote(tmp_path)
+    control = tmp_path / "control"
+    log_root = control / "agent-canon-log"
+    runtime = control / "runtime"
+    log_root.mkdir(parents=True)
+    invoke(runtime, "k", "add", "boundary", "keep archive host-owned", "--task", "t1")
+    assert invoke(runtime, "k", "sync", log_root=log_root) == 0
+    request = runtime / "spool/private-feedback/sync-request.json"
+    assert request.is_file()
+    assert invoke(
+        runtime,
+        "--remote",
+        f"file://{remote}",
+        "host-sync",
+        log_root=log_root,
+    ) == 0
+    assert not request.exists()
+    remote_head = subprocess.run(
+        ["git", "-C", str(log_root), "rev-parse", "origin/main"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    local_head = subprocess.run(
+        ["git", "-C", str(log_root), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert local_head == remote_head
+    manager = BootstrapRuntime(control, runtime, repository_root=Path(__file__).resolve().parents[2])
+    manager._ensure_layout()
+    mount = next(item for item in manager._mounts({}) if item["destination"] == PRIVATE_LOG_DESTINATION)
+    assert mount["mode"] == "read-only"

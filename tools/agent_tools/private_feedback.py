@@ -37,6 +37,8 @@ LOG_REMOTE = "git@github.com:iwashita-nozomu/agent-canon-log.git"
 LOG_MAIN_COMMIT = "db3722b817be8574c682949db733df0fb5c2674a"
 PRIVATE_SPOOL_NAME = "private-feedback"
 PRIVATE_SKILLS_DIR = "private-skills"
+SYNC_REQUEST_NAME = "sync-request.json"
+SYNC_REQUEST_SCHEMA = "agent-canon.private-feedback-sync-request.v1"
 SECRET_PATTERN = re.compile(
     r"(?is)(?:\b(?:password|passwd|secret|token|api[_ -]?key|authorization|cookie)\b\s*[:=]\s*\S+|"
     r"\bBearer\s+\S+|-----BEGIN (?:OPENSSH|RSA|EC|PRIVATE) KEY-----)"
@@ -121,6 +123,11 @@ def _spool_root(runtime: Path) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     path.chmod(0o700)
     return path
+
+
+def _sync_request_path(spool: Path) -> Path:
+    """Return the credential-free request exchanged with the host adapter."""
+    return spool / SYNC_REQUEST_NAME
 
 
 def _safe_relative(value: str) -> Path:
@@ -224,7 +231,7 @@ def _record_path(kind: str, topic: str, digest: str, spool: Path) -> Path:
 
 
 def _pending_paths(spool: Path) -> Iterable[Path]:
-    for family in ("feedback", "knowledge", "runtime"):
+    for family in ("feedback", "knowledge", "runtime", PRIVATE_SKILLS_DIR):
         root = spool / family
         if root.is_dir():
             yield from (path for path in root.rglob("*") if path.is_file())
@@ -398,7 +405,13 @@ def _git(path: Path, argv: list[str], *, check: bool = True) -> subprocess.Compl
 
 def ensure_clone(log_root: Path, remote: str = LOG_REMOTE) -> dict[str, str]:
     log_root.parent.mkdir(parents=True, exist_ok=True)
-    if not log_root.exists():
+    if log_root.exists() and log_root.is_symlink():
+        raise PrivateFeedbackError("log_clone_invalid", "private log root is a symlink")
+    if log_root.exists() and not log_root.is_dir():
+        raise PrivateFeedbackError("log_clone_invalid", "private log root is not a directory")
+    if log_root.exists() and not (log_root / ".git").exists() and any(log_root.iterdir()):
+        raise PrivateFeedbackError("log_clone_invalid", "private log root is not an empty checkout directory")
+    if not (log_root / ".git").exists():
         result = subprocess.run(
             ["git", "clone", "--no-tags", remote, str(log_root)],
             check=False,
@@ -496,9 +509,56 @@ def _copy_raw_for_annex(spool: Path, log_root: Path) -> list[Path]:
     return copied
 
 
-def sync(args: argparse.Namespace) -> int:
+def sync_request(args: argparse.Namespace) -> int:
+    """Request host publication without touching a Git checkout.
+
+    This function runs in the tool container.  Bodies remain in the external
+    writable spool and the request itself contains no body, credentials, or
+    host checkout path.  The host bootstrap consumes it after the container
+    command returns.
+    """
     runtime = _runtime_root(args.runtime_root)
     spool = _spool_root(runtime)
+    request = {
+        "schema": SYNC_REQUEST_SCHEMA,
+        "operation": "sync",
+        "execution_plane": "agentcanon_tool_container",
+        "requested_at": _now(),
+        "source_commit": _source_commit(),
+    }
+    _write_once(
+        _sync_request_path(spool),
+        json.dumps(request, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
+    )
+    _json_meta(
+        {
+            "schema": SCHEMA,
+            "status": "requested",
+            "execution_plane": "agentcanon_tool_container",
+            "request": "private-feedback-sync",
+        }
+    )
+    return 0
+
+
+def host_sync(args: argparse.Namespace) -> int:
+    """Consume one container request and publish it from the host plane."""
+    runtime = _runtime_root(args.runtime_root)
+    spool = _spool_root(runtime)
+    request_path = _sync_request_path(spool)
+    if not request_path.is_file() or request_path.is_symlink():
+        raise PrivateFeedbackError("sync_request_missing", "private feedback sync request is unavailable")
+    try:
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PrivateFeedbackError("sync_request_invalid", "private feedback sync request is invalid") from exc
+    if (
+        not isinstance(request, dict)
+        or request.get("schema") != SYNC_REQUEST_SCHEMA
+        or request.get("operation") != "sync"
+        or request.get("execution_plane") != "agentcanon_tool_container"
+    ):
+        raise PrivateFeedbackError("sync_request_invalid", "private feedback sync request schema is invalid")
     log_root = _log_root(args.log_root)
     remote = str(args.remote or os.environ.get("AGENT_CANON_LOG_REMOTE", LOG_REMOTE))
     legacy = _legacy_runtime_clone(runtime)
@@ -520,7 +580,7 @@ def sync(args: argparse.Namespace) -> int:
     normal_copied = _copy_pending(spool, log_root)
     copied = normal_copied + annex_raw
     if pending_raw:
-        meta = {"schema": SCHEMA, "status": "pending", "reason": "annex-special-remote-required", "clone": str(log_root), "branch": "main", "copied": len(copied), "migration": migration}
+        meta = {"schema": SCHEMA, "status": "pending", "execution_plane": "host_archive_adapter", "reason": "annex-special-remote-required", "clone": str(log_root), "branch": "main", "copied": len(copied), "migration": migration}
         _json_meta({k: str(v) for k, v in meta.items()})
         return 1
     if normal_copied:
@@ -548,7 +608,8 @@ def sync(args: argparse.Namespace) -> int:
                 directory.rmdir()
             except OSError:
                 pass
-    _json_meta({"schema": SCHEMA, "status": "synced", "clone": str(log_root), "branch": "main", "commit": remote_head, "tree": remote_tree, "copied": str(len(copied)), "migration": migration})
+    request_path.unlink()
+    _json_meta({"schema": SCHEMA, "status": "synced", "execution_plane": "host_archive_adapter", "clone": str(log_root), "branch": "main", "commit": remote_head, "tree": remote_tree, "copied": str(len(copied)), "migration": migration})
     return 0
 
 
@@ -638,6 +699,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--task", default="")
     parser.add_argument("--remote", default="")
     sub = parser.add_subparsers(dest="family", required=True)
+    sub.add_parser("host-sync")
     for family in ("knowledge", "k", "feedback", "f"):
         family_parser = sub.add_parser(family)
         family_sub = family_parser.add_subparsers(dest="operation", required=True)
@@ -688,13 +750,15 @@ def main(argv: list[str] | None = None) -> int:
             index += 1
     args = build_parser().parse_args(leading + remaining)
     family = str(args.family)
+    if family == "host-sync":
+        return host_sync(args)
     operation = str(args.operation)
     if operation == "add":
         return add(args, "knowledge" if family in {"knowledge", "k"} else "feedback")
     if operation == "read":
         return read(args)
     if operation == "sync":
-        return sync(args)
+        return sync_request(args)
     if operation == "status":
         return status(args)
     if operation == "capture":

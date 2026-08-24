@@ -65,6 +65,7 @@ KNOWN_SUBDIRS = (
 )
 CONTAINER_RUNTIME_DIR = "container-runtime"
 CONTAINER_RUNTIME_DESTINATION = "/var/lib/agent-canon/runtime"
+PRIVATE_LOG_DESTINATION = "/var/lib/agent-canon/private-log"
 REGISTRY_DESTINATION = "/var/lib/agent-canon/mount-registry.toml"
 REQUIRED_LABELS = frozenset(
     {
@@ -1108,6 +1109,7 @@ class DockerAdapter:
                 "GIT_CONFIG_KEY_0",
                 "GIT_CONFIG_VALUE_0",
                 "AGENT_CANON_OUTPUT_ROOT",
+                "AGENT_CANON_LOG_ROOT",
             }:
                 raise BootstrapError("environment_rejected", key)
             command.extend(("--env", f"{key}={value}"))
@@ -1351,6 +1353,15 @@ class BootstrapRuntime:
             os.close(fd)
         elif self.paths.lock.is_symlink():
             raise BootstrapError("symlink_path_rejected", "lifecycle lock is a symlink")
+        private_log = self.paths.control_parent_root / "agent-canon-log"
+        if private_log.exists() and private_log.is_symlink():
+            raise BootstrapError("symlink_path_rejected", "private log checkout is a symlink")
+        if not private_log.exists():
+            try:
+                private_log.mkdir(mode=0o700)
+            except OSError as exc:
+                raise BootstrapError("private_log_mount_invalid", "cannot create private log mount") from exc
+        self._enforce_private_directory(private_log)
 
     def _enforce_private_directory(self, path: Path) -> None:
         """Make an owned Host control directory private and verify readback."""
@@ -1708,6 +1719,11 @@ class BootstrapRuntime:
             {
                 "source": str(self.paths.mounts),
                 "destination": REGISTRY_DESTINATION,
+                "mode": "read-only",
+            },
+            {
+                "source": str(self.paths.control_parent_root / "agent-canon-log"),
+                "destination": PRIVATE_LOG_DESTINATION,
                 "mode": "read-only",
             },
         ]
@@ -3216,6 +3232,56 @@ class BootstrapRuntime:
             )
         return prepared
 
+    def _host_private_feedback_sync(self) -> dict[str, Any] | None:
+        """Publish a container-created private sync request on the host."""
+        request = self.paths.runtime_root / "spool" / "private-feedback" / "sync-request.json"
+        if not request.is_file() or request.is_symlink():
+            return None
+        adapter = self.repository_root / "tools" / "agent_tools" / "private_feedback.py"
+        if not adapter.is_file():
+            raise BootstrapError("private_feedback_sync_unavailable", "host archive adapter is unavailable")
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(adapter),
+                "--runtime-root",
+                str(self.paths.runtime_root),
+                "--log-root",
+                str(self.paths.control_parent_root / "agent-canon-log"),
+                "host-sync",
+            ],
+            cwd=str(self.repository_root),
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        payload: dict[str, Any] = {}
+        for line in reversed((result.stdout or "").splitlines()):
+            try:
+                candidate = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(candidate, dict):
+                payload = candidate
+                break
+        if result.returncode != 0:
+            raise BootstrapError(
+                "private_feedback_sync_failed",
+                str(payload.get("code", "host_archive_adapter_failed")),
+                evidence={
+                    "adapter_exit": result.returncode,
+                    "adapter_status": payload.get("status", "error"),
+                    "request_sha256": sha256_bytes(request.read_bytes()),
+                },
+            )
+        return {
+            "execution_plane": "host_archive_adapter",
+            "status": payload.get("status", "synced"),
+            "commit": payload.get("commit"),
+            "tree": payload.get("tree"),
+            "copied": payload.get("copied", "0"),
+        }
+
     def exec(
         self,
         root: Path,
@@ -3251,6 +3317,7 @@ class BootstrapRuntime:
                     "GIT_CONFIG_COUNT": "1",
                     "GIT_CONFIG_KEY_0": "safe.directory",
                     "GIT_CONFIG_VALUE_0": f"/targets/{target['digest']}",
+                    "AGENT_CANON_LOG_ROOT": PRIVATE_LOG_DESTINATION,
                 }
                 environment.update(extra_environment or {})
                 result = self.docker.exec_container(
@@ -3331,6 +3398,31 @@ class BootstrapRuntime:
                             "stderr_truncated": io["stderr_truncated"],
                         },
                     )
+                if len(argv) >= 3 and argv[0] == "agent-canon" and argv[1] in {"knowledge", "k", "feedback", "f"} and argv[2] == "sync":
+                    try:
+                        details["private_feedback_sync"] = self._host_private_feedback_sync()
+                    except BootstrapError as exc:
+                        details["private_feedback_sync"] = {
+                            "execution_plane": "host_archive_adapter",
+                            "status": "error",
+                            "code": exc.code,
+                        }
+                        failure_receipt = self._result(
+                            self._receipt(
+                                "exec",
+                                "error",
+                                exc.code,
+                                before="running",
+                                after="running",
+                                details=details,
+                                state=state,
+                            )
+                        )
+                        raise BootstrapError(
+                            exc.code,
+                            exc.detail,
+                            evidence={**exc.evidence, "receipt_path": failure_receipt["receipt_path"]},
+                        ) from exc
                 return self._result(
                     self._receipt(
                         "exec",
