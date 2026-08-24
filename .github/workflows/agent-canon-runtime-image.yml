@@ -43,6 +43,7 @@ jobs:
           docker buildx create \
             --name "${BUILDER_NAME}" \
             --driver docker-container \
+            --driver-opt network=host \
             --use
           docker buildx inspect --bootstrap "${BUILDER_NAME}"
 
@@ -53,6 +54,7 @@ jobs:
           metadata_file="${RUNNER_TEMP}/agent-canon-runtime-image-metadata.json"
           docker buildx build \
             --builder "${BUILDER_NAME}" \
+            --network host \
             --file bootstrap/container/Dockerfile \
             --platform linux/amd64,linux/arm64 \
             --tag "${IMAGE_NAME}:sha-${GITHUB_SHA}" \
