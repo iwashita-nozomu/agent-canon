@@ -127,9 +127,10 @@ CANONICAL_RUST_SOURCE_FILES = (
     "src/semantic_index/relations.rs", "src/semantic_index/report.rs",
     "src/semantic_index/source.rs", "src/semantic_index/storage.rs",
     "src/semantic_index/tests.rs", "src/structured_analysis.rs",
-    "src/test_design.rs", "tests/python_algorithm_contract_cli.rs",
+    "src/test_design.rs", "src/private_feedback.rs",
+    "tests/python_algorithm_contract_cli.rs",
 )
-CANONICAL_RUST_SOURCE_SHA256 = "15529a055d4d1b259708fb01a420605c4cc3f2b2b732b2f9e0318504f85b8975"
+CANONICAL_RUST_SOURCE_SHA256 = "992a9185011ac221558c9337eb7cb427777cd938f719b2b4f50b35430eb99662"
 CANONICAL_CARGO_LOCK_SHA256 = "060b8825843b14b12bebb9da095503f4ec7f68a77934e595c082957cb1f72638"
 CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 APT_PACKAGE_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]*$")
