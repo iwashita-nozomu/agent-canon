@@ -1,0 +1,42 @@
+name: Issue 871 merge bundle
+
+on:
+  push:
+    branches:
+      - tmp/871-merge-bundle
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Materialize immutable source refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          test "$(git rev-parse 1df5c74b65769bc2a422393041720dff0286f5ba)" = "1df5c74b65769bc2a422393041720dff0286f5ba"
+          test "$(git rev-parse 979a2dd977a1afd3b2d349fa5da01b4f5cd46c7f)" = "979a2dd977a1afd3b2d349fa5da01b4f5cd46c7f"
+          git update-ref refs/heads/issue-871-ours 1df5c74b65769bc2a422393041720dff0286f5ba
+          git update-ref refs/heads/issue-871-main 979a2dd977a1afd3b2d349fa5da01b4f5cd46c7f
+          git bundle create /tmp/agent-canon-871.bundle \
+            refs/heads/issue-871-ours refs/heads/issue-871-main
+          git bundle verify /tmp/agent-canon-871.bundle
+          sha256sum /tmp/agent-canon-871.bundle > /tmp/agent-canon-871.bundle.sha256
+
+      - name: Upload immutable bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-871-git-bundle
+          path: |
+            /tmp/agent-canon-871.bundle
+            /tmp/agent-canon-871.bundle.sha256
+          if-no-files-found: error
+          retention-days: 1
