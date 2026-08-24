@@ -687,25 +687,6 @@ entries:
     tests:
       - tests/agent_tools/test_import_responsibility.py
 
-  - id: issue-sync
-    summary: Validates local AgentCanon issue files and checks or syncs GitHub Issue mirrors.
-    path: tools/agent_tools/issue_sync.py
-    family: agent_tools
-    role: sync
-    status: canonical
-    command: python3 tools/agent_tools/issue_sync.py
-    writes: true
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - issues/README.md
-      - documents/design/responsibility-scope-management.md
-    tests:
-      - tests/agent_tools/test_issue_sync.py
-
   - id: github-publish
     summary: Publishes verified GitHub branches, pull requests, and PR checks through gh with explicit user-task evidence and verified remote policy.
     path: tools/agent_tools/github_publish.py

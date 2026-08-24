@@ -6,7 +6,7 @@ contract agent-runtime
 responsibility Defines deterministic GitHub Issue status-label lifecycle reconciliation, evidence, concurrency, and readback requirements.
 upstream design ../../documents/conventions/software-engineering-principles.md shared correctness, ownership, failure, and traceability precedence
 upstream design ../../documents/operations/issue-label-taxonomy.toml machine-readable repository label mapping
-upstream design ../../issues/README.md durable issue-file and GitHub mirror convention
+upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue packet convention
 downstream design ../skills/pr-processing.md invokes this routine inside the GitHub publication boundary
 downstream implementation ../../.agents/skills/_github-status-lifecycle/SKILL.md exposes this routine as a private runtime skill
 downstream implementation ../../tools/agent_tools/github_status_lifecycle.py projects the transport and reconciliation contract
@@ -43,7 +43,7 @@ Read-only inspection、通常の review、Issue triage、taxonomy 設計だけ�
 | Evidence comment | this routine | required fields、retry identity、duplicate/conflict stop | implementation/validation result の生成 |
 | GitHub transport | `GhStatusAdapter` | snapshot、comment、single-label API、readback | lifecycle の意味論、full-label replacement |
 | Label mutation publication | `pr-processing` | caller authority and publication readback | second transition table or predicate |
-| Durable issue mirror | `issues/README.md` | comment から mirror/PR に辿れる要求 | issue-sync protocol |
+| Durable Issue authority | repository-qualified GitHub URL/number | comment、PR、packetから対象へ辿れる要求 | host GitHub adapter |
 
 `pr-processing` は target resolution、fresh initial read、authority、adapter invocation、
 publication closeout のみを行います。mutation order、retry identity、success predicate

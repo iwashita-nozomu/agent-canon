@@ -3,7 +3,7 @@
 contract reference
 responsibility Documents レビュー手順とポリシー for this repository.
 upstream design README.md durable document index
-upstream design ../../issues/README.md durable issue and GitHub mirror policy
+upstream design ../runtime/private-feedback-knowledge.md GitHub Issue authority and private packet policy
 upstream design ../runtime/runtime-profiles-and-check-matrix.json validation profile taxonomy owner
 downstream design ../design/algorithm-implementation-boundary.md algorithm math-to-code boundary policy
 @dependency-end
@@ -146,9 +146,8 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 1. checkpoint review と final acceptance review では、`fix now` と
    `follow-up` finding ごとに `issue_route` を記録します。現在の review loop で
    閉じる finding は `run_local_resolution:<evidence>`、durable に残す finding は
-   `existing_issue:<path-or-url>` または
-   `new_local_issue:<issues/open/AC-YYYYMMDD-slug.md>`、GitHub で見える triage が必要な
-   finding は `github_mirror:<issue_sync.py command-or-url>` を使います。
+   `existing_issue:<owner/repository#number-or-url>`、GitHub で見える triage が必要な
+   finding は `github_issue:<owner/repository#number-or-url>` を使います。
 1. final acceptance review 前に read-only diff-check agent が最新 diff を確認し、decision、findings disposition、再実行 evidence を artifact に残します。指摘に応じて修正した場合は loop を先頭へ戻し、最新 diff で再度 diff-check agent を通します。
 1. review artifact が `revise`、`required_change`、または fix-now finding を返し、その指摘に応じて実装・文書・test・workflow を修正した場合は、修正の大小に関係なく required review family 全体を最新 diff に対してやり直します。直前の approve を流用して closeout してはいけません。
 1. 各 review では artifact に `request_clause_ids` があるか確認し、無い場合は差し戻します。
@@ -240,13 +239,13 @@ findings は少なくとも次に分けます。
 Review artifact の finding table には `issue_route` を置きます。
 
 - `run_local_resolution:<evidence>`: 現在の diff、validation、または review loop で閉じる finding。
-- `existing_issue:<path-or-url>`: 既存の `issues/open/AC-*.md`、`issues/closed/AC-*.md`、または GitHub Issue に接続する finding。
-- `new_local_issue:<issues/open/AC-YYYYMMDD-slug.md>`: `issues/README.md` の required fields を満たす durable local issue として起票する finding。
-- `github_mirror:<issue_sync.py command-or-url>`: local issue を operator-facing GitHub Issue へ mirror する finding。
+- `existing_issue:<owner/repository#number-or-url>`: 既存の repository-qualified GitHub Issue に接続する finding。
+- `github_issue:<owner/repository#number-or-url>`: GitHub Issueを唯一のdurable authorityとして扱うfinding。
 
-Durable operational defect は local issue file を正本にします。GitHub Issue は
-`python3 tools/agent_tools/issue_sync.py --root . --repo <owner>/<repo>` の
-plan output、または explicit apply / sync command に接続します。
+Durable operational defect は GitHub Issue を正本にします。オフライン時は
+private `agent-canon-log/feedback/issue-packets/pending/` にlocator/digestだけを置き、
+host adapterが `python3 tools/agent_tools/issue_sync.py --sync-pending --repo <owner>/<repo>`
+で公開し、URL/number/title/body/stateをreadbackしてpacketを解決します。
 
 ## 関連正本
 

@@ -40,7 +40,7 @@ that still names one to the Rust command before returning to the original task.
 
 - `accumulated_eval_result`: `.agent-canon/log-archive/eval-results/` の蓄積結果。正本 policy ではなく evidence。
 - `generated_report`: `reports/` 配下。再生成または evidence として扱い、source policy にしません。
-- `closed_issue_record`: `issues/closed/` 配下。履歴 record として保持し、新 scope は新 issue にします。
+- `github_issue_record`: repository-qualified GitHub Issue URL/number。GitHubを正本とし、source treeに履歴mirrorを作りません。
 - `missing_dependency_manifest`: 文書として残すなら dependency header を足し、artifact なら source tree 外へ移します。
 - `duplicate_heading_candidate`: H1 が重複する active 文書。merge、retitle、または両方が必要な理由を明記します。
 - `stale_name_candidate`: path 名が backup / copy / legacy / old / snapshot / stale を示す候補。現行正本か確認します。

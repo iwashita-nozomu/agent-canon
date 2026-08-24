@@ -143,7 +143,7 @@ path: tools/ci/check_github_workflows.py
     "documents/conventions/REVIEW_PROCESS.md": (
         "review structure-planning prose-reasoning-graph md-style-check "
         "structure_contract=skipped Review Finding Issue Routing issue_route "
-        "issues/open/ issue_sync.py github_mirror\n"
+        "github_issue issue_sync.py private packet\n"
     ),
     "documents/runtime/runtime-profiles-and-check-matrix.md": (
         "Static analysis and reading evidence primary validation evidence "
@@ -294,7 +294,7 @@ path: tools/ci/check_github_workflows.py
         "return-gate validation\n"
     ),
     "agents/skills/change-review.md": (
-        "issue_route issues/open/ issue_sync.py new_local_issue github_mirror "
+        "issue_route github_issue issue_sync.py private packet "
         "python-review $oop-readability-check tools/agent_tools/check_solid_evidence.py "
         "SOLID principle signal OOP readability report class Protocol\n"
     ),

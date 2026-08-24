@@ -289,7 +289,6 @@ skill_families:
       conditional:
       - python3 tools/agent_tools/check_solid_evidence.py --root . <changed-python-paths>
         --evidence <oop-readability-report>
-      - python3 tools/agent_tools/issue_sync.py --root .
       - bash tools/agent_tools/run_repo_dependency_review.sh
       - git diff --stat
       - git diff --name-only
@@ -541,7 +540,7 @@ skill_families:
         - ["run_repo_dependency_review.sh", "dependency", "graph"]
         - ["run_repo_dependency_review.sh", "修正先"]
   - id: issue-finding-report
-    purpose: Convert observed defects or accumulated evidence into cause-qualified durable Issues, and reorganize related open and closed Issues into cohesive responsibility units without clause loss.
+    purpose: Convert observed defects or accumulated evidence into cause-qualified repository-qualified GitHub Issues, and reorganize related Issues into cohesive responsibility units without clause loss.
     canonical_doc: agents/skills/issue-finding-report.md
     shim: .agents/skills/issue-finding-report/SKILL.md
     discovery:
@@ -552,8 +551,8 @@ skill_families:
       conditional:
       - python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
       - python3 tools/agent_tools/generate_agent_runtime_dashboard.py
-      - git grep -n "<cause keywords>" -- issues memory documents/notes/failures documents agents
-      - python3 tools/agent_tools/issue_sync.py --root .
+      - git grep -n "<cause keywords>" -- memory documents/notes/failures documents agents
+      - python3 tools/agent_tools/issue_sync.py --issue-url <owner/repository#number>
       - bash tools/agent_tools/run_repo_dependency_review.sh
       - python3 tools/agent_tools/check_dependency_headers.py --changed
       - bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing

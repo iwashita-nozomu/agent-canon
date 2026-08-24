@@ -1720,7 +1720,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 / "PULL_REQUEST_TEMPLATE"
                 / "agent_canon.md"
             )
-            issue_readme = root / "vendor" / "agent-canon" / "issues" / "README.md"
+            issue_readme = root / "vendor" / "agent-canon" / "documents" / "runtime" / "private-feedback-knowledge.md"
             root_copy.parent.mkdir(parents=True)
             source_copy.parent.mkdir(parents=True)
             issue_readme.parent.mkdir(parents=True)
@@ -1731,7 +1731,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                     "@dependency-start",
                     "contract test",
                     "responsibility Defines a template AgentCanon PR checklist copy.",
-                    "upstream design ../../vendor/agent-canon/issues/README.md durable issue storage",
+                    "upstream design ../../vendor/agent-canon/documents/runtime/private-feedback-knowledge.md private Issue packet storage",
                     "@dependency-end",
                     "-->",
                     "",
@@ -1768,7 +1768,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             )
             self.assertIn(
                 "upstream\tdesign\t.github/PULL_REQUEST_TEMPLATE/agent_canon.md\t"
-                "vendor/agent-canon/issues/README.md",
+                "vendor/agent-canon/documents/runtime/private-feedback-knowledge.md",
                 graph_result.stdout,
             )
             self.assertNotIn("\tissues/README.md", graph_result.stdout)

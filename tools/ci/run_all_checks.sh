@@ -21,7 +21,6 @@
 # upstream implementation ../agent_tools/tool_drift.py validates tool/convention trace contracts
 # upstream implementation ../agent_tools/skill_tool_commands.py validates runtime skill command packets
 # upstream implementation ../agent_tools/responsibility_scope.py validates responsibility-scope coverage
-# upstream implementation ../agent_tools/issue_sync.py validates local issue sync state
 # upstream implementation ../agent_tools/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
 # upstream implementation ../agent_tools/eval_accumulation_check.py validates eval result accumulation
 # upstream implementation ../agent_tools/runtime_log_archive_git.py manages mounted hook/eval log archive branches
@@ -525,12 +524,6 @@ if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/responsibility_scope.py" 2>&1;
   echo "✅ responsibility scope checks 成功"
 else
   echo "❌ responsibility scope checks 失敗"
-  EXIT_CODE=1
-fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/issue_sync.py" 2>&1; then
-  echo "✅ local issue sync checks 成功"
-else
-  echo "❌ local issue sync checks 失敗"
   EXIT_CODE=1
 fi
 accumulated_eval_args=(

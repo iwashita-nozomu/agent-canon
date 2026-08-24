@@ -23,7 +23,8 @@ context から必要な record だけを on-demand で read します。
 観測は最初に次のいずれかへ分類します。
 
 - raw chat、時系列、hook/event、run bundle evidence: runtime log/evidence owner
-- actionable defect と修正 action: `issues/open/`
+- actionable defect と修正 action: repository-qualified GitHub Issue URL/number;
+  offline transport metadata は private `agent-canon-log/feedback/issue-packets/pending/`
 - 再発した failure pattern: `documents/notes/failures/`
 - owner を参照する独立した problem-solving knowledge: `memory/records/*.md`
 - repo-wide rule、workflow、stable preference: canonical owner への明示変更

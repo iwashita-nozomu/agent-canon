@@ -812,14 +812,6 @@ pub(crate) fn source_path_is_explicitly_excluded(relative_path: &str) -> bool {
     parts.len() >= 3 && parts[0] == "experiments" && matches!(parts[2], "result" | "report")
 }
 
-pub(crate) fn source_path_is_historical_dependency_record(relative_path: &str) -> bool {
-    relative_path
-        .split('/')
-        .collect::<Vec<_>>()
-        .windows(2)
-        .any(|components| components == ["issues", "closed"])
-}
-
 fn path_is_surface_or_descendant(relative: &str, surface: &str) -> bool {
     relative
         .strip_prefix(surface)
@@ -1413,9 +1405,6 @@ pub(crate) fn capture_snapshot(
             });
             continue;
         }
-        if source_path_is_historical_dependency_record(relative) {
-            continue;
-        }
         let Ok(text) = String::from_utf8(candidate.bytes.clone()) else {
             continue;
         };
@@ -1670,7 +1659,7 @@ mod tests {
     use super::{
         declaration_identity, diagnostic_identity_json, manifest_lines,
         resolve_source_relative_target, source_diagnostic,
-        source_path_is_historical_dependency_record, source_span, target_path_diagnostic_code,
+        source_span, target_path_diagnostic_code,
         TargetPathError, SOURCE_DIAGNOSTIC_SCHEMA,
     };
     use std::path::Path;
@@ -1704,16 +1693,6 @@ mod tests {
             .1,
             "contract implementation"
         );
-    }
-
-    #[test]
-    fn closed_issues_are_historical_dependency_records() {
-        assert!(source_path_is_historical_dependency_record(
-            "issues/closed/AC-20260612-wave-activation-launcher-gap.md"
-        ));
-        assert!(!source_path_is_historical_dependency_record(
-            "issues/open/AC-20260612-active-finding.md"
-        ));
     }
 
     #[test]

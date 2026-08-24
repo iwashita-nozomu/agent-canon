@@ -432,10 +432,10 @@ context evidence. Freshness binds parent HEAD, dirty fingerprint, source
 snapshot, producer hashes, profile pair `default`/`parent`, schema, and tool
 versions; stale state is reported and never silently rebuilt.
 
-`issues/closed/` records are historical evidence, not active dependency
-owners. They remain source identities so active canon may cite a closed issue,
-but their dependency headers do not emit declarations or unresolved-target
-diagnostics. `issues/open/` records retain the ordinary active manifest route.
+GitHub Issue records are external authority and are not traversed as source
+documents or dependency-header owners. Repository-qualified URLs/numbers may
+be cited by active canon, while private offline packets contain only locator
+and digest metadata under `agent-canon-log`.
 
 ### Executable finite-set contract
 

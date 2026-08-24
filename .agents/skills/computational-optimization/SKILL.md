@@ -2,7 +2,7 @@
 name: computational-optimization
 description: "Use when designing, implementing, reviewing, or diagnosing numerical optimization, solvers, preconditioners, convergence, gradients, Jacobians, Hessians, KKT conditions, tolerances, or optimization benchmarks; fixes the mathematical and validation contract before code or experiment changes."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"baee9fadd427c92332c2710a0fe9889b5c85b5ff7c7c2d2bd28642b7ba46d343"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"c0eff7ae067d4aa0150eb1c74d839f4281b554a0670ed85081046c3bab252fe6"} -->
 
 <!--
 @dependency-start

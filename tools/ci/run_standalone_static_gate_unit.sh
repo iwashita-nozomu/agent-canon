@@ -101,7 +101,6 @@ run_contracts() {
   git rev-parse --verify "origin/${base_ref}^{commit}" >/dev/null
   python3 "${TOOLS_ROOT}/agent_tools/import_responsibility.py" \
     --changed --baseline-ref "origin/${base_ref}"
-  python3 "${TOOLS_ROOT}/agent_tools/issue_sync.py"
   PYTHONPATH="${ROOT}/tools/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
     python3 "${ROOT}/tools/agent_tools/check_agent_runtime_alignment.py"
   python3 "${TOOLS_ROOT}/agent_tools/check_convention_compliance.py" \

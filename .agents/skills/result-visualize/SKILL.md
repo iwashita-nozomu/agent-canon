@@ -2,7 +2,7 @@
 name: result-visualize
 description: "Use when designing reusable result visualizations that bind each figure to its exact calculation, coverage, and chart geometry in one contract."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"15f26c0395aaadebe0d54ff7c9e652757bf4e5914603e26c05053b4042d1eed6"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"87a54f1abb6793113662c4511dee3559365c9655a2eec6bbddcd8c077b21cd40"} -->
 
 <!--
 @dependency-start

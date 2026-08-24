@@ -713,7 +713,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
                                 "source_tool=legacy-forwarder severity=fix-now "
                                 "status=deferred_with_issue "
                                 "message=deprecated_wrapper "
-                                "repair_command=agent-canon_cli issue=issues/open/W1.md"
+                                "repair_command=agent-canon_cli issue=https://github.com/owner/repo/issues/1"
                             ),
                         ]
                     ),
