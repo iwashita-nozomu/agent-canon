@@ -1,4 +1,4 @@
-name: Issue 871 merge bundle
+name: Issue 871 semantic main integration
 
 on:
   push:
@@ -6,10 +6,10 @@ on:
       - tmp/871-merge-bundle
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  bundle:
+  integrate:
     runs-on: ubuntu-latest
     steps:
       - name: Check out source history
@@ -17,26 +17,214 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Materialize immutable source refs
+      - name: Merge current main without changing the PR branch
         shell: bash
+        env:
+          ISSUE_HEAD: 1df5c74b65769bc2a422393041720dff0286f5ba
+          MAIN_HEAD: 979a2dd977a1afd3b2d349fa5da01b4f5cd46c7f
+          TEMP_REF: tmp/871-merge-bundle
         run: |
           set -euo pipefail
-          git fetch --no-tags origin main
-          test "$(git rev-parse 1df5c74b65769bc2a422393041720dff0286f5ba)" = "1df5c74b65769bc2a422393041720dff0286f5ba"
-          test "$(git rev-parse 979a2dd977a1afd3b2d349fa5da01b4f5cd46c7f)" = "979a2dd977a1afd3b2d349fa5da01b4f5cd46c7f"
-          git update-ref refs/heads/issue-871-ours 1df5c74b65769bc2a422393041720dff0286f5ba
-          git update-ref refs/heads/issue-871-main 979a2dd977a1afd3b2d349fa5da01b4f5cd46c7f
-          git bundle create /tmp/agent-canon-871.bundle \
-            refs/heads/issue-871-ours refs/heads/issue-871-main
-          git bundle verify /tmp/agent-canon-871.bundle
-          sha256sum /tmp/agent-canon-871.bundle > /tmp/agent-canon-871.bundle.sha256
+          lease="$(git rev-parse "origin/${TEMP_REF}")"
+          git fetch --no-tags origin main "${TEMP_REF}"
+          test "$(git rev-parse "${ISSUE_HEAD}")" = "${ISSUE_HEAD}"
+          test "$(git rev-parse "${MAIN_HEAD}")" = "${MAIN_HEAD}"
 
-      - name: Upload immutable bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: issue-871-git-bundle
-          path: |
-            /tmp/agent-canon-871.bundle
-            /tmp/agent-canon-871.bundle.sha256
-          if-no-files-found: error
-          retention-days: 1
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --detach "${ISSUE_HEAD}"
+          git merge --no-ff --no-commit -X ours "${MAIN_HEAD}"
+          test -z "$(git diff --name-only --diff-filter=U)"
+
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          from pathlib import Path
+          import subprocess
+
+          MAIN = "979a2dd977a1afd3b2d349fa5da01b4f5cd46c7f"
+
+          def show(path: str) -> str:
+              return subprocess.check_output(
+                  ["git", "show", f"{MAIN}:{path}"], text=True
+              )
+
+          def read(path: str) -> str:
+              return Path(path).read_text(encoding="utf-8")
+
+          def write(path: str, text: str) -> None:
+              Path(path).write_text(text, encoding="utf-8")
+
+          protocol_path = "agents/COMMUNICATION_PROTOCOL.md"
+          protocol = read(protocol_path)
+          if "## Owner and invalidation packets" not in protocol:
+              source = show(protocol_path)
+              start = source.index("## Owner and invalidation packets")
+              anchor = "Before the generic runtime-event artifact exists"
+              end = source.index(anchor, start)
+              protocol = protocol.replace(anchor, source[start:end] + anchor, 1)
+          write(protocol_path, protocol)
+
+          orchestration_path = "agents/skills/agent-orchestration.md"
+          orchestration = read(orchestration_path)
+          if "## Distributed owner correspondence" not in orchestration:
+              source = show(orchestration_path)
+              start = source.index("## Distributed owner correspondence")
+              anchor = "### Canonical Skill Invocation Order"
+              end = source.index(anchor, start)
+              orchestration = orchestration.replace(anchor, source[start:end] + anchor, 1)
+          write(orchestration_path, orchestration)
+
+          catalog_path = "agents/task_catalog.yaml"
+          catalog = read(catalog_path)
+          old_focus = (
+              "Review roles provide their named findings; integration_executor owns "
+              "merge/conflict resolution and ship_reviewer owns final approval."
+          )
+          merged_focus = (
+              "Review roles provide hypotheses and named findings; owner-local receipts "
+              "establish correspondence. The parent owns transport, dependency ordering, "
+              "status reporting, and remote readback without approval or merge authority; "
+              "integration_executor owns merge/conflict resolution and ship_reviewer owns "
+              "final approval."
+          )
+          replacements = catalog.count(old_focus)
+          if replacements < 6:
+              raise RuntimeError(
+                  f"expected at least 6 task-catalog authority clauses, found {replacements}"
+              )
+          catalog = catalog.replace(old_focus, merged_focus)
+          old_design = (
+              "For analysis-heavy changes, require separate code dependency and header "
+              "dependency evidence before design approval."
+          )
+          new_design = (
+              "For analysis-heavy changes, require separate code dependency and header "
+              "dependency evidence before implementation selection; design prose remains "
+              "a proposal until an owner receipt establishes correspondence."
+          )
+          if old_design in catalog:
+              catalog = catalog.replace(old_design, new_design, 1)
+          write(catalog_path, catalog)
+
+          close_path = "tools/agent_tools/task_close.py"
+          closeout = read(close_path)
+          close_source = show(close_path)
+          dependency = (
+              "# upstream implementation ./packets.py owns owner-local receipt "
+              "normalization and compatibility.\n"
+          )
+          if dependency not in closeout:
+              anchor = (
+                  "# upstream implementation ./update_lifecycle_contract.py owns gate, "
+                  "cleanup, handback, and terminal ToolCall identities.\n"
+              )
+              if anchor not in closeout:
+                  raise RuntimeError("task_close dependency anchor missing")
+              closeout = closeout.replace(anchor, anchor + dependency, 1)
+
+          packet_import = next(
+              line
+              for line in close_source.splitlines()
+              if line.startswith("from packets import ")
+          ) + "\n"
+          if packet_import not in closeout:
+              anchor = "from autonomous_convergence import validate_closeout_projection\n"
+              if anchor not in closeout:
+                  raise RuntimeError("task_close import anchor missing")
+              closeout = closeout.replace(anchor, anchor + packet_import, 1)
+
+          if "def owner_receipt_closeout_consumer(" not in closeout:
+              start = close_source.index("OWNER_GUARANTEE_RECEIPTS_ARTIFACT_NAME")
+              end = close_source.index("\n\ndef _resolve_report_root", start)
+              block = close_source[start:end] + "\n\n"
+              anchor = "def _resolve_report_root"
+              if anchor not in closeout:
+                  raise RuntimeError("task_close function anchor missing")
+              closeout = closeout.replace(anchor, block + anchor, 1)
+
+          decision = "    owner_receipt_decision = owner_receipt_closeout_consumer(report_dir)\n"
+          if decision not in closeout:
+              anchor = (
+                  "    convergence_decision = "
+                  "validate_closeout_projection(review_convergence)\n"
+              )
+              if anchor not in closeout:
+                  raise RuntimeError("task_close decision anchor missing")
+              closeout = closeout.replace(anchor, anchor + decision, 1)
+
+          owner_check = (
+              '        "owner_receipts_consumer": '
+              'owner_receipt_decision.get("ready") is True,\n'
+          )
+          if owner_check not in closeout:
+              anchor = (
+                  '        "completion_coverage_consumer": '
+                  'completion_decision.get("ready") is True,\n'
+              )
+              if anchor not in closeout:
+                  raise RuntimeError("task_close check anchor missing")
+              closeout = closeout.replace(anchor, anchor + owner_check, 1)
+
+          print_marker = '        "OWNER_RECEIPTS_CONSUMER="'
+          if print_marker not in closeout:
+              start = close_source.index(
+                  '    print(\n        "OWNER_RECEIPTS_CONSUMER="'
+              )
+              anchor = '    print(\n        "CAPACITY_LIFECYCLE_CLOSEOUT="'
+              end = close_source.index(anchor, start)
+              if anchor not in closeout:
+                  raise RuntimeError("task_close print anchor missing")
+              closeout = closeout.replace(anchor, close_source[start:end] + anchor, 1)
+          write(close_path, closeout)
+
+          required = {
+              protocol_path: (
+                  "agent-canon.communication-capability-handshake.v1",
+                  "agent-canon.coordination-receipt.v1",
+                  "## Parent Orchestration-Only Contract",
+                  "## Owner and invalidation packets",
+              ),
+              orchestration_path: (
+                  "## Distributed owner correspondence",
+                  "integration executor performs merge and conflict resolution",
+                  "ship reviewers accept or reject",
+              ),
+              catalog_path: (
+                  "owner-local receipts establish correspondence",
+                  "without approval or merge authority",
+                  "integration_executor owns merge/conflict resolution",
+                  "ship_reviewer owns final approval",
+              ),
+              close_path: (
+                  "VERIFIER_RECEIPT_SCHEMA",
+                  "PARENT_MUTATION_EVIDENCE_SCHEMA",
+                  "def owner_receipt_closeout_consumer(",
+                  '"verifier_child_provenance"',
+                  '"parent_nonmutation_evidence"',
+                  '"owner_receipts_consumer"',
+              ),
+          }
+          for path, markers in required.items():
+              text = read(path)
+              missing = [marker for marker in markers if marker not in text]
+              if missing:
+                  raise RuntimeError(f"{path}: missing integrated markers: {missing}")
+          PY
+
+          git diff --check
+          python3 -m py_compile \
+            tools/agent_tools/autonomous_convergence.py \
+            tools/agent_tools/issue_sync.py \
+            tools/agent_tools/packets.py \
+            tools/agent_tools/publication_integrator.py \
+            tools/agent_tools/task_close.py
+          git add -A
+          git diff --cached --check
+          git commit -m "Merge main into runtime collaboration control plane (#871)"
+          test "$(git rev-parse HEAD^1)" = "${ISSUE_HEAD}"
+          test "$(git rev-parse HEAD^2)" = "${MAIN_HEAD}"
+          test ! -e .github/workflows/issue-871-merge-bundle.yml
+          git push \
+            --force-with-lease="refs/heads/${TEMP_REF}:${lease}" \
+            origin "HEAD:refs/heads/${TEMP_REF}"
