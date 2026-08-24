@@ -79,6 +79,10 @@ role_topology_defaults: &standard_role_topology
     implementation:
       - worker
       - spark_worker
+    integration:
+      - integration_executor
+    publication:
+      - publisher
     test_design:
       - test_designer
     review:
@@ -189,6 +193,14 @@ role_topology_defaults: &standard_role_topology
       stage_class: producer
       role_ids:
         - implementer
+    - id: integration
+      stage_class: producer
+      role_ids:
+        - integration_executor
+    - id: publication
+      stage_class: final
+      role_ids:
+        - publisher
     - id: test_design
       stage_class: reviewer
       role_ids:

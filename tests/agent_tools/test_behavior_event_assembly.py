@@ -19,6 +19,7 @@ from behavior_event_assembly import (  # noqa: E402
 )
 from prompt_classifier import PromptClassifierInputs  # noqa: E402
 from tool_selection import select_tools  # noqa: E402
+from subagent_selection import select_subagents  # noqa: E402
 from workflow_context import WorkflowContext  # noqa: E402
 
 
@@ -102,6 +103,26 @@ class BehaviorEventAssemblyTest(unittest.TestCase):
         self.assertEqual(data["workflow_attribution_kind"], "context")
         self.assertEqual(data["workflow_context_workflows"], ["scoped-change"])
         self.assertEqual(data["workflow_owner_workflows"], [])
+
+    def test_collaboration_operation_records_honest_transport(self) -> None:
+        """Observed operation names do not imply direct peer capability."""
+        parts = HookInvocationParts(
+            hook_event_name="PostToolUse",
+            hook_invocation_id="collaboration-operation",
+            hook_payload={"tool_name": "send_message"},
+            classifier_rules=PromptClassifierInputs("", Path("."), {}, {}),
+            subagent_selection=select_subagents({"tool_name": "send_message"}),
+            payload_fingerprint="f" * 64,
+            timestamp="2026-01-01T00:00:00Z",
+            root=Path("."),
+        )
+        event = record_hook_invocation(parts)
+        self.assertIsNotNone(event)
+        data = event.as_dict() if event is not None else {}
+        self.assertEqual(data["subagent_event_kind"], "send_message")
+        self.assertNotIn("coordination_capability_status", data)
+        self.assertNotIn("coordination_mode", data)
+        self.assertNotIn("coordination_receipt_status", data)
 
 
 if __name__ == "__main__":

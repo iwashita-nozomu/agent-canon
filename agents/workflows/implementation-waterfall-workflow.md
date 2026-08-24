@@ -188,7 +188,7 @@ decision が `approve` の場合に approval evidence になります。
     そのものを review 対象にし、`design_review.md` に design artifact path
     と対象 revision / section を記録します
   - selected Gate 6 の decision が `approve` でない場合だけ Gate 5 に戻します。reviewer
-    output は hypothesis であり、parent / integration owner が current snapshot、
+    output は hypothesis であり、decision-owning reviewer が current snapshot、
     reachable path、contract、witness/static proof を確認して adjudicate します
   - 文書通読レビューが active gate の場合は、`document_flow_review.md` の decision が `approve` でない限り Gate 5 に戻します
   - accepted finding が behavior、owner/design boundary、correctness、validation、
@@ -459,7 +459,7 @@ exit 条件:
 - 新規・変更する human-authored text file では旧 `Dependency Files:` block を使わず、`documents/design/dependency-manifest-design.md` の `@dependency-start` / `@dependency-end` 形式に統一します
 - 新しい dependency edge を足す場合は reverse edge も同じ pass の file plan に入れます。移行中で reverse edge 追加を同じ pass に含められない場合は、design review に blocker か明示 escalation として出します
 - `Canonical Tree-Head Plan` では、task 完了後に tracked tree に残してよい canonical design path と canonical implementation path を固定し、parallel design doc、implementation copy、dated snapshot、backup file、duplicate directory を作らないことを明示します
-- `bootstrap_agent_run.py` は `DESIGN_DOCUMENT_PACKET` と `IMPLEMENTATION_DOCUMENT_PACKET` を出力します。parent は designer / implementer subagent 起動時にその path 群をそのまま渡します
+- `bootstrap_agent_run.py` は `DESIGN_DOCUMENT_PACKET` と `IMPLEMENTATION_DOCUMENT_PACKET` を出力します。parent は designer / implementer subagent 起動時にその path 群をそのまま relay します
 - `Design-To-Implementation Trace` には、各予定差分ごとに design section、request clause ID、source / reuse 文書または code path、validation evidence を対応付けます。test-design route が active な場合だけ test plan item も対応付けます
 - 新規 helper、new module、new dependency、new public API を足す差分では、既存実装や導入済みライブラリでは足りない理由を `Design-To-Implementation Trace` に対応付けます
 - 既存 module boundary、命名、API shape、test style、docs style から逸脱する場合は、理由を明示します
@@ -539,7 +539,7 @@ exit 条件:
   を前提にした実装へ進みません。candidate artifact の不在だけでは停止しません
 - 承認は latest design artifact にだけ有効です。Gate 5 で設計を修正したら、
   旧 `approve` を流用せず Gate 6 を再実行します
-- parent が accepted と adjudicate した design concern を解消しないまま実装へ進みません
+- decision-owning design reviewer が accepted と adjudicate した design concern を解消しないまま実装へ進みません
 - naming plan、API shape、path layout、boundary choice の不足は `revise` blocker とします
 - `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、`Design Side-Effect Map`、または `Design-To-Implementation Trace` の不足は `revise` blocker とします
 - `Dependency Manifest Plan` の不足、reverse edge 欠落、旧形式温存は `revise` blocker とします
@@ -600,27 +600,26 @@ exit 条件:
   fixed in the handoff packet
 
 ルール:
-- Gate 8 starts from `IMPLEMENTATION_HANDOFF_REQUIRED=yes` and
-  `PARENT_REPO_EDITS_ALLOWED=no`. The parent owns routing, handoff packet
-  construction, monitoring, additional instructions, integration, validation,
-  and closeout; it does not directly patch repository files unless
-  `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` and
-  `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` are
-  recorded.
+- Gate 8 starts from `IMPLEMENTATION_HANDOFF_REQUIRED=yes`,
+  `PARENT_ORCHESTRATION_ONLY=yes`, and
+  `WRITE_CAPABLE_CHILD_REQUIRED=yes`. The parent owns routing, handoff packet
+  construction, packet relay, dependency order, and status monitoring only. A
+  selected reviewer owns finding adjudication, a verifier owns prescribed
+  validation, an auditor owns the closeout artifact, an integration executor
+  owns merge/conflict resolution, and a publisher owns Issue/PR writes.
 - Gate 8 cannot start from a detailed design when a selected design review is
   unresolved. In that case `pre_handoff_gate_status` records the current design
   artifact, `design_review.md decision=approve`, and
   `waterfall-gate-check --gate design` pass evidence. A candidate review does not
   block the handoff.
-- Parent-Direct Context Note is a routing / handoff artifact, not edit
-  authorization. Once edit scope is known, launch or schedule the selected
-  write-capable implementer. If the selected candidate is blocked, record
-  local/tool evidence with `selected_agent_type`,
-  `write_capable_handoff_blocker`, `evidence`, `parent_packet_ref`, and
-  `status=blocked`; changing candidates requires a revised parent packet and
-  wave.
-  Record `WRITE_SUBAGENT_AUTHORIZATION=required` or
-  `write_capable_handoff_blocker=<gate>` before any parent-direct exception.
+- Once edit scope is known, launch or schedule the selected write-capable
+  implementer. If the selected candidate is blocked, record local/tool
+  evidence with `selected_agent_type`, `write_capable_handoff_blocker`,
+  `evidence`, `parent_packet_ref`, and `status=blocked`; changing candidates
+  requires a revised parent packet and wave. Record
+  `WRITE_SUBAGENT_AUTHORIZATION=required` or
+  `write_capable_handoff_blocker=<gate>` and return a typed blocked/retry/user
+  report; the parent does not edit as recovery.
 - chunk、slice、checkpoint、subpass は内部進捗であり、user request 全体の完了ではありません
 - 実装前に `Abstract Design Frame`、`Implementation Source Packet`、`Design Side-Effect Map` の全項目、`design_review.md`、active な場合の `document_flow_review.md` を読み、抽象責務と概念 model から実装 slice が導かれていることを実装 summary に残します。`test_plan.md` は test-design route が明示的に activate された場合だけ参照し、実装の前提にしません
 - 実装前に `Dependency Manifest Plan` の upstream edge target を読み、編集後に downstream edge target を確認します
@@ -686,7 +685,7 @@ exit 条件:
 
 起動条件:
 - implementer が mechanism の確立または修復を記録している
-- parent が具体的な unresolved risk と、既存 validation がその risk を所有しない根拠を記録している
+- test_designer が具体的な unresolved risk と、既存 validation がその risk を所有しない根拠を記録している
 
 最低限の記録:
 - `Activation Decision:`

@@ -24,7 +24,7 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -107,6 +107,114 @@ DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX = "not_applicable:format-only:"
 DOCUMENT_STRUCTURE_ACTIVATIONS = {"required", "not_required", "format_only"}
 DOCUMENT_STRUCTURE_VALUE_MISSING = {"", "missing", "none", "not_applicable"}
 COMPLETION_COVERAGE_ARTIFACT_NAME = "completion_coverage.json"
+VERIFIER_RECEIPT_SCHEMA = "agent-canon.verifier-receipt.v1"
+PARENT_MUTATION_EVIDENCE_SCHEMA = "agent-canon.parent-mutation-evidence.v1"
+
+
+def _validated_runtime_receipt(
+    report_dir: Path,
+    reference: str,
+    schema: str,
+) -> dict[str, object] | None:
+    """Read one authenticated runtime receipt under the current run bundle."""
+    path = Path(reference)
+    if path.is_absolute() or ".." in path.parts:
+        return None
+    target = (report_dir / path).resolve()
+    if report_dir.resolve() not in target.parents or not target.is_file():
+        return None
+    try:
+        value = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(value, dict) or value.get("schema") != schema:
+        return None
+    receipt_sha = value.get("receipt_sha256")
+    if not isinstance(receipt_sha, str):
+        return None
+    unsigned = dict(value)
+    unsigned.pop("receipt_sha256", None)
+    if hashlib.sha256(
+        json.dumps(unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+    ).hexdigest() != receipt_sha:
+        return None
+    return value
+
+
+def _child_closeout_evidence(
+    report_dir: Path,
+    closeout: dict[str, str],
+) -> tuple[bool, tuple[str, ...]]:
+    """Require verifier provenance and hook-backed parent nonmutation evidence."""
+    required = (
+        "verifier_role_id",
+        "verifier_runtime_agent_id",
+        "verifier_receipt_ref",
+        "parent_mutation_status",
+        "parent_mutation_evidence_ref",
+    )
+    missing = tuple(field for field in required if not closeout.get(field, "").strip())
+    if missing:
+        return False, tuple(f"runtime_child_closeout_missing:{field}" for field in missing)
+    verifier = _validated_runtime_receipt(
+        report_dir,
+        closeout["verifier_receipt_ref"],
+        VERIFIER_RECEIPT_SCHEMA,
+    )
+    parent_evidence = _validated_runtime_receipt(
+        report_dir,
+        closeout["parent_mutation_evidence_ref"],
+        PARENT_MUTATION_EVIDENCE_SCHEMA,
+    )
+    blockers: list[str] = []
+    if verifier is None:
+        blockers.append("runtime_verifier_receipt_invalid")
+    else:
+        source_events = verifier.get("source_event_ids")
+        if (
+            verifier.get("role_id") != "verifier"
+            or verifier.get("runtime_agent_id") != closeout["verifier_runtime_agent_id"]
+            or verifier.get("status") != "pass"
+            or not isinstance(source_events, list)
+            or not source_events
+        ):
+            blockers.append("runtime_verifier_provenance_mismatch")
+    if parent_evidence is None:
+        blockers.append("parent_mutation_evidence_invalid")
+    else:
+        mutation_events = parent_evidence.get("mutation_event_ids")
+        source_events = parent_evidence.get("source_event_ids")
+        ledger_ref = parent_evidence.get("event_ledger_ref")
+        ledger_ids: set[str] = set()
+        ledger_mutations: list[Mapping[str, object]] = []
+        if isinstance(ledger_ref, str):
+            ledger_path = Path(ledger_ref)
+            if not ledger_path.is_absolute() and ".." not in ledger_path.parts:
+                ledger_target = (report_dir / ledger_path).resolve()
+                if report_dir.resolve() in ledger_target.parents and ledger_target.is_file():
+                    try:
+                        for line in ledger_target.read_text(encoding="utf-8").splitlines():
+                            item = json.loads(line)
+                            if isinstance(item, dict) and isinstance(item.get("hook_run_id"), str):
+                                ledger_ids.add(item["hook_run_id"])
+                                control = item.get("mutation_control")
+                                if isinstance(control, Mapping):
+                                    ledger_mutations.append(control)
+                    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                        pass
+        if (
+            closeout["parent_mutation_status"] != "no_parent_mutation"
+            or parent_evidence.get("status") != "no_parent_mutation"
+            or not isinstance(mutation_events, list)
+            or mutation_events
+            or not isinstance(source_events, list)
+            or not source_events
+            or not isinstance(ledger_ref, str)
+            or not set(source_events).issubset(ledger_ids)
+            or any(control.get("status") == "allowed" for control in ledger_mutations)
+        ):
+            blockers.append("parent_mutation_provenance_mismatch")
+    return not blockers, tuple(blockers)
 OWNER_GUARANTEE_RECEIPTS_ARTIFACT_NAME = "owner_guarantee_receipts.json"
 
 
@@ -1313,6 +1421,10 @@ def main() -> int:
     runtime_log_archive = parse_markdown_status_section(
         closeout_path, "Runtime Log Archive Evidence"
     )
+    child_closeout_ready, child_closeout_blockers = _child_closeout_evidence(
+        report_dir,
+        closeout,
+    )
     diff_check = parse_markdown_status_section(closeout_path, "Diff-Check Agent Evidence")
     diff_check_artifact_path = resolve_run_artifact(
         report_dir, diff_check.get("diff_check_artifact", "")
@@ -1380,6 +1492,8 @@ def main() -> int:
         "verification_unlock": verification.get("user_completion_report") == "unlocked",
         "closeout_verifier_status": closeout.get("verifier_status") == "pass",
         "closeout_auditor_status": closeout.get("auditor_status") == "resolved",
+        "verifier_child_provenance": child_closeout_ready,
+        "parent_nonmutation_evidence": child_closeout_ready,
         "required_reviews_complete": closeout.get("required_reviews_complete")
         in {"yes", "not_applicable"},
         "validation_complete": closeout.get("validation_complete") == "yes",
@@ -1597,6 +1711,9 @@ def main() -> int:
     print(f"VERIFICATION_UNLOCK={verification.get('user_completion_report', '')}")
     print(f"CLOSEOUT_VERIFIER_STATUS={closeout.get('verifier_status', '')}")
     print(f"CLOSEOUT_AUDITOR_STATUS={closeout.get('auditor_status', '')}")
+    print(f"VERIFIER_CHILD_PROVENANCE={'pass' if child_closeout_ready else 'fail'}")
+    print(f"PARENT_NONMUTATION_EVIDENCE={'pass' if child_closeout_ready else 'fail'}")
+    print(f"CHILD_CLOSEOUT_BLOCKERS={join_blockers(list(child_closeout_blockers))}")
     print(f"REQUIRED_REVIEWS_COMPLETE={closeout.get('required_reviews_complete', '')}")
     print(f"VALIDATION_COMPLETE={closeout.get('validation_complete', '')}")
     print(f"REQUEST_CONTRACT_COMPLETE={closeout.get('request_contract_complete', '')}")

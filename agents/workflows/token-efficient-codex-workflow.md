@@ -45,9 +45,9 @@ does not prove a token reduction.
 - Use `worker` for implementation. Use `spark_worker` only when the typed parent
   packet records the approved mechanical responsibility unit and selection
   evidence.
-- The `.codex/config.toml` `gpt-5.6-sol/high` parent is the orchestrator and
-  integrator. Parent-direct repository writes require the existing
-  explicit-approval or runtime-blocker exception evidence.
+- The `.codex/config.toml` `gpt-5.6-sol/high` parent is the orchestrator only.
+  Every repository-changing task uses a write-capable child; launch blockers
+  produce typed blocked/retry/user-report evidence and never a parent write.
 - Change model effort, user-level profile, or output limit only after observed
   runtime evidence identifies that surface as the cause. Apply profile changes
   in a fresh session; do not encode machine-local values in repository docs.
@@ -55,7 +55,7 @@ does not prove a token reduction.
 ## Context Protocol Use
 
 - Follow `agents/COMMUNICATION_PROTOCOL.md` for context visibility, repository
-  investigation packets, parent-direct notes, and fresh subagent capsules.
+  investigation packets, parent orchestration, and fresh subagent capsules.
 - For tool-covered questions, call the canonical checker, router, semantic
   index, dashboard, or structured report before prose review or subagent
   handoff. Treat pass/finding output as the authority for that covered property.

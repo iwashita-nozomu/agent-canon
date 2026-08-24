@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import subprocess
@@ -155,7 +156,7 @@ def write_workflow_monitoring(report_dir: Path) -> None:
             "# Workflow Monitoring",
             "## Signals",
             "- skills=$agent-orchestration,$codex-task-workflow",
-            "- stage owner=codex subagent=worker parent_direct_reason=small test run",
+            "- stage owner=codex subagent=worker write_capable_child=yes",
             "- repo_dependency_review=pass path_count=12",
             "- web_research_not_required: local deterministic test",
             "- review_status=approve",
@@ -166,7 +167,7 @@ def write_workflow_monitoring(report_dir: Path) -> None:
             "declared_team_peak_plus_nested_reservations_v1 requested_capacity_loader "
             "model-capacity thread-capacity",
             "- skill_invocation=$agent-orchestration status=observed",
-            "- subagent_routing=worker stage=implementation status=observed",
+            "- subagent_routing=worker stage=implementation write_capable_child=yes child_execution_receipts=pass status=observed",
             "- tool_call=run_repo_dependency_review.sh status=pass",
             "- tool_call=pyright code_checker=pass checker=pyright scope=repo-wide",
             "- tool_call=ruff code_checker=pass checker=ruff scope=repo-wide",
@@ -218,6 +219,27 @@ def write_workflow_monitoring(report_dir: Path) -> None:
             "",
         ],
     )
+
+
+def write_child_execution_receipts(report_dir: Path) -> None:
+    """Write the hashed spawn/mutation/close correlation fixture."""
+    value: dict[str, object] = {
+        "schema": "agent-canon.child-execution-receipts.v1",
+        "spawn": {"agent_id": "worker-1", "role_id": "implementer", "scope_digest": "scope-1"},
+        "mutations": [
+            {"actor_id": "worker-1", "role_id": "implementer", "scope_digest": "scope-1", "status": "allowed"}
+        ],
+        "close": {"agent_id": "worker-1", "status": "closed"},
+        "receipt_sha256": "",
+    }
+    unsigned = dict(value)
+    unsigned.pop("receipt_sha256")
+    value["receipt_sha256"] = hashlib.sha256(
+        json.dumps(unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+    ).hexdigest()
+    target = report_dir / "runtime" / "child_execution_receipts.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(value, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def write_review_closeout_artifacts(report_dir: Path) -> None:
@@ -282,6 +304,7 @@ def write_ready_run(report_dir: Path) -> None:
     write_prompt_eval_report(report_dir)
     write_planning_artifacts(report_dir)
     write_workflow_monitoring(report_dir)
+    write_child_execution_receipts(report_dir)
     write_review_closeout_artifacts(report_dir)
 
 
@@ -309,6 +332,26 @@ class EvaluateAgentRunTest(unittest.TestCase):
             module.VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES,
             frozenset(response["intent_preservation"]),
         )
+
+    def test_evaluate_rejects_forged_child_execution_declaration(self) -> None:
+        """Literal child markers cannot replace hashed spawn/mutation/close receipts."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            receipt = report_dir / "runtime" / "child_execution_receipts.json"
+            receipt.write_text(
+                receipt.read_text(encoding="utf-8").replace("worker-1", "forged"),
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--report-dir", str(report_dir)],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("write-capable child routing", result.stdout)
 
     def test_evaluate_ready_run_writes_pass_report(self) -> None:
         """A complete run should receive a passing agent evaluation."""
@@ -364,9 +407,9 @@ class EvaluateAgentRunTest(unittest.TestCase):
                     "--signal",
                     "skills=$agent-orchestration,$codex-task-workflow",
                     "--signal",
-                    "stage owner=codex subagent=worker parent_direct_reason=unit-test-run",
+                    "stage owner=codex subagent=worker write_capable_child=yes",
                     "--behavior-event",
-                    "subagent_routing=worker stage=implementation status=observed",
+                    "subagent_routing=worker stage=implementation write_capable_child=yes child_execution_receipts=pass status=observed",
                     "--behavior-event",
                     "subagent_lifecycle=closed subagents_closed=yes",
                     "--behavior-event",

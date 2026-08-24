@@ -186,7 +186,7 @@ path: tools/ci/check_github_workflows.py
     ),
     "agents/COMMUNICATION_PROTOCOL.md": (
         "responsibility_scope responsibility-scope.toml owner class protecting tools "
-        "planned path Parent-Direct Context Note "
+        "planned path Parent Orchestration-Only Contract "
         "external public API/behavior/schema unchanged\n"
     ),
     "agents/canonical/CODEX_WORKFLOW.md": (
@@ -256,7 +256,7 @@ path: tools/ci/check_github_workflows.py
         "write-capable handoff prose-reasoning-graph structure-planning "
         "md-style-check format-only structure_contract=skipped "
         "existing-tool route targeted validation Owner-Bounded Change "
-        "parent-direct SKILL.md external public API/behavior/schema unchanged "
+        "write-capable child SKILL.md external public API/behavior/schema unchanged "
         "scoped_change dependency/consumer/migration/docs closure "
         "selected_agent_type write_capable_handoff_blocker evidence "
         "parent_packet_ref status=blocked explicit_approval_evidence "
@@ -274,7 +274,7 @@ path: tools/ci/check_github_workflows.py
         "design_issue_blocker implementation shortcut "
         "md-style-check format-only structure_contract=skipped "
         "existing-tool route targeted validation Owner-Bounded Change "
-        "parent-direct SKILL.md "
+        "write-capable child SKILL.md "
         "external public API/behavior/schema unchanged scoped_change "
         "dependency/consumer/migration/docs closure "
         "tool_rejection_preflight.py "
@@ -1002,7 +1002,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertIn("skill_routing", result.stdout)
             self.assertIn("missing-marker:$subagent-bootstrap", result.stdout)
 
-    def test_fallback_exit_policy_rejects_parent_direct_alternate_route(self) -> None:
+    def test_fallback_exit_policy_rejects_parent_write_alternate_route(self) -> None:
         """Fallback route wording must point at explicit exit evidence."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -1010,7 +1010,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             skill = root / "agents" / "skills" / "codex-task-workflow.md"
             skill.write_text(
                 skill.read_text(encoding="utf-8")
-                + "\nrecord blocker before falling back to a parent-direct alternate route\n",
+                + "\nrecord blocker before falling back to a parent write alternate route\n",
                 encoding="utf-8",
             )
 

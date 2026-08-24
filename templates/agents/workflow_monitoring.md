@@ -23,7 +23,7 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
 
 ## Signals（signal）
 
-<!-- 実行中に観測した workflow signal を記録します。手編集より `python3 tools/agent_tools/workflow_monitor.py --report-dir <run> --signal "..."` と tool-level `--report-dir` hook を優先します。selected skill、stage owner、subagent/parent-direct routing、wave_id、repo dependency intake、web-research decision、review status、validation status、drift risk を含めます。run-bundle producer は `workflow_monitor.py` を通じて canonical な `runtime_measurement_input=<JSON>` signal を出力するため、null と明示的 zero を区別し、その record を手書き・重複しません。 -->
+<!-- 実行中に観測した workflow signal を記録します。手編集より `python3 tools/agent_tools/workflow_monitor.py --report-dir <run> --signal "..."` と tool-level `--report-dir` hook を優先します。selected skill、stage owner、write-capable child routing、wave_id、repo dependency intake、web-research decision、review status、validation status、drift risk を含めます。run-bundle producer は `workflow_monitor.py` を通じて canonical な `runtime_measurement_input=<JSON>` signal を出力するため、null と明示的 zero を区別し、その record を手書き・重複しません。 -->
 
 - failure-cause classification:
 - conflict intent / preserved user or design clause:

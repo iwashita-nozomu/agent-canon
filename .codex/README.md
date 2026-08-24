@@ -132,8 +132,10 @@ waive workflow gates and do not authorize dropping decision-relevant context.
   role view を手動の model authority として編集しません。
 - generated view の更新後は alignment readback を確認し、load 済み session
   との不一致は手動編集せず restart して canonical projection を再読込します。
-- The parent uses Sol/high and owns integration and final approval. Sol/xhigh is
-  an explicit high-risk or final escalation, not a child-role default.
+- The parent uses Sol/high for orchestration only. `integration_executor` owns
+  merge/conflict resolution, `publisher` owns authorized Issue/PR publication,
+  and `ship_reviewer` owns final approval. Sol/xhigh is an explicit high-risk
+  or final escalation, not a parent integration route.
 - mode の扱い
   - plan mode や permissions は session 単位で、per-agent TOML には書きません
   - official Codex CLI では `/plan`、`/model`、`/permissions` を使います

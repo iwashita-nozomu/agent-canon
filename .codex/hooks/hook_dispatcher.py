@@ -2,6 +2,7 @@
 # @dependency-start
 # contract agent-runtime
 # responsibility Dispatches the bounded active hook contract in-process without child processes, Git, or network access.
+# upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns coordination capability and receipt semantics.
 # upstream implementation ../hooks.json invokes this dispatcher once per active event.
 # upstream implementation ../../tools/agent_tools/hook_safety.py owns pure secret and destructive Git safety leaves.
 # upstream implementation ../../tools/agent_tools/execution_resource_projection.py validates producer projection bytes.
@@ -66,7 +67,15 @@ from parent_root_side_effects import (  # noqa: E402
     attest_parent_root,
 )
 from prompt_classifier import PromptClassifierInputs, freeze  # noqa: E402
-from subagent_selection import select_subagents  # noqa: E402
+from mutation_authority import (  # noqa: E402
+    evaluate_mutation_authority,
+    mutation_block_payload,
+)
+from subagent_selection import (  # noqa: E402
+    SubagentSelection,
+    build_coordination_receipt,
+    select_subagents,
+)
 from tool_selection import select_tools  # noqa: E402
 from workflow_context import WorkflowContext, load_workflow_context  # noqa: E402
 from workflow_monitor import emit_behavior_projection  # noqa: E402
@@ -145,7 +154,7 @@ HOOK_EVENT_CONTRACTS: dict[str, HookEventContract] = {
     ),
     "PostToolUse": HookEventContract(
         active=True,
-        matchers=("Bash|apply_patch|python|python3|Task|spawn_agent|send_input|wait_agent|close_agent|resume_agent",),
+        matchers=("Bash|apply_patch|python|python3|Task|spawn_agent|send_input|wait_agent|close_agent|resume_agent|send_message|followup_task|list_agents|interrupt_agent",),
         failure="invalid_projection=fail_open; malformed_payload=fail_open; spool_failure=fail_open",
         telemetry="one bounded fingerprint-only local spool event",
     ),
@@ -386,7 +395,7 @@ def prepare_parts(
     entry: dict[str, object],
     root: Path,
     report_dir: Path | None,
-) -> HookInvocationParts:
+) -> tuple[HookInvocationParts, SubagentSelection | None]:
     """Construct typed assembly inputs without writing an artifact."""
     parsed = payload is not None
     safe_payload = payload if parsed else None
@@ -408,24 +417,27 @@ def prepare_parts(
         tools = None
         subagents = None
         rules = None
-    return HookInvocationParts(
-        hook_event_name=event,
-        hook_invocation_id=str(entry["hook_run_id"]),
-        hook_payload=safe_payload,
-        payload_status="parsed" if parsed else "malformed_payload",
-        handler_result=FinalHandlerResult(
-            status=status,
-            output_kind="block" if output else "additional_context" if status == "projection_forwarded" else "",
-            safe_fields={"safety_decision": "block"} if status.startswith("blocked_") else {},
+    return (
+        HookInvocationParts(
+            hook_event_name=event,
+            hook_invocation_id=str(entry["hook_run_id"]),
+            hook_payload=safe_payload,
+            payload_status="parsed" if parsed else "malformed_payload",
+            handler_result=FinalHandlerResult(
+                status=status,
+                output_kind="block" if output else "additional_context" if status == "projection_forwarded" else "",
+                safe_fields={"safety_decision": "block"} if status.startswith("blocked_") else {},
+            ),
+            classifier_rules=rules,
+            tool_selection=tools,
+            subagent_selection=subagents,
+            workflow_context=context,
+            payload_fingerprint=str(entry["payload_fingerprint"]),
+            timestamp=str(entry["timestamp"]),
+            root=root,
+            report_dir=report_dir,
         ),
-        classifier_rules=rules,
-        tool_selection=tools,
-        subagent_selection=subagents,
-        workflow_context=context,
-        payload_fingerprint=str(entry["payload_fingerprint"]),
-        timestamp=str(entry["timestamp"]),
-        root=root,
-        report_dir=report_dir,
+        subagents,
     )
 
 
@@ -479,17 +491,45 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
         root_state.active_root,
         **telemetry,
     )
-    behavior = record_hook_invocation(
-        prepare_parts(
-            event,
-            payload,
-            status,
-            output,
-            spool_entry,
-            root_state.active_root,
-            report_dir,
-        )
+    mutation_decision = evaluate_mutation_authority(
+        payload,
+        report_dir=report_dir,
+        active_root=root_state.active_root,
+        environment=os.environ,
+        hook_spool_root=context.spool_root(),
+    ) if event == "PreToolUse" else None
+    if mutation_decision is not None and mutation_decision.status == "blocked":
+        if output is None:
+            output = official_payload(event, mutation_block_payload(mutation_decision))
+            status = "blocked_parent_mutation"
+    if mutation_decision is not None:
+        spool_entry["mutation_control"] = mutation_decision.as_dict()
+        spool_entry["status"] = status
+    parts, subagent_selection = prepare_parts(
+        event,
+        payload,
+        status,
+        output,
+        spool_entry,
+        root_state.active_root,
+        report_dir,
     )
+    receipt = build_coordination_receipt(
+        payload,
+        subagent_selection,
+        hook_event_name=event,
+    )
+    if receipt is not None:
+        spool_entry["coordination_receipt"] = receipt
+    if (
+        subagent_selection is not None
+        and subagent_selection.action == "spawn"
+        and isinstance(payload, dict)
+        and isinstance(payload.get("tool_input"), dict)
+        and isinstance(payload["tool_input"].get("scope_digest"), str)
+    ):
+        spool_entry["mutation_scope_digest"] = payload["tool_input"]["scope_digest"]
+    behavior = record_hook_invocation(parts)
     if behavior is not None:
         spool_entry.update(behavior.as_dict())
     try:

@@ -127,6 +127,11 @@ else:
     from manifest_rendering import required_output_templates_missing
 
 if __package__:
+    from .subagent_selection import COLLABORATION_OPERATIONS
+else:
+    from subagent_selection import COLLABORATION_OPERATIONS  # type: ignore[no-redef]
+
+if __package__:
     from .packets import (
         resolve_active_design_packet_config,
         resolve_cross_cutting_document_packet,
@@ -197,6 +202,54 @@ INITIAL_INTAKE_MARKERS = {
 SUBAGENT_PROTOCOL_DOCS = (
     ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md",
     ROOT / "agents" / "TASK_WORKFLOWS.md",
+)
+PARENT_ORCHESTRATION_DOCS = {
+    ROOT / "agents" / "COMMUNICATION_PROTOCOL.md": (
+        "Parent Orchestration-Only Contract",
+        "A write-capable child is mandatory",
+        "status=blocked",
+        "parent must not investigate",
+        "Decision-owning reviewers",
+        "A verifier runs prescribed validation",
+        "an auditor",
+        "an integration executor",
+        "a publisher or PR-processing child",
+        "an evaluation reviewer",
+        "Read-only conversational answers remain outside",
+    ),
+    ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md": (
+        "parent agent は orchestrator only",
+        "write-capable implementer handoff first",
+        "packet relay",
+        "decision-owning reviewer",
+    ),
+    ROOT / "agents" / "canonical" / "CODEX_WORKFLOW.md": (
+        "write-capable",
+        "typed blocked/retry/user-report evidence",
+        "integration executor",
+        "decision-owning reviewer",
+    ),
+    ROOT / "agents" / "skills" / "agent-orchestration.md": (
+        "write-capable child",
+        "parent is an orchestrator only",
+        "typed blocker",
+    ),
+    ROOT / "agents" / "skills" / "codex-task-workflow.md": (
+        "write-capable implementer even for bounded requests",
+        "parent does not",
+    ),
+    ROOT / "agents" / "skills" / "subagent-bootstrap.md": (
+        "write-capable child route",
+        "typed blocked/retry/user-report packet",
+        "parent remains orchestrator only",
+    ),
+}
+FORBIDDEN_PARENT_DIRECT_MARKERS = (
+    "Parent-Direct Context Note",
+    "parent-direct",
+    "parent_direct",
+    "PARENT_DIRECT",
+    "parent_direct_reason",
 )
 TOOL_RESULT_ROUTE_MARKERS = (
     "raw checker/stat artifacts -> artifact_reviewer",
@@ -383,7 +436,7 @@ def validate_project_config() -> None:
         == "explicit_alternative_implementation_experiment_only",
         "isolated worktrees are reserved for explicit alternative implementation experiments",
     )
-    repository_writers = {"worker", "spark_worker"}
+    repository_writers = {"worker", "spark_worker", "integration_executor", "publisher"}
     for role_id, sandbox in registry.role_sandbox_bindings.items():
         expected_sandbox = "workspace-write" if role_id in repository_writers else "read-only"
         ensure(
@@ -587,6 +640,18 @@ def validate_project_hooks() -> None:
         ensure(isinstance(event_contract.get("matchers"), list), f"hook contract {event} matchers must be a list")
         ensure(isinstance(event_contract.get("failure"), str) and event_contract["failure"], f"hook contract {event} failure must be non-empty")
         ensure(isinstance(event_contract.get("telemetry"), str) and event_contract["telemetry"], f"hook contract {event} telemetry must be non-empty")
+    post_tool_matchers = event_contracts["PostToolUse"].get("matchers")
+    ensure(
+        isinstance(post_tool_matchers, list)
+        and len(post_tool_matchers) == 1
+        and isinstance(post_tool_matchers[0], str),
+        "PostToolUse matcher contract must expose one string matcher",
+    )
+    matcher_tokens = set(post_tool_matchers[0].split("|")) if isinstance(post_tool_matchers, list) and post_tool_matchers and isinstance(post_tool_matchers[0], str) else set()
+    ensure(
+        set(COLLABORATION_OPERATIONS).issubset(matcher_tokens),
+        "PostToolUse matcher must observe collaboration operations without implying capability",
+    )
     retired = require_list(contract.get("retired_child_tombstones", []), "retired child tombstones must be a list")
     moved = require_list(contract.get("moved_source_absences", []), "moved source absences must be a list")
     ensure(len(retired) == 23 and len(moved) == 1, "hook retirement contract counts must be exact")
@@ -1533,6 +1598,16 @@ def validate_subagent_protocol_docs() -> None:
     validate_permanent_team_mapping(load_team_config(), subagents_text)
 
 
+def validate_parent_orchestration_contract() -> None:
+    """Require child-only repo writes and remove the retired parent route."""
+    for path, markers in PARENT_ORCHESTRATION_DOCS.items():
+        text = path.read_text(encoding="utf-8")
+        for marker in markers:
+            ensure(marker in text, f"{path} missing parent orchestration marker: {marker}")
+        for marker in FORBIDDEN_PARENT_DIRECT_MARKERS:
+            ensure(marker not in text, f"{path} retains retired parent route: {marker}")
+
+
 def parse_permanent_team_mapping_roles(markdown_text: str) -> set[str]:
     """Return role IDs listed in the CODEX_SUBAGENTS permanent-team mapping table."""
     in_mapping = False
@@ -1704,6 +1779,32 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
     run = require_mapping(
         manifest.get("run"), f"task {task_id} manifest missing run mapping"
     )
+    implementation_policy = require_mapping(
+        run.get("contract_complete_implementation_policy"),
+        f"task {task_id} manifest missing contract-complete implementation policy",
+    )
+    if "implementation_handoff_required" in implementation_policy:
+        ensure(
+            implementation_policy.get("parent_orchestration_only") == "yes",
+            f"task {task_id} manifest must require parent orchestration only",
+        )
+        ensure(
+            implementation_policy.get("write_capable_child_required") == "yes",
+            f"task {task_id} manifest must require a write-capable child",
+        )
+        ensure(
+            implementation_policy.get("parent_blocked_route")
+            == "typed_blocked_retry_or_user_report",
+            f"task {task_id} manifest must expose typed child-launch blocker route",
+        )
+        for retired_field in (
+            "parent_direct_write_exception_required",
+            "parent_direct_write_exception",
+        ):
+            ensure(
+                retired_field not in implementation_policy,
+                f"task {task_id} manifest retains retired field: {retired_field}",
+            )
     spawn_budget = require_mapping(
         run.get("spawn_budget"),
         f"task {task_id} manifest missing run.spawn_budget",
@@ -1743,6 +1844,61 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
     ensure(
         spawn_budget.get("max_write_subagents_scope") == "write-capable subagents only",
         f"task {task_id} manifest run.spawn_budget max_write scope unclear",
+    )
+    capability = require_mapping(
+        run.get("coordination_capability_handshake"),
+        f"task {task_id} manifest missing run.coordination_capability_handshake",
+    )
+    ensure(
+        capability.get("source") == "direct_runtime_collaboration_namespace",
+        f"task {task_id} coordination capability source must be direct runtime namespace",
+    )
+    ensure(
+        capability.get("status") in {"available", "unavailable", "unverified"},
+        f"task {task_id} coordination capability status is invalid",
+    )
+    ensure(
+        capability.get("effective_operations") == [],
+        f"task {task_id} generated manifest must not invent effective operations",
+    )
+    ensure(
+        capability.get("evidence_ref") == "",
+        f"task {task_id} generated manifest must not invent capability evidence",
+    )
+    ensure(
+        capability.get("matcher_is_not_capability_evidence") is True,
+        f"task {task_id} manifest must separate matchers from capability readback",
+    )
+    ensure(
+        capability.get("forbidden_capability_source") == "functions.exec.ALL_TOOLS",
+        f"task {task_id} manifest must reject exec tool inventories as capability evidence",
+    )
+    transport_policy = require_mapping(
+        capability.get("transport_by_status"),
+        f"task {task_id} coordination capability transport policy is missing",
+    )
+    ensure(
+        transport_policy.get("available") == "direct_peer"
+        and transport_policy.get("unavailable") == "parent_relay_or_durable_artifact"
+        and transport_policy.get("unverified") == "parent_relay_or_durable_artifact",
+        f"task {task_id} coordination transport policy is inconsistent",
+    )
+    receipt_policy = require_mapping(
+        run.get("coordination_receipt_policy"),
+        f"task {task_id} manifest missing run.coordination_receipt_policy",
+    )
+    ensure(
+        receipt_policy.get("operation_observation") == list(COLLABORATION_OPERATIONS),
+        f"task {task_id} coordination receipt operation observation is incomplete",
+    )
+    ensure(
+        receipt_policy.get("direct_peer_requires")
+        == "available_status_and_operation_evidence",
+        f"task {task_id} direct peer receipt gate is missing",
+    )
+    ensure(
+        receipt_policy.get("parent_relay_is_not_direct_peer") is True,
+        f"task {task_id} parent relay must remain distinct from direct peer",
     )
     delegated_spawn_policy = require_mapping(
         run.get("delegated_spawn_policy"),
@@ -2289,6 +2445,7 @@ def main() -> int:
     validate_dynamic_wave_policy()
     validate_public_skill_shims()
     validate_subagent_protocol_docs()
+    validate_parent_orchestration_contract()
     validate_vendor_skill_adapters()
     validate_bundle_outputs()
     print("AGENT_RUNTIME_ALIGNMENT=pass")

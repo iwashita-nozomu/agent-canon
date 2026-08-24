@@ -167,3 +167,11 @@ config_file = "agents/test_designer.toml"
 [agents.worker]
 description = "Implementation agent for bounded code, docs, or test changes."
 config_file = "agents/worker.toml"
+
+[agents.integration_executor]
+description = "Workspace-write child for candidate branch merge, conflict resolution, and integration readback."
+config_file = "agents/integration_executor.toml"
+
+[agents.publisher]
+description = "Workspace-write child for authorized Issue/PR publication and remote readback."
+config_file = "agents/publisher.toml"

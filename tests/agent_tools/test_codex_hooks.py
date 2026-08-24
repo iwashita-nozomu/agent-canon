@@ -209,13 +209,26 @@ class CodexHooksTest(unittest.TestCase):
     @staticmethod
     def _spooled_event(root: Path, pattern: str = "**/*.json") -> dict[str, object]:
         """Read the one isolated hook event emitted by a fixture invocation."""
-        paths = list(root.glob(pattern))
+        def event_paths(base: Path) -> list[Path]:
+            result: list[Path] = []
+            for path in base.glob(pattern):
+                if not path.is_file():
+                    continue
+                try:
+                    value = json.loads(path.read_text(encoding="utf-8"))
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                    continue
+                if isinstance(value, dict) and "hook_run_id" in value:
+                    result.append(path)
+            return result
+
+        paths = event_paths(root)
         if not paths:
             for runtime_root in (
                 root.parent,
                 root.parent / f".{root.name}-runtime",
             ):
-                paths = list(runtime_root.glob(pattern))
+                paths = event_paths(runtime_root)
                 if paths:
                     break
         if len(paths) != 1:
@@ -406,9 +419,14 @@ class CodexHooksTest(unittest.TestCase):
             [hook["command"] for hook in cast("list[dict[str, object]]", pre_tool_group["hooks"])],
             ["python3 .codex/hooks/hook_dispatcher.py PreToolUse"],
         )
-        self.assertEqual(
-            post_tool_group["matcher"],
-            "Bash|apply_patch|python|python3|Task|spawn_agent|send_input|wait_agent|close_agent|resume_agent",
+        post_matcher = cast(str, post_tool_group["matcher"])
+        self.assertTrue(
+            {
+                "send_message",
+                "followup_task",
+                "list_agents",
+                "interrupt_agent",
+            }.issubset(set(post_matcher.split("|")))
         )
         self.assertEqual(
             [hook["command"] for hook in cast("list[dict[str, object]]", post_tool_group["hooks"])],
@@ -482,6 +500,109 @@ class CodexHooksTest(unittest.TestCase):
         self.assertTrue(payload["remediation"])
         self.assertNotIn(secret, result.stdout)
 
+    @staticmethod
+    def _write_identity_receipt(report_dir: Path, role_id: str) -> None:
+        value: dict[str, object] = {
+            "schema": "agent-canon.runtime-agent-identity.v1",
+            "run_id": "hook-run",
+            "agent_id": "child-hook",
+            "role_id": role_id,
+            "parent_agent_id": "parent-hook",
+            "authority": "write_capable_child",
+            "allowed_files": ["src/owned.py"],
+            "allowed_directories": [],
+            "scope_digest": "",
+            "status": "active",
+            "receipt_sha256": "",
+        }
+        value["scope_digest"] = hashlib.sha256(
+            json.dumps(
+                {"allowed_files": value["allowed_files"], "allowed_directories": []},
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+        unsigned = dict(value)
+        unsigned.pop("receipt_sha256")
+        value["receipt_sha256"] = hashlib.sha256(
+            json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        target = report_dir / "runtime" / "agent_identity.json"
+        target.parent.mkdir(parents=True)
+        target.write_text(json.dumps(value, sort_keys=True), encoding="utf-8")
+
+    def test_pretooluse_rejects_parent_mutation_and_allows_child_scope(self) -> None:
+        """The active hook enforces runtime identity and child write scope."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "source"
+            root.mkdir()
+            run_dir = root / "run"
+            run_dir.mkdir()
+            self._write_identity_receipt(run_dir, "parent")
+            result = self._run_hook_in_root(
+                root,
+                "PreToolUse",
+                {
+                    "hookEventName": "PreToolUse",
+                    "tool_name": "apply_patch",
+                    "tool_input": {"patch": "*** Begin Patch\n*** Update File: src/owned.py\n*** End Patch\n"},
+                },
+                extra_env={
+                    "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(run_dir),
+                    "AGENT_CANON_RUNTIME_AGENT_ID": "child-hook",
+                    "AGENT_CANON_RUNTIME_ROLE_ID": "parent",
+                    "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-hook",
+                },
+            )
+            output = cast("dict[str, object]", json.loads(result.stdout))
+            self.assertEqual(output["decision"], "block")
+            self.assertEqual(output["mutation_authority"], "parent_mutation_forbidden")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "source"
+            root.mkdir()
+            run_dir = root / "run"
+            run_dir.mkdir()
+            self._write_identity_receipt(run_dir, "implementer")
+            identity = json.loads(
+                (run_dir / "runtime" / "agent_identity.json").read_text(encoding="utf-8")
+            )
+            spool = root / "hook-results" / ".event-spool"
+            spool.mkdir(parents=True)
+            (spool / "spawn.json").write_text(
+                json.dumps(
+                    {
+                        "subagent_event_kind": "spawn",
+                        "subagent_target": "child-hook",
+                        "subagent_agent_type": "worker",
+                        "mutation_scope_digest": identity["scope_digest"],
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            result = self._run_hook_in_root(
+                root,
+                "PreToolUse",
+                {
+                    "hookEventName": "PreToolUse",
+                    "tool_name": "apply_patch",
+                    "tool_input": {"patch": "*** Begin Patch\n*** Update File: src/owned.py\n*** End Patch\n"},
+                },
+                extra_env={
+                    "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(run_dir),
+                    "AGENT_CANON_RUNTIME_AGENT_ID": "child-hook",
+                    "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+                    "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-hook",
+                    "AGENT_CANON_HOOK_RESULTS_DIR": str(root / "hook-results"),
+                },
+            )
+            self.assertEqual(result.stdout, "")
+            event = self._spooled_event(root)
+            control = cast("dict[str, object]", event["mutation_control"])
+            self.assertEqual(control["status"], "allowed")
+            self.assertEqual(control["role_id"], "implementer")
+
     def test_dispatcher_forwards_only_valid_execution_projection(self) -> None:
         """PostToolUse forwards one exact, validator-approved execution projection."""
         run_id = "r5-dispatch"
@@ -515,6 +636,55 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(payload["schema"], "agent-canon.posttooluse-stop.v1")
         self.assertEqual(hook_output["hookEventName"], "PostToolUse")
         self.assertEqual(hook_output["additionalContext"], projection_stdout)
+
+    def test_coordination_receipt_uses_real_posttool_result(self) -> None:
+        """Coordination receipts live in the base spool event, not behavior snapshots."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "source"
+            root.mkdir()
+            payload = {
+                "hookEventName": "PostToolUse",
+                "tool_name": "send_message",
+                "tool_input": {"to": "worker"},
+                "tool_response": {"exit_code": 0, "stderr": "", "stdout": "sent"},
+            }
+            self._run_hook_in_root(root, "PostToolUse", payload)
+            event = self._spooled_event(root)
+            receipt = cast("dict[str, object]", event["coordination_receipt"])
+            self.assertEqual(
+                set(receipt),
+                {
+                    "schema",
+                    "operation",
+                    "capability_status",
+                    "effective_operations",
+                    "evidence_ref",
+                    "transport",
+                    "direct_peer",
+                    "status",
+                },
+            )
+            self.assertEqual(receipt["schema"], "agent-canon.coordination-receipt.v1")
+            self.assertEqual(receipt["operation"], "send_message")
+            self.assertEqual(receipt["status"], "succeeded")
+            self.assertEqual(receipt["capability_status"], "unverified")
+            self.assertEqual(receipt["transport"], "durable_artifact")
+            self.assertFalse(receipt["direct_peer"])
+            self.assertNotIn("coordination_mode", event)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "source"
+            root.mkdir()
+            payload = {
+                "hookEventName": "PostToolUse",
+                "tool_name": "send_message",
+                "tool_input": {"to": "worker"},
+                "tool_response": {"exit_code": 1, "stderr": "failed", "stdout": ""},
+            }
+            self._run_hook_in_root(root, "PostToolUse", payload)
+            event = self._spooled_event(root)
+            receipt = cast("dict[str, object]", event["coordination_receipt"])
+            self.assertEqual(receipt["status"], "failed")
 
     def test_post_tool_malformed_json_and_schema_matrix_is_noop(self) -> None:
         """Malformed PostToolUse JSON, raw schema, and projection schema fail open quietly."""
@@ -753,12 +923,13 @@ class CodexHooksTest(unittest.TestCase):
             "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
             "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved"
         )
-        self.assertIsNone(
-            self._run_shared_checkout_guard(f"{destructive} git restore file.py")
-        )
-        self.assertIsNone(
-            self._run_shared_checkout_guard(f"env {destructive} git reset HEAD")
-        )
+        for command in (
+            f"{destructive} git restore file.py",
+            f"env {destructive} git reset HEAD",
+        ):
+            payload = self._run_shared_checkout_guard(command)
+            self.assertIsNotNone(payload)
+            self.assertEqual(payload.get("mutation_authority"), "blocked_authority_required")
         self.assertIsNotNone(
             self._run_shared_checkout_guard(
                 "git restore file.py",
@@ -889,20 +1060,8 @@ class CodexHooksTest(unittest.TestCase):
                 self.assertIsNone(self._run_shared_checkout_guard(command))
 
     def test_shared_checkout_guard_enforces_overlap_authority_matrix(self) -> None:
-        """Creation and destructive-overwrite intents use their distinct authority sets."""
-        creation = (
-            "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
-            "AGENT_CANON_BRANCH_WORKTREE_REASON=requested"
-        )
-        workflow = (
-            "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow "
-            "AGENT_CANON_BRANCH_WORKTREE_REASON=pr-route"
-        )
-        destructive = (
-            "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
-            "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved"
-        )
-        normal_create = [
+        """Git authority strings cannot bypass the authenticated child guard."""
+        commands = [
             "git switch -ctopic",
             "git checkout -btopic",
             "git checkout --orphan topic",
@@ -914,8 +1073,6 @@ class CodexHooksTest(unittest.TestCase):
             "git branch --create-reflog topic origin/main",
             "git worktree add -b topic ../topic",
             "git worktree add --orphan topic ../topic",
-        ]
-        force_create = [
             "git switch -Ctopic",
             "git checkout -Btopic",
             "git branch -Ctopic main",
@@ -924,25 +1081,15 @@ class CodexHooksTest(unittest.TestCase):
             "git worktree add -f ../topic topic",
             "git worktree add --force ../topic topic",
         ]
-        for command in normal_create:
-            with self.subTest(command=command, route="normal"):
-                self.assertIsNotNone(self._run_shared_checkout_guard(command))
-                self.assertIsNone(self._run_shared_checkout_guard(f"{creation} {command}"))
-                self.assertIsNone(self._run_shared_checkout_guard(f"{workflow} {command}"))
-                self.assertIsNotNone(self._run_shared_checkout_guard(f"{destructive} {command}"))
-                self.assertIsNone(
-                    self._run_shared_checkout_guard(f"{creation} {destructive} {command}")
+        for command in commands:
+            with self.subTest(command=command):
+                payload = self._run_shared_checkout_guard(
+                    "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
+                    "AGENT_CANON_BRANCH_WORKTREE_REASON=requested "
+                    + command
                 )
-                self.assertIsNone(
-                    self._run_shared_checkout_guard(f"{workflow} {destructive} {command}")
-                )
-        for command in force_create:
-            with self.subTest(command=command, route="force"):
-                self.assertIsNotNone(self._run_shared_checkout_guard(f"{creation} {command}"))
-                self.assertIsNotNone(self._run_shared_checkout_guard(f"{destructive} {command}"))
-                self.assertIsNone(
-                    self._run_shared_checkout_guard(f"{creation} {destructive} {command}")
-                )
+                self.assertIsNotNone(payload)
+                self.assertEqual(payload.get("decision"), "block")
 
     def test_shared_checkout_guard_blocks_generic_branch_worktree_mutation(self) -> None:
         """Only explicit branch/worktree read-only allowlists stay quiet."""

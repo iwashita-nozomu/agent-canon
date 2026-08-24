@@ -2,6 +2,7 @@
 # contract tool
 # responsibility AgentTeam manifest rendering owner module.
 # upstream design ../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
+# upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns coordination capability and receipt semantics.
 # upstream implementation ./team_config.py provides rendering configuration inputs.
 # upstream implementation ./packets.py provides rendering packet inputs.
 # upstream implementation ./workspace_scope.py provides rendering paths.
@@ -92,6 +93,11 @@ else:
         resolve_role_write_scope,
         schedule_wave_row,
     )
+
+if __package__:
+    from .subagent_selection import COLLABORATION_OPERATIONS
+else:
+    from subagent_selection import COLLABORATION_OPERATIONS  # type: ignore[no-redef]
 
 if __package__:
     from .team_config import (
@@ -344,9 +350,11 @@ IMPLEMENTATION_HANDOFF_REQUIRED = "yes"
 
 PARENT_REPO_EDITS_ALLOWED = "no"
 
-PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED = "yes"
+PARENT_ORCHESTRATION_ONLY = "yes"
 
-PARENT_DIRECT_WRITE_EXCEPTION = "-"
+WRITE_CAPABLE_CHILD_REQUIRED = "yes"
+
+PARENT_BLOCKED_ROUTE = "typed_blocked_retry_or_user_report"
 
 REPO_TOOL_ROUTING_POLICY_SOURCE = "agents/skills/task-routing.md#Standard Command"
 
@@ -410,7 +418,7 @@ PRE_HANDOFF_SCOPE_HANDOFF_RULE = (
 )
 
 PRE_HANDOFF_GATE_STATUS_SOURCE = (
-    "agents/COMMUNICATION_PROTOCOL.md#Handoff Packet and Parent-Direct Context Note"
+    "agents/COMMUNICATION_PROTOCOL.md#Handoff Packet"
 )
 
 PRE_HANDOFF_GATE_STATUS_DEFAULT = "pending_design_review_gate_check"
@@ -518,7 +526,7 @@ SAME_ROLE_SUBAGENT_INSTANCE_POLICY = {
     "status": "allowed_with_distinct_packets",
     "identity_key": "role_id+instance_id+agent_type",
     "parallel_read_only": "allowed_when_input_packets_or_review_focus_are_distinct",
-    "parallel_write": "allowed_only_with_disjoint_write_scopes_and_parent_integration_order",
+    "parallel_write": "allowed_only_with_disjoint_write_scopes_and_integration_executor_order",
     "collision_policy": "serialize_current_checkout_waves",
 }
 
@@ -534,6 +542,14 @@ SAME_ROLE_SUBAGENT_REQUIRED_FIELDS = (
     "validation_route",
     "review_gate",
 )
+
+COORDINATION_CAPABILITY_CONTRACT_REF = (
+    "agents/COMMUNICATION_PROTOCOL.md#Runtime Collaboration Capability Handshake"
+)
+COORDINATION_RECEIPT_CONTRACT_REF = (
+    "agents/COMMUNICATION_PROTOCOL.md#Coordination Receipt"
+)
+COORDINATION_OPERATION_OBSERVATION = COLLABORATION_OPERATIONS
 
 SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE = (
     "python3 tools/agent_tools/workflow_monitor.py --report-dir {report_dir} "
@@ -591,6 +607,17 @@ def same_role_subagent_policy_output_lines() -> tuple[str, ...]:
     )
 
 
+def coordination_capability_policy_output_lines() -> tuple[str, ...]:
+    """Return manifest lines for the explicit runtime capability handshake."""
+    return (
+        "COORDINATION_CAPABILITY_SOURCE=direct_runtime_collaboration_namespace",
+        "COORDINATION_CAPABILITY_STATUS=unverified",
+        "COORDINATION_CAPABILITY_EFFECTIVE_OPERATIONS=none",
+        "COORDINATION_CAPABILITY_EVIDENCE_REF=none",
+        "COORDINATION_CAPABILITY_TRANSPORT=durable_artifact",
+    )
+
+
 def standard_agent_wave_sequence_output_lines() -> tuple[str, ...]:
     """Return machine-readable stdout lines for the standard Agent Wave order."""
     return (
@@ -639,9 +666,9 @@ def contract_complete_implementation_policy_output_lines(
         handoff_lines = (
             f"IMPLEMENTATION_HANDOFF_REQUIRED={IMPLEMENTATION_HANDOFF_REQUIRED}",
             f"PARENT_REPO_EDITS_ALLOWED={PARENT_REPO_EDITS_ALLOWED}",
-            "PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED="
-            f"{PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED}",
-            f"PARENT_DIRECT_WRITE_EXCEPTION={PARENT_DIRECT_WRITE_EXCEPTION}",
+            f"PARENT_ORCHESTRATION_ONLY={PARENT_ORCHESTRATION_ONLY}",
+            f"WRITE_CAPABLE_CHILD_REQUIRED={WRITE_CAPABLE_CHILD_REQUIRED}",
+            f"PARENT_BLOCKED_ROUTE={PARENT_BLOCKED_ROUTE}",
         )
     return (
         *handoff_lines,
@@ -1352,6 +1379,31 @@ def manifest_run_lines(
     for field in EVALUATOR_PROMPT_MUST_INCLUDE:
         lines.insert(insert_index, f"      - {field}")
         insert_index += 1
+    lines.extend(
+        [
+            "  coordination_capability_handshake:",
+            f"    contract_ref: {COORDINATION_CAPABILITY_CONTRACT_REF!r}",
+            "    source: direct_runtime_collaboration_namespace",
+            "    status: unverified",
+            "    effective_operations: []",
+            "    evidence_ref: ''",
+            "    matcher_is_not_capability_evidence: true",
+            "    forbidden_capability_source: functions.exec.ALL_TOOLS",
+            "    transport_by_status:",
+            "      available: direct_peer",
+            "      unavailable: parent_relay_or_durable_artifact",
+            "      unverified: parent_relay_or_durable_artifact",
+            "  coordination_receipt_policy:",
+            f"    contract_ref: {COORDINATION_RECEIPT_CONTRACT_REF!r}",
+            "    operation_observation:",
+            *(
+                f"      - {operation}"
+                for operation in COORDINATION_OPERATION_OBSERVATION
+            ),
+            "    direct_peer_requires: available_status_and_operation_evidence",
+            "    parent_relay_is_not_direct_peer: true",
+        ]
+    )
     communication_protocol = spec.config.team.get("communication_protocol")
     if communication_protocol is not None:
         lines.append(
@@ -1560,8 +1612,7 @@ def manifest_run_lines(
             "      - closeout_gate.md Subagent Lifecycle Evidence planned-vs-actual wave status"
         )
         lines.append(
-            "      - closed selected run-local agent ids, or the applicable structured "
-            "parent handoff / recorded parent-direct exception evidence"
+            "      - closed selected run-local agent ids and auditor closeout artifact"
         )
         lines.append("  write_scope_policy:")
         lines.append("    parent_managed: true")
@@ -1604,9 +1655,9 @@ def manifest_contract_complete_implementation_policy_lines(
         ] = [
             f"    implementation_handoff_required: {IMPLEMENTATION_HANDOFF_REQUIRED!r}",
             f"    parent_repo_edits_allowed: {PARENT_REPO_EDITS_ALLOWED!r}",
-            "    parent_direct_write_exception_required: "
-            f"{PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED!r}",
-            f"    parent_direct_write_exception: {PARENT_DIRECT_WRITE_EXCEPTION!r}",
+            f"    parent_orchestration_only: {PARENT_ORCHESTRATION_ONLY!r}",
+            f"    write_capable_child_required: {WRITE_CAPABLE_CHILD_REQUIRED!r}",
+            f"    parent_blocked_route: {PARENT_BLOCKED_ROUTE!r}",
         ]
     for field in CONTRACT_COMPLETE_IMPLEMENTATION_REQUIRED_INPUTS:
         lines.append(f"      - {field}")

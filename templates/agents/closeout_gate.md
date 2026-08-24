@@ -29,6 +29,11 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 
 - verifier_status: pending
 - auditor_status: pending
+- verifier_role_id: <verifier-child-role>
+- verifier_runtime_agent_id: <runtime-agent-id>
+- verifier_receipt_ref: runtime/verifier_receipt.json
+- parent_mutation_status: no_parent_mutation
+- parent_mutation_evidence_ref: runtime/parent_mutation_evidence.json
 - required_reviews_complete: not_applicable
 - validation_complete: no
 - request_contract_complete: no
@@ -261,7 +266,7 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 
 ## Diff-Check Agent Evidence（diff-check agent evidence）
 
-<!-- selected owning review gate（有効時だけ read-only diff-check instance）、input packet path、latest diff range/commit、decision、finding disposition、accepted same-owner fix 後の rerun evidence を記録します。reviewer output は仮説入力で parent/integration owner が判定します。accepted finding は current snapshot、reachable path、contract、witness/static proof を引用し、rejected finding は reason_code/evidence_ref を持ち wave や rollback を起こしません。 -->
+<!-- selected owning review gate（有効時だけ read-only diff-check instance）、input packet path、latest diff range/commit、decision、finding disposition、accepted same-owner fix 後の rerun evidence を記録します。reviewer output は仮説入力で decision-owning reviewer が判定します。accepted finding は current snapshot、reachable path、contract、witness/static proof を引用し、rejected finding は reason_code/evidence_ref を持ち wave や rollback を起こしません。 -->
 
 - diff_check_agent_role:
 - diff_check_agent_decision:
@@ -286,7 +291,7 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 
 ## Agent Evaluation Evidence（agent evaluation evidence）
 
-<!-- `tools/agent_tools/evaluate_agent_run.py --report-dir <this-run> --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write` を実行し、生成した agent_evaluation.md の status、score、feedback action、learning capture decision を記録します。evaluation_status が pass でない、または feedback_actions_resolved が yes でない間は completion を unlock しません。evaluation は active signal、Behavior Events、intervention、skill/config/workflow/memory improvement decision の workflow_monitoring.md evidence を含めます。 -->
+<!-- evaluation reviewer が `tools/agent_tools/evaluate_agent_run.py --report-dir <this-run> --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write` を実行し、生成した agent_evaluation.md の status、score、feedback action、learning capture decision を記録します。evaluation_status が pass でない、または feedback_actions_resolved が yes でない間は completion を unlock しません。evaluation は active signal、Behavior Events、intervention、skill/config/workflow/memory improvement decision の workflow_monitoring.md evidence を含めます。 -->
 
 ## Runtime Log Archive Evidence（runtime log archive evidence）
 

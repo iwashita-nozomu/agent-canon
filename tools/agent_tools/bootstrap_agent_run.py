@@ -97,6 +97,7 @@ else:
 if __package__:
     from .manifest_rendering import (
         contract_complete_implementation_policy_output_lines,
+        coordination_capability_policy_output_lines,
         default_quality_check_policy_output_lines,
         format_subagent_role_instance_wave_chunks,
         format_subagent_wave,
@@ -111,10 +112,12 @@ if __package__:
         subagent_wave_record_command,
         suggested_public_skills,
         user_facing_language_policy_output_lines,
+        implementation_handoff_required,
     )
 else:
     from manifest_rendering import (
         contract_complete_implementation_policy_output_lines,
+        coordination_capability_policy_output_lines,
         default_quality_check_policy_output_lines,
         format_subagent_role_instance_wave_chunks,
         format_subagent_wave,
@@ -129,6 +132,7 @@ else:
         subagent_wave_record_command,
         suggested_public_skills,
         user_facing_language_policy_output_lines,
+        implementation_handoff_required,
     )
 
 if __package__:
@@ -403,6 +407,17 @@ def resolve_bootstrap_context(
     repository_roots: object | None = None,
 ) -> BootstrapRunContext:
     """Resolve workflow family, specialists, and report paths for one run."""
+    if implementation_handoff_required(args.task):
+        implementer_roles = [
+            role
+            for role in (*config.always_on_roles, *config.specialist_roles)
+            if role.id == "implementer" and role.codex_agents
+        ]
+        if not implementer_roles:
+            raise RuntimeError(
+                "WRITE_SUBAGENT_AUTHORIZATION=required;"
+                "PARENT_BLOCKED_ROUTE=typed_blocked_retry_or_user_report"
+            )
     created_at = datetime.now(UTC).replace(microsecond=0)
     created_at_iso = created_at.isoformat().replace("+00:00", "Z")
     # The parent capability authorizes the eventual write; it does not replace
@@ -627,6 +642,8 @@ def emit_bootstrap_output(
         print("TASK_ID_ROUTE_RECOMMENDED_TASK_IDS=T11,T12")
         print("SUBAGENT_FANOUT_EXPECTATION=blocked_until_task_id_or_explicit_family")
     for line in pre_handoff_scope_policy_output_lines():
+        print(line)
+    for line in coordination_capability_policy_output_lines():
         print(line)
     for line in pre_handoff_gate_status_output_lines():
         print(line)

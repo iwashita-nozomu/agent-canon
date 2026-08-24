@@ -47,9 +47,9 @@ STATIC_OBLIGATION_TABLE: tuple[StaticObligation, ...]
 
 The closed table has these exact IDs and path-free canonical fragments:
 
-- `validation_owner`: follow the parent-selected closed validation route;
-- `parent_assignment`: act only on the parent packet and assigned scope;
-- `parent_authority`: do not perform parent-only integration or final decisions;
+- `validation_owner`: follow the selected closed validation route;
+- `parent_assignment`: act only on the assigned child packet and scope;
+- `parent_authority`: respect child-owned integration publication and final-review decisions;
 - `stop_handback`: return branch/head/check evidence or the role result and stop.
 
 The static renderer resolves `static_obligations` through

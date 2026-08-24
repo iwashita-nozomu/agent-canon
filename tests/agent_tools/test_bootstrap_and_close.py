@@ -57,7 +57,10 @@ from report_artifact_checks import (  # noqa: E402
     project_completion_coverage,
 )
 from task_authority import hash_baseline_bytes  # noqa: E402
-from task_close import update_lifecycle_closeout_consumer  # noqa: E402
+from task_close import (  # noqa: E402
+    _child_closeout_evidence,
+    update_lifecycle_closeout_consumer,
+)
 from team_config import (  # noqa: E402
     AgentTypeSelection,
     load_task_catalog,
@@ -456,7 +459,7 @@ def ready_closeout_evidence_lines(
         "- dynamic_spawn_policy_status: applied",
         "- subagent_closeout_status: closed",
         "- open_subagent_instances: none",
-        "- close_agent_evidence: parent_direct_no_open_subagents",
+        "- close_agent_evidence: orchestrator_no_open_subagents",
         "",
         "## Diff-Check Agent Evidence",
         "- diff_check_agent_role: reviewer",
@@ -911,6 +914,52 @@ def write_ready_closeout_bundle(
         ),
         encoding="utf-8",
     )
+    runtime_dir = report_dir / "runtime"
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    verifier_receipt = {
+        "schema": "agent-canon.verifier-receipt.v1",
+        "role_id": "verifier",
+        "runtime_agent_id": "verifier-1",
+        "status": "pass",
+        "source_event_ids": ["verification-event-1"],
+        "receipt_sha256": "",
+    }
+    verifier_unsigned = dict(verifier_receipt)
+    verifier_unsigned.pop("receipt_sha256")
+    verifier_receipt["receipt_sha256"] = hashlib.sha256(
+        json.dumps(verifier_unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+    ).hexdigest()
+    (runtime_dir / "verifier_receipt.json").write_text(
+        json.dumps(verifier_receipt, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    parent_evidence = {
+        "schema": "agent-canon.parent-mutation-evidence.v1",
+        "status": "no_parent_mutation",
+        "parent_agent_id": "parent-1",
+        "source_event_ids": ["mutation-event-1"],
+        "mutation_event_ids": [],
+        "event_ledger_ref": "runtime/hook_events.jsonl",
+        "receipt_sha256": "",
+    }
+    parent_unsigned = dict(parent_evidence)
+    parent_unsigned.pop("receipt_sha256")
+    parent_evidence["receipt_sha256"] = hashlib.sha256(
+        json.dumps(parent_unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+    ).hexdigest()
+    (runtime_dir / "parent_mutation_evidence.json").write_text(
+        json.dumps(parent_evidence, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    (runtime_dir / "hook_events.jsonl").write_text(
+        json.dumps(
+            {
+                "hook_run_id": "mutation-event-1",
+                "mutation_control": {"status": "not_applicable", "mutation": False},
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     (report_dir / "user_request_contract.md").write_text(
         "\n".join(
             [
@@ -934,6 +983,11 @@ def write_ready_closeout_bundle(
                 "",
                 "- verifier_status: pass",
                 "- auditor_status: resolved",
+                "- verifier_role_id: verifier",
+                "- verifier_runtime_agent_id: verifier-1",
+                "- verifier_receipt_ref: runtime/verifier_receipt.json",
+                "- parent_mutation_status: no_parent_mutation",
+                "- parent_mutation_evidence_ref: runtime/parent_mutation_evidence.json",
                 "- required_reviews_complete: yes",
                 "- validation_complete: yes",
                 "- request_contract_complete: yes",
@@ -2265,8 +2319,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
             self.assertNotIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
             self.assertNotIn("PARENT_REPO_EDITS_ALLOWED=no", result.stdout)
-            self.assertNotIn("PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes", result.stdout)
-            self.assertNotIn("PARENT_DIRECT_WRITE_EXCEPTION=-", result.stdout)
             manifest_text = (
                 report_root / "test-review-only-no-edit" / "team_manifest.yaml"
             ).read_text(encoding="utf-8")
@@ -2274,8 +2326,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             contract_policy = manifest["run"]["contract_complete_implementation_policy"]
             self.assertNotIn("implementation_handoff_required", contract_policy)
             self.assertNotIn("parent_repo_edits_allowed", contract_policy)
-            self.assertNotIn("parent_direct_write_exception_required", contract_policy)
-            self.assertNotIn("parent_direct_write_exception", contract_policy)
+            self.assertNotIn("parent_orchestration_only", contract_policy)
 
     def test_academic_route_uses_current_bounded_dynamic_waves(self) -> None:
         """Academic routing follows the current bounded designer/worker sequence."""
@@ -2719,16 +2770,16 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "no",
             )
             self.assertEqual(
-                contract_complete_implementation_policy[
-                    "parent_direct_write_exception_required"
-                ],
+                contract_complete_implementation_policy["parent_orchestration_only"],
                 "yes",
             )
             self.assertEqual(
-                contract_complete_implementation_policy[
-                    "parent_direct_write_exception"
-                ],
-                "-",
+                contract_complete_implementation_policy["write_capable_child_required"],
+                "yes",
+            )
+            self.assertEqual(
+                contract_complete_implementation_policy["parent_blocked_route"],
+                "typed_blocked_retry_or_user_report",
             )
             self.assertEqual(
                 default_quality_check_policy["candidate_roles"],
@@ -3060,6 +3111,33 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
+
+    def test_task_close_rejects_forged_verifier_or_parent_evidence(self) -> None:
+        """Closeout cannot pass with a forged child receipt or mutation claim."""
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
+            report_root = Path(tmp_dir) / "reports"
+            run_id = "test-task-close-forged-child-evidence"
+            report_dir = report_root / run_id
+            report_root.mkdir(parents=True, exist_ok=True)
+            report_dir.mkdir(parents=True, exist_ok=True)
+            write_ready_closeout_bundle(report_dir, run_id)
+            verifier = report_dir / "runtime" / "verifier_receipt.json"
+            verifier.write_text(
+                verifier.read_text(encoding="utf-8").replace("verifier-1", "forged"),
+                encoding="utf-8",
+            )
+            ready, blockers = _child_closeout_evidence(
+                report_dir,
+                {
+                    "verifier_role_id": "verifier",
+                    "verifier_runtime_agent_id": "verifier-1",
+                    "verifier_receipt_ref": "runtime/verifier_receipt.json",
+                    "parent_mutation_status": "no_parent_mutation",
+                    "parent_mutation_evidence_ref": "runtime/parent_mutation_evidence.json",
+                },
+            )
+            self.assertFalse(ready)
+            self.assertIn("runtime_verifier_receipt_invalid", blockers)
 
     def test_task_close_accepts_profile_selected_targeted_static_analysis(self) -> None:
         """task_close should allow targeted static analysis selected by the risk profile."""
@@ -3538,7 +3616,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 closeout_path.read_text(encoding="utf-8")
                 .replace("- subagents_closed: yes", "- subagents_closed: no")
                 .replace(
-                    "- close_agent_evidence: parent_direct_no_open_subagents",
+                    "- close_agent_evidence: orchestrator_no_open_subagents",
                     "- close_agent_evidence: none",
                 ),
                 encoding="utf-8",

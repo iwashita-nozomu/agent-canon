@@ -71,6 +71,64 @@ cleanup executors retain their existing owners and receipt formats.
   置換した clause、捨てた clause と理由を artifact に残します。
 - scope や permission の変更は `manager` に戻します。
 
+## Runtime Collaboration Capability Handshake
+
+This section is the sole owner of the runtime collaboration capability and
+coordination receipt contract. Generated manifests and hook events reference
+this contract; they do not redefine its schema or infer platform capability.
+
+The capability source is the direct runtime collaboration namespace exposed to
+the current agent. `functions.exec` and its `ALL_TOOLS` inventory are never
+capability evidence. A handshake has the following closed fields:
+
+- `schema`: `agent-canon.communication-capability-handshake.v1`
+- `status`: exactly `available`, `unavailable`, or `unverified`
+- `effective_operations`: operations explicitly returned by the direct runtime
+  readback, not merely names recognized by a matcher
+- `evidence_ref`: a durable artifact or runtime readback reference; it is
+  required for `available` and must not be fabricated when the runtime cannot
+  expose it
+- `source`: exactly `direct_runtime_collaboration_namespace`
+
+The effective transport is derived from the handshake:
+
+| status | allowed coordination mode | meaning |
+| --- | --- | --- |
+| `available` | `direct_peer` | the named operation was read back from the direct namespace |
+| `unavailable` | `parent_relay` or `durable_artifact` | the parent or an artifact carries the message; no peer claim |
+| `unverified` | `parent_relay` or `durable_artifact` | capability was not observed and remains unknown |
+
+An operation matcher is observation only. Seeing `send_message`,
+`followup_task`, `list_agents`, or `interrupt_agent` in an event does not change
+`unavailable` or `unverified` into `available`.
+
+### Coordination Receipt
+
+Every coordination attempt emits one coordination receipt through the existing
+`HookLogContext.append` base-event route. It is stored under the
+`coordination_receipt` member of that transport event; it is not added to the
+fixed `agent-canon.behavior-event.v1` snapshot field set. Its closed fields are:
+
+- `schema`: `agent-canon.coordination-receipt.v1`
+- `operation`: the observed operation
+- `capability_status`: the handshake status used for the decision
+- `effective_operations`: operations actually read back from the direct runtime
+  namespace; the hook route uses an empty list when no readback is available
+- `evidence_ref`: the handshake evidence or an explicit artifact reference
+- `transport`: `direct_peer`, `parent_relay`, or `durable_artifact`
+- `direct_peer`: a boolean consistency readback for the transport
+- `status`: `succeeded`, `failed`, or `invalid_tool_result`, derived from the
+  real tool response
+
+`transport=direct_peer` is valid only with `capability_status=available` and
+an evidence reference that names the operation. The hook dispatcher cannot
+observe the parent handoff capability, so its receipt is always
+`capability_status=unverified`, `effective_operations=[]`,
+`transport=durable_artifact`, and `direct_peer=false`. A parent relay is always
+recorded as `parent_relay`; it must never be rewritten as direct peer
+communication. If the runtime cannot return the direct namespace, use
+`durable_artifact` and preserve the honest `unverified` or `unavailable` status.
+
 ## 主要な通信面
 
 1. `reports/agents/<run-id>/` の role artifact
@@ -211,6 +269,28 @@ path, for example
 
 ## Handoff Packet
 
+### Parent Orchestration-Only Contract
+
+For every repository-changing task, including a bounded owner/path/validation
+request, the parent is an orchestrator only. The parent may select and launch
+agents, relay packets without changing their claims, manage dependency and
+integration order, monitor status, and return final external readback. The
+parent must not investigate, design, implement, run tests, review diffs, draft
+or publish Issues/PRs, score evaluations, decide convergence, resolve merge
+conflicts, or interpret validation/finding results.
+
+A write-capable child is mandatory for every repository edit. Missing spawn
+authorization, tool access, or another launch gate produces a typed
+`status=blocked` / retry / user-report packet; it never authorizes a parent
+write. Decision-owning reviewers or ship reviewers accept/reject findings and
+choose the next action. A verifier runs prescribed validation, an auditor
+creates the closeout artifact, an integration executor performs merge and
+conflict resolution, a publisher or PR-processing child performs Issue/PR
+writes, and an evaluation reviewer owns scoring and convergence.
+
+Read-only conversational answers remain outside this repository-changing
+route and do not create a write handoff.
+
 Implementation handoffs project the canonical TargetStateContract and
 ImplementationExecutionContract: complete owner/type/API/config/schema/path/
 dependency/transition/deletion/validation structure, immutable packet identity,
@@ -339,34 +419,6 @@ Raw search hits, chat memory, and a list of nearest files are not sufficient.
 If the packet is missing, implementation returns to investigation instead of
 guessing an edit path.
 
-## Parent-Direct Context Note
-
-For an approved parent-direct exception whose owner boundary, replaceable unit,
-validation route, and `external public API/behavior/schema unchanged` readback
-are already evidenced, the full
-Pre-Edit Repository Investigation Packet can be replaced by a short
-Parent-Direct Context Note. Routine docs, Focused code, typo/link/format-only,
-or other bounded work still needs the exception rationale when the work is
-repo-changing implementation / patch / doc-edit. File count alone is not enough
-to choose this note.
-
-The note records:
-
-- `owner`
-- `target_path`
-- `request_clause`
-- `parent_direct_exception_rationale`
-- `reuse_basis`
-- `design_oop_boundary`
-- `pre_handoff_gate_status`
-- `validation_route`
-- `llm_visible_context`
-- `local_tool_context`
-- `durable_memory_refs`
-
-The note is still a context-construction artifact. Raw search hits, nearest
-editable files, and chat context alone are not enough.
-
 ## Fresh Subagent Context Capsule
 
 Subagents are fresh per launch and do not inherit accumulated context. Each
@@ -376,7 +428,7 @@ enough to execute the role and owned enough to avoid unrelated repo reading.
 - `objective`: one sentence with active non-goals
 - `request_clause_ids`: clauses the subagent owns
 - `state_snapshot`: branch, relevant commit or run-id, current stage, and
-  parent integration owner
+  integration executor owner
 - `read_before_work`: exact files or sections to read within role-owned
   surfaces
 - `context_artifacts`: router output, dashboard summary, checker finding
@@ -438,7 +490,7 @@ edits, the parent runs or cites:
 python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>
 ```
 
-The handoff or parent-direct work log includes the resulting
+The handoff work log includes the resulting
 `TOOL_REJECTION_PREDICTED_GATE` lines or an explicit
 `TOOL_REJECTION_PREFLIGHT=pass` observation. If a predicted gate names OOP
 readability, helper inventory, dependency headers, GitHub workflow checks, hook
