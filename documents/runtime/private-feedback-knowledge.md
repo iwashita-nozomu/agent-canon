@@ -22,7 +22,10 @@ The operational checkout is selected by the explicit bootstrap control root:
 ```
 
 For the live installation this is normally `~/agent-canon-log`. The checkout
-is a private (`0700`) normal Git clone on `main`, with the exact private remote.
+is a private (`0700`) normal Git clone on the source-qualified stable branch
+resolved by `runtime_log_archive_git.py repo-key`, with the exact private
+remote. The log repository's `main` branch is schema/configuration content and
+is not the feedback content branch.
 Runtime data is first written below the external runtime root:
 
 ```text

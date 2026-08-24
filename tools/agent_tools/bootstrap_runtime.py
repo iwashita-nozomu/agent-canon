@@ -3253,6 +3253,8 @@ class BootstrapRuntime:
                 str(container_runtime),
                 "--log-root",
                 str(self.paths.control_parent_root / "agent-canon-log"),
+                "--source-root",
+                str(self.repository_root),
                 "host-sync",
             ],
             cwd=str(self.repository_root),
