@@ -1577,6 +1577,8 @@ class BootstrapRuntime:
         image_ref: str,
         image_record: Mapping[str, Any],
         source_head: str,
+        *,
+        reconcile_manifest: bool = False,
     ) -> dict[str, Any]:
         """Adopt one already-pulled immutable image without invoking Docker build."""
         if state.get("state") == "uninstalled":
@@ -1614,6 +1616,11 @@ class BootstrapRuntime:
                 "architecture": image_record.get("Architecture"),
                 "source_head": source_head,
             }
+            if reconcile_manifest:
+                # SourceSync has atomically installed the candidate checkout.
+                # The candidate lifecycle is the only route allowed to move
+                # the runtime state across the checkout's manifest boundary.
+                state["manifest_digest"] = self.manifest_digest
             state["state"] = "maintenance_pending"
             self._write_state(state)
             self._stop_owned_container(state)
@@ -2390,12 +2397,22 @@ class BootstrapRuntime:
                 evidence={**exc.evidence, "receipt_path": receipt["receipt_path"], "recovered": True},
             ) from exc
 
-    def update(self, image_ref: str | None = None) -> dict[str, Any]:
+    def update(
+        self,
+        image_ref: str | None = None,
+        *,
+        source_sync: bool = False,
+    ) -> dict[str, Any]:
         """Reconcile only the current checkout; never acquires a Git revision."""
         with self.locked():
             state = self._read_state(allow_manifest_drift=True)
             if state.get("state") == "uninstalled":
                 raise BootstrapError("not_installed", "install must complete before update")
+            if source_sync and not image_ref:
+                raise BootstrapError(
+                    "source_sync_image_required",
+                    "source-sync update requires an immutable image reference",
+                )
             if image_ref:
                 image_record = self.docker.inspect_image(image_ref)
                 if image_record is None:
@@ -2405,7 +2422,11 @@ class BootstrapRuntime:
                     image_record, source_head=source_head, image_ref=image_ref
                 )
                 result = self._adopt_registry_image_locked(
-                    state, image_ref, image_record, source_head
+                    state,
+                    image_ref,
+                    image_record,
+                    source_head,
+                    reconcile_manifest=source_sync,
                 )
             else:
                 result = self._update_locked(state, "update")
@@ -4115,6 +4136,11 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_parser(operation)
     update_parser = sub.add_parser("update")
     update_parser.add_argument("--image-ref")
+    update_parser.add_argument(
+        "--source-sync",
+        action="store_true",
+        help="Reconcile an atomically installed source-sync candidate across its manifest boundary",
+    )
     sync_parser = sub.add_parser("sync")
     sync_parser.add_argument("--install-root", required=True)
     sync_parser.add_argument("--remote", default="origin")
@@ -4181,7 +4207,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if operation == "install":
         return runtime.install()
     if operation == "update":
-        return runtime.update(image_ref=args.image_ref)
+        return runtime.update(image_ref=args.image_ref, source_sync=args.source_sync)
     if operation == "sync":
         try:
             from .source_sync import SourceSync  # type: ignore[import-not-found]

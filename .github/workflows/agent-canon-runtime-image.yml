@@ -81,7 +81,7 @@ jobs:
           test -n "${IMAGE_DIGEST}"
           inspect_output="$(docker buildx imagetools inspect "${IMAGE_NAME}@${IMAGE_DIGEST}")"
           printf '%s\n' "${inspect_output}"
-          if ! printf '%s\n' "${inspect_output}" | grep -Fq "Digest: ${IMAGE_DIGEST}"; then
+          if ! printf '%s\n' "${inspect_output}" | grep -Eq "Digest:[[:space:]]+${IMAGE_DIGEST}"; then
             echo "published image index digest did not match build metadata" >&2
             exit 1
           fi

@@ -165,18 +165,24 @@ class SourceSync:
         _atomic_json(self.runtime.paths.source_sync, {"schema": "agent-canon.source-sync.v1", **payload})
 
     def _run_candidate_bootstrap(self, image_digest: str) -> None:
-        command = [
+        common = [
             str(self.install_root / "bootstrap.sh"),
             "--control-parent-root",
             str(self.runtime.paths.control_parent_root),
             "--runtime-root",
             str(self.runtime.paths.runtime_root),
-            "update",
-            "--image-ref",
-            image_digest,
         ]
-        base = command[:-3]
-        commands = (command, [*base, "start"], [*base, "codex", "prepare"])
+        commands = (
+            [
+                *common,
+                "update",
+                "--source-sync",
+                "--image-ref",
+                image_digest,
+            ],
+            [*common, "start"],
+            [*common, "codex", "prepare"],
+        )
         environment = {**os.environ, "AGENT_CANON_LOCK_HELD": "1"}
         for args in commands:
             result = subprocess.run(
