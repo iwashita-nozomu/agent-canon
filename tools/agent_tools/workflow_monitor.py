@@ -1526,6 +1526,26 @@ def main() -> int:
         ),
         runtime_root=args.runtime_root,
     )
+    # Structured runtime feedback is also accumulated in the private log
+    # spool.  This is deliberately best-effort: monitoring remains usable
+    # when private feedback is not configured, while the feedback body never
+    # enters the monitoring receipt or dashboard.
+    if args.runtime_feedback and args.runtime_root:
+        try:
+            from .private_feedback import capture_runtime_feedback
+        except ImportError:
+            from private_feedback import capture_runtime_feedback
+        for entry in args.runtime_feedback:
+            try:
+                capture_runtime_feedback(
+                    entry,
+                    runtime_root=args.runtime_root,
+                    run=path.parent.name,
+                )
+            except Exception:
+                # The canonical monitoring artifact has already been written;
+                # the host sync route will retain any successful private spool.
+                continue
     print(f"WORKFLOW_MONITORING={path}")
     return 0
 

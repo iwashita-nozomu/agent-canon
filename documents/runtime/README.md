@@ -21,3 +21,7 @@ runtime surface ではありません。hooks、tools の実装は各 source dir
 - `log-surface-inventory.json`: runtime surface inventory。
 
 機械可読ファイルを編集した場合は、対応する runtime checker の所有範囲を確認します。
+Private feedback and reusable knowledge are defined in
+[`private-feedback-knowledge.md`](private-feedback-knowledge.md). Their body
+and receipts belong to the private `agent-canon-log` remote, not this source
+checkout.

@@ -60,3 +60,10 @@ agent-canon memory search --root . --search-path agents/canonical/CODEX_WORKFLOW
 
 固定 packet/read に memory record を追加しません。旧 append writer と旧単一 note path は
 廃止済みです。#536 固有の open draft はこの base tree に推測で取り込みません。
+# Migration boundary
+
+Private recurrence feedback is moving to the external `agent-canon-log`
+knowledge route. Use `agent-canon k` / `agent-canon knowledge` for new private
+records and `knowledge migrate-memory --root <source>` for a non-destructive
+one-cycle migration. Existing memory records are not deleted until the live
+archive has been read back.

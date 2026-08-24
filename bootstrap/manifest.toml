@@ -30,3 +30,10 @@ target = "runtime-root/codex-home/skills"
 
 [archive]
 remote = "git@github.com:iwashita-nozomu/agent-canon-log.git"
+
+[private_feedback]
+# The host control plane owns this private checkout. The tool container only
+# receives the external runtime spool and never receives Git credentials.
+remote = "git@github.com:iwashita-nozomu/agent-canon-log.git"
+operational_clone = "control-parent-root/agent-canon-log"
+legacy_clone = "runtime-root/archive/agent-canon-log"
