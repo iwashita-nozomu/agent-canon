@@ -26,15 +26,18 @@ is a private (`0700`) normal Git clone on `main`, with the exact private remote.
 Runtime data is first written below the external runtime root:
 
 ```text
-<runtime-root>/spool/private-feedback/
+<runtime-root>/container-runtime/spool/private-feedback/
 ```
 
-`k/f sync` in the tool container writes a typed, body-free request below the
-external spool. Bootstrap invokes the host archive adapter after the container
-command. The adapter performs fetch, non-force publication, compare/readback
-and spool retention on conflict. The operational checkout is mounted into the
-container read-only for search/read/status; the container has no Git
-credentials and never publishes or mutates that checkout.
+The tool container sees this same directory as
+`/var/lib/agent-canon/runtime/spool/private-feedback/` through the existing
+`container-runtime/` bind mount. `k/f sync` writes a typed, body-free request
+below that spool. Bootstrap invokes the host archive adapter after the
+container command, passing the bind-mounted host path to the adapter. The
+adapter performs fetch, non-force publication, compare/readback and spool
+retention on conflict. The operational checkout is mounted into the container
+read-only for search/read/status; the container has no Git credentials and
+never publishes or mutates that checkout.
 
 ## Commands
 
