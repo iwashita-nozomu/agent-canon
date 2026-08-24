@@ -24,7 +24,7 @@ downstream implementation ../../tests/tools/test_agent_canon_pr_dependency_sourc
 downstream implementation ../../tests/tools/test_agent_canon_pr_graph_gate_integration.py prevents persisted graph orchestration from returning
 downstream implementation ../../tests/tools/test_pr_gate_receipt.py verifies receipt schema and binding rejection
 downstream implementation ../../tests/tools/test_pr_gate_receipt_round_trip.py verifies writer/parser/consumer execution
-downstream implementation ../../issues/closed/AC-20260815-decouple-graph-runtime.md records Issue 723 implementation and validation
+downstream implementation https://github.com/iwashita-nozomu/agent-canon/issues/723 records implementation and validation
 @dependency-end
 -->
 

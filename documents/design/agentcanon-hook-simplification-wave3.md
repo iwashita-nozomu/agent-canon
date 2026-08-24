@@ -120,7 +120,11 @@ Audit conclusions:
 4. current `.codex/hooks/hook_dispatcher.py` imports `.codex/hooks/hook_safety.py`, so moving that file requires a direct dispatcher import change and an absent old path proof;
 5. convention, quality, report, worktree-health, GPU admission, catalog, responsibility, and generated-inventory surfaces are callers/readbacks, even when they do not invoke the hook process directly.
 
-For completeness, the baseline legacy-name `git grep -l` readback also returned these non-runtime or historical surfaces: `.agents/skills/worktree-health/SKILL.md`, `README.md`, `agents/canonical/CODEX_SUBAGENTS.md`, `documents/conventions/coding-conventions-python.md`, `documents/design/codex-spark-implementation-routing.md`, `documents/design/responsibility-scope-management.md`, `documents/runtime/runtime-log-archive.md`, `documents/tools/README.md`, `evidence/agent-evals/issue_eval_manifest.toml`, `evidence/agent-evals/workflow_selection_eval.toml`, `issues/closed/AC-20260513-hook-result-accumulation.md`, `issues/closed/AC-20260514-oop-hook-side-effect-and-skill-split.md`, `issues/closed/AC-20260514-skill-usage-noop-hook-churn.md`, `issues/closed/AC-20260517-responsibility-scope-management.md`, `issues/closed/AC-20260519-oop-hook-warning-mode.md`, `issues/open/AC-20260517-eval-accumulation-gaps.md`, `rust/agent-canon/src/rust_migration_plan.rs`, `tests/agent_tools/test_responsibility_scope.py`, `tests/agent_tools/test_task_authority.py`, `tools/README.md`, `tools/experiments/execution_resource_plan.py`, and `tools/validation/notebook_quality.py`. The implementation packet reads all of these; closed issues and historical evidence remain read-only and are not rewritten as compatibility references.
+For completeness, the baseline legacy-name `git grep -l` readback also returned
+non-runtime and historical surfaces across the source, evidence, tests, and
+GitHub Issue records. The implementation packet reads those bounded surfaces;
+GitHub Issue URLs/numbers remain the only durable Issue references and no local
+Issue history is recreated as a compatibility surface.
 
 ## Responsibility partition: 9 blocking groups and 14 direct retirements
 

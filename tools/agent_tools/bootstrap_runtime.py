@@ -3064,6 +3064,23 @@ class BootstrapRuntime:
                                 ),
                             }
                         )
+        # Private runtime Skill candidates are an external, runtime-local
+        # surface.  They are linked into the isolated CODEX_HOME only; this
+        # never changes the public catalog or the source-tree .agents view.
+        private_skills = self.paths.runtime_root / "private-skills"
+        if private_skills.is_dir() and not private_skills.is_symlink():
+            for path in sorted(private_skills.rglob("*")):
+                if path.is_file() and not path.is_symlink():
+                    entries.append(
+                        {
+                            "surface": "skills",
+                            "source": str(path),
+                            "relative": str(path.relative_to(private_skills)),
+                            "digest": sha256_bytes(
+                                _safe_read(path, field="private Skill source")
+                            ),
+                        }
+                    )
         return entries
 
     def codex_prepare(self) -> dict[str, Any]:

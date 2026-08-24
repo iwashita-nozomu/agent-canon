@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Defines AgentCanon issue templates and label taxonomy.
-upstream design ../../issues/README.md defines durable local issue storage.
+upstream design ../runtime/private-feedback-knowledge.md defines GitHub Issue authority and private packet transport.
 downstream implementation ../../templates/documents/github/issue/agentcanon-maintenance.yml captures maintenance issues.
 downstream implementation ../../templates/documents/github/issue/eval-capture.yml captures eval issues.
 downstream implementation ../../templates/documents/github/pull-request/agent_canon.md links issue/eval closeout evidence.

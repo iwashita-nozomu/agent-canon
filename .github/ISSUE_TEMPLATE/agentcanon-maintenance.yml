@@ -2,7 +2,7 @@
 # contract configuration
 # responsibility Defines AgentCanon maintenance issue capture form.
 # upstream design ../../documents/operations/issue-label-taxonomy.md issue labels and template routing.
-# upstream design ../../issues/README.md durable operational issue storage policy.
+# upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue transport policy.
 # upstream design ../AGENTS.md GitHub subtree instructions.
 # upstream design ../../templates/documents/README.md canonical template owner.
 # downstream implementation ../../tools/ci/check_github_workflows.py validates GitHub surface conventions.

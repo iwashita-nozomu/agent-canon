@@ -260,10 +260,11 @@ docs review、analysis、explanation、read-only research など、ローカル�
 この条件を満たす operation は、ローカルで試してからIssueへ移す二段階にせず、分類時点
 から直接 `issue_defer` にします。local-only capability、must-do、blocker/root-cause
 investigation、acceptance validation、remote mutation/integration、およびそれらに
-必要なreadbackはこの例外に含めず、`local_execute` します。既存 `issues/open/` form の
-`issue_id`、`status`、`source`、`severity`、`problem`、`evidence`、`done` を使い、future
-operator が再開できる `required_action` と `close_condition` を必ず記録します。remote
-Issue mirrorはユーザーが明示した場合だけ既存 sync routeを使います。
+必要なreadbackはこの例外に含めず、`local_execute` します。Issue handoffは
+repository-qualified GitHub URL/numberを使い、offline時だけprivate
+`agent-canon-log/feedback/issue-packets/pending/`にbody locator/digestを記録します。
+remote Issueのcreate/view/edit/close/reopenはhost adapterから実行し、container内で
+GitHub credentialやnetworkを扱いません。
 
 依存がある operationは `priority` と `depends_on` が許す順に進めます。split は
 local_executeすべき子と issue_defer できる子が同じ依頼に含まれる場合だけ使い、親子ID、

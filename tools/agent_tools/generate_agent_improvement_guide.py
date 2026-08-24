@@ -6,7 +6,7 @@
 # upstream design ../../documents/runtime/runtime-log-archive.md hook result accumulation contract
 # upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
 # upstream implementation ./historical_skill_usage_reader.py reads archived skill_usage.jsonl read-only
-# upstream design ../../issues/README.md durable operational issue storage
+# upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue packet storage
 # downstream implementation ../../.github/workflows/agent-improvement-guide.yml runs this on selected PR paths and manual dispatch
 # downstream implementation ../../tests/agent_tools/test_generate_agent_improvement_guide.py tests guide generation
 # @dependency-end
@@ -96,8 +96,7 @@ class HookEvidenceCounts:
 class EvidenceSummary:
     """Summarized AgentCanon improvement evidence."""
 
-    open_issues: tuple[Path, ...]
-    closed_issues: tuple[Path, ...]
+    github_issue_refs: tuple[str, ...]
     memory_entries: dict[str, int]
     skill_eval_reports: tuple[Path, ...]
     failed_skill_eval_reports: tuple[Path, ...]
@@ -504,8 +503,7 @@ class AgentImprovementGuide:
             path for path in skill_eval_reports if self.skill_eval_failed(path)
         )
         return EvidenceSummary(
-            open_issues=self.paths("issues/open/AC-*.md"),
-            closed_issues=self.paths("issues/closed/AC-*.md"),
+            github_issue_refs=self.github_issue_refs(),
             memory_entries=self.memory_entry_counts(),
             skill_eval_reports=skill_eval_reports,
             failed_skill_eval_reports=failed_skill_eval_reports,
@@ -515,6 +513,26 @@ class AgentImprovementGuide:
     def paths(self, pattern: str) -> tuple[Path, ...]:
         """Return sorted paths for one root-relative glob."""
         return tuple(sorted(self.root.glob(pattern)))
+
+    def github_issue_refs(self) -> tuple[str, ...]:
+        """Read repository-qualified URLs from private packet metadata only."""
+        configured = os.environ.get("AGENT_CANON_LOG_ROOT", "").strip()
+        if not configured:
+            return ()
+        pending = Path(configured).expanduser().resolve() / "feedback/issue-packets/pending"
+        refs: set[str] = set()
+        paths = sorted(pending.glob("*.json")) if pending.is_dir() else ()
+        for path in paths:
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            value = payload.get("issue_url")
+            if isinstance(value, str) and value.startswith("https://github.com/"):
+                refs.add(value)
+            elif isinstance(payload.get("repository"), str) and isinstance(payload.get("number"), str):
+                refs.add(f"https://github.com/{payload['repository']}/issues/{payload['number']}")
+        return tuple(sorted(refs))
 
     def skill_eval_report_paths(self) -> tuple[Path, ...]:
         """Return skill prompt eval reports from the mounted archive."""
@@ -599,8 +617,7 @@ def evidence_summary_lines(root: Path, summary: EvidenceSummary) -> list[str]:
     counts = summary.hook_counts
     return [
         f"- evidence_root: `{root.as_posix()}`",
-        f"- open_issues: `{len(summary.open_issues)}`",
-        f"- closed_issues: `{len(summary.closed_issues)}`",
+        f"- github_issue_refs: `{len(summary.github_issue_refs)}`",
         f"- memory_entries: `{sum(summary.memory_entries.values())}`",
         f"- skill_eval_reports: `{len(summary.skill_eval_reports)}`",
         f"- failed_skill_eval_reports: `{len(summary.failed_skill_eval_reports)}`",
@@ -642,7 +659,7 @@ def render_guidance_sections(root: Path, summary: EvidenceSummary) -> list[str]:
     sections.extend(named_section("Top Failure Repair Targets", counter_lines(summary.hook_counts.failure_targets)))
     sections.extend(named_section("Hook Quality Findings", counter_lines(summary.hook_counts.quality)))
     sections.extend(named_section("Protocol Feedback Coverage", protocol_feedback_lines(summary)))
-    sections.extend(named_section("Open Issues", path_lines(root, summary.open_issues)))
+    sections.extend(named_section("GitHub Issues", summary.github_issue_refs or ("github_issue_lookup_required",)))
     sections.extend(
         named_section(
             "Failed Skill Eval Reports",
@@ -777,8 +794,10 @@ def skill_source_path_candidates(skill: str) -> tuple[Path, ...]:
 def guidance(summary: EvidenceSummary) -> list[str]:
     """Return actionable guidance lines."""
     lines: list[str] = []
-    if summary.open_issues:
-        lines.append("- Prioritize open `issues/open/` findings before adding new workflow scope.")
+    if summary.github_issue_refs:
+        lines.append("- Resolve repository-qualified GitHub Issue references before adding new workflow scope.")
+    else:
+        lines.append("- github_issue_lookup_required: no repository-qualified Issue URL is present in private packets.")
     if summary.failed_skill_eval_reports:
         lines.append("- Repair skill or workflow prompt surfaces, then rerun accumulated prompt evals.")
     if summary.hook_counts.failures:

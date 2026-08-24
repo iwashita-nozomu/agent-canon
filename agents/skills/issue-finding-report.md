@@ -10,10 +10,10 @@ upstream design dependency-analysis.md cause-hypothesis, mechanism, impact, and 
 upstream design responsibility-cleanup.md complete owning responsibility-unit and boundary workflow
 upstream design subagent-bootstrap.md multi-agent partition and handoff workflow
 upstream design pr-processing.md repository-qualified Issue identity and publication boundary
-upstream design ../../issues/README.md durable AgentCanon operational issue schema
+upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue packet route
 upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py emits structured log evidence
 upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py resolves accumulated log archive state
-upstream implementation ../../tools/agent_tools/issue_sync.py validates local issue records and GitHub mirrors
+upstream implementation ../../tools/agent_tools/issue_sync.py resolves GitHub Issues and private packets
 downstream design ../../.agents/skills/issue-finding-report/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
@@ -393,8 +393,8 @@ outputs, locators, and decisions as evidence.
 
 ## Grouping And Dispatch Boundary
 
-Use `tools/agent_tools/issue_sync.py` as the shared normalization and mirror
-owner for tool and issue findings. Its `(owner, root_cause, fix)` key produces
+Use `tools/agent_tools/issue_sync.py` as the host-side GitHub adapter for tool
+and Issue findings. Its `(owner, root_cause, fix)` key produces
 an initial candidate group. Before publication, apply Cause Investigation and
 Issue Responsibility Unit contracts:
 
@@ -506,15 +506,14 @@ Before writing a new Issue:
 
 1. Confirm occurrence locations. Keep observed sites separate from proposed
    edit scope.
-1. Write `issues/open/AC-YYYYMMDD-short-slug.md` only when the responsibility
-   set needs a new durable record.
-1. Populate the minimum Issue form from `issues/README.md`: `problem`,
-   `evidence`, and `done`, plus identity fields. Add structured occurrence,
-   cause-hypothesis, responsibility-boundary, and relation sections.
-1. Use `github_issue: pending` or `github_issue: not-created` only for a mirror
-   being prepared in the same branch or explicit follow-up. These markers are
-   unresolved until `--apply` replaces them with one real GitHub Issue URL;
-   `--github-check` must report them and `--require-github-link` must fail.
+1. Resolve or create one repository-qualified GitHub Issue through the host
+   adapter when online.
+1. When offline, write only metadata under the private
+   `agent-canon-log/feedback/issue-packets/pending/` path. The packet stores a
+   private body locator and digest; it never stores the body or a pending
+   marker in AgentCanon source.
+1. Online publication reads back the GitHub URL, repository, number, title,
+   body digest, and state before removing the pending packet.
 
 Issue body sections:
 
@@ -555,7 +554,7 @@ copied agent claims, and repeated comments do not upgrade a clause. During
 pre-close revalidation, retain grounded clauses and downgrade unsupported
 `done`/`close_condition` text; do not discard a mixed Issue or create a new
 blocker. `issue_sync.py` exposes this projection through
-`project_issue_clauses()` and only mirrors it; the mechanism owner supplies the
+`project_issue_clauses()` and only projects it; the mechanism owner supplies the
 receipt and decides correspondence.
 
 ## Output Packet
@@ -579,7 +578,7 @@ cause_status: <hypothesis|directly-demonstrated|inconclusive>
 responsibility_units: <owner/decision/mechanism/validation/completion summaries>
 issue_graph: <parent/child/sibling/evidence/supersedes edges>
 clause_transfer_ledger: <assigned/deferred/rejected rows>
-issue_paths_or_urls: <repository-qualified identities>
+issue_paths_or_urls: <repository-qualified GitHub URLs/numbers>
 subagent_partitions: <role_id:instance_id:agent_type:packet>
 validation: <commands and readback>
 ```
@@ -599,18 +598,16 @@ Issue and evidence classification rather than creating another registry entry.
 - Do not close a source Issue before clause destinations, backlinks, and
   readback exist.
 - Closed state is not evidence that implementation or validation occurred.
-- If a unique clause has no destination, reorganization remains incomplete.
+- If a unique clause has no GitHub destination, reorganization remains incomplete.
 - Do not create a second Issue database or a giant tracking Issue. GitHub Issues
-  and durable local mirrors remain the authority; the packet is a run-local
-  receipt.
+  remain the authority; a private packet is only a run-local transport receipt.
 
 ## Validation
 
-Run local Issue schema and skill wiring checks after creating or updating
-Issues or this skill:
+Run focused GitHub adapter and skill wiring checks after changing this route:
 
 ```bash
-python3 tools/agent_tools/issue_sync.py --root .
+python3 tools/agent_tools/issue_sync.py --issue-url https://github.com/iwashita-nozomu/agent-canon/issues/<number>
 python3 tools/agent_tools/check_skill_frontmatter.py --root .
 python3 tools/agent_tools/skill_tool_commands.py check
 python3 tools/agent_tools/skill_shim_materializer.py check --root .

@@ -5,7 +5,7 @@ responsibility Documents Codex Workflow for this repository.
 upstream design ../../ROOT_AGENTS.md root runtime entrypoint
 upstream design ./CODEX_SUBAGENTS.md subagent routing contract
 upstream design ../workflows/agent-canon-pr-workflow.md standalone source PR workflow
-upstream design ../../issues/README.md durable AgentCanon operational finding storage
+upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue packet route
 downstream design ../workflows/token-efficient-codex-workflow.md token-aware runtime mode overlay
 downstream design ../../templates/agents/closeout_gate.md closeout gate contract
 upstream design ../../documents/design/dependency-manifest-design.md dependency manifest design
@@ -139,7 +139,7 @@ slice を選ぶ場合は、coverage map に `covered_surfaces`、`deferred_surfa
 `omitted_surfaces` と理由を残してから進めます。
 
 - `documents/`
-- `issues/`
+- repository-qualified GitHub Issue URLs/numbers and private packet locators
 - `memory/`
 - `documents/notes/knowledge/`
 - `documents/notes/guardrails/`

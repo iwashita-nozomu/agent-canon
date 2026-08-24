@@ -524,9 +524,9 @@ REVIEW_ISSUE_ROUTING_MARKERS = {
     "documents/conventions/REVIEW_PROCESS.md": (
         "Review Finding Issue Routing",
         "issue_route",
-        "issues/open/",
+        "github_issue",
         "issue_sync.py",
-        "github_mirror",
+        "private packet",
     ),
 }
 SOLID_CODING_CONTRACT_MARKERS = DECLARATIVE_MARKER_CONTRACTS["solid_coding_contract"]

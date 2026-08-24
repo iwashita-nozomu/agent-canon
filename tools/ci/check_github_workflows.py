@@ -4,11 +4,9 @@
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR evidence rules
 # upstream design ../../README.md AgentCanon surface index
 # upstream design ../../.github/AGENTS.md GitHub agent entrypoint
-# upstream design ../../issues/README.md durable operational issue conventions
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR checklist
 # upstream design ../../.github/workflows/agent-improvement-guide.yml PR and push improvement guide workflow
 # upstream design ../../.github/workflows/agent-runtime-dashboard.yml standalone AgentCanon runtime dashboard workflow
-# upstream design ../../.github/workflows/issue-mirror.yml standalone local/GitHub issue mirror workflow
 # upstream design ../../.github/workflows/agent-canon-static-gates.yml PR candidate gate workflow
 # upstream implementation ../agent_tools/check_skill_frontmatter.py validates runtime skill frontmatter in static gates
 # downstream implementation ../../tests/tools/test_check_github_workflows.py tests
@@ -34,9 +32,6 @@ LITERAL_ENV_REFERENCE_PATTERN = re.compile(
     r"|\$([A-Za-z_][A-Za-z0-9_]*)"
 )
 SHELL_LINE_CONTINUATION_PATTERN = re.compile(r"\\\r?\n")
-ISSUE_MIRROR_CHECK_JOB = "issue-mirror-check"
-ISSUE_MIRROR_CHECKOUT_OUTCOME = "steps.checkout.outcome"
-ISSUE_MIRROR_CHECKOUT_FAILURE_GUARD = "failure() && "
 AGENT_CANON_PR_READ_CREDENTIAL = "AGENT_CANON_PR_READ_TOKEN"
 GITHUB_TOKEN_EXPRESSION = "${{ github.token }}"
 WORKFLOW_DISPATCH_INPUT_PATTERN = re.compile(
@@ -72,8 +67,6 @@ PR_TEMPLATE_FORBIDDEN_TEXT = (
     "Agent Orchestration Evidence",
     "paused until",
     "Existing durable findings were searched",
-    "Issue Mirror artifact",
-    "issue_sync.py --repo",
     "Copilot Configuration Impact",
     "Candidate Commit And Publication Identity",
     "GitHub Mirror / Submodule Evidence",
@@ -99,17 +92,6 @@ STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS = (
     "schedule:",
     "generate_agent_runtime_dashboard.py",
 )
-STANDALONE_ISSUE_MIRROR_WORKFLOW_REQUIREMENTS = (
-    "push:",
-    "- main",
-    "workflow_dispatch:",
-    "issue_sync.py",
-    "--github-check",
-    "--sync-github",
-    "GITHUB_STEP_SUMMARY",
-    "permissions:",
-    "issues: write",
-)
 AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS = (
     "pull_request:",
     "workflow_dispatch:",
@@ -123,7 +105,6 @@ AGENT_CANON_STATIC_GATE_DIRECT_COMMANDS = (
     "responsibility_scope.py",
     "import_responsibility.py",
     "--baseline-ref",
-    "issue_sync.py",
     "run_accumulated_agent_evals.py",
     "eval_accumulation_check.py",
     "check_agent_runtime_alignment.py",
@@ -411,167 +392,6 @@ def checkout_step_findings(path: Path, workflow: dict[str, object]) -> list[Find
     return findings
 
 
-def issue_mirror_checkout_policy_findings(
-    path: Path,
-    workflow: dict[str, object],
-) -> list[Finding]:
-    """Return findings for issue-mirror checkout failure truthfulness and fallback."""
-    if path.name != "issue-mirror.yml":
-        return []
-    contexts = [
-        context
-        for context in step_contexts(workflow)
-        if context.job_name == ISSUE_MIRROR_CHECK_JOB
-    ]
-    if not contexts:
-        return []
-    findings: list[Finding] = []
-    findings.extend(issue_mirror_checkout_step_findings(path, contexts))
-    findings.extend(issue_mirror_checker_step_findings(path, contexts))
-    findings.extend(issue_mirror_fallback_step_findings(path, contexts))
-    return findings
-
-
-def issue_mirror_checkout_step_findings(
-    path: Path,
-    contexts: list[StepContext],
-) -> list[Finding]:
-    """Return issue-mirror checkout step-specific findings."""
-    findings: list[Finding] = []
-    for context in issue_mirror_checkout_steps(contexts):
-        if context.step.get("continue-on-error"):
-            findings.append(
-                Finding(
-                    "error",
-                    path,
-                    "issue_mirror_checkout_continue_on_error_not_allowed",
-                )
-            )
-    return findings
-
-
-def issue_mirror_checker_step_findings(
-    path: Path,
-    contexts: list[StepContext],
-) -> list[Finding]:
-    """Return issue-sync checker step-specific findings."""
-    for context in issue_mirror_issue_sync_checker_steps(contexts):
-        if context.step.get("if") != f"{ISSUE_MIRROR_CHECKOUT_OUTCOME} == 'success'":
-            return [
-                Finding(
-                    "error",
-                    path,
-                    "issue_mirror_checker_step_must_require_checkout_success",
-                )
-            ]
-    return []
-
-
-def issue_mirror_fallback_step_findings(
-    path: Path,
-    contexts: list[StepContext],
-) -> list[Finding]:
-    """Return issue-mirror fallback step-specific findings."""
-    fallback_steps = issue_mirror_checkout_failure_summary_steps(contexts)
-    if not fallback_steps:
-        return [
-            Finding("error", path, "issue_mirror_checkout_failure_summary_missing")
-        ]
-    findings: list[Finding] = []
-    for context in fallback_steps:
-        run = context.step.get("run")
-        if not isinstance(run, str):
-            findings.append(
-                Finding(
-                    "error",
-                    path,
-                    "issue_mirror_checkout_failure_summary_missing_run",
-                )
-            )
-            continue
-        if not issue_mirror_failure_summary_guard_valid(context):
-            findings.append(
-                Finding(
-                    "error",
-                    path,
-                    "issue_mirror_checkout_failure_summary_must_be_gated_by_failure",
-                )
-            )
-        if "ISSUE_SYNC=pass" in run:
-            findings.append(
-                Finding(
-                    "error",
-                    path,
-                    "issue_mirror_checkout_failure_fallback_must_fail",
-                )
-            )
-        normalized_run = run.replace("\\`", "`")
-        if (
-            "status: `fail`" not in normalized_run
-            or "reason: `checkout-failed`" not in normalized_run
-        ):
-            findings.append(
-                Finding(
-                    "error",
-                    path,
-                    "issue_mirror_checkout_failure_summary_must_be_fail",
-                )
-            )
-        if "exit 1" not in run:
-            findings.append(
-                Finding(
-                    "error",
-                    path,
-                    "issue_mirror_checkout_failure_must_be_nonzero",
-                )
-            )
-    return findings
-
-
-def issue_mirror_checkout_steps(contexts: list[StepContext]) -> list[StepContext]:
-    """Return issue-mirror checkout steps in the check job."""
-    return [
-        context
-        for context in contexts
-        if context.step.get("uses") == "actions/checkout@v4"
-    ]
-
-
-def issue_mirror_issue_sync_checker_steps(
-    contexts: list[StepContext],
-) -> list[StepContext]:
-    """Return issue-sync checker steps in the check job."""
-    return [
-        context
-        for context in contexts
-        if isinstance(context.step.get("run"), str)
-        and "tools/agent_tools/issue_sync.py" in str(context.step.get("run"))
-    ]
-
-
-def issue_mirror_checkout_failure_summary_steps(
-    contexts: list[StepContext],
-) -> list[StepContext]:
-    """Return issue-mirror fallback summary steps in the check job."""
-    return [
-        context
-        for context in contexts
-        if ISSUE_MIRROR_CHECKOUT_OUTCOME in str(context.step.get("if"))
-        and " != 'success'" in str(context.step.get("if"))
-    ]
-
-
-def issue_mirror_failure_summary_guard_valid(context: StepContext) -> bool:
-    """Return whether fallback summary step has the required failure guard."""
-    step_if = context.step.get("if")
-    return (
-        isinstance(step_if, str)
-        and ISSUE_MIRROR_CHECKOUT_FAILURE_GUARD in step_if
-        and ISSUE_MIRROR_CHECKOUT_OUTCOME in step_if
-        and " != 'success'" in step_if
-    )
-
-
 def check_workflow(root: Path, path: Path) -> list[Finding]:
     """Check one GitHub Actions workflow."""
     workflow = load_workflow(path)
@@ -603,7 +423,6 @@ def check_workflow(root: Path, path: Path) -> list[Finding]:
             if path.name == "agent-coordination.yml"
             else []
         ),
-        *issue_mirror_checkout_policy_findings(path, workflow),
         *checkout_step_findings(path, workflow),
     ]
 
@@ -791,10 +610,6 @@ def workflow_header_requirement_specs(root: Path) -> list[tuple[Path, Sequence[s
                 workflow_dir / "agent-runtime-dashboard.yml",
                 STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS,
             ),
-            (
-                workflow_dir / "issue-mirror.yml",
-                STANDALONE_ISSUE_MIRROR_WORKFLOW_REQUIREMENTS,
-            ),
         ]
     )
     return specs
@@ -880,44 +695,6 @@ def check_pr_flow_docs(root: Path) -> list[Finding]:
     )
 
 
-def check_agentcanon_issues(root: Path) -> list[Finding]:
-    """Check AgentCanon durable operational issue conventions."""
-    findings = require_text(
-        root / "issues" / "README.md",
-        [
-            "AgentCanon Operational Issues",
-            "issues/open/AC-YYYYMMDD-short-slug.md",
-            "issues/closed/",
-            "Required Fields",
-            "affected_surfaces:",
-            "edit_scope:",
-            "run_repo_dependency_review.sh",
-            "--search-hits-file",
-            "DEPENDENCY_EDIT_SCOPE_PATH",
-        ],
-    )
-    for issue_path in sorted((root / "issues").glob("*/*.md")):
-        if issue_path.name == "README.md":
-            continue
-        findings.extend(
-            require_text(
-                issue_path,
-                [
-                    "issue_id:",
-                    "status:",
-                    "source:",
-                    "severity:",
-                    "evidence:",
-                    "affected_surfaces:",
-                    "edit_scope:",
-                    "required_action:",
-                    "close_condition:",
-                ],
-            )
-        )
-    return findings
-
-
 def github_workflow_findings(root: Path) -> tuple[list[Finding], list[Path]]:
     """Return all workflow and PR-surface findings."""
     workflows = workflow_paths(root)
@@ -928,7 +705,6 @@ def github_workflow_findings(root: Path) -> tuple[list[Finding], list[Path]]:
     findings.extend(check_pr_templates(root))
     findings.extend(check_github_support_surfaces(root))
     findings.extend(check_pr_flow_docs(root))
-    findings.extend(check_agentcanon_issues(root))
     return findings, workflows
 
 

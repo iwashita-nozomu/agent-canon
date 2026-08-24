@@ -44,9 +44,6 @@ pub(super) fn responsibility_scope_bucket(path: &str) -> &'static str {
     {
         return "eval-and-hook-evidence";
     }
-    if normalized.starts_with("issues/") {
-        return "operational-issues";
-    }
     if normalized.starts_with("tests/") {
         return "test-surfaces";
     }

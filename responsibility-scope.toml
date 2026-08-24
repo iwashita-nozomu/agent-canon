@@ -145,20 +145,6 @@ protecting_tools = [
 issues = []
 
 [[scope]]
-id = "operational-issue-state"
-owner = "agent-canon"
-class = "durable_state"
-description = "Canonical local issue records and their lifecycle state."
-paths = [
-  "issues/**",
-]
-protecting_tools = [
-  "tools/agent_tools/issue_sync.py",
-  "tools/agent_tools/task_close.py",
-]
-issues = []
-
-[[scope]]
 id = "eval-and-hook-evidence"
 owner = "agent-canon"
 class = "evidence"

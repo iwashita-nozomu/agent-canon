@@ -140,7 +140,9 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 ## Evidence Boundary
 
 - raw runtime event、chat transcript、日時付き観測: runtime archive / evidence owner
-- actionable workflow defect: `issues/open/`
+- actionable workflow defect: repository-qualified GitHub Issue URL/number;
+  offline transport metadata belongs to the private
+  `agent-canon-log/feedback/issue-packets/pending/` path
 - failure analysis: `documents/notes/failures/`
 - 繰り返す問題解決知識: `memory/records/*.md`
 - repo-wide permanent rule: canonical documents / `AGENTS.md`

@@ -18,7 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 from autonomous_convergence import owner_receipt_closeout_state  # noqa: E402
-from issue_sync import IssueRecord, project_issue_clauses  # noqa: E402
+from issue_sync import GitHubIssueRecord, project_issue_clauses  # noqa: E402
 from packets import (  # noqa: E402
     OWNER_GUARANTEE_PACKET_SCHEMA,
     OWNER_INVALIDATION_PACKET_SCHEMA,
@@ -129,28 +129,25 @@ def test_invalidation_reaches_only_declared_dependency_edge() -> None:
 
 
 def test_issue_excessive_done_is_advisory_while_grounded_problem_remains() -> None:
-    issue = IssueRecord(
-        path=Path("issues/open/AC-20260823-distributed.md"),
-        directory_state="open",
-        fields={
-            "issue_id": "AC-20260823-distributed",
-            "owner_ref": "bootstrap-runtime-owner",
-            "authority_kind": "reproduced_failure",
-            "authority_ref": "artifact:failure-1",
-            "evidence": "artifact:failure-1",
-        },
-        body="## Problem\nObserved reachable failure.\n\n## Done\nAdd fsync everywhere.",
+    issue = GitHubIssueRecord(
+        repository="iwashita-nozomu/agent-canon",
+        number="873",
+        title="Distributed guarantee route",
+        state="OPEN",
+        url="https://github.com/iwashita-nozomu/agent-canon/issues/873",
+        body="## Problem\nObserved reachable failure. Evidence: artifact:failure-1.\n\n## Done\nAdd fsync everywhere.",
     )
     projected = project_issue_clauses(issue)
-    assert {item["clause_kind"]: item["state"] for item in projected} == {
-        "problem": "grounded",
-        "done": "advisory",
-    }
+    projected_states = {item["clause_kind"]: item["state"] for item in projected}
+    assert projected_states["problem"] == "grounded"
+    assert projected_states["done"] == "advisory"
     unsupported = issue.__class__(
-        path=issue.path,
-        directory_state=issue.directory_state,
-        fields={"issue_id": issue.issue_id},
-        body=issue.body,
+        repository=issue.repository,
+        number=issue.number,
+        title=issue.title,
+        state=issue.state,
+        url=issue.url,
+        body="## Problem\nObserved reachable failure.\n\n## Done\nAdd fsync everywhere.",
     )
     states = {item["clause_kind"]: item["state"] for item in project_issue_clauses(unsupported)}
     assert states["problem"] == "unproven"
