@@ -3,6 +3,7 @@ name: AgentCanon runtime image
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 env:
@@ -16,7 +17,7 @@ permissions:
 jobs:
   build:
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - arch: amd64
@@ -59,6 +60,7 @@ jobs:
           fi
 
       - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_USER: ${{ github.actor }}
@@ -77,7 +79,24 @@ jobs:
             --use
           docker buildx inspect --bootstrap "${BUILDER_NAME}"
 
+      - name: Build native architecture image for pull request
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --builder "${BUILDER_NAME}" \
+            --network host \
+            --file bootstrap/container/Dockerfile \
+            --platform "${EXPECTED_PLATFORM}" \
+            --tag "agent-canon-runtime:pr-${GITHUB_SHA}-${ARCH}" \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=pr-${GITHUB_SHA}" \
+            --output type=cacheonly \
+            .
+
       - name: Build and publish native architecture image
+        if: github.event_name != 'pull_request'
         run: |
           set -euo pipefail
           docker buildx build \
@@ -98,14 +117,25 @@ jobs:
           docker buildx rm --force "${BUILDER_NAME}" >/dev/null 2>&1 || true
           docker logout "${REGISTRY}" >/dev/null 2>&1 || true
 
-  merge:
+  runtime-image:
     needs: build
+    if: always()
+    name: runtime-image
     runs-on: ubuntu-24.04
     env:
       BUILDER_NAME: agent-canon-runtime-${{ github.run_id }}-merge
 
     steps:
+      - name: Require successful native builds
+        if: needs.build.result != 'success'
+        run: |
+          echo "native runtime-image builds did not all succeed: ${NEEDS_RESULT}" >&2
+          exit 1
+        env:
+          NEEDS_RESULT: ${{ needs.build.result }}
+
       - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_USER: ${{ github.actor }}
@@ -115,6 +145,7 @@ jobs:
             --username "${GHCR_USER}" --password-stdin
 
       - name: Create temporary buildx builder
+        if: github.event_name != 'pull_request'
         run: |
           set -euo pipefail
           docker buildx create \
@@ -125,6 +156,7 @@ jobs:
           docker buildx inspect --bootstrap "${BUILDER_NAME}"
 
       - name: Publish combined image tags
+        if: github.event_name != 'pull_request'
         run: |
           set -euo pipefail
           docker buildx imagetools create \
@@ -134,6 +166,7 @@ jobs:
             "${IMAGE_NAME}:sha-${GITHUB_SHA}-arm64"
 
       - name: Read back combined image tags
+        if: github.event_name != 'pull_request'
         run: |
           set -euo pipefail
           verify_platforms() {
