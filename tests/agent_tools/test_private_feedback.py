@@ -20,10 +20,14 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from tools.agent_tools import private_feedback
 from tools.agent_tools.bootstrap_runtime import BootstrapRuntime, PRIVATE_LOG_DESTINATION
+from tools.agent_tools.log_repository_identity import stable_log_branch
+
+
+SOURCE_ROOT = Path(__file__).resolve().parents[2]
 
 
 def invoke(runtime: Path, *argv: str, log_root: Path | None = None) -> int:
-    args = ["--runtime-root", str(runtime)]
+    args = ["--runtime-root", str(runtime), "--source-root", str(SOURCE_ROOT)]
     if log_root is not None:
         args.extend(["--log-root", str(log_root)])
     args.extend(argv)
@@ -88,6 +92,13 @@ def _local_remote(tmp_path: Path) -> tuple[Path, Path]:
     subprocess.run(["git", "-C", str(seed), "add", "README.md"], check=True)
     subprocess.run(["git", "-C", str(seed), "commit", "-m", "init"], check=True, capture_output=True)
     subprocess.run(["git", "-C", str(seed), "push", "origin", "HEAD:main"], check=True, capture_output=True)
+    branch = stable_log_branch(SOURCE_ROOT)
+    subprocess.run(["git", "-C", str(seed), "branch", branch], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(seed), "push", "origin", f"HEAD:refs/heads/{branch}"],
+        check=True,
+        capture_output=True,
+    )
     return remote, seed
 
 
@@ -115,7 +126,7 @@ def test_sync_failure_retains_spool(tmp_path: Path) -> None:
 
 
 def test_operational_clone_migration_observes_old_archive_before_new_clone(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """A legacy runtime clone is observed, retained, and replaced by main checkout."""
+    """A legacy runtime clone is observed, retained, and replaced by the stable checkout."""
     remote, _seed = _local_remote(tmp_path)
     legacy = tmp_path / "runtime/archive/agent-canon-log"
     subprocess.run(["git", "clone", str(remote), str(legacy)], check=True, capture_output=True)
@@ -161,7 +172,7 @@ def test_sync_request_host_readback_and_private_log_mount_are_separate(tmp_path:
     ) == 0
     assert not request.exists()
     remote_head = subprocess.run(
-        ["git", "-C", str(log_root), "rev-parse", "origin/main"],
+        ["git", "-C", str(log_root), "rev-parse", f"origin/{stable_log_branch(SOURCE_ROOT)}"],
         check=True,
         capture_output=True,
         text=True,
@@ -177,6 +188,62 @@ def test_sync_request_host_readback_and_private_log_mount_are_separate(tmp_path:
     manager._ensure_layout()
     mount = next(item for item in manager._mounts({}) if item["destination"] == PRIVATE_LOG_DESTINATION)
     assert mount["mode"] == "read-only"
+
+
+def test_sync_request_is_reused_across_k_and_f_and_publishes_stable_branch(tmp_path: Path) -> None:
+    """One valid request is shared by k/f and removed only after branch readback."""
+    remote, _seed = _local_remote(tmp_path)
+    runtime = tmp_path / "runtime"
+    log_root = tmp_path / "log"
+    invoke(runtime, "k", "add", "knowledge", "keep this knowledge", "--task", "t1")
+    assert invoke(runtime, "k", "sync") == 0
+    request = runtime / "spool/private-feedback/sync-request.json"
+    first_request = request.read_bytes()
+    invoke(runtime, "f", "add", "feedback", "keep this feedback", "--task", "t1")
+    assert invoke(runtime, "f", "sync") == 0
+    assert request.read_bytes() == first_request
+
+    assert invoke(
+        runtime,
+        "--remote",
+        f"file://{remote}",
+        "host-sync",
+        log_root=log_root,
+    ) == 0
+    branch = stable_log_branch(SOURCE_ROOT)
+    remote_head = subprocess.run(
+        ["git", "-C", str(log_root), "rev-parse", f"origin/{branch}"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    local_head = subprocess.run(
+        ["git", "-C", str(log_root), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert local_head == remote_head
+    assert subprocess.run(
+        ["git", "-C", str(log_root), "branch", "--show-current"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip() == branch
+    assert not request.exists()
+    assert not list((runtime / "spool/private-feedback").rglob("*.md"))
+
+
+def test_invalid_sync_request_is_a_preserved_typed_blocker(tmp_path: Path) -> None:
+    """A conflicting request is never replaced or discarded by a retry."""
+    runtime = tmp_path / "runtime"
+    request = runtime / "spool/private-feedback/sync-request.json"
+    request.parent.mkdir(parents=True)
+    request.write_text('{"schema":"wrong"}\n', encoding="utf-8")
+    before = request.read_bytes()
+    with pytest.raises(private_feedback.PrivateFeedbackError, match="sync_request_invalid"):
+        invoke(runtime, "k", "sync")
+    assert request.read_bytes() == before
 
 
 def test_bootstrap_consumes_container_runtime_private_feedback_spool(

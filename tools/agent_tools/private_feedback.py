@@ -32,6 +32,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+try:
+    from .log_repository_identity import stable_log_branch
+except ImportError:  # pragma: no cover - direct script execution
+    from log_repository_identity import stable_log_branch
+
 SCHEMA = "agent-canon.private-feedback.v1"
 LOG_REMOTE = "git@github.com:iwashita-nozomu/agent-canon-log.git"
 LOG_MAIN_COMMIT = "db3722b817be8574c682949db733df0fb5c2674a"
@@ -118,6 +123,14 @@ def _log_root(value: str | None) -> Path:
     return path.resolve()
 
 
+def _source_root(value: str | None) -> Path:
+    raw = value or os.environ.get("AGENT_CANON_SOURCE_ROOT", "").strip()
+    path = Path(raw).expanduser() if raw else Path.cwd()
+    if not path.is_absolute():
+        raise PrivateFeedbackError("source_root_invalid", "source root must be absolute")
+    return path.resolve()
+
+
 def _spool_root(runtime: Path) -> Path:
     path = runtime / "spool" / PRIVATE_SPOOL_NAME
     path.mkdir(parents=True, exist_ok=True)
@@ -128,6 +141,42 @@ def _spool_root(runtime: Path) -> Path:
 def _sync_request_path(spool: Path) -> Path:
     """Return the credential-free request exchanged with the host adapter."""
     return spool / SYNC_REQUEST_NAME
+
+
+def _valid_sync_request(request: object) -> bool:
+    return (
+        isinstance(request, dict)
+        and request.get("schema") == SYNC_REQUEST_SCHEMA
+        and request.get("operation") == "sync"
+        and request.get("execution_plane") == "agentcanon_tool_container"
+    )
+
+
+def _read_sync_request(path: Path) -> dict[str, Any]:
+    if path.is_symlink() or not path.is_file():
+        raise PrivateFeedbackError("sync_request_invalid", "private feedback sync request is invalid")
+    try:
+        request = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PrivateFeedbackError("sync_request_invalid", "private feedback sync request is invalid") from exc
+    if not _valid_sync_request(request):
+        raise PrivateFeedbackError("sync_request_invalid", "private feedback sync request schema is invalid")
+    return request
+
+
+def _runtime_archive_module() -> Any:
+    """Load the existing archive branch resolver in package or script mode."""
+    try:
+        from . import runtime_log_archive_git
+
+        return runtime_log_archive_git
+    except (ImportError, ModuleNotFoundError):  # pragma: no cover - direct script execution
+        tools_root = str(Path(__file__).resolve().parent)
+        if tools_root not in sys.path:
+            sys.path.insert(0, tools_root)
+        import runtime_log_archive_git
+
+        return runtime_log_archive_git
 
 
 def _safe_relative(value: str) -> Path:
@@ -403,7 +452,16 @@ def _git(path: Path, argv: list[str], *, check: bool = True) -> subprocess.Compl
     return result
 
 
-def ensure_clone(log_root: Path, remote: str = LOG_REMOTE) -> dict[str, str]:
+def ensure_clone(
+    log_root: Path,
+    remote: str = LOG_REMOTE,
+    *,
+    source_root: Path | None = None,
+    runtime_root: Path | None = None,
+) -> dict[str, str]:
+    """Ensure the operational clone uses the canonical source-qualified branch."""
+    source = (source_root or Path.cwd()).resolve()
+    expected_branch = stable_log_branch(source)
     log_root.parent.mkdir(parents=True, exist_ok=True)
     if log_root.exists() and log_root.is_symlink():
         raise PrivateFeedbackError("log_clone_invalid", "private log root is a symlink")
@@ -411,37 +469,50 @@ def ensure_clone(log_root: Path, remote: str = LOG_REMOTE) -> dict[str, str]:
         raise PrivateFeedbackError("log_clone_invalid", "private log root is not a directory")
     if log_root.exists() and not (log_root / ".git").exists() and any(log_root.iterdir()):
         raise PrivateFeedbackError("log_clone_invalid", "private log root is not an empty checkout directory")
-    if not (log_root / ".git").exists():
-        result = subprocess.run(
-            ["git", "clone", "--no-tags", remote, str(log_root)],
-            check=False,
-            capture_output=True,
-            text=True,
+    if log_root.exists() and not (log_root / ".git").exists() and not any(log_root.iterdir()):
+        # runtime_log_archive_git owns clone creation; hand it a non-existent
+        # path while preserving the exact empty directory contract.
+        log_root.rmdir()
+    if (log_root / ".git").exists():
+        configured = _git(log_root, ["remote", "get-url", "origin"]).stdout.strip()
+        if _remote(configured) != _remote(remote):
+            raise PrivateFeedbackError("log_remote_mismatch", "private log remote is not the configured exact remote")
+    runtime_archive_git = _runtime_archive_module()
+    context = runtime_archive_git.build_context(
+        argparse.Namespace(
+            canon_root=source,
+            source_root=source,
+            archive_root=log_root,
+            runtime_root=runtime_root,
+            remote=remote,
         )
-        if result.returncode != 0:
-            detail = (result.stderr or "git clone failed").strip().splitlines()[-1]
-            raise PrivateFeedbackError("git_failed", detail[:240])
+    )
+    if context.branch != expected_branch:
+        raise PrivateFeedbackError("log_branch_invalid", "runtime archive branch resolver returned an unexpected branch")
+    try:
+        runtime_archive_git.ensure_archive(context, fetch=True, allow_branch_switch=True)
+    except Exception as exc:
+        detail = str(exc)
+        if "local changes" in detail or "dirty" in detail:
+            raise PrivateFeedbackError("log_clone_dirty", "private log checkout has retained local changes") from exc
+        raise PrivateFeedbackError("git_failed", detail[:240]) from exc
     if not (log_root / ".git").exists():
         raise PrivateFeedbackError("log_clone_invalid", "private log root is not a Git checkout")
     log_root.chmod(0o700)
     configured = _git(log_root, ["remote", "get-url", "origin"]).stdout.strip()
     if _remote(configured) != _remote(remote):
         raise PrivateFeedbackError("log_remote_mismatch", "private log remote is not the configured exact remote")
-    _git(log_root, ["fetch", "--no-tags", "origin", "main"])
     branch = _git(log_root, ["branch", "--show-current"]).stdout.strip()
-    if branch != "main":
-        dirty = _git(log_root, ["status", "--porcelain"], check=False).stdout.strip()
-        if dirty:
-            raise PrivateFeedbackError("log_clone_dirty", "private log checkout has retained local changes")
-        switched = _git(log_root, ["switch", "main"], check=False)
-        if switched.returncode != 0:
-            _git(log_root, ["switch", "--track", "-c", "main", "origin/main"])
+    if branch != expected_branch:
+        raise PrivateFeedbackError("log_branch_invalid", "private log checkout is not on the source-qualified stable branch")
+    origin_branch = f"origin/{expected_branch}"
+    origin_head = _git(log_root, ["rev-parse", origin_branch], check=False).stdout.strip()
     return {
         "root": str(log_root),
         "remote": configured,
-        "branch": "main",
+        "branch": expected_branch,
         "head": _git(log_root, ["rev-parse", "HEAD"]).stdout.strip(),
-        "origin_main": _git(log_root, ["rev-parse", "origin/main"]).stdout.strip(),
+        "origin_head": origin_head,
         "mode": oct(log_root.stat().st_mode & 0o777),
     }
 
@@ -519,23 +590,31 @@ def sync_request(args: argparse.Namespace) -> int:
     """
     runtime = _runtime_root(args.runtime_root)
     spool = _spool_root(runtime)
-    request = {
-        "schema": SYNC_REQUEST_SCHEMA,
-        "operation": "sync",
-        "execution_plane": "agentcanon_tool_container",
-        "requested_at": _now(),
-        "source_commit": _source_commit(),
-    }
-    _write_once(
-        _sync_request_path(spool),
-        json.dumps(request, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
-    )
+    request_path = _sync_request_path(spool)
+    reused = request_path.exists() or request_path.is_symlink()
+    if reused:
+        # A valid request is the idempotency key.  Repeated k/f sync commands
+        # share it and never rewrite requested_at or invent another request.
+        _read_sync_request(request_path)
+    else:
+        request = {
+            "schema": SYNC_REQUEST_SCHEMA,
+            "operation": "sync",
+            "execution_plane": "agentcanon_tool_container",
+            "requested_at": _now(),
+            "source_commit": _source_commit(),
+        }
+        _write_once(
+            request_path,
+            json.dumps(request, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
+        )
     _json_meta(
         {
             "schema": SCHEMA,
             "status": "requested",
             "execution_plane": "agentcanon_tool_container",
             "request": "private-feedback-sync",
+            "request_reused": "yes" if reused else "no",
         }
     )
     return 0
@@ -548,30 +627,22 @@ def host_sync(args: argparse.Namespace) -> int:
     request_path = _sync_request_path(spool)
     if not request_path.is_file() or request_path.is_symlink():
         raise PrivateFeedbackError("sync_request_missing", "private feedback sync request is unavailable")
-    try:
-        request = json.loads(request_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise PrivateFeedbackError("sync_request_invalid", "private feedback sync request is invalid") from exc
-    if (
-        not isinstance(request, dict)
-        or request.get("schema") != SYNC_REQUEST_SCHEMA
-        or request.get("operation") != "sync"
-        or request.get("execution_plane") != "agentcanon_tool_container"
-    ):
-        raise PrivateFeedbackError("sync_request_invalid", "private feedback sync request schema is invalid")
+    _read_sync_request(request_path)
     log_root = _log_root(args.log_root)
     remote = str(args.remote or os.environ.get("AGENT_CANON_LOG_REMOTE", LOG_REMOTE))
+    source_root = _source_root(args.source_root)
     legacy = _legacy_runtime_clone(runtime)
     migration = "not-needed"
     if not log_root.exists() and legacy.is_dir() and (legacy / ".git").exists():
         # Read the old clone's remote head before creating the operational
         # checkout.  The old clone is retained; bootstrap owns its later
         # removal only after the new clone has published and read back.
-        old_remote_head = _git(legacy, ["rev-parse", "origin/main"], check=False).stdout.strip()
+        old_remote_head = _git(legacy, ["rev-parse", f"origin/{stable_log_branch(source_root)}"], check=False).stdout.strip()
         if old_remote_head:
             migration = "legacy-readback-observed"
-    info = ensure_clone(log_root, remote)
-    expected = info["origin_main"]
+    info = ensure_clone(log_root, remote, source_root=source_root, runtime_root=runtime)
+    branch = info["branch"]
+    expected = info["origin_head"]
     pending_raw = _raw_pending(spool)
     annex_raw: list[Path] = []
     if pending_raw and _annex_special_remote_available(log_root):
@@ -580,7 +651,7 @@ def host_sync(args: argparse.Namespace) -> int:
     normal_copied = _copy_pending(spool, log_root)
     copied = normal_copied + annex_raw
     if pending_raw:
-        meta = {"schema": SCHEMA, "status": "pending", "execution_plane": "host_archive_adapter", "reason": "annex-special-remote-required", "clone": str(log_root), "branch": "main", "copied": len(copied), "migration": migration}
+        meta = {"schema": SCHEMA, "status": "pending", "execution_plane": "host_archive_adapter", "reason": "annex-special-remote-required", "clone": str(log_root), "branch": branch, "copied": len(copied), "migration": migration}
         _json_meta({k: str(v) for k, v in meta.items()})
         return 1
     if normal_copied:
@@ -590,12 +661,12 @@ def host_sync(args: argparse.Namespace) -> int:
         _git(log_root, ["commit", "-m", "Append private feedback and knowledge"])
     current = _git(log_root, ["rev-parse", "HEAD"]).stdout.strip()
     if current != expected:
-        push = _git(log_root, ["push", "origin", "HEAD:refs/heads/main"], check=False)
+        push = _git(log_root, ["push", "origin", f"HEAD:refs/heads/{branch}"], check=False)
         if push.returncode != 0:
             raise PrivateFeedbackError("sync_conflict", "private log remote changed; local spool and clone retained")
-    _git(log_root, ["fetch", "--no-tags", "origin", "main"])
-    remote_head = _git(log_root, ["rev-parse", "origin/main"]).stdout.strip()
-    remote_tree = _git(log_root, ["rev-parse", "origin/main^{tree}"]).stdout.strip()
+    _git(log_root, ["fetch", "--no-tags", "origin", branch])
+    remote_head = _git(log_root, ["rev-parse", f"origin/{branch}"]).stdout.strip()
+    remote_tree = _git(log_root, ["rev-parse", f"origin/{branch}^{{tree}}"]).stdout.strip()
     if copied and remote_head != current:
         raise PrivateFeedbackError("sync_readback_failed", "private log remote head readback differs")
     for relative in copied:
@@ -609,7 +680,7 @@ def host_sync(args: argparse.Namespace) -> int:
             except OSError:
                 pass
     request_path.unlink()
-    _json_meta({"schema": SCHEMA, "status": "synced", "execution_plane": "host_archive_adapter", "clone": str(log_root), "branch": "main", "commit": remote_head, "tree": remote_tree, "copied": str(len(copied)), "migration": migration})
+    _json_meta({"schema": SCHEMA, "status": "synced", "execution_plane": "host_archive_adapter", "clone": str(log_root), "branch": branch, "commit": remote_head, "tree": remote_tree, "copied": str(len(copied)), "migration": migration})
     return 0
 
 
@@ -695,6 +766,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Private AgentCanon feedback and knowledge route")
     parser.add_argument("--runtime-root")
     parser.add_argument("--log-root")
+    parser.add_argument("--source-root")
     parser.add_argument("--run", default="")
     parser.add_argument("--task", default="")
     parser.add_argument("--remote", default="")
@@ -740,7 +812,7 @@ def main(argv: list[str] | None = None) -> int:
     leading: list[str] = []
     remaining: list[str] = []
     index = 0
-    global_options = {"--runtime-root", "--log-root", "--run", "--task", "--remote"}
+    global_options = {"--runtime-root", "--log-root", "--source-root", "--run", "--task", "--remote"}
     while index < len(raw):
         if raw[index] in global_options and index + 1 < len(raw):
             leading.extend(raw[index : index + 2])
