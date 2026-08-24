@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -42,6 +44,45 @@ def _fast_manifest(tmp_path: Path) -> Path:
     return path
 
 
+def _local_manifest(tmp_path: Path, *, fast: bool = False) -> Path:
+    text = (ROOT / "bootstrap/manifest.toml").read_text(encoding="utf-8")
+    if fast:
+        for old, new in (
+            ("idle_stop_seconds = 3600", "idle_stop_seconds = 1800"),
+            ("health_start_period_seconds = 10", "health_start_period_seconds = 0.01"),
+            ("health_timeout_seconds = 5", "health_timeout_seconds = 0.01"),
+            ("health_poll_interval_seconds = 0.2", "health_poll_interval_seconds = 0.005"),
+        ):
+            text = text.replace(old, new)
+    text = text.replace(
+        '\n[registry]\nimage = "ghcr.io/iwashita-nozomu/agent-canon"\nsource_branch = "main"\n',
+        "\n",
+    )
+    path = tmp_path / ("local-fast-manifest.toml" if fast else "local-manifest.toml")
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def _seed_registry_image(
+    state_path: Path,
+    image_ref: str,
+    source_head: str,
+    image_id: str = "sha256:registry-image",
+) -> None:
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["images"][image_ref] = {
+        "Id": image_id,
+        "RepoTags": [image_ref],
+        "RepoDigests": ["ghcr.io/example/agent-canon@sha256:registry-digest"],
+        "Config": {
+            "Labels": {"org.opencontainers.image.revision": source_head},
+        },
+        "Os": "linux",
+        "Architecture": "amd64",
+    }
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+
+
 def test_update_runs_one_normal_build(tmp_path: Path) -> None:
     manager, docker = _runtime(tmp_path)
     assert manager.install()["code"] == "installed"
@@ -69,6 +110,73 @@ def test_health_failure_restores_old_runtime_and_image(tmp_path: Path, monkeypat
     assert after["current_generation"] == old["current_generation"]
     assert after["resources"]["image"]["id"] == old["resources"]["image"]["id"]
     assert after["resources"]["container"]["id"]
+
+
+@pytest.mark.parametrize("fail_candidate", [False, True])
+def test_source_sync_reconciles_manifest_transition_and_preserves_old_state_on_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fail_candidate: bool,
+) -> None:
+    """Only the source-sync update route crosses a checkout manifest boundary."""
+    state = tmp_path / "docker.json"
+    os.environ["FAKE_DOCKER_STATE"] = str(state)
+    docker = DockerAdapter(str(ROOT / "tests/bootstrap/fake_docker.py"))
+    control = tmp_path / "control"
+    control.mkdir()
+    manager = BootstrapRuntime(
+        control,
+        control / "runtime",
+        repository_root=ROOT,
+        manifest_path=_local_manifest(tmp_path),
+        docker=docker,
+    )
+    assert manager.install()["code"] == "installed"
+    assert manager.start()["code"] == "ready"
+    old = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    changed = BootstrapRuntime(
+        manager.paths.control_parent_root,
+        manager.paths.runtime_root,
+        repository_root=ROOT,
+        manifest_path=_local_manifest(tmp_path, fast=True),
+        docker=docker,
+    )
+    source_head = subprocess.run(
+        ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    image_ref = f"ghcr.io/example/agent-canon:sha-{source_head}"
+    candidate_id = "sha256:registry-image"
+    _seed_registry_image(
+        Path(os.environ["FAKE_DOCKER_STATE"]), image_ref, source_head, candidate_id
+    )
+
+    if fail_candidate:
+        original_ensure = changed._ensure_container
+
+        def fail_only_candidate(
+            state: dict[str, Any], *, start: bool
+        ) -> dict[str, Any]:
+            image = state.get("resources", {}).get("image", {})
+            if isinstance(image, dict) and image.get("id") == candidate_id:
+                raise BootstrapError("candidate_generation_unhealthy", "candidate health failed")
+            return original_ensure(state, start=start)
+
+        monkeypatch.setattr(changed, "_ensure_container", fail_only_candidate)
+        with pytest.raises(BootstrapError, match="candidate_generation_unhealthy"):
+            changed.update(image_ref=image_ref, source_sync=True)
+        after = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+        assert after["manifest_digest"] == old["manifest_digest"]
+        assert after["resources"]["image"]["id"] == old["resources"]["image"]["id"]
+        assert after["current_generation"] == old["current_generation"]
+    else:
+        result = changed.update(image_ref=image_ref, source_sync=True)
+        assert result["code"] == "updated"
+        after = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+        assert after["manifest_digest"] == changed.manifest_digest
+        assert after["resources"]["image"]["id"] == candidate_id
 
 
 def test_active_task_rejected_before_build(tmp_path: Path) -> None:
