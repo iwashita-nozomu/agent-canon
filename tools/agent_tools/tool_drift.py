@@ -207,18 +207,6 @@ CONTRACTS = (
         ),
     ),
     ToolContract(
-        name="issue_sync",
-        tool="tools/agent_tools/issue_sync.py",
-        links=(
-            LinkCheck("issues/README.md"),
-            LinkCheck("documents/design/responsibility-scope-management.md"),
-            LinkCheck("tools/README.md"),
-            LinkCheck("documents/tools/README.md"),
-            LinkCheck("tools/ci/run_all_checks.sh"),
-            LinkCheck("tests/agent_tools/test_issue_sync.py"),
-        ),
-    ),
-    ToolContract(
         name="eval_accumulation",
         tool="tools/agent_tools/eval_accumulation_check.py",
         links=(

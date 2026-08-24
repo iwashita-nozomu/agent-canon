@@ -72,8 +72,7 @@ structured-analysis integration references the Rust CLI directly.
 
 | Kind | Meaning | Structured severity |
 | --- | --- | --- |
-| `closed_issue_record` | `issues/closed/...` の履歴 record。active cleanup scope ではなく、同名の新 scope は `issues/open/...` に作る。 | diagnostic なし |
-| `stale_name_candidate` on `issues/closed/...` | closed issue filename に legacy / old などの語が含まれる履歴 record。closed issue の immutable history として扱う。 | diagnostic なし |
+| `github_issue_record` | repository-qualified GitHub Issue URL/number。source treeのcleanup対象ではない。 | diagnostic なし |
 
 ## DB Mapping
 

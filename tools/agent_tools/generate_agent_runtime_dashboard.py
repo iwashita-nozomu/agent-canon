@@ -1212,7 +1212,7 @@ class RuntimeDashboardVisuals:
             f"  WorkflowEval[\"Workflow selection evals<br/>reports: {family_count(summary, 'workflow-selection')}\"]",
             f"  ReportEval[\"Report quality evals<br/>reports: {family_count(summary, 'report-quality')}\"]",
             f"  RoleEval[\"Codex role evals<br/>reports: {family_count(summary, 'codex-agent-role')}\"]",
-            f"  Issues[\"Durable issues<br/>open: {len(summary.evidence.open_issues)}<br/>closed: {len(summary.evidence.closed_issues)}\"]",
+            f"  Issues[\"GitHub Issues<br/>refs: {len(summary.evidence.github_issue_refs)}\"]",
             "  Dashboard[\"Runtime dashboard<br/>read-only view\"]",
             "  Guide[\"Improvement guide<br/>next repair targets\"]",
             "  Reviewer[\"Human / PR reviewer<br/>summary + artifacts\"]",
@@ -1398,8 +1398,8 @@ class RuntimeDashboardVisuals:
         return action_map_row(
             "durable issues",
             "triage open issues before claiming workflow health",
-            len(self.summary.evidence.open_issues),
-            bool(self.summary.evidence.open_issues),
+            len(self.summary.evidence.github_issue_refs),
+            bool(self.summary.evidence.github_issue_refs),
         )
 
 
@@ -1433,8 +1433,7 @@ class AgentRuntimeDashboard:
         )
         skill_eval_breakdown = SkillEvalBreakdownReader.read(result_families[0])
         evidence = EvidenceSummary(
-            open_issues=evidence.open_issues,
-            closed_issues=evidence.closed_issues,
+            github_issue_refs=evidence.github_issue_refs,
             memory_entries=evidence.memory_entries,
             skill_eval_reports=result_families[0].reports,
             failed_skill_eval_reports=result_families[0].failed_reports,
@@ -1505,8 +1504,7 @@ class AgentRuntimeDashboard:
         hook_files: tuple[Path, ...] = ()
         return (
             EvidenceSummary(
-                open_issues=self.guide.paths("issues/open/AC-*.md"),
-                closed_issues=self.guide.paths("issues/closed/AC-*.md"),
+                github_issue_refs=self.guide.github_issue_refs(),
                 memory_entries=self.guide.memory_entry_counts(),
                 skill_eval_reports=(),
                 failed_skill_eval_reports=(),
@@ -2554,7 +2552,7 @@ def evidence_location_lines(root: Path) -> list[str]:
         "- skill_prompt_eval_reports: `.agent-canon/log-archive/eval-results/skill-workflow-prompt/<eval-run-id>-<status>-<skill-slug>.md`",
         "- workflow_selection_eval_reports: `.agent-canon/log-archive/eval-results/workflow-selection/<eval-run-id>-<status>.md`",
         "- report_quality_eval_reports: `.agent-canon/log-archive/eval-results/report-quality/<eval-run-id>-<status>.md`",
-        "- durable_issues: `issues/open/AC-*.md` and `issues/closed/AC-*.md`",
+        "- github_issue_refs: repository-qualified URLs from private run-local packets; otherwise `github_issue_lookup_required`",
         "- shared_memory: `memory/README.md` and `memory/records/*.md` (on-demand)",
         "- token_comparison_reports: `reports/agents/**/workflow_monitoring.md` or `reports/agents/**/*token*.md`",
         "- reference_capture_hook: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/reference_capture_guard.jsonl`",
@@ -2909,9 +2907,9 @@ def issue_routing_lines(summary: RuntimeDashboardSummary) -> list[str]:
     rows.append(
         issue_route_row(
             summary,
-            "GitHub issue mirror",
-            "github-folder-issue-sync",
-            "mirror durable local issues to GitHub only through explicit sync tooling",
+            "GitHub Issue authority",
+            "github-issue-authority",
+            "resolve repository-qualified GitHub Issues through the host adapter; never mirror local issue files",
         )
     )
     return [
@@ -2948,10 +2946,10 @@ def issue_route_row(summary: RuntimeDashboardSummary, signal: str, slug: str, re
     return f"| `{signal}` | {issue_label} | {reason} |"
 
 
-def issue_by_slug(summary: RuntimeDashboardSummary, slug: str) -> Path | None:
-    """Return a durable issue path whose filename contains the requested slug."""
-    for issue in (*summary.evidence.open_issues, *summary.evidence.closed_issues):
-        if slug in issue.name:
+def issue_by_slug(summary: RuntimeDashboardSummary, slug: str) -> str | None:
+    """Return a repository-qualified GitHub Issue URL containing the slug."""
+    for issue in summary.evidence.github_issue_refs:
+        if slug in issue:
             return issue
     return None
 
@@ -3459,17 +3457,17 @@ def token_usage_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboard
 
 def durable_issue_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
     """Return the next action for open durable issues."""
-    if not summary.evidence.open_issues:
+    if not summary.evidence.github_issue_refs:
         return ()
-    issue = relative_path_label(summary.evidence.open_issues[0], summary.root)
+    issue = summary.evidence.github_issue_refs[0]
     return (DashboardNextAction(
         priority="P2",
         action="triage oldest open durable issue",
-        reason=f"{len(summary.evidence.open_issues)} durable issues are open",
+        reason=f"{len(summary.evidence.github_issue_refs)} repository-qualified GitHub Issue references are pending",
         evidence=issue,
-        owner_surface="issues/open/ and issues/closed/",
-        command="python3 tools/agent_tools/issue_sync.py",
-        done_condition="issue is resolved, moved to issues/closed, or explicitly deferred",
+        owner_surface="GitHub Issue URL/number and private packet locator",
+        command="python3 tools/agent_tools/issue_sync.py --sync-pending",
+        done_condition="GitHub Issue URL/number is read back or lookup is explicitly deferred",
         issue=f"`{issue}`",
         automation="human-review",
     ),)
@@ -3585,8 +3583,7 @@ def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"AGENT_RUNTIME_DASHBOARD_PROBLEM_COMPONENTS={len(dashboard_problem_components(summary))}",
         f"AGENT_RUNTIME_DASHBOARD_NEXT_ACTIONS={len(dashboard_next_actions(summary))}",
         f"AGENT_RUNTIME_DASHBOARD_BLOCKING_NEXT_ACTIONS={blocking_next_action_count(summary)}",
-        f"AGENT_RUNTIME_DASHBOARD_OPEN_ISSUES={len(summary.evidence.open_issues)}",
-        f"AGENT_RUNTIME_DASHBOARD_CLOSED_ISSUES={len(summary.evidence.closed_issues)}",
+        f"AGENT_RUNTIME_DASHBOARD_GITHUB_ISSUE_REFS={len(summary.evidence.github_issue_refs)}",
     ]
 
 

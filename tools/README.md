@@ -137,7 +137,7 @@ use `<eval_run_id>-<status>-<skill-slug>.md`. These files live in the external
 archive checkout, never in the source tree.
 
 `generate_agent_improvement_guide.py` reads the mounted runtime hook archive
-and `issues/open|closed/` as read-only evidence. Its generated guide is another
+and repository-qualified GitHub Issue URLs from run-local private packets as read-only evidence. Its generated guide is another
 external runtime artifact and is not permission to change source, Issue, or
 archive state.
 

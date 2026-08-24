@@ -9,7 +9,7 @@ upstream design ../../documents/design/README.md design canon reader route
 upstream design ../../documents/design/responsibility-rationale.md durable finding and OOP-review activation rationale
 upstream design ../../documents/conventions/software-engineering-principles.md contract-first review precedence and evidence model
 upstream design ../../documents/conventions/common/03_comments.md decision-comment review policy
-upstream design ../../issues/README.md durable issue and GitHub mirror policy
+upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue authority and packet policy
 upstream design ../internal-routines/design-implementation-correspondence.md forward/reverse design correspondence and drift block route
 @dependency-end
 -->
@@ -111,7 +111,7 @@ receipt; tie every material finding to the concrete invariant and reachable main
 
 For each material finding record enough to act on it: affected surface, evidence, impact/severity, current resolution, and the owning contract or selected engineering-principle clause when it affects the decision. Issue lifecycle is independent from finding validity.
 
-Use a durable issue only when the finding outlives the current review: it belongs to another owner/scope, recurs, needs later work, or cannot safely be closed in the current diff. Findings fixed in the current change, questions, rejected hypotheses, duplicates, and accepted local resolutions do **not** need `issue_route`, a local issue file, or a GitHub mirror.
+Use a durable GitHub Issue only when the finding outlives the current review: it belongs to another owner/scope, recurs, needs later work, or cannot safely be closed in the current diff. Findings fixed in the current change, questions, rejected hypotheses, duplicates, and accepted local resolutions do **not** need `issue_route` or a private packet.
 
 Remote mirror/publication follows the canonical issue policy; review does not perform remote reconciliation merely because a finding exists.
 
@@ -276,8 +276,8 @@ local patch returns to cause/scope analysis rather than opening a repair wave.
    straightforward finding では direct cause proof から導出します。各 finding に
    durable follow-up が必要な finding だけ `issue_route` を付けます。現在の
    review loop で閉じるものは issue route を要求せず、運用上残すものは既存
-   `issues/open/` または新規 local issue、外部 triage が必要なものは
-   `issue_sync.py` による GitHub mirror plan へ接続します。
+   repository-qualified GitHub Issue URL/number、外部 triage が必要なものは
+   `issue_sync.py` のhost adapterまたはprivate packetへ接続します。
 1. summary は findings の後に短く付けます。
 
 ## Boundary

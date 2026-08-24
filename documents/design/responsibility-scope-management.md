@@ -62,7 +62,8 @@ Each scope declares:
   Use this when a cross-cutting surface inside a broad directory has a
   different owning responsibility.
 - `protecting_tools`: checkers or workflow tools that keep the scope valid.
-- `issues`: durable local issues that currently drive or explain the scope.
+- `github_issues`: repository-qualified GitHub Issue URLs/numbers that currently
+  drive or explain the scope.
 
 Each `[[import_rule]]` declares which local Python scope imports are allowed:
 
@@ -72,13 +73,13 @@ Each `[[import_rule]]` declares which local Python scope imports are allowed:
 
 ## Owner Classes
 
-- `agent-canon`: shared runtime, policy, tooling, memory, eval, and issue state
+- `agent-canon`: shared runtime, policy, tooling, memory, eval, and Issue routing
   maintained in the AgentCanon repository.
 - `template`: template-local active contracts and parent-repo integration files.
 - `derived-project`: project-owned implementation, experiments, reports, and
   durable project state.
-- `github`: GitHub Actions, PR templates, GitHub automation, and GitHub
-  Issue mirror behavior.
+- `github`: GitHub Actions, PR templates, GitHub automation, and GitHub Issue
+  authority/transport behavior.
 - `external-vendor`: third-party skills or agent components vendored into
   AgentCanon. GitHub-sourced external repositories stay below
   `vendor/<asset-class>/<github-owner>/<import-id>/` and are exposed through
@@ -89,9 +90,9 @@ Each `[[import_rule]]` declares which local Python scope imports are allowed:
 `tools/agent_tools/responsibility_scope.py` validates the manifest. It scans the
 tracked path set once and fails when a tracked path has no owning scope or more
 than one owning scope after exclusions, a scope names a missing or uncataloged
-protecting tool, an issue link is stale, or an `[[import_rule]]` points at an
-unknown scope. It does not require every glob to match and it does not check
-required path existence or kind.
+protecting tool, a GitHub Issue identity is malformed, or an `[[import_rule]]`
+points at an unknown scope. It does not require every glob to match and it does
+not check required path existence or kind.
 
 Use it before adding a new checker, hook, skill, workflow, issue family, or
 tracked top-level path:
@@ -124,15 +125,18 @@ tool expects the parent repository to carry its own top-level
 the starter when initializing that file, then specialize it until every tracked
 path has exactly one owner.
 
-## Issue And GitHub Sync
+## GitHub Issue Authority
 
-Local `issues/open|closed/` files remain the durable source of truth because
-they carry dependency headers, edit scope, and reviewable history. GitHub
-Issues are the visible mirror for triage and external automation.
+GitHub Issues are the sole durable Issue authority. Every relation uses a
+repository-qualified URL/number such as
+`iwashita-nozomu/agent-canon#882` or its full GitHub URL; no local `issues/`
+directory, mirror, state database, or pending marker is maintained.
 
-`tools/agent_tools/issue_sync.py` validates the local files offline and can
-plan missing GitHub mirrors. Creating or updating GitHub Issues is an explicit
-operator action; CI should use offline validation by default.
+`tools/agent_tools/issue_sync.py` is a host adapter. Online mode reads and
+publishes GitHub Issues with title/body/state readback. Offline mode writes only
+metadata (`body_locator`, `body_digest`, repository, number/title context, and
+run/task) under the private `agent-canon-log/feedback/issue-packets/pending/`
+path. The private body remains at its owner-controlled locator.
 
 ## Eval Evidence
 

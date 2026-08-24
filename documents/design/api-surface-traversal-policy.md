@@ -2,7 +2,7 @@
 @dependency-start
 contract policy
 responsibility Defines public API traversal evidence before negative capability claims.
-upstream design ../../issues/closed/AC-20260518-api-surface-negative-conclusion.md records the original failure.
+upstream design https://github.com/iwashita-nozomu/agent-canon/issues/97 records the original failure.
 upstream design ../../agents/workflows/hypothesis-validation-workflow.md requires cause and evidence before fixes.
 upstream design ../conventions/coding-conventions-python.md defines helper and API-use discipline.
 downstream implementation ../../evidence/agent-evals/issue_eval_manifest.toml registers the API-surface eval case.

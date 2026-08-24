@@ -850,12 +850,12 @@ fn remove_regenerated_file(path: &Path) -> Result<(), String> {
 
 fn build_report(root: &Path) -> Result<InventoryReport, String> {
     let documents = collect_documents(root)?;
-    let (findings, historical_records) = collect_findings(&documents);
+    let findings = collect_findings(&documents);
     Ok(InventoryReport {
         root: root.to_string_lossy().to_string(),
         documents,
         findings,
-        historical_records,
+        historical_records: Vec::new(),
     })
 }
 
@@ -1182,7 +1182,7 @@ fn strip_comment_prefix(line: &str) -> &str {
     }
 }
 
-fn collect_findings(records: &[DocumentRecord]) -> (Vec<DocumentFinding>, Vec<DocumentFinding>) {
+fn collect_findings(records: &[DocumentRecord]) -> Vec<DocumentFinding> {
     let mut findings = Vec::new();
     let records_by_path = records
         .iter()
@@ -1203,33 +1203,7 @@ fn collect_findings(records: &[DocumentRecord]) -> (Vec<DocumentFinding>, Vec<Do
             seen.insert(key)
         })
         .collect::<Vec<_>>();
-    let mut active_findings = Vec::new();
-    let mut historical_records = Vec::new();
-    for finding in deduped {
-        if is_historical_document_record(&finding) {
-            historical_records.push(normalize_historical_record(finding));
-        } else {
-            active_findings.push(finding);
-        }
-    }
-    (active_findings, historical_records)
-}
-
-fn is_historical_document_record(finding: &DocumentFinding) -> bool {
-    let path = Path::new(&finding.path);
-    path.starts_with("issues/closed")
-        && path.file_name().and_then(|name| name.to_str()) != Some("README.md")
-}
-
-fn normalize_historical_record(mut finding: DocumentFinding) -> DocumentFinding {
-    if finding.kind == "closed_issue_record" {
-        finding.action = "retain as historical record; open a new issue for new scope".to_string();
-    } else if finding.kind == "stale_name_candidate" {
-        finding.action = "retain historical filename; open a new issue for new scope".to_string();
-        finding.reason =
-            "closed issue filenames preserve historical operational context".to_string();
-    }
-    finding
+    deduped
 }
 
 fn direct_findings(
@@ -1259,17 +1233,6 @@ fn direct_findings(
             canonical_path: "tools/README.md".to_string(),
             action: "regenerate or cite as evidence; do not treat as source policy".to_string(),
             reason: "reports are generated run artifacts".to_string(),
-        });
-    }
-    if path.starts_with("issues/closed")
-        && path.file_name().and_then(|name| name.to_str()) != Some("README.md")
-    {
-        findings.push(DocumentFinding {
-            path: record.path.clone(),
-            kind: "closed_issue_record".to_string(),
-            canonical_path: "issues/README.md".to_string(),
-            action: "retain as historical record; open a new issue for new scope".to_string(),
-            reason: "closed issue files are immutable operational records".to_string(),
         });
     }
     if !record.has_dependency_manifest {
@@ -1399,7 +1362,7 @@ fn nearest_canonical_anchor(path: &Path) -> String {
     let Some(root) = path.iter().next().and_then(|part| part.to_str()) else {
         return "README.md".to_string();
     };
-    if ["agents", "documents", "issues", "memory", "notes", "tools"].contains(&root) {
+    if ["agents", "documents", "memory", "notes", "tools"].contains(&root) {
         return format!("{root}/README.md");
     }
     if root.starts_with('.') {
@@ -1467,7 +1430,6 @@ fn participates_in_duplicate_title_check(path: &Path) -> bool {
         .collect();
     if parts.len() >= 2
         && ((parts[0] == ".agents" && parts[1] == "skills")
-            || (parts[0] == "issues" && parts[1] == "closed")
             || (parts[0] == "agents" && parts[1] == "templates"))
     {
         return false;
@@ -3341,36 +3303,6 @@ mod tests {
             .findings
             .iter()
             .any(|finding| finding.kind == "generated_report"));
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn closed_issue_records_are_historical_not_active_findings() {
-        let root = test_root("structured-analysis-closed-issue-history");
-        write_fixture(
-            &root,
-            "issues/README.md",
-            "<!--\n@dependency-start\nresponsibility Documents local issue storage.\nupstream design ../README.md repo root\n@dependency-end\n-->\n\n# Issues\n",
-        );
-        write_fixture(
-            &root,
-            "issues/closed/AC-20260517-legacy-tool-directory-regression.md",
-            "<!--\n@dependency-start\nresponsibility Records a closed legacy tool directory issue.\nupstream design ../README.md issue storage\n@dependency-end\n-->\n\n# Closed Issue\n",
-        );
-
-        let report = build_report(&root).expect("report");
-
-        assert!(!report.findings.iter().any(|finding| {
-            finding.path == "issues/closed/AC-20260517-legacy-tool-directory-regression.md"
-        }));
-        assert!(report.historical_records.iter().any(|record| {
-            record.kind == "closed_issue_record"
-                && record.path == "issues/closed/AC-20260517-legacy-tool-directory-regression.md"
-        }));
-        assert!(report.historical_records.iter().any(|record| {
-            record.kind == "stale_name_candidate"
-                && record.path == "issues/closed/AC-20260517-legacy-tool-directory-regression.md"
-        }));
         let _ = fs::remove_dir_all(root);
     }
 
