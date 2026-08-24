@@ -855,15 +855,19 @@ def validate_runtime_identity(
             "runtime identity requires Ubuntu 22.04: "
             f"ID={resolved.os_id} VERSION_ID={resolved.version_id}"
         )
-    if resolved.platform != "linux/amd64":
+    if resolved.platform not in {"linux/amd64", "linux/arm64"}:
         raise DependencyError(
-            f"runtime identity requires linux/amd64: platform={resolved.platform}"
+            f"runtime identity requires linux/amd64 or linux/arm64: platform={resolved.platform}"
         )
     for record in plan.records:
         if record.platform is not None and record.platform != resolved.platform:
             raise DependencyError(
                 f"dependency record {record.id} requires {record.platform}, "
                 f"but runtime platform is {resolved.platform}; no compatibility fallback is defined"
+            )
+        if record.platforms and resolved.platform not in record.platforms:
+            raise DependencyError(
+                f"dependency record {record.id} does not support {resolved.platform}"
             )
         if record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY} \
             and record.source.startswith("ubuntu:") \
@@ -960,6 +964,7 @@ class DependencyRecord:
     provides: tuple[str, ...]
     failure_policy: str
     platform: str | None = None
+    platforms: tuple[str, ...] = ()
     key_fingerprint: str | None = None
     key_url: str | None = None
     repository_suite: str | None = None
@@ -967,6 +972,9 @@ class DependencyRecord:
     repository_packages_sha256: str | None = None
     repository_package_url: str | None = None
     repository_package_sha256: str | None = None
+    repository_packages_sha256s: tuple[tuple[str, str], ...] = ()
+    repository_package_urls: tuple[tuple[str, str], ...] = ()
+    repository_package_sha256s: tuple[tuple[str, str], ...] = ()
     checksum: str | None = None
     checksums: tuple[tuple[str, str], ...] = ()
     asset: str | None = None
@@ -1454,6 +1462,8 @@ def _validate_method_fields(
         "version",
         "source",
         "platform",
+        "platforms",
+        "platforms",
         "verification",
         "deps",
         "provides",
@@ -1469,6 +1479,9 @@ def _validate_method_fields(
             "repository_packages_sha256",
             "repository_package_url",
             "repository_package_sha256",
+            "repository_packages_sha256s",
+            "repository_package_urls",
+            "repository_package_sha256s",
             "executable_owner_packages",
         },
         Method.NPM_GLOBAL: set(),
@@ -1482,7 +1495,7 @@ def _validate_method_fields(
             "extract",
             "destination",
         },
-        Method.RUST_TOOLCHAIN: {"components"},
+        Method.RUST_TOOLCHAIN: {"components", "checksums"},
         Method.LEAN_TOOLCHAIN: set(),
         Method.CARGO_SOURCE_BUILD: {
             "repo",
@@ -1508,6 +1521,16 @@ def _validate_method_values(record: DependencyRecord) -> None:
         raise DependencyError(
             f"{record.id}.platform must be one of linux/amd64 or linux/arm64"
         )
+    if record.platforms:
+        if len(set(record.platforms)) != len(record.platforms):
+            raise DependencyError(f"{record.id}.platforms contains duplicates")
+        for value in record.platforms:
+            if PLATFORM_RE.fullmatch(value) is None:
+                raise DependencyError(
+                    f"{record.id}.platforms must contain linux/amd64 or linux/arm64"
+                )
+        if record.platform is not None and record.platform not in record.platforms:
+            raise DependencyError(f"{record.id}.platform is not in platforms")
     _validate_package(record)
     if record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY}:
         if not record.executable_owner_packages:
@@ -1556,6 +1579,38 @@ def _validate_method_values(record: DependencyRecord) -> None:
                     raise DependencyError(
                         f"{record.id}: repository_packages_sha256 requires exactly one repository component"
                     )
+            for field_name, values in (
+                ("repository_packages_sha256s", record.repository_packages_sha256s),
+                ("repository_package_urls", record.repository_package_urls),
+                ("repository_package_sha256s", record.repository_package_sha256s),
+            ):
+                for architecture_name, value in values:
+                    if architecture_name not in {"amd64", "arm64"}:
+                        raise DependencyError(
+                            f"{record.id}.{field_name} has unsupported architecture: {architecture_name}"
+                        )
+                    if field_name != "repository_package_urls" and SHA256_RE.fullmatch(value) is None:
+                        raise DependencyError(
+                            f"{record.id}.{field_name}[{architecture_name}] must be a 64-character SHA256"
+                        )
+                    if field_name == "repository_package_urls":
+                        _validate_https_url(value, f"{record.id}.{field_name}[{architecture_name}]")
+                        if not value.lower().endswith(".deb"):
+                            raise DependencyError(
+                                f"{record.id}.{field_name}[{architecture_name}] must name a .deb artifact"
+                            )
+            package_url_arches = set(dict(record.repository_package_urls))
+            package_sha_arches = set(dict(record.repository_package_sha256s))
+            if package_url_arches != package_sha_arches:
+                raise DependencyError(
+                    f"{record.id}: repository package URL/checksum architecture maps differ"
+                )
+            if record.platforms and package_url_arches and {
+                value.split("/", 1)[1] for value in record.platforms
+            } != package_url_arches:
+                raise DependencyError(
+                    f"{record.id}: repository package map does not cover declared platforms"
+                )
             if (record.repository_package_url is None) != (
                 record.repository_package_sha256 is None
             ):
@@ -1713,6 +1768,7 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         "version",
         "source",
         "platform",
+        "platforms",
         "verification",
         "deps",
         "provides",
@@ -1724,6 +1780,9 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         "repository_packages_sha256",
         "repository_package_url",
         "repository_package_sha256",
+        "repository_packages_sha256s",
+        "repository_package_urls",
+        "repository_package_sha256s",
         "checksum",
         "checksums",
         "asset",
@@ -1786,6 +1845,9 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         version=_string(raw["version"], f"{record_id}.version"),
         source=_string(raw["source"], f"{record_id}.source"),
         platform=_optional_string(raw.get("platform"), f"{record_id}.platform"),
+        platforms=tuple(
+            _string_list(raw.get("platforms", []), f"{record_id}.platforms")
+        ),
         verification=_parse_verification(
             raw["verification"], record_id=record_id, method=Method(method_value)
         ),
@@ -1824,6 +1886,17 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
             raw.get("repository_package_sha256"),
             f"{record_id}.repository_package_sha256",
         ),
+        repository_packages_sha256s=_checksums(raw["repository_packages_sha256s"])
+        if "repository_packages_sha256s" in raw
+        else (),
+        repository_package_urls=_string_map(
+            raw["repository_package_urls"], f"{record_id}.repository_package_urls"
+        )
+        if "repository_package_urls" in raw
+        else (),
+        repository_package_sha256s=_checksums(raw["repository_package_sha256s"])
+        if "repository_package_sha256s" in raw
+        else (),
         checksum=_optional_string(raw.get("checksum"), f"{record_id}.checksum"),
         checksums=_checksums(raw["checksums"]) if "checksums" in raw else (),
         asset=_optional_string(raw.get("asset"), f"{record_id}.asset"),
@@ -2113,8 +2186,33 @@ def merge_records(manifests: Sequence[LoadedManifest]) -> tuple[DependencyRecord
                 **values,
                 deps=_union(current.deps, incoming.deps),
                 provides=_union(current.provides, incoming.provides),
+                platforms=_union(current.platforms, incoming.platforms),
                 checksums=tuple(sorted(checksum_union.items())),
                 assets=tuple(sorted(asset_union.items())),
+                repository_packages_sha256s=tuple(
+                    sorted(
+                        {
+                            **dict(current.repository_packages_sha256s),
+                            **dict(incoming.repository_packages_sha256s),
+                        }.items()
+                    )
+                ),
+                repository_package_urls=tuple(
+                    sorted(
+                        {
+                            **dict(current.repository_package_urls),
+                            **dict(incoming.repository_package_urls),
+                        }.items()
+                    )
+                ),
+                repository_package_sha256s=tuple(
+                    sorted(
+                        {
+                            **dict(current.repository_package_sha256s),
+                            **dict(incoming.repository_package_sha256s),
+                        }.items()
+                    )
+                ),
                 components=_union(current.components, incoming.components),
             )
     return tuple(merged.values())
@@ -2151,6 +2249,10 @@ def build_plan(
                 f"dependency record {record.id} requires {record.platform}, "
                 f"but runtime platform is {runtime_platform}; "
                 "no compatibility fallback is defined"
+            )
+        if record.platforms and runtime_platform not in record.platforms:
+            raise DependencyError(
+                f"dependency record {record.id} does not support {runtime_platform}"
             )
     by_id = {record.id: record for record in records}
     providers: dict[str, list[str]] = {}
@@ -2808,6 +2910,15 @@ def architecture() -> str:
     """Normalize the host architecture used by release checksum maps."""
     value = platform.machine().lower()
     return {"amd64": "x86_64", "arm64": "aarch64"}.get(value, value)
+
+
+def platform_architecture() -> str:
+    """Return the OCI architecture key used by architecture maps."""
+    value = platform.machine().lower()
+    normalized = {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64"}.get(value, value)
+    if normalized not in {"amd64", "arm64"}:
+        raise DependencyError(f"unsupported target architecture: {normalized}")
+    return normalized
 
 
 def _safe_member_path(root: Path, member_name: str) -> Path:
@@ -3782,7 +3893,7 @@ class Installer:
             )
         elif method is Method.APT_REPOSITORY:
             self._install_apt_repository(record, workspace, repair=repair)
-            if record.repository_package_url is not None:
+            if _repository_package_payload(record) is not None:
                 return
             command = [
                 "apt-get",
@@ -4225,7 +4336,11 @@ class Installer:
         self, record: DependencyRecord, *, workspace: Path | None = None
     ) -> None:
         """Verify a pinned Packages index before accepting an apt repository."""
-        expected = record.repository_packages_sha256
+        expected = (
+            dict(record.repository_packages_sha256s).get(platform_architecture())
+            if record.repository_packages_sha256s
+            else record.repository_packages_sha256
+        )
         if expected is None:
             return
         url = _repository_packages_url(record)
@@ -4669,10 +4784,11 @@ class Installer:
                 privileged=True,
             )
             self._run(["apt-get", "update"], workspace=workspace, privileged=True)
-            if record.repository_package_url is not None:
+            package_identity = _repository_package_payload(record)
+            if package_identity is not None:
                 package_path = root / _repository_package_filename(record)
                 _download(
-                    record.repository_package_url,
+                    package_identity["url"],
                     package_path,
                     operation=NetworkOperation(
                         phase="image-install",
@@ -4680,16 +4796,15 @@ class Installer:
                         operation="download-apt-package",
                         method=record.method.value,
                         record_id=record.id,
-                        url=record.repository_package_url,
+                        url=package_identity["url"],
                         allow_network=True,
                     ),
                 )
-                assert record.repository_package_sha256 is not None
                 observed = hashlib.sha256(package_path.read_bytes()).hexdigest()
-                if observed != record.repository_package_sha256:
+                if observed != package_identity["sha256"]:
                     raise DependencyError(
                         f"{record.id}: immutable apt package SHA256 mismatch "
-                        f"{observed}!={record.repository_package_sha256}"
+                        f"{observed}!={package_identity['sha256']}"
                     )
                 command = [
                     "apt-get",
@@ -4823,7 +4938,13 @@ def _repository_packages_url(record: DependencyRecord) -> str:
         raise DependencyError(
             f"{record.id}: Packages index URL requires apt-repository method"
         )
-    if record.platform is None:
+    architecture_name = platform_architecture()
+    if record.repository_packages_sha256s:
+        if architecture_name not in dict(record.repository_packages_sha256s):
+            raise DependencyError(
+                f"{record.id}: Packages index has no entry for {architecture_name}"
+            )
+    elif record.platform is None:
         raise DependencyError(f"{record.id}: Packages index URL requires platform")
     if record.repository_suite is None:
         raise DependencyError(f"{record.id}: Packages index URL requires repository suite")
@@ -4831,7 +4952,8 @@ def _repository_packages_url(record: DependencyRecord) -> str:
         raise DependencyError(
             f"{record.id}: Packages index URL requires exactly one repository component"
         )
-    architecture_name = record.platform.split("/", 1)[1]
+    if record.platform is not None:
+        architecture_name = record.platform.split("/", 1)[1]
     component = record.repository_components[0]
     return (
         f"{record.source.rstrip('/')}/dists/{record.repository_suite}/"
@@ -4843,15 +4965,21 @@ def _repository_package_payload(
     record: DependencyRecord,
 ) -> dict[str, str] | None:
     """Return the immutable apt artifact identity owned by one record."""
-    if record.repository_package_url is None:
+    url = record.repository_package_url
+    checksum = record.repository_package_sha256
+    if record.repository_package_urls:
+        arch = platform_architecture()
+        url = dict(record.repository_package_urls).get(arch)
+        checksum = dict(record.repository_package_sha256s).get(arch)
+    if url is None:
         return None
-    if record.repository_package_sha256 is None:  # pragma: no cover - parser closes this.
+    if checksum is None:  # pragma: no cover - parser closes this.
         raise DependencyError(
             f"{record.id}: repository package URL/SHA pair is incomplete"
         )
     return {
-        "url": record.repository_package_url,
-        "sha256": record.repository_package_sha256,
+        "url": url,
+        "sha256": checksum,
     }
 
 
@@ -4859,17 +4987,22 @@ def _repository_packages_payload(
     record: DependencyRecord,
 ) -> dict[str, str] | None:
     """Return the rolling Packages index identity owned by one record."""
-    if record.repository_packages_sha256 is None:
+    checksum = record.repository_packages_sha256
+    if record.repository_packages_sha256s:
+        checksum = dict(record.repository_packages_sha256s).get(platform_architecture())
+    if checksum is None:
         return None
     return {
         "url": _repository_packages_url(record),
-        "sha256": record.repository_packages_sha256,
+        "sha256": checksum,
     }
 
 
 def _repository_package_filename(record: DependencyRecord) -> str:
     """Return the safe `.deb` filename carried by an immutable apt URL."""
     url = record.repository_package_url
+    if record.repository_package_urls:
+        url = dict(record.repository_package_urls).get(platform_architecture())
     if url is None:
         raise DependencyError(f"{record.id}: immutable apt package URL is not declared")
     filename = PurePosixPath(urllib.parse.urlparse(url).path).name

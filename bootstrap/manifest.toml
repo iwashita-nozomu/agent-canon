@@ -31,6 +31,14 @@ target = "runtime-root/codex-home/skills"
 [archive]
 remote = "git@github.com:iwashita-nozomu/agent-canon-log.git"
 
+[registry]
+image = "ghcr.io/iwashita-nozomu/agent-canon"
+source_branch = "main"
+
+[update]
+sync_interval_seconds = 900
+sync_on_boot_delay_seconds = 300
+
 [private_feedback]
 # The host control plane owns this private checkout. The tool container only
 # receives the external runtime spool and never receives Git credentials.

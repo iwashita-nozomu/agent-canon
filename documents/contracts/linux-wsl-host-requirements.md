@@ -30,6 +30,7 @@ upstream design ../design/devcontainer/parent-dependency-manifest-followup.md de
 - `python3` が使えること
 - `make` が使えること
 - `docker` か `podman` の少なくとも 1 つが使えること
+- AgentCanon 自動同期を使う場合は、Linux / WSL の systemd user manager が使えること
 - repo workspace を置く path が決まっていること
 
 この template の既定は次です。
@@ -63,6 +64,9 @@ upstream design ../design/devcontainer/parent-dependency-manifest-followup.md de
 ## 5. Docker / Container Requirement
 
 - `docker version` か `podman version` が通ること
+- AgentCanon の公開 runtime image は `linux/amd64` と `linux/arm64` の OCI index から
+  Docker が native variant を選択します。手動 `--platform` 指定や各PCでの build は
+  AgentCanon 同期経路では行いません。
 - Docker を使う場合、現在の shell から daemon socket に到達できること
 - host で `make docker-build-check` を実行できることを推奨します
 - default devcontainer は host `sudo`、system group、または runtime directory の
@@ -148,6 +152,10 @@ GPU が無いこと自体を failure 条件にしません。
   owner docs の `docker-host` または `host-secrets` profile を明示し、対象が無い場合は
   mount を省略します。
 - AgentCanon source PR、eval archive、Issue/PR 操作を行う場合だけ、host から対象 GitHub remote へ到達できることを確認します。親は AgentCanon submodule を要求しません
+- Linux / WSL の AgentCanon 自動同期は `agent-canon-sync.service` の one-shot 実行と
+  `agent-canon-sync.timer` のみを使います。`scheduler enable` が systemd user manager
+  を利用できない場合は `systemd_user_unavailable` を返し、手動の one-shot `sync` は継続して
+  利用できます。
 - confidential local Git remote を dev container から使う場合は、起動前に
   `AGENT_CANON_SECRET_DIR` と、書き込みが必要なときだけ
   `AGENT_CANON_SECRET_DIR_MODE=rw` を設定します。container 側 path は
