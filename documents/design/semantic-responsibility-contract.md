@@ -42,7 +42,7 @@ implementation action を持ちます。
 | action | 意味 |
 | --- | --- |
 | `reuse` | 既存 mechanism を同じ契約のもとで使う |
-| `extend` | 既存 mechanism に承認済みの意味を追加する |
+| `extend` | 既存 mechanism に外部根拠のある意味を追加する |
 | `replace` | 既存 mechanism を新しい mechanism に置き換える |
 | `introduce` | 新しい mechanism を契約に追加する |
 
@@ -51,6 +51,31 @@ claim と、一次検証 owner、一次検証の reference を持ちます。一
 obligation ごとに一つだけです。supporting evidence は一次 owner の代替ではなく、
 別の property または別の role を検証するときだけ記録します。同じ property/role を
 別 owner で重ねません。
+
+## Owner-local guarantee correspondence
+
+obligation は、外部に根ざした authority または再現された witness から、因果的に
+その property を成立させる mechanism transition へ対応付けます。owner は残余の
+`not_guaranteed` 境界、failure semantics、execution plane、tool input、primary
+observation、local receipt も同じ対応の一部として保持します。設計文書、reviewer、
+Issue、approval、merge、label、PR 参照、handoff、または一度書かれた agent claim は
+authority ではありません。
+
+owner receipt の再利用キーは次の既存値の組です。
+
+`(candidate_digest, property_ref, owner_ref, execution_plane, tool_input_locator)`
+
+これは lookup tuple であり、global registry、生成 ID、counter、timestamp では
+ありません。同じ tuple と mechanism/effect closure が変わらなければ同じ receipt
+を再利用します。mechanism、effect/dependency closure、tool input、source snapshot
+の変更は、その owner の receipt を無効化し、既存 dependency edge で到達する下流
+owner にだけ invalidation packet を渡します。下流 owner は自分の mechanism が影響
+されたかを判断し、影響がなければ再実行せず reuse/not-applicable を記録します。
+
+`verified` は owner-local な因果対応の観測結果であって承認ではありません。
+`advisory`、`unproven`、`refuted` は要求、blocker、close 条件を生成しません。
+integration owner は receipt の存在、candidate/property/owner の互換性、既存 DAG
+の閉包だけを確認し、owner command や同一 property の check を再実行しません。
 
 許可される owner kind は次のとおりです。
 

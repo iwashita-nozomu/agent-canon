@@ -193,6 +193,242 @@ COMMON_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = (
 OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = ("docker/README.md",)
 
 
+# These packet helpers deliberately remain stateless.  A receipt is addressed by
+# the existing candidate/property/owner/plane/input tuple; no registry, counter,
+# timestamp, or generated packet ID is introduced here.
+OWNER_GUARANTEE_PACKET_SCHEMA = "agent-canon.owner-guarantee.v1"
+OWNER_GUARANTEE_PACKET_FIELDS = frozenset(
+    {
+        "schema",
+        "owner_ref",
+        "candidate_digest",
+        "property_ref",
+        "mechanism_ref",
+        "mechanism_transition",
+        "mechanism_sufficiency",
+        "not_guaranteed",
+        "failure_semantics",
+        "execution_plane",
+        "tool_input_locator",
+        "primary_observation_ref",
+        "observation_outcome",
+        "correspondence_state",
+        "invalidation_inputs",
+        "downstream_edges",
+        "source_snapshot",
+        "authority_ref",
+    }
+)
+OWNER_OBSERVATION_OUTCOMES = frozenset(
+    {"observed_pass", "observed_fail", "inconclusive", "not_applicable"}
+)
+OWNER_CORRESPONDENCE_STATES = frozenset(
+    {"unmapped", "mapped", "observer_assigned", "verified", "unresolved", "refuted", "advisory"}
+)
+OWNER_INVALIDATION_PACKET_SCHEMA = "agent-canon.owner-invalidation.v1"
+OWNER_INVALIDATION_PACKET_FIELDS = frozenset(
+    {
+        "schema",
+        "from_owner",
+        "to_owner",
+        "candidate_digest",
+        "changed_mechanism_ref",
+        "invalidated_property_ref",
+        "invalidated_receipt_ref",
+        "reason",
+        "affected_edge",
+        "owner_action",
+    }
+)
+OWNER_INVALIDATION_REASONS = frozenset(
+    {"mechanism_changed", "effect_closure_changed", "input_changed", "source_snapshot_changed"}
+)
+
+
+def _packet_text(raw: Mapping[str, object], field: str, prefix: str) -> str:
+    """Read one required packet text field without inventing defaults."""
+    value = raw.get(field)
+    if not isinstance(value, str) or not value.strip():
+        raise RuntimeError(f"{prefix}.{field}:required")
+    return value.strip()
+
+
+def _packet_text_list(raw: Mapping[str, object], field: str, prefix: str, *, allow_empty: bool) -> tuple[str, ...]:
+    """Read a bounded list of non-empty packet references."""
+    value = raw.get(field)
+    if not isinstance(value, list) or (not allow_empty and not value):
+        raise RuntimeError(f"{prefix}.{field}:list_required")
+    normalized: list[str] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, str) or not item.strip():
+            raise RuntimeError(f"{prefix}.{field}[{index}]:required")
+        normalized.append(item.strip())
+    return tuple(normalized)
+
+
+def normalize_owner_guarantee_packet(
+    raw_packet: object,
+    field_prefix: str = "owner_guarantee",
+) -> dict[str, object]:
+    """Normalize one owner-local guarantee/receipt packet.
+
+    This validates packet shape and local correspondence state only.  It does
+    not decide whether the authority is valid, whether the mechanism is
+    sufficient, or whether a repository may be published.
+    """
+    if not isinstance(raw_packet, Mapping):
+        raise RuntimeError(f"{field_prefix}:mapping_required")
+    unknown = sorted(set(raw_packet).difference(OWNER_GUARANTEE_PACKET_FIELDS))
+    missing = sorted(OWNER_GUARANTEE_PACKET_FIELDS.difference(raw_packet))
+    if unknown:
+        raise RuntimeError(f"{field_prefix}:field_unknown:{','.join(unknown)}")
+    if missing:
+        raise RuntimeError(f"{field_prefix}:field_missing:{','.join(missing)}")
+    schema = _packet_text(raw_packet, "schema", field_prefix)
+    if schema != OWNER_GUARANTEE_PACKET_SCHEMA:
+        raise RuntimeError(f"{field_prefix}.schema:unknown:{schema}")
+    observation_outcome = _packet_text(raw_packet, "observation_outcome", field_prefix)
+    if observation_outcome not in OWNER_OBSERVATION_OUTCOMES:
+        raise RuntimeError(f"{field_prefix}.observation_outcome:invalid")
+    correspondence_state = _packet_text(raw_packet, "correspondence_state", field_prefix)
+    if correspondence_state not in OWNER_CORRESPONDENCE_STATES:
+        raise RuntimeError(f"{field_prefix}.correspondence_state:invalid")
+    normalized: dict[str, object] = {
+        "schema": schema,
+        **{
+            field: _packet_text(raw_packet, field, field_prefix)
+            for field in (
+                "owner_ref",
+                "candidate_digest",
+                "property_ref",
+                "mechanism_ref",
+                "mechanism_transition",
+                "mechanism_sufficiency",
+                "failure_semantics",
+                "execution_plane",
+                "tool_input_locator",
+                "primary_observation_ref",
+                "source_snapshot",
+                "authority_ref",
+            )
+        },
+        "not_guaranteed": list(
+            _packet_text_list(raw_packet, "not_guaranteed", field_prefix, allow_empty=False)
+        ),
+        "invalidation_inputs": list(
+            _packet_text_list(raw_packet, "invalidation_inputs", field_prefix, allow_empty=False)
+        ),
+        "downstream_edges": list(
+            _packet_text_list(raw_packet, "downstream_edges", field_prefix, allow_empty=True)
+        ),
+        "observation_outcome": observation_outcome,
+        "correspondence_state": correspondence_state,
+    }
+    if "candidate_digest" not in normalized["invalidation_inputs"]:
+        raise RuntimeError(f"{field_prefix}.invalidation_inputs:candidate_digest_missing")
+    return normalized
+
+
+def owner_receipt_key(packet: Mapping[str, object]) -> tuple[str, str, str, str, str]:
+    """Return the existing lookup tuple used for receipt reuse/deduplication."""
+    normalized = normalize_owner_guarantee_packet(packet)
+    return tuple(
+        str(normalized[field])
+        for field in (
+            "candidate_digest",
+            "property_ref",
+            "owner_ref",
+            "execution_plane",
+            "tool_input_locator",
+        )
+    )  # type: ignore[return-value]
+
+
+def owner_receipt_is_compatible(
+    packet: Mapping[str, object],
+    *,
+    candidate_digest: str | None = None,
+    property_ref: str | None = None,
+    owner_ref: str | None = None,
+    execution_plane: str | None = None,
+    tool_input_locator: str | None = None,
+    mechanism_ref: str | None = None,
+) -> bool:
+    """Return whether one verified local receipt matches requested identity."""
+    normalized = normalize_owner_guarantee_packet(packet)
+    if normalized["correspondence_state"] != "verified":
+        return False
+    if normalized["observation_outcome"] != "observed_pass":
+        return False
+    for field, expected in (
+        ("candidate_digest", candidate_digest),
+        ("property_ref", property_ref),
+        ("owner_ref", owner_ref),
+        ("execution_plane", execution_plane),
+        ("tool_input_locator", tool_input_locator),
+        ("mechanism_ref", mechanism_ref),
+    ):
+        if expected is not None and normalized[field] != expected:
+            return False
+    return True
+
+
+def normalize_owner_invalidation_packet(
+    raw_packet: object,
+    field_prefix: str = "owner_invalidation",
+) -> dict[str, object]:
+    """Normalize one bounded existing-DAG invalidation packet."""
+    if not isinstance(raw_packet, Mapping):
+        raise RuntimeError(f"{field_prefix}:mapping_required")
+    unknown = sorted(set(raw_packet).difference(OWNER_INVALIDATION_PACKET_FIELDS))
+    missing = sorted(OWNER_INVALIDATION_PACKET_FIELDS.difference(raw_packet))
+    if unknown:
+        raise RuntimeError(f"{field_prefix}:field_unknown:{','.join(unknown)}")
+    if missing:
+        raise RuntimeError(f"{field_prefix}:field_missing:{','.join(missing)}")
+    normalized = {
+        "schema": _packet_text(raw_packet, "schema", field_prefix),
+        **{
+            field: _packet_text(raw_packet, field, field_prefix)
+            for field in (
+                "from_owner",
+                "to_owner",
+                "candidate_digest",
+                "changed_mechanism_ref",
+                "invalidated_property_ref",
+                "invalidated_receipt_ref",
+                "reason",
+                "affected_edge",
+                "owner_action",
+            )
+        },
+    }
+    if normalized["schema"] != OWNER_INVALIDATION_PACKET_SCHEMA:
+        raise RuntimeError(f"{field_prefix}.schema:unknown:{normalized['schema']}")
+    if normalized["reason"] not in OWNER_INVALIDATION_REASONS:
+        raise RuntimeError(f"{field_prefix}.reason:invalid")
+    if normalized["owner_action"] != "reevaluate_local_correspondence":
+        raise RuntimeError(f"{field_prefix}.owner_action:invalid")
+    return normalized
+
+
+def owner_receipt_is_invalidated(
+    packet: Mapping[str, object],
+    invalidation: Mapping[str, object],
+) -> bool:
+    """Return whether an existing-edge invalidation reaches one receipt."""
+    receipt = normalize_owner_guarantee_packet(packet)
+    event = normalize_owner_invalidation_packet(invalidation)
+    if receipt["candidate_digest"] != event["candidate_digest"]:
+        return False
+    if event["invalidated_receipt_ref"] == receipt["primary_observation_ref"]:
+        return True
+    return (
+        event["to_owner"] == receipt["owner_ref"]
+        and event["invalidated_property_ref"] == receipt["property_ref"]
+    )
+
+
 @dataclass(frozen=True)
 class DocumentSectionLocator:
     """One exact markdown section a role must read within a document."""

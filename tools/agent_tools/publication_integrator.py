@@ -6,14 +6,15 @@
 # upstream design ../../documents/operations/BRANCH_SCOPE.md owns branch, push, merge, and main publication policy.
 # upstream design ../../agents/workflows/main-integration-workflow.md owns main integration ordering.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md owns AgentCanon PR publication policy.
-# upstream implementation ./review_dispatch.py resolves current explicit APPROVE state.
+# upstream implementation ./review_dispatch.py resolves current candidate identity only.
 # upstream implementation ./report_artifact_checks.py regenerates materializer-produced validation results.
 # upstream implementation ./artifact_identity.py provides canonical serialization and artifact readback.
+# upstream implementation ./packets.py owns owner-local receipt normalization and compatibility.
 # upstream implementation ./update_lifecycle_contract.py owns G1/G3/G5 verdict identity and lifecycle guards.
 # downstream implementation ./github_publish.py exposes verified remote and PR publication.
 # downstream implementation ../../tests/agent_tools/test_publication_integrator.py validates CAS, dirty-checkout, and race behavior.
 # @dependency-end
-"""Publish the exact approved candidate through one expected-old-OID authority."""
+"""Publish the exact owner-receipted candidate through one expected-old-OID authority."""
 
 from __future__ import annotations
 
@@ -50,6 +51,11 @@ from update_lifecycle_contract import (
     materialize_gate_verdict,
     validate_publication_readback_receipt,
     validate_record_binding,
+)
+from packets import (
+    normalize_owner_guarantee_packet,
+    owner_receipt_is_compatible,
+    owner_receipt_key,
 )
 
 TREE_DELTA_SCHEMA = "agent-canon.git-tree-delta-observation.v1"
@@ -90,6 +96,67 @@ class PublicationError(ValueError):
         self.code = code
         self.detail = detail
         super().__init__(code if not detail else f"{code}:{detail}")
+
+
+def owner_receipt_projection(
+    owner_receipts: Sequence[Mapping[str, object]],
+    *,
+    candidate_digest: str | None = None,
+    required_owner_refs: Sequence[str] = (),
+    dependency_edges: Sequence[str] = (),
+) -> dict[str, object]:
+    """Consume owner-local receipts without rerunning their commands.
+
+    The integrator checks only packet presence, tuple compatibility, and the
+    already-declared dependency edges.  It never treats approval, a copied
+    claim, or a local command invocation as owner evidence.
+    """
+    normalized: list[dict[str, object]] = []
+    keys: set[tuple[str, str, str, str, str]] = set()
+    missing: list[str] = []
+    for index, raw in enumerate(owner_receipts):
+        try:
+            packet = normalize_owner_guarantee_packet(raw, f"owner_receipts[{index}]")
+            key = owner_receipt_key(packet)
+        except (RuntimeError, TypeError, ValueError) as exc:
+            missing.append(f"owner_receipts[{index}]:{exc}")
+            continue
+        if key in keys:
+            # Same property/owner/input is one receipt, not corroboration.
+            continue
+        keys.add(key)
+        if packet["correspondence_state"] != "verified" or packet["observation_outcome"] != "observed_pass":
+            # Advisory/unproven/refuted claims do not create integration blockers.
+            continue
+        if not owner_receipt_is_compatible(packet, candidate_digest=candidate_digest):
+            missing.append(f"incompatible:{packet['primary_observation_ref']}")
+            continue
+        normalized.append(packet)
+
+    owner_refs = {str(packet["owner_ref"]) for packet in normalized}
+    for owner_ref in required_owner_refs:
+        if owner_ref not in owner_refs:
+            missing.append(f"missing_owner:{owner_ref}")
+    declared_edges = {
+        str(edge)
+        for packet in normalized
+        for edge in packet["downstream_edges"]
+        if isinstance(packet["downstream_edges"], list)
+    }
+    missing.extend(
+        f"missing_dependency_edge:{edge}"
+        for edge in dependency_edges
+        if edge not in declared_edges
+    )
+    return {
+        "candidate_digest": candidate_digest,
+        "owner_receipt_refs": [
+            str(packet["primary_observation_ref"]) for packet in normalized
+        ],
+        "dependency_edges": list(dependency_edges),
+        "missing_or_incompatible": missing,
+        "publication_state": "ready" if not missing else "blocked",
+    }
 
 
 @dataclass(frozen=True)
@@ -345,6 +412,18 @@ def _review_approval(workspace: Path) -> tuple[dict[str, object], dict[str, obje
     return dict(candidate), dict(decision)
 
 
+def _review_candidate(workspace: Path) -> dict[str, object]:
+    """Read the current candidate identity without consuming approval text."""
+    review_eligibility = resolve_review_eligibility(workspace)
+    if review_eligibility.get("outcome") != "eligible":
+        raise PublicationError("publication_eligibility:review_not_eligible")
+    state = resolve_current_review_state(workspace)
+    candidate = state.get("candidate")
+    if not isinstance(candidate, Mapping):
+        raise PublicationError("publication_authority:candidate_missing")
+    return dict(candidate)
+
+
 def _validation_provenance(workspace: Path) -> dict[str, object]:
     """Regenerate materializer-only required validation provenance."""
     from report_artifact_checks import resolve_validation_result
@@ -398,10 +477,32 @@ def resolve_publication_authority(
     *,
     lifecycle_binding: Mapping[str, object] | None = None,
     ordered_input_evidence_refs: Sequence[str] = (),
+    owner_receipts: Sequence[Mapping[str, object]] = (),
+    required_owner_refs: Sequence[str] = (),
+    dependency_edges: Sequence[str] = (),
 ) -> dict[str, object]:
-    """Resolve the unique current APPROVE-only publication authority."""
+    """Resolve publication inputs from owner receipts, never review approval."""
     root = workspace.resolve()
-    candidate, decision = _review_approval(root)
+    candidate = _review_candidate(root)
+    if not owner_receipts:
+        raise PublicationError("publication_eligibility:owner_receipts_missing")
+    candidate_digest = str(
+        candidate.get("candidate_digest")
+        or candidate.get("candidate_id")
+        or candidate.get("candidate_commit")
+        or ""
+    ).strip()
+    receipt_projection = owner_receipt_projection(
+        owner_receipts,
+        candidate_digest=candidate_digest or None,
+        required_owner_refs=required_owner_refs,
+        dependency_edges=dependency_edges,
+    )
+    if receipt_projection["publication_state"] != "ready":
+        raise PublicationError(
+            "publication_eligibility:owner_receipts_incompatible",
+            ",".join(str(item) for item in receipt_projection["missing_or_incompatible"]),
+        )
     validation = _validation_provenance(root)
     candidate_commit = _hex_oid(candidate.get("candidate_commit"), "candidate_commit")
     candidate_tree = _hex_oid(candidate.get("candidate_tree"), "candidate_tree")
@@ -472,9 +573,6 @@ def resolve_publication_authority(
         **attestation_core,
         "attestation_body_sha256": attestation_hash,
     }
-    review_identity = decision.get("review_artifact_identity")
-    if not isinstance(review_identity, Mapping):
-        raise PublicationError("publication_authority:review_receipt_mismatch")
     candidate_authority = {
         "attestation_id": attestation["attestation_id"],
         "attestation_body_sha256": attestation["attestation_body_sha256"],
@@ -482,22 +580,9 @@ def resolve_publication_authority(
         "candidate_commit": candidate_commit,
         "candidate_tree": candidate_tree,
     }
-    approving_review = {
-        "decision_event_id": decision["event_id"],
-        "decision_event_body_sha256": decision["event_body_sha256"],
-        "identity_record_id": review_identity.get("identity_record_id"),
-        "identity_record_body_sha256": review_identity.get(
-            "identity_record_body_sha256"
-        ),
-        "path": review_identity.get("artifact_path"),
-        "sha256": review_identity.get("sha256"),
-        "blob": review_identity.get("git_blob"),
-        "owner": "change_reviewer",
-        "decision": "APPROVE",
-    }
     selection_payload = {
         "candidate_authority": candidate_authority,
-        "approving_review": approving_review,
+        "owner_receipt_projection": receipt_projection,
         "source": {"commit": source_commit, "tree": source_tree},
         "target": target,
         "validation_provenance_ref": {
@@ -522,10 +607,10 @@ def resolve_publication_authority(
         "owner_attestation": {
             "scheme": "agent-canon-ledger-publication-authority-v3",
             "owner": "completion_authority",
-            "authority_event_id": decision["event_id"],
-            "authority_revision": candidate["candidate_revision"],
+            "authority_event_id": None,
+            "authority_revision": candidate.get("candidate_revision"),
             "candidate_attestation_sha256": attestation["attestation_body_sha256"],
-            "approving_receipt_body_sha256": decision["event_body_sha256"],
+            "owner_receipt_refs": receipt_projection["owner_receipt_refs"],
             "selection_sha256": selection_sha256,
             "status": "frozen",
         },
@@ -556,6 +641,9 @@ def resolve_publication_eligibility(
     *,
     lifecycle_binding: Mapping[str, object] | None = None,
     ordered_input_evidence_refs: Sequence[str] = (),
+    owner_receipts: Sequence[Mapping[str, object]] = (),
+    required_owner_refs: Sequence[str] = (),
+    dependency_edges: Sequence[str] = (),
 ) -> dict[str, object]:
     """Return one pure publication-eligibility projection."""
     review_eligibility: dict[str, object] | None = None
@@ -567,6 +655,9 @@ def resolve_publication_eligibility(
             workspace,
             lifecycle_binding=lifecycle_binding,
             ordered_input_evidence_refs=ordered_input_evidence_refs,
+            owner_receipts=owner_receipts,
+            required_owner_refs=required_owner_refs,
+            dependency_edges=dependency_edges,
         )
     except (PublicationError, ValueError) as exc:
         failure_code = (
@@ -607,6 +698,7 @@ def resolve_publication_eligibility(
             ),
         },
         "approval": None,
+        "owner_receipts": owner_receipts,
         "publication_authority": authority,
         "outcome": outcome,
         "failure_codes": failure_codes,
@@ -758,7 +850,7 @@ def _construct_result_commit(
             code="publication_integrator:result_tree_failed",
         ).stdout.strip()
     message = (
-        f"Integrate approved W2 interface candidate {candidate_commit}\n"
+        f"Integrate owner-receipted W2 interface candidate {candidate_commit}\n"
     ).encode()
     commit_command = [
         "git",
@@ -787,13 +879,19 @@ def integrate_publication(
     pr_merge_adapter: PrMergeAdapter | None = None,
     lifecycle_binding: Mapping[str, object] | None = None,
     ordered_input_evidence_refs: Sequence[str] = (),
+    owner_receipts: Sequence[Mapping[str, object]] = (),
+    required_owner_refs: Sequence[str] = (),
+    dependency_edges: Sequence[str] = (),
 ) -> dict[str, object]:
-    """Execute exactly one current publication authority with CAS and readback."""
+    """Execute one publication CAS operation after consuming owner receipts."""
     root = workspace.resolve()
     authority = resolve_publication_authority(
         root,
         lifecycle_binding=lifecycle_binding,
         ordered_input_evidence_refs=ordered_input_evidence_refs,
+        owner_receipts=owner_receipts,
+        required_owner_refs=required_owner_refs,
+        dependency_edges=dependency_edges,
     )
     target = authority.get("target")
     if not isinstance(target, Mapping):
@@ -836,6 +934,9 @@ def integrate_publication(
         root,
         lifecycle_binding=lifecycle_binding,
         ordered_input_evidence_refs=ordered_input_evidence_refs,
+        owner_receipts=owner_receipts,
+        required_owner_refs=required_owner_refs,
+        dependency_edges=dependency_edges,
     )
     if authority_second != authority:
         raise PublicationError("publication_authority:readback_changed")
