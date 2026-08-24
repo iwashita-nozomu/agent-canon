@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - fix/877-wsl-probe-accounting-scope
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
