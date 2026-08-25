@@ -1,0 +1,137 @@
+{
+  "schema": "agent-canon.environment-resolution.gpu-build-capability",
+  "version": 1,
+  "builder": {
+    "platform": "wsl2-ubuntu-24.04",
+    "builder_name": "rootless",
+    "daemon_mode": "rootless",
+    "builder_driver": "docker",
+    "docker_version": "29.7.2",
+    "buildx_version": "0.36.1",
+    "buildkit_version": "0.32.2",
+    "requested_devices": [
+      "nvidia.com/gpu=all",
+      "local.wsl/cuda-build=all"
+    ],
+    "cdi_devices": [
+      "nvidia.com/gpu=all",
+      "local.wsl/cuda-build=all"
+    ]
+  },
+  "stages": {
+    "device_entitlement": "supported",
+    "cdi_inventory": "matched",
+    "run_device_request": "accepted",
+    "device_nodes": "present",
+    "driver_loader": "complete",
+    "cuda_driver_api": "ready",
+    "cuda_compile_run": "passed",
+    "runtime_cdi": "passed"
+  },
+  "evidence": {
+    "device_entitlement": {
+      "summary": "The build request limited entitlement to the NVIDIA and WSL CUDA build devices.",
+      "command": [
+        "docker",
+        "buildx",
+        "build",
+        "--allow",
+        "device=nvidia.com/gpu=all",
+        "--allow",
+        "device=local.wsl/cuda-build=all"
+      ],
+      "exit_code": 0,
+      "observations": [
+        "two exact device entitlements accepted"
+      ]
+    },
+    "cdi_inventory": {
+      "summary": "The builder resolved both exact requested CDI devices.",
+      "command": [
+        "docker",
+        "buildx",
+        "inspect",
+        "rootless",
+        "--bootstrap"
+      ],
+      "exit_code": 0,
+      "observations": [
+        "nvidia.com/gpu=all",
+        "local.wsl/cuda-build=all"
+      ]
+    },
+    "run_device_request": {
+      "summary": "BuildKit entered a step requesting the NVIDIA device and read-only WSL thunk addon.",
+      "command": [
+        "docker",
+        "buildx",
+        "build",
+        "--allow",
+        "device"
+      ],
+      "exit_code": 0,
+      "observations": [
+        "both RUN --device requests accepted"
+      ]
+    },
+    "device_nodes": {
+      "summary": "The repaired build step retained the WSL GPU transport device.",
+      "command": [
+        "test",
+        "-c",
+        "/dev/dxg"
+      ],
+      "exit_code": 0,
+      "observations": [
+        "/dev/dxg"
+      ]
+    },
+    "driver_loader": {
+      "summary": "The read-only WSL addon supplied the thunk and complete loader surface.",
+      "command": [
+        "test",
+        "-e",
+        "/usr/lib/wsl/lib/libcuda.so.1"
+      ],
+      "exit_code": 0,
+      "observations": [
+        "libcuda.so.1 158304 bytes WSL thunk",
+        "libcuda.so.1.1 29169208 bytes driver body"
+      ]
+    },
+    "cuda_driver_api": {
+      "summary": "The CUDA count probe initialized the driver and read both devices.",
+      "command": [
+        "/tmp/cuda-count-probe"
+      ],
+      "exit_code": 0,
+      "observations": [
+        "CUDA_COUNT status=0 count=2",
+        "RTX 2080 capability=7.5"
+      ]
+    },
+    "cuda_compile_run": {
+      "summary": "The parent-owned CUDA/Kokkos build and GPU-profile C++ tests completed.",
+      "command": [
+        "<parent-owned-build-and-test-command>"
+      ],
+      "exit_code": 0,
+      "observations": [
+        "Kokkos_ARCH_TURING75=ON",
+        "IMAGE_KOKKOS_CUDA_PROVIDER=present",
+        "GPU-profile C++ unit tests 3/3 passed"
+      ]
+    },
+    "runtime_cdi": {
+      "summary": "The rebuilt parent image resolved and executed the CUDA runtime route.",
+      "command": [
+        "<parent-owned-runtime-command>"
+      ],
+      "exit_code": 0,
+      "observations": [
+        "BACKEND_COMPUTE_ENVIRONMENT=cuda",
+        "compute_environment: cuda"
+      ]
+    }
+  }
+}

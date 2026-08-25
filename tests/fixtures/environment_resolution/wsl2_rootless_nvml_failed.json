@@ -1,0 +1,140 @@
+{
+  "schema": "agent-canon.environment-resolution.gpu-build-capability",
+  "version": 1,
+  "builder": {
+    "platform": "wsl2-ubuntu-24.04",
+    "builder_name": "rootless",
+    "daemon_mode": "rootless",
+    "builder_driver": "docker",
+    "docker_version": "29.7.2",
+    "buildx_version": "0.36.1",
+    "buildkit_version": "0.32.2",
+    "requested_devices": [
+      "nvidia.com/gpu=all"
+    ],
+    "cdi_devices": [
+      "nvidia.com/gpu=all"
+    ]
+  },
+  "stages": {
+    "device_entitlement": "supported",
+    "cdi_inventory": "matched",
+    "run_device_request": "accepted",
+    "device_nodes": "present",
+    "driver_loader": "partial",
+    "cuda_driver_api": "failed_initialization",
+    "cuda_compile_run": "run_failed",
+    "runtime_cdi": "passed"
+  },
+  "evidence": {
+    "device_entitlement": {
+      "summary": "BuildKit advertised device entitlement and accepted the bounded allow list.",
+      "command": [
+        "docker",
+        "buildx",
+        "build",
+        "--allow",
+        "device"
+      ],
+      "exit_code": 0,
+      "observations": [
+        "BuildKit v0.32.2 device entitlement supported"
+      ]
+    },
+    "cdi_inventory": {
+      "summary": "The builder advertised the exact requested NVIDIA CDI device.",
+      "command": [
+        "docker",
+        "buildx",
+        "inspect",
+        "rootless",
+        "--bootstrap"
+      ],
+      "exit_code": 0,
+      "observations": [
+        "nvidia.com/gpu=all"
+      ]
+    },
+    "run_device_request": {
+      "summary": "BuildKit accepted RUN --device and entered the probe step.",
+      "command": [
+        "docker",
+        "buildx",
+        "build",
+        "--allow",
+        "device"
+      ],
+      "exit_code": 0,
+      "observations": [
+        "RUN --device=nvidia.com/gpu=all started"
+      ]
+    },
+    "device_nodes": {
+      "summary": "The build step observed the WSL GPU transport device node.",
+      "command": [
+        "test",
+        "-c",
+        "/dev/dxg"
+      ],
+      "exit_code": 0,
+      "observations": [
+        "/dev/dxg"
+      ]
+    },
+    "driver_loader": {
+      "summary": "The driver body was mounted but the WSL libcuda thunk and hook-produced loader state were incomplete.",
+      "command": [
+        "find",
+        "/usr/lib/wsl",
+        "-maxdepth",
+        "5",
+        "-name",
+        "libcuda.so*"
+      ],
+      "exit_code": 0,
+      "observations": [
+        "BuildKit CDI: libcuda.so.1.1 present",
+        "BuildKit CDI: WSL thunk libcuda.so.1 absent",
+        "Failed to initialize NVML: N/A"
+      ]
+    },
+    "cuda_driver_api": {
+      "summary": "The CUDA count probe ran but driver initialization failed with status 35.",
+      "command": [
+        "/tmp/cuda-count-probe"
+      ],
+      "exit_code": 1,
+      "observations": [
+        "cudaGetDeviceCount: status 35"
+      ]
+    },
+    "cuda_compile_run": {
+      "summary": "The compiled CUDA probe executed but could not enumerate a device.",
+      "command": [
+        "/tmp/cuda-count-probe"
+      ],
+      "exit_code": 1,
+      "observations": [
+        "CUDA_COUNT status=35"
+      ]
+    },
+    "runtime_cdi": {
+      "summary": "The same image passed runtime CDI admission and exposed both RTX 2080 devices.",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--device",
+        "nvidia.com/gpu=all",
+        "<image>",
+        "nvidia-smi",
+        "-L"
+      ],
+      "exit_code": 0,
+      "observations": [
+        "NVIDIA GeForce RTX 2080",
+        "NVIDIA GeForce RTX 2080"
+      ]
+    }
+  }
+}
