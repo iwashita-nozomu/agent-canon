@@ -67,8 +67,11 @@ Task admission and release are explicit:
 "$BOOTSTRAP" "${COMMON[@]}" task release --task-id <task-id> --outcome completed
 ```
 
-`codex prepare` creates an isolated runtime-local Codex home. `codex launch`
-sets `CODEX_HOME` only for the launched child:
+`install` and `update` create the explicit control-root split links for skills,
+role files, and the personal `~/.codex/config.toml` source. They preserve
+foreign entries and do not link project hooks or authentication/session/cache
+state. `codex prepare` remains an isolated runtime-local Codex home;
+`codex launch` sets `CODEX_HOME` only for the launched child:
 
 ```bash
 "$BOOTSTRAP" "${COMMON[@]}" codex prepare

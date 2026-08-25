@@ -85,9 +85,23 @@ tool-generated report directories.
 
 `codex prepare` installs verified skills, agents, hooks, and configuration as
 manifest-managed links under the selected runtime root's isolated `codex-home`.
-It never modifies global `CODEX_HOME`; `codex launch` sets `CODEX_HOME` only in
-the child process. Conflicting pre-existing paths fail closed, and uninstall
-removes only links owned by this installation.
+It remains separate from the global Codex links below; `codex launch` sets
+`CODEX_HOME` only in the child process. Conflicting pre-existing paths fail
+closed, and uninstall removes only links owned by this installation.
+
+When the explicit control root is `$HOME`, `install` and `update` also converge
+these user-facing links:
+
+```text
+~/.agents/skills/<skill>       -> ~/agent-canon/.agents/skills/<skill>
+~/.codex/agents/<role>.toml   -> ~/agent-canon/.codex/agents/<role>.toml
+~/.codex/config.toml           -> ~/agent-canon/.codex/personal/config.toml
+```
+
+An existing regular `~/.codex/config.toml` is migrated byte-for-byte to the
+ignored personal source before the link is created. Update preserves it;
+uninstall restores a regular copy. Project hooks, authentication, sessions,
+history, cache, plugins, rules, MCP, and TUI/trust settings are not linked.
 
 ## Evaluation and archive
 
@@ -178,7 +192,8 @@ container, bootstrap, or archive changes.
 
 AgentCanon is licensed under Apache License 2.0. See [LICENSE](LICENSE) and
 [the licensing policy](documents/agent-canon/agent-canon-licensing-policy.md).
-`install` and `update` own only the exact `<control-parent-root>/.agents` link to
-the tracked source adapters. No home link is inferred; selecting `$HOME` as the
-explicit control root makes `$HOME/.agents` the owned path. Global `.codex`
-remains outside AgentCanon ownership.
+`install` and `update` own the split links beneath the explicit
+`<control-parent-root>/.agents` and `<control-parent-root>/.codex` paths. They do
+not replace a foreign entry and preserve personal entries in those directories.
+The global Codex config is one managed link to the ignored personal source;
+project-scoped hooks and settings remain project-owned.

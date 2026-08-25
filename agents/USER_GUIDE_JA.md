@@ -45,15 +45,22 @@ control root と runtime root は必須です。runtime root は control root �
 ```
 
 `prepare` は runtime root 内の isolated `codex-home/` に manifest 管理の skill、agent、
-hook、設定リンクを作ります。global `$CODEX_HOME` は変更しません。衝突する既存パスは
-fail closed で、uninstall が削除できるのはこの installation が作成したリンクだけです。
-install / update 後は新しい Codex session を起動し、manifest と link target を
-readback してください。
+hook、設定リンクを作ります。これは global link とは別の実行用経路です。衝突する既存
+パスは fail closed で、uninstall が削除できるのはこの installation が作成したリンクだけです。
 
-install / update は明示された control root の `.agents` を、AgentCanon source の
-tracked `.agents` への exact symlink として管理します。global `~/.agents` と global
-`.codex` は暗黙には管理しません。control root に `$HOME` を明示した場合だけ
-`~/.agents` が管理対象になります。regular pathや別symlinkが存在する場合は collision として停止します。
+control root に `$HOME` を明示した場合、install / update は次の分割リンクも管理します。
+
+```text
+~/.agents/skills/<skill>       -> ~/agent-canon/.agents/skills/<skill>
+~/.codex/agents/<role>.toml   -> ~/agent-canon/.codex/agents/<role>.toml
+~/.codex/config.toml           -> ~/agent-canon/.codex/personal/config.toml
+```
+
+既存の regular な `~/.codex/config.toml` は内容と mode を保持したまま ignored な
+personal source に移してからリンクします。update はその内容を保持し、uninstall は
+regular file に戻します。project hook、認証、session、history、cache、plugin、rule、
+MCP、TUI/trust 設定はリンクしません。install / update 後は新しい Codex session を
+起動し、global link と runtime-local manifest の target を readback してください。
 
 ## Tool を呼ぶ
 
@@ -126,9 +133,11 @@ quarantine と旧 generation 維持、旧 generation も復旧できなければ
 
 `stop` は container を消して state と未同期 spool を残します。`gc` は完了かつ pin の
 ない、この installation の所有物だけを削除します。`uninstall` は managed image、
-container、links、state を削除しますが、親レポ、global Codex、pre-existing Docker
-resource は削除しません。uninstall 前に `eval sync`、`status`、archive readback、
-resource absence を確認してください。`docker system prune` は使いません。
+container、links、state を削除しますが、親レポ、foreign な global Codex entry、
+pre-existing Docker resource は削除しません。AgentCanon が所有した exact link だけを
+削除し、personal config は regular file に戻します。uninstall 前に `eval sync`、
+`status`、archive readback、resource absence を確認してください。`docker system prune`
+は使いません。
 
 ## AgentCanon を編集する場合
 

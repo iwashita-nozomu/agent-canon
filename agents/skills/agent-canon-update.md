@@ -134,10 +134,14 @@ Run:
 ```
 
 `prepare` writes only manifest-managed links beneath runtime-local isolated
-`codex-home/`. It does not overwrite global skills, agents, hooks, config, or
-`CODEX_HOME`. Collisions fail closed; uninstall removes only links owned by
-this installation. After update, launch a new session and read back manifest,
-link target, and source digest. Existing sessions do not reload links.
+`codex-home/`; it remains separate from the global link lifecycle. When the
+explicit control root is `$HOME`, install/update also manage per-skill,
+per-agent, and personal `~/.codex/config.toml` links. The regular config is
+migrated byte-for-byte to the ignored personal source and restored on
+uninstall. Hooks, authentication, sessions, history, cache, plugins, rules,
+MCP, and TUI/trust state remain outside the link set. Collisions fail closed;
+uninstall removes only exact links owned by this installation. After update,
+launch a new session and read back the global links and runtime-local manifest.
 
 ## Tool and compatibility route
 
@@ -230,8 +234,8 @@ Before closeout, verify:
 - Issue/PR are qualified as `iwashita-nozomu/agent-canon#...`;
 - new bootstrap session uses the explicit control/runtime roots;
 - only one owned resident container exists and its limits/readback match;
-- source, parent, global `$CODEX_HOME`, and pre-existing Docker resources are
-  unchanged;
+- source, parent, foreign global Codex entries, and pre-existing Docker
+  resources are unchanged; only exact managed global links may change;
 - eval collection is in the external spool and archive publication has remote
   readback, or its failure receipt and pending spool are intentionally kept;
 - stop/gc/uninstall removed only exact task-owned resources;

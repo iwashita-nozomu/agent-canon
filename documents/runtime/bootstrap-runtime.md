@@ -107,12 +107,17 @@ one-shot `agent-canon-sync.timer`; its service exits after one sync. The timer
 is owned by `scheduler enable`, `disable`, `status`, and `uninstall`. Hosts
 without systemd user support, macOS, and native Windows remain one-shot-only;
 no daemon, webhook listener, cron route, or `loginctl enable-linger` is added.
-`install` and `update` also converge `<control-parent-root>/.agents` to an
-exact symlink targeting the tracked source `.agents`. A regular file, directory,
-or different symlink at that path is a typed collision. `uninstall` removes only
-that exact owned link; it never creates an implicit home link and does not touch
-global `.codex`. When the caller explicitly selects `$HOME` as control root,
-the owned path is deliberately `$HOME/.agents`.
+`install` and `update` converge the explicit control-root Codex views into split
+per-entry links. With `$HOME` as control root, these are
+`~/.agents/skills/<skill>` to the tracked source skill, `~/.codex/agents/<role>.toml`
+to the tracked role file, and `~/.codex/config.toml` to the ignored personal
+source under the AgentCanon checkout. An existing regular Codex config is moved
+byte-for-byte (including mode) before linking; update preserves it and uninstall
+restores a regular file. Foreign entries and foreign symlinks are preserved or
+reported as collisions. Project hooks and user authentication, session,
+history, cache, plugins, rules, MCP, and TUI/trust settings are outside this
+projection. `codex prepare` remains the separate runtime-local isolated home
+route.
 
 The container is bounded by the manifest: two CPUs, 4 GiB memory, 512 PIDs,
 network disabled, read-only root filesystem, all Linux capabilities dropped,
@@ -121,13 +126,14 @@ admitted tasks, one shared resident container, and a 30-minute task timeout
 with a 10-second termination grace period. Runtime, task, cache, and archive
 lease quotas are checked before garbage collection.
 
-The host owns `$CODEX_HOME`. `codex prepare` instead creates a
-manifest-managed, isolated `codex-home/` beneath the selected runtime root.
-`codex launch` sets `CODEX_HOME` only for the launched process and does not
-overwrite global skills, agents, hooks, or configuration. Existing conflicting
-paths fail closed; only links recorded as owned by this installation can be
-removed by `uninstall`. Start a new Codex session after an install or update
-and use `codex prepare` readback to verify link targets.
+`codex prepare` creates a manifest-managed, isolated `codex-home/` beneath the
+selected runtime root and `codex launch` sets `CODEX_HOME` only for the launched
+process. Separately, with `$HOME` as explicit control root, install/update own
+split global skill and role links plus the one personal `~/.codex/config.toml`
+link described above. Existing conflicting paths fail closed; only links
+recorded as owned by this installation can be removed by `uninstall`, which
+restores the regular personal config. Start a new Codex session after an
+install or update and read back both global links and runtime-local targets.
 
 ## Targets, generations, and failure recovery
 
@@ -156,7 +162,8 @@ pre-existing resources. `uninstall` removes only this installation's image,
 container, and managed links after checking that no task is active. It retains
 the external state, owner record, and receipts for absence readback; after that
 readback the installation runtime directory may be removed as the final
-task-owned cleanup. User repositories and global Codex state remain untouched.
+task-owned cleanup. Foreign global Codex entries remain untouched; exact
+AgentCanon-managed links are removed or restored as described above.
 
 ## Tool routes and compatibility
 

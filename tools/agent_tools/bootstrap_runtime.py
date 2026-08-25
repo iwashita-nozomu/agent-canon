@@ -1323,6 +1323,30 @@ class BootstrapRuntime:
             timeout=int(self.manifest["container"]["task_timeout_seconds"]),
         )
 
+    @property
+    def global_agents_home(self) -> Path:
+        """Return the explicit control-root ``~/.agents`` directory."""
+        return self.paths.control_parent_root / ".agents"
+
+    @property
+    def global_codex_home(self) -> Path:
+        """Return the explicit control-root ``~/.codex`` directory."""
+        return self.paths.control_parent_root / ".codex"
+
+    @property
+    def global_codex_config(self) -> Path:
+        """Return the user's regular Codex config path managed by the link lifecycle."""
+        return self.global_codex_home / "config.toml"
+
+    @property
+    def personal_codex_config(self) -> Path:
+        """Return AgentCanon's ignored, persistent personal-config source."""
+        return self.repository_root / ".codex" / "personal" / "config.toml"
+
+    def _global_home_scope(self) -> bool:
+        """Return whether global projection is explicitly bound to the real HOME."""
+        return self.paths.control_parent_root == Path.home().resolve()
+
     def _ensure_layout(self) -> None:
         _ensure_directory(self.paths.runtime_root)
         self._enforce_private_directory(self.paths.runtime_root)
@@ -1414,6 +1438,8 @@ class BootstrapRuntime:
             "managed_paths": [],
             "managed_links": [],
             "managed_agents_link": None,
+            "managed_global_links": [],
+            "managed_codex_config": None,
             "updated_at": _now(),
         }
 
@@ -1706,6 +1732,8 @@ class BootstrapRuntime:
         with self.locked():
             state = self._read_state(allow_manifest_drift=True)
             result = self._adopt_registry_image_locked(state, image_ref, image_record, source_head)
+            self._ensure_global_links(state)
+            self._write_state(state)
         self.codex_prepare()
         return result
 
@@ -2160,7 +2188,6 @@ class BootstrapRuntime:
             else:
                 if state.get("manifest_digest") != self.manifest_digest:
                     state = self._new_state()
-                self._ensure_agents_link(state)
                 before = state["state"]
                 shallow = False
                 try:
@@ -2214,6 +2241,8 @@ class BootstrapRuntime:
                     CONTAINER_RUNTIME_DIR,
                 ]
                 self._write_mounts(state)
+                self._write_state(state)
+                self._ensure_global_links(state)
                 self._write_state(state)
                 result = self._result(
                     self._receipt(
@@ -2312,7 +2341,6 @@ class BootstrapRuntime:
 
     def _update_locked(self, state: dict[str, Any], operation: str) -> dict[str, Any]:
         """Reconcile current checkout/image inputs with existing v2 lifecycle state."""
-        self._ensure_agents_link(state)
         if state.get("active_task_count", 0):
             raise BootstrapError(
                 "mount_update_blocked",
@@ -2322,6 +2350,8 @@ class BootstrapRuntime:
         resources = state.get("resources", {})
         image = resources.get("image", {}) if isinstance(resources, dict) else {}
         if image.get("owned") is not True:
+            self._write_state(state)
+            self._ensure_global_links(state)
             self._write_state(state)
             return self._result(
                 self._receipt(
@@ -2351,6 +2381,8 @@ class BootstrapRuntime:
                 state["state"] = "ready"
             else:
                 state["state"] = "installed"
+            self._write_state(state)
+            self._ensure_global_links(state)
             self._write_state(state)
             return self._result(
                 self._receipt(
@@ -2444,6 +2476,8 @@ class BootstrapRuntime:
                     source_head,
                     reconcile_manifest=source_sync,
                 )
+                self._ensure_global_links(state)
+                self._write_state(state)
             else:
                 result = self._update_locked(state, "update")
         self.codex_prepare()
@@ -2609,6 +2643,8 @@ class BootstrapRuntime:
                         "runtime_bytes": _dir_bytes(self.paths.runtime_root),
                         "manifest_drift": manifest_drift,
                         "managed_agents_link": self._agents_link_readback(state),
+                        "managed_global_links": self._global_links_readback(state),
+                        "managed_codex_config": state.get("managed_codex_config"),
                     },
                     state=state,
                 )
@@ -3039,34 +3075,377 @@ class BootstrapRuntime:
             raise BootstrapError("source_adapters_invalid", "tracked .agents skill adapters failed readback")
 
     def _ensure_agents_link(self, state: dict[str, Any]) -> dict[str, str]:
-        """Converge exactly one control-root .agents link without touching global home."""
-        self._validate_source_adapters()
-        link = self.paths.control_parent_root / ".agents"
+        """Migrate the legacy root link to a real per-skill-link directory."""
+        link = self.global_agents_home
         source = self.repository_root / ".agents"
-        if link.exists() or link.is_symlink():
-            if not link.is_symlink() or link.resolve() != source.resolve():
-                raise BootstrapError("agents_link_collision", f"managed .agents path already exists: {link}")
+        previous = state.get("managed_agents_link")
+        created_root = bool(previous.get("created_root")) if isinstance(previous, dict) else False
+        created_skills = bool(previous.get("created_skills")) if isinstance(previous, dict) else False
+        if link.is_symlink():
+            if link.resolve() != source.resolve():
+                raise BootstrapError(
+                    "agents_link_collision",
+                    f"global .agents path is a foreign symlink: {link}",
+                )
+            link.unlink()
+            link.mkdir(mode=0o700)
+            created_root = True
+        elif link.exists():
+            if not link.is_dir():
+                raise BootstrapError(
+                    "agents_link_collision",
+                    f"global .agents path is not a directory: {link}",
+                )
         else:
-            link.symlink_to(source, target_is_directory=True)
+            _ensure_directory(link)
+            created_root = True
+
+        skills = link / "skills"
+        source_skills = source / "skills"
+        if skills.is_symlink():
+            if skills.resolve() != source_skills.resolve():
+                raise BootstrapError(
+                    "skills_link_collision",
+                    f"global skills directory is a foreign symlink: {skills}",
+                )
+            skills.unlink()
+            skills.mkdir(mode=0o700)
+            created_skills = True
+        elif skills.exists():
+            if not skills.is_dir():
+                raise BootstrapError(
+                    "skills_link_collision",
+                    f"global skills path is not a directory: {skills}",
+                )
+        else:
+            _ensure_directory(skills)
+            created_skills = True
         record = {
             "path": str(link),
             "target": str(source),
             "owned": "true",
+            "mode": "split-directory",
+            "created_root": created_root,
+            "created_skills": created_skills,
         }
         state["managed_agents_link"] = record
         return record
 
+    def _validate_global_sources(self) -> None:
+        """Validate the source files that are projected into the user's Codex home."""
+        self._validate_source_adapters()
+        agents = self.repository_root / ".codex" / "agents"
+        if agents.is_symlink() or not agents.is_dir():
+            raise BootstrapError(
+                "source_codex_agents_invalid",
+                "tracked .codex/agents is missing or not regular",
+            )
+        role_files = sorted(agents.glob("*.toml"))
+        if not role_files or any(path.is_symlink() or not path.is_file() for path in role_files):
+            raise BootstrapError(
+                "source_codex_agents_invalid",
+                "tracked .codex agent role files failed readback",
+            )
+
+    @staticmethod
+    def _ensure_exact_link(target: Path, source: Path, *, collision_code: str) -> bool:
+        """Create one exact symlink, returning whether this call created it."""
+        _ensure_directory(target.parent)
+        if target.exists() or target.is_symlink():
+            if target.is_symlink() and target.resolve() == source.resolve():
+                return False
+            raise BootstrapError(
+                collision_code,
+                f"managed Codex path already exists: {target}",
+            )
+        target.symlink_to(source, target_is_directory=source.is_dir())
+        return True
+
+    def _ensure_personal_codex_config(self) -> dict[str, Any]:
+        """Migrate one regular user config into the ignored AgentCanon source path."""
+        target = self.global_codex_config
+        source = self.personal_codex_config
+        _ensure_directory(self.global_codex_home)
+        _ensure_directory(source.parent)
+        source_exists = source.exists() or source.is_symlink()
+        target_exists = target.exists() or target.is_symlink()
+        if source.is_symlink() or (source_exists and not source.is_file()):
+            raise BootstrapError(
+                "personal_config_collision",
+                f"personal Codex source is not a regular file: {source}",
+            )
+        if target.is_symlink():
+            if target.resolve() != source.resolve():
+                raise BootstrapError(
+                    "config_link_collision",
+                    f"global Codex config is a foreign symlink: {target}",
+                )
+            if not source.is_file():
+                raise BootstrapError(
+                    "personal_config_missing",
+                    f"managed Codex config target is missing: {source}",
+                )
+            return {
+                "target": str(target),
+                "source": str(source),
+                "managed": True,
+                "created_source": False,
+                "migrated": False,
+                "restore_mode": None,
+            }
+        if target_exists and not target.is_file():
+            raise BootstrapError(
+                "config_link_collision",
+                f"global Codex config is not a regular file: {target}",
+            )
+
+        created_source = False
+        migrated = False
+        restore_mode: int | None = None
+        if source.is_file():
+            source_bytes = _safe_read(source, field="personal Codex source")
+            if target.is_file() and _safe_read(target, field="user Codex config") != source_bytes:
+                raise BootstrapError(
+                    "personal_config_collision",
+                    "regular user config differs from the existing AgentCanon personal source",
+                )
+            if target.is_file():
+                restore_mode = stat.S_IMODE(target.stat().st_mode)
+        elif target.is_file():
+            source_bytes = _safe_read(target, field="user Codex config")
+            source_mode = stat.S_IMODE(target.stat().st_mode)
+            _atomic_bytes(source, source_bytes, mode=source_mode)
+            source.chmod(source_mode)
+            created_source = True
+            migrated = True
+            restore_mode = source_mode
+        else:
+            _atomic_bytes(source, b"")
+            created_source = True
+        if target.is_file():
+            target.unlink()
+        self._ensure_exact_link(target, source, collision_code="config_link_collision")
+        return {
+            "target": str(target),
+            "source": str(source),
+            "managed": True,
+            "created_source": created_source,
+            "migrated": migrated,
+            "restore_mode": restore_mode,
+        }
+
+    def _preflight_global_links(self) -> None:
+        """Check every global collision before changing any home path."""
+        self._validate_global_sources()
+        agents_home = self.global_agents_home
+        source_agents = self.repository_root / ".agents"
+        legacy_root_link = agents_home.is_symlink() and agents_home.resolve() == source_agents.resolve()
+        if agents_home.is_symlink() and not legacy_root_link:
+            raise BootstrapError(
+                "agents_link_collision",
+                f"global .agents path is a foreign symlink: {agents_home}",
+            )
+        if agents_home.exists() and not agents_home.is_dir():
+            raise BootstrapError(
+                "agents_link_collision",
+                f"global .agents path is not a directory: {agents_home}",
+            )
+        if agents_home.is_dir() and not agents_home.is_symlink():
+            skills_home = agents_home / "skills"
+            source_skills = source_agents / "skills"
+            if skills_home.is_symlink() and skills_home.resolve() != source_skills.resolve():
+                raise BootstrapError(
+                    "skills_link_collision",
+                    f"global skills directory is a foreign symlink: {skills_home}",
+                )
+            if skills_home.exists() and not skills_home.is_dir():
+                raise BootstrapError(
+                    "skills_link_collision",
+                    f"global skills path is not a directory: {skills_home}",
+                )
+
+        codex_home = self.global_codex_home
+        if codex_home.is_symlink() or (codex_home.exists() and not codex_home.is_dir()):
+            raise BootstrapError(
+                "config_link_collision",
+                f"global Codex home is not a regular directory: {codex_home}",
+            )
+        agents_root = codex_home / "agents"
+        if agents_root.is_symlink() or (agents_root.exists() and not agents_root.is_dir()):
+            raise BootstrapError(
+                "agents_link_collision",
+                f"global Codex agents directory is not regular: {agents_root}",
+            )
+
+        source_config = self.personal_codex_config
+        if source_config.is_symlink() or (source_config.exists() and not source_config.is_file()):
+            raise BootstrapError(
+                "personal_config_collision",
+                f"personal Codex source is not a regular file: {source_config}",
+            )
+        target_config = self.global_codex_config
+        if target_config.is_symlink():
+            if target_config.resolve() != source_config.resolve() or not source_config.is_file():
+                raise BootstrapError(
+                    "config_link_collision",
+                    f"global Codex config is a foreign or missing-source symlink: {target_config}",
+                )
+        elif target_config.exists() and not target_config.is_file():
+            raise BootstrapError(
+                "config_link_collision",
+                f"global Codex config is not a regular file: {target_config}",
+            )
+        elif target_config.is_file() and source_config.is_file():
+            if _safe_read(target_config, field="user Codex config") != _safe_read(
+                source_config, field="personal Codex source"
+            ):
+                raise BootstrapError(
+                    "personal_config_collision",
+                    "regular user config differs from the existing AgentCanon personal source",
+                )
+
+        skills_root = agents_home / "skills"
+        for source in sorted((self.repository_root / ".codex" / "agents").glob("*.toml")):
+            target = agents_root / source.name
+            if target.is_symlink():
+                if target.resolve() != source.resolve():
+                    raise BootstrapError(
+                        "agents_link_collision",
+                        f"global Codex agent path is foreign: {target}",
+                    )
+            elif target.exists():
+                raise BootstrapError(
+                    "agents_link_collision",
+                    f"global Codex agent path already exists: {target}",
+                )
+        for source in sorted((self.repository_root / ".agents" / "skills").iterdir()):
+            if not source.is_dir() or source.is_symlink():
+                continue
+            target = skills_root / source.name
+            if target.is_symlink():
+                if target.resolve() != source.resolve():
+                    raise BootstrapError(
+                        "skills_link_collision",
+                        f"global skill path is foreign: {target}",
+                    )
+            elif target.exists() and not legacy_root_link:
+                raise BootstrapError(
+                    "skills_link_collision",
+                    f"global skill path already exists: {target}",
+                )
+
+    def _ensure_global_links(self, state: dict[str, Any]) -> list[dict[str, str]]:
+        """Converge split global Codex links while preserving foreign entries."""
+        if not self._global_home_scope():
+            state["managed_global_links"] = []
+            state["managed_codex_config"] = None
+            state["managed_agents_link"] = None
+            return []
+        self._preflight_global_links()
+        self._ensure_agents_link(state)
+        config_record = self._ensure_personal_codex_config()
+        previous_config = state.get("managed_codex_config")
+        if (
+            isinstance(previous_config, dict)
+            and config_record.get("restore_mode") is None
+            and isinstance(previous_config.get("restore_mode"), int)
+        ):
+            config_record["restore_mode"] = previous_config["restore_mode"]
+        agents_root = self.global_codex_home / "agents"
+        if agents_root.is_symlink():
+            raise BootstrapError(
+                "agents_link_collision",
+                f"global Codex agents directory is a symlink: {agents_root}",
+            )
+        _ensure_directory(agents_root)
+        skills_root = self.global_agents_home / "skills"
+        desired: list[tuple[str, Path, Path, str]] = [
+            ("config", self.global_codex_config, self.personal_codex_config, "config_link_collision"),
+        ]
+        for source in sorted((self.repository_root / ".codex" / "agents").glob("*.toml")):
+            desired.append(
+                (
+                    "agents",
+                    agents_root / source.name,
+                    source,
+                    "agents_link_collision",
+                )
+            )
+        for source in sorted((self.repository_root / ".agents" / "skills").iterdir()):
+            if source.is_dir() and not source.is_symlink():
+                desired.append(
+                    (
+                        "skills",
+                        skills_root / source.name,
+                        source,
+                        "skills_link_collision",
+                    )
+                )
+        links: list[dict[str, str]] = []
+        for surface, target, source, collision_code in desired:
+            created = self._ensure_exact_link(
+                target, source, collision_code=collision_code
+            )
+            links.append(
+                {
+                    "surface": surface,
+                    "target": str(target),
+                    "source": str(source),
+                    "managed": "true",
+                    "created": "true" if created else "false",
+                }
+            )
+        state["managed_global_links"] = links
+        state["managed_codex_config"] = config_record
+        return links
+
     def _agents_link_readback(self, state: Mapping[str, Any]) -> dict[str, Any]:
+        if not self._global_home_scope():
+            return {"state": "home_scope_disabled", "home_scope": False}
         record = state.get("managed_agents_link")
         if not isinstance(record, dict):
-            return {"path": str(self.paths.control_parent_root / ".agents"), "state": "absent"}
+            return {"path": str(self.global_agents_home), "state": "absent"}
         path = Path(str(record["path"]))
         target = Path(str(record["target"]))
         return {
             "path": str(path),
             "target": str(target),
-            "exists": path.is_symlink(),
+            "exists": path.exists() or path.is_symlink(),
             "exact": path.is_symlink() and path.resolve() == target.resolve(),
+            "split": path.is_dir() and not path.is_symlink() and (path / "skills").is_dir(),
+        }
+
+    def _global_links_readback(self, state: Mapping[str, Any]) -> dict[str, Any]:
+        """Read back a bounded summary of the exact global-link inventory."""
+        if not self._global_home_scope():
+            return {
+                "count": 0,
+                "exact_count": 0,
+                "all_exact": True,
+                "surfaces": {},
+                "home_scope": False,
+            }
+        surfaces: dict[str, dict[str, int]] = {}
+        entries = state.get("managed_global_links", [])
+        if not isinstance(entries, list):
+            return {"count": 0, "exact_count": 0, "all_exact": True, "surfaces": {}}
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            target = Path(str(entry.get("target", "")))
+            source = Path(str(entry.get("source", "")))
+            surface = str(entry.get("surface", "unknown"))
+            exact = target.is_symlink() and target.resolve() == source.resolve()
+            bucket = surfaces.setdefault(surface, {"count": 0, "exact_count": 0})
+            bucket["count"] += 1
+            bucket["exact_count"] += int(exact)
+        count = sum(bucket["count"] for bucket in surfaces.values())
+        exact_count = sum(bucket["exact_count"] for bucket in surfaces.values())
+        return {
+            "count": count,
+            "exact_count": exact_count,
+            "all_exact": count == exact_count,
+            "surfaces": surfaces,
         }
 
     def _managed_links(self) -> list[dict[str, str]]:
@@ -4150,6 +4529,84 @@ class BootstrapRuntime:
                 )
             )
 
+    def _restore_personal_codex_config(self, state: Mapping[str, Any]) -> None:
+        """Restore a regular config from the exact managed personal source link."""
+        record = state.get("managed_codex_config")
+        if not isinstance(record, dict):
+            return
+        target = Path(str(record.get("target", "")))
+        source = Path(str(record.get("source", "")))
+        if not target.is_symlink():
+            return
+        if target.resolve() != source.resolve():
+            return
+        if not source.is_file() or source.is_symlink():
+            raise BootstrapError(
+                "personal_config_missing",
+                f"managed Codex config source is unavailable: {source}",
+            )
+        payload = _safe_read(source, field="personal Codex source")
+        recorded_mode = record.get("restore_mode")
+        mode = (
+            int(recorded_mode)
+            if isinstance(recorded_mode, int) and 0 <= recorded_mode <= 0o777
+            else stat.S_IMODE(source.stat().st_mode)
+        )
+        temporary = target.with_name(
+            f".{target.name}.{os.getpid()}.{secrets.token_hex(8)}.restore"
+        )
+        _atomic_bytes(temporary, payload, mode=mode)
+        temporary.chmod(mode)
+        os.replace(temporary, target)
+        os.chmod(target, mode)
+
+    def _remove_global_links(self, state: dict[str, Any]) -> None:
+        """Remove only exact links and restore the personal config file."""
+        if not self._global_home_scope():
+            state["managed_global_links"] = []
+            state["managed_codex_config"] = None
+            state["managed_agents_link"] = None
+            return
+        for entry in state.get("managed_global_links", []):
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("surface") == "config":
+                continue
+            target = Path(str(entry.get("target", "")))
+            source = Path(str(entry.get("source", "")))
+            if target.is_symlink() and target.resolve() == source.resolve():
+                target.unlink()
+        self._restore_personal_codex_config(state)
+        agents_record = state.get("managed_agents_link")
+        if isinstance(agents_record, dict):
+            agents_path = Path(str(agents_record.get("path", "")))
+            agents_target = Path(str(agents_record.get("target", "")))
+            if agents_path.is_symlink() and agents_path.resolve() == agents_target.resolve():
+                agents_path.unlink()
+            skills_path = agents_path / "skills"
+            if (
+                bool(agents_record.get("created_skills"))
+                and skills_path.is_dir()
+                and not skills_path.is_symlink()
+                and not any(skills_path.iterdir())
+            ):
+                skills_path.rmdir()
+            if (
+                bool(agents_record.get("created_root"))
+                and agents_path.is_dir()
+                and not agents_path.is_symlink()
+                and not any(agents_path.iterdir())
+            ):
+                agents_path.rmdir()
+        for directory in (
+            self.global_codex_home / "agents",
+        ):
+            if directory.is_dir() and not directory.is_symlink() and not any(directory.iterdir()):
+                directory.rmdir()
+        state["managed_global_links"] = []
+        state["managed_codex_config"] = None
+        state["managed_agents_link"] = None
+
     def uninstall(self) -> dict[str, Any]:
         """Remove exact owned Docker resources and managed Codex links."""
         self.scheduler_uninstall()
@@ -4163,13 +4620,7 @@ class BootstrapRuntime:
             self._clear_exchange_in_container(state)
             self._stop_owned_container(state)
             self._remove_exchange()
-            agents_record = state.get("managed_agents_link")
-            if isinstance(agents_record, dict):
-                agents_path = Path(str(agents_record.get("path", "")))
-                agents_target = Path(str(agents_record.get("target", "")))
-                if agents_path.is_symlink() and agents_path.resolve() == agents_target.resolve():
-                    agents_path.unlink()
-                state["managed_agents_link"] = None
+            self._remove_global_links(state)
             for entry in state.get("managed_links", []):
                 target = Path(entry["target"])
                 if (

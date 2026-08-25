@@ -328,11 +328,17 @@ dashboard、report、tmp、cache を対象にします。
 
 ## Skill Installation
 
-Bootstrap は global `$CODEX_HOME` を変更しません。明示 runtime root 内の
-`codex-home/` に skills、agents、hooks、config の verified manifest-managed link を
-作ります。同名 pre-existing path は同一 managed digestだけをadoptし、その他は
-fail-closedです。uninstall は自分が作ったlinkだけを削除します。receiptに
-surface id、source commit/digest、target、created/pre-existing を記録します。
+Bootstrap の `codex prepare` は global `$CODEX_HOME` を変更せず、明示 runtime
+root 内の `codex-home/` に skills、agents、hooks、config の verified
+manifest-managed link を作ります。加えて、control root に `$HOME` を明示した
+install/update は `~/.agents/skills/<skill>`、`~/.codex/agents/<role>.toml`、および
+`~/.codex/config.toml` を個別に管理します。最後のリンク先は AgentCanon checkout
+内の ignored な personal source で、既存の regular config は bytes と mode を保持
+して移行し、uninstall で regular file に戻します。hooks、認証、session、history、
+cache、plugin、rule、MCP、TUI/trust はこの投影に含めません。同名 pre-existing path
+は foreign entry として保持または typed collision にし、uninstall は自分が作った
+exact linkだけを削除します。receipt には surface、source、target、created 状態を
+記録します。
 
 `bootstrap.sh ... codex --project-root <path>` は process-local にこの isolated
 `CODEX_HOME` を指定して project root で Codex を起動します。Template に
