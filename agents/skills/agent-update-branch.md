@@ -12,7 +12,7 @@ Use this skill when agent-runtime updates should not be mixed into ordinary feat
 
 ## Lanes
 
-- `memory-eval`: updates durable agent memory, eval manifests, eval result artifacts, and skill prompt feedback.
+- `knowledge-eval`: updates private knowledge/feedback routing, eval manifests, eval result artifacts, and skill prompt feedback.
 - `integration`: merges one or more `agent-updates/*` branches into an integration branch before `main`.
 
 AgentCanon source/runtime changes are not an update-branch lane. They move
@@ -23,7 +23,7 @@ already owns the same lane. Continue the existing branch / PR for added user
 instructions, bounded follow-ups, and checklist or evidence updates. Create a new
 `agent-updates/*` branch only when the current branch is merged, closed,
 unpushable, has an unrelated ownership lane, needs explicit review isolation, or
-would mix incompatible pin / memory / eval ownership. Record
+would mix incompatible pin / private knowledge / eval ownership. Record
 `branch_creation_reason=<reason>` before requesting current-task user approval.
 Normal creation proceeds only when that approval exists and the same command
 segment carries creation authority/reason. Force-create or ref-overwrite

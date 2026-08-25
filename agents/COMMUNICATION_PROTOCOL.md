@@ -411,8 +411,8 @@ before implementation.
   that must be in the prompt for the next decision
 - `local_tool_context`: artifact paths, command outputs, raw logs, dashboards,
   or search results intentionally kept out of the prompt
-- `durable_memory_refs`: stable policy, issue, report, source packet, or memory
-  references that survive chat compaction
+- `durable_knowledge_refs`: stable policy, issue, report, source packet, or private
+  knowledge references that survive chat compaction
 - `open_questions`: only items that cannot be resolved from repo evidence
 
 Raw search hits, chat memory, and a list of nearest files are not sufficient.

@@ -67,12 +67,12 @@ mkdir -p "${CARGO_TARGET_DIR}" "${TMPDIR}"
 
 run_rust() {
   cargo build --manifest-path rust/agent-canon/Cargo.toml
-  local memory_cli="${CARGO_TARGET_DIR:?}/debug/agent-canon"
-  if [[ ! -x "${memory_cli}" ]]; then
-    echo "AGENT_CANON_MEMORY_CLI_BUILD=fail" >&2
+  local agent_cli="${CARGO_TARGET_DIR:?}/debug/agent-canon"
+  if [[ ! -x "${agent_cli}" ]]; then
+    echo "AGENT_CANON_CLI_BUILD=fail" >&2
     return 1
   fi
-  "${memory_cli}" memory validate --root .
+  "${agent_cli}" --version
   cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check
   cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D warnings
   env -u AGENT_CANON_RUNTIME_ROOT \

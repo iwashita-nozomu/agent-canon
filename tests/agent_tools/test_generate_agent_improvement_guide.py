@@ -28,18 +28,24 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
     def setUp(self) -> None:
         self._runtime_temp = tempfile.TemporaryDirectory()
         self._previous_runtime = os.environ.get("AGENT_CANON_RUNTIME_ROOT")
+        self._previous_log = os.environ.get("AGENT_CANON_LOG_ROOT")
         self.runtime_root = Path(self._runtime_temp.name) / "runtime"
         self.runtime_root.mkdir()
         os.environ["AGENT_CANON_RUNTIME_ROOT"] = str(self.runtime_root)
+        os.environ["AGENT_CANON_LOG_ROOT"] = str(self.runtime_root / "agent-canon-log")
 
     def tearDown(self) -> None:
         if self._previous_runtime is None:
             os.environ.pop("AGENT_CANON_RUNTIME_ROOT", None)
         else:
             os.environ["AGENT_CANON_RUNTIME_ROOT"] = self._previous_runtime
+        if self._previous_log is None:
+            os.environ.pop("AGENT_CANON_LOG_ROOT", None)
+        else:
+            os.environ["AGENT_CANON_LOG_ROOT"] = self._previous_log
         self._runtime_temp.cleanup()
 
-    def test_generates_guidance_from_issues_eval_memory_and_hook_logs(self) -> None:
+    def test_generates_guidance_from_issues_eval_knowledge_and_hook_logs(self) -> None:
         """The guide should summarize every evidence family."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -105,7 +111,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn("Protocol Feedback Coverage", guide)
         self.assertIn("hook_tool_feedback=reviewed", guide)
         self.assertNotIn("failure-a", guide)
-        self.assertIn("memory/records", guide)
+        self.assertIn("agent-canon-log/knowledge", guide)
         self.assertIn("Local Codex", guide)
 
     def test_skill_routing_gap_ignores_pre_cutover_skill_logs(self) -> None:
@@ -180,7 +186,6 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         (evals_root / "README.md").write_text("# Eval fixture\n", encoding="utf-8")
         (root / "issues" / "open").mkdir(parents=True)
         (root / "issues" / "closed").mkdir(parents=True)
-        (root / "memory").mkdir()
         archive_root = mounted_log_archive_root(root)
         skill_results = archive_root / "eval-results" / "skill-workflow-prompt"
         hook_results = archive_root / "hook-runs" / "legacy-import" / "test-container"
@@ -194,10 +199,9 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
             "issue_id: AC-20260513-closed\nstatus: resolved\n",
             encoding="utf-8",
         )
-        (root / "memory" / "records").mkdir(parents=True)
-        (root / "memory" / "records" / "agent--durable-learning.md").write_text(
-            "# Durable learning\n", encoding="utf-8"
-        )
+        knowledge = self.runtime_root / "agent-canon-log" / "knowledge" / "topics" / "durable-learning"
+        knowledge.mkdir(parents=True)
+        (knowledge / "candidate.md").write_text("# Durable learning\n", encoding="utf-8")
         for skill in ("agent-orchestration", "codex-task-workflow", "result-artifact-writeout"):
             skill_path = root / ".agents" / "skills" / skill / "SKILL.md"
             skill_path.parent.mkdir(parents=True, exist_ok=True)

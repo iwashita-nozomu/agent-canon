@@ -21,7 +21,7 @@
 # upstream implementation ../agent_tools/check_convention_compliance.py convention gate wiring eval
 # upstream implementation ../agent_tools/skill_tool_commands.py runtime skill command packet gate
 # upstream implementation ../agent_tools/update_lifecycle_contract.py owns G1-G3 receipt identity.
-# upstream implementation ../../rust/agent-canon/src/memory.rs owns memory CLI validation reused by the Rust build gate.
+# upstream implementation ../../rust/agent-canon/src/main.rs owns the Rust CLI build gate.
 # upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
 # upstream implementation ../ci/run_python_quality_checks.sh owns shared Python static quality checks
 # downstream implementation ../../tests/tools/test_agent_canon_pr_dependency_source_gate.py verifies source-only dependency routing

@@ -1179,7 +1179,7 @@ required_regex = ["workflow_monitor\\.py", "behavior-event", "agent_behavior_eva
 id = "AIL-HUMAN-8"
 critical = true
 description = "Routes runtime feedback to a concrete prompt, eval, memory, or no-op decision."
-required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "prompt_repair", "eval_update", "memory_record"]
+required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "prompt_repair", "eval_update", "knowledge_record"]
 
 [[evals.checklist]]
 id = "AIL-HUMAN-5"
@@ -1761,7 +1761,7 @@ required_regex = ["skill invocation", "subagent lifecycle", "diff-check"]
 id = "ALW-BEHAVIOR-4"
 critical = true
 description = "Requires runtime feedback capture and routing to prompt/eval/memory updates."
-required_regex = ["workflow_monitor\\.py --runtime-feedback", "runtime_feedback=observed", "prompt_repair", "memory_record"]
+required_regex = ["workflow_monitor\\.py --runtime-feedback", "runtime_feedback=observed", "prompt_repair", "knowledge_record"]
 
 [[evals]]
 id = "workflow-monitoring-template-behavior-events"
@@ -1858,12 +1858,12 @@ required_regex = ["agent_behavior_eval\\.toml", "AGENT_EVALUATION_STATUS=pass"]
 id = "ALH-BEHAVIOR-3"
 critical = true
 description = "Documents runtime feedback capture and prompt/eval/memory routing."
-required_regex = ["runtime-feedback", "prompt_repair", "eval_update", "memory_record", "active skill set", "calibration step", "hard rule"]
+required_regex = ["runtime-feedback", "prompt_repair", "eval_update", "knowledge_record", "active skill set", "calibration step", "hard rule"]
 
 [[evals.checklist]]
 id = "ALW-BEHAVIOR-6"
 critical = true
-description = "Requires active-skill feedback to calibrate prompt repair strength before memory-only closure."
+description = "Requires active-skill feedback to calibrate prompt repair strength before private-knowledge-only closure."
 required_regex = ["active skill set", "first repair candidate", "calibration step", "hard rule", "skill_improvement_decision=applied"]
 
 [[evals]]

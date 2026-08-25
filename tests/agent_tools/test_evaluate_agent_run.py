@@ -212,7 +212,7 @@ def write_workflow_monitoring(report_dir: Path) -> None:
             "- skill_improvement_decision: recorded",
             "- config_improvement_decision: not_applicable",
             "- workflow_improvement_decision: not_applicable",
-            "- memory_learning_decision: not_applicable",
+            "- knowledge_learning_decision: not_applicable",
             "- runtime_profile_projection=generated_role_view_v1 profile-attribution "
             "topology_derived_v1 declared_team_peak_plus_nested_reservations_v1 "
             "requested_capacity_loader model-capacity thread-capacity",
@@ -431,7 +431,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
                     "--decision",
                     "workflow_improvement_decision=not_applicable",
                     "--decision",
-                    "memory_learning_decision=not_applicable",
+                    "knowledge_learning_decision=not_applicable",
                     "--intervention",
                     "Closeout preset generated standard evaluator tokens.",
                 ],
@@ -567,7 +567,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
             self.assertIn("workflow_monitoring", report)
 
     def test_evaluate_pending_improvement_decisions_fail(self) -> None:
-        """Skill/config/workflow/memory improvement decisions must be closed."""
+        """Skill/config/workflow/knowledge improvement decisions must be closed."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)

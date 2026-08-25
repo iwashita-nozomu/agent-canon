@@ -266,7 +266,7 @@ DOC_OR_RUNTIME_PATH_MARKERS = (
     ".github/",
     "agents/",
     "documents/",
-    "memory/",
+    "documents/notes/knowledge/",
     "documents/notes/",
     "tools/catalog.yaml",
 )

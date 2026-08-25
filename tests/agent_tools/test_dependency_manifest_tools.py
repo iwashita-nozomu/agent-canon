@@ -2293,8 +2293,8 @@ class DependencyManifestToolTest(unittest.TestCase):
             "documents/experiments/experiment-critical-review.md",
             "documents/tools/README.md",
             "documents/operations/worktree-lifecycle.md",
-            "memory/README.md",
-            "memory/records",
+            "documents/notes/knowledge/README.md",
+            "documents/notes/knowledge",
             "documents/notes/README.md",
             "documents/notes/guardrails/engineering_avoidances.md",
         ]

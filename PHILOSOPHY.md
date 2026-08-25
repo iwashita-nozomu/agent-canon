@@ -9,7 +9,7 @@ downstream design ROOT_AGENTS.md root agent instruction source.
 downstream design agents/README.md workflow, skill, and runtime hub.
 downstream design documents/README.md documentation ownership and policy index.
 downstream design documents/conventions/software-engineering-principles.md language- and paradigm-neutral engineering principles and decision precedence.
-downstream design memory/README.md on-demand problem-solving memory record contract.
+downstream design documents/runtime/private-feedback-knowledge.md private knowledge and feedback contract.
 @dependency-end
 -->
 
@@ -42,7 +42,7 @@ downstream design memory/README.md on-demand problem-solving memory record contr
 - tool design 文書は実行時 agent ではなく maintainer / reviewer / 設計 agent が読む。
 - 新しい surface は convenience ではなく責務 gap から作る。
 - KISS、YAGNI、DRY、SOLID は一律 checklist にせず、到達する contract と failure evidence がある場合だけ専門 owner から選ぶ。
-- memory は同じ問題に再遭遇したときに検索して使う知識置き場にし、安定した契約は正本へ昇格する。
+- private `agent-canon-log` は同じ問題に再遭遇したときに検索して使う knowledge / feedback の置き場にし、安定した契約は正本へ昇格する。
 
 ## 境界
 
@@ -52,5 +52,5 @@ downstream design memory/README.md on-demand problem-solving memory record contr
 - skill の実行契約は `agents/skills/` と `.agents/skills/` に置く。
 - workflow の手順は `agents/workflows/` に置く。
 - validation matrix と policy は `documents/` に置く。
-- 対話から得た raw observation は runtime logs/evidence/issues/failures の owner に置き、
-  独立した再発防止知識だけを `memory/records/` に self-contained record として置く。
+- 対話から得た raw observation は runtime logs/evidence/Issue/failures の owner に置き、
+  独立した再発防止知識や修正 feedback は private `agent-canon-log` に置く。source treeへ本文を複製しない。

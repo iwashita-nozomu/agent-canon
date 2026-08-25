@@ -489,7 +489,7 @@ Before writing a new Issue:
 
    ```bash
    git grep -n "<owner, decision, mechanism, cause, or occurrence keywords>" \
-     -- issues memory documents agents
+     -- documents/notes/knowledge documents agents
    ```
 
 1. Build the Related Issue Set Intake. If the responsibility exists but current

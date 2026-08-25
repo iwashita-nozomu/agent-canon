@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Generates bounded PR/manual guidance from AgentCanon memory, eval, hook, and issue evidence.
+# responsibility Generates bounded PR/manual guidance from private knowledge/feedback, eval, hook, and Issue evidence.
 # upstream design ../../evidence/agent-evals/README.md eval evidence contract
 # upstream design ../../documents/runtime/runtime-log-archive.md hook result accumulation contract
 # upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
@@ -97,7 +97,7 @@ class EvidenceSummary:
     """Summarized AgentCanon improvement evidence."""
 
     github_issue_refs: tuple[str, ...]
-    memory_entries: dict[str, int]
+    knowledge_entries: dict[str, int]
     skill_eval_reports: tuple[Path, ...]
     failed_skill_eval_reports: tuple[Path, ...]
     hook_counts: HookEvidenceCounts
@@ -504,7 +504,7 @@ class AgentImprovementGuide:
         )
         return EvidenceSummary(
             github_issue_refs=self.github_issue_refs(),
-            memory_entries=self.memory_entry_counts(),
+            knowledge_entries=self.knowledge_entry_counts(),
             skill_eval_reports=skill_eval_reports,
             failed_skill_eval_reports=failed_skill_eval_reports,
             hook_counts=self.hook_counts(),
@@ -549,10 +549,13 @@ class AgentImprovementGuide:
         }
         return tuple(sorted(reports))
 
-    def memory_entry_counts(self) -> dict[str, int]:
-        """Return the number of self-contained on-demand memory records."""
-        records_dir = self.root / "memory" / "records"
-        return {"memory/records": len(tuple(records_dir.glob("*.md")))}
+    def knowledge_entry_counts(self) -> dict[str, int]:
+        """Return private knowledge candidate counts without reading bodies."""
+        configured = os.environ.get("AGENT_CANON_LOG_ROOT", "").strip()
+        if not configured:
+            return {"agent-canon-log/knowledge": 0}
+        topics = Path(configured).expanduser().resolve() / "knowledge" / "topics"
+        return {"agent-canon-log/knowledge": len(tuple(topics.glob("*/candidate.md")))}
 
     def skill_eval_failed(self, path: Path) -> bool:
         """Return whether one accumulated skill eval report is failing."""
@@ -601,7 +604,7 @@ class AgentImprovementGuide:
             "",
             "This generated guide is read-only evidence. Use it to choose a local",
             "Codex repair branch; do not let the workflow rewrite",
-            "skills, workflows, tools, or memory directly.",
+            "skills, workflows, tools, or private knowledge/feedback directly.",
             "",
             "## Evidence Summary",
             "",
@@ -618,7 +621,7 @@ def evidence_summary_lines(root: Path, summary: EvidenceSummary) -> list[str]:
     return [
         f"- evidence_root: `{root.as_posix()}`",
         f"- github_issue_refs: `{len(summary.github_issue_refs)}`",
-        f"- memory_entries: `{sum(summary.memory_entries.values())}`",
+        f"- knowledge_entries: `{sum(summary.knowledge_entries.values())}`",
         f"- skill_eval_reports: `{len(summary.skill_eval_reports)}`",
         f"- failed_skill_eval_reports: `{len(summary.failed_skill_eval_reports)}`",
         f"- hook_status_counts: `{dict(counts.statuses)}`",
@@ -667,7 +670,7 @@ def render_guidance_sections(root: Path, summary: EvidenceSummary) -> list[str]:
         )
     )
     sections.extend(named_section("Repeated Hook Failures", failure_lines(summary.hook_counts.failures)))
-    sections.extend(named_section("Memory Entry Counts", memory_entry_lines(summary)))
+    sections.extend(named_section("Private Knowledge Entry Counts", knowledge_entry_lines(summary)))
     return sections
 
 
@@ -676,11 +679,11 @@ def named_section(name: str, lines: list[str]) -> list[str]:
     return [f"## {name}", "", *lines, ""]
 
 
-def memory_entry_lines(summary: EvidenceSummary) -> list[str]:
-    """Return memory count bullets."""
+def knowledge_entry_lines(summary: EvidenceSummary) -> list[str]:
+    """Return private knowledge count bullets."""
     return [
         f"- `{path}`: `{count}`"
-        for path, count in sorted(summary.memory_entries.items())
+        for path, count in sorted(summary.knowledge_entries.items())
     ]
 
 
@@ -821,7 +824,7 @@ def guidance(summary: EvidenceSummary) -> list[str]:
             "- Treat hook quality counters as instrumentation debt; repair unknown events, empty skill signals, or missing workflow monitor events."
         )
     if not lines:
-        lines.append("- No immediate memory/eval/hook/issue improvement target was detected.")
+        lines.append("- No immediate private-knowledge/eval/hook/Issue improvement target was detected.")
     lines.append(
         "- Local Codex should make the actual skill/workflow/tool edits and attach validation evidence."
     )

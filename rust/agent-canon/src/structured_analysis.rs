@@ -1362,7 +1362,7 @@ fn nearest_canonical_anchor(path: &Path) -> String {
     let Some(root) = path.iter().next().and_then(|part| part.to_str()) else {
         return "README.md".to_string();
     };
-    if ["agents", "documents", "memory", "notes", "tools"].contains(&root) {
+    if ["agents", "documents", "notes", "tools"].contains(&root) {
         return format!("{root}/README.md");
     }
     if root.starts_with('.') {

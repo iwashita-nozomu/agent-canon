@@ -106,7 +106,7 @@ description = "Project-owned experiments, evidence, memory, notes, references, a
 paths = [
   "experiments/**",
   "evidence/**",
-  "memory/**",
+  "documents/notes/knowledge/**",
   "documents/notes/**",
   "references/**",
 ]

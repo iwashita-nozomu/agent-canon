@@ -114,7 +114,7 @@ RUSTUP_INIT_URL = (
 RUSTUP_INIT_SHA256 = "20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c"
 CANONICAL_RUST_SOURCE_FILES = (
     "Cargo.lock", "Cargo.toml", "src/dependency_manifest.rs", "src/docs.rs",
-    "src/graph.rs", "src/jit_ir_to_lean.rs", "src/main.rs", "src/memory.rs",
+    "src/graph.rs", "src/jit_ir_to_lean.rs", "src/main.rs",
     "src/migration_audit.rs", "src/python_algorithm_contract.rs",
     "src/python_module_groups.rs", "src/python_structure_hash.rs",
     "src/python_structure_hash_impact.rs", "src/python_structure_hash_report.rs",

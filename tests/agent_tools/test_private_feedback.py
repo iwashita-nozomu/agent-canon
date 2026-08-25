@@ -57,7 +57,7 @@ def test_body_redaction_receipt_rejects_secret_and_never_prints_body(tmp_path: P
 def test_structured_runtime_feedback_auto_capture(tmp_path: Path) -> None:
     """The existing structured feedback route can write an external spool record."""
     meta = private_feedback.capture_runtime_feedback(
-        "source=user target=agent-log action=memory_record runtime_feedback=observed",
+        "source=user target=agent-log action=knowledge_record runtime_feedback=observed",
         runtime_root=tmp_path / "runtime",
         run="run-1",
         task="task-1",
@@ -138,18 +138,6 @@ def test_operational_clone_migration_observes_old_archive_before_new_clone(tmp_p
     assert payload["migration"] == "legacy-readback-observed"
     assert legacy.is_dir()
     assert (tmp_path / "log/.git").is_dir()
-
-
-def test_memory_migration_is_non_destructive(tmp_path: Path) -> None:
-    """The one-cycle memory migration never deletes source records."""
-    source = tmp_path / "source"
-    record = source / "memory/records/runtime--boundary.md"
-    record.parent.mkdir(parents=True)
-    record.write_text("# Boundary\n\nKeep runtime data external.\n", encoding="utf-8")
-    runtime = tmp_path / "runtime"
-    assert invoke(runtime, "k", "migrate-memory", "--root", str(source)) == 0
-    assert record.is_file()
-    assert list((runtime / "spool/private-feedback/knowledge/topics").rglob("candidate.md"))
 
 
 def test_sync_request_host_readback_and_private_log_mount_are_separate(tmp_path: Path) -> None:

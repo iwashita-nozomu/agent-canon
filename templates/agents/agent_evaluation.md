@@ -54,4 +54,4 @@ downstream implementation ../../tools/agent_tools/task_close.py enforces pass st
 
 ## Learning Capture（学習の保存）
 
-<!-- durable な agent-side observation を tools/agent_tools/memory_record.py で記録するか、skill/config/workflow change を適用したか、明示的に not_applicable としたかを記録します。raw chat は貼り付けません。runtime feedback を観測し action が no_op でない場合は、適用または記録した improvement decision と具体的な target を引用します。 -->
+<!-- durable な agent-side observation を agent-canon k/f で private log に記録するか、skill/config/workflow change を適用したか、明示的に not_applicable としたかを記録します。raw chat は貼り付けません。runtime feedback を観測し action が no_op でない場合は、適用または記録した improvement decision と具体的な target を引用します。 -->

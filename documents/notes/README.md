@@ -69,8 +69,8 @@ upstream design ../README.md document index and notes placement boundary
 - どこへ昇格させるか迷うときは `documents/operations/notes-lifecycle.md` を見ます。
 - `documents/notes/` は「書き捨て」ではなく、closeout ごとに再編して太らせる前提です。
 - stable preference は対象の `AGENTS.md` または canonical owner へ直接昇格します。
-- 同じ問題に再遭遇したときに使う独立した知識だけを shared canon `memory/records/*.md` に残します。
-  raw chat と時系列観測は runtime logs/evidence/issues/failures の owner に置きます。
+- 同じ問題に再遭遇したときに使う独立した知識や修正 feedback は private `agent-canon-log` に残します。
+  raw chat と時系列観測は runtime logs/evidence/Issue/failures の owner に置きます。
 
 ## Action Log Rule
 

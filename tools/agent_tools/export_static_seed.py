@@ -42,7 +42,7 @@ FORBIDDEN_PATH_PREFIXES = (
     "agents",
     "evidence",
     "issues",
-    "memory",
+    "knowledge",
     "notes",
     "reports",
     "rust",

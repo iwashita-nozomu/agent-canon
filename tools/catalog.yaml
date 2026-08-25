@@ -69,10 +69,6 @@ runtime_schema:
       selector: docs
       path: rust/agent-canon/src/docs.rs
       writes: true
-    - id: rust-memory
-      selector: memory
-      path: rust/agent-canon/src/memory.rs
-      writes: true
     - id: rust-structured-analysis
       selector: structured-analysis
       path: rust/agent-canon/src/structured_analysis.rs

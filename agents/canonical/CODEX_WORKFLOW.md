@@ -140,7 +140,7 @@ slice を選ぶ場合は、coverage map に `covered_surfaces`、`deferred_surfa
 
 - `documents/`
 - repository-qualified GitHub Issue URLs/numbers and private packet locators
-- `memory/`
+- private `agent-canon-log/knowledge/` (metadata and locator only)
 - `documents/notes/knowledge/`
 - `documents/notes/guardrails/`
 - `documents/notes/failures/`
@@ -151,8 +151,8 @@ slice を選ぶ場合は、coverage map に `covered_surfaces`、`deferred_surfa
 - `references/`
 
 memory は固定 packet/read の対象にしません。owner/path、failure evidence、recurrence
-decision が選択された後、必要な record だけを `agent-canon memory search` で on-demand
-に検索します。stable preference は対象 owner への明示変更として扱います。
+decision が選択された後、必要な topic だけを `agent-canon k search` / `k read` で private
+logへ on-demand に検索します。stable preference は対象 owner への明示変更として扱います。
 
 raw text search の hit だけで編集対象を決めません。
 検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じたら、implementation-executable TargetStateContract に固定された complete responsibility unit を write-capable child handoff へ materialize します。空の unresolved-decision set は即時に one-pass handoff へ遷移し、owner gate は完了後だけです。明示された bounded owner/path/targeted-validation request も同じ child route で進めます。
@@ -502,8 +502,8 @@ checked and cited.
   - `comprehensive-development`
 - environment and tool rollout:
   - `environment-maintenance`
-- memory record の検索・更新・owner 昇格と agent-side 対話学習:
-  `agent-learning` と Rust `agent-canon memory` を使う。stable preference は対象
+- private knowledge / feedback の検索・記録と agent-side 対話学習:
+  `agent-learning` と Rust `agent-canon k/f` を使う。stable preference は対象
   `AGENTS.md` または canonical owner への明示変更として扱う。
 
 ## Execution Flow
@@ -521,9 +521,9 @@ checked and cited.
 - 着手時の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
 - skill を user-facing に書くときは `$skill-name` を既定にし、`skills=<...>` でも同じ表記を維持する
 - agent-side の再発防止知識を残す必要がある場合は、選択済み context で
-  `python3 tools/agent_tools/memory_record.py search --root . --search-path <owner> --failure-evidence <evidence>`
-  を先に実行し、既存 topic は同じ record を update します。独立 topic の create は
-  `plan` の readback 後に行います。raw chat は memory に追記しません。
+  `agent-canon k search --query <failure-evidence>` を先に実行し、既存 topic は同じ private
+  topicへ追記します。独立 topicだけを `agent-canon k/f add` で記録します。raw chatはprivate
+  logへそのまま追記しません。
 
 ### 2. Workflow Selection
 

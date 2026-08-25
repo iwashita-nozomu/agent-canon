@@ -120,7 +120,7 @@ Allowed repair types:
 - `tool_repair`,
 - `schema_repair`,
 - `eval_update`,
-- `memory_record`,
+- `knowledge_record`,
 - `no_op` with explicit reason.
 
 Important rule:

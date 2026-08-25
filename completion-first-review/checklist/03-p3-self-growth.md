@@ -80,26 +80,26 @@ P3 makes AgentCanon able to improve itself without turning every observation int
 - Action: add a positive fixture for the accepted path.
 - Acceptance: positive fixture passes under new verifier.
 
-### [ ] P3-008: memory propagation gate
+### [ ] P3-008: private knowledge propagation gate
 
-- Target: `memory/`, AgentCanon submodule, superproject pin.
-- Problem: memory changes can stay local and fail to propagate.
-- Violation: an on-demand memory record is edited without its Rust validation, owner refs, or
+- Target: private `agent-canon-log/knowledge/`, AgentCanon source, and any explicit parent pin.
+- Problem: private knowledge changes can stay local and fail to propagate.
+- Violation: private knowledge is written without its external-log locator, source digest, or
   AgentCanon branch readback.
-- Action: require `agent-canon memory validate --root .`, record_id/owner-ref evidence, and
+- Action: require `agent-canon k/f status`, topic/digest evidence, and
   AgentCanon commit/push evidence when this shared surface changes.
-- Acceptance: the record tree validates and the source branch readback is clean.
+- Acceptance: the private log readback and source branch readback are clean.
 
-### [ ] P3-009: promotion criteria
+### [ ] P3-009: private-knowledge derivation criteria
 
-- Target: promotion decision artifact.
+- Target: private-knowledge derivation decision artifact.
 - Problem: one-off observations can become repo-wide rules.
 - Action: require scope, support count or explicit durable user instruction, and counterexample review.
-- Acceptance: repo-wide promotion without scope and support fails.
+- Acceptance: repo-wide owner change without scope and support fails.
 
 ### [ ] P3-010: retirement policy
 
-- Target: memory and workflow rules.
+- Target: private knowledge and workflow rules.
 - Problem: canon grows but does not shrink.
 - Action: every durable learning item has `review_after`, `expiry`, `superseded_by`, or no-retirement rationale.
 - Acceptance: retirement sweep can identify stale items.

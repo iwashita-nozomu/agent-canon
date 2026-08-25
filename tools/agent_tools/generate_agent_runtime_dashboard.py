@@ -5,7 +5,7 @@
 # upstream design ../../evidence/agent-evals/README.md eval evidence contract
 # upstream design ../../documents/runtime/runtime-log-archive.md eval and hook result storage contract
 # upstream design ../../references/README.md external-source capture and Markdown retention contract
-# upstream implementation ./generate_agent_improvement_guide.py summarizes hook, memory, eval, and issue evidence
+# upstream implementation ./generate_agent_improvement_guide.py summarizes hook, private knowledge/feedback, eval, and Issue evidence
 # upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
 # downstream implementation ../../.github/workflows/agent-runtime-dashboard.yml publishes standalone AgentCanon dashboards
 # downstream implementation ../../tests/agent_tools/test_generate_agent_runtime_dashboard.py tests dashboard rendering
@@ -1434,7 +1434,7 @@ class AgentRuntimeDashboard:
         skill_eval_breakdown = SkillEvalBreakdownReader.read(result_families[0])
         evidence = EvidenceSummary(
             github_issue_refs=evidence.github_issue_refs,
-            memory_entries=evidence.memory_entries,
+            knowledge_entries=evidence.knowledge_entries,
             skill_eval_reports=result_families[0].reports,
             failed_skill_eval_reports=result_families[0].failed_reports,
             hook_counts=read_hook_evidence_counts(
@@ -1505,7 +1505,7 @@ class AgentRuntimeDashboard:
         return (
             EvidenceSummary(
                 github_issue_refs=self.guide.github_issue_refs(),
-                memory_entries=self.guide.memory_entry_counts(),
+                knowledge_entries=self.guide.knowledge_entry_counts(),
                 skill_eval_reports=(),
                 failed_skill_eval_reports=(),
                 hook_counts=read_hook_evidence_counts(
@@ -2360,7 +2360,7 @@ def dashboard_header_lines() -> list[str]:
         "This report is a read-only view over accumulated AgentCanon evidence.",
         "It tells humans and PR reviewers where logs live and what signals have",
         "been collected; it does not create GitHub Issues or rewrite skills,",
-        "workflows, tools, hooks, or memory.",
+        "workflows, tools, hooks, or private knowledge/feedback.",
         "",
         "## Machine Summary",
         "",
@@ -2553,7 +2553,7 @@ def evidence_location_lines(root: Path) -> list[str]:
         "- workflow_selection_eval_reports: `.agent-canon/log-archive/eval-results/workflow-selection/<eval-run-id>-<status>.md`",
         "- report_quality_eval_reports: `.agent-canon/log-archive/eval-results/report-quality/<eval-run-id>-<status>.md`",
         "- github_issue_refs: repository-qualified URLs from private run-local packets; otherwise `github_issue_lookup_required`",
-        "- shared_memory: `memory/README.md` and `memory/records/*.md` (on-demand)",
+        "- private_knowledge: `agent-canon-log/knowledge/topics/*/candidate.md` (on-demand; locator/count only)",
         "- token_comparison_reports: `reports/agents/**/workflow_monitoring.md` or `reports/agents/**/*token*.md`",
         "- reference_capture_hook: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/reference_capture_guard.jsonl`",
         "- materialized_references: `references/external/*.md` in the parent repository that consulted the source",

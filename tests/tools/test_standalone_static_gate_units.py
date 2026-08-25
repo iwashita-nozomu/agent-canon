@@ -141,7 +141,7 @@ def test_canonical_selector_maps_representative_surfaces_to_units() -> None:
         "workflow-container",
     )
     assert selected_units("docker/Dockerfile") == ("workflow-container",)
-    assert selected_units("memory/example.yaml") == ("contracts",)
+    assert selected_units("documents/notes/knowledge/example.yaml") == ("contracts",)
 
 
 def test_selector_boundary_change_uses_full_confidence_unit_set() -> None:

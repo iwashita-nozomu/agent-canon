@@ -9,7 +9,7 @@ downstream design ../skills/agent-update-branch.md exposes the workflow as a ski
 @dependency-end
 -->
 
-This workflow keeps AgentCanon source updates, memory/eval feedback, and parent
+This workflow keeps AgentCanon source updates, private knowledge/eval feedback, and parent
 project changes in separate ownership lanes. A parent never becomes an update
 hub for AgentCanon source, and no source pin or projection is maintained.
 
@@ -25,7 +25,7 @@ of these conditions:
 - the current branch / PR is merged, closed, or unpushable
 - the update belongs to a different lane or ownership surface
 - explicit review isolation is required
-- continuing would mix incompatible pin, memory, eval, or protected-surface work
+- continuing would mix incompatible pin, private knowledge, eval, or protected-surface work
 - the user explicitly asks for a separate branch
 
 The reason and workflow condition only bound the approval request. Normal
@@ -37,18 +37,18 @@ the user.
 
 ## Branch Lanes
 
-- `agent-updates/memory-eval/<slug>`: memory and eval-only updates.
+- `agent-updates/knowledge-eval/<slug>`: private knowledge and eval-only updates.
 - `agent-updates/canon-source/<slug>`: qualified standalone AgentCanon source clone and source PR updates.
 - `agent-updates/integration/<slug>`: merges update branches and validates them before `main`.
 
-## Memory/Eval Branch
+## Private Knowledge/Eval Branch
 
-1. Reuse the current branch if it already owns this memory/eval lane.
-1. Otherwise request user direction and approval for `agent-updates/memory-eval/<slug>` after recording `branch_creation_reason=<reason>`; create it only through the same-segment creation-authority guard contract. Add the destructive authority/reason pair only when the route force-creates or overwrites a ref.
-1. Change only `memory/`, `evidence/agent-evals/`, `.agents/skills/*/SKILL.md`, or run-local evaluation artifacts that document feedback.
-1. Run `bash tools/agent_tools/agent_update_branch.sh validate memory-eval`.
-1. Commit with a message that states this is a memory/eval-only agent update branch.
-1. Push with `bash tools/agent_tools/agent_update_branch.sh push memory-eval <branch>`.
+1. Reuse the current branch if it already owns this private knowledge/eval lane.
+1. Otherwise request user direction and approval for `agent-updates/knowledge-eval/<slug>` after recording `branch_creation_reason=<reason>`; create it only through the same-segment creation-authority guard contract. Add the destructive authority/reason pair only when the route force-creates or overwrites a ref.
+1. Change only `evidence/agent-evals/`, `.agents/skills/*/SKILL.md`, or run-local evaluation artifacts that document private feedback.
+1. Run `bash tools/agent_tools/agent_update_branch.sh validate knowledge-eval`.
+1. Commit with a message that states this is a private knowledge/eval-only agent update branch.
+1. Push with `bash tools/agent_tools/agent_update_branch.sh push knowledge-eval <branch>`.
 
 ## Canon Source Branch
 

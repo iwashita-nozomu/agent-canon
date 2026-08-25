@@ -686,7 +686,7 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - Markdown file edit、docs lint / link / heading repair、Mermaid / math drift、formatter adjacent check、`agent-canon docs`、docs-check failure、Markdown style drift が scope にある場合は `md-style-check` を足します。substantive な文書変更は `prose-reasoning-graph` と `structure-planning` も併用します
 - skill / tool / workflow / hook / eval の蓄積ログ分析、routing miss、selection gap、弱い skill の調査が scope にある場合は `agent-log-analysis` を足します
 - AgentCanon source、bootstrap/runtime、skill、eval/archive、または AgentCanon source PR が scope にある場合は `agent-canon-update` を足します。親repoはAgentCanon sourceをvendor/submoduleとして更新しません
-- user / reviewer feedback が agent 行動、routing miss、再発防止、task retrospective、agent-side memory update を要求する場合は `agent-learning` を足します
+- user / reviewer feedback が agent 行動、routing miss、再発防止、task retrospective、private knowledge update を要求する場合は `agent-learning` を足します
 - 関係のない family skill は足しません
 - tool 化済みの規約検証は task-shape skill として増やさず、`check_convention_compliance.py` の gate に委譲します
 

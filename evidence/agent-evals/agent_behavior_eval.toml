@@ -208,7 +208,7 @@ required_all = [
   "skill_improvement_decision:",
   "config_improvement_decision:",
   "workflow_improvement_decision:",
-  "memory_learning_decision:",
+  "knowledge_learning_decision:",
 ]
 
 [[criteria]]
