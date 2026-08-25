@@ -762,6 +762,42 @@ entries:
     tests:
       - tests/agent_tools/test_generated_artifact_guard.py
 
+  - id: compose-consumer-entrypoint
+    summary: Composes a consumer-owned root AGENTS.md from the common ROOT_AGENTS.md base and specific instructions.
+    path: tools/agent_tools/entrypoint_composer.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    audience: maintainer
+    placement: workflow_helper
+    command: python3 tools/agent_tools/entrypoint_composer.py --base <ROOT_AGENTS.md> --specific <consumer-specific-file> --output <consumer-root-AGENTS.md>
+    writes: true
+    dispatch:
+      runtime: python
+      argv: [python3, tools/agent_tools/entrypoint_composer.py]
+      execution_plane: tool-container
+      cwd: source-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: explicit-target-write
+      output_root: explicit-target
+      written_paths: []
+      parity: legacy
+      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/entrypoint_composer.md
+      - documents/design/entrypoint-owner-map.md
+      - ROOT_AGENTS.md
+    tests:
+      - tests/agent_tools/test_entrypoint_composer.py
+
   - id: template-bundle
     summary: Exports one canonical template profile to a fresh external directory.
     path: tools/agent_tools/template_bundle.py
