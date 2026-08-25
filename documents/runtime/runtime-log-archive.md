@@ -12,12 +12,14 @@ downstream design runtime-log-archive-migration.md archive migration route
 
 # Runtime Log Archive
 
-AgentCanon runtime evidence is external state. Hook events, accumulated evals,
+AgentCanon runtime evidence is runtime state. Hook events, accumulated evals,
 Codex runtime summaries, and archived task bundles are collected under the
-explicit runtime root selected by `bootstrap.sh` and published to the separate
+runtime root selected by `bootstrap.sh` (the bootstrap-owned ignored
+`<install-root>/.runtime/` by default) and published to the separate
 [`iwashita-nozomu/agent-canon-log`](https://github.com/iwashita-nozomu/agent-canon-log)
-repository. They are not written to the AgentCanon source checkout, a parent
-repository, a vendor directory, or a source-local `.agent-canon` fallback.
+repository. Outside that exact `.runtime/` directory, they are not written to
+the AgentCanon source checkout, a parent repository, a vendor directory, or a
+source-local `.agent-canon` fallback.
 
 The log repository owns its branch, append-only layout, retention, and legacy
 import policy. AgentCanon owns only the local spool, archive checkout lease,
@@ -36,7 +38,8 @@ Given:
 
 ```text
 ROOT=<authorized-parent-root>
-RUNTIME=$ROOT/workspace/agent-canon-runtime/<installation>
+INSTALL_ROOT=/path/to/agent-canon
+RUNTIME=$INSTALL_ROOT/.runtime
 ```
 
 the runtime-local layout is:

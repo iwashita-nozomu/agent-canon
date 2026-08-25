@@ -22,12 +22,11 @@ tests stay parent-owned.
 ## Execution planes
 
 Use the top-level [`bootstrap.sh`](../bootstrap.sh) for the shared AgentCanon
-runtime. It requires an authorized control root and an external runtime root:
+runtime. It requires an authorized control root. The default runtime is the
+bootstrap-owned ignored `.runtime/` under the install checkout:
 
 ```bash
-./bootstrap.sh --control-parent-root <authorized-parent-root> \
-  --runtime-root <authorized-parent-root>/workspace/agent-canon-runtime/<id> \
-  <operation>
+./bootstrap.sh --control-parent-root <authorized-parent-root> <operation>
 ```
 
 | Plane | Owner | Examples | Side-effect rule |

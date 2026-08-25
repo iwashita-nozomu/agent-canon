@@ -144,7 +144,7 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 1. standalone `agent-canon` source の remote/main と Issue-qualified branch を確認する
 1. 必要なら親の ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon`
    に source clone を作成・再利用してそこで編集する
-1. 明示 control/runtime root で bootstrap の status と必要な validation を流す
+1. 明示 control root（既定 runtime は source の ignored `.runtime/`）で bootstrap の status と必要な validation を流す
 1. source、runtime、parent project の責務別 evidence を記録する
 1. AgentCanon source PR を merge する
 1. merged `main` の commit/tree を読み戻し、親側の own validation を実行する
@@ -152,8 +152,7 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 
 ```bash
 ROOT=<authorized-parent-root>
-RUNTIME="$ROOT/workspace/agent-canon-runtime/<installation>"
-./bootstrap.sh --control-parent-root "$ROOT" --runtime-root "$RUNTIME" status
+./bootstrap.sh --control-parent-root "$ROOT" status
 ```
 
 親 project から AgentCanon source を更新するときは、親の tracked tree を

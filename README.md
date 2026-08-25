@@ -33,14 +33,13 @@ subagent の canonical owner は `agents/`、設計と runtime contract の owne
 ## Standalone runtime
 
 通常の利用では、source checkout の中で依存を直接実行せず、top-level
-[`bootstrap.sh`](bootstrap.sh) から共有 tool runtime を起動します。control root と
-runtime root は必須です。
+[`bootstrap.sh`](bootstrap.sh) から共有 tool runtime を起動します。control root は
+必須で、runtime は既定で install root の ignored `.runtime/` を使います。
 
 ```bash
 ROOT=<authorized-parent-root>
-RUNTIME="$ROOT/workspace/agent-canon-runtime/<installation>"
 BOOTSTRAP=./bootstrap.sh
-COMMON=(--control-parent-root "$ROOT" --runtime-root "$RUNTIME")
+COMMON=(--control-parent-root "$ROOT")
 
 "$BOOTSTRAP" "${COMMON[@]}" install
 "$BOOTSTRAP" "${COMMON[@]}" update
@@ -152,13 +151,14 @@ and [the tool catalog](tools/catalog.yaml).
 | `tests/` | AgentCanon mechanism tests |
 | `bootstrap/` | Shared image and lifecycle manifest used by `bootstrap.sh` |
 
-The runtime root is intentionally separate:
+The default runtime root is intentionally limited to the bootstrap-owned
+ignored directory below the install checkout:
 
 ```text
-<authorized-parent-root>/workspace/agent-canon-runtime/<installation>/
+<install-root>/.runtime/
   current-generation  rollback-generation  lifecycle.lock  mounts.toml
   codex-home/  tasks/  spool/  archive/  container-runtime/
-  cache/       # bounded external cache, never source-local
+  cache/       # bounded bootstrap cache; other artifacts remain external
 ```
 
 For an AgentCanon edit from Template or another parent repository, use that

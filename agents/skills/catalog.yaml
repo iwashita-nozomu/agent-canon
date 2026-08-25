@@ -716,7 +716,7 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - ./bootstrap.sh --control-parent-root <parent> --runtime-root <parent>/workspace/agent-canon-runtime/<installation> status
+      - ./bootstrap.sh --control-parent-root <parent> status
       - git status --short --branch
       - git diff --check
       maintenance:
@@ -743,17 +743,17 @@ skill_families:
       description: "Use when AgentCanon's shared Python, Rust, or LSP tool runtime must be installed, started, targeted, inspected, updated, evaluated, or removed; project builds and tests remain in the project Docker/test-runner plane."
     tool_commands:
       required:
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime status
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime target add --root <project-root> --mode read-only
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime tool run <catalog-id> -- <args...>
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> status
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> target add --root <project-root> --mode read-only
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> tool run <catalog-id> -- <args...>
       conditional:
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime install
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime start
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime exec -- <argv...>
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime eval collect --root <project-root> --run-id <run-id>
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime eval sync --run-id <run-id>
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime stop
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> --runtime-root <authorized-parent-workspace>/agent-canon-runtime gc --dry-run
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> install
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> start
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> exec -- <argv...>
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> eval collect --root <project-root> --run-id <run-id>
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> eval sync --run-id <run-id>
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> stop
+      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> gc --dry-run
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check
@@ -846,7 +846,7 @@ skill_families:
       - gh issue list --state open --json number,title,labels,updatedAt,url
       - gh pr view
       - gh pr checks
-      - ./bootstrap.sh --control-parent-root <parent> --runtime-root <parent>/workspace/agent-canon-runtime/<installation> status
+      - ./bootstrap.sh --control-parent-root <parent> status
       - python3 tools/agent_tools/bootstrap_agent_run.py --task "<task>" --owner codex
         --workspace-root "$PWD"
       - gh pr view <n> --json ...
@@ -1179,7 +1179,7 @@ skill_families:
         > <run>/responsibility_scope.json
       - python3 tools/agent_tools/import_responsibility.py --root <root> --format json
         > <run>/import_responsibility.json
-      - ./bootstrap.sh --control-parent-root <parent> --runtime-root <parent>/workspace/agent-canon-runtime/<installation> status
+      - ./bootstrap.sh --control-parent-root <parent> status
       - agent-canon structured-analysis document-inventory --root <root>
       - python3 tools/agent_tools/responsibility_scope.py --root <root> --format json
       - python3 tools/agent_tools/prose_reasoning_graph.py check-document <readme-path>

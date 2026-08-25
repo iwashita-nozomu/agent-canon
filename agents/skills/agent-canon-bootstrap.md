@@ -22,9 +22,11 @@ evidence.
 ## Boundary
 
 - `bootstrap.sh` is the only host entrypoint. Always pass explicit
-  `--repository-root`, `--control-parent-root`, and `--runtime-root`; the
-  control root must be the authorized parent workspace and the runtime root a
-  child of it. Do not fall back to the source tree or a global `$HOME` path.
+  `--repository-root` and `--control-parent-root`; omitting `--runtime-root`
+  selects the bootstrap-owned, ignored `<repository-root>/.runtime/`. The
+  control root must be the authorized parent workspace and an explicitly
+  selected runtime root a child of it. Do not fall back to an arbitrary source
+  path or a global `$HOME` path.
 - One shared AgentCanon tool container owns Python/Rust/LSP tools. Docker
   command availability is assumed; container process identity and UID/GID
   mapping remain host/caller policy and are not validated here.
@@ -40,9 +42,10 @@ evidence.
 - Project code is tested through the project-owned `docker/` image and
   `test/testrunner.sh`/test list. Do not mount a project's tests into the
   AgentCanon tool container and do not make AgentCanon know project test names.
-- Runtime state, cache, task receipts, and eval artifacts live below the
-  explicit external runtime root. The AgentCanon source checkout stays free of
-  runtime output, generated reports, skill links, and tool caches.
+- Bootstrap lifecycle state and cache may live in the ignored,
+  reconstructible `<repository-root>/.runtime/`. General eval/report/SQLite/log/
+  analysis artifacts remain outside the source checkout; the artifact output
+  boundary does not permit `.runtime` as a source-local exception.
 - When the explicit control root is `$HOME`, install/update also manage split
   `~/.agents/skills/<skill>`, `~/.codex/agents/<role>.toml`, and
   `~/.codex/config.toml` links. The last points to the ignored personal config
@@ -83,30 +86,28 @@ evidence.
 
 ## Command Shape
 
-The concrete root values are task inputs; placeholders below must never be
-silently inferred:
+The control root is a task input; the omitted runtime root is the fixed
+bootstrap default `<repository-root>/.runtime`:
 
 ```bash
 bash bootstrap.sh \
   --repository-root . \
   --control-parent-root <authorized-parent-workspace> \
-  --runtime-root <authorized-parent-workspace>/agent-canon-runtime status
+  status
 
 bash bootstrap.sh \
   --repository-root . \
   --control-parent-root <authorized-parent-workspace> \
-  --runtime-root <authorized-parent-workspace>/agent-canon-runtime \
   target add --root <project-root> --mode read-only
 
 bash bootstrap.sh \
   --repository-root . \
   --control-parent-root <authorized-parent-workspace> \
-  --runtime-root <authorized-parent-workspace>/agent-canon-runtime \
   tool run --root <project-root> <catalog-id> -- <args...>
 ```
 
 Use `install`, `update`, `start`, `stop`, `rollback`, `uninstall`, and `gc --dry-run`
-only with the same explicit roots and task lifecycle evidence. `eval collect`
+with the same repository/control roots and task lifecycle evidence. `eval collect`
 and `eval sync --run-id <run-id>` are the only bootstrap eval routes. Any
 non-zero result remains a typed failure; do not retry through a project
 container, a source checkout fallback, or an unqualified legacy command.

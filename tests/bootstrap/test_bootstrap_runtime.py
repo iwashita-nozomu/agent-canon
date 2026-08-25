@@ -58,6 +58,54 @@ def test_explicit_roots_reject_escape_and_symlink_without_rootless_policy(
         validate_roots(control, link / "runtime")
 
 
+def test_default_source_runtime_rebuilds_without_copying_legacy_state(
+    tmp_path: Path, fake_docker: DockerAdapter
+) -> None:
+    """Migrate the fixed legacy root and remove it only after new readback."""
+    repository = tmp_path / "repo"
+    (repository / "bootstrap").mkdir(parents=True)
+    (repository / "bootstrap" / "manifest.toml").write_bytes(
+        (REPOSITORY_ROOT / "bootstrap" / "manifest.toml").read_bytes()
+    )
+    scheduler_source = REPOSITORY_ROOT / "bootstrap" / "systemd" / "user"
+    scheduler_target = repository / "bootstrap" / "systemd" / "user"
+    scheduler_target.mkdir(parents=True)
+    for template in scheduler_source.glob("*.in"):
+        (scheduler_target / template.name).write_bytes(template.read_bytes())
+    legacy = tmp_path / "workspace" / "agent-canon-runtime" / "host"
+    (legacy / "unknown.sqlite").parent.mkdir(parents=True)
+    (legacy / "unknown.sqlite").write_text("do not copy\n", encoding="utf-8")
+    legacy_manager = BootstrapRuntime(
+        tmp_path,
+        legacy,
+        repository_root=repository,
+        docker=fake_docker,
+    )
+    with legacy_manager.locked():
+        state = legacy_manager._new_state()
+        state["state"] = "installed"
+        state["resources"] = legacy_manager._resource_records()
+        legacy_manager._write_state(state)
+
+    manager = BootstrapRuntime(
+        tmp_path,
+        repository / ".runtime",
+        repository_root=repository,
+        docker=fake_docker,
+    )
+    with manager.locked():
+        manager._prepare_legacy_runtime_reset()
+        assert not (repository / ".runtime" / "unknown.sqlite").exists()
+        assert legacy.is_dir()
+        fresh = manager._new_state()
+        fresh["state"] = "installed"
+        fresh["resources"] = manager._resource_records()
+        manager._write_mounts(fresh)
+        manager._write_state(fresh)
+        manager._finalize_legacy_runtime_reset()
+    assert not legacy.exists()
+
+
 def test_explicit_roots_canonicalize_dot_segments_after_symlink_validation(
     tmp_path: Path,
 ) -> None:

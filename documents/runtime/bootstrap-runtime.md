@@ -26,20 +26,21 @@ Cargo toolchain, volume, or source checkout is created.
 
 ## One command family
 
-Every command starts with the same explicit control and runtime roots:
+Every command starts with the install root and explicit control root. The
+persistent runtime defaults to the install root's ignored `.runtime/`:
 
 ```bash
 BOOTSTRAP=./bootstrap.sh
 ROOT=<authorized-parent-root>
-RUNTIME="$ROOT/workspace/agent-canon-runtime/<installation>"
-COMMON=(--control-parent-root "$ROOT" --runtime-root "$RUNTIME")
+COMMON=(--control-parent-root "$ROOT")
 ```
 
 `--control-parent-root` is the authorized parent repository root. The runtime
-root must be beneath it and must not escape through a symlink. There is no
-implicit `$HOME`, `$HOME/.cache`, `$HOME/.local`, current-directory, or source
-tree fallback. Keep the runtime directory outside the AgentCanon checkout and
-outside product source.
+root must be beneath it and must not escape through a symlink. The only
+source-local state is the bootstrap-owned `<install-root>/.runtime/`; it is
+ignored and reconstructible. Eval, report, SQLite, log, and analysis output
+remains under its declared external artifact root. There is no implicit
+`$HOME`, `$HOME/.cache`, or `$HOME/.local` fallback.
 
 The command family is:
 
@@ -95,11 +96,14 @@ it performs one ordinary Docker build; with an immutable `--image-ref` it
 adopts only an already-pulled registry image. A handled build or health
 failure restores the existing v2 generation, container, and image.
 `sync` is the one-shot source/update route. It uses `git ls-remote` for
-`origin/main`, treats equal HEAD as a no-op, clones a fresh depth-one checkout
-under runtime staging, pulls `:sha-<full-commit>`, verifies the OCI revision,
-RepoDigest, and native platform, then atomically swaps the shallow checkout and
-runs `update --image-ref`, `start`, and `codex prepare`. A pull, health, or
-candidate bootstrap failure restores the previous checkout and runtime.
+`origin/main`, treats equal HEAD as a no-op, clones a fresh full-history
+checkout under runtime staging, pulls `:sha-<full-commit>`, verifies the OCI
+revision, RepoDigest, and native platform, then atomically swaps the full
+checkout transactionally while preserving the bootstrap-owned `.runtime/`, then runs
+`update --image-ref`, `start`, and `codex prepare`. A pull,
+health, or candidate bootstrap failure restores the previous checkout and
+runtime; the source checkout's commit history remains available for logs and
+diagnostics.
 `main` and `latest` are discovery labels only and are never runtime identity.
 
 On Linux and WSL with a usable systemd user manager, `install` enables the

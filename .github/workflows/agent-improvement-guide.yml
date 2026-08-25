@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
-      AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/../workspace/agent-canon-runtime/improvement-guide
+      AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/.runtime
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
