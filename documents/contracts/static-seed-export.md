@@ -41,8 +41,10 @@ allowlist は現在、次の consumer-owned regular file だけを含みます�
 - `.codex/config.toml`
 - `.codex/agents/<role>.toml`
 
-consumer root instruction は project-owned content です。現行 live runtime を参照する source instruction
-file を seed に混ぜません。
+consumer root instruction は、共通の `ROOT_AGENTS.md` base と consumer-owned specific text を
+明示合成した project-owned `AGENTS.md` です。生成された root file は static-seed allowlist に
+混ぜず、consumer tree で通常の tracked file として管理します。現行 live runtime を参照する source
+instruction file、AgentCanon checkout、source symlink は seed に混ぜません。
 
 ## Consumer-static role projection
 
@@ -131,7 +133,10 @@ Template maintainer は export 結果を通常の tracked file として review 
 runtime import を持ちません。
 
 この契約は自動 publish、registry、package manager、bot、background update、derived repository への
-同期を定義しません。再生成は maintainer が明示的に実行する一方向操作です。
+同期を定義しません。static seed の再生成も root instruction の composition も、consumer maintainer
+が明示的に実行する一方向操作です。root composition は base、specific、output を明示し、source
+commit と exact input-byte digest を output marker に記録します。unmarked output、symlink、partial
+marker は上書きしません。
 
 Migration order は次で固定します。
 

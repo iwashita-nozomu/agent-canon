@@ -71,6 +71,16 @@ cleanup executors retain their existing owners and receipt formats.
   置換した clause、捨てた clause と理由を artifact に残します。
 - scope や permission の変更は `manager` に戻します。
 
+### Consumer root instruction composition
+
+Consumer root の `AGENTS.md` は communication packet や agent 発言から生成しません。
+AgentCanon の `ROOT_AGENTS.md` common base と、consumer が所有する
+`documents/agent-canon/consumer-root-instructions.md` を、明示された composer の
+入力として一度の deterministic composition に渡します。生成された通常 file は
+consumer が commit して読みます。source checkout、runtime projection、symlink、vendor、
+submodule、singular `AGENT.md` を通信経路に追加せず、nested directory の `AGENTS.md` は
+この root composition の対象外です。
+
 ## Runtime Collaboration Capability Handshake
 
 This section is the sole owner of the runtime collaboration capability and

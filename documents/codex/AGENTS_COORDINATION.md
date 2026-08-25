@@ -41,6 +41,13 @@ qualified source clone の `bootstrap.sh` と明示 runtime root から起動し
 instruction view を投影しません。`.github/AGENTS.md` は `.github/` subtree に
 入ったときの parent overlay です。
 
+Consumer root の `AGENTS.md` は、AgentCanon の `ROOT_AGENTS.md` common base と
+consumer-owned specific text を明示的に合成した通常の tracked file です。base の
+source checkout、runtime、symlink、vendor、submodule は consumer の instruction
+chain に必要ありません。AgentCanon source の `AGENTS.md` は standalone source-tree
+編集用であり、consumer root へ直接コピーしたり、`AGENT.md` という singular alias
+を追加したりしません。
+
 Skills は repository instruction chain とは別 surface です。Codex は skill
 metadata で候補を選び、選択後に該当 `SKILL.md` を読みます。hook、rules、MCP、
 plugin、`.codex/config.toml` も runtime behavior の owner surface であり、この
