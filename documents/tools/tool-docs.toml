@@ -152,6 +152,13 @@ language = "python"
 summary = "Generic repository topic clone lifecycle and reconstructibility cleanup documentation."
 
 [[tool]]
+id = "compose-consumer-entrypoint"
+tool = "tools/agent_tools/entrypoint_composer.py"
+doc = "documents/tools/entrypoint_composer.md"
+language = "python"
+summary = "Deterministic source-to-consumer root AGENTS.md composition documentation."
+
+[[tool]]
 id = "dependency-module-change"
 tool = "tools/agent_tools/dependency_module_change.py"
 doc = "documents/tools/dependency_module_change.md"

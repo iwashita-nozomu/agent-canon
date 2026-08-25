@@ -4,7 +4,8 @@ contract design
 responsibility Defines the structural grammar and ownership invariant for root agent instruction entrypoints.
 upstream design ../conventions/software-engineering-principles.md single-owner, information-hiding, and contract-complete change policy
 downstream design ../../AGENTS.md standalone source-tree entrypoint
-downstream design ../../ROOT_AGENTS.md explicit live-integration entrypoint
+downstream design ../../ROOT_AGENTS.md common consumer root base
+downstream implementation ../../tools/agent_tools/entrypoint_composer.py consumer root composer
 downstream implementation ../../tools/agent_tools/check_entrypoint_owner_map.py structural verifier
 downstream implementation ../../tools/agent_tools/convention_compliance_contracts.toml canonical marker ownership projection
 downstream implementation ../../tests/agent_tools/test_check_entrypoint_owner_map.py contract regression
@@ -53,16 +54,19 @@ Standalone `AGENTS.md`:
 - `Task Entry`
 - `Validation Routing`
 
-Explicit live-integration `ROOT_AGENTS.md`:
+Consumer common `ROOT_AGENTS.md`:
 
-- `Integration Role`
+- `Repository Role`
 - `Reader Map`
 - `Always-On Boundary`
 - `Runtime Owner Map`
 - `Task Entry`
 - `Validation Routing`
 
-これらの節は identity、owner edge、activation boundary の要約だけを持ちます。
+Consumer root `AGENTS.md` は、この `ROOT_AGENTS.md` の bytes を先頭の論理内容として
+保持し、consumer-owned specific section を明示的に合成した regular tracked file です。
+合成元の source commit と exact input-byte digest は deterministic comment marker にのみ
+記録します。これらの節は identity、owner edge、activation boundary の要約だけを持ちます。
 subagent sequence、Git environment variables、update command、design receipt、experiment setting、
 validation menu、closeout token は、それぞれの owner surface に置きます。
 
@@ -91,15 +95,31 @@ validation menu、closeout token は、それぞれの owner surface に置き�
 - fenced block と番号付き procedure がないこと
 - bullet / direct command recipe がないこと
 - required owner-map row が同一 row 内に存在すること
-- convention marker manifest が `AGENTS.md` / `ROOT_AGENTS.md` を operational surface として
+- convention marker manifest が source `AGENTS.md` / `ROOT_AGENTS.md` を operational surface として
   再登録していないこと
 
 checker は prose の意味を推測しません。意味上の重複は review owner が判断し、構造的に再流入可能な
 surface は checker が拒否します。この分担により、自然言語 classifier を新しい policy owner に
 せず、検証可能な文書 grammar だけを機械化します。
 
+## Consumer root composition
+
+`tools/agent_tools/entrypoint_composer.py` は、明示された base、consumer-specific source、
+output の三つの path と source checkout から現在 commit を読み、通常 file を同一 directory
+内で atomic に置き換えます。出力には managed marker、source commit、base/specific の exact
+byte count と SHA-256、固定 separator、二つの exact source byte 列が入ります。新規 output は
+作成でき、既存の unmarked output、directory、symlink、partial/corrupt marker は保存したまま
+typed failure になります。valid な managed output だけが current exact sources で更新されます。
+
+この composition は consumer の bootstrap/maintenance 操作です。AgentCanon runtime update、
+source symlink、vendor/submodule projection、nested directory `AGENTS.md` の更新を行いません。
+生成後の consumer は output だけで instruction を読め、AgentCanon checkout や runtime の存在を
+前提にしません。`AGENT.md` という singular alias はこの contract に存在しません。
+
 ## Template boundary
 
 `project_template` の tracked `AGENTS.md` は self-contained static consumer の project-owned file です。
-本設計はそれを `ROOT_AGENTS.md` projection、submodule、source resolver、updater へ戻しません。
-`ROOT_AGENTS.md` は `live-agent-canon` を明示選択した repository だけの compatibility entrypoint です。
+本設計はそれを source resolver、updater、vendor、submodule、symlink projection へ戻しません。
+consumer の具体的な追加文は consumer 側の `documents/agent-canon/consumer-root-instructions.md`
+が所有し、AgentCanon の `ROOT_AGENTS.md` はその共通 base だけを所有します。static-seed allowlist は
+role/config のままとし、生成された root `AGENTS.md` は consumer の tracked output として扱います。

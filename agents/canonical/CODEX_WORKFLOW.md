@@ -2,7 +2,7 @@
 @dependency-start
 contract agent-runtime
 responsibility Documents Codex Workflow for this repository.
-upstream design ../../ROOT_AGENTS.md root runtime entrypoint
+upstream design ../../ROOT_AGENTS.md common consumer root instruction base
 upstream design ./CODEX_SUBAGENTS.md subagent routing contract
 upstream design ../workflows/agent-canon-pr-workflow.md standalone source PR workflow
 upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue packet route
@@ -70,8 +70,8 @@ Cross-Cutting Packet:
 
 task 開始時は read-only worktree check で、現在の AgentCanon source clone と親の作業領域を分類します。preflight の contract は checkout-preserving read-only classification です。更新が必要な場合は standalone topic branch / PR route に入ります。
 
-- AgentCanon source/runtime変更は standalone cloneから `agents/workflows/agent-canon-pr-workflow.md` に入り、AgentCanon branch / PR / merge / main readbackを閉じます。親repoへroot view、vendor、submodule pinを同期しません。
-- 親で source の変更が必要な場合は、親の ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon` に clone し、完了時に exact clone path を削除します。親の product test、Docker、CI、GPU は親の entrypoint で実行し、AgentCanon runtime はそれらを発見または mount しません。
+- AgentCanon source/runtime変更は standalone cloneから `agents/workflows/agent-canon-pr-workflow.md` に入り、AgentCanon branch / PR / merge / main readbackを閉じます。親repoへlive root view、vendor、submodule pinを同期しません。consumer root `AGENTS.md` は、親が明示 composer で common `ROOT_AGENTS.md` と consumer-specific text を合成して通常 file として管理します。
+- 親で source の変更が必要な場合は、親の ignored `workspace/agent-canondevelop/<qualified-task>/agent-canon` に clone し、完了時に exact clone path を削除します。親の product test、Docker、CI、GPU は親の entrypoint で実行し、AgentCanon runtime はそれらを発見または mount しません。root instruction composition は runtime projection ではありません。
 - standalone AgentCanon source branch が remote main と divergeしている場合はfail-closedとし、source branchのrebase/merge判断、AgentCanon PR、merge後main readbackを完了してから実装へ戻ります。
 - `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。親から起動したときは AgentCanon source clone の存在、runtime root の containment、source-unchanged readbackを確認します。`skipped_source_canon` は AgentCanon source checkout がこの task の owner でない場合だけ妥当です。
 

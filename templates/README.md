@@ -79,7 +79,8 @@ topic-produced outputs are divided between `result/<run-id>/raw/` and `result/<r
 
 ## Consumer Migration Packet
 
-Default consumer を static seed へ切り替える変更は、次を同じ migration packet に記録します。
+Default consumer を static seed と composed root instruction へ切り替える変更は、次を同じ
+migration packet に記録します。
 
 - producer commit と allowlist から seed を一度 export する。
 - provenance と全 output が regular file であることを確認する。
@@ -88,6 +89,9 @@ Default consumer を static seed へ切り替える変更は、次を同じ migr
 - consumer-owned project config、実 topic、product tests、Docker/CI surface を保持する。
 - source checkout を不可視化した fixture で bootstrap と canonical project checks を実行する。
 - static seed の再生成を consumer setup、CI、runtime へ追加しない。
+- `ROOT_AGENTS.md` を共通 base、`documents/agent-canon/consumer-root-instructions.md` を
+  consumer-specific source とし、consumer root `AGENTS.md` は明示 composer の regular output とする。
+- composition output に source checkout、symlink、vendor、submodule、singular `AGENT.md` を追加しない。
 
 Migration order は AgentCanon static consumer contract、consumer tree ownership、canonical command、
 fresh-clone bootstrap の順です。互換 wrapper や dangling link を中間状態として残しません。
