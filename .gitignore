@@ -36,6 +36,9 @@ reports/*.patch
 venv/
 workspace/
 
+# Personal Codex config is migrated here and linked from the user's Codex home.
+.codex/personal/
+
 # OS/editor noise
 .DS_Store
 .ipynb_checkpoints/

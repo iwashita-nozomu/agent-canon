@@ -57,5 +57,7 @@ does not import a pin or run a source synchronization wrapper after merge.
 The update record names the source branch/commit, qualified Issue/PR, selected
 validation, runtime root, and cleanup readback. A source-invariant check must
 show the source tree unchanged after status/plan inspection. Task-owned Docker
-resources and runtime directories are removed by exact identity; global Codex
-state and pre-existing resources are not touched.
+resources and runtime directories are removed by exact identity; foreign global
+Codex entries and pre-existing resources are not touched. Exact
+AgentCanon-managed links may be reconciled and the personal config is restored
+as a regular file during uninstall.

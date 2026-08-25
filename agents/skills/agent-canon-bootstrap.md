@@ -43,6 +43,13 @@ evidence.
 - Runtime state, cache, task receipts, and eval artifacts live below the
   explicit external runtime root. The AgentCanon source checkout stays free of
   runtime output, generated reports, skill links, and tool caches.
+- When the explicit control root is `$HOME`, install/update also manage split
+  `~/.agents/skills/<skill>`, `~/.codex/agents/<role>.toml`, and
+  `~/.codex/config.toml` links. The last points to the ignored personal config
+  source under the AgentCanon checkout; existing regular config bytes and mode
+  are migrated losslessly and restored on uninstall. Project hooks and
+  authentication, session, history, cache, plugins, rules, MCP, and TUI/trust
+  state remain outside this link set. `codex prepare` remains runtime-local.
 - Eval collection is append-only and is handed to the repository-qualified
   `iwashita-nozomu/agent-canon-log` archive through the host adapter. Never
   write archive output back into the AgentCanon source tree.

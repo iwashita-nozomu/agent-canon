@@ -73,5 +73,6 @@ non-force push plus remote ref/tree/blob readback in
 - source status/content is unchanged by runtime/eval validation;
 - exactly one shared container was used for registered targets;
 - task-owned containers/images/runtime paths are absent after cleanup;
-- pre-existing Docker resources and global Codex state are unchanged;
+- pre-existing Docker resources and foreign global Codex entries are unchanged;
+  only the exact AgentCanon-managed links may be reconciled;
 - parent repositories have no AgentCanon vendor/submodule/root projection.
