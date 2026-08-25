@@ -75,11 +75,11 @@ positive_fixture: V001_positive
 - Should fail when: tool-gap categories require tool/schema/eval repair.
 - Positive case: verifier or schema updated and negative fixture fails.
 
-### [ ] VF-007: memory dirty fixture
+### [ ] VF-007: private knowledge propagation fixture
 
-- Represents: memory changed inside AgentCanon submodule but not committed/pushed.
-- Should fail when: memory propagation gate is active.
-- Positive case: AgentCanon commit/push and superproject pin evidence exist.
+- Represents: private knowledge route changed without external-log readback.
+- Should fail when: private knowledge propagation gate is active.
+- Positive case: private log sync/readback evidence exists.
 
 ### [ ] VF-008: root view direct edit fixture
 

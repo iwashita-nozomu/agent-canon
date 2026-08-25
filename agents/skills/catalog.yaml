@@ -551,7 +551,7 @@ skill_families:
       conditional:
       - python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
       - python3 tools/agent_tools/generate_agent_runtime_dashboard.py
-      - git grep -n "<cause keywords>" -- memory documents/notes/failures documents agents
+      - git grep -n "<cause keywords>" -- documents/notes/knowledge documents/notes/failures documents agents
       - python3 tools/agent_tools/issue_sync.py --issue-url <owner/repository#number>
       - bash tools/agent_tools/run_repo_dependency_review.sh
       - python3 tools/agent_tools/check_dependency_headers.py --changed
@@ -889,12 +889,12 @@ skill_families:
         - ["branch protection"]
         - ["required checks"]
   - id: agent-update-branch
-    purpose: Isolate memory, eval result, AgentCanon pin, and other agent-runtime updates on template-derived update branches before controlled integration.
+    purpose: Isolate private knowledge, eval result, AgentCanon pin, and other agent-runtime updates on template-derived update branches before controlled integration.
     canonical_doc: agents/skills/agent-update-branch.md
     shim: .agents/skills/agent-update-branch/SKILL.md
     discovery:
       name: agent-update-branch
-      description: "Use when Memory, eval results, AgentCanon pins, or other agent-runtime updates should be isolated on template-derived update branches and later integrated through a controlled branch workflow."
+      description: "Use when private knowledge, eval results, AgentCanon pins, or other agent-runtime updates should be isolated on template-derived update branches and later integrated through a controlled branch workflow."
     tool_commands:
       required: []
       conditional:
@@ -1738,7 +1738,7 @@ skill_families:
       conditional:
       - python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml
       - python3 tools/agent_tools/workflow_monitor.py --report-dir <run> --runtime-feedback
-        "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op>"
+        "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|knowledge_record|no_op>"
       - python3 tools/agent_tools/workflow_monitor.py --report-dir <run> --behavior-event
         "..."
       - python3 tools/agent_tools/compare_agent_run_paths.py --baseline-run <run-a> --candidate-run
@@ -2051,12 +2051,12 @@ skill_families:
         - ["environment-maintenance"]
         - ["環境メンテ"]
   - id: agent-learning
-    purpose: Curate searchable problem-solving memory records and learn from runtime agent behavior, interaction lessons, routing misses, and task retrospectives with evidence.
+    purpose: Route searchable problem-solving knowledge and feedback to private agent-canon-log while learning from runtime agent behavior, interaction lessons, routing misses, and task retrospectives with evidence.
     canonical_doc: agents/skills/agent-learning.md
     shim: .agents/skills/agent-learning/SKILL.md
     discovery:
       name: agent-learning
-      description: "Use when problem-solving memory curation or runtime agent behavior learning should capture recurrence evidence without mixing it into user preferences."
+      description: "Use when private knowledge/feedback curation or runtime agent behavior learning should capture recurrence evidence without mixing it into user preferences."
     tool_commands:
       required: []
       conditional:
@@ -2064,15 +2064,14 @@ skill_families:
         --behavior-event "..."
       - python3 tools/agent_tools/workflow_monitor.py --report-dir reports/agents/<run-id>
         --runtime-feedback "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval>
-        action=<prompt_repair|eval_update|memory_record|no_op>"
+        action=<prompt_repair|eval_update|knowledge_record|no_op>"
       - python3 tools/agent_tools/evaluate_agent_run.py --report-dir reports/agents/<run-id>
         --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write
-      - python3 tools/agent_tools/memory_record.py search --root . --search-path <owner> --failure-evidence <evidence>
-      - python3 tools/agent_tools/memory_record.py plan --root . --record-id <record-id> --search-path <owner> --recurrence-decision <decision>
-      - python3 tools/agent_tools/memory_record.py create --root . --record-id <record-id> --title <title> --problem <problem> --symptom <symptom> --context <context> --root-cause <cause> --effective-resolution <resolution> --failed-approaches <failed> --applicability-limits <limits> --evidence-source <source> --owner-ref <owner>
-      - python3 tools/agent_tools/memory_record.py update --root . --record-id <record-id> --section <section> --text <replacement>
-      - python3 tools/agent_tools/memory_record.py promote --root . --record-id <record-id> --owner-ref <owner> --reason <reason>
-      - python3 tools/agent_tools/memory_record.py validate --root .
+      - agent-canon k search --query <failure-evidence>
+      - agent-canon k add <topic> --stdin
+      - agent-canon f add <topic> --stdin
+      - agent-canon k status
+      - agent-canon f status
       - python3 tools/agent_tools/evaluate_agent_run.py
       - python3 tools/agent_tools/workflow_monitor.py
       maintenance:
@@ -2092,7 +2091,7 @@ skill_families:
         - ["アルゴリズム", "テスト", "やめ"]
         - ["algorithm", "test", "first"]
         - ["algorithm", "repair", "feedback"]
-        - ["memory", "feedback"]
+        - ["knowledge", "feedback"]
         - ["エージェント", "成長"]
         - ["agent", "growth"]
         - ["スキル", "呼ばれ"]

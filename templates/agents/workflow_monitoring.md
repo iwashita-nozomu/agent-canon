@@ -55,6 +55,6 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
 - skill_improvement_decision: pending
 - config_improvement_decision: pending
 - workflow_improvement_decision: pending
-- memory_learning_decision: pending
+- knowledge_learning_decision: pending
 
 <!-- applied、recorded、not_applicable のいずれかを使います。`workflow_monitor.py --decision key=value` を優先し、closeout に pending を残しません。applied/recorded なら具体的な file、commit、memory entry を引用します。runtime_feedback=observed かつ action が no_op でなければ、全 decision を not_applicable のままにしません。 -->

@@ -576,7 +576,7 @@ def improvement_decisions_complete(evidence: RunEvidence) -> bool:
             "skill_improvement_decision",
             "config_improvement_decision",
             "workflow_improvement_decision",
-            "memory_learning_decision",
+            "knowledge_learning_decision",
         )
     )
 
@@ -589,7 +589,7 @@ def improvement_decision_applied_or_recorded(evidence: RunEvidence) -> bool:
             "skill_improvement_decision",
             "config_improvement_decision",
             "workflow_improvement_decision",
-            "memory_learning_decision",
+            "knowledge_learning_decision",
         )
     )
 
@@ -959,7 +959,7 @@ def build_self_improvement_feedback_criterion(evidence: RunEvidence) -> Criterio
         and section_has_content(evidence.retrospective_text, "## Follow-ups")
         and improvement_decisions_complete(evidence)
         and runtime_feedback_closure_complete(evidence),
-        "Fill retrospective sections and mark skill/config/workflow/memory "
+        "Fill retrospective sections and mark skill/config/workflow/knowledge "
         "improvement decisions as applied, recorded, or not_applicable. "
         "When runtime_feedback=observed is not action=no_op, at least one "
         "improvement decision must be applied or recorded.",
@@ -1460,7 +1460,7 @@ def render_learning_capture_lines() -> list[str]:
         "## Learning Capture",
         "",
         "If this evaluation exposed a durable agent-side lesson, record it with "
-        "`tools/agent_tools/memory_record.py` and cite the evidence. "
+        "`agent-canon k add <topic> --stdin` or `agent-canon f add <topic> --stdin` and cite the evidence. "
         "If the lesson requires a durable process change, update the relevant "
         "skill, config, or workflow "
         "before marking the monitoring decision as applied. Do not copy raw chat.",

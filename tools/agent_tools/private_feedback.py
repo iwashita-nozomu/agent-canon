@@ -741,27 +741,6 @@ def capture_runtime_feedback(
     return meta
 
 
-def migrate_memory(args: argparse.Namespace) -> int:
-    source = Path(args.root).resolve()
-    records = source / "memory" / "records"
-    if not records.is_dir():
-        raise PrivateFeedbackError("memory_root_missing", "memory/records is unavailable")
-    runtime = _runtime_root(args.runtime_root)
-    spool = _spool_root(runtime)
-    count = 0
-    for record in sorted(records.glob("*.md")):
-        topic = topic_slug(record.stem.replace("--", "-"))
-        body = record.read_text(encoding="utf-8")
-        if _sensitive(body):
-            continue
-        digest = _sha256(body.encode("utf-8"))
-        meta = _metadata(kind="knowledge-candidate", topic=topic, locator=_candidate_locator(topic).as_posix(), digest=digest, run="memory-migration", task="", input_mode="structured-log", status="candidate", source_commit=_source_commit(source))
-        _write_once(spool / _candidate_locator(topic), _frontmatter(meta, body))
-        count += 1
-    _json_meta({"schema": SCHEMA, "status": "spooled", "migration": "memory", "records": str(count), "source": str(source)})
-    return 0
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Private AgentCanon feedback and knowledge route")
     parser.add_argument("--runtime-root")
@@ -790,8 +769,6 @@ def build_parser() -> argparse.ArgumentParser:
             capture_parser = family_sub.add_parser("capture")
             capture_parser.add_argument("text", nargs="*")
             capture_parser.add_argument("--stdin", action="store_true")
-            migrate = family_sub.add_parser("migrate-memory")
-            migrate.add_argument("--root", required=True)
         else:
             add_parser = family_sub.add_parser("add")
             add_parser.add_argument("topic")
@@ -835,8 +812,6 @@ def main(argv: list[str] | None = None) -> int:
         return status(args)
     if operation == "capture":
         return capture(args)
-    if operation == "migrate-memory":
-        return migrate_memory(args)
     if operation == "search":
         # Search is metadata-only and deliberately bounded to the private clone/spool.
         runtime = _runtime_root(args.runtime_root)

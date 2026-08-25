@@ -219,7 +219,7 @@ class RepoStructureContractTest(unittest.TestCase):
             "tools/internal",
             "tools/ci",
             "tests/agent_tools",
-            "memory",
+            "documents/notes/knowledge",
             "documents/notes",
             "issues",
         ]:
@@ -340,7 +340,7 @@ class RepoStructureContractTest(unittest.TestCase):
                     "name": "tests",
                     "contents": [{"type": "directory", "name": "agent_tools"}],
                 },
-                {"type": "directory", "name": "memory"},
+                {"type": "directory", "name": "knowledge"},
                 {"type": "directory", "name": "issues"},
             ],
         }

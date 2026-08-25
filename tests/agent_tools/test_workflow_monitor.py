@@ -194,7 +194,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                     "--decision",
                     "workflow_improvement_decision=applied",
                     "--decision",
-                    "memory_learning_decision=not_applicable",
+                    "knowledge_learning_decision=not_applicable",
                     "--timestamp",
                     "2026-04-30 12:00 JST",
                 ],
@@ -219,7 +219,7 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertIn("- tool_warnings_status: pending", text)
             self.assertIn("spawned reviewer", text)
             self.assertIn("- workflow_improvement_decision: applied", text)
-            self.assertIn("- memory_learning_decision: not_applicable", text)
+            self.assertIn("- knowledge_learning_decision: not_applicable", text)
 
     def test_monitor_appends_structured_tool_warning(self) -> None:
         """Tool warnings should be recorded as closeout-obligating ledger rows."""
@@ -1094,7 +1094,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                     "--decision",
                     "workflow_improvement_decision=recorded",
                     "--decision",
-                    "memory_learning_decision=not_applicable",
+                    "knowledge_learning_decision=not_applicable",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,

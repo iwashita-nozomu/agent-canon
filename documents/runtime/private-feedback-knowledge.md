@@ -54,7 +54,6 @@ agent-canon k search [--query <text>]
 agent-canon k status
 agent-canon k sync
 agent-canon k capture <structured-feedback>
-agent-canon k migrate-memory --root <agent-canon-source>
 
 agent-canon f add <topic> <prose>
 agent-canon f add <topic> --stdin
@@ -82,22 +81,17 @@ raw/<topic>/<payload>
 remains in the external spool and `sync` reports `pending`; it is not added as
 an ordinary Git blob.
 
-## Read and private promotion
+## Read and private derivation
 
 `read` writes a metadata-only read receipt. A task scope is counted once even
 if it is read repeatedly. When the same topic and content digest has been read
 in two distinct task/run scopes, the adapter writes a private
 `runtime/skills/<topic>/SKILL.md` candidate with evidence, use, and limits. A
 read receipt, a single worker-written document, or a written candidate is not
-approval, truth, or public promotion. No evaluator loop, approval registry,
+approval, truth, or public publication. No evaluator loop, approval registry,
 new global ID, or public skill-catalog/shim mutation is performed.
 
 The runtime-local Codex managed-link route may install the private candidate
-for the next session. Existing sessions do not reload it. Public promotion
+for the next session. Existing sessions do not reload it. Public publication
 requires explicit user declassification and the normal `skill-creator` and
 AgentCanon update route.
-
-`agent-canon memory` remains a compatibility route during the one-cycle
-migration. `knowledge migrate-memory` copies existing `memory/records` into the
-private spool and never deletes the source; deletion requires live migration
-readback by the owner.

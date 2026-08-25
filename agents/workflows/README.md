@@ -126,7 +126,7 @@ primary にし、どの overlay を重ねるか」を決めます。workflow 読
 - `pr-queue-cleanup-workflow.md`
   - AgentCanon source PR と template / derived pin PR が同時に開いているとき、source merge、template pin realignment、dependent PR validation、ready / merge 判断を順番に閉じる手順
 - `agent-learning-workflow.md`
-  - `memory/` と guardrail への learning promotion
+  - private `agent-canon-log` と guardrail への learning capture
 - `workflow-references.md`
   - workflow 設計の外部根拠索引
 

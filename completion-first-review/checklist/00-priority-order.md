@@ -64,7 +64,7 @@ upstream design ../explanation/00-completion-first-principle.md completion-first
 
 - [ ] Do not start with agent settings unless P-1 has at least a draft.
 - [ ] Do not start with workflow prose unless a verifier path exists.
-- [ ] Do not start with memory promotion unless self-growth completion requirements exist.
+- [ ] Do not start with private-knowledge derivation unless self-growth completion requirements exist.
 - [ ] Do not use token-efficiency work to weaken completion requirements.
 
 ## Review question

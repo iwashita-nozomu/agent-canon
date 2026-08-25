@@ -838,7 +838,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         evals_dir.mkdir(parents=True)
         (evals_dir / "README.md").write_text("# Eval Fixture\n", encoding="utf-8")
         self.create_fixture_dirs(root, hook_dir, skill_dir, workflow_dir)
-        self.write_issue_memory_fixture(root)
+        self.write_issue_knowledge_fixture(root)
         self.write_eval_report_fixture(skill_dir, workflow_dir)
         self.write_hook_fixture(hook_dir)
         self.write_workflow_monitor_fixture(root)
@@ -855,10 +855,8 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             directory.mkdir(parents=True)
         (root / "issues" / "open").mkdir(parents=True)
         (root / "issues" / "closed").mkdir(parents=True)
-        (root / "memory").mkdir()
-
-    def write_issue_memory_fixture(self, root: Path) -> None:
-        """Write issue and memory fixture files."""
+    def write_issue_knowledge_fixture(self, root: Path) -> None:
+        """Write issue and private knowledge fixture files."""
         (root / "issues" / "open" / "AC-20260517-open.md").write_text(
             "issue_id: AC-20260517-open\nstatus: open\n",
             encoding="utf-8",
@@ -875,10 +873,6 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         (root / "issues" / "closed" / "AC-20260517-closed.md").write_text(
             "issue_id: AC-20260517-closed\nstatus: resolved\n",
             encoding="utf-8",
-        )
-        (root / "memory" / "records").mkdir(parents=True)
-        (root / "memory" / "records" / "agent--learning.md").write_text(
-            "# Learning\n", encoding="utf-8"
         )
 
     def write_eval_report_fixture(

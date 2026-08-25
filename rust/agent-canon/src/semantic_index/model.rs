@@ -58,7 +58,6 @@ pub(super) fn responsibility_scope_bucket(path: &str) -> &'static str {
         || normalized == "responsibility-scope.toml"
         || normalized.starts_with("documents/")
         || normalized.starts_with("documents/notes/")
-        || normalized.starts_with("memory/")
         || normalized.starts_with("references/")
     {
         return "shared-policy-documents";

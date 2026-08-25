@@ -114,7 +114,7 @@ RUSTUP_INIT_URL = (
 RUSTUP_INIT_SHA256 = "20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c"
 CANONICAL_RUST_SOURCE_FILES = (
     "Cargo.lock", "Cargo.toml", "src/dependency_manifest.rs", "src/docs.rs",
-    "src/graph.rs", "src/jit_ir_to_lean.rs", "src/main.rs", "src/memory.rs",
+    "src/graph.rs", "src/jit_ir_to_lean.rs", "src/main.rs",
     "src/migration_audit.rs", "src/python_algorithm_contract.rs",
     "src/python_module_groups.rs", "src/python_structure_hash.rs",
     "src/python_structure_hash_impact.rs", "src/python_structure_hash_report.rs",
@@ -130,7 +130,7 @@ CANONICAL_RUST_SOURCE_FILES = (
     "src/test_design.rs", "src/private_feedback.rs",
     "tests/python_algorithm_contract_cli.rs",
 )
-CANONICAL_RUST_SOURCE_SHA256 = "992a9185011ac221558c9337eb7cb427777cd938f719b2b4f50b35430eb99662"
+CANONICAL_RUST_SOURCE_SHA256 = "1cbb9f55bc8c4c0f1464e22f41d43d04c38c4df4e3b8a12cf9be612a0694b949"
 CANONICAL_CARGO_LOCK_SHA256 = "060b8825843b14b12bebb9da095503f4ec7f68a77934e595c082957cb1f72638"
 CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 APT_PACKAGE_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]*$")

@@ -43,8 +43,8 @@ closeout 前に、action log と report を見て次のどれへ昇格するか�
   - 何度も参照する短い横断知識
 - `documents/notes/themes/`
   - 複数 run から得た topic-level synthesis
-- `memory/README.md` と `memory/records/*.md`
-  - 同じ問題に再遭遇したときに検索して使う、owner ref 付きの self-contained knowledge
+- private `agent-canon-log/knowledge/` と `feedback/`
+  - 同じ問題に再遭遇したときに検索して使う、source tree外の private knowledge / feedback
 - `documents/notes/failures/`
   - 再発防止のために残す failure pattern
 - `documents/`
@@ -85,10 +85,9 @@ closeout ごとに最低限次を確認します。
 1. 失敗として残すべきものはあるか
 1. 既存 note を追記すべきか、新規 note を起こすべきか
 1. 文書正本へ上げるべき rule change はあるか
-1. 今回の観測を既存 record の update、独立 record の create、owner への明示変更、
-   issue/failure/evidence のどれに分類したか
-1. record が必要なら selected context で search-before-create を行ったか
-1. `agent-canon memory validate --root .` と owner ref readback が pass したか
+1. 今回の観測を既存 private topic の update、private feedback、owner への明示変更、
+   Issue/failure/evidence のどれに分類したか
+1. private topicが必要なら `agent-canon k search` を先に行ったか
 1. stable preference や permanent rule を対象 owner へ直接昇格したか
 
 ## Templates
@@ -97,5 +96,5 @@ closeout ごとに最低限次を確認します。
 - `documents/notes/branches/BRANCH_NOTE_TEMPLATE.md`
 - `documents/notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md`
 - `documents/notes/themes/THEME_NOTE_TEMPLATE.md`
-- `memory/records/<domain>--<problem-slug>.md`
+- private `agent-canon-log/knowledge/topics/<topic>/candidate.md`
 - `documents/notes/failures/FAILURE_NOTE_TEMPLATE.md`

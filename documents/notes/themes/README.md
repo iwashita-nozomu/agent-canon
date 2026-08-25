@@ -10,7 +10,7 @@ upstream design ../README.md notes lifecycle index
 
 `documents/notes/themes/` には、複数の実験や調査から得た知見を話題ごとにまとめます。
 
-`documents/notes/experiments/` が個別実験の report と解釈を扱い、`documents/notes/knowledge/` が短い実務メモを扱うのに対し、このディレクトリでは「その話題について今何が言えるか」を topic 単位で整理します。self-learning と対話由来の durable memory は `memory/` を正本にし、この directory は topic synthesis を主に扱います。
+`documents/notes/experiments/` が個別実験の report と解釈を扱い、`documents/notes/knowledge/` が短い人間向け実務メモを扱うのに対し、このディレクトリでは「その話題について今何が言えるか」を topic 単位で整理します。self-learning と対話由来の private knowledge / feedback は `agent-canon-log` を正本にし、この directory は topic synthesis を主に扱います。
 
 ## 役割
 
@@ -32,6 +32,6 @@ upstream design ../README.md notes lifecycle index
 ## Template
 
 - [THEME_NOTE_TEMPLATE.md](./THEME_NOTE_TEMPLATE.md)
-- shared canon の recurrence knowledge は [memory/README.md](../../../memory/README.md) と
-  [memory/records/](../../../memory/records/) を on-demand に検索します。
-  stable preference や permanent rule は record を第二正本にせず、対象 owner へ直接昇格します。
+- shared canon の recurrence knowledge は private `agent-canon-log` を `agent-canon k search`
+  / `k read` で on-demand に検索します。stable preference や permanent rule は private logを
+  第二正本にせず、対象 ownerへ直接昇格します。

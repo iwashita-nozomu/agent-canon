@@ -55,7 +55,7 @@ DECISION_KEYS = (
     "skill_improvement_decision",
     "config_improvement_decision",
     "workflow_improvement_decision",
-    "memory_learning_decision",
+    "knowledge_learning_decision",
 )
 DECISION_VALUES = {"applied", "recorded", "not_applicable", "pending"}
 
@@ -481,7 +481,7 @@ def add_closeout_decision_arguments(parser: argparse.ArgumentParser) -> None:
         help=(
             "Improvement decision as key=value. Keys are "
             "skill_improvement_decision, config_improvement_decision, "
-            "workflow_improvement_decision, memory_learning_decision."
+            "workflow_improvement_decision, knowledge_learning_decision."
         ),
     )
     parser.add_argument(
@@ -523,7 +523,7 @@ def default_monitoring_text(report_dir: Path) -> str:
             "- skill_improvement_decision: pending",
             "- config_improvement_decision: pending",
             "- workflow_improvement_decision: pending",
-            "- memory_learning_decision: pending",
+            "- knowledge_learning_decision: pending",
             "",
         ]
     )

@@ -14,8 +14,8 @@ BASE_REF="${AGENT_UPDATE_BASE_REF:-origin/main}"
 usage() {
   cat <<'EOF'
 Usage:
-  bash tools/agent_tools/agent_update_branch.sh validate <memory-eval|canon-pin|integration> [base-ref]
-  bash tools/agent_tools/agent_update_branch.sh push <memory-eval|canon-pin|integration> <branch> [base-ref]
+  bash tools/agent_tools/agent_update_branch.sh validate <knowledge-eval|canon-pin|integration> [base-ref]
+  bash tools/agent_tools/agent_update_branch.sh push <knowledge-eval|canon-pin|integration> <branch> [base-ref]
 
 The command validates that an agent update branch only changes the allowed lane
 surface, then pushes the current HEAD to the requested branch.
@@ -36,8 +36,7 @@ path_allowed() {
   local lane="$1"
   local path="$2"
   case "$lane" in
-    memory-eval)
-      [[ "$path" == memory/* ]] && return 0
+    knowledge-eval)
       [[ "$path" == evidence/agent-evals/* ]] && return 0
       [[ "$path" == .agents/skills/*/SKILL.md ]] && return 0
       [[ "$path" == reports/agents/*/agent_evaluation.md ]] && return 0
@@ -49,7 +48,7 @@ path_allowed() {
       [[ "$path" == AGENTS.md ]] && return 0
       [[ "$path" == .agents || "$path" == agents ]] && return 0
       [[ "$path" == .codex/* || "$path" == .github/* ]] && return 0
-      [[ "$path" == documents/* || "$path" == memory/* || "$path" == documents/notes/* ]] && return 0
+      [[ "$path" == documents/* || "$path" == documents/notes/* ]] && return 0
       [[ "$path" == mcp || "$path" == tools || "$path" == tests/agent_tools/* || "$path" == tests/tools/* ]] && return 0
       return 1
       ;;

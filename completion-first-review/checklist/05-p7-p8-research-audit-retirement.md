@@ -107,14 +107,14 @@ P7 and P8 come after completion judgment, mechanical evidence, MCP honesty, self
 
 ### [ ] P8-003: learning retirement sweep
 
-- Target: memory, workflow rules, skill rules.
+- Target: private knowledge, workflow rules, skill rules.
 - Problem: canon grows without cleanup.
 - Action: add `review_after`, `expiry`, `superseded_by`, or no-retirement rationale to durable learning items.
 - Acceptance: expired or superseded items appear in retirement report.
 
 ### [ ] P8-004: duplicate rule detector
 
-- Target: AGENTS, workflows, skills, memory.
+- Target: AGENTS, workflows, skills, private knowledge references.
 - Problem: same rule can appear in many forms.
 - Violation: completion requirements are repeated in ROOT_AGENTS and workflow docs with slight wording differences.
 - Action: run similarity or rule-id based duplicate detection.
