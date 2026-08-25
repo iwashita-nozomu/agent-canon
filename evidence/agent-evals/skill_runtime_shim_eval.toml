@@ -19,7 +19,7 @@ target_skill_id = "agent-orchestration"
 iteration_ids = { current = "fresh-current-01", generated = "fresh-generated-01" }
 prompt_digest = "ca3ae5fe1e5b07e7411bc7d394179f3dfdad1b9988f58e239796eaa293e6ce06"
 prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/full/shim-discovery-selection-v1.md"
-canonical_target_files = [".agents/skills/agent-orchestration/SKILL.md", "agents/skills/agent-orchestration.md"]
+canonical_target_files = [".codex/personal/skills/agent-orchestration/SKILL.md", "agents/skills/agent-orchestration.md"]
 prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/skills/skill-dependencies.yaml", "documents/codex/prompt-skill-evaluation-checklist.md"]
 method = "one fresh read-only gpt-5.4-mini evaluator"
 requirements = ["discovery", "canonical-owner", "no-shim-route"]
@@ -35,7 +35,7 @@ target_skill_id = "task-routing"
 iteration_ids = { current = "fresh-current-01", generated = "fresh-generated-01" }
 prompt_digest = "95c636dd3b8567ab94b0d28700d4460cf77335b5c5184ef3dca28e3d37b24e1b"
 prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/full/shim-boundary-and-negative-v1.md"
-canonical_target_files = [".agents/skills/task-routing/SKILL.md", "agents/skills/task-routing.md"]
+canonical_target_files = [".codex/personal/skills/task-routing/SKILL.md", "agents/skills/task-routing.md"]
 prompt_dependency_files = ["agents/skills/catalog.yaml", "documents/codex/prompt-skill-evaluation-checklist.md"]
 method = "one fresh read-only gpt-5.4-mini evaluator"
 requirements = ["no-false-activation", "host-delegation", "no-duplicate-policy"]
@@ -51,7 +51,7 @@ target_skill_id = "structure-planning"
 iteration_ids = { current = "fresh-current-01", generated = "fresh-generated-01" }
 prompt_digest = "2d55c4e202ddfce59f2c5b3f662aa18542ee76e576d092621119fcf00fa4bfaa"
 prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/changed/shim-toolcall-route-v1.md"
-canonical_target_files = [".agents/skills/structure-planning/SKILL.md", "agents/skills/structure-planning.md"]
+canonical_target_files = [".codex/personal/skills/structure-planning/SKILL.md", "agents/skills/structure-planning.md"]
 prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/skills/skill-dependencies.yaml", "documents/design/skill-tool-invocation-graph.md"]
 method = "one fresh read-only gpt-5.4-mini evaluator"
 requirements = ["owner-command-packet", "typed-toolcall", "failure-semantics"]
@@ -67,7 +67,7 @@ target_skill_id = "agent-orchestration"
 iteration_ids = { current = "fresh-current-01", generated = "fresh-generated-01" }
 prompt_digest = "545dfae08a21d23699cc2050442c531daaea2e730b97f4573209dba90b6e2232"
 prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/changed/shim-dependent-skill-ordering-v1.md"
-canonical_target_files = [".agents/skills/agent-orchestration/SKILL.md", "agents/skills/agent-orchestration.md"]
+canonical_target_files = [".codex/personal/skills/agent-orchestration/SKILL.md", "agents/skills/agent-orchestration.md"]
 prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/skills/skill-dependencies.yaml"]
 method = "one fresh read-only gpt-5.4-mini evaluator"
 requirements = ["dependency-order", "canonical-owner", "no-shim-route"]
@@ -83,7 +83,7 @@ target_skill_id = "subagent-bootstrap"
 iteration_ids = { current = "fresh-current-01", generated = "fresh-generated-01" }
 prompt_digest = "3864c2552648a0342fa6e957d528ca210d1fe712538b8cac7996136e30bdcd20"
 prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/full/shim-parent-subagent-instruction-v1.md"
-canonical_target_files = [".agents/skills/subagent-bootstrap/SKILL.md", "agents/skills/subagent-bootstrap.md"]
+canonical_target_files = [".codex/personal/skills/subagent-bootstrap/SKILL.md", "agents/skills/subagent-bootstrap.md"]
 prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/canonical/CODEX_SUBAGENTS.md"]
 method = "one fresh read-only gpt-5.4-mini evaluator"
 requirements = ["parent-owner", "subagent-boundary", "canonical-instruction"]
@@ -99,7 +99,7 @@ target_skill_id = "agent-orchestration"
 iteration_ids = { current = "fresh-current-01", generated = "fresh-generated-01" }
 prompt_digest = "a82826d53ee43e0096ea312f9d36f9864ab8b10ed1a84cf51059d20565771365"
 prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/changed/shim-failure-argparse-normalization-v1.md"
-canonical_target_files = [".agents/skills/agent-orchestration/SKILL.md", "agents/skills/agent-orchestration.md"]
+canonical_target_files = [".codex/personal/skills/agent-orchestration/SKILL.md", "agents/skills/agent-orchestration.md"]
 prompt_dependency_files = ["tools/agent_tools/route.py", "tools/agent_tools/skill_shim_evaluation.py"]
 method = "one fresh read-only gpt-5.4-mini evaluator"
 requirements = ["argument-error", "failure-normalization", "no-invented-command"]

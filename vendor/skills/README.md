@@ -49,7 +49,7 @@ Add one entry to `manifest.toml` for each imported skill:
 id = "third-party-skill"
 provider = "upstream-owner"
 source = "vendor/skills/upstream-owner/third-party-skill"
-adapter = ".agents/skills/third-party-skill"
+adapter = ".codex/personal/skills/third-party-skill"
 enabled = true
 license = "MIT"
 upstream = "https://github.com/upstream-owner/skill-repo"
@@ -78,7 +78,7 @@ python3 tools/agent_tools/check_agent_runtime_alignment.py
 
 - Do not copy third-party skill source directly into canonical
   `agents/skills/`.
-- Do not clone a GitHub skill repository directly into `.agents/skills/`,
+- Do not clone a GitHub skill repository directly into `.codex/personal/skills/`,
   `tools/`, `documents/`, or a template parent repository. Attach it under
   AgentCanon `vendor/skills/<github-owner>/<skill-id>/` and expose it through a
   manifest-backed adapter.

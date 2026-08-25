@@ -16,7 +16,7 @@ upstream design ../README.md agent canon overview
 
 ## なぜ正本を分けるか
 
-- Codex は `AGENTS.md` と `.agents/skills/` を読む
+- Codex は `AGENTS.md` と `.codex/personal/skills/` を読む
 
 単一の discovery path はないため、正本は `agents/` に集約し、各ランタイムには薄い互換入口だけを置きます。
 
@@ -42,7 +42,7 @@ upstream design ../README.md agent canon overview
   - 人間向け skill 正本
 - `agents/skills/catalog.yaml`
   - skill family の機械可読カタログ
-- `.agents/skills/`
+- `.codex/personal/skills/`
   - Codex 向け canonical skill path
 - `.codex/`
   - Codex project-scoped runtime config

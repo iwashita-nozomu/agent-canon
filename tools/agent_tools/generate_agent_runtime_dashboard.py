@@ -3403,7 +3403,7 @@ def markdown_docs_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboa
         action="repair Markdown/docs checking signal",
         reason=reason,
         evidence=MARKDOWN_EVIDENCE_TARGET,
-        owner_surface=".agents/skills/md-style-check/SKILL.md and rust/agent-canon/src/docs.rs",
+        owner_surface=".codex/personal/skills/md-style-check/SKILL.md and rust/agent-canon/src/docs.rs",
         command="tools/bin/agent-canon docs check",
         done_condition="markdown eval failures are 0 and markdown hook signal is present",
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),

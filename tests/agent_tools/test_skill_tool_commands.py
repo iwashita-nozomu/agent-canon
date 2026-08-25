@@ -109,7 +109,7 @@ class SkillToolCommandsTest(unittest.TestCase):
                     "skill_families:",
                     f"  - id: {skill}",
                     f"    canonical_doc: agents/skills/{skill}.md",
-                    f"    shim: .agents/skills/{skill}/SKILL.md",
+                    f"    shim: .codex/personal/skills/{skill}/SKILL.md",
                     "    routing:",
                     "      stage_policy: active",
                     "      reason: test fixture",
@@ -434,7 +434,7 @@ class SkillToolCommandsTest(unittest.TestCase):
 
     def test_generated_entry_is_a_read_only_packet_projection(self) -> None:
         """The materialized adapter exposes a read-only packet path."""
-        runtime = (PROJECT_ROOT / ".agents/skills/agent-orchestration/SKILL.md").read_text(
+        runtime = (PROJECT_ROOT / ".codex/personal/skills/agent-orchestration/SKILL.md").read_text(
             encoding="utf-8"
         )
         self.assertIn("Canonical workflow and policy:", runtime)
@@ -542,7 +542,7 @@ class SkillToolCommandsTest(unittest.TestCase):
                 "python3 tools/agent_tools/check_execution_time_aware_orchestration.py --root ."
             ],
         )
-        shim = (PROJECT_ROOT / ".agents/skills/agent-orchestration/SKILL.md").read_text(
+        shim = (PROJECT_ROOT / ".codex/personal/skills/agent-orchestration/SKILL.md").read_text(
             encoding="utf-8"
         )
         self.assertNotIn(payload["required_commands"][0], shim)
@@ -570,10 +570,10 @@ class SkillToolCommandsTest(unittest.TestCase):
                 [
                     "  - id: example-skill",
                     "    canonical_doc: agents/skills/example-skill.md",
-                    "    shim: .agents/skills/example-skill/SKILL.md",
+                    "    shim: .codex/personal/skills/example-skill/SKILL.md",
                     "  - id: review-skill",
                     "    canonical_doc: agents/skills/review-skill.md",
-                    "    shim: .agents/skills/review-skill/SKILL.md",
+                    "    shim: .codex/personal/skills/review-skill/SKILL.md",
                 ],
             )
             self.write_dependency_map(

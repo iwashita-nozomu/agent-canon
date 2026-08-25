@@ -8,7 +8,7 @@ upstream design research-workflow.md research-backed change boundary
 upstream design experiment-lifecycle.md experiment execution and rerun boundary
 upstream design test-design.md adversarial test design boundary
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic obligation and verification-owner contract
-downstream implementation ../../.agents/skills/computational-optimization/SKILL.md Codex discovery shim
+downstream implementation ../../.codex/personal/skills/computational-optimization/SKILL.md Codex discovery shim
 @dependency-end
 -->
 

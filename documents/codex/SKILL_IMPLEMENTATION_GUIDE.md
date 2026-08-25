@@ -21,7 +21,7 @@ upstream design README.md durable document index
 - artifact placement canon: `agents/canonical/ARTIFACT_PLACEMENT.md`
 - CLI entrypoint canon: `agents/canonical/CLI_ENTRYPOINTS.md`
 - Codex workflow canon: `agents/canonical/CODEX_WORKFLOW.md`
-- Codex discovery path: `.agents/skills/`
+- Codex discovery path: `.codex/personal/skills/`
 
 ## 方針
 
@@ -29,7 +29,7 @@ upstream design README.md durable document index
 - numbered skill catalog は増やしません。
 - skill ごとの instructions は `SKILL.md` に集約します。
 - 再利用可能な workflow は skill にし、repo 全体の恒久ルールは `documents/` または `agents/` に置きます。
-- shared discovery shim は `.agents/skills/` を正本にし、互換 path は同期スクリプトで更新します。
+- shared discovery shim は `.codex/personal/skills/` を正本にし、互換 path は同期スクリプトで更新します。
 
 ## 推奨 skill directory
 

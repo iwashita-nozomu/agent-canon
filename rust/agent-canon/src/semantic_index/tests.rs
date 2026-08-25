@@ -1034,7 +1034,7 @@ fn similar_pairs_can_cross_responsibility_bucket_for_alignment_search() {
 fn merge_candidates_skip_alignment_mirrors_and_eval_logs() {
     let root = unique_temp_dir("semantic-index-skip-alignment");
     fs::create_dir_all(root.join("documents")).unwrap();
-    fs::create_dir_all(root.join(".agents/skills/example")).unwrap();
+    fs::create_dir_all(root.join(".codex/personal/skills/example")).unwrap();
     fs::create_dir_all(root.join("agents/evals/results/example")).unwrap();
     fs::create_dir_all(root.join("templates/agents/_partials")).unwrap();
     fs::create_dir_all(root.join("codex-cli-guide/source")).unwrap();
@@ -1044,7 +1044,7 @@ fn merge_candidates_skip_alignment_mirrors_and_eval_logs() {
     fs::write(root.join("documents").join("one.md"), mergeable_duplicate).unwrap();
     fs::write(root.join("documents").join("two.md"), mergeable_duplicate).unwrap();
     fs::write(
-        root.join(".agents/skills/example").join("SKILL.md"),
+        root.join(".codex/personal/skills/example").join("SKILL.md"),
         mergeable_duplicate,
     )
     .unwrap();

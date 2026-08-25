@@ -109,7 +109,7 @@ RUN python3 /opt/agent-canon/tools/agent_tools/dependency_plan.py \
 COPY tools /usr/local/share/agent-canon/runtime/tools
 COPY agents /usr/local/share/agent-canon/runtime/agents
 COPY documents /usr/local/share/agent-canon/runtime/documents
-COPY .agents /usr/local/share/agent-canon/runtime/.agents
+COPY .codex/personal/skills /usr/local/share/agent-canon/runtime/.codex/personal/skills
 COPY .codex/agents /usr/local/share/agent-canon/runtime/.codex/agents
 COPY .codex/config.toml /usr/local/share/agent-canon/runtime/.codex/config.toml
 COPY evidence/agent-evals /usr/local/share/agent-canon/runtime/evidence/agent-evals
@@ -123,6 +123,7 @@ RUN test -f /usr/local/share/agent-canon/runtime/tools/catalog.yaml \
     && test -f /usr/local/share/agent-canon/runtime/agents/skills/catalog.yaml \
     && test -f /usr/local/share/agent-canon/runtime/.codex/config.toml \
     && test -f /usr/local/share/agent-canon/runtime/.codex/agents/worker.toml \
+    && test -f /usr/local/share/agent-canon/runtime/.codex/personal/skills/agent-orchestration/SKILL.md \
     && test -f /usr/local/share/agent-canon/runtime/evidence/agent-evals/skill_workflow_prompt_eval.toml \
     && test -f /usr/local/share/agent-canon/runtime/ROOT_AGENTS.md \
     && test -f /usr/local/share/agent-canon/runtime/documents/runtime/runtime-profiles-and-check-matrix.json \

@@ -4,7 +4,7 @@
 contract skill
 responsibility Documents user-guided-debugging for this repository.
 upstream design ../canonical/skills.md skill canon registry
-downstream implementation ../../.agents/skills/user-guided-debugging/SKILL.md exposes this workflow as a runtime skill
+downstream implementation ../../.codex/personal/skills/user-guided-debugging/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
 

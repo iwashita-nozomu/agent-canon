@@ -49,7 +49,7 @@ class CheckSkillFrontmatterTest(unittest.TestCase):
 
     def write_skill(self, root: Path, name: str, body: str) -> None:
         """Write one SKILL.md file below the runtime skill directory."""
-        path = root / ".agents" / "skills" / name / "SKILL.md"
+        path = root / ".codex" / "personal" / "skills" / name / "SKILL.md"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(body, encoding="utf-8")
 
@@ -67,7 +67,7 @@ class CheckSkillFrontmatterTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1)
             self.assertIn("SKILL_FRONTMATTER=fail", result.stdout)
-            self.assertIn(".agents/skills/broken-skill/SKILL.md", result.stdout)
+            self.assertIn(".codex/personal/skills/broken-skill/SKILL.md", result.stdout)
             self.assertIn("invalid-yaml", result.stdout)
 
     def test_quoted_description_colon_passes(self) -> None:

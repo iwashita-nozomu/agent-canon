@@ -8,7 +8,7 @@ upstream design code-visualization.md sole public visualization owner and typed 
 upstream implementation ../../tools/agent_tools/visualization_contract.py owns ToolCall, identity, manifest, readback, and coverage serialization.
 upstream implementation ../../tools/agent_tools/jit_canonical_ir.py builds StableHLO-derived JIT-canonical IR and backend traces.
 upstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
-downstream implementation ../../.agents/skills/algorithm-flowchart/SKILL.md exposes the skill to Codex.
+downstream implementation ../../.codex/personal/skills/algorithm-flowchart/SKILL.md exposes the skill to Codex.
 downstream implementation ../../tests/tools/test_fix_mermaid.py checks syntax-only Mermaid formatting.
 @dependency-end
 -->

@@ -24,7 +24,7 @@ downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompt
 ## Reader Map
 
 この設計は、AgentCanon の catalog-defined public skill について、Codex host が発見する
-.agents/skills/*/SKILL.md を一つの schema と一つの materializer から生成する
+`~/.agents/skills/*/SKILL.md` の source view を一つの schema と一つの materializer から生成する
 target state を定めます。実装者は先に「正本と adapter の境界」「生成 record の
 field order」「移行/readback」を読み、その後に graph/route golden と
 gpt-5.4-mini 評価を確認します。skill の本文は個別の
@@ -34,8 +34,9 @@ agents/skills/<skill>.md が所有し、この文書は本文の複製ではあ�
 
 現在の public skill identity は agents/skills/catalog.yaml の全 `skill_families` 行、依存関係は
 agents/skills/skill-dependencies.yaml、読者向け索引は
-agents/canonical/skills.md、host discovery は Codex が自動探索する
-.agents/skills/<skill>/SKILL.md が所有します。
+agents/canonical/skills.md、host discovery は bootstrap が
+`~/.agents/skills/<skill>` から個別リンクする `.codex/personal/skills/<skill>/SKILL.md`
+が所有します。
 
 Wave 4 の target state は次です。
 
@@ -45,7 +46,7 @@ Wave 4 の target state は次です。
   tool_commands、visualization fields は削除・再解釈しない。
 - agents/skills/skill-dependencies.yaml の relation は唯一の dependency source
   とする。shim に relation の配列や routing policy を写さない。
-- .agents/skills/<skill>/SKILL.md は frontmatter、owner link、source identity、
+- .codex/personal/skills/<skill>/SKILL.md は frontmatter、owner link、source identity、
   ToolCall command packet の薄い adapter_only projection とする。
 - catalog の全 public skill を同じ schema、同じ template、同じ materializer で生成する（`agents/skills/catalog.yaml`、`tools/agent_tools/skill_shim_materializer.py`）。
   skill_tool_commands.py は read-only の command-packet producer として残すが、
@@ -60,8 +61,8 @@ Wave 4 の target state は次です。
   所有境界であり、route.py の既存 owner data を別の shim route に置き換えること
   ではない。
 
-この設計では実装、shim の書き換え、catalog の更新、graph artifact の再生成、
-commit を行わない。
+この設計は、実装済みの materializer、bootstrap、catalog、graph readback の責務と
+更新順を定義します。生成 view 自体は commit せず、source change から再生成します。
 
 ## Scope and Non-Goals
 
@@ -70,10 +71,11 @@ commit を行わない。
 対象は catalog.yaml の全 public skill と、対応する全 generated target です。
 
 ~~~text
-.agents/skills/<skill>/SKILL.md
+.codex/personal/skills/<skill>/SKILL.md
 ~~~
 
-host は repository root から `.agents/skills/<skill>/SKILL.md` を自動探索します。
+これは source checkout 内の ignored view です。bootstrap が各 skill directory を
+`~/.agents/skills/<skill>` にリンクし、Codex の global skill discovery に渡します。
 materializer はその target だけを生成し、`.codex/config.toml` に skill の列挙や
 有効化順を作りません。
 
@@ -95,7 +97,7 @@ materializer はその target だけを生成し、`.codex/config.toml` に skil
 | 判断 | 正本 | shim が持つもの | shim が持たないもの |
 | --- | --- | --- | --- |
 | skill identity / purpose | agents/skills/catalog.yaml | skill_id への参照 | 別の skill 一覧 |
-| host discovery | `.agents/skills/*/SKILL.md` の Codex 自動探索 | name、description | 列挙 config、独自 discovery lane |
+| host discovery | `~/.agents/skills/*/SKILL.md` の Codex 自動探索 | name、description | 列挙 config、独自 discovery lane |
 | canonical prose | agents/skills/<skill>.md | 相対 link と digest | canonical rules のコピー |
 | trigger / route identity | catalog.yaml#skill:<id>.routing と route.py | route locator と route digest | trigger 配列、keyword matcher、route decision |
 | dependencies | skill-dependencies.yaml | invocation locator と digest | prerequisite/successor の再掲 |
@@ -111,7 +113,7 @@ Markdown template は所有しません。
 ## Canonical Input Record
 
 materializer は catalog/dependency/route/command/typed-tool reader の戻り値を、次の
-順序の `agent_canon.skill_runtime_shim.v2` record に canonicalize します。JSON の
+順序の `agent_canon.skill_runtime_shim.v3` record に canonicalize します。JSON の
 object field order、array order、scalar normalization、digest preimage を固定し、
 未定義 field、`null`、任意の policy prose、absolute path は拒否します。optional
 な関係は `[]` で表し、optional key を省略しません。
@@ -143,17 +145,17 @@ field の値は次のように固定します。
 
 | field | 生成値と検査 |
 | --- | --- |
-| schema.id / schema.version | `agent_canon.skill_runtime_shim` / `2`。未知の version は fail-closed |
+| schema.id / schema.version | `agent_canon.skill_runtime_shim` / `3`。未知の version は fail-closed |
 | skill_id | catalog の `skill_families[].id` と完全一致。lower hyphen-case |
 | discovery.name | 現在の shim frontmatter の name を migration で catalog の discovery metadata に移す。skill_id と一致 |
 | discovery.description | 現在の shim frontmatter の description を UTF-8/NFC の scalar として byte-preserving に catalog の discovery metadata へ移す。`purpose` の要約で置換しない |
-| discovery.shim_path | .agents/skills/<skill_id>/SKILL.md |
-| discovery.method | `automatic-.agents-skills-discovery`。Codex の repository skill 自動探索を使い、config 配列は作らない |
+| discovery.shim_path | .codex/personal/skills/<skill_id>/SKILL.md |
+| discovery.method | `managed-global-agents-skills-discovery`。bootstrap の個別リンク経由で Codex の global skill 自動探索を使い、config 配列は作らない |
 | owner.* | repository-relative POSIX locator。`canonical_ref` は `catalog.yaml#skill:<id>.canonical_doc`、`route_ref` は `catalog.yaml#skill:<id>.routing`、`command_ref` は `catalog.yaml#skill:<id>.tool_commands`、`tool_surface_ref` は `agent_team.materialize_skill_tool_call_token` の skill/phase typed identity record |
 | identity.* | 各 owner の typed projection digest。required/discovered/conditional/maintenance の非空 phase ごとに `agent_team` が materialize した ToolCall/argument-schema identity を読み、trigger、dependency、ToolID、ToolCall、argument schema の payload を shim にコピーせず、各 owner の readback が同じ digest を再計算 |
 | render.mode | 常に adapter_only。canonical prose は materialize 対象外 |
-| render.template_id | skill-runtime-shim-md-v2 |
-| render.command_packet_template_id | `skill-tool-command-packet-v2`。packet の全 phase/resolution は locator/digest 経由で保持し、shim に絶対実行 path を入れない |
+| render.template_id | skill-runtime-shim-md-v3 |
+| render.command_packet_template_id | `skill-tool-command-packet-v3`。packet の全 phase/resolution は locator/digest 経由で保持し、shim に絶対実行 path を入れない |
 | provenance.* | repository-relative source digest、materializer identity、record digest。absolute execution path は入れない |
 
 ### Canonical serialization and digest
@@ -166,7 +168,7 @@ order を維持し、その他は normalized id の昇順です。`null`、unkno
 YAML mapping の偶然の挿入順は digest に入りません。
 
 record digest は、digest field を除いた canonical JSON bytes `P` に対して
-`sha256("agent-canon.skill-runtime-shim.record.v2\0" || P)` とします。owner identity
+`sha256("agent-canon.skill-runtime-shim.record.v3\0" || P)` とします。owner identity
 digest は owner kind ごとに `sha256("agent-canon.skill-runtime-shim.owner.<kind>.v1\0" || P)`、
 command packet digest は
 `SkillCommandPacket` の全 fields（required/discovered/conditional/maintenance と全
@@ -183,7 +185,7 @@ ToolCall、materializer を個別 comment として複製しません。material
 render/readback します。
 
 ~~~text
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"<hex64>"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"<hex64>"} -->
 ~~~
 
 `record_digest` の preimage は canonical doc SHA、route/dependency/command packet
@@ -253,7 +255,7 @@ discovery の値は現行 frontmatter の readback から一度だけ移しま�
 各 SKILL.md は次の順序・節だけを持ちます。実装時の template は placeholder を
 出力しません。例えば `agent-orchestration` の canonical path は
 `../../../agents/skills/agent-orchestration.md` と具体化されます。
-各 skill では `posixpath.relpath(owner.canonical_doc, ".agents/skills/<id>")` で
+各 skill では `posixpath.relpath(owner.canonical_doc, ".codex/personal/skills/<id>")` で
 同じ相対 link を計算します。
 
 ~~~markdown
@@ -261,7 +263,7 @@ discovery の値は現行 frontmatter の readback から一度だけ移しま�
 name: <discovery.name>
 description: <discovery.description>
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"<provenance.record_digest>"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"<provenance.record_digest>"} -->
 
 <!--
 @dependency-start
@@ -308,7 +310,7 @@ packet digest で保存し、`source_root`、`execution_cwd`、`execution_argv` 
 
 | 状態 | canonical owner | runtime file | 処理 |
 | --- | --- | --- | --- |
-| canonical_prose | agents/skills/<id>.md | adapter_only shim | 正常な v2。canonical link と単一 materialization-record comment だけを生成 |
+| canonical_prose | agents/skills/<id>.md | adapter_only shim | 正常な v3。canonical link と単一 materialization-record comment だけを生成 |
 | generated_prior_schema | 直前 generated schema の完全な bytes | adapter 節 | frontmatter と安定本文が一致し、record version/digest だけが旧値なら再生成 |
 | legacy_canonical_prose | canonical doc と重複する既存 shim prose | 生成停止 | canonical prose を adapter 節へ推測で縮退しない |
 | legacy_mixed_or_unknown | 未確定 | 生成停止 | shim-only の意味を自動で canonical policy に昇格せず、blocking finding として修正 |
@@ -398,9 +400,9 @@ materializer の source、tests、eval producer は通常の実装 diff であ�
 write set や per-file recovery に含めません。
 
 ~~~text
-runtime targets:     .agents/skills/<skill_id>/SKILL.md for all catalog ids
+runtime targets:     .codex/personal/skills/<skill_id>/SKILL.md for all catalog ids
 source diff:         agents/skills/catalog.yaml (discovery.name/description only)
-host discovery:      Codex automatic .agents/skills discovery; no config registry
+host discovery:      Codex automatic global .agents/skills discovery via managed per-skill links; no config registry
 canonical/deps:      read-only agents/skills/<id>.md and skill-dependencies.yaml
 runtime source:      tools/agent_tools/skill_shim_materializer.py (normal implementation diff)
 command source:      tools/agent_tools/skill_tool_commands.py (normal implementation diff;
@@ -423,7 +425,7 @@ README だけであり、上記の source/tests/eval producer diff は次の imp
 
 1. `git diff` を変更せずに読み、catalog、canonical docs、current shims、
    command packets、typed ToolID/ToolCall refs の各集合を catalog と照合する。
-2. catalog の各 `shim` が `.agents/skills/<skill_id>/SKILL.md` と一致することを確認する。
+2. catalog の各 `shim` が `.codex/personal/skills/<skill_id>/SKILL.md` と一致することを確認する。
 3. current frontmatter/body を分類し、全 LegacyResolutionRecord を作る。unmatched block、
    unknown command、owner link 欠落が一つでもあれば全 locator/digest receipt を出して停止する。
 4. catalog の discovery metadata と全 records を canonicalize し、catalog-sized staged shim
@@ -630,7 +632,7 @@ evaluation が返す観測可能な `input_tokens` usage をそのまま artifac
 
 ~~~formula
 U_i = observed host input_tokens(current or generated, fresh gpt-5.4-mini)
-B_i = deterministic_measure(host_envelope + current .agents/skills/<id>/SKILL.md)
+B_i = deterministic_measure(host_envelope + current .codex/personal/skills/<id>/SKILL.md)
 G_i = deterministic_measure(host_envelope + generated adapter-only SKILL.md)
 reduction_i = (B_i - G_i) / B_i
 aggregate_reduction = sum(B_i - G_i) / sum(B_i)
@@ -783,7 +785,7 @@ packet_class_order = ["full", "changed"]
 id = "shim-discovery-selection-v1"
 packet_class = "full"
 prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/full/shim-discovery-selection-v1.md"
-canonical_target_files = [".agents/skills/agent-orchestration/SKILL.md", "agents/skills/agent-orchestration.md"]
+canonical_target_files = [".codex/personal/skills/agent-orchestration/SKILL.md", "agents/skills/agent-orchestration.md"]
 prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/skills/skill-dependencies.yaml", "documents/codex/prompt-skill-evaluation-checklist.md"]
 method = "one fresh read-only gpt-5.4-mini evaluator"
 requirements = ["discovery", "canonical-owner", "no-shim-route"]
@@ -794,7 +796,7 @@ packet_digest = "sha256-of-the-complete-answer-free-packet"
 id = "shim-boundary-and-negative-v1"
 packet_class = "full"
 prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/full/shim-boundary-and-negative-v1.md"
-canonical_target_files = [".agents/skills/task-routing/SKILL.md", "agents/skills/task-routing.md"]
+canonical_target_files = [".codex/personal/skills/task-routing/SKILL.md", "agents/skills/task-routing.md"]
 prompt_dependency_files = ["agents/skills/catalog.yaml", "documents/codex/prompt-skill-evaluation-checklist.md"]
 method = "one fresh read-only gpt-5.4-mini evaluator"
 requirements = ["no-false-activation", "host-delegation", "no-duplicate-policy"]
@@ -805,7 +807,7 @@ packet_digest = "sha256-of-the-complete-answer-free-packet"
 id = "shim-toolcall-route-v1"
 packet_class = "changed"
 prompt_path = "evidence/agent-evals/skill-runtime-shim/packets/changed/shim-toolcall-route-v1.md"
-canonical_target_files = [".agents/skills/structure-planning/SKILL.md", "agents/skills/structure-planning.md"]
+canonical_target_files = [".codex/personal/skills/structure-planning/SKILL.md", "agents/skills/structure-planning.md"]
 prompt_dependency_files = ["agents/skills/catalog.yaml", "agents/skills/skill-dependencies.yaml", "documents/design/skill-tool-invocation-graph.md"]
 method = "one fresh read-only gpt-5.4-mini evaluator"
 requirements = ["owner-command-packet", "typed-toolcall", "failure-semantics"]
@@ -910,7 +912,7 @@ python3 tools/agent_tools/skill_shim_evaluation.py tokens \
 | fact | shim frontmatter は catalog-derived な全件で readback され、body size は不均一になり得る | check_skill_frontmatter.py、catalog-sized inventory | observed |
 | fact | current skill_tool_commands.py は catalog structured branch で command phase を解決し、現在の `sync` は runtime file を直接編集する | tools/agent_tools/skill_tool_commands.py | observed; target state では sync surface を削除 |
 | assumption | discovery metadata を catalog に追加しても graph semantic payload は変わらない | graph builder の skill payload は id/doc/shim/command/capability/phase だけを投影 | explicit; implementation readback required |
-| assumption | Codex の `.agents/skills` 自動探索は frontmatter を読み、fresh gpt-5.4-mini evaluator は adapter の canonical relative link を辿れる | official discovery contract、fresh packet artifact と observation reportで検証 | pending implementation eval |
+| assumption | Codex の `.agents/skills` 自動探索（bootstrap の個別リンク経由）は frontmatter を読み、fresh gpt-5.4-mini evaluator は adapter の canonical relative link を辿れる | official discovery contract、fresh packet artifact と observation reportで検証 | pending implementation eval |
 | limitation | fresh clone には dependency graph DB と semantic-index cache がなく、依存 review/semantic relations は今回実行不可 | run_repo_dependency_review.sh、semantic-index output | recorded, non-blocking for design |
 
 ## Design-To-Implementation Trace
@@ -923,7 +925,7 @@ python3 tools/agent_tools/skill_shim_evaluation.py tokens \
 | SHIM-004 owner/dependency/route identity | route/dependency readers | `agents/skills/catalog.yaml`、`tools/agent_tools/skill_route_catalog.py`、`tools/agent_tools/route.py`、`documents/runtime/skill-dependency-graph.json`、`tools/agent_tools/check_skill_tool_invocation_graph.py` | catalog-derived route/dependency digests and semantic edge golden |
 | SHIM-005 command packet preservation | command packet owner | `agents/skills/catalog.yaml`、`tools/agent_tools/skill_tool_commands.py` / SkillCommandPacket (read-only) | complete packet JSON/digest, all phases/resolved fields, catalog-derived command count equals `documents/runtime/skill-dependency-graph.json` readback |
 | SHIM-005b typed ToolID/ToolCall preservation | graph/tool-packet owner | agent_team.py, skill-tool-invocation-graph.md | ToolID/ToolCall/argument-schema Ref and digest equal; no payload in shim |
-| SHIM-006 host discovery preservation | runtime alignment | `.agents/skills/*/SKILL.md`, check_agent_runtime_alignment.py | catalog-sized shim paths、frontmatter pass、project config skill registry absent |
+| SHIM-006 host discovery preservation | runtime alignment | `.codex/personal/skills/*/SKILL.md`, check_agent_runtime_alignment.py | catalog-sized shim paths、frontmatter pass、project config skill registry absent |
 | SHIM-007 single writer | shim materializer | skill_shim_materializer.py; skill_tool_commands.py has no sync/write surface | writer inventory identifies exactly one SKILL.md writer; sync symbol absent |
 | SHIM-008 all-catalog migration/readback | migration route | `tools/agent_tools/skill_shim_materializer.py` migrate/readback and tests | catalog-sized row receipt, unresolved=0 |
 | SHIM-009 graph/route golden | graph and route checkers | skill_dependency_map.py, check_skill_tool_invocation_graph.py, frozen route cases | typed identity/edge/order/route equality |

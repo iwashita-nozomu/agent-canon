@@ -41,7 +41,7 @@ prompt-routing lists. The leading underscore marks old private/internal label
 text, not a public skill namespace.
 
 Public skills remain plain hyphen-case, catalog-backed, and discoverable through
-`agents/skills/catalog.yaml` plus `.agents/skills/<skill>/SKILL.md`. Do not add
+`agents/skills/catalog.yaml` plus `.codex/personal/skills/<skill>/SKILL.md`. Do not add
 these historical startup labels to public `SKILLS`, `ACTIVE_SKILLS`,
 `agents/skills/catalog.yaml`, `.codex/config.toml`, `route.py --name` aliases,
 or public prompt-routing skill lists.

@@ -45,7 +45,7 @@ the user.
 
 1. Reuse the current branch if it already owns this private knowledge/eval lane.
 1. Otherwise request user direction and approval for `agent-updates/knowledge-eval/<slug>` after recording `branch_creation_reason=<reason>`; create it only through the same-segment creation-authority guard contract. Add the destructive authority/reason pair only when the route force-creates or overwrites a ref.
-1. Change only `evidence/agent-evals/`, `.agents/skills/*/SKILL.md`, or run-local evaluation artifacts that document private feedback.
+1. Change only `evidence/agent-evals/`, `.codex/personal/skills/*/SKILL.md`, or run-local evaluation artifacts that document private feedback.
 1. Run `bash tools/agent_tools/agent_update_branch.sh validate knowledge-eval`.
 1. Commit with a message that states this is a private knowledge/eval-only agent update branch.
 1. Push with `bash tools/agent_tools/agent_update_branch.sh push knowledge-eval <branch>`.

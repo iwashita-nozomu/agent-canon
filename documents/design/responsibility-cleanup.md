@@ -129,7 +129,7 @@ source snapshot から検証します（`documents/runtime/skill-dependency-grap
 checker の条件を弱めずに再実行します（`tools/agent_tools/check_skill_tool_invocation_graph.py`）。
 
 `tools/agent_tools/skill_shim_materializer.py` の生成 target は
-`.agents/skills/<skill>/SKILL.md` だけです。`.codex/config.toml` は materializer の
+`.codex/personal/skills/<skill>/SKILL.md` だけです。`.codex/config.toml` は materializer の
 出力ではなく、`.codex/config.toml` の catalog skill id に対する entry set、source order、
 path、enabled の readback input とします。
 

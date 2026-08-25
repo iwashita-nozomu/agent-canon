@@ -29,11 +29,11 @@ tool_runtime:
 
 skill_families:
   # Public user-facing skill ids use plain hyphen-case. Runtime-internal skill
-  # shims use .agents/skills/_<name>/SKILL.md and stay owner-routed.
+  # shims use .codex/personal/skills/_<name>/SKILL.md and stay owner-routed.
   - id: agent-orchestration
     purpose: Mandatory routing skill for repository tasks; selects workflow family, skills, review roles, and runtime entrypoints before execution.
     canonical_doc: agents/skills/agent-orchestration.md
-    shim: .agents/skills/agent-orchestration/SKILL.md
+    shim: .codex/personal/skills/agent-orchestration/SKILL.md
     discovery:
       name: agent-orchestration
       description: "Mandatory routing skill for repository tasks. Use before selecting workflow family, skills, review roles, subagents, model/team policy, runtime entrypoints, or run bundles for Codex routing."
@@ -69,7 +69,7 @@ skill_families:
   - id: repo-onboarding
     purpose: Fast safe entry path for an unfamiliar repository or subdirectory.
     canonical_doc: agents/skills/repo-onboarding.md
-    shim: .agents/skills/repo-onboarding/SKILL.md
+    shim: .codex/personal/skills/repo-onboarding/SKILL.md
     discovery:
       name: repo-onboarding
       description: "Use when entering an unfamiliar repository or subdirectory and you need the fastest safe path to the repo overview, commands, conventions, and agent canon."
@@ -83,7 +83,7 @@ skill_families:
   - id: task-routing
     purpose: Resolve long proposed tool or skill names into short routing areas and compact commands.
     canonical_doc: agents/skills/task-routing.md
-    shim: .agents/skills/task-routing/SKILL.md
+    shim: .codex/personal/skills/task-routing/SKILL.md
     discovery:
       name: task-routing
       description: "Use when choosing short AgentCanon tool, skill, profile, check, runtime, closeout, or evidence routes from long candidate names, broad workflow text, routing misses, over-constrained related-skill candidates, public/system skill delegation, skill splitting, or skill/tool routing refactors."
@@ -180,7 +180,7 @@ skill_families:
   - id: start-repository
     purpose: Start a repository from the template clone through the project-owned source-free bootstrap.
     canonical_doc: agents/skills/start-repository.md
-    shim: .agents/skills/start-repository/SKILL.md
+    shim: .codex/personal/skills/start-repository/SKILL.md
     discovery:
       name: start-repository
       description: "Use when starting a repository from this template after clone, including project identity setup, source-free static-seed validation, and destination-remote setup without live AgentCanon integration."
@@ -197,7 +197,7 @@ skill_families:
   - id: codex-task-workflow
     purpose: Execute repository tasks with a context-independent Codex flow.
     canonical_doc: agents/skills/codex-task-workflow.md
-    shim: .agents/skills/codex-task-workflow/SKILL.md
+    shim: .codex/personal/skills/codex-task-workflow/SKILL.md
     discovery:
       name: codex-task-workflow
       description: "Use when Codex needs a context-independent execution path for a repository task, from intake and workflow selection through artifact placement, implementation, validation, and closeout."
@@ -221,7 +221,7 @@ skill_families:
   - id: subagent-bootstrap
     purpose: Start the right specialist run bundle and make stage subagents explicit before implementation.
     canonical_doc: agents/skills/subagent-bootstrap.md
-    shim: .agents/skills/subagent-bootstrap/SKILL.md
+    shim: .codex/personal/skills/subagent-bootstrap/SKILL.md
     discovery:
       name: subagent-bootstrap
       description: "Use when a task needs specialist delegation, run-bundle bootstrap, explicit stage subagents, or Codex implementation routing."
@@ -258,7 +258,7 @@ skill_families:
   - id: direct-luna-communication
     purpose: Exchange a bounded typed packet with a directly selected Luna subagent and verify its effective runtime identity.
     canonical_doc: agents/skills/direct-luna-communication.md
-    shim: .agents/skills/direct-luna-communication/SKILL.md
+    shim: .codex/personal/skills/direct-luna-communication/SKILL.md
     discovery:
       name: direct-luna-communication
       description: "Use after orchestration selects a Luna execution profile and needs bounded context, explicit authority, effective model/effort readback, and typed handback without a role-specific physical alias."
@@ -280,7 +280,7 @@ skill_families:
   - id: change-review
     purpose: Review diffs for regressions, missing validation, and stale docs.
     canonical_doc: agents/skills/change-review.md
-    shim: .agents/skills/change-review/SKILL.md
+    shim: .codex/personal/skills/change-review/SKILL.md
     discovery:
       name: change-review
       description: "Use for code review, doc review, or AI-generated diff review when you need findings-first output focused on bugs, regressions, missing tests, and broken assumptions."
@@ -315,7 +315,7 @@ skill_families:
   - id: python-review
     purpose: Review Python diffs with pyright, pytest, ruff, type-boundary awareness, API behavior, and OOP readability evidence when a Python diff already owns it.
     canonical_doc: agents/skills/python-review.md
-    shim: .agents/skills/python-review/SKILL.md
+    shim: .codex/personal/skills/python-review/SKILL.md
     discovery:
       name: python-review
       description: "Python 差分を pyright、pytest、ruff、型境界、API 挙動、OOP 可読性根拠で厳密に確認する。"
@@ -349,7 +349,7 @@ skill_families:
   - id: cpp-review
     purpose: Review C and C++ diffs with build evidence, header-boundary awareness, and ownership checks.
     canonical_doc: agents/skills/cpp-review.md
-    shim: .agents/skills/cpp-review/SKILL.md
+    shim: .codex/personal/skills/cpp-review/SKILL.md
     discovery:
       name: cpp-review
       description: "Use when C or C++ code changes need strict review for build evidence, header boundaries, ownership, and native-code behavior."
@@ -374,7 +374,7 @@ skill_families:
   - id: oop-readability-check
     purpose: Run the OOP readability checker, produce mechanical SOLID/OOP report tables, and optionally add separate agent analysis.
     canonical_doc: agents/skills/oop-readability-check.md
-    shim: .agents/skills/oop-readability-check/SKILL.md
+    shim: .codex/personal/skills/oop-readability-check/SKILL.md
     discovery:
       name: oop-readability-check
       description: "Use when the user asks to run the OOP readability checker, SOLID check, OOP check, readability check, produce a mechanical OOP report table, or interpret/prioritize OOP readability results; keep mechanical tool output separate from agent analysis."
@@ -413,7 +413,7 @@ skill_families:
   - id: oop-type-design
     purpose: Write pre-implementation OOP designs with explicit types, invariants, state transitions, ownership, composition, and API/external boundaries.
     canonical_doc: agents/skills/oop-type-design.md
-    shim: .agents/skills/oop-type-design/SKILL.md
+    shim: .codex/personal/skills/oop-type-design/SKILL.md
     discovery:
       name: oop-type-design
       description: "Use before implementation to define language-neutral OOP/type contracts, responsibility boundaries, and explicit capability-owned design packets."
@@ -439,7 +439,7 @@ skill_families:
   - id: result-artifact-writeout
     purpose: Write tool, hook, eval, skill, and experiment results as durable raw artifacts, summaries, and manifests without accidental overwrite.
     canonical_doc: agents/skills/result-artifact-writeout.md
-    shim: .agents/skills/result-artifact-writeout/SKILL.md
+    shim: .codex/personal/skills/result-artifact-writeout/SKILL.md
     discovery:
       name: result-artifact-writeout
       description: "Use when writing, exporting, saving, accumulating, or reporting tool/checker/hook/skill/eval/experiment results; creates durable raw and summary artifacts with unique IDs and no accidental overwrite."
@@ -475,7 +475,7 @@ skill_families:
   - id: result-visualize
     purpose: Design reusable result visualizations by binding each figure to explicit calculations, coverage rules, denominators, and chart geometry.
     canonical_doc: agents/skills/result-visualize.md
-    shim: .agents/skills/result-visualize/SKILL.md
+    shim: .codex/personal/skills/result-visualize/SKILL.md
     discovery:
       name: result-visualize
       description: "Use when designing reusable result visualizations that bind each figure to its exact calculation, coverage, and chart geometry in one contract."
@@ -506,7 +506,7 @@ skill_families:
   - id: tool-finding-report
     purpose: Run tools and checkers to discover findings, preserve raw and structured full artifacts, mechanically rank every finding, and produce complete finding packets for implementation or refactor planning; compare impact only when requested.
     canonical_doc: agents/skills/tool-finding-report.md
-    shim: .agents/skills/tool-finding-report/SKILL.md
+    shim: .codex/personal/skills/tool-finding-report/SKILL.md
     discovery:
       name: tool-finding-report
       description: "Use when running tools, checkers, hooks, static analysis, or structural analyzers to find problems, preserve raw and structured full finding artifacts, mechanically rank every finding, and produce a complete finding report for implementation or refactor planning; before/after impact is optional when explicitly requested."
@@ -542,7 +542,7 @@ skill_families:
   - id: issue-finding-report
     purpose: Convert observed defects or accumulated evidence into cause-qualified repository-qualified GitHub Issues, and reorganize related Issues into cohesive responsibility units without clause loss.
     canonical_doc: agents/skills/issue-finding-report.md
-    shim: .agents/skills/issue-finding-report/SKILL.md
+    shim: .codex/personal/skills/issue-finding-report/SKILL.md
     discovery:
       name: issue-finding-report
       description: "Use when creating, splitting, merging, re-parenting, reopening, or superseding Issues by owner, decision, mechanism, validation, and completion responsibility; investigates cause hypotheses without overclaiming, preserves unique clauses, and can also convert accumulated runtime evidence into durable AgentCanon Issues."
@@ -584,7 +584,7 @@ skill_families:
   - id: agent-log-analysis
     purpose: Analyze accumulated skill, tool, workflow, hook, and eval logs through a compact generated summary before reading raw evidence.
     canonical_doc: agents/skills/agent-log-analysis.md
-    shim: .agents/skills/agent-log-analysis/SKILL.md
+    shim: .codex/personal/skills/agent-log-analysis/SKILL.md
     discovery:
       name: agent-log-analysis
       description: "Use when analyzing accumulated AgentCanon skill/tool/workflow/hook/eval logs, missed or late skill invocation, routing misses, weak skills, over-constrained related-skill coverage, or selection gaps; first convert raw logs into a structured dashboard summary with AgentCanon source generate_agent_runtime_dashboard.py before reading or interpreting evidence."
@@ -649,7 +649,7 @@ skill_families:
   - id: runtime-log-repair
     purpose: Turn AgentCanon runtime dashboard priority repair evidence into owner-routed Runtime Log Repair Packets and closeout verification.
     canonical_doc: agents/skills/runtime-log-repair.md
-    shim: .agents/skills/runtime-log-repair/SKILL.md
+    shim: .codex/personal/skills/runtime-log-repair/SKILL.md
     discovery:
       name: runtime-log-repair
       description: "Use when AgentCanon runtime dashboard evidence should be turned into owner-routed repair work, including dashboard next actions, repair failing hook evidence, hook entries status=fail, missing actual wave rows, workflow attribution gaps, consulted source URLs, reference missing URLs, AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL, AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING, or AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS."
@@ -688,7 +688,7 @@ skill_families:
   - id: agent-eval-accumulation
     purpose: Repair missing, stale, or failing AgentCanon accumulated eval evidence by running registered producers, validating family accumulation, and archiving append-only reports.
     canonical_doc: agents/skills/agent-eval-accumulation.md
-    shim: .agents/skills/agent-eval-accumulation/SKILL.md
+    shim: .codex/personal/skills/agent-eval-accumulation/SKILL.md
     discovery:
       name: agent-eval-accumulation
       description: "Use when accumulated AgentCanon eval evidence is missing, stale, or failing; runs registered eval producers, validates eval family accumulation, and stores evidence through the log archive instead of hand-writing reports."
@@ -709,7 +709,7 @@ skill_families:
   - id: agent-canon-update
     purpose: Update and publish standalone AgentCanon source and its shared bootstrap runtime through a qualified source PR.
     canonical_doc: agents/skills/agent-canon-update.md
-    shim: .agents/skills/agent-canon-update/SKILL.md
+    shim: .codex/personal/skills/agent-canon-update/SKILL.md
     discovery:
       name: agent-canon-update
       description: "Use when updating standalone AgentCanon source, its bootstrap/runtime, skills, eval/archive route, or publishing a qualified AgentCanon branch and PR."
@@ -737,7 +737,7 @@ skill_families:
   - id: agent-canon-bootstrap
     purpose: Own the explicit host-controlled lifecycle of one shared non-root AgentCanon Python, Rust, and LSP tool runtime, including target admission, typed tool dispatch, eval collection, and task-owned cleanup.
     canonical_doc: agents/skills/agent-canon-bootstrap.md
-    shim: .agents/skills/agent-canon-bootstrap/SKILL.md
+    shim: .codex/personal/skills/agent-canon-bootstrap/SKILL.md
     discovery:
       name: agent-canon-bootstrap
       description: "Use when AgentCanon's shared Python, Rust, or LSP tool runtime must be installed, started, targeted, inspected, updated, evaluated, or removed; project builds and tests remain in the project Docker/test-runner plane."
@@ -776,7 +776,7 @@ skill_families:
   - id: repository-topic-clone
     purpose: Prepare, reuse, merge, publish-readback, and reconstructibly clean one generic repository topic clone before repository-kind policy decoration.
     canonical_doc: agents/skills/repository-topic-clone.md
-    shim: .agents/skills/repository-topic-clone/SKILL.md
+    shim: .codex/personal/skills/repository-topic-clone/SKILL.md
     discovery:
       name: repository-topic-clone
       description: "Use for any parent, dependency, or standalone repository topic clone lifecycle under workspace/<topic>/<repo>; repository kind is a post-clone policy decorator."
@@ -806,7 +806,7 @@ skill_families:
   - id: dependency-module-change
     purpose: Decorate the generic repository topic clone lifecycle with .gitmodules, gitlink, pin, and projection policy.
     canonical_doc: agents/skills/dependency-module-change.md
-    shim: .agents/skills/dependency-module-change/SKILL.md
+    shim: .codex/personal/skills/dependency-module-change/SKILL.md
     discovery:
       name: dependency-module-change
       description: "Use when a dependency source change, topic branch clone, or reconstructibility-based clone cleanup is required."
@@ -835,7 +835,7 @@ skill_families:
   - id: pr-processing
     purpose: Process GitHub pull request and issue queues by inventorying state, preserving PR Essence in bodies and run bundles, checking mutation authority, resolving conflicts, ordering merges, validating gates, triaging issues, and syncing AgentCanon source PRs with parent pin PRs.
     canonical_doc: agents/skills/pr-processing.md
-    shim: .agents/skills/pr-processing/SKILL.md
+    shim: .codex/personal/skills/pr-processing/SKILL.md
     discovery:
       name: pr-processing
       description: "Use when processing GitHub pull requests or issue queues: inventory open PRs, preserve PR Essence in bodies and run bundles, resolve conflicts, order merges, update branch protection evidence, merge only with authority, triage stale issues, and sync AgentCanon source PRs with parent pin PRs."
@@ -891,7 +891,7 @@ skill_families:
   - id: agent-update-branch
     purpose: Isolate private knowledge, eval result, AgentCanon pin, and other agent-runtime updates on template-derived update branches before controlled integration.
     canonical_doc: agents/skills/agent-update-branch.md
-    shim: .agents/skills/agent-update-branch/SKILL.md
+    shim: .codex/personal/skills/agent-update-branch/SKILL.md
     discovery:
       name: agent-update-branch
       description: "Use when private knowledge, eval results, AgentCanon pins, or other agent-runtime updates should be isolated on template-derived update branches and later integrated through a controlled branch workflow."
@@ -912,7 +912,7 @@ skill_families:
     argument_schema: agent_canon.visualization.arguments.document_mermaid.v1
     purpose: Draft reader-facing reports, experiment summaries, decision briefs, and presentation/PPT storyboards from evidence with explicit source packets, visual asset plans, limitations, actionability, and quality checklist gates.
     canonical_doc: agents/skills/report-writing.md
-    shim: .agents/skills/report-writing/SKILL.md
+    shim: .codex/personal/skills/report-writing/SKILL.md
     discovery:
       name: report-writing
       description: "Use when drafting or revising reader-facing reports, decision briefs, experiment summaries, presentation narratives, PPT/storyboard plans, or slide-ready visual asset plans from tool, hook, eval, experiment, review, audit, or operational evidence; separates raw-result writeout from report narrative and applies the report quality checklist."
@@ -955,7 +955,7 @@ skill_families:
     argument_schema: agent_canon.visualization.arguments.knowledge_graph.v1
     purpose: Convert prose into a SQLite-backed structure graph under an explicit external runtime, diagnose discourse/argument/evidence/experiment gaps, explain findings, and emit writing-skill handoff packets without source-tree or HOME cache fallback.
     canonical_doc: agents/skills/prose-reasoning-graph.md
-    shim: .agents/skills/prose-reasoning-graph/SKILL.md
+    shim: .codex/personal/skills/prose-reasoning-graph/SKILL.md
     discovery:
       name: prose-reasoning-graph
       description: "Use when existing prose should be converted into a SQLite-backed structure graph under an explicit external runtime, diagnosed for discourse/argument/evidence/experiment gaps, explained in natural language, and handed off to writing or review skills with split/merge/bridge/reorder rewrite packets."
@@ -991,7 +991,7 @@ skill_families:
     argument_schema: agent_canon.visualization.arguments.document_mermaid.v1
     purpose: Build structure contracts for reports, experiments, presentations/PPT decks, documents, papers, HTML views, and refactors before prose, rendering, interpretation, runs, or edits.
     canonical_doc: agents/skills/structure-planning.md
-    shim: .agents/skills/structure-planning/SKILL.md
+    shim: .codex/personal/skills/structure-planning/SKILL.md
     discovery:
       name: structure-planning
       description: "Use when a report, experiment plan, Eval output, presentation storyboard, PPT/deck plan, document, paper, HTML view, or refactor needs a structure contract before prose, rendering, interpretation, follow-up runs, or edits."
@@ -1020,7 +1020,7 @@ skill_families:
     argument_schema: agent_canon.visualization.arguments.coverage.v1
     purpose: Infer the context question and embedding context, then select the appropriate diagram type, source evidence, owner skill or tool, and renderer for code, repository, or document-embedded visualization.
     canonical_doc: agents/skills/code-visualization.md
-    shim: .agents/skills/code-visualization/SKILL.md
+    shim: .codex/personal/skills/code-visualization/SKILL.md
     discovery:
       name: code-visualization
       description: "Sole public visualization owner for code, repository structure, runtime behavior, state, data movement, dependencies, types, proof state, interactive graphs, and document diagrams; builds the complete typed universe and coverage manifest before delegating renderer-only projection."
@@ -1057,7 +1057,7 @@ skill_families:
     argument_schema: agent_canon.visualization.arguments.repository_graph.v1
     purpose: Produce polished browser-readable HTML artifacts only when HTML is explicit, including layout gates, optional ImageGen assets, and local/external browser server publication.
     canonical_doc: agents/skills/html-output.md
-    shim: .agents/skills/html-output/SKILL.md
+    shim: .codex/personal/skills/html-output/SKILL.md
     discovery:
       name: html-output
       description: "Use when the user explicitly asks for HTML output, a browser-readable page, dashboard/report HTML, external browser publication, or local preview server; defaults reports to Markdown unless HTML is explicit."
@@ -1081,7 +1081,7 @@ skill_families:
   - id: test-design
     purpose: After the owning implementation mechanism exists, classify explicit unresolved oracle, specification, regression, or failure-mode risk beyond static analysis, existing checkers, and targeted validation.
     canonical_doc: agents/skills/test-design.md
-    shim: .agents/skills/test-design/SKILL.md
+    shim: .codex/personal/skills/test-design/SKILL.md
     discovery:
       name: test-design
       description: "Use after the owning implementation mechanism exists to proactively design a logically minimal test set; classify unresolved oracle, specification, regression, and failure-mode risk before adding cases."
@@ -1118,7 +1118,7 @@ skill_families:
   - id: refactor-loop
     purpose: Run large refactors as behavior-preserving looped structural change with explicit safety contracts and repair slices.
     canonical_doc: agents/skills/refactor-loop.md
-    shim: .agents/skills/refactor-loop/SKILL.md
+    shim: .codex/personal/skills/refactor-loop/SKILL.md
     discovery:
       name: refactor-loop
       description: "Use when a large refactor should run as a behavior-preserving refactor loop with explicit path mapping, semantic-delta controls, repair slices, and strong review gates."
@@ -1164,7 +1164,7 @@ skill_families:
     argument_schema: agent_canon.visualization.arguments.repository_graph.v1
     purpose: Refactor repository directory structure from recursive directory README responsibilities, dependency manifests, path mappings, and responsibility-scope validation.
     canonical_doc: agents/skills/structure-refactor.md
-    shim: .agents/skills/structure-refactor/SKILL.md
+    shim: .codex/personal/skills/structure-refactor/SKILL.md
     discovery:
       name: structure-refactor
       description: "Use when repository structure review, repo-refactor requests, expected AgentCanon layout, directory responsibilities, canonical README ownership, path layout, root views, project .codex/.agents views, personal ~/.codex runtime boundaries, or responsibility-scope maps must be reviewed, repaired, or refactored using structure contracts, recursive directory README analysis, source/view ownership checks, stale-surface sweeps, dependency manifests, and behavior-preserving move/rename gates."
@@ -1253,7 +1253,7 @@ skill_families:
   - id: user-guided-debugging
     purpose: Debug or repair one issue at a time when the user explicitly asks for visible problem statements before each edit and the next issue after each fix.
     canonical_doc: agents/skills/user-guided-debugging.md
-    shim: .agents/skills/user-guided-debugging/SKILL.md
+    shim: .codex/personal/skills/user-guided-debugging/SKILL.md
     discovery:
       name: user-guided-debugging
       description: "Use when the user explicitly asks to debug, repair, or refactor one issue at a time with visible problem statements before each edit and a next-issue prompt after each scoped fix."
@@ -1302,7 +1302,7 @@ skill_families:
     argument_schema: agent_canon.visualization.arguments.document_mermaid.v1
     purpose: Project graph/DSL structure into general explanatory repository prose for README, workflow, guide, migration, and specification responsibilities.
     canonical_doc: agents/skills/long-form-writing.md
-    shim: .agents/skills/long-form-writing/SKILL.md
+    shim: .codex/personal/skills/long-form-writing/SKILL.md
     discovery:
       name: long-form-writing
       description: "Use as the general explanatory-doc DSL-to-prose adapter for README, workflow, guide, migration, or specification documents whose file responsibility is reader-facing explanation; do not select this skill by text length alone."
@@ -1318,7 +1318,7 @@ skill_families:
   - id: academic-writing
     purpose: Draft academic documents with explicit claim mapping and mandatory multi-agent review for notation and logic.
     canonical_doc: agents/skills/academic-writing.md
-    shim: .agents/skills/academic-writing/SKILL.md
+    shim: .codex/personal/skills/academic-writing/SKILL.md
     discovery:
       name: academic-writing
       description: "Use when drafting a paper, thesis chapter, scholarly note, or other academic document that needs mandatory multi-agent review for notation, logic, and reader flow."
@@ -1348,7 +1348,7 @@ skill_families:
   - id: paper-writing
     purpose: Draft papers and thesis chapters with section contracts and mandatory citation/evidence review.
     canonical_doc: agents/skills/paper-writing.md
-    shim: .agents/skills/paper-writing/SKILL.md
+    shim: .codex/personal/skills/paper-writing/SKILL.md
     discovery:
       name: paper-writing
       description: "Use when drafting a submission paper, thesis chapter, or other paper-style manuscript that needs section contracts, citation-evidence review, notation review, and logic-gap review."
@@ -1368,7 +1368,7 @@ skill_families:
     argument_schema: agent_canon.visualization.arguments.document_mermaid.v1
     purpose: Check Markdown formatting, heading structure, and link hygiene for format-only docs work; pair substantive document edits with prose-reasoning-graph and structure-planning.
     canonical_doc: agents/skills/md-style-check.md
-    shim: .agents/skills/md-style-check/SKILL.md
+    shim: .codex/personal/skills/md-style-check/SKILL.md
     discovery:
       name: md-style-check
       description: "Use when Markdown files changed, docs formatter/fixer output must be checked, or `agent-canon docs` formatting, heading, math, Mermaid, and link checks are in scope."
@@ -1411,7 +1411,7 @@ skill_families:
   - id: mvp-skeleton
     purpose: Keep MVP, prototype, v0, and thin-slice implementation skeletal by fixing one core loop, stubbing nonessential work, and reporting deferrals.
     canonical_doc: agents/skills/mvp-skeleton.md
-    shim: .agents/skills/mvp-skeleton/SKILL.md
+    shim: .codex/personal/skills/mvp-skeleton/SKILL.md
     discovery:
       name: mvp-skeleton
       description: "Use when creating, scaffolding, planning, or implementing an MVP, prototype, runnable vertical slice, product skeleton, v0, or thin vertical slice and the agent must prevent overbuilding. Trigger for MVP作成, プロトタイプ, 骨格だけ, core runnable path, thin vertical slice, scope creep, over-polish, and cases where early implementation is getting unnecessary UI, architecture, features, or tests."
@@ -1425,7 +1425,7 @@ skill_families:
   - id: document-canon-cleanup
     purpose: Find non-canonical documents and route edits to source canon instead of mirrors, generated evidence, or stale copies.
     canonical_doc: agents/skills/document-canon-cleanup.md
-    shim: .agents/skills/document-canon-cleanup/SKILL.md
+    shim: .codex/personal/skills/document-canon-cleanup/SKILL.md
     discovery:
       name: document-canon-cleanup
       description: "Use when organizing repository documents, finding non-canonical docs, separating source canon from generated reports, eval results, closed issues, duplicate headings, or stale document paths."
@@ -1468,7 +1468,7 @@ skill_families:
   - id: parent-repository-audit
     purpose: Audit a complete parent tracked tree by canonical responsibility units and close findings through owner repair and readback.
     canonical_doc: agents/skills/parent-repository-audit.md
-    shim: .agents/skills/parent-repository-audit/SKILL.md
+    shim: .codex/personal/skills/parent-repository-audit/SKILL.md
     discovery:
       name: parent-repository-audit
       description: "Use when auditing an AgentCanon-consuming parent repository across structure, ownership, environment, dependencies, code and types, OOP, tests, docs and design trace, CI/hooks/skills, templates, or Git/PR lifecycle, with owner-routed repair and finding closure."
@@ -1497,7 +1497,7 @@ skill_families:
     argument_schema: agent_canon.visualization.arguments.dependency_manifest.v1
     purpose: Run dependency manifest and code-dependency tools, then package change impact and repair-planning context for editing, review, or subagent handoff.
     canonical_doc: agents/skills/dependency-analysis.md
-    shim: .agents/skills/dependency-analysis/SKILL.md
+    shim: .codex/personal/skills/dependency-analysis/SKILL.md
     discovery:
       name: dependency-analysis
       description: "Use when checking, validating, or diagnosing repository dependency manifests, expanding code/header/search dependencies into a change-impact packet, or preparing repair-planning and subagent handoff context before editing, review, or closeout."
@@ -1527,7 +1527,7 @@ skill_families:
   - id: worktree-start
     purpose: Diagnose stale worktree, WORKTREE_SCOPE.md, and action-log state as legacy cleanup evidence; not for new worktree kickoff, recreation, or resume.
     canonical_doc: agents/skills/worktree-start.md
-    shim: .agents/skills/worktree-start/SKILL.md
+    shim: .codex/personal/skills/worktree-start/SKILL.md
     discovery:
       name: worktree-start
       description: "Legacy cleanup only. Use when inspecting or retiring stale WORKTREE_SCOPE.md/action-log state; do not use to create, recreate, resume, or move work into a git worktree."
@@ -1556,7 +1556,7 @@ skill_families:
   - id: worktree-health
     purpose: Review worktree scope, drift, and cleanup readiness.
     canonical_doc: agents/skills/worktree-health.md
-    shim: .agents/skills/worktree-health/SKILL.md
+    shim: .codex/personal/skills/worktree-health/SKILL.md
     discovery:
       name: worktree-health
       description: "Use this skill to review current checkout authority, run-bundle drift, legacy worktree cleanup evidence, and cleanup readiness."
@@ -1577,7 +1577,7 @@ skill_families:
   - id: experiment-lifecycle
     purpose: Run a single experiment protocol, then branch through review, rewrite, extra validation, or rerun.
     canonical_doc: agents/skills/experiment-lifecycle.md
-    shim: .agents/skills/experiment-lifecycle/SKILL.md
+    shim: .codex/personal/skills/experiment-lifecycle/SKILL.md
     discovery:
       name: experiment-lifecycle
       description: "Use this skill when preparing, running, or validating experiments."
@@ -1616,7 +1616,7 @@ skill_families:
   - id: experiment-review
     purpose: Review experiment topics for the managed runner route and run.py inner entrypoint, GPU/JAX environment ownership, artifact schemas, visualization.py renderer, and README run contracts.
     canonical_doc: agents/skills/experiment-review.md
-    shim: .agents/skills/experiment-review/SKILL.md
+    shim: .codex/personal/skills/experiment-review/SKILL.md
     discovery:
       name: experiment-review
       description: "Use when reviewing experiment topics, run.py files, experiment registries, GPU/JAX environment ownership, visualization.py artifacts, or experiment README/report readiness."
@@ -1646,7 +1646,7 @@ skill_families:
   - id: gpu-execution
     purpose: Route GPU/CUDA/JAX/XLA/IREE execution through provider-independent full-UUID admission by default, with the managed ExperimentRunner adapter only for managed experiment lifecycle contracts.
     canonical_doc: agents/skills/gpu-execution.md
-    shim: .agents/skills/gpu-execution/SKILL.md
+    shim: .codex/personal/skills/gpu-execution/SKILL.md
     discovery:
       name: gpu-execution
       description: "Use when planning, running, validating, or diagnosing GPU/CUDA/JAX/XLA/IREE execution, free-GPU admission, full UUID or MIG selection, nvidia-smi evidence, arbitrary pytest/benchmark/diagnostic argv, managed ExperimentRunner runs, GPU validation blockers, or preallocation-disabled JAX/XLA execution."
@@ -1694,7 +1694,7 @@ skill_families:
   - id: computational-optimization
     purpose: Fix mathematical and validation contracts for numerical optimization, solvers, preconditioners, convergence, derivatives, KKT conditions, tolerances, and optimization benchmarks.
     canonical_doc: agents/skills/computational-optimization.md
-    shim: .agents/skills/computational-optimization/SKILL.md
+    shim: .codex/personal/skills/computational-optimization/SKILL.md
     discovery:
       name: computational-optimization
       description: "Use when designing, implementing, reviewing, or diagnosing numerical optimization, solvers, preconditioners, convergence, gradients, Jacobians, Hessians, KKT conditions, tolerances, or optimization benchmarks; fixes the mathematical and validation contract before code or experiment changes."
@@ -1729,7 +1729,7 @@ skill_families:
   - id: adaptive-improvement-loop
     purpose: Manage experiments, research, tuning, and iterative code changes as one backlog-driven outer loop.
     canonical_doc: agents/skills/adaptive-improvement-loop.md
-    shim: .agents/skills/adaptive-improvement-loop/SKILL.md
+    shim: .codex/personal/skills/adaptive-improvement-loop/SKILL.md
     discovery:
       name: adaptive-improvement-loop
       description: "Use when experiments, research, tuning, and iterative code improvement must be managed as one backlog-driven agile outer loop."
@@ -1777,7 +1777,7 @@ skill_families:
   - id: literature-survey
     purpose: Search for primary sources, prior art, contradictory evidence, and reusable bibliography structure.
     canonical_doc: agents/skills/literature-survey.md
-    shim: .agents/skills/literature-survey/SKILL.md
+    shim: .codex/personal/skills/literature-survey/SKILL.md
     discovery:
       name: literature-survey
       description: "Use when a task needs paper search, prior-art mapping, contradictory-source hunting, or a reusable bibliography."
@@ -1795,7 +1795,7 @@ skill_families:
     argument_schema: agent_canon.visualization.arguments.algorithm_flowchart.v1
     purpose: Convert natural-language mathematical claims or JIT-canonical implementation claims into formal-proof obligations, existing-proof search packets, proof-assistant scaffolds, and checker-gated evidence.
     canonical_doc: agents/skills/formal-proof-workflow.md
-    shim: .agents/skills/formal-proof-workflow/SKILL.md
+    shim: .codex/personal/skills/formal-proof-workflow/SKILL.md
     discovery:
       name: formal-proof-workflow
       description: "Use when natural-language mathematical claims, JIT-canonical implementation claims, proof sketches, or theory assumptions should be converted into formal-proof obligations, generated Lean evidence, theorem-graph targets, and checker-gated evidence."
@@ -1827,7 +1827,7 @@ skill_families:
   - id: lean-algorithm-design
     purpose: Design candidate algorithms directly in Lean before production implementation, prove or refute the mathematical design contract, and hand checked definitions to implementation.
     canonical_doc: agents/skills/lean-algorithm-design.md
-    shim: .agents/skills/lean-algorithm-design/SKILL.md
+    shim: .codex/personal/skills/lean-algorithm-design/SKILL.md
     discovery:
       name: lean-algorithm-design
       description: "Use when an algorithm should be designed and checked in Lean before production implementation; models candidate algorithms independently of existing code paths, proves or refutes convergence, stopping, certificate, filter/restoration, and inner-solver contracts, then hands a checked design contract to implementation or implementation-derived proof workflows."
@@ -1841,7 +1841,7 @@ skill_families:
   - id: algorithm-proof-exploration
     purpose: Explore algorithm choices under proof obligations by building JIT-canonical IR, theorem graphs, algorithmic blocker frontiers, and algorithm-change handoffs for formal-proof adoption.
     canonical_doc: agents/skills/algorithm-proof-exploration.md
-    shim: .agents/skills/algorithm-proof-exploration/SKILL.md
+    shim: .codex/personal/skills/algorithm-proof-exploration/SKILL.md
     discovery:
       name: algorithm-proof-exploration
       description: "Use when exploring, refactoring, or choosing an algorithm under proof obligations; builds JIT-canonical IR, lemma dependency graphs, algorithmic blocker frontiers, and algorithm-change guidance before handing terminal proof work to formal-proof-workflow."
@@ -1873,7 +1873,7 @@ skill_families:
     argument_schema: agent_canon.visualization.arguments.algorithm_flowchart.v1
     purpose: Render JIT-canonical IR, generated Lean evidence modules, and theorem graph overlays into Mermaid block charts for algorithm/proof-state review.
     canonical_doc: agents/skills/algorithm-flowchart.md
-    shim: .agents/skills/algorithm-flowchart/SKILL.md
+    shim: .codex/personal/skills/algorithm-flowchart/SKILL.md
     discovery:
       name: algorithm-flowchart
       description: "Use when rendering JIT-canonical IR records, generated Lean evidence modules, and theorem-graph proof overlays into Mermaid block charts that show the implemented iterative algorithm and proof state."
@@ -1894,7 +1894,7 @@ skill_families:
   - id: research-workflow
     purpose: Manage the outer loop of question framing, external research, iterative changes, runs, and explicit review decisions.
     canonical_doc: agents/skills/research-workflow.md
-    shim: .agents/skills/research-workflow/SKILL.md
+    shim: .codex/personal/skills/research-workflow/SKILL.md
     discovery:
       name: research-workflow
       description: "Use when a task needs external research, comparison design, iterative implementation and runs, and explicit review decisions before claims are accepted."
@@ -1922,7 +1922,7 @@ skill_families:
   - id: comprehensive-development
     purpose: Run repo-wide integrated delivery across code, docs, tools, workflows, and runtime with explicit subagent routing.
     canonical_doc: agents/skills/comprehensive-development.md
-    shim: .agents/skills/comprehensive-development/SKILL.md
+    shim: .codex/personal/skills/comprehensive-development/SKILL.md
     discovery:
       name: comprehensive-development
       description: "Use when a repo-wide task spans code, docs, tools, workflows, and runtime surfaces and needs explicit subagent routing."
@@ -1953,7 +1953,7 @@ skill_families:
   - id: dependency-design
     purpose: Define and validate the typed declarative devcontainer dependency design packet before environment maintenance.
     canonical_doc: agents/skills/dependency-design.md
-    shim: .agents/skills/dependency-design/SKILL.md
+    shim: .codex/personal/skills/dependency-design/SKILL.md
     discovery:
       name: dependency-design
       description: "Define and validate the typed declarative devcontainer dependency design packet before changing mounted developer or agent tools, manifests, bootstrap, or dependency installation order."
@@ -1985,7 +1985,7 @@ skill_families:
   - id: devcontainer-exec
     purpose: Preserve a narrow compatibility route for targeted commands inside an explicitly selected existing project Dev Container; AgentCanon tools route to agent-canon-bootstrap.
     canonical_doc: agents/skills/devcontainer-exec.md
-    shim: .agents/skills/devcontainer-exec/SKILL.md
+    shim: .codex/personal/skills/devcontainer-exec/SKILL.md
     discovery:
       name: devcontainer-exec
       description: "Use only when an explicitly selected existing project Dev Container needs a targeted command through devcontainer exec; AgentCanon's shared tools and LSPs use agent-canon-bootstrap, and project tests use the project Docker/test runner."
@@ -2012,7 +2012,7 @@ skill_families:
   - id: environment-maintenance
     purpose: Update Docker, CI, dependencies, and runtime guidance coherently.
     canonical_doc: agents/skills/environment-maintenance.md
-    shim: .agents/skills/environment-maintenance/SKILL.md
+    shim: .codex/personal/skills/environment-maintenance/SKILL.md
     discovery:
       name: environment-maintenance
       description: "Use when touching Docker, CI, dependencies, runtime compatibility, or repository-level development environment instructions."
@@ -2053,7 +2053,7 @@ skill_families:
   - id: agent-learning
     purpose: Route searchable problem-solving knowledge and feedback to private agent-canon-log while learning from runtime agent behavior, interaction lessons, routing misses, and task retrospectives with evidence.
     canonical_doc: agents/skills/agent-learning.md
-    shim: .agents/skills/agent-learning/SKILL.md
+    shim: .codex/personal/skills/agent-learning/SKILL.md
     discovery:
       name: agent-learning
       description: "Use when private knowledge/feedback curation or runtime agent behavior learning should capture recurrence evidence without mixing it into user preferences."
@@ -2104,7 +2104,7 @@ skill_families:
   - id: wiki-publication
     purpose: Publishes AgentCanon wiki pages only through the dedicated wiki sidecar using default-branch-only pushes and source commit binding.
     canonical_doc: agents/skills/wiki-publication.md
-    shim: .agents/skills/wiki-publication/SKILL.md
+    shim: .codex/personal/skills/wiki-publication/SKILL.md
     discovery:
       name: wiki-publication
       description: "Use this when publishing AgentCanon wiki pages to a dedicated wiki sidecar with default-branch-only, source-bound publication checks."
@@ -2119,7 +2119,7 @@ skill_families:
   - id: responsibility-cleanup
     purpose: Route responsibility-unit cleanup from tree observation through owner dispatch, integration, and re-review.
     canonical_doc: agents/skills/responsibility-cleanup.md
-    shim: .agents/skills/responsibility-cleanup/SKILL.md
+    shim: .codex/personal/skills/responsibility-cleanup/SKILL.md
     discovery:
       name: responsibility-cleanup
       description: "Use when cleanup requires tree observation, source/view/generated/project/personal boundary classification, dependency closure, responsibility-unit dispatch, integration, or re-review."
@@ -2136,7 +2136,7 @@ skill_families:
   - id: environment-cleanup
     purpose: Route environment dependency and runtime-capability cleanup through dependency design and environment maintenance.
     canonical_doc: agents/skills/environment-cleanup.md
-    shim: .agents/skills/environment-cleanup/SKILL.md
+    shim: .codex/personal/skills/environment-cleanup/SKILL.md
     discovery:
       name: environment-cleanup
       description: "Use when environment dependencies or runtime capabilities need cleanup through dependency-design and environment-maintenance with version, scope, security, and rollback evidence."
@@ -2151,7 +2151,7 @@ skill_families:
   - id: code-cleanup
     purpose: Route public and module code cleanup by responsibility and reachability through dependency analysis, refactor loop, and change review.
     canonical_doc: agents/skills/code-cleanup.md
-    shim: .agents/skills/code-cleanup/SKILL.md
+    shim: .codex/personal/skills/code-cleanup/SKILL.md
     discovery:
       name: code-cleanup
       description: "Use when public or module code cleanup must be bounded by responsibility and reachability, then passed through dependency-analysis, refactor-loop, and change-review."
@@ -2167,7 +2167,7 @@ skill_families:
   - id: skill-cleanup
     purpose: Route canonical skill and generated runtime cleanup as one source-to-readback unit.
     canonical_doc: agents/skills/skill-cleanup.md
-    shim: .agents/skills/skill-cleanup/SKILL.md
+    shim: .codex/personal/skills/skill-cleanup/SKILL.md
     discovery:
       name: skill-cleanup
       description: "Use when canonical skill docs, catalog, dependency DAG, routes, tool commands, generated shims, host config, graph, or readback must be cleaned as one unit."

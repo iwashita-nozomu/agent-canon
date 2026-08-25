@@ -218,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
         "documents",
         "scripts",
         ".github",
-        ".agents/skills",
+        ".codex/personal/skills",
         ".codex/README.md",
     ]
 

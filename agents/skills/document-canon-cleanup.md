@@ -5,7 +5,7 @@ contract skill
 responsibility Documents document-canon cleanup workflow for this repository.
 upstream design README.md shared skill canon
 upstream design ../canonical/CODEX_WORKFLOW.md shared workflow contract
-downstream implementation ../../.agents/skills/document-canon-cleanup/SKILL.md exposes runtime skill
+downstream implementation ../../.codex/personal/skills/document-canon-cleanup/SKILL.md exposes runtime skill
 downstream implementation ../../rust/agent-canon/src/structured_analysis.rs canonical document inventory implementation
 @dependency-end
 -->

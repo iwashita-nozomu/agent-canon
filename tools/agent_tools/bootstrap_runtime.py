@@ -1729,6 +1729,7 @@ class BootstrapRuntime:
         source_head: str,
     ) -> dict[str, Any]:
         """Adopt an already-pulled registry image; this route never builds locally."""
+        self._materialize_skill_view()
         with self.locked():
             state = self._read_state(allow_manifest_drift=True)
             result = self._adopt_registry_image_locked(state, image_ref, image_record, source_head)
@@ -2203,6 +2204,7 @@ class BootstrapRuntime:
                     )
                 except OSError:
                     shallow = False
+                self._materialize_skill_view()
                 registry = self.manifest.get("registry", {})
                 if shallow and isinstance(registry, dict) and registry.get("image"):
                     try:
@@ -2350,6 +2352,7 @@ class BootstrapRuntime:
         resources = state.get("resources", {})
         image = resources.get("image", {}) if isinstance(resources, dict) else {}
         if image.get("owned") is not True:
+            self._materialize_skill_view()
             self._write_state(state)
             self._ensure_global_links(state)
             self._write_state(state)
@@ -2371,6 +2374,7 @@ class BootstrapRuntime:
             or before in {"ready", "running"}
         )
         try:
+            self._materialize_skill_view()
             self._image(state, force_build=True)
             state["manifest_digest"] = self.manifest_digest
             state["state"] = "maintenance_pending"
@@ -3064,25 +3068,48 @@ class BootstrapRuntime:
                 )
             )
 
+    def _materialize_skill_view(self) -> dict[str, Any]:
+        """Generate the ignored project-local skill view before image/link use."""
+        tools_root = self.repository_root / "tools" / "agent_tools"
+        if str(tools_root) not in sys.path:
+            sys.path.insert(0, str(tools_root))
+        from skill_shim_materializer import materialize
+
+        previous = os.environ.get("AGENT_CANON_PARENT_ROOT")
+        os.environ["AGENT_CANON_PARENT_ROOT"] = str(self.repository_root)
+        try:
+            return materialize(self.repository_root, all_skills=True)
+        except Exception as exc:  # noqa: BLE001 - translate owner failure once
+            raise BootstrapError("skill_view_materialization_failed", str(exc)) from exc
+        finally:
+            if previous is None:
+                os.environ.pop("AGENT_CANON_PARENT_ROOT", None)
+            else:
+                os.environ["AGENT_CANON_PARENT_ROOT"] = previous
+
     def _validate_source_adapters(self) -> None:
-        """Read back tracked .agents adapters before runtime convergence."""
-        source = self.repository_root / ".agents"
+        """Read back the ignored personal skill view before runtime convergence."""
+        source = self.repository_root / ".codex" / "personal"
         skills = source / "skills"
         if source.is_symlink() or not source.is_dir() or skills.is_symlink() or not skills.is_dir():
-            raise BootstrapError("source_adapters_invalid", "tracked .agents/skills is missing or not regular")
+            raise BootstrapError(
+                "source_adapters_invalid",
+                "ignored .codex/personal/skills is missing or not regular",
+            )
         skill_files = sorted(skills.glob("*/SKILL.md"))
         if not skill_files or any(path.is_symlink() or not path.is_file() for path in skill_files):
-            raise BootstrapError("source_adapters_invalid", "tracked .agents skill adapters failed readback")
+            raise BootstrapError("source_adapters_invalid", "personal skill adapters failed readback")
 
     def _ensure_agents_link(self, state: dict[str, Any]) -> dict[str, str]:
         """Migrate the legacy root link to a real per-skill-link directory."""
         link = self.global_agents_home
-        source = self.repository_root / ".agents"
+        source = self.repository_root / ".codex" / "personal"
+        legacy_source = self.repository_root / ".agents"
         previous = state.get("managed_agents_link")
         created_root = bool(previous.get("created_root")) if isinstance(previous, dict) else False
         created_skills = bool(previous.get("created_skills")) if isinstance(previous, dict) else False
         if link.is_symlink():
-            if link.resolve() != source.resolve():
+            if link.resolve() not in {source.resolve(), legacy_source.resolve()}:
                 raise BootstrapError(
                     "agents_link_collision",
                     f"global .agents path is a foreign symlink: {link}",
@@ -3239,6 +3266,7 @@ class BootstrapRuntime:
         self._validate_global_sources()
         agents_home = self.global_agents_home
         source_agents = self.repository_root / ".agents"
+        source_skills = self.repository_root / ".codex" / "personal" / "skills"
         legacy_root_link = agents_home.is_symlink() and agents_home.resolve() == source_agents.resolve()
         if agents_home.is_symlink() and not legacy_root_link:
             raise BootstrapError(
@@ -3252,7 +3280,6 @@ class BootstrapRuntime:
             )
         if agents_home.is_dir() and not agents_home.is_symlink():
             skills_home = agents_home / "skills"
-            source_skills = source_agents / "skills"
             if skills_home.is_symlink() and skills_home.resolve() != source_skills.resolve():
                 raise BootstrapError(
                     "skills_link_collision",
@@ -3318,7 +3345,7 @@ class BootstrapRuntime:
                     "agents_link_collision",
                     f"global Codex agent path already exists: {target}",
                 )
-        for source in sorted((self.repository_root / ".agents" / "skills").iterdir()):
+        for source in sorted(source_skills.iterdir()):
             if not source.is_dir() or source.is_symlink():
                 continue
             target = skills_root / source.name
@@ -3359,6 +3386,7 @@ class BootstrapRuntime:
             )
         _ensure_directory(agents_root)
         skills_root = self.global_agents_home / "skills"
+        source_skills = self.repository_root / ".codex" / "personal" / "skills"
         desired: list[tuple[str, Path, Path, str]] = [
             ("config", self.global_codex_config, self.personal_codex_config, "config_link_collision"),
         ]
@@ -3371,7 +3399,7 @@ class BootstrapRuntime:
                     "agents_link_collision",
                 )
             )
-        for source in sorted((self.repository_root / ".agents" / "skills").iterdir()):
+        for source in sorted(source_skills.iterdir()):
             if source.is_dir() and not source.is_symlink():
                 desired.append(
                     (
@@ -3451,7 +3479,7 @@ class BootstrapRuntime:
     def _managed_links(self) -> list[dict[str, str]]:
         entries: list[dict[str, str]] = []
         for surface, source in (
-            ("skills", self.repository_root / ".agents" / "skills"),
+            ("skills", self.repository_root / ".codex" / "personal" / "skills"),
             ("agents", self.repository_root / ".codex" / "agents"),
             ("hooks", self.repository_root / ".codex" / "hooks"),
             ("config", self.repository_root / ".codex" / "config.toml"),
@@ -3482,7 +3510,7 @@ class BootstrapRuntime:
                         )
         # Private runtime Skill candidates are an external, runtime-local
         # surface.  They are linked into the isolated CODEX_HOME only; this
-        # never changes the public catalog or the source-tree .agents view.
+        # never changes the public catalog or the source-tree personal view.
         private_skills = self.paths.runtime_root / "private-skills"
         if private_skills.is_dir() and not private_skills.is_symlink():
             for path in sorted(private_skills.rglob("*")):

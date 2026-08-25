@@ -801,7 +801,7 @@ def build_graph(root: Path) -> dict[str, object]:
                 "id": skill,
                 "catalog_locator": f"agents/skills/catalog.yaml#skill:{skill}",
                 "canonical_doc": f"agents/skills/{skill}.md",
-                "shim": f".agents/skills/{skill}/SKILL.md",
+                "shim": f".codex/personal/skills/{skill}/SKILL.md",
                 "command_ids": command_ids,
                 "capability_ids": capability_ids,
                 "phase_ids": phase_ids,

@@ -53,7 +53,7 @@ Target-State-First と Decision Sufficiency は
 
 ## Skills And Subagents
 
-- Public Codex skill discovery: `.agents/skills/`
+- Public Codex skill discovery: `.codex/personal/skills/`
 - Human-readable public skill docs: `agents/skills/`
 - Workflow-routed internal and compatibility routines: `agents/internal-routines/`
 - Codex runtime config and subagent registry: `.codex/config.toml`

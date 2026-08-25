@@ -8,7 +8,7 @@
 # downstream design pr-processing.md PR queue specialization consumer
 # downstream design ../../templates/agents/schedule.md schedule projection consumer
 # downstream implementation ../task_catalog.yaml task routing projection consumer
-# downstream implementation ../../.agents/skills/agent-orchestration/SKILL.md runtime discovery consumer
+# downstream implementation ../../.codex/personal/skills/agent-orchestration/SKILL.md runtime discovery consumer
 # @dependency-end
 
 schema = "agent-canon.execution-time-aware-orchestration.v3"
@@ -213,7 +213,7 @@ required_markers = [
 
 [[consumers]]
 id = "runtime-shim"
-path = ".agents/skills/agent-orchestration/SKILL.md"
+path = ".codex/personal/skills/agent-orchestration/SKILL.md"
 kind = "runtime_reference"
 reference_mode = "reference"
 required_markers = [

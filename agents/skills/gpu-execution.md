@@ -12,7 +12,7 @@ downstream design ./environment-maintenance.md consumes canonical Docker device 
 downstream implementation ../../tools/experiments/run_gpu_command.py provider-independent direct-command CLI
 downstream implementation ../../tools/experiments/run_managed_experiment.py optional managed provider adapter
 downstream implementation ../../tools/ci/run_gpu_container.sh single-entry Docker injection adapter with internal CDI/all selection
-downstream implementation ../../.agents/skills/gpu-execution/SKILL.md Codex discovery shim
+downstream implementation ../../.codex/personal/skills/gpu-execution/SKILL.md Codex discovery shim
 downstream implementation ../../tests/agent_tools/test_gpu_execution_docker_all_contract.py single-entry Docker documentation regression contract
 upstream environment ../../agent-canon-environment.toml audited managed ExperimentRunner provider identity and runtime item
 @dependency-end

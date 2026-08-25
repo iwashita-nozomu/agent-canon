@@ -652,7 +652,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
                 "missing-positive-convention-compliance-command",
                 result.stdout,
             )
-            self.assertNotIn(".agents/skills", result.stdout)
+            self.assertNotIn(".codex/personal/skills", result.stdout)
 
     def test_policy_source_tables_exclude_generated_skill_shims(self) -> None:
         """Every skill policy source resolves to its canonical prose owner."""
@@ -679,7 +679,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         }
 
         self.assertFalse(
-            any(path.startswith(".agents/skills/") for path in paths | tool_references)
+            any(path.startswith(".codex/personal/skills/") for path in paths | tool_references)
         )
 
     def test_missing_workflow_hook_fails(self) -> None:
@@ -1234,7 +1234,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
     ) -> None:
         """Literature-backed skill-call order surfaces are manifest-backed."""
         self.assertNotIn(
-            ".agents/skills/agent-orchestration/SKILL.md",
+            ".codex/personal/skills/agent-orchestration/SKILL.md",
             LITERATURE_BACKED_SKILL_CALL_ORDER_MARKERS,
         )
         self.assertIn(
@@ -1292,7 +1292,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         )
         self.assertFalse(
             any(
-                path.startswith(".agents/skills/")
+                path.startswith(".codex/personal/skills/")
                 for path in STATIC_READ_VALIDATION_POLICY_MARKERS
             )
         )

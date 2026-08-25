@@ -4,14 +4,14 @@
 # responsibility Predicts tool and hook rejection gates before edits are handed to agents.
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md defines handoff packet fields
 # upstream design ../../agents/skills/codex-task-workflow.md owns implementation preflight routing
-# upstream design ../../.agents/skills/codex-task-workflow/SKILL.md exposes implementation preflight routing
+# upstream design ../../.codex/personal/skills/codex-task-workflow/SKILL.md exposes implementation preflight routing
 # upstream design ../../agents/skills/experiment-lifecycle.md owns experiment execution lifecycle routing
-# upstream design ../../.agents/skills/experiment-lifecycle/SKILL.md exposes experiment execution lifecycle routing
+# upstream design ../../.codex/personal/skills/experiment-lifecycle/SKILL.md exposes experiment execution lifecycle routing
 # upstream design ../../documents/experiments/experiment-registry.md defines managed experiment registry contract
 # upstream design ../../tools/README.md documents tool entrypoints
 # upstream design ../../documents/tools/README.md documents user-facing tool routes
 # upstream implementation ./log_surface_inventory.py checks hook/tool/skill log-surface drift
-# upstream implementation ../../.agents/skills/oop-readability-check/SKILL.md owns OOP readability review routing
+# upstream implementation ../../.codex/personal/skills/oop-readability-check/SKILL.md owns OOP readability review routing
 # upstream implementation ./task_authority.py owns library implementation authority.
 # upstream implementation ../bin/agent-canon owns selected style checks.
 # upstream implementation ./responsibility_scope.py validates responsibility owner scopes
@@ -87,7 +87,7 @@ HOOK_SURFACE_PREFIXES = (
 HOOK_CONFIG_PATHS = frozenset({".codex/hooks.json"})
 STRICT_SCHEMA_JSON_PATHS = HOOK_CONFIG_PATHS
 SKILL_SURFACE_PREFIXES = (
-    ".agents/skills/",
+    ".codex/personal/skills/",
     "agents/skills/",
 )
 TOOL_SURFACE_PREFIXES = (
@@ -111,7 +111,7 @@ AGENT_PROTOCOL_PATHS = frozenset(
 TOOL_CATALOG_PATHS = frozenset({"tools/catalog.yaml"})
 EXPERIMENT_EXECUTION_SURFACE_PATHS = frozenset(
     {
-        ".agents/skills/experiment-lifecycle/SKILL.md",
+        ".codex/personal/skills/experiment-lifecycle/SKILL.md",
         "agents/skills/experiment-lifecycle.md",
         "agents/workflows/experiment-workflow.md",
         "documents/experiments/experiment-registry.md",

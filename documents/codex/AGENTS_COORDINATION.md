@@ -82,7 +82,7 @@ lifecycle policy.
 
 ## Skills
 
-- Canonical path: `.agents/skills/`
+- Canonical path: `.codex/personal/skills/`
 
 ## 実行入口
 

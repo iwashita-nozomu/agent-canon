@@ -331,7 +331,7 @@ dashboard、report、tmp、cache を対象にします。
 Bootstrap の `codex prepare` は global `$CODEX_HOME` を変更せず、明示 runtime
 root 内の `codex-home/` に skills、agents、hooks、config の verified
 manifest-managed link を作ります。加えて、control root に `$HOME` を明示した
-install/update は `~/.agents/skills/<skill>`、`~/.codex/agents/<role>.toml`、および
+install/update は `~/.codex/personal/skills/<skill>`、`~/.codex/agents/<role>.toml`、および
 `~/.codex/config.toml` を個別に管理します。最後のリンク先は AgentCanon checkout
 内の ignored な personal source で、既存の regular config は bytes と mode を保持
 して移行し、uninstall で regular file に戻します。hooks、認証、session、history、

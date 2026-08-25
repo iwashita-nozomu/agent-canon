@@ -15,7 +15,9 @@ downstream implementation ../../tools/agent_tools/skill_dependency_map.py valida
 -->
 
 このディレクトリは、public Codex skill 文書の人間向け正本です。
-機械 discovery 用の `SKILL.md` は `.agents/skills/` を正本にします。
+機械 discovery 用の `SKILL.md` は `.codex/personal/skills/` に materialize します。
+この view は source checkout の編集用で、Codex の global discovery は
+`~/.agents/skills/` から個別リンク経由で行います。
 
 ## Visualization Ownership
 
@@ -36,13 +38,14 @@ or copy the universal omission/granularity policy into adapter entries.
   Skills define boundaries and maintenance.
 - Use when: adding, routing, reviewing, or explaining public AgentCanon skills.
 - Boundary: long skill behavior belongs in each `agents/skills/<skill>.md` and
-  runtime discovery belongs in `.agents/skills/<skill>/SKILL.md`.
+  runtime discovery belongs in `.codex/personal/skills/<skill>/SKILL.md`.
 
 ## Rules
 
 - skill の目的、使う場面、関連正本は `agents/skills/` に書きます。
 - `AGENTS.md` には長い skill 説明を複製しません。
-- `.agents/skills/` は Codex の auto-discovery path です。
+- `.codex/personal/skills/` は ignored な生成 view です。Codex の global
+  auto-discovery path は `~/.agents/skills/` です。
 - 人間が skill を明示する場合は plain text ではなく `$skill-name` を使います。
 - 例: `$research-workflow`、`$adaptive-improvement-loop`、`$paper-writing`
 - 新しい public skill を追加するときは `catalog.yaml` と対応文書を同時に更新します。
@@ -51,7 +54,7 @@ or copy the universal omission/granularity policy into adapter entries.
 ## Skill Visibility Naming
 
 ユーザー向け skill 名は `research-workflow` のような plain hyphen-case を使います。
-catalog に登録し、この directory に文書化し、`.agents/skills/<skill>/SKILL.md`
+catalog に登録し、この directory に文書化し、`.codex/personal/skills/<skill>/SKILL.md`
 から公開し、`.codex/config.toml` で有効化します。
 
 runtime-internal skill shim は `_runtime-helper` のように先頭 underscore を使います。
@@ -95,7 +98,7 @@ GPU profile の admission semantics は `gpu-execution` に残します。
 
 - docs completeness、docs consistency、notation、logic gap、citation/evidence、critical/report、research perspective review は public skill ではなく、workflow が自動で要求する review pass として扱います。
 - artifact placement、CLI adapter、static validation は `agents/internal-routines/`、`agents/canonical/`、`documents/conventions/REVIEW_PROCESS.md` の責務に寄せます。
-- `.agents/skills/<skill>/SKILL.md` shim がない routine は `agents/internal-routines/` に置きます。AgentCanon public skill へ昇格するときだけ `agents/skills/` 文書、catalog entry、shim を同じ変更で追加します。Codex は `.agents/skills/` を自動探索するため、列挙 config は追加しません。
+- `.codex/personal/skills/<skill>/SKILL.md` shim がない routine は `agents/internal-routines/` に置きます。AgentCanon public skill へ昇格するときだけ `agents/skills/` 文書、catalog entry、shim を同じ変更で追加します。bootstrap が `~/.agents/skills/<skill>` をこの view にリンクするため、列挙 config は追加しません。
 - agent orchestration は public skill として先頭に出し、task 開始時に runtime が拾えるようにします。
 - subagent bootstrap は public skill として出し、repo-changing task の stage separation で使います。
 - carry-over の吸い上げは `documents/notes/` と worktree log を正本にし、独立 public skill にはしません。
@@ -118,10 +121,10 @@ in the Codex host runtime.
 ## Codex Defaults
 
 - AgentCanon public skills are discovered automatically from
-  `.agents/skills/<skill>/SKILL.md`; `.codex/config.toml` does not duplicate the
+  `.codex/personal/skills/<skill>/SKILL.md`; `.codex/config.toml` does not duplicate the
   catalog as a second registry.
 - Parent repositories add repo-specific skills only through an official
-  parent- or subtree-owned `.agents/skills/<skill>/SKILL.md` surface.
+  parent- or subtree-owned `.codex/personal/skills/<skill>/SKILL.md` surface.
 - AgentCanon-owned public skills appear in `catalog.yaml`; official system skills stay in the host-provided lane above.
 - Codex では `AGENTS.md` と `agents/canonical/CODEX_WORKFLOW.md` を先に読み、repo task の skill 選択は `$agent-orchestration` から始めます。
 - task ごとの skill 選択は `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。依存 module の source clone、lifecycle、cleanup が scope の場合は `$dependency-module-change` を先に通し、AgentCanon 固有の pin/update route はその一般規約を参照する具体例として扱います。
@@ -183,5 +186,5 @@ in the Codex host runtime.
 
 1. `agents/skills/<family>.md` を更新する
 1. `agents/skills/catalog.yaml` を更新する
-1. `.agents/skills/<family>/SKILL.md` を更新する
+1. `.codex/personal/skills/<family>/SKILL.md` を更新する
 1. 必要なら `agents/canonical/CODEX_WORKFLOW.md` と `agents/canonical/CODEX_SUBAGENTS.md` の routing を更新する

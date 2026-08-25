@@ -194,7 +194,7 @@ def write_workflow_monitoring(report_dir: Path) -> None:
             ),
             (
                 "- runtime_feedback=observed source=user "
-                "target=.agents/skills/agent-learning/SKILL.md "
+                "target=.codex/personal/skills/agent-learning/SKILL.md "
                 "action=prompt_repair evidence=unit-test"
             ),
             "- review_decision=approve feedback_actions_resolved=yes",
@@ -843,7 +843,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
                 monitoring.replace(
                     (
                         "- runtime_feedback=observed source=user "
-                        "target=.agents/skills/agent-learning/SKILL.md "
+                        "target=.codex/personal/skills/agent-learning/SKILL.md "
                         "action=prompt_repair evidence=unit-test\n"
                     ),
                     "",

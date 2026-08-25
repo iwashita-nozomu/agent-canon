@@ -1439,7 +1439,7 @@ fn participates_in_duplicate_title_check(path: &Path) -> bool {
 
 fn canonical_priority(record: &DocumentRecord) -> (usize, String) {
     let path = &record.path;
-    if path.starts_with(".agents/skills/") {
+    if path.starts_with(".codex/personal/skills/") {
         return (0, path.clone());
     }
     if path.starts_with("agents/skills/") {

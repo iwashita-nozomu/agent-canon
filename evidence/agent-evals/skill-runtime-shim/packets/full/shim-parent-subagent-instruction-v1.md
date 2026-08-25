@@ -17,7 +17,7 @@ Keep the evaluation read-only and do not assign work from adapter prose.
 
 ## Canonical Target Files
 
-- `.agents/skills/subagent-bootstrap/SKILL.md`
+- `.codex/personal/skills/subagent-bootstrap/SKILL.md`
 - `agents/skills/subagent-bootstrap.md`
 
 ## Prompt Dependency Files

@@ -167,7 +167,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
         target_globs = {entry.get("target_glob") for entry in evals}
         for required_glob in (
-            ".agents/skills/*/SKILL.md",
+            ".codex/personal/skills/*/SKILL.md",
             "agents/skills/*.md",
             "agents/internal-routines/*.md",
             "agents/workflows/*.md",
@@ -226,11 +226,11 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         )
         self.assertEqual(
             by_id["agent-orchestration-skill-call-routing"]["target"],
-            ".agents/skills/agent-orchestration/SKILL.md",
+            ".codex/personal/skills/agent-orchestration/SKILL.md",
         )
         self.assertEqual(
             by_id["codex-task-workflow-convention-gate"]["target"],
-            ".agents/skills/codex-task-workflow/SKILL.md",
+            ".codex/personal/skills/codex-task-workflow/SKILL.md",
         )
         orchestration_check_ids = {
             str(item["id"])
@@ -369,7 +369,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         for eval_id, target_glob in (
             (
                 "test-design-validation-failure-response-shim",
-                ".agents/skills/test-design/SKILL.md",
+                ".codex/personal/skills/test-design/SKILL.md",
             ),
             (
                 "test-design-validation-failure-response-doc",

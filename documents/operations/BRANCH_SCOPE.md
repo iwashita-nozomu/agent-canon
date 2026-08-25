@@ -6,9 +6,9 @@ upstream design README.md durable document index
 downstream design ../../agents/canonical/CODEX_WORKFLOW.md consumes commit correctness closeout contract
 downstream design ../../agents/workflows/agent-canon-pr-workflow.md consumes branch, commit, and PR scope split contract
 downstream design ../../agents/skills/codex-task-workflow.md exposes commit correctness workflow guidance
-downstream design ../../.agents/skills/codex-task-workflow/SKILL.md exposes commit correctness runtime guidance
+downstream design ../../.codex/personal/skills/codex-task-workflow/SKILL.md exposes commit correctness runtime guidance
 downstream design ../../agents/skills/pr-processing.md exposes PR merge scope review
-downstream design ../../.agents/skills/pr-processing/SKILL.md exposes PR merge scope review
+downstream design ../../.codex/personal/skills/pr-processing/SKILL.md exposes PR merge scope review
 @dependency-end
 -->
 

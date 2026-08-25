@@ -41,7 +41,7 @@ class SkillShimMaterializerTest(unittest.TestCase):
         ):
             actual = fixed_point_acceptance(PROJECT_ROOT)
         self.assertEqual(actual["schema"], "agent_canon.skill_runtime_shim.fixed_point")
-        self.assertEqual(actual["version"], 2)
+        self.assertEqual(actual["version"], 3)
         self.assertEqual(actual["first_run"]["content_delta_count"], 0)
         self.assertEqual(actual["second_run"]["content_delta_count"], 0)
         self.assertTrue(actual["equal_record_digests"])
@@ -64,7 +64,7 @@ class SkillShimMaterializerTest(unittest.TestCase):
         digest = provenance["record_digest"]
         if not isinstance(digest, str):
             raise AssertionError("record digest is not a string")
-        runtime_path = PROJECT_ROOT / ".agents/skills" / skill / "SKILL.md"
+        runtime_path = PROJECT_ROOT / ".codex/personal/skills" / skill / "SKILL.md"
         original = runtime_path.read_text(encoding="utf-8")
         self.assertIn(f'"record_digest":"{digest}"', original)
         runtime_path.write_text(
@@ -82,7 +82,7 @@ class SkillShimMaterializerTest(unittest.TestCase):
         """Generated section-only bodies must keep all unmatched blocks and remain blocked."""
         context = build_context(PROJECT_ROOT)
         skill = "agent-orchestration"
-        runtime_path = PROJECT_ROOT / ".agents/skills" / skill / "SKILL.md"
+        runtime_path = PROJECT_ROOT / ".codex/personal/skills" / skill / "SKILL.md"
         expected = render_shim(build_record(context, skill))
         original = runtime_path.read_text(encoding="utf-8")
         runtime_path.write_text(
@@ -113,7 +113,7 @@ class SkillShimMaterializerTest(unittest.TestCase):
         context = build_context(PROJECT_ROOT)
         skill = "agent-orchestration"
         expected = render_shim(build_record(context, skill))
-        runtime_path = PROJECT_ROOT / ".agents/skills" / skill / "SKILL.md"
+        runtime_path = PROJECT_ROOT / ".codex/personal/skills" / skill / "SKILL.md"
         original = runtime_path.read_text(encoding="utf-8")
         runtime_path.write_text(
             "---\nname: agent-orchestration\ndescription: "
@@ -139,7 +139,7 @@ class SkillShimMaterializerTest(unittest.TestCase):
         canonical_start = legacy.index("## Canonical Skill")
         commands_start = legacy.index("## Tool Commands")
         subset = legacy[:canonical_start] + legacy[commands_start:]
-        runtime_path = PROJECT_ROOT / ".agents/skills" / skill / "SKILL.md"
+        runtime_path = PROJECT_ROOT / ".codex/personal/skills" / skill / "SKILL.md"
         original = runtime_path.read_text(encoding="utf-8")
         runtime_path.write_text(subset, encoding="utf-8")
         try:
@@ -158,10 +158,10 @@ class SkillShimMaterializerTest(unittest.TestCase):
         legacy = expected
         owner_line = (
             "Canonical workflow and policy: "
-            "[agent-orchestration](../../../agents/skills/agent-orchestration.md).\n"
+            "[agent-orchestration](../../../../agents/skills/agent-orchestration.md).\n"
         )
         self.assertIn(owner_line, legacy)
-        runtime_path = PROJECT_ROOT / ".agents/skills" / skill / "SKILL.md"
+        runtime_path = PROJECT_ROOT / ".codex/personal/skills" / skill / "SKILL.md"
         original = runtime_path.read_text(encoding="utf-8")
         runtime_path.write_text(legacy.replace(owner_line, "", 1), encoding="utf-8")
         try:
@@ -183,7 +183,7 @@ class SkillShimMaterializerTest(unittest.TestCase):
                     "@dependency-start",
                     "contract skill",
                     "responsibility Exposes agent-orchestration for runtime discovery.",
-                    "upstream design ../../../agents/skills/agent-orchestration.md owner",
+                    "upstream design ../../../../agents/skills/agent-orchestration.md owner",
                     "@dependency-end",
                     "-->",
                 )

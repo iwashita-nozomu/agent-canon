@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Validates and pushes Template/AgentCanon agent update branches.
 # upstream design ../../agents/workflows/agent-update-branch-workflow.md defines branch lanes
-# downstream design ../../.agents/skills/agent-update-branch/SKILL.md documents invocation
+# downstream design ../../.codex/personal/skills/agent-update-branch/SKILL.md documents invocation
 # @dependency-end
 set -euo pipefail
 
@@ -38,7 +38,7 @@ path_allowed() {
   case "$lane" in
     knowledge-eval)
       [[ "$path" == evidence/agent-evals/* ]] && return 0
-      [[ "$path" == .agents/skills/*/SKILL.md ]] && return 0
+      [[ "$path" == .codex/personal/skills/*/SKILL.md ]] && return 0
       [[ "$path" == reports/agents/*/agent_evaluation.md ]] && return 0
       [[ "$path" == reports/agents/*/workflow_monitoring.md ]] && return 0
       return 1

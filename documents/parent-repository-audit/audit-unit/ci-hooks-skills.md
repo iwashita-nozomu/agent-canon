@@ -32,7 +32,7 @@ semantic route と typed tool command を持つ。shim は薄い adapter で、c
 
 - `agents/skills/catalog.yaml`
 - `agents/skills/skill-dependencies.yaml`
-- `.agents/skills/*/SKILL.md`
+- `.codex/personal/skills/*/SKILL.md`
 - `tools/agent_tools/skill_shim_materializer.py`
 - `tools/agent_tools/skill_dependency_map.py`
 - `.github/`、hooks、`check_agent_runtime_alignment.py`

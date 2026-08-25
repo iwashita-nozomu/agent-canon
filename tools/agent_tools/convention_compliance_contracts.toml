@@ -12,7 +12,7 @@
 schema_version = 1
 
 # Skill policy markers belong to agents/skills/<skill>.md canonical prose owners.
-# Generated .agents/skills/<skill>/SKILL.md adapters use dedicated shim readback gates.
+# Generated .codex/personal/skills/<skill>/SKILL.md adapters use dedicated shim readback gates.
 # AGENTS.md and ROOT_AGENTS.md are reader maps; operational marker contracts stay in owners.
 
 [[contracts]]

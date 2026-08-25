@@ -9,7 +9,7 @@ upstream design agent-eval-accumulation.md accumulated eval repair loop
 upstream design result-artifact-writeout.md durable raw and summary artifact writeout
 upstream design issue-finding-report.md durable issue candidate writing
 upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py owns dashboard API fields
-downstream implementation ../../.agents/skills/runtime-log-repair/SKILL.md exposes this workflow as a runtime skill
+downstream implementation ../../.codex/personal/skills/runtime-log-repair/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
 

@@ -4,7 +4,7 @@
 contract skill
 responsibility Documents worktree-start for this repository.
 upstream design ../canonical/skills.md skill canon registry
-downstream design ../../.agents/skills/worktree-start/SKILL.md runtime skill shim
+downstream design ../../.codex/personal/skills/worktree-start/SKILL.md runtime skill shim
 @dependency-end
 -->
 

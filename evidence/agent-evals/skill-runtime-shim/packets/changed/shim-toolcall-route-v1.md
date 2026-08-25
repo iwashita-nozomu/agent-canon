@@ -18,7 +18,7 @@ semantics. Keep the evaluation read-only and do not invent an execution payload.
 
 ## Canonical Target Files
 
-- `.agents/skills/structure-planning/SKILL.md`
+- `.codex/personal/skills/structure-planning/SKILL.md`
 - `agents/skills/structure-planning.md`
 
 ## Prompt Dependency Files

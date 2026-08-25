@@ -10,7 +10,7 @@ upstream design prose-reasoning-graph.md shared graph projection contract
 upstream design html-output.md browser-readable rendering route
 upstream implementation ../../tools/agent_tools/visualization_contract.py owns the exact D2.4 seven-function API and ToolCall validation
 upstream implementation ../../tools/agent_tools/route.py emits the singular canonical owner route
-downstream implementation ../../.agents/skills/code-visualization/SKILL.md exposes the skill to Codex.
+downstream implementation ../../.codex/personal/skills/code-visualization/SKILL.md exposes the skill to Codex.
 @dependency-end
 -->
 

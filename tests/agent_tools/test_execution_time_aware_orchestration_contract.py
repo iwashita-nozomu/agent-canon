@@ -10,7 +10,7 @@
 # upstream design ../../templates/agents/schedule.md schedule projection
 # upstream implementation ../../tools/agent_tools/check_execution_time_aware_orchestration.py production contract checker
 # upstream implementation ../../tools/agent_tools/skill_tool_commands.py selected-skill command packet
-# downstream implementation ../../.agents/skills/agent-orchestration/SKILL.md runtime discovery shim
+# downstream implementation ../../.codex/personal/skills/agent-orchestration/SKILL.md runtime discovery shim
 # @dependency-end
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ CONTRACT_FIXTURE_PATHS = (
     "agents/skills/catalog.yaml",
     "agents/task_catalog.yaml",
     "templates/agents/schedule.md",
-    ".agents/skills/agent-orchestration/SKILL.md",
+    ".codex/personal/skills/agent-orchestration/SKILL.md",
     "tools/agent_tools/check_execution_time_aware_orchestration.py",
 )
 
@@ -171,7 +171,7 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
             root = self.fixture_root(temporary_directory)
             self.append(
                 root,
-                ".agents/skills/agent-orchestration/SKILL.md",
+                ".codex/personal/skills/agent-orchestration/SKILL.md",
                 "\n- Prompt keywords route ready nodes.\n",
             )
             self.assert_rejected(root, "keyword_based_routing")

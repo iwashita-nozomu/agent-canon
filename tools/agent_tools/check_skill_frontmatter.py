@@ -22,7 +22,7 @@ from typing import cast
 
 import yaml
 
-SKILL_GLOB = ".agents/skills/*/SKILL.md"
+SKILL_GLOB = ".codex/personal/skills/*/SKILL.md"
 FRONTMATTER_DELIMITER = "---"
 REQUIRED_STRING_FIELDS = ("name", "description")
 SKILL_NAME_RE = re.compile(r"_?[a-z0-9]+(?:-[a-z0-9]+)*")

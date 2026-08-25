@@ -9,7 +9,7 @@ upstream design result-artifact-writeout.md raw result and summary artifact poli
 upstream design report-writing.md reader-facing evidence report policy
 downstream design refactor-loop.md consumes finding packets for repair slices
 upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits design evidence findings
-downstream implementation ../../.agents/skills/tool-finding-report/SKILL.md exposes this workflow as a runtime skill
+downstream implementation ../../.codex/personal/skills/tool-finding-report/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
 

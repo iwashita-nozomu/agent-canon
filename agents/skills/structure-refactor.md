@@ -11,7 +11,7 @@ upstream design ../../documents/design/README.md design canon reader route
 upstream design refactor-loop.md behavior-preserving refactor loop
 upstream design dependency-analysis.md dependency and change-impact packets
 upstream design prose-reasoning-graph.md optional graph-backed prose diagnostics
-downstream implementation ../../.agents/skills/structure-refactor/SKILL.md exposes this workflow as a runtime skill
+downstream implementation ../../.codex/personal/skills/structure-refactor/SKILL.md exposes this workflow as a runtime skill
 downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this adapter dependency header
 @dependency-end
 -->

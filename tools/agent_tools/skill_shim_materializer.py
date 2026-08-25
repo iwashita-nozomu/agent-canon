@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Materializes and reads back the complete public Codex skill-shim adapter set.
-# upstream design ../../documents/design/skill-runtime-shim-materialization.md owns the v2 schema, migration, and fixed-point contract
+# upstream design ../../documents/design/skill-runtime-shim-materialization.md owns the v3 schema, migration, and fixed-point contract
 # upstream design ../../agents/skills/catalog.yaml owns public skill identity, discovery metadata, and command phases
 # upstream implementation ./skill_route_catalog.py owns typed route and dependency projections
 # upstream implementation ./skill_dependency_map.py owns graph/tool identity projections
@@ -63,14 +63,14 @@ except ImportError:
     )
 
 SCHEMA = "agent_canon.skill_runtime_shim"
-VERSION = 2
+VERSION = 3
 FIXED_POINT_SCHEMA = "agent_canon.skill_runtime_shim.fixed_point"
-MATERIALIZER_ID = "skill_shim_materializer.v2"
-TEMPLATE_ID = "skill-runtime-shim-md-v2"
-COMMAND_PACKET_TEMPLATE_ID = "skill-tool-command-packet-v2"
+MATERIALIZER_ID = "skill_shim_materializer.v3"
+TEMPLATE_ID = "skill-runtime-shim-md-v3"
+COMMAND_PACKET_TEMPLATE_ID = "skill-tool-command-packet-v3"
 MATERIALIZATION_RECORD_SCHEMA = "agent_canon.skill_runtime_shim.materialization_record"
-MATERIALIZATION_RECORD_VERSION = 2
-RUNTIME_ROOT = Path(".agents/skills")
+MATERIALIZATION_RECORD_VERSION = 3
+RUNTIME_ROOT = Path(".codex/personal/skills")
 CATALOG_PATH = Path("agents/skills/catalog.yaml")
 DEPENDENCY_PATH = Path("agents/skills/skill-dependencies.yaml")
 GRAPH_PATH = Path("documents/runtime/skill-dependency-graph.json")
@@ -410,12 +410,12 @@ def _catalog_discovery(entry: Mapping[str, object]) -> tuple[str, str]:
 
 
 def build_record(context: BuildContext, skill: str) -> dict[str, object]:
-    """Build one fixed-order v2 SkillRuntimeShimRecord."""
+    """Build one fixed-order v3 SkillRuntimeShimRecord."""
     entry = context.catalog_entries[skill]
     name, description = _catalog_discovery(entry)
     canonical_doc = _string(entry.get("canonical_doc"), f"{skill}.canonical_doc")
     shim_path = _string(entry.get("shim"), f"{skill}.shim")
-    if shim_path != f".agents/skills/{skill}/SKILL.md":
+    if shim_path != f".codex/personal/skills/{skill}/SKILL.md":
         raise MaterializerError("shim_path_mismatch", skill)
     if canonical_doc != f"agents/skills/{skill}.md":
         raise MaterializerError("canonical_doc_mismatch", skill)
@@ -458,7 +458,7 @@ def build_record(context: BuildContext, skill: str) -> dict[str, object]:
             "name": name,
             "description": description,
             "shim_path": shim_path,
-            "method": "automatic-.agents-skills-discovery",
+            "method": "managed-global-agents-skills-discovery",
         },
         "owner": {
             "canonical_doc": canonical_doc,
@@ -492,7 +492,7 @@ def build_record(context: BuildContext, skill: str) -> dict[str, object]:
     }
     if not tool_call_refs:
         raise MaterializerError("argument_schema_missing", skill)
-    record_digest = domain_digest("agent-canon.skill-runtime-shim.record.v2", record)
+    record_digest = domain_digest("agent-canon.skill-runtime-shim.record.v3", record)
     cast(dict[str, object], record["provenance"])["record_digest"] = record_digest
     return record
 
@@ -520,10 +520,12 @@ def _dependency_manifest_lines(record: Mapping[str, object]) -> list[str]:
     skill = cast(str, record["skill_id"])
     owner = cast(Mapping[str, object], record["owner"])
     canonical_doc = cast(str, owner["canonical_doc"])
+    runtime_dir = f"{RUNTIME_ROOT.as_posix()}/{skill}"
+    canonical_link = posixpath.relpath(canonical_doc, runtime_dir)
     body = [
         "contract skill",
         f"responsibility Exposes {skill} for runtime discovery.",
-        f"upstream design ../../../{canonical_doc} owner",
+        f"upstream design {canonical_link} owner",
     ]
     return ["<!--", "@dependency-start", *body, "@dependency-end", "-->"]
 
@@ -539,7 +541,7 @@ def _render_shim_template(
     skill = cast(str, record["skill_id"])
     description = json.dumps(cast(str, discovery["description"]), ensure_ascii=False)
     canonical_doc = cast(str, owner["canonical_doc"])
-    canonical_link = posixpath.relpath(canonical_doc, f".agents/skills/{skill}")
+    canonical_link = posixpath.relpath(canonical_doc, f"{RUNTIME_ROOT.as_posix()}/{skill}")
     lines = [
         "---",
         f"name: {discovery['name']}",

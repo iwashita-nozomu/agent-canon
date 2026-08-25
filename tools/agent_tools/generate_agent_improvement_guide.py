@@ -713,17 +713,16 @@ def is_agentcanon_root(root: Path) -> bool:
     """Return whether a path looks like the AgentCanon evidence root."""
     return (
         (root / "agents" / "evals" / "README.md").is_file()
-        or (root / ".agents" / "skills").is_dir()
+        or (root / ".codex" / "personal" / "skills").is_dir()
         or (root / "tools" / "agent_tools" / "generate_agent_improvement_guide.py").is_file()
         or (root / "agents" / "evals" / "results").is_dir()
-        or (root / ".agents" / "skills").is_dir()
     )
 
 
 def known_skill_ids(root: Path) -> frozenset[str]:
     """Return AgentCanon-owned skill ids from shim and human docs."""
     skills: set[str] = set()
-    for path in (root / ".agents" / "skills").glob("*/SKILL.md"):
+    for path in (root / ".codex" / "personal" / "skills").glob("*/SKILL.md"):
         skills.add(path.parent.name)
     for path in (root / "agents" / "skills").glob("*.md"):
         if path.name != "README.md":
@@ -789,7 +788,7 @@ def skill_source_path_candidates(skill: str) -> tuple[Path, ...]:
     """Return likely source paths that define one skill id."""
     slug = skill.removeprefix("$")
     return (
-        Path(".agents") / "skills" / slug / "SKILL.md",
+        Path(".codex") / "personal" / "skills" / slug / "SKILL.md",
         Path("agents") / "skills" / f"{slug}.md",
     )
 

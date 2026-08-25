@@ -9,7 +9,7 @@ upstream design ../../responsibility-scope.toml owns the tracked-path owner/clas
 upstream design ../skills/catalog.yaml owns public capability and command metadata
 upstream design ../skills/skill-dependencies.yaml owns prerequisite and routing relations
 upstream implementation ../../tools/agent_tools/parent_repository_audit.py owns deterministic unit selection and evidence receipts
-downstream implementation ../../.agents/skills/parent-repository-audit/SKILL.md exposes this source skill as a generated runtime adapter
+downstream implementation ../../.codex/personal/skills/parent-repository-audit/SKILL.md exposes this source skill as a generated runtime adapter
 @dependency-end
 -->
 

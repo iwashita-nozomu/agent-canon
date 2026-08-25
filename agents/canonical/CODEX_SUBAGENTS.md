@@ -810,7 +810,7 @@ runtime は再生成後に restart し、readback で反映を確認します。
 
 - human routing and inventory canon: `agents/`
 - permanent team ownership and write policy: `agents/agents_config.json`
-- skill shim: `.agents/skills/`
+- skill shim: `.codex/personal/skills/`
 - Codex project config: `.codex/config.toml`
 - generated Codex subagent readback views: `.codex/agents/*.toml`
 

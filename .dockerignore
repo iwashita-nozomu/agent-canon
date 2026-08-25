@@ -11,6 +11,9 @@
 !.codex/agents/
 !.codex/agents/**
 !.codex/config.toml
+!.codex/personal/
+!.codex/personal/skills/
+!.codex/personal/skills/**
 !bootstrap/
 !bootstrap/container/
 !bootstrap/container/**
