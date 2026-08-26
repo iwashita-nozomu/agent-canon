@@ -1704,8 +1704,24 @@ entries:
     family: agent_tools
     role: helper
     status: canonical
-    command: python3 tools/agent_tools/skill_document_reader.py
+    command: bootstrap.sh --control-parent-root <root> exec --root <registered-project> -- python3 tools/agent_tools/skill_document_reader.py
     writes: false
+    dispatch:
+      runtime: python
+      argv: [python3, tools/agent_tools/skill_document_reader.py]
+      execution_plane: tool-container
+      cwd: source-root
+      env: allowlisted
+      stdin: inherited
+      stdout: inherited
+      stderr: inherited
+      exit: propagate
+      signal: propagate
+      side_effect: read-only
+      output_root: none
+      written_paths: []
+      parity: legacy
+      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
     default_wiring:
       ci: false
       pr_check: false

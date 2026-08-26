@@ -169,9 +169,11 @@ required EOF flag is true. Canonical `agents/skills/<skill>.md` remains the
 owner prose and is read only by indexed, task-relevant heading sections.
 
 ```bash
-python3 tools/agent_tools/skill_document_reader.py index --path <skill.md>
-python3 tools/agent_tools/skill_document_reader.py chunk \
-  --path <skill.md> --heading "## <section>" --offset <next_offset>
+bootstrap.sh --control-parent-root <root> exec --root <registered-project> -- \
+  python3 tools/agent_tools/skill_document_reader.py index --path <skill.md>
+bootstrap.sh --control-parent-root <root> exec --root <registered-project> -- \
+  python3 tools/agent_tools/skill_document_reader.py chunk \
+    --path <skill.md> --heading "## <section>" --offset <next_offset>
 ```
 
 The transient owner-first update sets `implementation_read=ready` only when
