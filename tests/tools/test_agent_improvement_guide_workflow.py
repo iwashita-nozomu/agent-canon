@@ -47,6 +47,7 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
             text,
         )
         self.assertNotIn('mkdir -p "${report_dir}"', text)
+        self.assertIn("--output-mode 644", text)
 
 
 if __name__ == "__main__":

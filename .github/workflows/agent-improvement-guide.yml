@@ -60,7 +60,8 @@ jobs:
           ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
             exec --root "${GITHUB_WORKSPACE}" -- python3 \
             /usr/local/share/agent-canon/runtime/tools/agent_tools/generate_agent_improvement_guide.py \
-            --root . --runtime-root /var/lib/agent-canon/runtime --out "${container_guide}"
+            --root . --runtime-root /var/lib/agent-canon/runtime --out "${container_guide}" \
+            --output-mode 644
           cat "${guide_path}" >> "${GITHUB_STEP_SUMMARY}"
           echo "guide_path=${guide_path}" >> "$GITHUB_OUTPUT"
 

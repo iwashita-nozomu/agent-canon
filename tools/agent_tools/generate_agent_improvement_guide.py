@@ -714,6 +714,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="reports/agent-improvement-guide/agent-improvement-guide.md",
         help="Markdown output path.",
     )
+    parser.add_argument(
+        "--output-mode",
+        default="600",
+        choices=("600", "644"),
+        help="Output permission mode; CI guide artifacts use 644 for host readback.",
+    )
     return parser
 
 
@@ -954,7 +960,11 @@ def main() -> int:
     output = Path(args.out)
     boundary = runtime_artifact_boundary(root, args.runtime_root)
     guide = AgentImprovementGuide(root, boundary.root)
-    output = boundary.atomic_write_text(output, guide.render(guide.collect()))
+    output = boundary.atomic_write_text(
+        output,
+        guide.render(guide.collect()),
+        mode=int(args.output_mode, 8),
+    )
     print(f"AGENT_IMPROVEMENT_GUIDE={output}")
     return 0
 
