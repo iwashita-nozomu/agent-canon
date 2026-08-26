@@ -52,7 +52,6 @@ from report_artifact_checks import (  # noqa: E402
 from runtime_log_paths import (  # noqa: E402
     LOG_ARCHIVE_REMOTE,
     agent_canon_git_commit_key,
-    agent_report_archive_dir,
     codex_trace_key,
     hook_event_spool_root,
     log_environment_key,
@@ -6032,16 +6031,15 @@ def report_root_for_context(context: ArchiveContext, report_root: Path | None) -
 
 
 def _agent_report_archive_root(context: ArchiveContext) -> Path:
-    """Return the archive-owned report root without a source-tree fallback."""
-    if context.runtime_root is not None or os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip():
-        return agent_report_archive_dir(
-            context.source_root,
-            context.canon_root,
-            context.runtime_root,
-        )
-    # An explicit --archive-root is a legacy public CLI capability.  It is
-    # already authenticated as the archive clone by build_context, so derive
-    # the destination directly without consulting source-local paths.
+    """Return the report root beneath the archive clone selected by context.
+
+    ``runtime_root`` owns only producer spool/staging.  When callers provide
+    an explicit archive clone (the normal host publication path), deriving the
+    report destination from runtime path helpers would point at a second clone
+    and make the manifest path non-relative to ``context.archive_root``.
+    Keep every report destination relative to the one authenticated archive
+    root used by the transaction.
+    """
     return context.archive_root / DEFAULT_AGENT_REPORT_DESTINATION / context.repo_key
 
 
