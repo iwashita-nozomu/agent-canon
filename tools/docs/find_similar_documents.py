@@ -13,7 +13,7 @@ and produce a report plus simple merge-draft files for manual review.
 
 Usage:
   python3 tools/docs/find_similar_documents.py \
-    --runtime-root /abs/path/to/workspace/agent-canon-runtime/<run> [--min 0.5] \
+    --runtime-root /abs/path/to/external/agent-canon-runtime/<run> [--min 0.5] \
     [--documents-root /path/to/documents]
 
 Outputs are written beneath the explicit external runtime root, under a

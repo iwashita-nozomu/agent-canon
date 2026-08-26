@@ -37,9 +37,6 @@ def copy_required_surfaces(root: Path) -> None:
         ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
         "templates/documents/github/pull-request/agent_canon.md",
         "agents/workflows/agent-canon-pr-workflow.md",
-        "issues/README.md",
-        "issues/closed/AC-20260517-eval-accumulation-gaps.md",
-        "issues/closed/AC-20260513-durable-finding-auto-promotion.md",
         "README.md",
     ):
         source = ROOT / relative
@@ -129,16 +126,8 @@ def test_no_submodule_checkout_helper_remains() -> None:
     assert "checkout_agent_canon_submodule" not in CHECKER.read_text(encoding="utf-8")
 
 
-def test_issue_mirror_runtime_stays_below_authorized_parent() -> None:
-    """Issue publication writes its report below the authorized repository."""
-    path = ROOT / ".github" / "workflows" / "issue-mirror.yml"
-    workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
-    sync_job = workflow["jobs"]["issue-mirror-sync"]
-    runtime = sync_job["env"]["AGENT_CANON_RUNTIME_ROOT"]
-    assert runtime == "${{ github.workspace }}/workspace/agent-canon-runtime/issue-mirror"
-    assert "RUNNER_TEMP" not in path.read_text(encoding="utf-8")
-    cleanup = next(
-        step for step in sync_job["steps"] if step.get("name") == "Remove workflow runtime"
-    )
-    assert cleanup["if"] == "always()"
-    assert 'find "${AGENT_CANON_RUNTIME_ROOT}" -depth -delete' in cleanup["run"]
+def test_workflows_do_not_restore_workspace_runtime_defaults() -> None:
+    """GitHub workflows keep runtime state at each checked-out install root."""
+    workflow_root = ROOT / ".github" / "workflows"
+    for path in workflow_root.glob("*.y*ml"):
+        assert "workspace/agent-canon-runtime" not in path.read_text(encoding="utf-8")

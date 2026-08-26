@@ -1,6 +1,6 @@
 # AgentCanon shared tool-runtime lifecycle manifest.
 # This file contains policy only; runtime ownership is recorded under the
-# explicit runtime root selected by bootstrap.sh.
+# source-owned runtime root selected by bootstrap.sh.
 
 [container]
 name_template = "agent-canon-tools"
@@ -43,5 +43,5 @@ sync_on_boot_delay_seconds = 300
 # The host control plane owns this private checkout. The tool container only
 # receives the external runtime spool and never receives Git credentials.
 remote = "git@github.com:iwashita-nozomu/agent-canon-log.git"
-operational_clone = "control-parent-root/agent-canon-log"
+operational_clone = "install-root-parent/agent-canon-log"
 legacy_clone = "runtime-root/archive/agent-canon-log"

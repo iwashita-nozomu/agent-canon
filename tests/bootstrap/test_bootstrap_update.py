@@ -423,6 +423,39 @@ def test_update_then_codex_prepare_reads_current_tracked_adapters(tmp_path: Path
     assert all(Path(entry["target"]).is_symlink() for entry in skill_links)
 
 
+def test_codex_prepare_places_config_at_code_home_root(tmp_path: Path) -> None:
+    """Codex reads the managed config at CODEX_HOME/config.toml."""
+    manager, _docker = _runtime(tmp_path)
+    manager.install()
+    manager.codex_prepare()
+    config_link = manager.paths.codex_home / "config.toml"
+    assert config_link.is_symlink()
+    assert config_link.resolve() == (ROOT / ".codex" / "config.toml").resolve()
+    assert not (manager.paths.codex_home / "config" / "config.toml").exists()
+
+
+def test_container_codex_links_project_to_host_live_install_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Resident validation sources stay in-image while links target host live files."""
+    control = tmp_path / "control"
+    control.mkdir()
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setenv("AGENT_CANON_HOST_INSTALL_ROOT", str(ROOT))
+    manager = BootstrapRuntime(control, control / "runtime", repository_root=ROOT)
+    links = manager._managed_links()
+    assert links
+    for entry in links:
+        source = Path(entry["source"])
+        assert source.exists()
+        assert str(source).startswith(str(ROOT) + "/")
+        validation_source = Path(entry.get("validation_source", entry["source"]))
+        assert validation_source.exists()
+        assert str(validation_source).startswith(str(ROOT) + "/")
+    assert any(entry["surface"] == "skills" for entry in links)
+    assert any(entry["surface"] == "config" for entry in links)
+
+
 def test_non_owned_image_update_materializes_absent_personal_skill_view(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

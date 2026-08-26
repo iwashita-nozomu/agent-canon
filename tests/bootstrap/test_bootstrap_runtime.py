@@ -18,6 +18,8 @@ from tools.agent_tools.bootstrap_runtime import (  # noqa: E402
     BootstrapError,
     BootstrapRuntime,
     DockerAdapter,
+    build_parser,
+    run,
     sha256_bytes,
     validate_roots,
 )
@@ -104,6 +106,7 @@ def test_default_source_runtime_rebuilds_without_copying_legacy_state(
         manager._write_state(fresh)
         manager._finalize_legacy_runtime_reset()
     assert not legacy.exists()
+    assert not legacy.parent.exists()
 
 
 def test_explicit_roots_canonicalize_dot_segments_after_symlink_validation(
@@ -553,6 +556,291 @@ def test_rollback_restarts_previous_verified_mount_generation(
     state = manager.status()["details"]["state"]
     assert state["current_generation"] != current
     assert state["generations"][state["current_generation"]]["state"] == "current"
+
+
+def test_container_rollback_restores_previous_targets_and_generation_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Resident rollback applies the host-provided previous target manifest."""
+    control = tmp_path / "control"
+    runtime_root = control / "runtime"
+    control.mkdir()
+    (control / "private-log").mkdir()
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    manager = BootstrapRuntime(
+        control, runtime_root, repository_root=REPOSITORY_ROOT
+    )
+    manager._ensure_layout()
+    current_root, previous_root = tmp_path / "current", tmp_path / "previous"
+    current_root.mkdir()
+    previous_root.mkdir()
+    current_id = "sha256:candidate-image-1234567890"
+    previous_id = "sha256:previous-image-0987654321"
+    current_digest = "current-target"
+    previous_digest = "previous-target"
+    current_target = {
+        "digest": current_digest,
+        "host_root": str(current_root),
+        "root": f"/targets/{current_digest}",
+        "mode": "read-only",
+    }
+    previous_target = {
+        "digest": previous_digest,
+        "host_root": str(previous_root),
+        "root": f"/targets/{previous_digest}",
+        "mode": "read-only",
+    }
+    state = manager._new_state()
+    state.update(
+        {
+            "state": "ready",
+            "targets": {current_digest: current_target},
+            "current_generation": "generation-current",
+            "rollback_generation": "generation-previous",
+            "generations": {
+                "generation-current": {
+                    "image_id": current_id,
+                    "targets": {current_digest: current_target},
+                    "state": "current",
+                },
+                "generation-previous": {
+                    "image_id": previous_id,
+                    "targets": {previous_digest: previous_target},
+                    "state": "rollback",
+                },
+            },
+            "resources": {
+                "image": {"id": current_id, "state": "present", "owned": True},
+                "container": {"id": "container-current", "state": "running", "owned": True},
+            },
+        }
+    )
+    manager._write_mounts(state)
+    manager._write_mount_manifest(state)
+    manager._write_state(state)
+    (runtime_root / "rollback-mounts.tsv").write_text(
+        f"target\t{previous_digest}\t{previous_root}\t/targets/{previous_digest}\tread-only\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AGENT_CANON_CURRENT_IMAGE_ID", current_id)
+    monkeypatch.setenv("AGENT_CANON_RESTORE_IMAGE_ID", previous_id)
+    monkeypatch.setenv("AGENT_CANON_RESTORE_IMAGE_REF", previous_id)
+    args = build_parser().parse_args(
+        [
+            "--container-control",
+            "--repository-root",
+            str(REPOSITORY_ROOT),
+            "--control-parent-root",
+            str(control),
+            "--runtime-root",
+            str(runtime_root),
+            "rollback",
+        ]
+    )
+    result = run(args)
+    assert result["code"] == "previous_generation_restored"
+    restored = json.loads((runtime_root / "state.json").read_text(encoding="utf-8"))
+    assert restored["targets"] == {previous_digest: previous_target}
+    active = restored["generations"][restored["current_generation"]]
+    rollback = restored["generations"][restored["rollback_generation"]]
+    assert active["targets"] == {previous_digest: previous_target}
+    assert rollback["targets"] == {current_digest: current_target}
+    assert f"{previous_digest}\t{previous_root}\t/targets/{previous_digest}\tread-only" in (
+        runtime_root / "mounts.tsv"
+    ).read_text(encoding="utf-8")
+
+
+def test_container_restore_reads_mounted_target_backup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """State-only recovery reads the target backup through the runtime mount."""
+    control = tmp_path / "control"
+    runtime_root = control / "runtime"
+    control.mkdir()
+    (control / "private-log").mkdir()
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
+    manager._ensure_layout()
+    candidate_root, restored_root = tmp_path / "candidate", tmp_path / "restored"
+    candidate_root.mkdir()
+    restored_root.mkdir()
+    candidate_id = "sha256:candidate-image-1234567890"
+    restored_id = "sha256:restored-image-0987654321"
+    candidate_digest = "candidate-target"
+    restored_digest = "restored-target"
+    candidate_target = {
+        "digest": candidate_digest,
+        "host_root": str(candidate_root),
+        "root": f"/targets/{candidate_digest}",
+        "mode": "read-only",
+    }
+    restored_target = {
+        "digest": restored_digest,
+        "host_root": str(restored_root),
+        "root": f"/targets/{restored_digest}",
+        "mode": "read-only",
+    }
+    state = manager._new_state()
+    state.update(
+        {
+            "state": "ready",
+            "targets": {candidate_digest: candidate_target},
+            "current_generation": "generation-candidate",
+            "rollback_generation": "generation-restored",
+            "generations": {
+                "generation-candidate": {
+                    "image_id": candidate_id,
+                    "targets": {candidate_digest: candidate_target},
+                    "state": "current",
+                }
+            },
+            "resources": {
+                "image": {"id": candidate_id, "state": "present", "owned": True},
+                "container": {"id": "container-candidate", "state": "running", "owned": True},
+            },
+        }
+    )
+    manager._write_mounts(state)
+    manager._write_mount_manifest(state)
+    manager._write_state(state)
+    backup = runtime_root / "restore-targets.tsv"
+    backup.write_text(
+        f"target\t{restored_digest}\t{restored_root}\t/targets/{restored_digest}\tread-only\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AGENT_CANON_RESTORE_IMAGE_ID", restored_id)
+    monkeypatch.setenv(
+        "AGENT_CANON_CURRENT_IMAGE_ID", candidate_id
+    )
+    monkeypatch.setenv(
+        "AGENT_CANON_RESTORE_TARGETS_FILE",
+        str(backup),
+    )
+    args = build_parser().parse_args(
+        [
+            "--container-control",
+            "--repository-root",
+            str(REPOSITORY_ROOT),
+            "--control-parent-root",
+            str(control),
+            "--runtime-root",
+            str(runtime_root),
+            "restore",
+        ]
+    )
+    result = run(args)
+    assert result["code"] == "previous_generation_restored"
+    restored = json.loads((runtime_root / "state.json").read_text(encoding="utf-8"))
+    assert restored["targets"] == {restored_digest: restored_target}
+    assert restored["generations"][restored["current_generation"]]["targets"] == {
+        restored_digest: restored_target
+    }
+    assert restored["generations"][restored["rollback_generation"]]["targets"] == {
+        candidate_digest: candidate_target
+    }
+
+
+def test_container_target_only_rollback_toggles_generations_without_image_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Target generation rollback uses one plan and preserves the image."""
+    control = tmp_path / "control"
+    runtime_root = control / "runtime"
+    control.mkdir()
+    (control / "private-log").mkdir()
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    image_id = "sha256:shared-image-1234567890"
+    image_ref = "agent-canon-tools:shared"
+    monkeypatch.setenv("AGENT_CANON_IMAGE_ID", image_id)
+    monkeypatch.setenv("AGENT_CANON_IMAGE_REF", image_ref)
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_ID", "container-shared")
+    manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
+    manager._ensure_layout()
+    state = manager._new_state()
+    state.update(
+        {
+            "state": "ready",
+            "resources": {
+                "image": {"id": image_id, "tag": image_ref, "state": "present", "owned": True},
+                "container": {"id": "container-shared", "state": "running", "owned": True},
+            },
+        }
+    )
+    manager._write_mounts(state)
+    manager._write_mount_manifest(state)
+    manager._write_state(state)
+    target_a, target_b = tmp_path / "target-a", tmp_path / "target-b"
+    target_a.mkdir()
+    target_b.mkdir()
+
+    def target_args(action: str, root: Path, digest: str) -> Any:
+        monkeypatch.setenv("AGENT_CANON_TARGET_HOST_ROOT", str(root))
+        monkeypatch.setenv("AGENT_CANON_TARGET_CONTAINER_ROOT", f"/targets/{digest}")
+        monkeypatch.setenv("AGENT_CANON_TARGET_DIGEST", digest)
+        return build_parser().parse_args(
+            [
+                "--container-control",
+                "--repository-root",
+                str(REPOSITORY_ROOT),
+                "--control-parent-root",
+                str(control),
+                "--runtime-root",
+                str(runtime_root),
+                "target",
+                action,
+                "--root",
+                str(root),
+                "--mode",
+                "read-only",
+            ]
+        )
+
+    run(target_args("add", target_a, "target-a"))
+    run(target_args("add", target_b, "target-b"))
+    plan = runtime_root / "rollback-plan.tsv"
+    assert plan.is_file()
+    assert "target-a" in plan.read_text(encoding="utf-8")
+
+    def rollback_args() -> Any:
+        monkeypatch.setenv("AGENT_CANON_RESTORE_IMAGE_ID", image_id)
+        monkeypatch.setenv("AGENT_CANON_RESTORE_IMAGE_REF", image_ref)
+        monkeypatch.setenv("AGENT_CANON_CURRENT_IMAGE_ID", image_id)
+        monkeypatch.setenv("AGENT_CANON_CURRENT_IMAGE_REF", image_ref)
+        return build_parser().parse_args(
+            [
+                "--container-control",
+                "--repository-root",
+                str(REPOSITORY_ROOT),
+                "--control-parent-root",
+                str(control),
+                "--runtime-root",
+                str(runtime_root),
+                "rollback",
+            ]
+        )
+
+    def mount_backup(digest: str, root: Path) -> None:
+        (runtime_root / "rollback-mounts.tsv").write_text(
+            f"target\t{digest}\t{root}\t/targets/{digest}\tread-only\n",
+            encoding="utf-8",
+        )
+
+    mount_backup("target-a", target_a)
+    first = run(rollback_args())
+    first_state = json.loads((runtime_root / "state.json").read_text(encoding="utf-8"))
+    assert first["code"] == "previous_generation_restored"
+    assert set(first_state["targets"]) == {"target-a"}
+    assert first_state["resources"]["image"]["id"] == image_id
+    assert first_state["current_generation"] != first_state["rollback_generation"]
+    assert "target-b" in plan.read_text(encoding="utf-8")
+
+    mount_backup("target-b", target_b)
+    second = run(rollback_args())
+    second_state = json.loads((runtime_root / "state.json").read_text(encoding="utf-8"))
+    assert second["code"] == "previous_generation_restored"
+    assert set(second_state["targets"]) == {"target-b"}
+    assert second_state["resources"]["image"]["id"] == image_id
+    assert second_state["current_generation"] != first_state["current_generation"]
 
 
 def test_symlink_state_write_fails_closed(
