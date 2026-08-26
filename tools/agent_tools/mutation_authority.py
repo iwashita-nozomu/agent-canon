@@ -176,6 +176,40 @@ def _command_segments(command: str) -> tuple[tuple[str, ...], ...]:
     return tuple(tuple(segment) for segment in segments if segment)
 
 
+def _repository_topic_clone_operation(command: str) -> str | None:
+    """Classify only the canonical conflict-preserving clone lifecycle command."""
+    for segment in _command_segments(command):
+        if not segment:
+            continue
+        try:
+            interpreter = next(
+                index for index, token in enumerate(segment) if token in {"python", "python3"}
+            )
+        except StopIteration:
+            continue
+        arguments = segment[interpreter + 1 :]
+        script_index = next(
+            (
+                index
+                for index, token in enumerate(arguments)
+                if Path(token).name == "repository_topic_clone.py"
+            ),
+            None,
+        )
+        if script_index is None or script_index + 1 >= len(arguments):
+            continue
+        operation = arguments[script_index + 1]
+        if operation not in {"merge-main", "resume-merge", "finalize-merge"}:
+            continue
+        if operation in {"resume-merge", "finalize-merge"} and not {
+            "--inventory",
+            "--plan",
+        }.issubset(arguments):
+            return "repository_topic_clone_preservation_inputs_missing"
+        return f"repository_topic_clone_{operation.replace('-', '_')}"
+    return None
+
+
 def _bash_mutation(command: str) -> tuple[bool, tuple[str, ...], str]:
     segments = _command_segments(command)
     if not segments:
@@ -253,6 +287,14 @@ def _mutation_request(tool_name: str, tool_input: Mapping[str, object]) -> tuple
         if not isinstance(command, str):
             return True, (), "bash_command_missing", ""
         mutation, paths, reason = _bash_mutation(command)
+        lifecycle_operation = _repository_topic_clone_operation(command)
+        if lifecycle_operation is not None:
+            return (
+                mutation,
+                (),
+                lifecycle_operation,
+                hashlib.sha256(command.encode()).hexdigest(),
+            )
         return mutation, paths, reason, hashlib.sha256(command.encode()).hexdigest()
     return False, (), "not_mutating_tool", ""
 
@@ -451,6 +493,47 @@ def evaluate_mutation_authority(
             evidence_ref,
             command_sha,
         )
+    if reason in {"git_merge", "git_rebase"}:
+        return MutationAuthorityDecision(
+            "blocked",
+            "raw_git_merge_or_rebase_forbidden",
+            True,
+            actor_id,
+            role_id,
+            parent_agent_id,
+            str(identity.get("scope_digest", "")),
+            paths,
+            evidence_ref,
+            command_sha,
+        )
+    canonical_lifecycle = reason.startswith("repository_topic_clone_")
+    if canonical_lifecycle:
+        if role_id != "integration_executor":
+            return MutationAuthorityDecision(
+                "blocked",
+                "repository_topic_clone_lifecycle_requires_integration_executor",
+                True,
+                actor_id,
+                role_id,
+                parent_agent_id,
+                str(identity.get("scope_digest", "")),
+                paths,
+                evidence_ref,
+                command_sha,
+            )
+        if reason == "repository_topic_clone_preservation_inputs_missing":
+            return MutationAuthorityDecision(
+                "blocked",
+                "repository_topic_clone_preservation_inputs_missing",
+                True,
+                actor_id,
+                role_id,
+                parent_agent_id,
+                str(identity.get("scope_digest", "")),
+                paths,
+                evidence_ref,
+                command_sha,
+            )
     if hook_spool_root is None or not any(
         _spawn_event_matches(path, actor_id, role_id, str(identity.get("scope_digest", "")))
         for path in hook_spool_root.glob("**/*.json")
@@ -511,11 +594,8 @@ def evaluate_mutation_authority(
                 evidence_ref,
                 command_sha,
             )
-    target_metadata_only = (
-        bool(environment.get(WRITER_CHECKOUT_ROOT_ENV, "").strip())
-        and reason in {"git_commit", "git_merge", "git_rebase"}
-    )
-    if not target_metadata_only and (
+    target_metadata_only = writer_target is not None and reason == "git_commit"
+    if not canonical_lifecycle and not target_metadata_only and (
         not paths
         or not all(
             _allowed_path(path, active_root, allowed_files, allowed_directories)

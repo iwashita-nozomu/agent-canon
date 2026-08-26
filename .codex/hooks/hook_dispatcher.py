@@ -153,7 +153,7 @@ HOOK_EVENT_CONTRACTS: dict[str, HookEventContract] = {
     "PreToolUse": HookEventContract(
         active=True,
         matchers=("Bash|apply_patch|python|python3",),
-        failure="unauthorized_destructive_git=block; writer_target_packet_missing=block; writer_target_mismatch=block; malformed_payload=fail_open; spool_failure=fail_open",
+        failure="unauthorized_destructive_git=block; raw_git_merge_or_rebase=block; writer_target_packet_missing=block; writer_target_mismatch=block; malformed_payload=fail_open; spool_failure=fail_open",
         telemetry="one bounded fingerprint-only local spool event",
     ),
     "PostToolUse": HookEventContract(

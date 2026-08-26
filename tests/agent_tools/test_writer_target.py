@@ -44,12 +44,12 @@ def target(root: str, branch: str = "fix/942") -> WriterTarget:
     return WriterTarget(root, branch, "iwashita-nozomu/agent-canon", ("tools/",))
 
 
-def write_identity(root: Path) -> None:
+def write_identity(root: Path, role_id: str = "implementer") -> None:
     value: dict[str, object] = {
         "schema": "agent-canon.runtime-agent-identity.v1",
         "run_id": "run-942",
         "agent_id": "writer-942",
-        "role_id": "implementer",
+        "role_id": role_id,
         "parent_agent_id": "parent-942",
         "authority": "write_capable_child",
         "allowed_files": ["src/owned.py"],
@@ -71,7 +71,7 @@ def write_identity(root: Path) -> None:
         json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
     target_path = root / "runtime" / "agent_identity.json"
-    target_path.parent.mkdir()
+    target_path.parent.mkdir(parents=True, exist_ok=True)
     target_path.write_text(json.dumps(value, sort_keys=True), encoding="utf-8")
     (root / "spawn.json").write_text(
         json.dumps(
@@ -100,7 +100,7 @@ def write_identity(root: Path) -> None:
         },
     }
     packet_path = root / ".agent-canon" / "writer-target.json"
-    packet_path.parent.mkdir()
+    packet_path.parent.mkdir(parents=True, exist_ok=True)
     packet_path.write_text(json.dumps(packet, sort_keys=True), encoding="utf-8")
 
 
@@ -323,6 +323,90 @@ def test_pretooluse_uses_exact_structured_allowed_paths() -> None:
             hook_spool_root=root,
         )
         assert packet_mutation.reason == "writer_target_packet_mutation_forbidden"
+
+
+def test_raw_merge_and_rebase_are_rejected_even_inside_target() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        environment = {
+            "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+            "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+            "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+        }
+        for command in ("git merge origin/main", "git rebase origin/main"):
+            decision = evaluate_mutation_authority(
+                {"tool_name": "Bash", "tool_input": {"command": command}},
+                report_dir=root,
+                active_root=root,
+                environment=environment,
+                hook_spool_root=root,
+            )
+            assert decision.reason == "raw_git_merge_or_rebase_forbidden"
+
+
+def test_canonical_merge_main_is_integration_only_and_preservation_gated() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root, role_id="integration_executor")
+        runtime_environment = {
+            "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+            "AGENT_CANON_RUNTIME_ROLE_ID": "integration_executor",
+            "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+        }
+        command = (
+            "python3 tools/agent_tools/repository_topic_clone.py merge-main "
+            "--url git@github.com:iwashita-nozomu/agent-canon.git "
+            "--repo-name agent-canon --workspace-root /tmp --topic issue-942 "
+            "--branch fix/942 --owner-evidence evidence.txt"
+        )
+        allowed = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": command}},
+            report_dir=root,
+            active_root=root,
+            environment=runtime_environment,
+            hook_spool_root=root,
+        )
+        assert allowed.status == "allowed"
+        missing_inputs = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {
+                    "command": command.replace("merge-main", "finalize-merge")
+                },
+            },
+            report_dir=root,
+            active_root=root,
+            environment=runtime_environment,
+            hook_spool_root=root,
+        )
+        assert missing_inputs.reason == "repository_topic_clone_preservation_inputs_missing"
+        finalized = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {
+                    "command": command.replace("merge-main", "finalize-merge")
+                    + " --inventory inventory.json --plan plan.json"
+                },
+            },
+            report_dir=root,
+            active_root=root,
+            environment=runtime_environment,
+            hook_spool_root=root,
+        )
+        assert finalized.status == "allowed"
+        write_identity(root, role_id="implementer")
+        ordinary = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": command}},
+            report_dir=root,
+            active_root=root,
+            environment={
+                **runtime_environment,
+                "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+            },
+            hook_spool_root=root,
+        )
+        assert ordinary.reason == "repository_topic_clone_lifecycle_requires_integration_executor"
 
 
 def test_workspace_writer_without_static_packet_is_blocked() -> None:
