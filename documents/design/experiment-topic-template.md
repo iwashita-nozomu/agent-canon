@@ -73,7 +73,7 @@ case codeはrun-level summary、atomic file publication、visualizationを所有
 - config/provenance completion readback
 - run-level state/summary/manifest type
 - atomic text/JSON/JSONL publication
-- case orchestrationとrun acceptance
+- case orchestrationとrun-level operational state
 - summary artifact digest readback
 
 独立`artifact_schema.py`と`artifact_io.py`は作らない。統合後もatomic replacement、typed terminal state、
@@ -112,6 +112,11 @@ artifactをrun rootへ追加しない。
 
 registry/runnerのrequired eval artifactは`summary/summary.json`と`summary/cases.jsonl`を参照する。
 旧root-level `summary.json` / `cases.jsonl`はfallbackにしない。
+
+plan の completion は question、observables、evidence targets、protocol、resource、入力・環境条件、
+operational stop condition など実行に必要な宣言だけを対象にする。研究上の結果解釈、
+案の採否、レビュー判断は topic / research owner の post-run artifact であり、runner の
+開始・完了条件ではない。
 
 ## Materialization
 

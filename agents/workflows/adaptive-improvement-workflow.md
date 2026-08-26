@@ -121,6 +121,10 @@ backlog は単なる思いつき置き場ではなく、優先順付きの実行
 
 ## 6. Decision States
 
+ここで扱う decision は run 後の iteration 遷移です。実験 plan は question、comparison、
+observables、evidence targets、protocol、resource、operational stop condition を宣言すればよく、これらの
+decision や reviewer の判断を run 開始・完了の前提にしません。
+
 - `approved`
   - 今回の iteration outcome は採用可能
 - `backlog_continue`

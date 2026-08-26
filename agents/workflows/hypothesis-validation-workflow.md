@@ -243,6 +243,9 @@ cause/scope analysis に戻し、symptom-level repair を開始しません。
 ## Gate H4. 実装後の仮説判定
 
 実装後は「変更した」ではなく、仮説が支持されたかを判定します。
+この判定は実行後の結果解釈です。実験 plan の作成、run の開始、または operational
+completion を `supported`、`rejected`、`inconclusive` や reviewer decision で事前に
+ブロックしません。
 
 Validation test/check が失敗した場合は、通すために仮説、intended behavior/test、oracle、
 または required validation を縮めません。先に `failing_contract`、
