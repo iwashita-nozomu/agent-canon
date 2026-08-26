@@ -291,9 +291,10 @@ def validate_spawn_handoff(
     *,
     workspace_write_capable: bool,
     writer_target: WriterTarget | Mapping[str, object] | None,
+    checkout_identity: Mapping[str, object] | None = None,
 ) -> tuple[WriterTarget, ...]:
     """Validate one spawn boundary, exempting external-only publication roles."""
-    return validate_writer_target_allocations(
+    targets = validate_writer_target_allocations(
         (
             {
                 "owner": role_id,
@@ -302,6 +303,12 @@ def validate_spawn_handoff(
             },
         )
     )
+    if workspace_write_capable:
+        if checkout_identity is None:
+            raise WriterTargetError("writer_target:checkout_identity_required")
+        for target in targets:
+            validate_writer_target_identity(target, checkout_identity)
+    return targets
 
 
 def validate_wave_writer_targets(

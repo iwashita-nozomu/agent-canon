@@ -182,6 +182,28 @@ def test_spawn_tool_call_validates_writer_target_before_materialization() -> Non
         writer_target=writer,
     )
     assert call["arguments"]["writer_target"] == writer.as_dict()
+    for mismatch, expected in (
+        (
+            WriterTarget("/tmp/other", "fix/942", "local/repo", ("tools/",)),
+            "checkout_root_identity_mismatch",
+        ),
+        (
+            WriterTarget("/tmp/spawn", "main", "local/repo", ("tools/",)),
+            "branch_identity_mismatch",
+        ),
+        (
+            WriterTarget("/tmp/spawn", "fix/942", "other/repo", ("tools/",)),
+            "remote_identity_mismatch",
+        ),
+    ):
+        with pytest.raises(ValueError, match=expected):
+            materialize_subagent_spawn_tool_call(
+                role="worker",
+                agent_type="worker",
+                input="write the assigned files",
+                checkout_identity=identity,
+                writer_target=mismatch,
+            )
     with pytest.raises(ValueError, match="required_before_spawn"):
         materialize_subagent_spawn_tool_call(
             role="worker",

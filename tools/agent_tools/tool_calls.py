@@ -247,6 +247,7 @@ def materialize_subagent_spawn_tool_call(
         role,
         workspace_write_capable=workspace_write_capable,
         writer_target=writer_target,
+        checkout_identity=identity,
     )
     argument_properties: dict[str, Mapping[str, object]] = {
         "role": {"type": "string", "minLength": 1},
