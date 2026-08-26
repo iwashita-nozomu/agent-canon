@@ -79,6 +79,32 @@
         "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "written_paths": []
       }
+    },
+    {
+      "id": "skill-document-reader",
+      "probe_args": ["index", "--path", "tools/agent_tools/skill_document_reader.py"],
+      "observed": {
+        "argv": ["python3", "tools/agent_tools/skill_document_reader.py"],
+        "cwd": "source-root",
+        "stdin": "inherited",
+        "stdout": "inherited",
+        "stderr": "inherited",
+        "exit": "propagate",
+        "signal": "propagate",
+        "written_paths": []
+      },
+      "legacy_result": {
+        "exit_code": 0,
+        "stdout_sha256": "59b8688f813b4d490115edf487a35fb7f5c2385e745fc4dae47873551a08adbf",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_paths": []
+      },
+      "container_result": {
+        "exit_code": 0,
+        "stdout_sha256": "59b8688f813b4d490115edf487a35fb7f5c2385e745fc4dae47873551a08adbf",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_paths": []
+      }
     }
   ]
 }

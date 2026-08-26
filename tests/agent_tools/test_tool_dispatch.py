@@ -68,7 +68,12 @@ class ToolDispatchTest(unittest.TestCase):
         self.assertEqual(schema["default_parity"], "legacy")
         self.assertEqual(
             {spec.tool_id for spec in specs.values() if spec.parity == "verified"},
-            {"generate-agent-runtime-dashboard", "route", "template-bundle"},
+            {
+                "generate-agent-runtime-dashboard",
+                "route",
+                "skill-document-reader",
+                "template-bundle",
+            },
         )
 
     def test_dashboard_uses_container_and_external_artifact_route(self) -> None:

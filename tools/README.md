@@ -112,7 +112,7 @@ second README registry.
 | path-risk/profile selection | `python3 tools/agent_tools/classify_path_risk.py` |
 | Markdown/links/Mermaid | `tools/bin/agent-canon docs check` |
 | semantic repository search | `tools/bin/agent-canon semantic-index ...` |
-| bounded Skill read and EOF admission | `bootstrap.sh ... exec --root <registered-project> -- python3 tools/agent_tools/skill_document_reader.py` (shared tool container) |
+| bounded Skill read and EOF admission | `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...` (shared tool container) |
 
 ## Artifact and archive route
 

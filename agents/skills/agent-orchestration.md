@@ -111,7 +111,8 @@ fixed route:
 2. Read the generated discovered `SKILL.md` completely in bounded chunks. It is
    the complete compact Skill used for discovery, not a prefix of the canonical
    prose. Continue the same path from `next_offset` until `file_eof=true` using
-   `tools/agent_tools/skill_document_reader.py`. The compact Skill is the first
+   `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...`.
+   The compact Skill is the first
    operational owner. The Skill body is the first operational owner; here that
    body is the complete compact discovery text. If it resolves responsibility,
    operation, and validation,

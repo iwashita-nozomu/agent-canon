@@ -83,7 +83,8 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 Before the implementation stage, consume
 `agents/skills/agent-orchestration.md#Owner-First-Read-Trace`. Read the
 generated discovered `SKILL.md` in bounded chunks with
-`tools/agent_tools/skill_document_reader.py` until `file_eof=true`; it is the
+`bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...`
+until `file_eof=true`; it is the
 complete compact Skill. When that Skill delegates a decision, read only the
 indexed canonical owner sections needed for the task until
 `section_eof=true`. The current task update must name the active root Reader
