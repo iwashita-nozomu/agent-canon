@@ -624,6 +624,12 @@ def emit_bootstrap_output(
                         "ISSUE_WORKER_TOOL_CALL="
                         + json.dumps(dict(tool_call), sort_keys=True)
                     )
+                spawn_tool_call = runtime.issue_worker_dispatch.get("spawn_tool_call")
+                if isinstance(spawn_tool_call, Mapping):
+                    print(
+                        "ISSUE_WORKER_SPAWN_TOOL_CALL="
+                        + json.dumps(dict(spawn_tool_call), sort_keys=True)
+                    )
             print(
                 "ISSUE_WORKER_DISPATCH_ROUTE="
                 "tools/agent_tools/agent_team.py#dispatch_issue_worker"
@@ -1091,7 +1097,6 @@ def main(
     if (
         context.workflow_family_id == "issue_worker_publication"
         and context.issue_worker_candidate
-        and spawn is not None
     ):
         try:
             dispatched = dispatch_issue_worker(

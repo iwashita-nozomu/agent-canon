@@ -260,6 +260,7 @@ if __package__:
         CloseAgentLifecycleEvidence,
         materialize_close_agent_tool_call,
         materialize_issue_worker_tool_call,
+        materialize_subagent_spawn_tool_call,
         materialize_skill_tool_call_token,
     )
 else:
@@ -267,6 +268,7 @@ else:
         CloseAgentLifecycleEvidence,
         materialize_close_agent_tool_call,
         materialize_issue_worker_tool_call,
+        materialize_subagent_spawn_tool_call,
         materialize_skill_tool_call_token,
     )
 
@@ -536,6 +538,7 @@ __all__ = (
     "materialize_skill_tool_call_token",
     "materialize_close_agent_tool_call",
     "materialize_issue_worker_tool_call",
+    "materialize_subagent_spawn_tool_call",
     "dispatch_issue_worker",
     "CloseAgentLifecycleEvidence",
     "create_run_bundle",

@@ -32,7 +32,10 @@ if __package__:
         load_model_profile_registry,
         materialize_prompt_capsule,
     )
-    from .tool_calls import materialize_issue_worker_tool_call
+    from .tool_calls import (
+        materialize_issue_worker_tool_call,
+        materialize_subagent_spawn_tool_call,
+    )
 else:
     from checkout_identity import CheckoutIdentity, resolve_checkout_identity
     from issue_sync import (  # type: ignore[no-redef]
@@ -47,7 +50,10 @@ else:
         load_model_profile_registry,
         materialize_prompt_capsule,
     )
-    from tool_calls import materialize_issue_worker_tool_call
+    from tool_calls import (  # type: ignore[no-redef]
+        materialize_issue_worker_tool_call,
+        materialize_subagent_spawn_tool_call,
+    )
 
 
 PublisherSpawn = Callable[[str, str], str | None]
@@ -63,6 +69,7 @@ class IssueWorkerDispatch:
     prompt_capsule: MaterializedPromptCapsule | None = None
     tool_call: dict[str, object] | None = None
     publisher_agent_id: str | None = None
+    spawn_tool_call: dict[str, object] | None = None
 
     def as_dict(self) -> dict[str, object]:
         """Return route evidence without credentials or private Issue bodies."""
@@ -73,13 +80,14 @@ class IssueWorkerDispatch:
             "prompt_materialized": self.prompt_capsule is not None,
             "tool_call": self.tool_call,
             "publisher_agent_id": self.publisher_agent_id,
+            "spawn_tool_call": self.spawn_tool_call,
         }
 
 
 def dispatch_issue_worker(
     candidate: Mapping[str, object],
     objective: str,
-    spawn: PublisherSpawn,
+    spawn: PublisherSpawn | None = None,
     *,
     workspace_root: Path | str = ".",
     source_root: Path | str | None = None,
@@ -134,9 +142,29 @@ def dispatch_issue_worker(
         ),
         registry,
     )
+    spawn_tool_call = materialize_subagent_spawn_tool_call(
+        role="publisher",
+        agent_type="worker",
+        input=prompt.body,
+        checkout_identity=identity.as_dict(),
+    )
+    if spawn is None:
+        return IssueWorkerDispatch(
+            "pending",
+            handoff,
+            identity,
+            prompt,
+            spawn_tool_call=spawn_tool_call,
+        )
     publisher_agent_id = spawn("publisher", prompt.body)
     if not publisher_agent_id:
-        return IssueWorkerDispatch("blocked", handoff, identity, prompt)
+        return IssueWorkerDispatch(
+            "blocked",
+            handoff,
+            identity,
+            prompt,
+            spawn_tool_call=spawn_tool_call,
+        )
     tool_call = materialize_issue_worker_tool_call(
         handoff=handoff.as_dict(),
         publisher_agent_id=publisher_agent_id,
@@ -149,6 +177,7 @@ def dispatch_issue_worker(
         prompt,
         tool_call,
         publisher_agent_id,
+        spawn_tool_call,
     )
 
 

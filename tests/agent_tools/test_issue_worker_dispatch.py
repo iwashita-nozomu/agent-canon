@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import io
 import json
+import os
+import subprocess
 import sys
 import tempfile
 from contextlib import redirect_stdout
@@ -282,6 +284,61 @@ def test_bootstrap_t15_foreign_candidate_is_handoff_without_spawn() -> None:
         assert dispatch["status"] == "deferred"
         assert dispatch["handoff"]["reason"] == "other-repository"
         assert dispatch["tool_call"] is None
+
+
+def test_bootstrap_cli_materializes_spawn_handoff_without_injected_callback() -> None:
+    candidate = _candidate(durable_follow_up=True)
+
+    with tempfile.TemporaryDirectory(prefix="issue-worker-bootstrap-cli-") as root:
+        runtime_root = Path(root) / "runtime"
+        report_root = runtime_root / "reports"
+        run_id = "t15-bootstrap-cli"
+        environment = os.environ.copy()
+        environment["AGENT_CANON_RUNTIME_ROOT"] = str(runtime_root)
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"),
+                "--task",
+                "publish explicit feedback",
+                "--task-id",
+                "T15",
+                "--owner",
+                "codex",
+                "--run-id",
+                run_id,
+                "--workspace-root",
+                str(PROJECT_ROOT),
+                "--report-root",
+                str(report_root),
+                "--runtime-root",
+                str(runtime_root),
+                "--skip-agent-canon-preflight",
+                "--issue-worker-candidate",
+                json.dumps(candidate),
+            ],
+            cwd=PROJECT_ROOT,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert "ISSUE_WORKER_DISPATCH_STATUS=pending" in result.stdout
+        assert "ISSUE_WORKER_SPAWN_TOOL_CALL=" in result.stdout
+        manifest = yaml.safe_load(
+            (report_root / run_id / "team_manifest.yaml").read_text(encoding="utf-8")
+        )
+        dispatch = manifest["run"]["issue_worker_dispatch"]
+        assert dispatch["status"] == "pending"
+        spawn_tool_call = dispatch["spawn_tool_call"]
+        assert spawn_tool_call["tool_id"] == "spawn_agent"
+        assert spawn_tool_call["arguments"]["role"] == "publisher"
+        assert spawn_tool_call["arguments"]["agent_type"] == "worker"
+        assert spawn_tool_call["arguments"]["checkout_identity"]["remote"] == (
+            "iwashita-nozomu/agent-canon"
+        )
 
 
 def test_other_repository_candidate_is_no_mutation_handoff() -> None:
