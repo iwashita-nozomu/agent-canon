@@ -138,6 +138,32 @@ CHECKOUT_IDENTITY_PROMPT = (
     "repeat it for ordinary commands."
 )
 
+WRITER_TARGET_ROLE_IDS = frozenset(
+    {"worker", "spark_worker", "implementer", "integration_executor"}
+)
+WRITER_TARGET_PROMPT = (
+    "Write-capable handoffs must carry writer_target with an absolute checkout_root, "
+    "fixed branch, normalized remote owner/repository, and allowed_paths. The checkout "
+    "is prepared by repository-topic-clone before handoff; start with cwd equal to "
+    "checkout_root and branch equal to the target branch. Do not use git switch, git "
+    "checkout, branch rename, or git worktree operations; a target mismatch is a hard "
+    "stop before mutation."
+)
+CANONICAL_SPAWN_PROMPT = (
+    "Spawn only through the canonical AgentTeam dispatch and ToolCall route; "
+    "raw spawn_agent is not an admission path."
+)
+CANONICAL_SPAWN_ROLE_IDS = frozenset({"sol_parent", "manager", "manager_reviewer"})
+
+
+def role_boundary_prompt(role_id: str) -> str:
+    """Return the bounded checkout prompt for one generated role."""
+    if role_id in WRITER_TARGET_ROLE_IDS:
+        return f"{CHECKOUT_IDENTITY_PROMPT} {WRITER_TARGET_PROMPT} {CANONICAL_SPAWN_PROMPT}"
+    if role_id in CANONICAL_SPAWN_ROLE_IDS:
+        return f"{CHECKOUT_IDENTITY_PROMPT} {CANONICAL_SPAWN_PROMPT}"
+    return CHECKOUT_IDENTITY_PROMPT
+
 
 def _contains_static_forbidden_prefix(text: str) -> bool:
     lowered = text.casefold()
@@ -635,7 +661,7 @@ def load_model_profile_registry(
             {
                 "current_checkout_mode": "legacy_unspecified",
                 "parallel_requirements": ["disjoint_paths"],
-                "collision_action": "serialize_current_checkout_waves",
+                "collision_action": "reject_same_checkout_root_before_spawn",
                 "isolated_worktree_mode": "explicit_only",
             },
         ),
@@ -905,7 +931,7 @@ def materialize_prompt_capsule(
         request.role_id, request.profile_id
     )
     clauses = " ".join(clause.text for clause in role_clauses)
-    clauses = f"{clauses} {CHECKOUT_IDENTITY_PROMPT}".strip()
+    clauses = f"{clauses} {role_boundary_prompt(request.role_id)}".strip()
     projection_digest = registry.projection_digest_for_role(
         request.role_id, request.profile_id
     )
@@ -1139,7 +1165,7 @@ def generate_role_views(
         logical_role, contract_ref, sandbox = metadata[role_id]
         role_clauses = registry.instruction_clauses_for_role(role_id, profile.id)
         clauses = _render_instruction_clauses(role_clauses, projection)
-        clauses = f"{clauses} {CHECKOUT_IDENTITY_PROMPT}".strip()
+        clauses = f"{clauses} {role_boundary_prompt(role_id)}".strip()
         instructions = profile.role_template.format(
             role_id=role_id,
             model_alias=profile.model_alias,

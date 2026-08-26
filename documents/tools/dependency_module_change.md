@@ -26,15 +26,15 @@ python3 tools/agent_tools/dependency_module_change.py --root <parent-root> statu
 
 python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare \
   --topic <topic> --module <module-path> --branch <branch> \
-  --owner-evidence <file>
+  --owner-evidence <file> [--allowed-path <relative-path> ...]
 
 python3 tools/agent_tools/dependency_module_change.py --root <parent-root> merge-main \
   --topic <topic> --module <module-path> --branch <branch> \
-  --owner-evidence <file>
+  --owner-evidence <file> [--allowed-path <relative-path> ...]
 
 python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup \
   --topic <topic> --module <module-path> --branch <branch> \
-  --owner-evidence <file> \
+  --owner-evidence <file> [--allowed-path <relative-path> ...] \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
   [--publication-readback <publication-readback.json>]] [--apply]
 ```
@@ -52,3 +52,9 @@ publication readback は任意の追加 evidence です。いずれかを指定�
 PR lifecycle を一組で指定し、merged state では strict publication readback も検証します。
 全 command は dependency 固有の module identity と generic receipt を出力し、specialized
 mismatch 時も user-requested operation 自体は拒否しません。
+
+`prepare`、`merge-main`、`cleanup` は write-capable generic lifecycle に対して
+`allowed_paths` を明示的に渡します。`--allowed-path` を省略した canonical dependency
+operation は dependency clone 全体を所有するため `.` を明示値として使い、狭い責務を
+持つ caller はこの option を一つ以上指定してその範囲を forward します。adapter や generic
+lifecycle 側で scope を暗黙補完しません。

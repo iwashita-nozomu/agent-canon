@@ -101,8 +101,10 @@ else:
 
 if __package__:
     from .subagent_selection import COLLABORATION_OPERATIONS
+    from .writer_target import parse_writer_target
 else:
     from subagent_selection import COLLABORATION_OPERATIONS  # type: ignore[no-redef]
+    from writer_target import parse_writer_target  # type: ignore[no-redef]
 
 if __package__:
     from .team_config import (
@@ -554,8 +556,8 @@ SAME_ROLE_SUBAGENT_INSTANCE_POLICY = {
     "status": "allowed_with_distinct_packets",
     "identity_key": "role_id+instance_id+agent_type",
     "parallel_read_only": "allowed_when_input_packets_or_review_focus_are_distinct",
-    "parallel_write": "allowed_only_with_disjoint_write_scopes_and_integration_executor_order",
-    "collision_policy": "serialize_current_checkout_waves",
+    "parallel_write": "allowed_only_with_disjoint_writer_targets",
+    "collision_policy": "reject_same_checkout_root_before_spawn",
 }
 
 SAME_ROLE_SUBAGENT_REQUIRED_FIELDS = (
@@ -569,6 +571,14 @@ SAME_ROLE_SUBAGENT_REQUIRED_FIELDS = (
     "write_scope",
     "validation_route",
     "review_gate",
+    "writer_target",
+)
+
+WRITER_TARGET_REQUIRED_FIELDS = (
+    "checkout_root",
+    "branch",
+    "remote",
+    "allowed_paths",
 )
 
 COORDINATION_CAPABILITY_CONTRACT_REF = (
@@ -633,6 +643,19 @@ def same_role_subagent_policy_output_lines() -> tuple[str, ...]:
         f"SAME_ROLE_SUBAGENT_INSTANCE_KEY={SAME_ROLE_SUBAGENT_INSTANCE_POLICY['identity_key']}",
         "SAME_ROLE_SUBAGENT_REQUIRED_FIELDS="
         f"{','.join(SAME_ROLE_SUBAGENT_REQUIRED_FIELDS)}",
+    )
+
+
+def writer_target_policy_output_lines() -> tuple[str, ...]:
+    """Return the pre-spawn writer-target contract."""
+    return (
+        "WRITER_TARGET_POLICY=required_for_write_capable_handoffs",
+        "WRITER_TARGET_PREPARED_BY=repository-topic-clone.prepare",
+        "WRITER_TARGET_COLLISION=reject_same_checkout_root_before_spawn",
+        f"WRITER_TARGET_FIELDS={','.join(WRITER_TARGET_REQUIRED_FIELDS)}",
+        "WRITER_TARGET_PRETOOLUSE_ENV=AGENT_CANON_CHECKOUT_ROOT,AGENT_CANON_CHECKOUT_BRANCH,AGENT_CANON_WRITER_ALLOWED_PATHS(JSON)",
+        "WRITER_TARGET_READERS=target_omitted_and_shareable",
+        "WRITER_TARGET_REGISTRY=none",
     )
 
 
@@ -1483,7 +1506,11 @@ def manifest_run_lines(
         )
         lines.append("    initial_three_agent_intake_is_total_cap: false")
         lines.append("    max_write_subagents_scope: 'write-capable subagents only'")
-        initial_wave = recommended_initial_subagent_wave(
+        writer_targets = cast(
+            Mapping[str, object],
+            spec.writer_targets,
+        )
+        initial_slots = recommended_initial_subagent_wave_slots(
             spec.roles,
             active_subagents,
             spec.task_catalog,
@@ -1491,16 +1518,10 @@ def manifest_run_lines(
             _required_spec_source_root(spec) / ".codex" / "agents",
             workflow_family_id=spec.workflow_family_id,
             issue_worker_candidate=spec.issue_worker_candidate,
+            writer_targets=writer_targets,
         )
-        initial_wave_slots = recommended_initial_subagent_wave_slots(
-            spec.roles,
-            active_subagents,
-            spec.task_catalog,
-            spec.agent_type_selections,
-            _required_spec_source_root(spec) / ".codex" / "agents",
-            workflow_family_id=spec.workflow_family_id,
-            issue_worker_candidate=spec.issue_worker_candidate,
-        )
+        initial_wave_slots = initial_slots
+        initial_wave = tuple(slot.agent_type for slot in initial_slots)
         expansion_wave_slots = recommended_dynamic_expansion_wave_slots(
             spec.roles,
             active_subagents,
@@ -1510,6 +1531,7 @@ def manifest_run_lines(
             _required_spec_source_root(spec) / ".codex" / "agents",
             workflow_family_id=spec.workflow_family_id,
             issue_worker_candidate=spec.issue_worker_candidate,
+            writer_targets=writer_targets,
         )
         lines.append("  spawn_wave_recommendation:")
         lines.append(
@@ -1558,6 +1580,16 @@ def manifest_run_lines(
             lines.append("        standard_sequence_ref: run.standard_wave_sequence")
             lines.append("        agent_types: []")
             lines.append("        role_instances: []")
+        lines.append("    writer_targets:")
+        if writer_targets:
+            for owner, raw_target in sorted(writer_targets.items()):
+                target = parse_writer_target(raw_target)  # type: ignore[arg-type]
+                lines.append(f"      - owner: {str(owner)!r}")
+                lines.append("        target:")
+                for field, value in target.as_dict().items():
+                    lines.append(f"          {field}: {value!r}")
+        else:
+            lines.append("      []")
         lines.extend(render_role_topology(workflow_family, indent="    "))
         lines.append("  delegated_spawn_policy:")
         lines.append("    dynamic_mid_task_spawn: allowed")
@@ -1632,6 +1664,7 @@ def manifest_run_lines(
         lines.append("      - write_scope")
         lines.append("      - remaining_spawn_budget")
         lines.append("      - checkout_identity")
+        lines.append("      - writer_target")
         lines.append("    handoff_optional_fields:")
         lines.append("      - decision_sufficiency_packet_ref")
         lines.append("      - unresolved_branch")
@@ -1699,8 +1732,21 @@ def manifest_run_lines(
         lines.append("    scope_source_ref: run.pre_handoff_scope_policy")
         lines.append("    handoff_scope_status: seed_then_expand_before_handoff")
         lines.append("    disjoint_write_scopes_required: true")
-        lines.append("    overlapping_write_scopes: serialize_current_checkout_waves")
+        lines.append("    overlapping_write_scopes: reject_same_checkout_root_before_spawn")
         lines.append(f"    max_write_subagents: {max_write_subagents}")
+        lines.append("  writer_target_policy:")
+        lines.append("    required_for: write_capable_handoffs")
+        lines.append("    prepared_by: repository-topic-clone.prepare")
+        lines.append("    collision: reject_same_checkout_root_before_spawn")
+        lines.append(
+            "    pretooluse_environment: "
+            "AGENT_CANON_CHECKOUT_ROOT,AGENT_CANON_CHECKOUT_BRANCH,AGENT_CANON_WRITER_ALLOWED_PATHS(JSON)"
+        )
+        lines.append("    fields:")
+        for field in WRITER_TARGET_REQUIRED_FIELDS:
+            lines.append(f"      - {field}")
+        lines.append("    readers: target_omitted_and_shareable")
+        lines.append("    registry: none")
         lines.append("  workflow_family:")
         lines.append(f"    id: {spec.workflow_family_id}")
         lines.append(f"    name: {str(workflow_family['name'])!r}")
@@ -2370,11 +2416,19 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         if role.write_policy.mode != "read_only"
         else "do not edit repository files"
     )
+    writer_target = (
+        " Carry writer_target with absolute checkout_root, fixed branch, normalized remote, "
+        "and allowed_paths; start in that checkout and do not switch/checkout/rename branches "
+        "or create worktrees."
+        if role.id in {"implementer", "integration_executor"}
+        else ""
+    )
     return (
         f"You are the {role.id} role for {family_name}. Start from structured context artifacts and the "
         "owned role_document_packet named in the handoff; load cross_cutting_document_packet "
         "entries only when the selected route or review gate makes them active, otherwise mark "
         f"them not_applicable. Use allowed_paths and do_not_read as ownership boundaries. {write_scope}. "
+        f"{writer_target} "
         "When run.subagent_prompt_packet.subagent_startup_route is present, carry that "
         "structural route field into the next handoff or review result without turning it "
         "into prompt keyword skill activation. "
@@ -2383,7 +2437,8 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         "the next handoff or review result when repo-owned tools are part of the selected route. "
         "Carry one checkout_identity block with cwd, git_root, branch (or detached), head, "
         "and normalized remote owner/repository at the bounded transition points; do not "
-        "repeat it for ordinary commands. "
+        "repeat it for ordinary commands. Use the canonical AgentTeam dispatch route and "
+        "writer-target validator for spawn; do not invoke raw spawn_agent. "
         "Return findings or outputs tied to request_clause_ids, artifact paths, dependency-file "
         "headers for every edited or created text file, remaining planned work, and the next "
         "required gate."
@@ -2410,12 +2465,18 @@ def compact_role_prompt_contract(
     write_scope = (
         "read-only" if role.write_policy.mode == "read_only" else "bounded writer"
     )
+    writer_target = (
+        " carry writer_target (absolute checkout_root, fixed branch, normalized remote, allowed_paths); "
+        "do not switch or rename branches or create worktrees"
+        if role.id in {"implementer", "integration_executor"}
+        else ""
+    )
     return (
         f"{role.id} for {family_name}; {write_scope}; use structured context artifacts, "
         "role-specific packet, common packet only when active, allowed paths, "
         "subagent startup route when present, repo tool route fields, and the listed "
         "output fields."
-        " Include checkout_identity in every handoff where Git state matters."
+        f" Include checkout_identity in every handoff where Git state matters;{writer_target}."
     )
 
 
@@ -2432,6 +2493,8 @@ def role_prompt_must_include(role: Role) -> tuple[str, ...]:
     common.append("checkout_identity")
     if role.write_policy.mode != "read_only":
         common.extend(("write_policy", "allowed_files_or_directories"))
+    if role.id in {"implementer", "integration_executor"}:
+        common.append("writer_target")
     if role.id == "designer":
         common.extend(
             (

@@ -428,8 +428,8 @@ def validate_project_config() -> None:
         "writer isolation policy requirements must be explicit",
     )
     ensure(
-        writer_policy.get("collision_action") == "serialize_current_checkout_waves",
-        "writer collisions must serialize in the current checkout",
+        writer_policy.get("collision_action") == "reject_same_checkout_root_before_spawn",
+        "writer collisions must be rejected before spawning on a shared checkout",
     )
     ensure(
         writer_policy.get("isolated_worktree_mode")
@@ -1956,6 +1956,7 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         "do_not_read",
         "expected_output",
         "write_scope",
+        "writer_target",
         "validation_route",
         "remaining_spawn_budget",
     }
@@ -1988,6 +1989,7 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         "do_not_read",
         "expected_output",
         "write_scope",
+        "writer_target",
         "validation_route",
         "review_gate",
     }
@@ -2094,7 +2096,7 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
     )
     ensure(
         write_scope_policy.get("overlapping_write_scopes")
-        == "serialize_current_checkout_waves",
+        == "reject_same_checkout_root_before_spawn",
         f"task {task_id} manifest overlapping write scope policy must serialize current checkout waves",
     )
     ensure(

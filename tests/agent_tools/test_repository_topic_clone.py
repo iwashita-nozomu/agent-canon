@@ -18,6 +18,8 @@ from pathlib import Path
 
 import pytest
 import tools.agent_tools.repository_topic_clone as rtc
+from tools.agent_tools.checkout_identity import CheckoutIdentity
+from tools.agent_tools.writer_target import read_writer_target_packet
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOL_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "repository_topic_clone.py"
@@ -373,6 +375,51 @@ def test_request_reuses_local_and_remote_branch(tmp_path: Path) -> None:
         run_git(reused_remote.clone, "rev-parse", "--abbrev-ref", "@{upstream}")
         == "origin/feature/remote"
     )
+
+
+def test_request_and_merge_preserve_existing_writer_target_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+
+    def fake_identity(path: Path) -> CheckoutIdentity:
+        root = path.resolve()
+        return CheckoutIdentity(
+            cwd=str(root),
+            git_root=str(root),
+            branch=run_git(root, "symbolic-ref", "--short", "HEAD"),
+            head=run_git(root, "rev-parse", "HEAD"),
+            remote="local/repo",
+        )
+
+    monkeypatch.setattr(rtc, "resolve_checkout_identity", fake_identity)
+    prepared = rtc.request(
+        remote_url,
+        "repo-target",
+        workspace,
+        "topic-target",
+        "feature/target",
+        evidence,
+        allowed_paths=("src/owned.py",),
+    )
+    packet, _identity = read_writer_target_packet(prepared.clone)
+    assert packet.allowed_paths == ("src/owned.py",)
+    reused = rtc.request(
+        remote_url,
+        "repo-target",
+        workspace,
+        "topic-target",
+        "feature/target",
+        evidence,
+    )
+    assert reused.request.allowed_paths == ("src/owned.py",)
+    merged = rtc.merge_main(reused.request)
+    assert merged.request.allowed_paths == ("src/owned.py",)
+    after, _identity = read_writer_target_packet(prepared.clone)
+    assert after.allowed_paths == ("src/owned.py",)
 
 
 def test_local_branch_reuse_does_not_fetch_main_when_main_is_unavailable(

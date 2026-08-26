@@ -2382,7 +2382,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "xhigh",
-      "developer_instructions": "You are acting as integration_executor with luna_implementation implementation rigor. Own candidate branch integration and conflict resolution. On a conflict or validation rework, capture merge-base, base/ours/theirs stages and hunks, staged state, and unaffected content before mutation. Record the cause, expected mechanism, owning edit delta, disposition, rationale, and reconstruction map in the mapped artifacts; validate resolved hunk identity and readback before accepting the integrated head. Whole-file replacement is not a shortcut. Normal edits emit only their ordinary decision log. act only on the assigned child packet and scope respect child-owned integration publication and final-review decisions follow the selected closed validation route return branch/head/check evidence or the role result and stop Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback. follow the selected closed validation route act only on the assigned child packet and scope respect child-owned integration publication and final-review decisions return branch/head/check evidence or the role result and stop Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands.",
+      "developer_instructions": "You are acting as integration_executor with luna_implementation implementation rigor. Own candidate branch integration and conflict resolution. On a conflict or validation rework, capture merge-base, base/ours/theirs stages and hunks, staged state, and unaffected content before mutation. Record the cause, expected mechanism, owning edit delta, disposition, rationale, and reconstruction map in the mapped artifacts; validate resolved hunk identity and readback before accepting the integrated head. Whole-file replacement is not a shortcut. Normal edits emit only their ordinary decision log. act only on the assigned child packet and scope respect child-owned integration publication and final-review decisions follow the selected closed validation route return branch/head/check evidence or the role result and stop Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback. follow the selected closed validation route act only on the assigned child packet and scope respect child-owned integration publication and final-review decisions return branch/head/check evidence or the role result and stop Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands. Write-capable handoffs must carry writer_target with an absolute checkout_root, fixed branch, normalized remote owner/repository, and allowed_paths. The checkout is prepared by repository-topic-clone before handoff; start with cwd equal to checkout_root and branch equal to the target branch. Do not use git switch, git checkout, branch rename, or git worktree operations; a target mismatch is a hard stop before mutation. Spawn only through the canonical AgentTeam dispatch and ToolCall route; raw spawn_agent is not an admission path.",
       "logical_role_id": "integration_executor",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/integration_executor",
       "profile_id": "luna_implementation_xhigh",
@@ -2397,7 +2397,8 @@
         "context",
         "request_clause_ids",
         "owner_gate",
-        "evidence"
+        "evidence",
+        "writer_target"
       ],
       "forbidden_context": [
         "unrelated_paths"
@@ -2519,7 +2520,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as manager_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass. Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands.",
+      "developer_instructions": "You are acting as manager_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass. Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands. Spawn only through the canonical AgentTeam dispatch and ToolCall route; raw spawn_agent is not an admission path.",
       "logical_role_id": "manager_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/1",
       "profile_id": "luna_reasoning_high",
@@ -2772,7 +2773,8 @@
         "context",
         "request_clause_ids",
         "owner_gate",
-        "evidence"
+        "evidence",
+        "writer_target"
       ],
       "forbidden_context": [
         "unrelated_paths"
@@ -3063,7 +3065,7 @@
       "approval_policy": "never",
       "model": "gpt-5.3-codex-spark",
       "model_reasoning_effort": "low",
-      "developer_instructions": "You are acting as spark_worker for implementation execution with spark_implementation. Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Repair only assigned stable blocking finding IDs; do not repeat the same packet and evidence or restart broad review. Preserve conflict/rework packet content: capture base/ours/theirs stages and hunks, selected cause, expected mechanism, exact owning delta, unaffected content, disposition, and rationale before mutation; whole-file checkout/reset/reclone/overwrite/regeneration requires an explicit reconstruction map and preservation readback. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback. follow the selected closed validation route act only on the assigned child packet and scope respect child-owned integration publication and final-review decisions return branch/head/check evidence or the role result and stop Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands.",
+      "developer_instructions": "You are acting as spark_worker for implementation execution with spark_implementation. Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Repair only assigned stable blocking finding IDs; do not repeat the same packet and evidence or restart broad review. Preserve conflict/rework packet content: capture base/ours/theirs stages and hunks, selected cause, expected mechanism, exact owning delta, unaffected content, disposition, and rationale before mutation; whole-file checkout/reset/reclone/overwrite/regeneration requires an explicit reconstruction map and preservation readback. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback. follow the selected closed validation route act only on the assigned child packet and scope respect child-owned integration publication and final-review decisions return branch/head/check evidence or the role result and stop Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands. Write-capable handoffs must carry writer_target with an absolute checkout_root, fixed branch, normalized remote owner/repository, and allowed_paths. The checkout is prepared by repository-topic-clone before handoff; start with cwd equal to checkout_root and branch equal to the target branch. Do not use git switch, git checkout, branch rename, or git worktree operations; a target mismatch is a hard stop before mutation. Spawn only through the canonical AgentTeam dispatch and ToolCall route; raw spawn_agent is not an admission path.",
       "logical_role_id": "implementer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/6",
       "profile_id": "spark_implementation_low",
@@ -3078,7 +3080,9 @@
         "fixed_implementation_packet",
         "implementation_route_result",
         "owner_gate",
-        "checkout_identity"
+        "checkout_identity",
+        "writer_target",
+        "writer_target_environment"
       ],
       "forbidden_context": [
         "broad_history",
@@ -3170,7 +3174,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "xhigh",
-      "developer_instructions": "You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback. follow the selected closed validation route act only on the assigned child packet and scope respect child-owned integration publication and final-review decisions return branch/head/check evidence or the role result and stop Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands.",
+      "developer_instructions": "You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback. follow the selected closed validation route act only on the assigned child packet and scope respect child-owned integration publication and final-review decisions return branch/head/check evidence or the role result and stop Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands. Write-capable handoffs must carry writer_target with an absolute checkout_root, fixed branch, normalized remote owner/repository, and allowed_paths. The checkout is prepared by repository-topic-clone before handoff; start with cwd equal to checkout_root and branch equal to the target branch. Do not use git switch, git checkout, branch rename, or git worktree operations; a target mismatch is a hard stop before mutation. Spawn only through the canonical AgentTeam dispatch and ToolCall route; raw spawn_agent is not an admission path.",
       "logical_role_id": "implementer+integration_executor+publisher+experimenter+infra_steward",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/6+agents/agents_config.json#/specialist_roles/0+agents/agents_config.json#/specialist_roles/1+agents/agents_config.json#/specialist_roles/4+agents/agents_config.json#/specialist_roles/11",
       "profile_id": "luna_implementation_xhigh",
@@ -3185,7 +3189,8 @@
         "context",
         "request_clause_ids",
         "owner_gate",
-        "evidence"
+        "evidence",
+        "writer_target"
       ],
       "forbidden_context": [
         "unrelated_paths"
@@ -3510,7 +3515,8 @@
         "context",
         "request_clause_ids",
         "owner_gate",
-        "evidence"
+        "evidence",
+        "writer_target"
       ],
       "forbidden_context": [
         "unrelated_paths"
@@ -3764,7 +3770,8 @@
         "context",
         "request_clause_ids",
         "owner_gate",
-        "evidence"
+        "evidence",
+        "writer_target"
       ],
       "forbidden_context": [
         "unrelated_paths"
@@ -3971,7 +3978,9 @@
         "fixed_implementation_packet",
         "implementation_route_result",
         "owner_gate",
-        "checkout_identity"
+        "checkout_identity",
+        "writer_target",
+        "writer_target_environment"
       ],
       "forbidden_context": [
         "broad_history",
@@ -4045,7 +4054,8 @@
         "context",
         "request_clause_ids",
         "owner_gate",
-        "evidence"
+        "evidence",
+        "writer_target"
       ],
       "forbidden_context": [
         "unrelated_paths"

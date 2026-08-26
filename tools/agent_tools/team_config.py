@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -28,9 +28,11 @@ if TYPE_CHECKING:
     if __package__:
         from .packets import ActiveDesignPacketConfig
         from .workspace_scope import RepositoryRoots
+        from .writer_target import WriterTarget
     else:
         from packets import ActiveDesignPacketConfig
         from workspace_scope import RepositoryRoots
+        from writer_target import WriterTarget
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -82,6 +84,8 @@ class SubagentWaveSlot:
     role_id: str
     instance_id: str
     agent_type: str
+    write_capable: bool = False
+    writer_target: WriterTarget | None = None
 
     def __post_init__(self) -> None:
         """Default the role instance id from the selected executable agent."""
@@ -168,6 +172,7 @@ class RunBundleSpec:
     decision_sufficiency_packet: dict[str, object] | None = None
     decision_sufficiency_packet_ref: str = ""
     active_design_packet: ActiveDesignPacketConfig | None = None
+    writer_targets: Mapping[str, object] = field(default_factory=dict)
 
 
 def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:

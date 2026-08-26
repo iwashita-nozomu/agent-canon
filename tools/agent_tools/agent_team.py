@@ -179,6 +179,7 @@ if __package__:
         declared_team_capacity_derivation,
         default_quality_check_agent_types,
         dispatch_fixed_implementation,
+        dispatch_subagent_wave,
         format_agent_type_selections,
         parse_agent_type_selections,
         recommended_dynamic_expansion_wave_slots,
@@ -187,6 +188,7 @@ if __package__:
         recommended_initial_subagent_wave_slots,
         unique_codex_agents_for_roles,
         validate_agent_type_selections,
+        validate_writer_handoff_waves,
         workflow_spawn_budget,
         workflow_topology_policy_violations,
     )
@@ -200,6 +202,7 @@ else:
         declared_team_capacity_derivation,
         default_quality_check_agent_types,
         dispatch_fixed_implementation,
+        dispatch_subagent_wave,
         format_agent_type_selections,
         parse_agent_type_selections,
         recommended_dynamic_expansion_wave_slots,
@@ -208,6 +211,7 @@ else:
         recommended_initial_subagent_wave_slots,
         unique_codex_agents_for_roles,
         validate_agent_type_selections,
+        validate_writer_handoff_waves,
         workflow_spawn_budget,
         workflow_topology_policy_violations,
     )
@@ -232,6 +236,7 @@ if __package__:
         subagent_wave_record_command,
         suggested_public_skills,
         user_facing_language_policy_output_lines,
+        writer_target_policy_output_lines,
     )
 else:
     from manifest_rendering import (
@@ -253,6 +258,7 @@ else:
         subagent_wave_record_command,
         suggested_public_skills,
         user_facing_language_policy_output_lines,
+        writer_target_policy_output_lines,
     )
 
 if __package__:
@@ -509,6 +515,7 @@ __all__ = (
     "deferred_stage_skills",
     "workflow_spawn_budget",
     "workflow_topology_policy_violations",
+    "writer_target_policy_output_lines",
     "required_output_templates_missing",
     "codex_runtime_max_threads",
     "codex_runtime_max_depth",
@@ -524,15 +531,18 @@ __all__ = (
     "declared_team_capacity_derivation",
     "capacity_runtime_for_spec",
     "dispatch_fixed_implementation",
+    "dispatch_subagent_wave",
     "recommended_initial_subagent_wave",
     "recommended_initial_subagent_wave_slots",
     "recommended_dynamic_expansion_waves",
     "recommended_dynamic_expansion_wave_slots",
+    "recommended_initial_subagent_wave_slots",
     "unique_codex_agents_for_roles",
     "default_quality_check_agent_types",
     "parse_agent_type_selections",
     "format_agent_type_selections",
     "validate_agent_type_selections",
+    "validate_writer_handoff_waves",
     "agent_type_selection_map",
     "capacity_start_output_lines",
     "materialize_skill_tool_call_token",

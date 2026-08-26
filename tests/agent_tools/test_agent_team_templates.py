@@ -34,6 +34,7 @@ from agent_team import (  # noqa: E402
     create_run_bundle,
 )
 from implementation_dispatch import dispatch_fixed_implementation  # noqa: E402
+from writer_target import WriterTarget  # noqa: E402
 from manifest_rendering import (  # noqa: E402
     language_review_candidates,
     render_code_template,
@@ -50,6 +51,7 @@ from packets import (  # noqa: E402
 from team_config import load_task_catalog, load_team_config, resolve_role  # noqa: E402
 from task_authority import hash_baseline_bytes  # noqa: E402
 from runtime_artifacts import RuntimeArtifactBoundary  # noqa: E402
+from checkout_identity import resolve_checkout_identity  # noqa: E402
 
 class AgentTeamTemplateTest(unittest.TestCase):
     """Verify reusable template partial expansion."""
@@ -585,11 +587,44 @@ class AgentTeamTemplateTest(unittest.TestCase):
             },
         }
         calls: list[tuple[str, str]] = []
+        missing_target = dispatch_fixed_implementation(
+            request,
+            "materialize P3",
+            lambda role, prompt: calls.append((role, prompt)) or "missing-target",
+            workspace_root=PROJECT_ROOT,
+        )
+        self.assertEqual(missing_target.status, "blocked")
+        self.assertEqual(
+            missing_target.owner_gate_id,
+            "writer_target:required_before_spawn",
+        )
+        identity = resolve_checkout_identity(PROJECT_ROOT).as_dict()
+        target = WriterTarget(
+            str(PROJECT_ROOT),
+            identity["branch"],
+            identity["remote"],
+            ("tools/agent_tools",),
+        )
+        with patch(
+            "implementation_dispatch.resolve_checkout_identity",
+            side_effect=AssertionError("checkout identity must be reused"),
+        ):
+            snapshot_dispatch = dispatch_fixed_implementation(
+                request,
+                "materialize P3",
+                lambda role, prompt: "snapshot-worker",
+                workspace_root=PROJECT_ROOT,
+                writer_target=target,
+                checkout_identity=identity,
+            )
+        self.assertEqual(snapshot_dispatch.status, "spawned")
+        self.assertIn(identity["head"], snapshot_dispatch.prompt_capsule.body)
         dispatch = dispatch_fixed_implementation(
             request,
             "materialize P3",
             lambda role, prompt: calls.append((role, prompt)) or "spark-1",
             workspace_root=PROJECT_ROOT,
+            writer_target=target,
         )
         self.assertEqual(dispatch.status, "spawned")
         self.assertEqual(dispatch.spawn_count, 1)
@@ -610,6 +645,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
             "materialize P3",
             lambda role, prompt: None,
             workspace_root=PROJECT_ROOT,
+            writer_target=target,
         )
         self.assertEqual(blocked.status, "blocked")
         self.assertEqual(blocked.owner_gate_id, "WRITE_SUBAGENT_AUTHORIZATION=required")

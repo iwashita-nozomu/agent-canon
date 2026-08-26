@@ -106,9 +106,9 @@ role_topology_defaults: &standard_role_topology
     status: allowed_with_distinct_packets
     identity_key: role_id+instance_id+agent_type
     read_only: allowed_when_input_packets_or_review_focus_are_distinct
-    write_capable: allowed_only_for_worker_or_spark_worker
+    write_capable: allowed_only_for_worker_spark_worker_integration_executor
     current_checkout_parallel_requirements: disjoint_paths+no_shared_git_index_or_head+no_generated_or_formatter_effects
-    collision_policy: serialize_current_checkout_waves
+    collision_policy: reject_same_checkout_root_before_spawn
     isolated_worktree_policy: explicit_alternative_implementation_experiment_only
     runtime_threads_are_cardinality_source: false
   stage_waves:

@@ -29,6 +29,11 @@ except ImportError:  # direct script/module execution
     )
 
 if __package__:
+    from .writer_target import WriterTargetError, parse_writer_target
+else:
+    from writer_target import WriterTargetError, parse_writer_target  # type: ignore[no-redef]
+
+if __package__:
     from .agent_canon_source_root import resolve_agent_canon_source_root
 else:
     from agent_canon_source_root import resolve_agent_canon_source_root
@@ -114,6 +119,7 @@ if __package__:
         subagent_wave_record_command,
         suggested_public_skills,
         user_facing_language_policy_output_lines,
+        writer_target_policy_output_lines,
         implementation_handoff_required,
     )
 else:
@@ -135,6 +141,7 @@ else:
         subagent_wave_record_command,
         suggested_public_skills,
         user_facing_language_policy_output_lines,
+        writer_target_policy_output_lines,
         implementation_handoff_required,
     )
 
@@ -147,7 +154,6 @@ if __package__:
         parse_agent_type_selections,
         recommended_dynamic_expansion_wave_slots,
         recommended_dynamic_expansion_waves,
-        recommended_initial_subagent_wave,
         recommended_initial_subagent_wave_slots,
         validate_agent_type_selections,
         workflow_spawn_budget,
@@ -161,7 +167,6 @@ else:
         parse_agent_type_selections,
         recommended_dynamic_expansion_wave_slots,
         recommended_dynamic_expansion_waves,
-        recommended_initial_subagent_wave,
         recommended_initial_subagent_wave_slots,
         validate_agent_type_selections,
         workflow_spawn_budget,
@@ -341,6 +346,14 @@ def build_parser(
         help=(
             f"Atomic {ACTIVE_DESIGN_PACKET_SCHEMA} JSON object. All schema, path, "
             "document_flow_required, clause_registry, and graph-entry fields are required."
+        ),
+    )
+    parser.add_argument(
+        "--writer-targets",
+        metavar="JSON",
+        help=(
+            "JSON object mapping role/instance identities to repository-topic-clone "
+            "writer_target values. Required before spawning write-capable waves."
         ),
     )
     parser.add_argument(
@@ -545,6 +558,7 @@ def emit_bootstrap_output(
     workspace_root: Path,
     preflight: AgentCanonPreflightResult,
     runtime: BootstrapRuntime,
+    writer_targets: Mapping[str, object] | None = None,
 ) -> None:
     """Print the machine-readable bootstrap summary."""
     repository_roots = context.repository_roots
@@ -644,7 +658,8 @@ def emit_bootstrap_output(
             f"SUBAGENT_WAVE_RECORD_COMMAND={subagent_wave_record_command(context.report_dir, layout=public_layout)}"
         )
         active_budget = context.workflow_active_spawn_budget or 0
-        initial_wave = recommended_initial_subagent_wave(
+        writer_targets = writer_targets or {}
+        initial_slots = recommended_initial_subagent_wave_slots(
             runtime.roles,
             active_budget,
             catalog,
@@ -652,16 +667,10 @@ def emit_bootstrap_output(
             source_root / ".codex" / "agents",
             workflow_family_id=context.workflow_family_id,
             issue_worker_candidate=context.issue_worker_candidate,
+            writer_targets=writer_targets,
         )
-        initial_wave_slots = recommended_initial_subagent_wave_slots(
-            runtime.roles,
-            active_budget,
-            catalog,
-            runtime.agent_type_selections,
-            source_root / ".codex" / "agents",
-            workflow_family_id=context.workflow_family_id,
-            issue_worker_candidate=context.issue_worker_candidate,
-        )
+        initial_wave_slots = initial_slots
+        initial_wave = tuple(slot.agent_type for slot in initial_wave_slots)
         if initial_wave:
             print("PARENT_WAVE_EXECUTION_GATE=required_before_implementation")
             print("PARENT_WAVE_EXECUTION_GATE_STATUS=blocked_authority_required")
@@ -681,6 +690,7 @@ def emit_bootstrap_output(
             source_root / ".codex" / "agents",
             workflow_family_id=context.workflow_family_id,
             issue_worker_candidate=context.issue_worker_candidate,
+            writer_targets=writer_targets,
         )
         expansion_wave_slots = recommended_dynamic_expansion_wave_slots(
             runtime.roles,
@@ -691,6 +701,7 @@ def emit_bootstrap_output(
             source_root / ".codex" / "agents",
             workflow_family_id=context.workflow_family_id,
             issue_worker_candidate=context.issue_worker_candidate,
+            writer_targets=writer_targets,
         )
         print(
             "SUBAGENT_AGENT_TYPE_SELECTIONS="
@@ -711,6 +722,8 @@ def emit_bootstrap_output(
         for line in standard_agent_wave_sequence_output_lines():
             print(line)
         for line in same_role_subagent_policy_output_lines():
+            print(line)
+        for line in writer_target_policy_output_lines():
             print(line)
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(context.task_default_specialists)}")
         print(f"PLANNED_ACTIVE_ROLE_COUNT={len(runtime.roles)}")
@@ -1048,6 +1061,19 @@ def main(
     except RuntimeError as exc:
         print(str(exc), flush=True)
         return 2
+    try:
+        writer_targets: dict[str, object] = {}
+        if args.writer_targets:
+            parsed_targets = json.loads(args.writer_targets)
+            if not isinstance(parsed_targets, dict):
+                raise WriterTargetError("writer_targets:must_be_mapping")
+            writer_targets = {
+                str(owner): parse_writer_target(target)
+                for owner, target in parsed_targets.items()
+            }
+    except (TypeError, json.JSONDecodeError, WriterTargetError) as exc:
+        print(str(exc), flush=True)
+        return 2
     workspace_root = Path(args.workspace_root).resolve()
     try:
         repository_roots = resolve_repository_roots(
@@ -1143,11 +1169,12 @@ def main(
             selected_skills=selected_skills,
             task_catalog=catalog,
             agent_type_selections=agent_type_selections,
+            writer_targets=writer_targets,
         )
     try:
         prepared = prepare_run_bundle(run_spec)
         active_design_packet = prepared.active_design_packet
-    except (RuntimeError, OSError) as exc:
+    except (RuntimeError, OSError, WriterTargetError) as exc:
         print(str(exc), flush=True)
         return 1
     active_pointer = context.report_root / ".active_run"
@@ -1186,6 +1213,7 @@ def main(
         workspace_root=workspace_root,
         preflight=preflight,
         runtime=runtime,
+        writer_targets=writer_targets,
     )
     return 0
 

@@ -51,7 +51,7 @@ generic lifecycle または operation-level approval carve-out には含めま�
 ```bash
 python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare \
   --topic <topic> --module <path> --branch <branch> \
-  --owner-evidence <file>
+  --owner-evidence <file> [--allowed-path <relative-path> ...]
 ```
 
 通常の closeout cleanup は canonical lifecycle artifact を materialize せず、manifest から
@@ -62,7 +62,7 @@ python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepa
 ```bash
 python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup \
   --topic <topic> --module <path> --branch <branch> \
-  --owner-evidence <file> \
+  --owner-evidence <file> [--allowed-path <relative-path> ...] \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
   [--publication-readback <publication-readback.json>]] [--apply]
 ```
@@ -70,6 +70,11 @@ python3 tools/agent_tools/dependency_module_change.py --root <parent-root> clean
 completion evidence は generic prepare/merge receipt、dependency identity readback、
 pin/projection validation、および必要に応じた canonical publication evidence と `CleanupProof`
 です。
+
+`prepare`、`merge-main`、`cleanup` は write-capable generic lifecycle に `allowed_paths` を
+明示的に渡します。`--allowed-path` を省略した canonical dependency operation は clone 全体を
+所有するため `.` を明示値として使い、狭い責務を持つ caller は repeated option で範囲を
+指定します。adapter や generic lifecycle 側で scope を暗黙補完しません。
 
 completion ではこの skill が canonical `cleanup` を dispatch し、computed clone path、owner
 evidence/marker、clean branch、および fetch した `origin/<branch>` の head/tree 一致を検証

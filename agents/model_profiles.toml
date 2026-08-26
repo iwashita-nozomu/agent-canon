@@ -16,7 +16,7 @@ registry_version = 3
 [writer_isolation_policy]
 current_checkout_mode = "parallel_only_for_disjoint_paths_without_shared_state"
 parallel_requirements = ["disjoint_paths", "no_shared_git_index_or_head", "no_generated_or_formatter_effects"]
-collision_action = "serialize_current_checkout_waves"
+collision_action = "reject_same_checkout_root_before_spawn"
 isolated_worktree_mode = "explicit_alternative_implementation_experiment_only"
 
 [role_profile_bindings]
@@ -218,7 +218,7 @@ model = "gpt-5.6-luna"
 reasoning_effort = "xhigh"
 owner = "luna"
 capabilities = ["implementation", "causal_repair", "cross_owner_integration"]
-allowed_context = ["objective", "context", "request_clause_ids", "owner_gate", "evidence"]
+allowed_context = ["objective", "context", "request_clause_ids", "owner_gate", "evidence", "writer_target"]
 forbidden_context = ["unrelated_paths"]
 return_schema_id = "claim_evidence_v1"
 checkpoint_policy = "nonblocking_observation"
@@ -304,7 +304,7 @@ model = "gpt-5.3-codex-spark"
 reasoning_effort = "low"
 owner = "spark"
 capabilities = ["implementation", "fixed_packet"]
-allowed_context = ["objective", "context", "fixed_implementation_packet", "implementation_route_result", "owner_gate", "checkout_identity"]
+allowed_context = ["objective", "context", "fixed_implementation_packet", "implementation_route_result", "owner_gate", "checkout_identity", "writer_target", "writer_target_environment"]
 forbidden_context = ["broad_history", "unrelated_paths", "alternate_architecture"]
 return_schema_id = "claim_evidence_v1"
 checkpoint_policy = "nonblocking_observation_only"

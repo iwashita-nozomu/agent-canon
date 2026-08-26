@@ -66,6 +66,26 @@ def write_identity(
     target.write_text(json.dumps(value, sort_keys=True), encoding="utf-8")
 
 
+def write_writer_packet(root: Path) -> None:
+    packet = {
+        "schema": "agent-canon.writer-target-packet.v1",
+        "checkout_root": str(root),
+        "branch": "test",
+        "remote": "local/repo",
+        "allowed_paths": ["src/"],
+        "checkout_identity": {
+            "cwd": str(root),
+            "git_root": str(root),
+            "branch": "test",
+            "head": "a" * 40,
+            "remote": "local/repo",
+        },
+    }
+    target = root / ".agent-canon" / "writer-target.json"
+    target.parent.mkdir()
+    target.write_text(json.dumps(packet, sort_keys=True), encoding="utf-8")
+
+
 def write_spawn_event(root: Path) -> None:
     identity = json.loads((root / "runtime" / "agent_identity.json").read_text(encoding="utf-8"))
     target = root / "spawn.json"
@@ -109,6 +129,7 @@ class MutationAuthorityTest(unittest.TestCase):
             root = Path(tmp)
             write_identity(root, role_id="implementer")
             write_spawn_event(root)
+            write_writer_packet(root)
             payload = {
                 "tool_name": "apply_patch",
                 "tool_input": {"patch": "*** Begin Patch\n*** Update File: src/owned.py\n*** End Patch\n"},

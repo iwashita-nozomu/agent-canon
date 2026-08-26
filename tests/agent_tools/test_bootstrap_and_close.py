@@ -1146,7 +1146,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
         self.assertEqual(write_scope_policy["max_write_subagents"], max_write_subagents)
         self.assertEqual(
             write_scope_policy["overlapping_write_scopes"],
-            "serialize_current_checkout_waves",
+            "reject_same_checkout_root_before_spawn",
         )
         self.assertNotIn("active_subagents", write_scope_policy)
 

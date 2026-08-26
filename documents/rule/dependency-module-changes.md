@@ -83,7 +83,7 @@ cleanup hold を返します。plan detail は stage-0、remote、tracking、mat
 ```bash
 python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare \
   --topic <topic> --module <module-path> --branch <branch> \
-  --owner-evidence <file>
+  --owner-evidence <file> [--allowed-path <relative-path> ...]
 ```
 
 manifest identity を generic request へ写像し、exact clone/branch を再利用するか、不在
@@ -99,7 +99,7 @@ operation-level の追加承認なしで実行できます。この扱いは rep
 ```bash
 python3 tools/agent_tools/dependency_module_change.py --root <parent-root> merge-main \
   --topic <topic> --module <module-path> --branch <branch> \
-  --owner-evidence <file>
+  --owner-evidence <file> [--allowed-path <relative-path> ...]
 ```
 
 generic owner が `fetch origin main` と通常の `git merge --no-edit origin/main` を実行し、
@@ -111,7 +111,7 @@ dirty state と conflict は破棄せず typed evidence として保持します
 ```bash
 python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup \
   --topic <topic> --module <module-path> --branch <branch> \
-  --owner-evidence <file> \
+  --owner-evidence <file> [--allowed-path <relative-path> ...] \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
   [--publication-readback <publication-readback.json>]] [--apply]
 ```

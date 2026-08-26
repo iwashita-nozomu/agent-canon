@@ -4,6 +4,7 @@
 # responsibility Implements repository-topic clone lifecycle with strict cleanup and evidence checks.
 # upstream design ../../documents/rule/repository-topic-clone.md defines generic clone and cleanup behavior
 # upstream implementation ./conflict_preservation.py captures conflict stages and validates finalization readback.
+# upstream implementation ./writer_target.py materializes the ignored static writer handoff packet.
 # downstream implementation ../../tests/agent_tools/test_repository_topic_clone.py validates repository-topic clone lifecycle.
 # @dependency-end
 """Manage repository-topic clones with explicit receipts and strict cleanup gates."""
@@ -18,14 +19,30 @@ import re
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
 try:
     from .conflict_preservation import capture_inventory, validate_plan
+    from .checkout_identity import resolve_checkout_identity
+    from .writer_target import (
+        WriterTarget,
+        WriterTargetError,
+        WRITER_TARGET_PACKET_RELATIVE,
+        materialize_writer_target_packet,
+        read_writer_target_packet,
+    )
 except ImportError:  # direct CLI execution
     from conflict_preservation import capture_inventory, validate_plan
+    from checkout_identity import resolve_checkout_identity  # type: ignore[no-redef]
+    from writer_target import (  # type: ignore[no-redef]
+        WriterTarget,
+        WriterTargetError,
+        WRITER_TARGET_PACKET_RELATIVE,
+        materialize_writer_target_packet,
+        read_writer_target_packet,
+    )
 
 if TYPE_CHECKING:
     from . import parent_root_side_effects as _parent_boundary
@@ -104,6 +121,23 @@ class GitCommandError(RepositoryTopicCloneError):
         )
 
 
+def _ensure_writer_target_packet_ignored(clone: Path) -> None:
+    """Keep the task-local writer packet out of Git status in every clone."""
+    exclude = clone / ".git" / "info" / "exclude"
+    line = WRITER_TARGET_PACKET_RELATIVE.as_posix()
+    try:
+        current = exclude.read_text(encoding="utf-8") if exclude.is_file() else ""
+        if line in {entry.strip() for entry in current.splitlines()}:
+            return
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        separator = "" if not current or current.endswith("\n") else "\n"
+        exclude.write_text(f"{current}{separator}{line}\n", encoding="utf-8")
+    except OSError as exc:
+        raise RepositoryTopicCloneError(
+            f"writer_target_packet_ignore_failed:{exclude}"
+        ) from exc
+
+
 def _run_git(repo: Path, args: Sequence[str], *, pass_fds: tuple[int, ...] = ()) -> str:
     result = subprocess.run(
         ["git", "-C", str(repo), *args], check=False, capture_output=True, text=True,
@@ -133,6 +167,7 @@ class RepositoryTopicCloneRequest:
     topic: str
     branch: str
     owner_evidence: Path
+    allowed_paths: tuple[str, ...] = ()
     parent_attestation: _parent_boundary.ParentRootAttestationReceipt | None = None
 
 
@@ -147,6 +182,7 @@ class PrepareReceipt:
     candidate_tree: str
     clone_dev: int | None = None
     clone_ino: int | None = None
+    writer_target_packet: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -709,6 +745,7 @@ def request(
     branch: str,
     owner_evidence: Path | str,
     *,
+    allowed_paths: Sequence[str] | None = None,
     policy: RepositoryPolicyCallback | None = None,
 ) -> PrepareReceipt:
     """Prepare a topic clone and return a typed receipt."""
@@ -720,6 +757,7 @@ def request(
         topic=topic,
         branch=_normalise_branch(branch),
         owner_evidence=_require_evidence(owner_evidence, repository_root),
+        allowed_paths=tuple(allowed_paths or ()),
     )
     try:
         request_state = RepositoryTopicCloneRequest(
@@ -729,6 +767,7 @@ def request(
             topic=request_state.topic,
             branch=request_state.branch,
             owner_evidence=request_state.owner_evidence,
+            allowed_paths=request_state.allowed_paths,
             parent_attestation=_attest_parent(
                 _parent_request(repository_root, purpose="repository-topic-clone")
             ),
@@ -810,8 +849,47 @@ def request(
         raise RepositoryTopicCloneError(
             f"prepared clone not ready: {final_state.state}"
         )
+    try:
+        packet_target, _packet_identity = read_writer_target_packet(clone)
+    except WriterTargetError as exc:
+        if (clone / WRITER_TARGET_PACKET_RELATIVE).exists():
+            raise RepositoryTopicCloneError(str(exc)) from exc
+        packet_target = None
+    if packet_target is not None:
+        if request_state.allowed_paths and tuple(request_state.allowed_paths) != tuple(
+            packet_target.allowed_paths
+        ):
+            raise RepositoryTopicCloneError(
+                "writer_target_allowed_paths_mismatch:existing packet"
+            )
+        if not request_state.allowed_paths:
+            request_state = replace(
+                request_state,
+                allowed_paths=packet_target.allowed_paths,
+            )
     candidate_sha = _run_git(clone, ["rev-parse", branch_name]).strip()
     candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]).strip()
+    checkout_identity = resolve_checkout_identity(clone).as_dict()
+    writer_target_packet: Path | None = None
+    if (
+        checkout_identity["remote"] != "unknown"
+        and not request_state.allowed_paths
+        and packet_target is None
+    ):
+        raise RepositoryTopicCloneError(
+            "writer_target_allowed_paths_required:forward explicit allowed_paths"
+        )
+    if checkout_identity["remote"] != "unknown" and request_state.allowed_paths:
+        _ensure_writer_target_packet_ignored(clone)
+        writer_target_packet = materialize_writer_target_packet(
+            WriterTarget(
+                str(clone),
+                branch_name,
+                checkout_identity["remote"],
+                request_state.allowed_paths,
+            ),
+            checkout_identity,
+        )
     clone_identity = clone.stat()
     receipt = PrepareReceipt(
         request=request_state,
@@ -821,6 +899,7 @@ def request(
         candidate_tree=candidate_tree,
         clone_dev=clone_identity.st_dev,
         clone_ino=clone_identity.st_ino,
+        writer_target_packet=writer_target_packet,
     )
     if policy is not None:
         policy.apply(operation="prepare", request=request_state, receipt=receipt)
@@ -840,8 +919,10 @@ def merge_main(
         request_state.topic,
         request_state.branch,
         request_state.owner_evidence,
+        allowed_paths=request_state.allowed_paths or None,
         policy=None,
     )
+    request_state = prepared.request
     clone = prepared.clone
     _run_git(clone, ["fetch", "origin", "main"])
     candidate_sha = _run_git(clone, ["rev-parse", "HEAD"]).strip()
@@ -897,6 +978,24 @@ def finalize_merge_main(
     clone = computed_clone_path(request_state, create_topic=False)
     if not clone.is_dir() or not (clone / ".git").exists():
         raise RepositoryTopicCloneError("merge-finalize hold: clone is unavailable")
+    try:
+        packet_target, _packet_identity = read_writer_target_packet(clone)
+    except WriterTargetError as exc:
+        if (clone / WRITER_TARGET_PACKET_RELATIVE).exists():
+            raise RepositoryTopicCloneError(str(exc)) from exc
+        packet_target = None
+    if packet_target is not None:
+        if request_state.allowed_paths and tuple(request_state.allowed_paths) != tuple(
+            packet_target.allowed_paths
+        ):
+            raise RepositoryTopicCloneError(
+                "writer_target_allowed_paths_mismatch:existing packet"
+            )
+        if not request_state.allowed_paths:
+            request_state = replace(
+                request_state,
+                allowed_paths=packet_target.allowed_paths,
+            )
     if _normalise_url(_remote_url(clone)) != _normalise_url(request_state.url):
         raise RepositoryTopicCloneError("merge-finalize hold: remote identity mismatch")
     branch = _run_git(clone, ["symbolic-ref", "--quiet", "--short", "HEAD"]).strip()
@@ -1194,6 +1293,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     prepare.add_argument("--topic", required=True)
     prepare.add_argument("--branch", required=True)
     prepare.add_argument("--owner-evidence", required=True)
+    prepare.add_argument(
+        "--allowed-path",
+        action="append",
+        default=[],
+        help="Relative path or directory (trailing slash) allowed for the writer target.",
+    )
 
     merge = commands.add_parser("merge-main")
     merge.add_argument("--url", required=True)
@@ -1266,6 +1371,7 @@ def main(argv: list[str] | None = None) -> None:
                 args.topic,
                 args.branch,
                 args.owner_evidence,
+                allowed_paths=tuple(args.allowed_path) or None,
             )
             print("REQUEST_STATE=ready")
             print(f"REQUEST_REPO={receipt.request.repository}")
@@ -1274,6 +1380,8 @@ def main(argv: list[str] | None = None) -> None:
             print(f"REQUEST_CLONE={receipt.clone}")
             print(f"REQUEST_CANDIDATE_SHA={receipt.candidate_sha}")
             print(f"REQUEST_CANDIDATE_TREE={receipt.candidate_tree}")
+            if receipt.writer_target_packet is not None:
+                print(f"REQUEST_WRITER_TARGET_PACKET={receipt.writer_target_packet}")
         elif args.command == "merge-main":
             receipt = merge_main(request_state)
             print("MERGE_STATUS=done")
