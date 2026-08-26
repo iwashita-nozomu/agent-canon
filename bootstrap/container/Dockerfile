@@ -109,7 +109,13 @@ RUN python3 /opt/agent-canon/tools/agent_tools/dependency_plan.py \
 COPY tools /usr/local/share/agent-canon/runtime/tools
 COPY agents /usr/local/share/agent-canon/runtime/agents
 COPY documents /usr/local/share/agent-canon/runtime/documents
-COPY .codex/personal/skills /usr/local/share/agent-canon/runtime/.codex/personal/skills
+# The generated host view is intentionally excluded from the build context.
+# Reuse the canonical materializer in the image layer so this path is derived
+# from the tracked catalog and canonical skill documents at build time.
+RUN install -d -m 0755 /usr/local/share/agent-canon/runtime/.codex/personal \
+    && AGENT_CANON_IMAGE_BUILD=1 python3 \
+      /usr/local/share/agent-canon/runtime/tools/agent_tools/skill_shim_materializer.py \
+      materialize --root /usr/local/share/agent-canon/runtime --all --image-build --format text
 COPY .codex/agents /usr/local/share/agent-canon/runtime/.codex/agents
 COPY .codex/config.toml /usr/local/share/agent-canon/runtime/.codex/config.toml
 COPY evidence/agent-evals /usr/local/share/agent-canon/runtime/evidence/agent-evals
