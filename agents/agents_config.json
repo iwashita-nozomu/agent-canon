@@ -319,12 +319,20 @@
       "write_policy": {
         "mode": "parent_assigned_scope_plus_artifacts",
         "allowed_artifacts": [
-          "decision_log"
+          "decision_log",
+          "conflict_preservation_inventory",
+          "preservation_readback"
         ],
+        "conditional_artifacts": {
+          "conflict_or_rework": [
+            "conflict_preservation_inventory",
+            "preservation_readback"
+          ]
+        },
         "allowed_directories": [
           "."
         ],
-        "notes": "The integration executor owns normal merge/conflict resolution and records the exact branch, tree, and readback evidence; the parent only relays dependency order and status."
+        "notes": "The integration executor owns normal merge/conflict resolution and records the exact branch, tree, stage/hunk preservation inventory, disposition/reconstruction rationale, and readback evidence; the parent only relays dependency order and status."
       }
     },
     {
@@ -1758,6 +1766,8 @@
     "design_brief": "design_brief.md",
     "design_review": "design_review.md",
     "document_flow_review": "document_flow_review.md",
+    "conflict_preservation_inventory": "conflict_preservation_inventory.yaml",
+    "preservation_readback": "preservation_readback.md",
     "active_design_packet": {
       "schema": "waterfall.design_packet.v1",
       "design_artifact": "design_brief.md",
@@ -2372,7 +2382,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "xhigh",
-      "developer_instructions": "You are acting as integration_executor with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback. follow the selected closed validation route act only on the assigned child packet and scope respect child-owned integration publication and final-review decisions return branch/head/check evidence or the role result and stop",
+      "developer_instructions": "You are acting as integration_executor with luna_implementation implementation rigor. Own candidate branch integration and conflict resolution. On a conflict or validation rework, capture merge-base, base/ours/theirs stages and hunks, staged state, and unaffected content before mutation. Record the cause, expected mechanism, owning edit delta, disposition, rationale, and reconstruction map in the mapped artifacts; validate resolved hunk identity and readback before accepting the integrated head. Whole-file replacement is not a shortcut. Normal edits emit only their ordinary decision log. act only on the assigned child packet and scope respect child-owned integration publication and final-review decisions follow the selected closed validation route return branch/head/check evidence or the role result and stop Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback. follow the selected closed validation route act only on the assigned child packet and scope respect child-owned integration publication and final-review decisions return branch/head/check evidence or the role result and stop",
       "logical_role_id": "integration_executor",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/integration_executor",
       "profile_id": "luna_implementation_xhigh",
@@ -2395,7 +2405,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation",
       "continuation_policy": "same_packet_until_handoff",
-      "projection_digest": "a29418d254ab2badd61d75f3304ba042ddbef3aaf1b57525a0f5ab695e42b8c6"
+      "projection_digest": "815ff4eb2376bf078f39a1821ff45a488b0e215d5e8039dd965e1c3d68f8f600"
     },
     "literature_researcher": {
       "name": "literature_researcher",
@@ -2770,7 +2780,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation",
       "continuation_policy": "same_packet_until_handoff",
-      "projection_digest": "72dc6a284a9fcc7786aa866355318abc5d80247b58d5943d1bbe7073e849d3ad"
+      "projection_digest": "925ed476797889124e308dab1a647dbba5caa5b858eae6eb9b1beb1d5868c8be"
     },
     "python_reviewer": {
       "name": "python_reviewer",
@@ -3053,7 +3063,7 @@
       "approval_policy": "never",
       "model": "gpt-5.3-codex-spark",
       "model_reasoning_effort": "low",
-      "developer_instructions": "You are acting as spark_worker for implementation execution with spark_implementation. Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Repair only assigned stable blocking finding IDs; do not repeat the same packet and evidence or restart broad review. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback. follow the selected closed validation route act only on the assigned child packet and scope respect child-owned integration publication and final-review decisions return branch/head/check evidence or the role result and stop",
+      "developer_instructions": "You are acting as spark_worker for implementation execution with spark_implementation. Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Repair only assigned stable blocking finding IDs; do not repeat the same packet and evidence or restart broad review. Preserve conflict/rework packet content: capture base/ours/theirs stages and hunks, selected cause, expected mechanism, exact owning delta, unaffected content, disposition, and rationale before mutation; whole-file checkout/reset/reclone/overwrite/regeneration requires an explicit reconstruction map and preservation readback. Execute only the assigned child action within authority bounds; worker implements, integration_executor merges/resolves conflicts, publisher performs authorized Issue/PR publication, and ship_reviewer owns final approval. The parent only relays packets, dependency order, status, and external readback. follow the selected closed validation route act only on the assigned child packet and scope respect child-owned integration publication and final-review decisions return branch/head/check evidence or the role result and stop",
       "logical_role_id": "implementer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/6",
       "profile_id": "spark_implementation_low",
@@ -3077,7 +3087,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation_only",
       "continuation_policy": "same_spark_after_one_repaired_structural_gap",
-      "projection_digest": "908c2f616c4414213fd582d38d2ba2dce4835846b750b9745c8f50e5f1ab645f"
+      "projection_digest": "e4e9d227003983b37016321969f2b5bdbcbafa7da59fa630d6aa0794e7bc722f"
     },
     "terra": {
       "name": "terra",
@@ -3182,7 +3192,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation",
       "continuation_policy": "same_packet_until_handoff",
-      "projection_digest": "929ca6231695227fd26f3319f0008acc436e2d761f1bef413abba7e8ed6ff8b6"
+      "projection_digest": "0101be554e013fdd23356e24964cba344a92e8057fd5d08bca76a7b2a85b4735"
     }
   },
   "roles": [
@@ -3507,7 +3517,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation",
       "continuation_policy": "same_packet_until_handoff",
-      "projection_digest": "a29418d254ab2badd61d75f3304ba042ddbef3aaf1b57525a0f5ab695e42b8c6"
+      "projection_digest": "815ff4eb2376bf078f39a1821ff45a488b0e215d5e8039dd965e1c3d68f8f600"
     },
     {
       "id": "literature_researcher",
@@ -3761,7 +3771,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation",
       "continuation_policy": "same_packet_until_handoff",
-      "projection_digest": "72dc6a284a9fcc7786aa866355318abc5d80247b58d5943d1bbe7073e849d3ad"
+      "projection_digest": "925ed476797889124e308dab1a647dbba5caa5b858eae6eb9b1beb1d5868c8be"
     },
     {
       "id": "python_reviewer",
@@ -3969,7 +3979,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation_only",
       "continuation_policy": "same_spark_after_one_repaired_structural_gap",
-      "projection_digest": "908c2f616c4414213fd582d38d2ba2dce4835846b750b9745c8f50e5f1ab645f"
+      "projection_digest": "e4e9d227003983b37016321969f2b5bdbcbafa7da59fa630d6aa0794e7bc722f"
     },
     {
       "id": "terra",
@@ -4041,7 +4051,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation",
       "continuation_policy": "same_packet_until_handoff",
-      "projection_digest": "929ca6231695227fd26f3319f0008acc436e2d761f1bef413abba7e8ed6ff8b6"
+      "projection_digest": "0101be554e013fdd23356e24964cba344a92e8057fd5d08bca76a7b2a85b4735"
     }
   ],
   "generated_profile_projection": {
@@ -4049,6 +4059,6 @@
     "materializer": "tools/agent_tools/model_profile_registry.py",
     "registry_ref": "agents/model_profiles.toml",
     "role_count": 37,
-    "projection_digest": "5e2fb4b5163b95502c27dbac5fba6dd37bdcae11b188bafe7299b09e7f9a18da"
+    "projection_digest": "ede663f3e7e12db99230f7ca7d6bdca250e06726a82471fb9c94f901122fbee2"
   }
 }

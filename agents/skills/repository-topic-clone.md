@@ -30,6 +30,7 @@ file size、diff size で owner route を固定しません。
 
 - `python3 tools/agent_tools/repository_topic_clone.py prepare ...`
 - `python3 tools/agent_tools/repository_topic_clone.py merge-main ...`
+- `python3 tools/agent_tools/repository_topic_clone.py finalize-merge ...`
 - `python3 tools/agent_tools/repository_topic_clone.py cleanup ...`
 
 `--workspace-root` は既存 topic root を再利用し、指定 topic の
@@ -38,6 +39,11 @@ computed path / remote / branch identity が検証できる場合、canonical `p
 `merge-main` は個別操作ごとの追加承認なしで実行します。reuse は `prepare` に含まれます。これはこの
 canonical lifecycle command が workspace 管理と衝突保持を所有するためであり、raw
 shared-checkout Git の承認境界を緩和するものではありません。
+
+競合で停止した merge の再開・完了は `finalize-merge` またはその alias
+`resume-merge` だけが行います。両方とも保存された inventory と plan を current clone に
+対して検証し、unmerged state、hunk identity、unaffected content の readback が通らなければ
+commit しません。`conflict_preservation.py validate` 単体は診断用です。
 
 `prepare` と `merge-main` は selected repository root の Git toplevel、既存 symlink component、
 regular/tracked root `.gitignore`、および repository-owned `workspace/` ignore probe を

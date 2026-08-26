@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Implements repository-topic clone lifecycle with strict cleanup and evidence checks.
 # upstream design ../../documents/rule/repository-topic-clone.md defines generic clone and cleanup behavior
+# upstream implementation ./conflict_preservation.py captures conflict stages and validates finalization readback.
 # downstream implementation ../../tests/agent_tools/test_repository_topic_clone.py validates repository-topic clone lifecycle.
 # @dependency-end
 """Manage repository-topic clones with explicit receipts and strict cleanup gates."""
@@ -20,6 +21,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
+
+try:
+    from .conflict_preservation import capture_inventory, validate_plan
+except ImportError:  # direct CLI execution
+    from conflict_preservation import capture_inventory, validate_plan
 
 if TYPE_CHECKING:
     from . import parent_root_side_effects as _parent_boundary
@@ -532,6 +538,45 @@ def _set_marker(
         _run_git(path, ["config", "--local", f"{MARKER_PREFIX}.{field}", value])
 
 
+def _write_conflict_inventory(
+    clone: Path,
+    *,
+    base: str,
+    ours: str,
+    theirs: str,
+) -> Path:
+    """Persist the captured stages in the conflicted topic clone's ignored state."""
+    inventory = capture_inventory(
+        clone,
+        base=base,
+        ours=ours,
+        theirs=theirs,
+        repository=str(clone),
+    )
+    artifact = clone / ".agent-canon" / "conflict-preservation.json"
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_text(
+        json.dumps(inventory, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    exclude = Path(_run_git(clone, ["rev-parse", "--git-path", "info/exclude"]).strip())
+    if not exclude.is_absolute():
+        exclude = clone / exclude
+    existing = exclude.read_text(encoding="utf-8") if exclude.exists() else ""
+    markers = (
+        ".agent-canon/conflict-preservation.json",
+        ".agent-canon/conflict-preservation-plan.json",
+    )
+    missing = [marker for marker in markers if marker not in existing.splitlines()]
+    if missing:
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        with exclude.open("a", encoding="utf-8") as stream:
+            if existing and not existing.endswith("\n"):
+                stream.write("\n")
+            stream.writelines(f"{marker}\n" for marker in missing)
+    return artifact
+
+
 def _inspect(
     path: Path, request: RepositoryTopicCloneRequest, *, owner_sha: str
 ) -> CloneState:
@@ -802,12 +847,24 @@ def merge_main(
     candidate_sha = _run_git(clone, ["rev-parse", "HEAD"]).strip()
     candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]).strip()
     origin_main_sha = _run_git(clone, ["rev-parse", "origin/main"]).strip()
+    merge_base = _run_git(clone, ["merge-base", candidate_sha, origin_main_sha]).strip()
     try:
         _run_git(clone, ["merge", "--no-edit", "origin/main"])
     except GitCommandError as exc:
         if (clone / ".git" / "MERGE_HEAD").exists():
+            try:
+                inventory = _write_conflict_inventory(
+                    clone,
+                    base=merge_base,
+                    ours=candidate_sha,
+                    theirs=origin_main_sha,
+                )
+                inventory_note = f" inventory={inventory}"
+            except Exception as inventory_exc:
+                inventory_note = f" inventory_capture_failed={inventory_exc}"
             raise RepositoryTopicCloneError(
-                "merge-conflict-preserve: normal origin/main merge requires intentional resolution"
+                "merge-conflict-preserve: normal origin/main merge requires intentional resolution;"
+                + inventory_note
             ) from exc
         raise
     merged_sha = _run_git(clone, ["rev-parse", "HEAD"]).strip()
@@ -826,6 +883,93 @@ def merge_main(
     if policy is not None:
         policy.apply(operation="merge_main", request=request_state, receipt=receipt)
     return receipt
+
+
+def finalize_merge_main(
+    request_state: RepositoryTopicCloneRequest,
+    *,
+    inventory_path: Path | str | None = None,
+    plan_path: Path | str | None = None,
+    policy: RepositoryPolicyCallback | None = None,
+) -> MergeMainReceipt:
+    """Commit a conflict only after its preservation plan and readback pass."""
+    _repository_workspace_root(request_state.workspace_root, require_ignore=False)
+    clone = computed_clone_path(request_state, create_topic=False)
+    if not clone.is_dir() or not (clone / ".git").exists():
+        raise RepositoryTopicCloneError("merge-finalize hold: clone is unavailable")
+    if _normalise_url(_remote_url(clone)) != _normalise_url(request_state.url):
+        raise RepositoryTopicCloneError("merge-finalize hold: remote identity mismatch")
+    branch = _run_git(clone, ["symbolic-ref", "--quiet", "--short", "HEAD"]).strip()
+    if branch != request_state.branch:
+        raise RepositoryTopicCloneError(
+            f"merge-finalize hold: branch mismatch ({branch})"
+        )
+    merge_result = subprocess.run(
+        ["git", "-C", str(clone), "rev-parse", "MERGE_HEAD"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    merge_head = merge_result.stdout.strip()
+    if not merge_head:
+        raise RepositoryTopicCloneError("merge-finalize hold: merge is not in progress")
+    inventory_file = Path(inventory_path) if inventory_path is not None else clone / ".agent-canon" / "conflict-preservation.json"
+    plan_file = Path(plan_path) if plan_path is not None else clone / ".agent-canon" / "conflict-preservation-plan.json"
+    inventory = _read_json_artifact(inventory_file, "conflict preservation inventory")
+    plan = _read_json_artifact(plan_file, "conflict preservation plan")
+    if not isinstance(inventory, Mapping) or not isinstance(plan, Mapping):
+        raise RepositoryTopicCloneError("merge-finalize hold: preservation packets must be objects")
+    ours_record = inventory.get("ours")
+    theirs_record = inventory.get("theirs")
+    if not isinstance(ours_record, Mapping) or not isinstance(theirs_record, Mapping):
+        raise RepositoryTopicCloneError("merge-finalize hold: inventory stage identities are missing")
+    candidate_sha = _run_git(clone, ["rev-parse", "HEAD"]).strip()
+    if candidate_sha != ours_record.get("commit"):
+        raise RepositoryTopicCloneError("merge-finalize hold: candidate moved after inventory capture")
+    if merge_head != theirs_record.get("commit"):
+        raise RepositoryTopicCloneError("merge-finalize hold: merge parent moved after inventory capture")
+    _run_git(clone, ["fetch", "origin", "main"])
+    origin_main_sha = _run_git(clone, ["rev-parse", "origin/main"]).strip()
+    if origin_main_sha != theirs_record.get("commit"):
+        raise RepositoryTopicCloneError("merge-finalize hold: origin/main moved after inventory capture")
+    try:
+        validate_plan(inventory, plan, repo=clone)
+    except (ValueError, TypeError) as exc:
+        raise RepositoryTopicCloneError(f"merge-finalize hold: preservation validation failed: {exc}") from exc
+    candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]).strip()
+    _run_git(clone, ["commit", "--no-edit"])
+    merged_sha = _run_git(clone, ["rev-parse", "HEAD"]).strip()
+    merged_tree = _run_git(clone, ["rev-parse", f"{merged_sha}^{{tree}}"]).strip()
+    _run_git(clone, ["merge-base", "--is-ancestor", candidate_sha, merged_sha])
+    _run_git(clone, ["merge-base", "--is-ancestor", origin_main_sha, merged_sha])
+    receipt = MergeMainReceipt(
+        request=request_state,
+        clone=clone,
+        candidate_sha=candidate_sha,
+        candidate_tree=candidate_tree,
+        merged_sha=merged_sha,
+        merged_tree=merged_tree,
+        origin_main_sha=origin_main_sha,
+    )
+    if policy is not None:
+        policy.apply(operation="finalize_merge_main", request=request_state, receipt=receipt)
+    return receipt
+
+
+def resume_merge_main(
+    request_state: RepositoryTopicCloneRequest,
+    *,
+    inventory_path: Path | str | None = None,
+    plan_path: Path | str | None = None,
+    policy: RepositoryPolicyCallback | None = None,
+) -> MergeMainReceipt:
+    """Resume a stopped conflict through the same validated finalization route."""
+    return finalize_merge_main(
+        request_state,
+        inventory_path=inventory_path,
+        plan_path=plan_path,
+        policy=policy,
+    )
 
 
 def _read_json_artifact(path: Path | str, label: str) -> object:
@@ -1059,6 +1203,32 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     merge.add_argument("--branch", required=True)
     merge.add_argument("--owner-evidence", required=True)
 
+    finalize = commands.add_parser(
+        "finalize-merge",
+        help="Commit an existing conflict only after preservation validation passes",
+    )
+    finalize.add_argument("--url", required=True)
+    finalize.add_argument("--repo-name", required=True)
+    finalize.add_argument("--workspace-root", required=True)
+    finalize.add_argument("--topic", required=True)
+    finalize.add_argument("--branch", required=True)
+    finalize.add_argument("--owner-evidence", required=True)
+    finalize.add_argument("--inventory")
+    finalize.add_argument("--plan")
+
+    resume = commands.add_parser(
+        "resume-merge",
+        help="Alias for finalize-merge after a preserved conflict is resolved",
+    )
+    resume.add_argument("--url", required=True)
+    resume.add_argument("--repo-name", required=True)
+    resume.add_argument("--workspace-root", required=True)
+    resume.add_argument("--topic", required=True)
+    resume.add_argument("--branch", required=True)
+    resume.add_argument("--owner-evidence", required=True)
+    resume.add_argument("--inventory")
+    resume.add_argument("--plan")
+
     clean = commands.add_parser("cleanup")
     clean.add_argument("--url", required=True)
     clean.add_argument("--repo-name", required=True)
@@ -1107,6 +1277,19 @@ def main(argv: list[str] | None = None) -> None:
         elif args.command == "merge-main":
             receipt = merge_main(request_state)
             print("MERGE_STATUS=done")
+            print(f"MERGE_CLONE={receipt.clone}")
+            print(f"MERGE_CANDIDATE_SHA={receipt.candidate_sha}")
+            print(f"MERGE_CANDIDATE_TREE={receipt.candidate_tree}")
+            print(f"MERGE_INTEGRATED_SHA={receipt.merged_sha}")
+            print(f"MERGE_INTEGRATED_TREE={receipt.merged_tree}")
+            print(f"MERGE_ORIGIN_MAIN_SHA={receipt.origin_main_sha}")
+        elif args.command in {"finalize-merge", "resume-merge"}:
+            receipt = resume_merge_main(
+                request_state,
+                inventory_path=args.inventory,
+                plan_path=args.plan,
+            )
+            print("MERGE_STATUS=finalized")
             print(f"MERGE_CLONE={receipt.clone}")
             print(f"MERGE_CANDIDATE_SHA={receipt.candidate_sha}")
             print(f"MERGE_CANDIDATE_TREE={receipt.candidate_tree}")

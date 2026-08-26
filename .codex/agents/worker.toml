@@ -1,5 +1,5 @@
 # generated role view: generated_role_view_v1
-# source canonical digest: 929ca6231695227fd26f3319f0008acc436e2d761f1bef413abba7e8ed6ff8b6
+# source canonical digest: 0101be554e013fdd23356e24964cba344a92e8057fd5d08bca76a7b2a85b4735
 
 name = "worker"
 description = "Implementation agent for bounded code, docs, or test changes."

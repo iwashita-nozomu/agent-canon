@@ -826,10 +826,33 @@ def validate_team_config_references() -> None:
                 f"{role.id} allowed_artifact key missing from artifacts: {artifact_key}",
             )
             mapped = config.artifacts[artifact_key]
+            conditional_keys = {
+                key
+                for keys in role.write_policy.conditional_artifacts.values()
+                for key in keys
+            }
             ensure(
-                mapped in role.required_outputs,
+                mapped in role.required_outputs or artifact_key in conditional_keys,
                 f"{role.id} artifact mapping mismatch: {artifact_key} -> {mapped}",
             )
+        for condition, artifact_keys in role.write_policy.conditional_artifacts.items():
+            ensure(
+                bool(condition.strip()),
+                f"{role.id} conditional artifact condition must be non-empty",
+            )
+            for artifact_key in artifact_keys:
+                ensure(
+                    artifact_key in role.write_policy.allowed_artifacts,
+                    f"{role.id} conditional artifact is not allowed: {artifact_key}",
+                )
+                ensure(
+                    artifact_key in config.artifacts,
+                    f"{role.id} conditional artifact key missing from artifacts: {artifact_key}",
+                )
+                ensure(
+                    config.artifacts[artifact_key].endswith((".md", ".yaml", ".txt")),
+                    f"{role.id} conditional artifact has unsupported suffix: {artifact_key}",
+                )
 
     implementer = resolve_role(config, "implementer")
     ensure(
