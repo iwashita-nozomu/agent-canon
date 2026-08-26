@@ -69,6 +69,7 @@ CONTAINER_RUNTIME_DIR = "container-runtime"
 CONTAINER_RUNTIME_DESTINATION = "/var/lib/agent-canon/runtime"
 PRIVATE_LOG_DESTINATION = "/var/lib/agent-canon/private-log"
 REGISTRY_DESTINATION = "/var/lib/agent-canon/mount-registry.toml"
+CODEX_SESSION_ROOT_ENV = "AGENT_CANON_CODEX_SESSION_ROOT"
 # This is the only historical source of runtime state that the bootstrap may
 # migrate.  It is intentionally a fixed path; arbitrary source/workspace
 # directories are never scanned or adopted.
@@ -1155,6 +1156,7 @@ class DockerAdapter:
                 "GIT_CONFIG_VALUE_0",
                 "AGENT_CANON_OUTPUT_ROOT",
                 "AGENT_CANON_LOG_ROOT",
+                "AGENT_CANON_RUNTIME_ROOT",
             }:
                 raise BootstrapError("environment_rejected", key)
             command.extend(("--env", f"{key}={value}"))
@@ -4078,6 +4080,9 @@ class BootstrapRuntime:
         """Launch Codex with a process-local isolated home."""
         project = _existing_no_symlink(project_root, field="Codex project root")
         prepared = self.codex_prepare()
+        session_root = self.paths.codex_home / "sessions"
+        _ensure_directory(session_root)
+        self._enforce_private_directory(session_root)
         executable = os.environ.get("AGENT_CANON_CODEX", "codex")
         env = os.environ.copy()
         env["CODEX_HOME"] = str(self.paths.codex_home)
@@ -4085,6 +4090,7 @@ class BootstrapRuntime:
             self.paths.control_parent_root
         )
         env["AGENT_CANON_RUNTIME_ROOT"] = str(self.paths.runtime_root)
+        env[CODEX_SESSION_ROOT_ENV] = str(session_root)
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         try:
             result = subprocess.run(
@@ -4103,71 +4109,6 @@ class BootstrapRuntime:
                 "codex_failed", f"Codex exited with {result.returncode}"
             )
         return prepared
-
-    def _host_private_feedback_sync(self) -> dict[str, Any] | None:
-        """Publish a container-created private sync request on the host."""
-        if self._container_control():
-            # A resident has no credentials, network, or host archive checkout.
-            # The shell adapter consumes the body-free request after this
-            # command returns; never invoke the host Git helper here.
-            return {
-                "execution_plane": "host_archive_adapter",
-                "status": "deferred",
-            }
-        # The container's /var/lib/agent-canon/runtime is the existing
-        # container-runtime bind mount.  Keep request discovery and adapter
-        # consumption on that one host-side path; the control runtime root is
-        # host-only and never contains container feedback payloads.
-        container_runtime = self.paths.container_runtime
-        request = container_runtime / "spool" / "private-feedback" / "sync-request.json"
-        if not request.is_file() or request.is_symlink():
-            return None
-        adapter = self.repository_root / "tools" / "agent_tools" / "private_feedback.py"
-        if not adapter.is_file():
-            raise BootstrapError("private_feedback_sync_unavailable", "host archive adapter is unavailable")
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(adapter),
-                "--runtime-root",
-                str(container_runtime),
-                "--log-root",
-                str(self.private_log_root),
-                "--source-root",
-                str(self.repository_root),
-                "host-sync",
-            ],
-            cwd=str(self.repository_root),
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        payload: dict[str, Any] = {}
-        for line in reversed((result.stdout or "").splitlines()):
-            try:
-                candidate = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(candidate, dict):
-                payload = candidate
-                break
-        if result.returncode != 0:
-            raise BootstrapError(
-                "private_feedback_sync_failed",
-                str(payload.get("code", "host_archive_adapter_failed")),
-                evidence={
-                    "adapter_exit": result.returncode,
-                    "adapter_status": payload.get("status", "error"),
-                    "request_sha256": sha256_bytes(request.read_bytes()),
-                },
-            )
-        return {
-            "execution_plane": "host_archive_adapter",
-            "status": payload.get("status", "synced"),
-            "commit": payload.get("commit"),
-            "tree": payload.get("tree"),
-            "copied": payload.get("copied", "0"),
-        }
 
     def exec(
         self,
@@ -4221,6 +4162,7 @@ class BootstrapRuntime:
                     "GIT_CONFIG_KEY_0": "safe.directory",
                     "GIT_CONFIG_VALUE_0": f"/targets/{target['digest']}",
                     "AGENT_CANON_LOG_ROOT": PRIVATE_LOG_DESTINATION,
+                    "AGENT_CANON_RUNTIME_ROOT": CONTAINER_RUNTIME_DESTINATION,
                 }
                 environment.update(extra_environment or {})
                 result = self.docker.exec_container(
@@ -4301,37 +4243,6 @@ class BootstrapRuntime:
                             "stderr_truncated": io["stderr_truncated"],
                         },
                     )
-                if len(argv) >= 3 and argv[0] == "agent-canon" and argv[1] in {"knowledge", "k", "feedback", "f"} and argv[2] == "sync":
-                    if self._container_control():
-                        details["private_feedback_sync"] = {
-                            "execution_plane": "host_archive_adapter",
-                            "status": "deferred",
-                        }
-                    else:
-                        try:
-                            details["private_feedback_sync"] = self._host_private_feedback_sync()
-                        except BootstrapError as exc:
-                            details["private_feedback_sync"] = {
-                                "execution_plane": "host_archive_adapter",
-                                "status": "error",
-                                "code": exc.code,
-                            }
-                            failure_receipt = self._result(
-                                self._receipt(
-                                    "exec",
-                                    "error",
-                                    exc.code,
-                                    before="running",
-                                    after="running",
-                                    details=details,
-                                    state=state,
-                                )
-                            )
-                            raise BootstrapError(
-                                exc.code,
-                                exc.detail,
-                                evidence={**exc.evidence, "receipt_path": failure_receipt["receipt_path"]},
-                            ) from exc
                 return self._result(
                     self._receipt(
                         "exec",
@@ -5484,10 +5395,77 @@ def _container_restore_target_manifest(
     )
 
 
+def _container_source_identity(
+    remote: str, repository_id: str = "", *, mode: str = "source"
+) -> dict[str, str]:
+    """Return a canonical source or generic remote identity without I/O."""
+    try:
+        from .log_repository_identity import (  # type: ignore[import-not-found]
+            normalize_remote,
+            stable_source_repository_id,
+        )
+    except ImportError:  # pragma: no cover - direct container script execution
+        from log_repository_identity import normalize_remote, stable_source_repository_id
+
+    try:
+        normalized = normalize_remote(remote)
+    except ValueError as exc:
+        raise BootstrapError(
+            "source_repository_identity_unavailable",
+            str(exc),
+        ) from exc
+    if mode == "remote":
+        if repository_id:
+            raise BootstrapError(
+                "source_repository_id_invalid",
+                "generic remote identity does not accept a source override",
+            )
+        return {
+            "schema": "agent-canon.remote-identity.v1",
+            "normalized_remote": normalized,
+        }
+    if mode != "source":
+        raise BootstrapError(
+            "source_repository_identity_unavailable",
+            "identity mode is invalid",
+        )
+    try:
+        derived = stable_source_repository_id(remote)
+    except ValueError as exc:
+        raise BootstrapError(
+            "source_repository_identity_unavailable",
+            str(exc),
+        ) from exc
+    if repository_id:
+        if not re.fullmatch(r"[a-z0-9][a-z0-9.-]{0,95}", repository_id):
+            raise BootstrapError(
+                "source_repository_id_invalid",
+                "source repository identity override is invalid",
+            )
+        if repository_id != derived:
+            raise BootstrapError(
+                "source_repository_id_mismatch",
+                "source repository identity override does not match its remote",
+            )
+        derived = repository_id
+    return {
+        "schema": "agent-canon.source-identity.v1",
+        "normalized_remote": normalized,
+        "repository_id": derived,
+        "stable_branch": f"logs/{derived}",
+    }
+
+
 def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
     """Apply only state/tool-plane operations after host Docker activation."""
-    runtime = _runtime_from_args(args)
     operation = args.operation
+    if operation == "source-identity":
+        return _container_source_identity(
+            args.remote,
+            args.repository_id,
+            mode=args.mode,
+        )
+    runtime = _runtime_from_args(args)
     if operation in {"install", "update", "start", "stop", "uninstall"}:
         with runtime.locked():
             state = runtime._read_state(allow_manifest_drift=True)
@@ -5836,6 +5814,18 @@ def build_parser() -> argparse.ArgumentParser:
     sync_parser.add_argument("--install-root", required=True)
     sync_parser.add_argument("--remote", default="origin")
     sync_parser.add_argument("--branch", default="main")
+    source_identity = sub.add_parser(
+        "source-identity",
+        help=argparse.SUPPRESS,
+    )
+    source_identity.add_argument("--remote", required=True)
+    source_identity.add_argument("--repository-id", default="")
+    source_identity.add_argument(
+        "--mode",
+        choices=("source", "remote"),
+        default="source",
+        help=argparse.SUPPRESS,
+    )
     scheduler = sub.add_parser("scheduler")
     scheduler_sub = scheduler.add_subparsers(dest="scheduler_operation", required=True)
     for scheduler_operation in ("enable", "disable", "status", "uninstall"):

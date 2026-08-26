@@ -91,6 +91,7 @@ def test_container_controller_routes_non_docker_public_operations() -> None:
         'if operation == "task" and args.task_operation == "admit":',
         'if operation == "gc":',
         'if operation == "codex":',
+        'if operation == "source-identity":',
     ):
         assert marker in controller
 
@@ -439,15 +440,29 @@ def test_archive_and_codex_crossings_are_host_owned() -> None:
     """Resident routes produce requests; host owns archive and Codex launch."""
     text = ADAPTER.read_text(encoding="utf-8")
     assert '_agent_canon_private_feedback_sync' in text
-    assert 'private_feedback.py' in text
+    assert '_agent_canon_private_feedback_identity' in text
+    assert 'private_feedback.py' not in text
+    assert 'source-identity --mode "$mode" --remote "$remote"' in text
+    assert 'urlsplit' not in text
+    assert 'source_identity=$(_agent_canon_private_feedback_identity "$container" "$source_remote" source)' in text
+    assert 'remote_normalized=$(_agent_canon_private_feedback_identity "$container" "$remote" remote)' in text
+    assert 'configured_normalized=$(_agent_canon_private_feedback_identity "$container" "$configured" remote)' in text
+    assert 'remote_normalized" == "$configured_normalized"' in text
+    assert 'if [[ "$mode" == source && -n "${AGENT_CANON_SOURCE_REPOSITORY_ID:-}" ]]' in text
+    assert 'identity_args+=(--repository-id "$AGENT_CANON_SOURCE_REPOSITORY_ID")' in text
+    assert 'git -C "$log_root" merge --ff-only "origin/$branch"' in text
     assert 'runtime_log_archive_git.py' in text
     assert 'AGENT_CANON_CODEX' in text
+    assert 'AGENT_CANON_CODEX_SESSION_ROOT' in text
     assert 'CODEX_HOME="$AGENT_CANON_STATE_ROOT/codex-home"' in text
     assert 'AGENT_CANON_PROJECT_ROOT="$codex_project"' in text
     assert 'AGENT_CANON_HOST_INSTALL_ROOT=$AGENT_CANON_REPOSITORY_ROOT' in text
     assert '_agent_canon_run_controller "$codex_container" codex prepare' in text
     assert '"$codex_executable" --project-root "$codex_project"' in text
+    assert 'if ((rc == 0)) && [[ "$operation" == exec ]]; then' in text
     controller = (ROOT / "tools/agent_tools/bootstrap_runtime.py").read_text(encoding="utf-8")
+    assert 'source_identity = sub.add_parser' in controller
+    assert 'normalize_remote' in controller
     container_control = controller.split('def _container_control_run', 1)[1].split(
         '\ndef build_parser', 1
     )[0]

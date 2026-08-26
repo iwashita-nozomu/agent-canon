@@ -663,20 +663,248 @@ _agent_canon_restore_candidate_failure() {
   return 0
 }
 
+_agent_canon_private_feedback_identity() {
+  local container=$1 remote=$2 mode=${3:-source} response normalized branch
+  local -a identity_args=(source-identity --mode "$mode" --remote "$remote")
+  [[ -n "$container" && -n "$remote" ]] ||
+    _agent_canon_json_error source_repository_identity_unavailable "resident identity operation requires a container and source remote"
+  [[ "$mode" == source || "$mode" == remote ]] ||
+    _agent_canon_json_error source_repository_identity_unavailable "identity mode is invalid"
+  if [[ "$mode" == source && -n "${AGENT_CANON_SOURCE_REPOSITORY_ID:-}" ]]; then
+    identity_args+=(--repository-id "$AGENT_CANON_SOURCE_REPOSITORY_ID")
+  fi
+  response=$(_agent_canon_run_controller "$container" "${identity_args[@]}") ||
+    _agent_canon_json_error source_repository_identity_unavailable "resident identity operation failed"
+  normalized=$(printf '%s\n' "$response" | sed -n 's/.*"normalized_remote":"\([^"]*\)".*/\1/p' | tail -n 1)
+  branch=$(printf '%s\n' "$response" | sed -n 's/.*"stable_branch":"\([^"]*\)".*/\1/p' | tail -n 1)
+  [[ -n "$normalized" && "$normalized" != *$'\t'* && "$normalized" != *$'\n'* ]] ||
+    _agent_canon_json_error source_repository_identity_unavailable "resident identity operation returned an invalid stable branch"
+  if [[ "$mode" == source ]]; then
+    [[ "$branch" =~ ^logs/[a-z0-9][a-z0-9.-]{0,127}$ ]] ||
+      _agent_canon_json_error source_repository_identity_unavailable "resident identity operation returned an invalid stable branch"
+    printf '%s\t%s\n' "$normalized" "$branch"
+  else
+    printf '%s\n' "$normalized"
+  fi
+}
+
+_agent_canon_private_feedback_raw_pending() {
+  local spool=$1 raw="$1/raw"
+  [[ -d "$raw" && ! -L "$raw" ]] || return 1
+  find "$raw" -type f -print -quit | grep -q .
+}
+
+_agent_canon_private_feedback_cleanup_clone() {
+  local log_root=$1 original_head=$2
+  local -a touched=("${@:3}")
+  if [[ -n "$original_head" && -d "$log_root/.git" ]]; then
+    git -C "$log_root" reset --hard "$original_head" >/dev/null 2>&1 || true
+    if ((${#touched[@]})); then
+      git -C "$log_root" clean -fd -- "${touched[@]}" >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
 _agent_canon_private_feedback_sync() {
   # The request is written by the resident into the one writable exchange
-  # mount.  Only this host-side adapter may open the private log checkout or
-  # use Git credentials/network access.
-  local request="$AGENT_CANON_STATE_ROOT/spool/private-feedback/sync-request.json"
+  # mount.  Only this host-side shell adapter may open the private log
+  # checkout or use Git credentials/network access.
+  local container=${1:-}
+  local spool="$AGENT_CANON_STATE_ROOT/spool/private-feedback"
+  local request="$spool/sync-request.json"
   [[ -f "$request" && ! -L "$request" ]] || return 0
-  if ! command -v python3 >/dev/null 2>&1; then
-    printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"archive","code":"host_adapter_deferred","execution_plane":"host_archive_adapter"}\n'
-    return 0
+  local request_body
+  request_body=$(<"$request")
+  request_body=${request_body%$'\n'}
+  if ! printf '%s\n' "$request_body" | grep -Eq '^\{"execution_plane":"agentcanon_tool_container","operation":"sync","requested_at":"[^"]+","schema":"agent-canon\.private-feedback-sync-request\.v1","source_commit":"([0-9a-f]{40,64}|unknown)"\}$'; then
+    _agent_canon_json_error private_feedback_sync_request_invalid "private feedback sync request is invalid"
   fi
-  python3 "$AGENT_CANON_REPOSITORY_ROOT/tools/agent_tools/private_feedback.py" \
-    --runtime-root "$AGENT_CANON_STATE_ROOT" \
-    --log-root "$AGENT_CANON_PRIVATE_LOG_ROOT" \
-    --source-root "$AGENT_CANON_REPOSITORY_ROOT" host-sync
+
+  local log_root="$AGENT_CANON_PRIVATE_LOG_ROOT"
+  local remote=${AGENT_CANON_LOG_REMOTE:-git@github.com:iwashita-nozomu/agent-canon-log.git}
+  local source_remote=${AGENT_CANON_SOURCE_REPOSITORY_REMOTE:-}
+  local source_remote_name=${AGENT_CANON_SOURCE_REPOSITORY_REMOTE_NAME:-origin}
+  local branch configured current expected remote_head remote_tree
+  local source_identity remote_normalized configured_normalized
+  local -a copied=()
+  local -a touched=()
+  local source relative target
+  local -a pending_files=() raw_files=()
+
+  [[ -n "$container" ]] ||
+    _agent_canon_json_error source_repository_identity_unavailable "resident identity operation requires a container"
+  if [[ -z "$source_remote" ]]; then
+    if ! source_remote=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" remote get-url "$source_remote_name" 2>/dev/null); then
+      _agent_canon_json_error source_repository_identity_unavailable "source repository remote is unavailable"
+    fi
+  fi
+
+  if [[ -L "$log_root" || ( -e "$log_root" && ! -d "$log_root" ) ]]; then
+    _agent_canon_json_error private_log_invalid "private log checkout path is not a regular directory"
+  fi
+  source_identity=$(_agent_canon_private_feedback_identity "$container" "$source_remote" source)
+  if [[ -d "$log_root/.git" && ! -L "$log_root/.git" ]]; then
+    if ! configured=$(git -C "$log_root" remote get-url origin 2>/dev/null); then
+      _agent_canon_json_error private_log_invalid "private log checkout has no origin remote"
+    fi
+  else
+    configured=$remote
+  fi
+  remote_normalized=$(_agent_canon_private_feedback_identity "$container" "$remote" remote)
+  configured_normalized=$(_agent_canon_private_feedback_identity "$container" "$configured" remote)
+  [[ "$remote_normalized" == "$configured_normalized" ]] ||
+    _agent_canon_json_error private_log_remote_mismatch "private log origin differs from the configured archive repository"
+  if [[ ! -e "$log_root" ]]; then
+    mkdir -p "$(dirname -- "$log_root")"
+    if ! git clone --no-tags "$remote" "$log_root" >/dev/null 2>&1; then
+      _agent_canon_json_error private_feedback_sync_failed "private log clone failed"
+    fi
+  elif [[ ! -d "$log_root/.git" ]]; then
+    if [[ -n "$(find "$log_root" -mindepth 1 -print -quit 2>/dev/null)" ]]; then
+      _agent_canon_json_error private_log_invalid "private log path is not an empty checkout directory"
+    fi
+    rmdir -- "$log_root"
+    if ! git clone --no-tags "$remote" "$log_root" >/dev/null 2>&1; then
+      _agent_canon_json_error private_feedback_sync_failed "private log clone failed"
+    fi
+  fi
+  chmod 700 "$log_root"
+  if [[ -n "$(git -C "$log_root" status --porcelain=v1 --untracked-files=all)" ]]; then
+    _agent_canon_json_error private_log_dirty "private log checkout has retained local changes"
+  fi
+  branch=${source_identity#*$'\t'}
+  current=$(git -C "$log_root" branch --show-current 2>/dev/null || true)
+  if ! git -C "$log_root" fetch --no-tags origin "$branch" >/dev/null 2>&1; then
+    :
+  fi
+  if [[ "$current" != "$branch" ]]; then
+    if git -C "$log_root" rev-parse --verify "origin/$branch" >/dev/null 2>&1; then
+      git -C "$log_root" switch --track -c "$branch" "origin/$branch" >/dev/null 2>&1 ||
+        _agent_canon_json_error private_log_branch_invalid "private log stable branch could not be selected"
+    elif git -C "$log_root" rev-parse --verify origin/main >/dev/null 2>&1; then
+      git -C "$log_root" switch -c "$branch" origin/main >/dev/null 2>&1 ||
+        _agent_canon_json_error private_log_branch_invalid "private log stable branch could not be created"
+    else
+      git -C "$log_root" switch -c "$branch" >/dev/null 2>&1 ||
+        _agent_canon_json_error private_log_branch_invalid "private log stable branch could not be created"
+    fi
+  fi
+  current=$(git -C "$log_root" branch --show-current 2>/dev/null || true)
+  [[ "$current" == "$branch" ]] ||
+    _agent_canon_json_error private_log_branch_invalid "private log checkout is not on the source-qualified stable branch"
+  local original_head
+  original_head=$(git -C "$log_root" rev-parse --verify HEAD 2>/dev/null || true)
+  expected=$(git -C "$log_root" rev-parse --verify "origin/$branch" 2>/dev/null || true)
+  if [[ -n "$(git -C "$log_root" status --porcelain=v1 --untracked-files=all)" ]]; then
+    _agent_canon_json_error private_log_dirty "private log checkout changed after stable branch fetch"
+  fi
+  if [[ -n "$expected" ]] && ! git -C "$log_root" merge --ff-only "origin/$branch" >/dev/null 2>&1; then
+    _agent_canon_json_error private_feedback_sync_conflict "private log stable branch diverged from its remote"
+  fi
+  current=$(git -C "$log_root" rev-parse --verify HEAD 2>/dev/null || true)
+
+  if _agent_canon_private_feedback_raw_pending "$spool"; then
+    local annex_info trusted uuid_count
+    if ! git -C "$log_root" annex version >/dev/null 2>&1 ||
+       ! annex_info=$(git -C "$log_root" annex info --json 2>/dev/null); then
+      _agent_canon_json_error private_feedback_annex_required "raw feedback requires a git-annex special remote"
+    fi
+    trusted=${annex_info#*\"trusted repositories\":}
+    trusted=${trusted#\[}
+    trusted=${trusted%%\]*}
+    uuid_count=$(printf '%s' "$trusted" | grep -o '"uuid"' | wc -l | tr -d ' ')
+    ((uuid_count > 1)) ||
+      _agent_canon_json_error private_feedback_annex_required "raw feedback requires a git-annex special remote"
+  fi
+
+  mapfile -d '' pending_files < <(find "$spool" -type f ! -path "$spool/raw/*" ! -name sync-request.json -print0)
+  for source in "${pending_files[@]}"; do
+    relative=${source#"$spool"/}
+    target="$log_root/$relative"
+    [[ "$relative" != /* && "$relative" != *$'\t'* && "$relative" != *$'\n'* && "$relative" != *"../"* ]] || {
+      _agent_canon_private_feedback_cleanup_clone "$log_root" "$original_head" "${touched[@]}"
+      _agent_canon_json_error private_feedback_path_invalid "private feedback path is invalid"
+    }
+    mkdir -p "$(dirname -- "$target")"
+    if [[ -e "$target" || -L "$target" ]]; then
+      if [[ -L "$target" ]] || ! cmp -s -- "$source" "$target"; then
+        _agent_canon_private_feedback_cleanup_clone "$log_root" "$original_head" "${touched[@]}"
+        _agent_canon_json_error private_feedback_content_conflict "private log target differs from the pending spool"
+      fi
+    else
+      cp -- "$source" "$target" || {
+        _agent_canon_private_feedback_cleanup_clone "$log_root" "$original_head" "${touched[@]}"
+        _agent_canon_json_error private_feedback_copy_failed "private feedback could not be copied"
+      }
+    fi
+    copied+=("$relative")
+    touched+=("$relative")
+  done
+  if _agent_canon_private_feedback_raw_pending "$spool"; then
+    while IFS= read -r -d '' source; do
+      relative=${source#"$spool"/}
+      target="$log_root/$relative"
+      mkdir -p "$(dirname -- "$target")"
+      if [[ -e "$target" || -L "$target" ]]; then
+        if [[ ! -L "$target" ]] && ! cmp -s -- "$source" "$target"; then
+          _agent_canon_private_feedback_cleanup_clone "$log_root" "$original_head" "${touched[@]}"
+          _agent_canon_json_error private_feedback_content_conflict "private raw target differs from the pending spool"
+        fi
+      else
+        cp -- "$source" "$target" || {
+          _agent_canon_private_feedback_cleanup_clone "$log_root" "$original_head" "${touched[@]}"
+          _agent_canon_json_error private_feedback_copy_failed "private raw feedback could not be copied"
+        }
+      fi
+      raw_files+=("$relative")
+      copied+=("$relative")
+      touched+=("$relative")
+    done < <(find "$spool/raw" -type f -print0)
+    if ! git -C "$log_root" annex add -- "${raw_files[@]}" >/dev/null 2>&1 ||
+       ! git -C "$log_root" annex sync --no-content >/dev/null 2>&1; then
+      _agent_canon_private_feedback_cleanup_clone "$log_root" "$original_head" "${touched[@]}"
+      _agent_canon_json_error private_feedback_annex_failed "private raw feedback could not be staged"
+    fi
+  fi
+  if ((${#copied[@]})); then
+    if ((${#pending_files[@]})); then
+      git -C "$log_root" add -- "${copied[@]}" >/dev/null 2>&1 || {
+        _agent_canon_private_feedback_cleanup_clone "$log_root" "$original_head" "${touched[@]}"
+        _agent_canon_json_error private_feedback_stage_failed "private feedback could not be staged"
+      }
+    fi
+    if ! git -C "$log_root" diff --cached --quiet; then
+      git -C "$log_root" -c user.name='AgentCanon Log Archive' \
+        -c user.email='agent-canon-log@example.invalid' \
+        commit -m 'Append private feedback and knowledge' >/dev/null 2>&1 || {
+          _agent_canon_private_feedback_cleanup_clone "$log_root" "$original_head" "${touched[@]}"
+          _agent_canon_json_error private_feedback_commit_failed "private feedback could not be committed"
+        }
+    fi
+  fi
+  current=$(git -C "$log_root" rev-parse --verify HEAD 2>/dev/null || true)
+  if [[ "$current" != "$expected" ]]; then
+    if ! git -C "$log_root" push origin "HEAD:refs/heads/$branch" >/dev/null 2>&1; then
+      _agent_canon_private_feedback_cleanup_clone "$log_root" "$original_head" "${touched[@]}"
+      _agent_canon_json_error private_feedback_sync_conflict "private log remote changed; pending spool retained"
+    fi
+  fi
+  if ! git -C "$log_root" fetch --no-tags origin "$branch" >/dev/null 2>&1; then
+    _agent_canon_json_error private_feedback_readback_failed "private log remote readback failed"
+  fi
+  remote_head=$(git -C "$log_root" rev-parse --verify "origin/$branch" 2>/dev/null || true)
+  remote_tree=$(git -C "$log_root" rev-parse --verify "origin/$branch^{tree}" 2>/dev/null || true)
+  [[ -n "$remote_head" && -n "$remote_tree" && ( ! ${#copied[@]} -gt 0 || "$remote_head" == "$current" ) ]] ||
+    _agent_canon_json_error private_feedback_readback_failed "private log remote head readback differs"
+  for relative in "${copied[@]}"; do
+    rm -f -- "$spool/$relative"
+  done
+  while IFS= read -r -d '' source; do
+    [[ "$source" == "$spool" ]] || rmdir -- "$source" 2>/dev/null || true
+  done < <(find "$spool" -depth -type d -print0)
+  rm -f -- "$request"
+  printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"archive","code":"synced","execution_plane":"host_archive_adapter","clone":"%s","branch":"%s","commit":"%s","tree":"%s","copied":"%s"}\n' \
+    "$log_root" "$branch" "$remote_head" "$remote_tree" "${#copied[@]}"
 }
 
 _agent_canon_archive_eval_sync() {
@@ -741,20 +969,6 @@ _agent_canon_archive_eval_sync() {
     rm -f -- "$request"
   fi
   return "$adapter_rc"
-}
-
-_agent_canon_feedback_sync_requested() {
-  local -a argv=("$@")
-  local index
-  for index in "${!argv[@]}"; do
-    if ((index >= 1 && index + 1 < ${#argv[@]})) &&
-       [[ "${argv[index-1]}" == agent-canon &&
-          "${argv[index]}" =~ ^(knowledge|k|feedback|f)$ &&
-          "${argv[index+1]}" == sync ]]; then
-      return 0
-    fi
-  done
-  return 1
 }
 
 _agent_canon_remove_global_links() {
@@ -1333,13 +1547,20 @@ bootstrap_host_entrypoint() {
       fi
       [[ -x "$codex_executable" ]] ||
         _agent_canon_json_error codex_unavailable "Codex executable is unavailable"
+      local codex_session_root="$AGENT_CANON_STATE_ROOT/codex-home/sessions"
+      mkdir -p "$codex_session_root"
+      chmod 700 "$codex_session_root"
+      local codex_rc=0 feedback_rc=0
       CODEX_HOME="$AGENT_CANON_STATE_ROOT/codex-home" \
       AGENT_CANON_CONTROL_PARENT_ROOT="$AGENT_CANON_CONTROL_ROOT" \
       AGENT_CANON_RUNTIME_ROOT="$AGENT_CANON_RUNTIME_ROOT" \
       AGENT_CANON_SESSION_RUNTIME_ROOT="$AGENT_CANON_STATE_ROOT" \
+      AGENT_CANON_CODEX_SESSION_ROOT="$codex_session_root" \
       AGENT_CANON_PROJECT_ROOT="$codex_project" \
-        "$codex_executable" --project-root "$codex_project"
-      return $?
+        "$codex_executable" --project-root "$codex_project" || codex_rc=$?
+      ((codex_rc == 0)) || return "$codex_rc"
+      _agent_canon_private_feedback_sync "$codex_container" || feedback_rc=$?
+      return "$feedback_rc"
       ;;
     eval)
       if [[ "${command_args[1]:-}" == sync ]]; then
@@ -1386,9 +1607,8 @@ bootstrap_host_entrypoint() {
       cat "$output_file"
       cat "$error_file" >&2
       rm -f -- "$output_file" "$error_file"
-      if ((rc == 0)) && [[ "$operation" == exec ]] &&
-         _agent_canon_feedback_sync_requested "${command_args[@]}"; then
-        _agent_canon_private_feedback_sync || rc=$?
+      if ((rc == 0)) && [[ "$operation" == exec ]]; then
+        _agent_canon_private_feedback_sync "$container" || rc=$?
       fi
       return "$rc"
       ;;

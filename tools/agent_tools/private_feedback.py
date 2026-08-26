@@ -164,6 +164,33 @@ def _read_sync_request(path: Path) -> dict[str, Any]:
     return request
 
 
+def _ensure_sync_request(runtime: Path) -> bool:
+    """Create or reuse the one body-free host publication request.
+
+    Capture is complete only after this request exists.  Keeping the helper
+    behind the spool boundary makes both explicit ``sync`` and automatic
+    capture use the same idempotency record without copying private prose into
+    the request.
+    """
+    spool = _spool_root(runtime)
+    request_path = _sync_request_path(spool)
+    if request_path.exists() or request_path.is_symlink():
+        _read_sync_request(request_path)
+        return True
+    request = {
+        "schema": SYNC_REQUEST_SCHEMA,
+        "operation": "sync",
+        "execution_plane": "agentcanon_tool_container",
+        "requested_at": _now(),
+        "source_commit": _source_commit(),
+    }
+    _write_once(
+        request_path,
+        json.dumps(request, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
+    )
+    return False
+
+
 def _runtime_archive_module() -> Any:
     """Load the existing archive branch resolver in package or script mode."""
     try:
@@ -296,11 +323,11 @@ def _receipt_metadata(topic: str, digest: str, run: str, task: str, source_commi
     return "\n".join(
         [
             "## Read receipt",
-            f"kind: knowledge-read-receipt",
+            "kind: knowledge-read-receipt",
             f"topic: {topic}",
             f"candidate_locator: {_candidate_locator(topic).as_posix()}",
             f"candidate_digest: sha256:{digest}",
-            f"reader: agent-canon",
+            "reader: agent-canon",
             f"read_at: {_now()}",
             f"run: {run}",
             f"task: {task}",
@@ -395,7 +422,9 @@ def add(args: argparse.Namespace, kind: str) -> int:
     )
     path = _record_path(kind, topic, digest, spool)
     _write_once(path, _frontmatter(meta, body))
+    request_reused = _ensure_sync_request(runtime)
     meta["status"] = "spooled"
+    meta["sync_request"] = "reused" if request_reused else "created"
     _json_meta(meta)
     return 0
 
@@ -507,6 +536,22 @@ def ensure_clone(
         raise PrivateFeedbackError("log_branch_invalid", "private log checkout is not on the source-qualified stable branch")
     origin_branch = f"origin/{expected_branch}"
     origin_head = _git(log_root, ["rev-parse", origin_branch], check=False).stdout.strip()
+    local_head = _git(log_root, ["rev-parse", "HEAD"]).stdout.strip()
+    if origin_head and local_head != origin_head:
+        # Fetch may observe a remote advance while the checkout is already on
+        # the expected branch.  Fast-forward the clean operational clone before
+        # staging this spool; otherwise a retry would build on a stale head and
+        # fail its first non-force push even though no local conflict exists.
+        fast_forward = _git(
+            log_root,
+            ["merge", "--ff-only", origin_branch],
+            check=False,
+        )
+        if fast_forward.returncode != 0:
+            raise PrivateFeedbackError(
+                "log_clone_dirty",
+                "private log checkout cannot fast-forward to the remote branch",
+            )
     return {
         "root": str(log_root),
         "remote": configured,
@@ -515,11 +560,6 @@ def ensure_clone(
         "origin_head": origin_head,
         "mode": oct(log_root.stat().st_mode & 0o777),
     }
-
-
-def _legacy_runtime_clone(runtime: Path) -> Path:
-    """Return the old archive clone location without creating or deleting it."""
-    return runtime / "archive" / "agent-canon-log"
 
 
 def _copy_pending(spool: Path, log_root: Path) -> list[Path]:
@@ -589,25 +629,9 @@ def sync_request(args: argparse.Namespace) -> int:
     command returns.
     """
     runtime = _runtime_root(args.runtime_root)
-    spool = _spool_root(runtime)
-    request_path = _sync_request_path(spool)
-    reused = request_path.exists() or request_path.is_symlink()
-    if reused:
-        # A valid request is the idempotency key.  Repeated k/f sync commands
-        # share it and never rewrite requested_at or invent another request.
-        _read_sync_request(request_path)
-    else:
-        request = {
-            "schema": SYNC_REQUEST_SCHEMA,
-            "operation": "sync",
-            "execution_plane": "agentcanon_tool_container",
-            "requested_at": _now(),
-            "source_commit": _source_commit(),
-        }
-        _write_once(
-            request_path,
-            json.dumps(request, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
-        )
+    # A valid request is the idempotency key. Repeated k/f sync commands share
+    # it and never rewrite requested_at or invent another request.
+    reused = _ensure_sync_request(runtime)
     _json_meta(
         {
             "schema": SCHEMA,
@@ -631,29 +655,32 @@ def host_sync(args: argparse.Namespace) -> int:
     log_root = _log_root(args.log_root)
     remote = str(args.remote or os.environ.get("AGENT_CANON_LOG_REMOTE", LOG_REMOTE))
     source_root = _source_root(args.source_root)
-    legacy = _legacy_runtime_clone(runtime)
-    migration = "not-needed"
-    if not log_root.exists() and legacy.is_dir() and (legacy / ".git").exists():
-        # Read the old clone's remote head before creating the operational
-        # checkout.  The old clone is retained; bootstrap owns its later
-        # removal only after the new clone has published and read back.
-        old_remote_head = _git(legacy, ["rev-parse", f"origin/{stable_log_branch(source_root)}"], check=False).stdout.strip()
-        if old_remote_head:
-            migration = "legacy-readback-observed"
     info = ensure_clone(log_root, remote, source_root=source_root, runtime_root=runtime)
     branch = info["branch"]
     expected = info["origin_head"]
     pending_raw = _raw_pending(spool)
+    # Raw payloads require a git-annex special remote.  Resolve that capability
+    # before copying any ordinary feedback/knowledge so a mixed spool cannot
+    # leave a partially published operational checkout behind.
+    if pending_raw and not _annex_special_remote_available(log_root):
+        _json_meta(
+            {
+                "schema": SCHEMA,
+                "status": "pending",
+                "execution_plane": "host_archive_adapter",
+                "reason": "annex-special-remote-required",
+                "clone": str(log_root),
+                "branch": branch,
+                "copied": "0",
+            }
+        )
+        return 1
     annex_raw: list[Path] = []
-    if pending_raw and _annex_special_remote_available(log_root):
+    if pending_raw:
         annex_raw = _copy_raw_for_annex(spool, log_root)
         pending_raw = False
     normal_copied = _copy_pending(spool, log_root)
     copied = normal_copied + annex_raw
-    if pending_raw:
-        meta = {"schema": SCHEMA, "status": "pending", "execution_plane": "host_archive_adapter", "reason": "annex-special-remote-required", "clone": str(log_root), "branch": branch, "copied": len(copied), "migration": migration}
-        _json_meta({k: str(v) for k, v in meta.items()})
-        return 1
     if normal_copied:
         _git(log_root, ["add", "--", *[path.as_posix() for path in normal_copied]])
     staged = _git(log_root, ["diff", "--cached", "--quiet"], check=False)
@@ -680,7 +707,7 @@ def host_sync(args: argparse.Namespace) -> int:
             except OSError:
                 pass
     request_path.unlink()
-    _json_meta({"schema": SCHEMA, "status": "synced", "execution_plane": "host_archive_adapter", "clone": str(log_root), "branch": branch, "commit": remote_head, "tree": remote_tree, "copied": str(len(copied)), "migration": migration})
+    _json_meta({"schema": SCHEMA, "status": "synced", "execution_plane": "host_archive_adapter", "clone": str(log_root), "branch": branch, "commit": remote_head, "tree": remote_tree, "copied": str(len(copied))})
     return 0
 
 
@@ -738,6 +765,8 @@ def capture_runtime_feedback(
         source_commit=_source_commit(),
     )
     _write_once(spool / "feedback" / topic / f"{digest[:16]}.md", _frontmatter(meta, body))
+    request_reused = _ensure_sync_request(runtime)
+    meta["sync_request"] = "reused" if request_reused else "created"
     return meta
 
 
