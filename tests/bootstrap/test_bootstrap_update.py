@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import subprocess
@@ -85,6 +86,21 @@ def test_bootstrap_defaults_runtime_to_repository_dot_runtime(tmp_path: Path) ->
     )
     runtime = _runtime_from_args(args)
     assert runtime.paths.runtime_root == repository / ".runtime"
+
+
+def test_lifecycle_lock_cannot_be_bypassed_by_environment_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The old child-process marker never suppresses lock acquisition."""
+    manager, _docker = _runtime(tmp_path)
+    flock_calls: list[int] = []
+    monkeypatch.setenv("AGENT_CANON_LOCK_HELD", "1")
+    monkeypatch.setattr(fcntl, "flock", lambda _fd, operation: flock_calls.append(operation))
+
+    with manager.locked():
+        pass
+
+    assert flock_calls == [fcntl.LOCK_EX, fcntl.LOCK_UN]
 
 
 def test_bootstrap_maps_only_the_exact_legacy_runtime_default(tmp_path: Path) -> None:

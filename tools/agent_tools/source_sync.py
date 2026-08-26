@@ -209,37 +209,18 @@ class SourceSync:
             os.rename(child, self.install_root / child.name)
 
     def _run_candidate_bootstrap(self, image_digest: str) -> None:
-        common = [
-            str(self.install_root / "bootstrap.sh"),
-            "--control-parent-root",
-            str(self.runtime.paths.control_parent_root),
-            "--runtime-root",
-            str(self.runtime.paths.runtime_root),
-        ]
-        # A source-owned runtime is empty after the outer migration reset.
-        # Install/adopt the verified immutable image first; ``update`` is
-        # intentionally reserved for an already-installed runtime.
-        commands = (
-            [
-                *common,
-                "install",
-                "--image-ref",
-                image_digest,
-            ],
-            [*common, "start"],
-            [*common, "codex", "prepare"],
+        # The outer SourceSync transaction owns this runtime lock.  Invoke the
+        # candidate's lock-owned implementations in-process so a fresh source
+        # cannot be made to bypass the lock through an environment marker.
+        candidate = BootstrapRuntime(
+            self.runtime.paths.control_parent_root,
+            self.runtime.paths.runtime_root,
+            repository_root=self.install_root,
+            docker=self.runtime.docker,
         )
-        environment = {**os.environ, "AGENT_CANON_LOCK_HELD": "1"}
-        for args in commands:
-            result = subprocess.run(
-                args, check=False, capture_output=True, text=True, env=environment
-            )
-            if result.returncode:
-                raise BootstrapError(
-                    "candidate_bootstrap_failed",
-                    f"candidate bootstrap command failed: {args[-2] if len(args) > 1 else args[-1]}",
-                    evidence={"exit": result.returncode},
-                )
+        candidate._install_locked(image_digest)
+        candidate._start_locked()
+        candidate._codex_prepare_locked()
 
     def sync(self) -> dict[str, Any]:
         """Synchronize source and image once; unchanged main is a no-op."""

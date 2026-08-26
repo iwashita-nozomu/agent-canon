@@ -1443,12 +1443,6 @@ class BootstrapRuntime:
     def locked(self) -> Iterator[None]:
         """Serialize lifecycle transitions using the external lock file."""
         self._ensure_layout()
-        if os.environ.get("AGENT_CANON_LOCK_HELD") == "1":
-            # SourceSync owns the lock while handing the verified candidate to
-            # the new checkout. The child bootstrap must not deadlock on the
-            # same transaction; the marker is set only for that child.
-            yield
-            return
         handle = os.fdopen(os.open(self.paths.lock, os.O_RDWR | os.O_NOFOLLOW), "r+")
         try:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
@@ -1576,16 +1570,7 @@ class BootstrapRuntime:
 
     def _prepare_legacy_runtime_reset(self) -> None:
         """Stop the old owned runtime and prepare a fresh source runtime."""
-        # SourceSync owns the outer migration transaction and invokes the
-        # candidate checkout with the lifecycle lock marker.  The candidate
-        # must only initialize/adopt the verified image; repeating this reset
-        # in the child would remove the parent's rollback backup and make a
-        # failed candidate impossible to restore.
-        if (
-            os.environ.get("AGENT_CANON_LOCK_HELD") == "1"
-            or not self.default_runtime_root
-            or self._legacy_runtime_pending_cleanup
-        ):
+        if not self.default_runtime_root or self._legacy_runtime_pending_cleanup:
             return
         legacy = self.legacy_runtime_root
         if legacy == self.paths.runtime_root or not legacy.exists():
@@ -2361,11 +2346,12 @@ class BootstrapRuntime:
             "mounts": summarized_mounts,
         }
 
-    def install(self, image_ref: str | None = None) -> dict[str, Any]:
-        """Install the initial image or reconcile an existing runtime."""
+    def _install_locked(self, image_ref: str | None = None) -> dict[str, Any]:
+        """Install while the caller owns the lifecycle lock."""
         result: dict[str, Any] | None = None
-        with self.locked():
-            self._prepare_legacy_runtime_reset()
+        # Keep this implementation lock-free so SourceSync can invoke it for
+        # the swapped checkout while retaining its transaction lock.
+        with contextlib.nullcontext():
             state = self._read_state(allow_manifest_drift=True)
             if state.get("state") != "uninstalled":
                 if image_ref:
@@ -2482,6 +2468,13 @@ class BootstrapRuntime:
                         )
                     )
         assert result is not None
+        return result
+
+    def install(self, image_ref: str | None = None) -> dict[str, Any]:
+        """Install the initial image or reconcile an existing runtime."""
+        with self.locked():
+            self._prepare_legacy_runtime_reset()
+            result = self._install_locked(image_ref)
         self.codex_prepare()
         try:
             self.scheduler_enable()
@@ -2846,9 +2839,9 @@ class BootstrapRuntime:
             c["state"] = "running"
         return c
 
-    def start(self) -> dict[str, Any]:
-        """Create or adopt exactly one constrained healthy container."""
-        with self.locked():
+    def _start_locked(self) -> dict[str, Any]:
+        """Start while the caller owns the lifecycle lock."""
+        with contextlib.nullcontext():
             state = self._read_state()
             if state["state"] == "uninstalled":
                 raise BootstrapError(
@@ -2873,6 +2866,11 @@ class BootstrapRuntime:
                     state=state,
                 )
             )
+
+    def start(self) -> dict[str, Any]:
+        """Create or adopt exactly one constrained healthy container."""
+        with self.locked():
+            return self._start_locked()
 
     def status(self) -> dict[str, Any]:
         """Return state plus Docker inspect readback."""
@@ -3788,9 +3786,9 @@ class BootstrapRuntime:
                     )
         return entries
 
-    def codex_prepare(self) -> dict[str, Any]:
-        """Install only manifest-managed links into isolated ``CODEX_HOME``."""
-        with self.locked():
+    def _codex_prepare_locked(self) -> dict[str, Any]:
+        """Prepare links while the caller owns the lifecycle lock."""
+        with contextlib.nullcontext():
             state = self._read_state()
             _ensure_directory(self.paths.codex_home)
             desired = self._managed_links()
@@ -3869,6 +3867,11 @@ class BootstrapRuntime:
                     state=state,
                 )
             )
+
+    def codex_prepare(self) -> dict[str, Any]:
+        """Install only manifest-managed links into isolated ``CODEX_HOME``."""
+        with self.locked():
+            return self._codex_prepare_locked()
 
     def codex_launch(self, project_root: Path) -> dict[str, Any]:
         """Launch Codex with a process-local isolated home."""
