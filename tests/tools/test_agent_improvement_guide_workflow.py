@@ -43,7 +43,7 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
         """PR guide runs must not select an unpublished GHCR merge tag."""
         text = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn(
-            "fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}",
+            "fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}",
             text,
         )
 
