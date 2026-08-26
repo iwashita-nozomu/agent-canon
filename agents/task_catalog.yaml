@@ -632,6 +632,8 @@ workflow_families:
 
   - id: issue_worker_publication
     name: IssueWorker Publication
+    logical_route: issue_worker
+    execution_role: publisher
     subagent_prompt:
       purpose: Prompt packet for explicit repository-owned feedback publication and related Issue reorganization.
       prompt_preamble:
