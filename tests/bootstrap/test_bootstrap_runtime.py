@@ -705,6 +705,8 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
             "--runtime-root",
             str(runtime_root),
             "exec",
+            "--target-digest",
+            digest,
             "--request-json",
             json.dumps(request),
         ]
@@ -786,6 +788,8 @@ def test_container_control_rejects_unallowlisted_structured_tool_environment(
             "--runtime-root",
             str(runtime_root),
             "exec",
+            "--target-digest",
+            digest,
             "--request-json",
             json.dumps(request),
         ]

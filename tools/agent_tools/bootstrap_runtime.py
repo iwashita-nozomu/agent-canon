@@ -5789,6 +5789,11 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
                 or any(not isinstance(item, str) or "\x00" in item for item in descriptor_argv)
             ):
                 raise BootstrapError("invalid_exec_request", "tool or argv is invalid")
+            if (
+                not isinstance(args.target_digest, str)
+                or args.target_digest != os.environ.get("AGENT_CANON_TARGET_DIGEST")
+            ):
+                raise BootstrapError("invalid_exec_request", "target digest handoff is invalid")
             source_root, host_runtime, host_control, container_target = (
                 _container_target_for_request(runtime, request)
             )
@@ -5912,6 +5917,7 @@ def build_parser() -> argparse.ArgumentParser:
     execute_group = execute.add_mutually_exclusive_group(required=True)
     execute_group.add_argument("--root")
     execute_group.add_argument("--request-json")
+    execute.add_argument("--target-digest")
     execute.add_argument("command", nargs=argparse.REMAINDER)
     tool = sub.add_parser("tool")
     tool_sub = tool.add_subparsers(dest="tool_operation", required=True)

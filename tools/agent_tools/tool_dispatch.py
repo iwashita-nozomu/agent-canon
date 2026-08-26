@@ -718,6 +718,7 @@ def _bootstrap_command(root: Path, runtime: Path, spec: ToolSpec, args: Sequence
             "target-root-required",
             "set AGENT_CANON_TARGET_ROOT when zero or multiple targets are registered",
         )
+    target_digest = hashlib.sha256(str(target_root).encode("utf-8")).hexdigest()
     request = {
         "schema": "agent-canon.tool-exec-request.v1",
         "tool_id": spec.tool_id,
@@ -748,7 +749,11 @@ def _bootstrap_command(root: Path, runtime: Path, spec: ToolSpec, args: Sequence
         "--repository-root", str(root.resolve()),
         "--control-parent-root", str(control),
         "--runtime-root", str(runtime),
-        "exec", "--request-json", json.dumps(request, sort_keys=True, separators=(",", ":")),
+        "exec",
+        "--target-digest",
+        target_digest,
+        "--request-json",
+        json.dumps(request, sort_keys=True, separators=(",", ":")),
     ]
     environment = {key: value for key, value in os.environ.items() if key in BOOTSTRAP_EXEC_ENV}
     environment.update({"AGENT_CANON_CONTROL_PARENT_ROOT": str(control), "AGENT_CANON_RUNTIME_ROOT": str(runtime)})

@@ -139,6 +139,42 @@ _agent_canon_rewrite_target_args() {
   command_args=("${rewritten[@]}")
 }
 
+_agent_canon_extract_exec_target_digest() {
+  local -a original=("${command_args[@]}")
+  local -a rewritten=()
+  local digest= index=0 token value found=0
+  while ((index < ${#original[@]})); do
+    token=${original[index]}
+    if [[ "$token" == --target-digest ]]; then
+      ((found == 0)) || _agent_canon_json_error argument_duplicate "exec target digest was provided more than once"
+      ((index + 1 < ${#original[@]})) || _agent_canon_json_error argument_missing "--target-digest requires a value"
+      digest=${original[index+1]}
+      [[ "$digest" =~ ^[A-Za-z0-9_.-]{1,128}$ ]] ||
+        _agent_canon_json_error argument_invalid "exec target digest is invalid"
+      rewritten+=(--target-digest "$digest")
+      found=1
+      index=$((index + 2))
+      continue
+    fi
+    rewritten+=("$token")
+    index=$((index + 1))
+  done
+  ((found == 1)) || _agent_canon_json_error argument_missing "structured exec requires --target-digest"
+  local kind mounted_digest mounted_source mounted_destination mounted_mode
+  while IFS=$'\t' read -r kind mounted_digest mounted_source mounted_destination mounted_mode; do
+    if [[ "$kind" == target && "$mounted_digest" == "$digest" ]]; then
+      [[ "$mounted_source" = /* && -d "$mounted_source" && ! -L "$mounted_source" &&
+         "$mounted_destination" == "/targets/$digest" && "$mounted_mode" == read-only ]] ||
+        _agent_canon_json_error mount_manifest_invalid "exec target digest maps to an invalid mount"
+      AGENT_CANON_TARGET_DIGEST=$digest
+      export AGENT_CANON_TARGET_DIGEST
+      command_args=("${rewritten[@]}")
+      return 0
+    fi
+  done < "$AGENT_CANON_STATE_ROOT/mounts.tsv"
+  _agent_canon_json_error target_not_registered "exec target digest is absent from the strict mount registry"
+}
+
 _agent_canon_prepare_host_runtime() {
   AGENT_CANON_STATE_ROOT="$AGENT_CANON_RUNTIME_ROOT/container-state"
   export AGENT_CANON_STATE_ROOT
@@ -1585,13 +1621,15 @@ bootstrap_host_entrypoint() {
         return $?
       fi
       ;;&
-    install|update|start|stop|rollback|uninstall|target|tool|template|task|gc|eval)
+    install|update|start|stop|rollback|uninstall|target|tool|template|task|gc|eval|exec)
       if [[ "$operation" != install && "$operation" != update ]]; then
         _agent_canon_use_active_image "$(_agent_canon_container_name)"
       fi
       local container
       container=$(_agent_canon_ensure_container)
-      if [[ "$operation" == tool || "$operation" == template || "$operation" == eval || "$operation" == exec ]]; then
+      if [[ "$operation" == exec && " ${command_args[*]} " == *" --request-json "* ]]; then
+        _agent_canon_extract_exec_target_digest
+      elif [[ "$operation" == tool || "$operation" == template || "$operation" == eval || "$operation" == exec ]]; then
         _agent_canon_rewrite_target_args "${command_args[@]}"
       fi
       local output_file error_file rc

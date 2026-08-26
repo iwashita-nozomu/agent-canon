@@ -113,6 +113,12 @@ class ToolDispatchTest(unittest.TestCase):
         )
         output_root = root / "control" / "runtime" / "reports"
         output_root.mkdir()
+        previous_target_digest = os.environ.pop("AGENT_CANON_TARGET_DIGEST", None)
+        self.addCleanup(
+            self._restore_optional_environment,
+            "AGENT_CANON_TARGET_DIGEST",
+            previous_target_digest,
+        )
         previous_output_root = os.environ.get("AGENT_CANON_OUTPUT_ROOT")
         self.addCleanup(
             self._restore_optional_environment,
@@ -150,6 +156,11 @@ class ToolDispatchTest(unittest.TestCase):
         command = run.call_args.args[0]
         request = json.loads(command[command.index("--request-json") + 1])
         self.assertEqual(command[0], str(root / "bootstrap.sh"))
+        digest_index = command.index("--target-digest")
+        self.assertEqual(
+            command[digest_index + 1],
+            hashlib.sha256(str(root).encode("utf-8")).hexdigest(),
+        )
         self.assertEqual(request["tool_id"], "generate-agent-runtime-dashboard")
         self.assertEqual(request["side_effect"], "external-artifact")
         self.assertEqual(request["output_root"], str(output_root))

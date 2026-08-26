@@ -65,6 +65,16 @@ def test_target_mount_manifest_is_strict_and_reused_on_create() -> None:
     assert 'target mount destination or mode is invalid' in text
 
 
+def test_structured_exec_target_digest_is_shell_validated_before_container_handoff() -> None:
+    """Structured requests carry a typed digest; the shell never parses JSON."""
+    text = ADAPTER.read_text(encoding="utf-8")
+    assert "_agent_canon_extract_exec_target_digest" in text
+    assert "--target-digest" in text
+    assert 'AGENT_CANON_STATE_ROOT/mounts.tsv' in text
+    assert 'AGENT_CANON_TARGET_DIGEST=$digest' in text
+    assert 'install|update|start|stop|rollback|uninstall|target|tool|template|task|gc|eval|exec)' in text
+
+
 def test_uninstall_preserves_foreign_links_and_restores_owned_config() -> None:
     """Uninstall scopes symlink removal by exact AgentCanon source prefixes."""
     text = ADAPTER.read_text(encoding="utf-8")
@@ -423,7 +433,7 @@ def test_active_image_state_owns_ordinary_route_selection() -> None:
     assert '_agent_canon_read_active_image' in text
     assert '_agent_canon_record_active_container' in text
     assert text.count('_agent_canon_record_active_container') >= 3
-    ordinary = text.split('    install|update|start|stop|rollback|uninstall|target|tool|template|task|gc|eval)', 1)[1]
+    ordinary = text.split('    install|update|start|stop|rollback|uninstall|target|tool|template|task|gc|eval|exec)', 1)[1]
     assert '_agent_canon_use_active_image' in ordinary
     assert '_agent_canon_image "$image_ref"' not in ordinary
     assert 'AGENT_CANON_EXPECTED_IMAGE_ID=$candidate_image_id' in text
