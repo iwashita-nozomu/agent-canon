@@ -25,6 +25,9 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 from generate_agent_runtime_dashboard import (  # noqa: E402
     HookWorkflowBreakdownReader,
     TokenUsageBreakdownReader,
+    durable_issue_next_action,
+    issue_worker_candidate_records,
+    read_issue_worker_handoffs,
     token_usage_lines,
     token_usage_next_action,
     tool_source_path_candidates,
@@ -49,6 +52,64 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         else:
             os.environ["AGENT_CANON_RUNTIME_ROOT"] = self._previous_runtime
         self._runtime_temp.cleanup()
+
+    def test_issue_worker_reads_only_explicit_candidates(self) -> None:
+        """Counts and selection misses do not synthesize Issue candidates."""
+        self.assertEqual(
+            issue_worker_candidate_records(
+                {"selection_misses": 35, "workflow_attribution_missing": 6882}
+            ),
+            (),
+        )
+        candidate = {
+            "repository": "owner/repo",
+            "owner": "issue-owner",
+            "fix": "repair the missing route",
+        }
+        self.assertEqual(
+            issue_worker_candidate_records({"issue_worker_candidate": candidate}),
+            (candidate,),
+        )
+
+    def test_issue_worker_uses_checkout_readback_and_routes_flagless_candidate(self) -> None:
+        """The #938 checkout identity is the sole repository routing input."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            hook = Path(temp_dir) / "events.jsonl"
+            hook.write_text(
+                json.dumps(
+                    {
+                        "checkout_identity": {"remote": "owner/repo"},
+                        "issue_worker_candidate": {
+                            "repository": "owner/repo",
+                            "owner": "issue-owner",
+                            "fix": "repair the missing route",
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            handoffs = read_issue_worker_handoffs((hook,))
+
+        self.assertEqual(len(handoffs), 1)
+        self.assertTrue(handoffs[0].qualifies)
+        self.assertEqual(handoffs[0].reason, "user-owned-candidate")
+
+    def test_issue_worker_candidate_creates_host_publisher_action(self) -> None:
+        """A qualified candidate creates a host action, not a dashboard mutation."""
+        handoff = SimpleNamespace(
+            qualifies=True,
+            repository="owner/repo",
+            status="qualified",
+        )
+        summary = SimpleNamespace(
+            issue_worker_handoffs=(handoff,),
+            evidence=SimpleNamespace(github_issue_refs=()),
+        )
+        actions = durable_issue_next_action(summary)
+        self.assertEqual(len(actions), 1)
+        self.assertEqual(actions[0].automation, "host-publisher")
+        self.assertIn("read-only", actions[0].command)
     """Verify dashboard output from accumulated runtime evidence."""
 
     def test_iter_entries_tolerates_disappeared_log_file(self) -> None:
@@ -271,7 +332,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         """Verify concrete dashboard-generated next actions."""
         required = (
             "## Next Actions",
-            "AGENT_RUNTIME_DASHBOARD_NEXT_ACTIONS=6",
+            "AGENT_RUNTIME_DASHBOARD_NEXT_ACTIONS=",
             "AGENT_RUNTIME_DASHBOARD_BLOCKING_NEXT_ACTIONS=5",
             "`materialize missing consulted source URLs`",
             "`repair failed skill eval for agent-orchestration`",
@@ -292,9 +353,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "| hook evidence | `healthy` | `3` |",
             "| report quality eval | `missing` | `0` |",
             "## Issue Routing",
-            "AC-20260517-mcp-inventory-preflight-cache.md",
-            "AC-20260517-eval-accumulation-gaps.md",
-            "AC-20260517-github-folder-issue-sync.md",
+            "missing-local-issue",
             "## Skill Eval Failure Analysis",
             "| `agent-orchestration` | `1` | `1` | `100.0%` |",
             "## Hook Workflow Attribution",

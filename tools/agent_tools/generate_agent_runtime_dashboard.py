@@ -1199,7 +1199,7 @@ def issue_worker_candidate_records(entry: Mapping[str, object]) -> tuple[Mapping
     the typed qualification route.
     """
     values: list[object] = []
-    for key in ("issue_worker_candidates", "issue_candidates", "issue_candidate"):
+    for key in ("issue_worker_candidates", "issue_worker_candidate"):
         value = entry.get(key)
         if isinstance(value, Mapping):
             values.append(value)
@@ -1223,13 +1223,14 @@ def read_issue_worker_handoffs(
             hook_file, recent_cutoff_epoch
         ):
             for candidate in issue_worker_candidate_records(entry):
-                # Authentication is an explicit evidence field.  The
-                # dashboard must not infer repository ownership from a path.
-                authenticated_repository = str(
-                    candidate.get("authenticated_repository")
-                    or entry.get("authenticated_repository")
-                    or ""
-                ).strip()
+                # Repository ownership comes from the #938 checkout readback,
+                # never from a candidate's self-claimed authentication field.
+                identity = entry.get("checkout_identity")
+                authenticated_repository = (
+                    str(identity.get("remote") or "").strip()
+                    if isinstance(identity, Mapping)
+                    else str(entry.get("authenticated_repository") or "").strip()
+                )
                 handoffs.append(
                     qualify_issue_worker_finding(
                         candidate,
@@ -1448,11 +1449,12 @@ class RuntimeDashboardVisuals:
 
     def issue_row(self) -> str:
         """Return the durable issue action-map row."""
+        handoff_count = len(getattr(self.summary, "issue_worker_handoffs", ()))
         return action_map_row(
             "durable issues",
-            "triage open issues before claiming workflow health",
-            len(self.summary.evidence.github_issue_refs),
-            bool(self.summary.evidence.github_issue_refs),
+            "route explicit IssueWorker candidates through the host publisher",
+            len(self.summary.evidence.github_issue_refs) + handoff_count,
+            bool(self.summary.evidence.github_issue_refs) or handoff_count > 0,
         )
 
 
@@ -2093,6 +2095,20 @@ def dashboard_repair_payload(summary: RuntimeDashboardSummary) -> dict[str, obje
             selection_metric_payload(row)
             for row in top_selection_misses(summary)
         ],
+        "issue_worker": issue_worker_payload(summary),
+    }
+
+
+def issue_worker_payload(summary: RuntimeDashboardSummary) -> dict[str, object]:
+    """Return IssueWorker outcomes without exposing raw hook entries."""
+    handoffs = getattr(summary, "issue_worker_handoffs", ())
+    counts = Counter(handoff.status for handoff in handoffs)
+    reasons = Counter(handoff.reason for handoff in handoffs)
+    return {
+        "qualified": counts.get("qualified", 0),
+        "handoff": counts.get("handoff", 0),
+        "no_action": counts.get("no-action", 0),
+        "reasons": dict(sorted(reasons.items())),
     }
 
 
@@ -3022,7 +3038,7 @@ def issue_route_row(summary: RuntimeDashboardSummary, signal: str, slug: str, re
 
 def issue_by_slug(summary: RuntimeDashboardSummary, slug: str) -> str | None:
     """Return a repository-qualified GitHub Issue URL containing the slug."""
-    for issue in summary.evidence.github_issue_refs:
+    for issue in getattr(summary.evidence, "github_issue_refs", ()):
         if slug in issue:
             return issue
     return None
@@ -3530,7 +3546,22 @@ def token_usage_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboard
 
 
 def durable_issue_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
-    """Return the next action for open durable issues."""
+    """Return the next host-publisher action for explicit IssueWorker candidates."""
+    handoffs = getattr(summary, "issue_worker_handoffs", ())
+    qualified = tuple(handoff for handoff in handoffs if handoff.qualifies)
+    if qualified:
+        repositories = ", ".join(sorted({handoff.repository for handoff in qualified}))
+        return (DashboardNextAction(
+            priority="P1",
+            action="publish explicit IssueWorker candidates",
+            reason=f"{len(qualified)} same-repository candidate(s) require host publication",
+            evidence=repositories,
+            owner_surface="IssueWorker publisher and GitHub Issue readback",
+            command="route the typed handoff to the publisher role; dashboard remains read-only",
+            done_condition="each candidate is created, updated, reorganized, or explicitly deferred with readback",
+            issue="`issue-worker`",
+            automation="host-publisher",
+        ),)
     if not summary.evidence.github_issue_refs:
         return ()
     issue = summary.evidence.github_issue_refs[0]
@@ -3658,6 +3689,9 @@ def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"AGENT_RUNTIME_DASHBOARD_NEXT_ACTIONS={len(dashboard_next_actions(summary))}",
         f"AGENT_RUNTIME_DASHBOARD_BLOCKING_NEXT_ACTIONS={blocking_next_action_count(summary)}",
         f"AGENT_RUNTIME_DASHBOARD_GITHUB_ISSUE_REFS={len(summary.evidence.github_issue_refs)}",
+        f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_QUALIFIED={sum(handoff.qualifies for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",
+        f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_HANDOFFS={sum(handoff.status == 'handoff' for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",
+        f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_NO_ACTION={sum(handoff.status == 'no-action' for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",
     ]
 
 

@@ -799,6 +799,9 @@ def workflow_topology_policy_violations(
         if family_id == "skill_evaluation":
             if always_on or specialists != ("skill_evaluator",):
                 violations.append((family_id, "evaluator-only-topology"))
+        elif family_id == "issue_worker_publication":
+            if always_on or specialists != ("publisher",):
+                violations.append((family_id, "publisher-only-topology"))
         elif family_id == "owner_bounded_change":
             if always_on != owner_bounded_always_on:
                 violations.append((family_id, "owner-bounded-producer-core"))

@@ -40,6 +40,9 @@ NON_DURABLE_FINDING_KINDS = frozenset({
     "status",
     "one-off",
     "one_off",
+    "selection",
+    "selection-miss",
+    "selection_miss",
 })
 
 
@@ -142,6 +145,32 @@ class IssueWorkerHandoff:
         }
 
 
+@dataclass(frozen=True)
+class IssueWorkerPlan:
+    """Read-only publication plan returned to the host publisher.
+
+    The plan describes whether an explicit candidate creates, updates, or
+    reorganizes an existing related Issue.  It does not perform GitHub
+    mutation; the publisher applies the selected operation through
+    ``GitHubIssueClient`` and keeps the URL/body/state readback.
+    """
+
+    action: str
+    handoff: IssueWorkerHandoff
+    related_issue_refs: tuple[str, ...] = ()
+    destination_issue_ref: str = ""
+
+    def as_dict(self) -> dict[str, object]:
+        """Return the machine-readable, mutation-free plan projection."""
+        return {
+            "schema": ISSUE_WORKER_HANDOFF_SCHEMA,
+            "action": self.action,
+            "handoff": self.handoff.as_dict(),
+            "related_issue_refs": list(self.related_issue_refs),
+            "destination_issue_ref": self.destination_issue_ref,
+        }
+
+
 def _record_text(record: Mapping[str, object], *keys: str) -> str:
     """Return the first non-empty textual field from a finding record."""
     for key in keys:
@@ -161,10 +190,10 @@ def _record_bool(record: Mapping[str, object], *keys: str) -> bool | None:
 
 
 def _occurrence_locations(record: Mapping[str, object]) -> tuple[str, ...]:
-    """Return only explicitly confirmed occurrence locators."""
+    """Return occurrence locators explicitly carried by a candidate."""
     value = record.get("occurrence_locations", record.get("occurrence_location"))
     if isinstance(value, str) and value.strip():
-        return (value.strip(),) if record.get("occurrence_confirmed") is True else ()
+        return (value.strip(),)
     if not isinstance(value, (list, tuple)):
         return ()
     locations: list[str] = []
@@ -178,8 +207,7 @@ def _occurrence_locations(record: Mapping[str, object]) -> tuple[str, ...]:
         locator = _record_text(item, "locator", "symbol", "heading")
         if path and locator:
             locations.append(f"{path}::{locator}")
-    confirmed = _record_bool(record, "occurrence_confirmed")
-    return tuple(dict.fromkeys(locations)) if confirmed is True else ()
+    return tuple(dict.fromkeys(locations))
 
 
 def qualify_issue_worker_finding(
@@ -189,9 +217,9 @@ def qualify_issue_worker_finding(
 ) -> IssueWorkerHandoff:
     """Classify one finding for the logical IssueWorker stage.
 
-    Qualification is deliberately evidence-first.  Missing repository,
-    owner, or occurrence confirmation yields a repository-qualified handoff
-    with no mutation authority.  Counts, status-only observations, one-offs,
+    Qualification is deliberately candidate-first.  The checkout identity
+    supplied by #938 is the repository authority; candidate confirmation flags
+    are not a second authority.  Counts, status-only observations, one-offs,
     and findings already closed by the active repair remain local under #638.
     """
     repository = _record_text(record, "repository", "repo")
@@ -221,21 +249,17 @@ def qualify_issue_worker_finding(
         return IssueWorkerHandoff("handoff", "repository-unresolved", repository, owner, fix, occurrence, related_refs)
     if not owner:
         return IssueWorkerHandoff("handoff", "owner-unresolved", repository, owner, fix, occurrence, related_refs)
-    if _record_bool(record, "repository_confirmed", "repository_identity_confirmed") is not True:
-        return IssueWorkerHandoff("handoff", "repository-unconfirmed", repository, owner, fix, occurrence, related_refs)
-    if _record_bool(record, "owner_confirmed", "owner_identity_confirmed") is not True:
-        return IssueWorkerHandoff("handoff", "owner-unconfirmed", repository, owner, fix, occurrence, related_refs)
-    if not occurrence:
-        return IssueWorkerHandoff("handoff", "occurrence-unconfirmed", repository, owner, fix, occurrence, related_refs)
+    if not fix:
+        return IssueWorkerHandoff("handoff", "fix-unresolved", repository, owner, fix, occurrence, related_refs)
     if not authenticated_repository:
         return IssueWorkerHandoff("handoff", "authenticated-repository-unresolved", repository, owner, fix, occurrence, related_refs)
     if repository != authenticated_repository:
         return IssueWorkerHandoff("handoff", "other-repository", repository, owner, fix, occurrence, related_refs)
 
     durable = _record_bool(record, "durable_follow_up", "needs_durable_follow_up", "recurrent", "repeatable")
-    if durable is not True and _record_text(record, "scope").casefold() not in {"owner-bounded", "repo-wide"}:
+    if durable is False:
         return IssueWorkerHandoff("no-action", "durable-follow-up-not-established", repository, owner, fix, occurrence, related_refs)
-    return IssueWorkerHandoff("qualified", "user-owned-durable-follow-up", repository, owner, fix, occurrence, related_refs)
+    return IssueWorkerHandoff("qualified", "user-owned-candidate", repository, owner, fix, occurrence, related_refs)
 
 
 class IssueWorker:
@@ -262,6 +286,123 @@ class IssueWorker:
                 continue
             records.append(self.client.read(reference))
         return tuple(records)
+
+    def plan_publication(
+        self,
+        handoff: IssueWorkerHandoff,
+        related_issues: Iterable[GitHubIssueRecord] = (),
+    ) -> IssueWorkerPlan:
+        """Plan one publisher operation after reading related Issues.
+
+        The input may contain both open and closed Issues.  A single exact
+        destination is updated or left alone; multiple related Issues are
+        returned as a reorganization plan so the publisher can narrow clauses
+        and transfer backlinks before any lifecycle change.  No duplicate
+        Issue is created by a rerun when an exact destination is already
+        present.
+        """
+        records = tuple(related_issues)
+        if not records and handoff.related_issue_refs:
+            records = self.related_issue_set(handoff.related_issue_refs)
+        refs = tuple(record.url for record in records)
+        if not handoff.qualifies:
+            return IssueWorkerPlan("no-action", handoff, refs)
+        if not records:
+            return IssueWorkerPlan("create", handoff)
+        exact = tuple(
+            record for record in records
+            if record.repository == handoff.repository
+            and handoff.fix
+            and handoff.fix in record.body
+        )
+        if len(records) > 1:
+            destination = exact[0].url if exact else records[0].url
+            return IssueWorkerPlan("reorganize", handoff, refs, destination)
+        destination = exact[0].url if exact else records[0].url
+        if exact:
+            action = "reopen" if exact[0].state.upper() == "CLOSED" else "noop"
+        else:
+            action = "update"
+        return IssueWorkerPlan(action, handoff, refs, destination)
+
+    @staticmethod
+    def _append_relation(body: str, relation: str) -> str:
+        """Add one idempotent clause-transfer backlink to an Issue body."""
+        if relation in body:
+            return body
+        heading = "## Relations And Clause Transfers"
+        if heading in body:
+            return f"{body.rstrip()}\n- {relation}\n"
+        return f"{body.rstrip()}\n\n{heading}\n\n- {relation}\n"
+
+    def publish(
+        self,
+        handoff: IssueWorkerHandoff,
+        *,
+        title: str,
+        body: str,
+        related_issues: Iterable[GitHubIssueRecord] = (),
+    ) -> GitHubIssueRecord:
+        """Apply one planned operation through the host GitHub adapter.
+
+        This method is intentionally owned by the publisher role.  Dashboard,
+        resident runtime, and qualification callers use ``plan_publication``
+        only and therefore cannot mutate GitHub.
+        """
+        if not handoff.qualifies:
+            raise IssueSyncError(
+                "issue_worker_not_qualified",
+                f"IssueWorker handoff is {handoff.status}:{handoff.reason}",
+            )
+        if not title.strip() or not body.strip():
+            raise IssueSyncError("issue_worker_content_required", "Issue title and body are required")
+        records = tuple(related_issues)
+        if not records and handoff.related_issue_refs:
+            records = self.related_issue_set(handoff.related_issue_refs)
+        plan = self.plan_publication(handoff, records)
+        if plan.action == "create":
+            return self.client.create(handoff.repository, title, body)
+        destination = next(
+            (record for record in records if record.url == plan.destination_issue_ref),
+            None,
+        )
+        if destination is None:
+            destination = self.client.read(
+                parse_issue_reference(plan.destination_issue_ref, handoff.repository)
+            )
+        if plan.action == "noop":
+            return destination
+        if plan.action == "update":
+            return self.client.edit(destination, title=title, body=body)
+        if plan.action == "reopen":
+            updated = self.client.edit(destination, title=title, body=body)
+            return self.client.set_state(updated, "OPEN")
+        if plan.action == "reorganize":
+            destination_body = body
+            for source in records:
+                if source.url != destination.url:
+                    destination_body = self._append_relation(
+                        destination_body,
+                        f"transferred from {source.url} to {destination.url}",
+                    )
+            updated = destination
+            if updated.title != title or updated.body != destination_body:
+                updated = self.client.edit(
+                    updated, title=title, body=destination_body
+                )
+            if updated.state.upper() == "CLOSED":
+                updated = self.client.set_state(updated, "OPEN")
+            for source in records:
+                if source.url == destination.url:
+                    continue
+                source_body = self._append_relation(
+                    source.body,
+                    f"clauses transferred to {destination.url}",
+                )
+                if source_body != source.body:
+                    self.client.edit(source, title=source.title, body=source_body)
+            return updated
+        raise IssueSyncError("issue_worker_plan_invalid", f"unsupported action: {plan.action}")
 
 
 def parse_issue_reference(value: str, default_repo: str = "") -> GitHubIssueReference:

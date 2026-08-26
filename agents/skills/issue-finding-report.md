@@ -56,8 +56,8 @@ structured evidence and returns one of:
 - a new durable Issue candidate,
 - a merge into an already cohesive Issue,
 - a responsibility reorganization of existing Issues, or
-- an investigation/defer result when owner, cause, occurrence, or clause
-  destination is not yet sufficiently supported.
+- an investigation/defer result when repository identity, mechanism, or
+  clause destination is unavailable to the host publisher.
 
 It also owns direct upstream escalation when a current repository task supports
 that the failing invariant belongs to AgentCanon rather than the consumer
@@ -367,8 +367,9 @@ Build a mutation plan before writes and route GitHub publication through
 1. Only then close duplicate/superseded Issues, reopen closed-but-incomplete
    parents when authorized, or change completion labels.
 1. When the implementation is handoff-ready, remove `in progress` and add
-   `ready for review`. Add `need verification` when cause, owner, occurrence,
-   relation, or validation remains unverified.
+   `ready for review`. Add `need verification` when the owner, mechanism,
+   relation, or validation remains unresolved. Missing optional occurrence
+   detail is carried as a follow-up clause, not used as a qualification gate.
 
 Do not mutate an Issue in a repository for which the current actor lacks
 explicit authority. Produce the same plan and receipt as a handoff instead.
@@ -406,6 +407,19 @@ Issue Responsibility Unit contracts:
 
 Warnings add a closeout obligation only when actionable or blocking.
 
+Runtime dashboard evidence enters this route only through an explicit
+`issue_worker_candidate` or `issue_worker_candidates` field. Counts, status
+rows, and selection misses are observations and never synthesize candidates.
+`read_issue_worker_handoffs()` emits a typed, read-only handoff using the
+`checkout_identity.remote` value from the #938 readback. The same repository
+may proceed to the logical IssueWorker route, which is executed by the host
+`publisher`; another repository receives a qualified no-mutation handoff.
+`IssueWorker.plan_publication()` reads the related open/closed set and returns
+`create`, `update`, `reopen`, `reorganize`, or `noop`. The publisher performs
+the required GitHub mutation through the existing adapter and reads back the
+URL, number, body, and state. The dashboard, resident runtime, and parent
+Python remain read-only and do not receive GitHub credentials.
+
 ## Multi-Agent Partition
 
 Use a parent-created `Issue Finding Packet` before spawning. Each packet fixes:
@@ -416,7 +430,7 @@ evidence_cells: <structured dashboard headings, source locators, or API JSON pat
 instance_partition: <repo_key|hook_family|skill_name|workflow_name|tool_name|issue_id|path_scope>
 candidate_issue_slug: <lowercase-ascii-slug>
 affected_surfaces: <candidate edit or verification paths>
-occurrence_locations: <confirmed records from the contract below>
+occurrence_locations: <observed records when available>
 related_issue_set: <repository-qualified open/closed identities>
 cause_hypothesis_scope: <alternatives this reviewer may evaluate>
 duplicate_search: <bounded query and snapshot>
@@ -425,8 +439,10 @@ expected_output: <new_candidate|merge_existing|reorganize_existing|defer_with_re
 
 `affected_surfaces` is planning scope. It may include files that need edits or
 verification, but it is not evidence that the defect occurred there.
-`occurrence_locations` names observed sites and cannot be inferred from a
-repository name, directory, or broad affected surface.
+`occurrence_locations` names observed sites when available and cannot be
+inferred from a repository name, directory, or broad affected surface. The
+IssueWorker route does not require a separate `*_confirmed` flag: the explicit
+candidate record and the checkout identity readback are the authorities.
 
 Recommended review partition:
 
@@ -446,9 +462,9 @@ writing files or mutating Issues.
 
 ## Confirmed Occurrence Location Contract
 
-Before an Issue candidate or reorganization cause claim is complete, record at
-least one confirmed occurrence location tied to the source or artifact snapshot
-where the behavior was observed. Use one record per distinct site:
+When available, record each observed occurrence location tied to the source or
+artifact snapshot where the behavior was observed. Use one record per distinct
+site:
 
 ```text
 repository: <owner/name or local repository identity>
@@ -476,9 +492,9 @@ Apply these rules:
   field result with `locator_type: absence-query`.
 - For generated or runtime evidence, name both the producer surface when known
   and the immutable artifact/run field where the bad state was observed.
-- When no occurrence location can yet be confirmed, return
-  `defer_with_reason`, keep the Issue in investigation with
-  `need verification`, and do not present a cause or required fix as confirmed.
+- When no occurrence location is available, retain the explicit candidate and
+  let the IssueWorker publisher carry the missing-location follow-up. Do not
+  synthesize a location from a repository name, directory, or broad surface.
 
 ## Issue Candidate Contract
 
@@ -504,8 +520,9 @@ Before writing a new Issue:
      --search-hits-file reports/agents/<run-id>/<slug>-search-hits.txt
    ```
 
-1. Confirm occurrence locations. Keep observed sites separate from proposed
-   edit scope.
+1. Record occurrence locations when the candidate carries observed sites. Keep
+   observed sites separate from proposed edit scope; an absent optional
+   occurrence locator does not disqualify an explicit IssueWorker candidate.
 1. Resolve or create one repository-qualified GitHub Issue through the host
    adapter when online.
 1. When offline, write only metadata under the private
@@ -533,9 +550,10 @@ Issue body sections:
 - `## Done`: only this Issue's owner-scoped completion criteria
 - `## Non-goals`: adjacent work explicitly excluded from completion
 
-Do not call an Issue complete when occurrence locations are missing or broad,
-when a material cause alternative remains hidden, when clauses lack a canonical
-destination, or when completion requires unrelated Issue responsibilities.
+Do not call an Issue complete when the owner/mechanism remains unresolved,
+when clauses lack a canonical destination, or when completion requires
+unrelated Issue responsibilities. Missing optional occurrence detail is a
+follow-up clause, not a second qualification gate.
 
 ## Distributed Clause Routing
 
