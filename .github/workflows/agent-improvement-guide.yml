@@ -34,6 +34,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          # PR runtime images are cache-only and are not available from GHCR.
+          # A full PR checkout makes bootstrap use its normal local Docker build.
+          fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}
           persist-credentials: false
 
       - name: Setup Python
