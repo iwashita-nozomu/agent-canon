@@ -57,6 +57,9 @@ The durable archive layout and its operational checkout are owned by
 than hard-code a second local layout. Bootstrap eval publication passes this
 checkout explicitly to the host archive adapter. The resident container sees
 only the external spool and never creates an archive clone under `$RUNTIME`.
+All report manifests and snapshots use paths relative to that same explicit
+archive checkout (`agent-reports/<repo-key>/...`); `$RUNTIME` is only the
+producer spool and staging boundary.
 
 ## Collection contract
 

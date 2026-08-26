@@ -527,6 +527,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         canon_root: Path,
         remote: Path,
         runtime_root: Path | None = None,
+        archive_root: Path | None = None,
         extra_env: dict[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         """Run the archive helper with explicit temp paths."""
@@ -541,20 +542,21 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             env.pop(env_name, None)
         if extra_env:
             env.update(extra_env)
+        command = [
+            sys.executable,
+            str(SCRIPT),
+            "--source-root",
+            str(source_root),
+            "--canon-root",
+            str(canon_root),
+            "--remote",
+            str(remote),
+        ]
+        if archive_root is not None:
+            command.extend(("--archive-root", str(archive_root)))
+        command.extend(("--runtime-root", str(runtime_root), *args))
         return subprocess.run(
-            [
-                sys.executable,
-                str(SCRIPT),
-                "--source-root",
-                str(source_root),
-                "--canon-root",
-                str(canon_root),
-                "--remote",
-                str(remote),
-                "--runtime-root",
-                str(runtime_root),
-                *args,
-            ],
+            command,
             check=False,
             capture_output=True,
             env=env,
@@ -1513,6 +1515,52 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             snapshots = list((clone / "agent-reports" / key / "run-2").iterdir())
             self.assertEqual(len(snapshots), 1)
             self.assertTrue((snapshots[0] / "closeout_gate.md").exists())
+
+    def test_sync_with_explicit_archive_root_keeps_reports_in_archive_clone(self) -> None:
+        """Explicit private archive roots must not create a runtime archive clone."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            runtime = root / ".runtime"
+            archive = root / "agent-canon-log"
+            source.mkdir()
+            canon.mkdir()
+            runtime.mkdir()
+            remote = self.make_remote(root)
+            key = repo_log_key(source)
+            run_dir = source / "reports" / "agents" / "run-explicit-archive"
+            run_dir.mkdir(parents=True)
+            (run_dir / "summary.md").write_text("# Summary\n", encoding="utf-8")
+
+            synced = self.run_tool(
+                "sync",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+                runtime_root=runtime,
+                archive_root=archive,
+            )
+
+            self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_SYNC=pass", synced.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_PUSH_STATUS=committed", synced.stdout)
+            self.assertIn(
+                f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR={archive / 'agent-reports' / key}",
+                synced.stdout,
+            )
+            self.assertTrue(archive.is_dir())
+            self.assertFalse((runtime / "archive").exists())
+            clean = self.run_tool(
+                "check-clean",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+                runtime_root=runtime,
+                archive_root=archive,
+            )
+            self.assertEqual(clean.returncode, 0, clean.stdout + clean.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CLEAN=yes", clean.stdout)
 
     def test_external_runtime_bare_remote_readback_duplicate_noop_and_conflict(self) -> None:
         """The external runtime flow proves remote objects, replay no-op, and conflict retention."""
