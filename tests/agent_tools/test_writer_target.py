@@ -521,6 +521,59 @@ def test_writer_aggregates_all_shell_segments_and_preserves_effective_cwd() -> N
         assert all_allowed.status == "allowed"
 
 
+@pytest.mark.parametrize(
+    "command",
+    (
+        "touch $OUTSIDE",
+        'touch "$PWD/../outside.py"',
+        "OUTSIDE=/tmp/foreign touch $OUTSIDE",
+        "touch generated-*",
+        "touch <(printf x)",
+        "bash -c 'touch $OUTSIDE'",
+    ),
+)
+def test_writer_rejects_unresolved_shell_path_tokens(command: str) -> None:
+    """Path scope must not resolve shell variables, globs, or nested expansions."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        decision = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": command}},
+            report_dir=root,
+            active_root=root,
+            environment={
+                "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+                "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+                "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+            },
+            hook_spool_root=root,
+        )
+        assert decision.status == "blocked"
+
+
+def test_writer_does_not_treat_git_commit_message_as_a_path() -> None:
+    """Shell expansion in a non-path Git option value is not scope evidence."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        decision = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git commit -m '$MESSAGE'"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment={
+                "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+                "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+                "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+            },
+            hook_spool_root=root,
+        )
+        assert decision.status == "allowed"
+        assert decision.mutation_paths == ()
+
+
 def test_canonical_merge_main_is_integration_only_and_preservation_gated() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)

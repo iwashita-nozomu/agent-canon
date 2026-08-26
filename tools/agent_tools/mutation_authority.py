@@ -74,6 +74,24 @@ SHELL_CONTROL_TOKENS = frozenset(
 SHELL_COMMAND_PREFIXES = frozenset({"env", "command", "sudo", "exec", "builtin", "time", "!"})
 OPAQUE_SHELL_COMMANDS = frozenset({".", "source", "eval", "xargs"})
 SHELL_ANALYSIS_MAX_DEPTH = 32
+UNRESOLVED_SHELL_PATH = "/__agent_canon_unresolved_shell_path__"
+GIT_NON_PATH_VALUE_OPTIONS = frozenset(
+    {
+        "-m",
+        "--message",
+        "--author",
+        "--cleanup",
+        "--reuse-message",
+        "--reedit-message",
+        "--fixup",
+        "--squash",
+        "--gpg-sign",
+        "--format",
+        "--pretty",
+        "--date",
+        "--output",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -248,6 +266,14 @@ def _shell_path(
     active_root: Path | None,
 ) -> tuple[str, bool]:
     """Normalize a shell path and report whether it leaves the active checkout."""
+    if (
+        not value
+        or value.startswith("~")
+        or any(marker in value for marker in ("$", "`", "*", "?", "[", "]", "<(", ">("))
+    ):
+        # Scope resolution must never guess the result of an expansion,
+        # glob, process substitution, or shell metacharacter in a path.
+        return UNRESOLVED_SHELL_PATH, True
     candidate = Path(value).expanduser()
     if not candidate.is_absolute():
         candidate = cwd / candidate
@@ -333,6 +359,37 @@ def _git_repository_redirect(
         paths.append(normalized)
         return tuple(paths), "git_repository_redirect"
     return tuple(paths), None
+
+
+def _git_mutation_paths(
+    sub_args: tuple[str, ...],
+    *,
+    cwd: Path,
+    active_root: Path | None,
+) -> tuple[str, ...]:
+    """Return Git path operands without treating option values as paths."""
+    paths: list[str] = []
+    skip_value = False
+    after_separator = False
+    for token in sub_args:
+        if skip_value:
+            skip_value = False
+            continue
+        if after_separator:
+            paths.append(_shell_path(token, cwd=cwd, active_root=active_root)[0])
+            continue
+        if token == "--":
+            after_separator = True
+            continue
+        if token in GIT_NON_PATH_VALUE_OPTIONS:
+            skip_value = True
+            continue
+        if any(token.startswith(option + "=") for option in GIT_NON_PATH_VALUE_OPTIONS):
+            continue
+        if token.startswith("-"):
+            continue
+        paths.append(_shell_path(token, cwd=cwd, active_root=active_root)[0])
+    return tuple(paths)
 
 
 def _analysis_reason(reasons: list[str]) -> str:
@@ -481,9 +538,11 @@ def _bash_mutation_inner(
                 continue
             mutation = True
             paths.extend(
-                _shell_path(token, cwd=cwd, active_root=active_root)[0]
-                for token in sub_args
-                if not token.startswith("-")
+                _git_mutation_paths(
+                    sub_args,
+                    cwd=cwd,
+                    active_root=active_root,
+                )
             )
             reasons.append(f"git_{subcommand or 'unknown'}")
             continue
@@ -897,6 +956,19 @@ def evaluate_mutation_authority(
         return MutationAuthorityDecision(
             "blocked",
             "writer_target_packet_mutation_forbidden",
+            True,
+            actor_id,
+            role_id,
+            parent_agent_id,
+            str(identity.get("scope_digest", "")),
+            paths,
+            evidence_ref,
+            command_sha,
+        )
+    if UNRESOLVED_SHELL_PATH in paths:
+        return MutationAuthorityDecision(
+            "blocked",
+            "writer_target_unresolved_shell_path",
             True,
             actor_id,
             role_id,
