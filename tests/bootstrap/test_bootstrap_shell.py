@@ -177,7 +177,10 @@ def test_help_does_not_require_python_or_docker(tmp_path: Path) -> None:
     python_sentinel = tmp_path / "python3"
     python_sentinel.write_text("#!/bin/sh\nexit 99\n", encoding="utf-8")
     python_sentinel.chmod(0o755)
-    environment = {"PATH": f"{tmp_path}:/usr/bin:/bin"}
+    environment = {
+        **os.environ,
+        "PATH": f"{tmp_path}{os.pathsep}{os.environ.get('PATH', '')}",
+    }
     completed = subprocess.run(
         [str(BOOTSTRAP), "--help"],
         check=False,
@@ -204,7 +207,8 @@ def test_missing_docker_is_typed_without_host_python(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
         env={
-            "PATH": "/usr/bin:/bin",
+            **os.environ,
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
             "AGENT_CANON_DOCKER": str(tmp_path / "missing-docker"),
         },
     )
@@ -240,7 +244,11 @@ def test_legacy_runtime_argument_keeps_install_state_at_source_sibling_paths(
         check=False,
         capture_output=True,
         text=True,
-        env={"PATH": "/usr/bin:/bin", "AGENT_CANON_DOCKER": str(fake_docker)},
+        env={
+            **os.environ,
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "AGENT_CANON_DOCKER": str(fake_docker),
+        },
     )
 
     assert completed.returncode == 0, completed.stderr
@@ -280,7 +288,11 @@ def test_symlinked_source_runtime_is_rejected_before_legacy_argument_mapping(
         check=False,
         capture_output=True,
         text=True,
-        env={"PATH": "/usr/bin:/bin", "AGENT_CANON_DOCKER": "missing-docker"},
+        env={
+            **os.environ,
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "AGENT_CANON_DOCKER": "missing-docker",
+        },
     )
 
     assert completed.returncode == 2
@@ -320,7 +332,11 @@ def test_symlinked_private_log_is_rejected_before_runtime_creation(
         check=False,
         capture_output=True,
         text=True,
-        env={"PATH": "/usr/bin:/bin", "AGENT_CANON_DOCKER": "missing-docker"},
+        env={
+            **os.environ,
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "AGENT_CANON_DOCKER": "missing-docker",
+        },
     )
 
     assert completed.returncode == 2
@@ -348,7 +364,11 @@ def test_runtime_escape_is_rejected_before_mkdir(tmp_path: Path) -> None:
         check=False,
         capture_output=True,
         text=True,
-        env={"PATH": "/usr/bin:/bin", "AGENT_CANON_DOCKER": "docker"},
+        env={
+            **os.environ,
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "AGENT_CANON_DOCKER": "docker",
+        },
     )
     assert completed.returncode == 2
     assert json.loads(completed.stderr)["code"] == "runtime_root_escape"
@@ -374,7 +394,11 @@ def test_symlink_escape_is_rejected_before_mount_creation(tmp_path: Path) -> Non
         check=False,
         capture_output=True,
         text=True,
-        env={"PATH": "/usr/bin:/bin", "AGENT_CANON_DOCKER": "docker"},
+        env={
+            **os.environ,
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "AGENT_CANON_DOCKER": "docker",
+        },
     )
     assert completed.returncode == 2
     assert json.loads(completed.stderr)["code"] == "runtime_root_escape"
@@ -397,7 +421,8 @@ def test_malicious_docker_environment_is_not_sourced(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
         env={
-            "PATH": "/usr/bin:/bin",
+            **os.environ,
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
             "AGENT_CANON_DOCKER": f"$(touch {marker})",
         },
     )
@@ -426,7 +451,11 @@ def test_container_controller_status_never_requires_docker(tmp_path: Path) -> No
         check=False,
         capture_output=True,
         text=True,
-        env={"PATH": "/usr/bin:/bin", "AGENT_CANON_DOCKER": "missing-docker"},
+        env={
+            **os.environ,
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "AGENT_CANON_DOCKER": "missing-docker",
+        },
     )
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout)["operation"] == "status"
@@ -604,7 +633,8 @@ bootstrap_host_entrypoint "$1" \
         capture_output=True,
         text=True,
         env={
-            "PATH": "/usr/bin:/bin",
+            **os.environ,
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
             "AGENT_CANON_DOCKER": str(fake_docker),
         },
     )

@@ -103,6 +103,44 @@ def test_lifecycle_lock_cannot_be_bypassed_by_environment_marker(
     assert flock_calls == [fcntl.LOCK_EX, fcntl.LOCK_UN]
 
 
+def test_scheduler_generation_uses_test_owned_xdg_and_fake_systemctl(
+    tmp_path: Path,
+) -> None:
+    """Scheduler rendering never needs the developer's user systemd manager."""
+    manager, _docker = _runtime(tmp_path)
+
+    result = manager.scheduler_enable()
+
+    service_path, timer_path = manager._scheduler_paths()
+    assert result["code"] == "scheduler_enabled"
+    assert service_path.parent == Path(os.environ["XDG_CONFIG_HOME"]) / "systemd" / "user"
+    assert service_path.is_file()
+    assert timer_path.is_file()
+    assert "ExecStart=" in service_path.read_text(encoding="utf-8")
+    assert "OnUnitActiveSec=" in timer_path.read_text(encoding="utf-8")
+    systemctl_log = Path(os.environ["AGENT_CANON_TEST_SYSTEMCTL_LOG"])
+    assert systemctl_log.is_relative_to(tmp_path)
+
+    manager.scheduler_uninstall()
+    assert not service_path.exists()
+    assert not timer_path.exists()
+    operations = [
+        value
+        for key, value in (
+            line.split("\t", 1)
+            for line in systemctl_log.read_text(encoding="utf-8").splitlines()
+        )
+        if key == "argv"
+    ]
+    assert operations == [
+        "--user show-environment",
+        "--user daemon-reload",
+        "--user enable --now agent-canon-sync.timer",
+        "--user disable --now agent-canon-sync.timer",
+        "--user daemon-reload",
+    ]
+
+
 def test_bootstrap_maps_only_the_exact_legacy_runtime_default(tmp_path: Path) -> None:
     """Migrate the removed default without rewriting an explicit runtime root."""
     repository = tmp_path / "agent-canon"
@@ -139,6 +177,10 @@ def test_update_adopts_fresh_source_runtime_after_legacy_default_reset(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """An old default path is rebuilt and scheduled at the source-owned root."""
+    # This test observes the production scheduler call through a stub.  The
+    # shared bootstrap fixture still provides a test-owned XDG directory, so
+    # no real user unit can be reached when the scheduler boundary is opened.
+    monkeypatch.delenv("AGENT_CANON_CONTAINER_CONTROL", raising=False)
     state_path = tmp_path / "docker.json"
     monkeypatch.setenv("FAKE_DOCKER_STATE", str(state_path))
     docker = DockerAdapter(str(ROOT / "tests/bootstrap/fake_docker.py"))
