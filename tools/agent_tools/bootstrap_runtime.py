@@ -3228,7 +3228,15 @@ class BootstrapRuntime:
                 f"digest = {json.dumps(record['digest'])}",
                 "",
             ]
-        _atomic_bytes(self.paths.mounts, "\n".join(lines).encode("utf-8"), mode=0o444)
+        registry_path = os.environ.get("AGENT_CANON_MOUNT_REGISTRY", "").strip()
+        if self._container_control() and registry_path and registry_path != REGISTRY_DESTINATION:
+            raise BootstrapError("mount_registry_invalid", "container registry destination is not fixed")
+        destination = (
+            Path(registry_path)
+            if self._container_control() and registry_path
+            else self.paths.mounts
+        )
+        _atomic_bytes(destination, "\n".join(lines).encode("utf-8"), mode=0o444)
 
     def _write_mount_manifest(self, state: Mapping[str, Any]) -> None:
         """Write the strict host-readable target mount manifest."""
