@@ -1017,17 +1017,28 @@ def _initial_stage_wave_slots(
     catalog: TaskCatalog,
     agent_type_selections: tuple[AgentTypeSelection, ...] = (),
     agent_root: Path = CODEX_AGENT_ROOT,
+    *,
+    workflow_family_id: str | None = None,
+    issue_worker_candidate: Mapping[str, object] | None = None,
 ) -> tuple[SubagentWaveSlot, ...]:
     """Return intake-stage slots derived from active roles and catalog topology."""
     if active_subagents < 1:
         return ()
     stage_waves = catalog_stage_waves(catalog)
     roles_by_id = {role.id: role for role in roles}
-    stage_id = (
-        "skill_evaluation"
-        if "skill_evaluator" in roles_by_id and "manager" not in roles_by_id
-        else "intake"
-    )
+    if workflow_family_id == "issue_worker_publication":
+        if not (
+            isinstance(issue_worker_candidate, Mapping)
+            and issue_worker_candidate
+        ):
+            return ()
+        stage_id = "publication"
+    else:
+        stage_id = (
+            "skill_evaluation"
+            if "skill_evaluator" in roles_by_id and "manager" not in roles_by_id
+            else "intake"
+        )
     intake_wave = next((wave for wave in stage_waves if wave.id == stage_id), None)
     if intake_wave is None:
         raise RuntimeError(
@@ -1067,6 +1078,9 @@ def recommended_initial_subagent_wave(
     catalog: TaskCatalog,
     agent_type_selections: tuple[AgentTypeSelection, ...] = (),
     agent_root: Path = CODEX_AGENT_ROOT,
+    *,
+    workflow_family_id: str | None = None,
+    issue_worker_candidate: Mapping[str, object] | None = None,
 ) -> tuple[str, ...]:
     """Return executable agent_type values for active catalog intake roles."""
     return tuple(
@@ -1077,6 +1091,8 @@ def recommended_initial_subagent_wave(
             catalog,
             agent_type_selections,
             agent_root,
+            workflow_family_id=workflow_family_id,
+            issue_worker_candidate=issue_worker_candidate,
         )
     )
 
@@ -1088,6 +1104,9 @@ def recommended_dynamic_expansion_waves(
     catalog: TaskCatalog,
     agent_type_selections: tuple[AgentTypeSelection, ...] = (),
     agent_root: Path = CODEX_AGENT_ROOT,
+    *,
+    workflow_family_id: str | None = None,
+    issue_worker_candidate: Mapping[str, object] | None = None,
 ) -> tuple[tuple[str, ...], ...]:
     """Return executable follow-up stage waves inside the active budget."""
     return tuple(
@@ -1099,6 +1118,8 @@ def recommended_dynamic_expansion_waves(
             catalog,
             agent_type_selections,
             agent_root,
+            workflow_family_id=workflow_family_id,
+            issue_worker_candidate=issue_worker_candidate,
         )
     )
 
@@ -1110,6 +1131,9 @@ def recommended_dynamic_expansion_wave_slots(
     catalog: TaskCatalog,
     agent_type_selections: tuple[AgentTypeSelection, ...] = (),
     agent_root: Path = CODEX_AGENT_ROOT,
+    *,
+    workflow_family_id: str | None = None,
+    issue_worker_candidate: Mapping[str, object] | None = None,
 ) -> tuple[tuple[SubagentWaveSlot, ...], ...]:
     """Return executable follow-up role-instance waves inside the active budget."""
     initial_slots = _initial_stage_wave_slots(
@@ -1118,6 +1142,8 @@ def recommended_dynamic_expansion_wave_slots(
         catalog,
         agent_type_selections,
         agent_root,
+        workflow_family_id=workflow_family_id,
+        issue_worker_candidate=issue_worker_candidate,
     )
     expected_initial_wave = tuple(slot.agent_type for slot in initial_slots)
     if initial_wave != expected_initial_wave:

@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -153,6 +154,7 @@ class RunBundleSpec:
     report_root: Path | None = None
     repository_roots: "RepositoryRoots | None" = None
     workflow_family_id: str = ""
+    issue_worker_candidate: Mapping[str, object] | None = None
     manual_specialists: tuple[str, ...] = ()
     task_default_specialists: tuple[str, ...] = ()
     language_review_candidates: tuple[str, ...] = ()
@@ -430,6 +432,7 @@ def select_roles(
     full_team: bool,
     catalog: TaskCatalog | None = None,
     workflow_family_id: str | None = None,
+    issue_worker_candidate: Mapping[str, object] | None = None,
 ) -> tuple[Role, ...]:
     """Return the active roles for one run."""
     if full_team:
@@ -438,7 +441,18 @@ def select_roles(
             return tuple(role for role in all_roles if role.id == "skill_evaluator")
         return tuple(role for role in all_roles if role.id != "skill_evaluator")
     always_on_roles = workflow_always_on_roles(config, catalog, workflow_family_id)
-    enabled_roles = tuple(resolve_role(config, name) for name in enabled_specialists)
+    selected_specialist_names = list(enabled_specialists)
+    # T15 is publisher-only, but its publisher is conditional on an explicit
+    # typed candidate.  Do not turn the task default into a global initial
+    # wave or activate this role for unrelated workflow families.
+    if (
+        workflow_family_id == "issue_worker_publication"
+        and isinstance(issue_worker_candidate, Mapping)
+        and issue_worker_candidate
+        and "publisher" not in selected_specialist_names
+    ):
+        selected_specialist_names.append("publisher")
+    enabled_roles = tuple(resolve_role(config, name) for name in selected_specialist_names)
     selected_roles = list(always_on_roles)
     selected_ids = {role.id for role in selected_roles}
     for role in enabled_roles:

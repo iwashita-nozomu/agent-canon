@@ -1090,6 +1090,8 @@ def write_initial_wave_execution_gate(spec: RunBundleSpec) -> None:
         spec.task_catalog,
         spec.agent_type_selections,
         _required_spec_source_root(spec) / ".codex" / "agents",
+        workflow_family_id=spec.workflow_family_id,
+        issue_worker_candidate=spec.issue_worker_candidate,
     )
     if not initial_wave:
         return
@@ -1128,6 +1130,8 @@ def initial_wave_execution_gate_lines(
         spec.task_catalog,
         spec.agent_type_selections,
         _required_spec_source_root(spec) / ".codex" / "agents",
+        workflow_family_id=spec.workflow_family_id,
+        issue_worker_candidate=spec.issue_worker_candidate,
     )
     if not initial_wave:
         return ()
@@ -1480,6 +1484,8 @@ def manifest_run_lines(
             spec.task_catalog,
             spec.agent_type_selections,
             _required_spec_source_root(spec) / ".codex" / "agents",
+            workflow_family_id=spec.workflow_family_id,
+            issue_worker_candidate=spec.issue_worker_candidate,
         )
         expansion_wave_slots = recommended_dynamic_expansion_wave_slots(
             spec.roles,
@@ -1488,6 +1494,8 @@ def manifest_run_lines(
             spec.task_catalog,
             spec.agent_type_selections,
             _required_spec_source_root(spec) / ".codex" / "agents",
+            workflow_family_id=spec.workflow_family_id,
+            issue_worker_candidate=spec.issue_worker_candidate,
         )
         lines.append("  spawn_wave_recommendation:")
         lines.append(
@@ -1496,8 +1504,11 @@ def manifest_run_lines(
         lines.append("    standard_sequence_ref: run.standard_wave_sequence")
         lines.append("    initial_wave_id: WAVE-1")
         lines.append("    initial_wave_agent_types:")
-        for agent_type in initial_wave:
-            lines.append(f"      - {agent_type}")
+        if initial_wave:
+            for agent_type in initial_wave:
+                lines.append(f"      - {agent_type}")
+        else:
+            lines[-1] = "    initial_wave_agent_types: []"
         if spec.agent_type_selections:
             lines.append("    agent_type_selections:")
             for selection in spec.agent_type_selections:

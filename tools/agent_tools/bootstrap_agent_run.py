@@ -10,10 +10,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import tempfile
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -211,6 +212,7 @@ class BootstrapRunContext:
     workflow_family_name: str | None
     workflow_active_spawn_budget: int | None
     workflow_max_write_subagents: int | None
+    issue_worker_candidate: Mapping[str, object] | None = None
     repository_roots: object | None = None
 
 
@@ -317,6 +319,14 @@ def build_parser(
         ),
     )
     parser.add_argument(
+        "--issue-worker-candidate",
+        metavar="JSON",
+        help=(
+            "Explicit JSON IssueWorker candidate that activates the T15 publisher "
+            "initial wave. Other workflows ignore this input."
+        ),
+    )
+    parser.add_argument(
         "--run-id",
         help="Optional explicit run id. Defaults to a timestamped slug.",
     )
@@ -401,12 +411,26 @@ def build_parser(
     return parser
 
 
+def parse_issue_worker_candidate(value: str | None) -> Mapping[str, object] | None:
+    """Parse one explicit IssueWorker candidate without inferring candidates."""
+    if value is None:
+        return None
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("issue_worker_candidate:invalid_json") from exc
+    if not isinstance(parsed, dict) or not parsed:
+        raise RuntimeError("issue_worker_candidate:must_be_nonempty_object")
+    return parsed
+
+
 def resolve_bootstrap_context(
     args: argparse.Namespace,
     config: TeamConfig,
     catalog: TaskCatalog,
     workspace_root: Path,
     repository_roots: object | None = None,
+    issue_worker_candidate: Mapping[str, object] | None = None,
 ) -> BootstrapRunContext:
     """Resolve workflow family, specialists, and report paths for one run."""
     if implementation_handoff_required(args.task):
@@ -487,6 +511,7 @@ def resolve_bootstrap_context(
         workflow_family_name=workflow_family_name,
         workflow_active_spawn_budget=workflow_active_spawn_budget,
         workflow_max_write_subagents=workflow_max_write_subagents,
+        issue_worker_candidate=issue_worker_candidate,
         repository_roots=repository_roots,
     )
 
@@ -582,6 +607,10 @@ def emit_bootstrap_output(
         )
         if context.workflow_family_id == "issue_worker_publication":
             print(
+                "ISSUE_WORKER_CANDIDATE_STATUS="
+                + ("explicit" if context.issue_worker_candidate else "absent")
+            )
+            print(
                 "ISSUE_WORKER_DISPATCH_ROUTE="
                 "tools/agent_tools/agent_team.py#dispatch_issue_worker"
             )
@@ -601,6 +630,8 @@ def emit_bootstrap_output(
             catalog,
             runtime.agent_type_selections,
             source_root / ".codex" / "agents",
+            workflow_family_id=context.workflow_family_id,
+            issue_worker_candidate=context.issue_worker_candidate,
         )
         if initial_wave:
             print("PARENT_WAVE_EXECUTION_GATE=required_before_implementation")
@@ -619,6 +650,8 @@ def emit_bootstrap_output(
             catalog,
             runtime.agent_type_selections,
             source_root / ".codex" / "agents",
+            workflow_family_id=context.workflow_family_id,
+            issue_worker_candidate=context.issue_worker_candidate,
         )
         expansion_wave_slots = recommended_dynamic_expansion_wave_slots(
             runtime.roles,
@@ -627,6 +660,8 @@ def emit_bootstrap_output(
             catalog,
             runtime.agent_type_selections,
             source_root / ".codex" / "agents",
+            workflow_family_id=context.workflow_family_id,
+            issue_worker_candidate=context.issue_worker_candidate,
         )
         print(
             "SUBAGENT_AGENT_TYPE_SELECTIONS="
@@ -960,6 +995,13 @@ def main() -> int:
         return 1
     args = build_parser(enable_choices(config, catalog), task_ids(catalog)).parse_args()
     try:
+        issue_worker_candidate = parse_issue_worker_candidate(
+            args.issue_worker_candidate
+        )
+    except RuntimeError as exc:
+        print(str(exc), flush=True)
+        return 2
+    try:
         explicit_active_design_packet = parse_active_design_packet_input(
             args.active_design_packet
         )
@@ -992,6 +1034,7 @@ def main() -> int:
         catalog,
         workspace_root,
         repository_roots,
+        issue_worker_candidate,
     )
     roles = select_roles(
         config,
@@ -999,6 +1042,7 @@ def main() -> int:
         args.full_team,
         catalog=catalog,
         workflow_family_id=context.workflow_family_id,
+        issue_worker_candidate=context.issue_worker_candidate,
     )
     try:
         agent_type_selections = validate_agent_type_selections(
@@ -1029,6 +1073,7 @@ def main() -> int:
             repository_roots=repository_roots,
             active_design_packet=explicit_active_design_packet,
             workflow_family_id=context.workflow_family_id or "",
+            issue_worker_candidate=context.issue_worker_candidate,
             manual_specialists=context.manual_specialists,
             task_default_specialists=context.task_default_specialists,
             language_review_candidates=context.language_review_candidates,
