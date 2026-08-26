@@ -6,6 +6,7 @@ upstream design ../../ROOT_AGENTS.md common consumer root instruction base
 upstream design ./CODEX_SUBAGENTS.md subagent routing contract
 upstream design ../workflows/agent-canon-pr-workflow.md standalone source PR workflow
 upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue packet route
+upstream implementation ../../tools/agent_tools/skill_document_reader.py bounded Skill read and EOF admission
 downstream design ../workflows/token-efficient-codex-workflow.md token-aware runtime mode overlay
 downstream design ../../templates/agents/closeout_gate.md closeout gate contract
 upstream design ../../documents/design/dependency-manifest-design.md dependency manifest design
@@ -156,7 +157,31 @@ logへ on-demand に検索します。stable preference は対象 owner への�
 
 raw text search の hit だけで編集対象を決めません。
 検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じたら、implementation-executable TargetStateContract に固定された complete responsibility unit を write-capable child handoff へ materialize します。空の unresolved-decision set は即時に one-pass handoff へ遷移し、owner gate は完了後だけです。明示された bounded owner/path/targeted-validation request も同じ child route で進めます。
-bounded route では、existing tool の実行と patching を tool-owned evidence から開始します。runtime `SKILL.md` 読了は、対象 property を正本として持つ existing tool の実行後に必要な場合だけ使う follow-up context です。結果の解釈や修正に必要な owner surface だけを開きます。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
+bounded route では、existing tool の実行と patching を tool-owned evidence から開始します。#335 の既存 tool 先行実行は維持しますが、結果の解釈や修正に入る前に、生成された compact `SKILL.md` を `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...` で `file_eof=true` まで読みます。Skill が委譲する場合だけ、canonical owner document の必要な見出しを `section_eof=true` まで読みます。canonical ファイル全体の EOF は要求しません。`implementation_read=ready` はこの条件を満たしたときだけ使い、可視 prefix や既知 path だけでは unlock しません。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
+
+### Skill read admission
+
+Generated discovery `SKILL.md` is the complete compact Skill, so its whole
+file is read in bounded UTF-8-safe chunks. The reader returns the path,
+heading, one-based line range, half-open byte range, `next_offset`,
+`section_eof`, and `file_eof`; callers continue with `next_offset` until the
+required EOF flag is true. Canonical `agents/skills/<skill>.md` remains the
+owner prose and is read only by indexed, task-relevant heading sections.
+
+```bash
+bootstrap.sh --control-parent-root <root> tool run --root <registered-project> \
+  skill-document-reader -- index --path <skill.md>
+bootstrap.sh --control-parent-root <root> tool run --root <registered-project> \
+  skill-document-reader -- chunk --path <skill.md> \
+    --heading "## <section>" --offset <next_offset>
+```
+
+The transient owner-first update sets `implementation_read=ready` only when
+the compact Skill reaches `file_eof=true` and every explicitly delegated
+canonical section reaches `section_eof=true`. A truncated response, a section
+prefix, an unverified delegated path, or a missing heading remains locked.
+This readback creates no per-read receipt, identifier, approval gate, or
+duplicate Skill body.
 
 ```bash
 git grep -l "topic keywords" -- <responsibility-scoped dirs> \
