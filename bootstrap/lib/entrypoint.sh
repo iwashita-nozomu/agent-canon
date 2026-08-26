@@ -51,6 +51,31 @@ _agent_canon_control_digest() {
   printf '%s' "$AGENT_CANON_CONTROL_ROOT" | sha256sum | awk '{print $1}'
 }
 
+_agent_canon_validate_new_path() {
+  local path=$1 field=$2 current=/ remaining component
+  [[ "$path" == /* ]] ||
+    _agent_canon_json_error path_invalid "$field must be absolute"
+  remaining=${path#/}
+  while [[ -n "$remaining" ]]; do
+    if [[ "$remaining" == */* ]]; then
+      component=${remaining%%/*}
+      remaining=${remaining#*/}
+    else
+      component=$remaining
+      remaining=
+    fi
+    [[ -n "$component" ]] || continue
+    current="$current$component"
+    if [[ -L "$current" ]]; then
+      _agent_canon_json_error symlink_path_rejected "$field contains a symlink: $current"
+    fi
+    if [[ -e "$current" && ! -d "$current" ]]; then
+      _agent_canon_json_error path_not_directory "$field component is not a directory: $current"
+    fi
+    current="$current/"
+  done
+}
+
 _agent_canon_validate_roots() {
   local control runtime default_runtime legacy_runtime
   if ! control=$(realpath -e -- "$AGENT_CANON_CONTROL_ROOT" 2>/dev/null); then
@@ -60,12 +85,10 @@ _agent_canon_validate_roots() {
     _agent_canon_json_error control_root_invalid "control parent root must be an existing directory"
   }
   AGENT_CANON_CONTROL_ROOT=$control
-  default_runtime=$(realpath -m -- "$AGENT_CANON_REPOSITORY_ROOT/.runtime")
-  AGENT_CANON_PRIVATE_LOG_ROOT=$(realpath -m -- "$AGENT_CANON_REPOSITORY_ROOT/../agent-canon-log")
-  if [[ "${AGENT_CANON_RUNTIME_REQUEST:-$AGENT_CANON_RUNTIME_ROOT}" == "$AGENT_CANON_REPOSITORY_ROOT/.runtime" &&
-        -L "$AGENT_CANON_REPOSITORY_ROOT/.runtime" ]]; then
-    _agent_canon_json_error runtime_root_symlink "default runtime root must not be a symlink"
-  fi
+  default_runtime="$AGENT_CANON_REPOSITORY_ROOT/.runtime"
+  AGENT_CANON_PRIVATE_LOG_ROOT="$(dirname -- "$AGENT_CANON_REPOSITORY_ROOT")/agent-canon-log"
+  _agent_canon_validate_new_path "$default_runtime" "default runtime root"
+  _agent_canon_validate_new_path "$AGENT_CANON_PRIVATE_LOG_ROOT" "private log root"
   runtime=$(realpath -m -- "$AGENT_CANON_RUNTIME_ROOT")
   legacy_runtime=$(realpath -m -- "$AGENT_CANON_CONTROL_ROOT/workspace/agent-canon-runtime/host")
   if [[ "$runtime" == "$legacy_runtime" ]]; then

@@ -183,6 +183,84 @@ def test_legacy_runtime_argument_keeps_install_state_at_source_sibling_paths(
     assert (tmp_path / "agent-canon-log").is_dir()
 
 
+def test_symlinked_source_runtime_is_rejected_before_legacy_argument_mapping(
+    tmp_path: Path,
+) -> None:
+    """A symlinked canonical runtime cannot redirect the legacy migration input."""
+    repository = tmp_path / "agent-canon"
+    control = tmp_path / "control"
+    outside = tmp_path / "outside-runtime"
+    repository.mkdir()
+    control.mkdir()
+    outside.mkdir()
+    (outside / "sentinel").write_text("untouched\n", encoding="utf-8")
+    (repository / ".runtime").symlink_to(outside, target_is_directory=True)
+    legacy = control / "workspace" / "agent-canon-runtime" / "host"
+
+    completed = subprocess.run(
+        [
+            str(BOOTSTRAP),
+            "--repository-root",
+            str(repository),
+            "--control-parent-root",
+            str(control),
+            "--runtime-root",
+            str(legacy),
+            "status",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={"PATH": "/usr/bin:/bin", "AGENT_CANON_DOCKER": "missing-docker"},
+    )
+
+    assert completed.returncode == 2
+    assert json.loads(completed.stderr)["code"] == "symlink_path_rejected"
+    assert (outside / "sentinel").read_text(encoding="utf-8") == "untouched\n"
+    assert (repository / ".runtime").is_symlink()
+    assert not (outside / "container-state").exists()
+    assert not (control / "workspace").exists()
+    assert not (tmp_path / "agent-canon-log").exists()
+
+
+def test_symlinked_private_log_is_rejected_before_runtime_creation(
+    tmp_path: Path,
+) -> None:
+    """A symlinked install sibling cannot redirect private log writes."""
+    repository = tmp_path / "agent-canon"
+    control = tmp_path / "control"
+    outside = tmp_path / "outside-log"
+    repository.mkdir()
+    control.mkdir()
+    outside.mkdir()
+    (outside / "sentinel").write_text("untouched\n", encoding="utf-8")
+    (tmp_path / "agent-canon-log").symlink_to(outside, target_is_directory=True)
+    legacy = control / "workspace" / "agent-canon-runtime" / "host"
+
+    completed = subprocess.run(
+        [
+            str(BOOTSTRAP),
+            "--repository-root",
+            str(repository),
+            "--control-parent-root",
+            str(control),
+            "--runtime-root",
+            str(legacy),
+            "status",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={"PATH": "/usr/bin:/bin", "AGENT_CANON_DOCKER": "missing-docker"},
+    )
+
+    assert completed.returncode == 2
+    assert json.loads(completed.stderr)["code"] == "symlink_path_rejected"
+    assert (outside / "sentinel").read_text(encoding="utf-8") == "untouched\n"
+    assert not (repository / ".runtime").exists()
+    assert not (control / "workspace").exists()
+
+
 def test_runtime_escape_is_rejected_before_mkdir(tmp_path: Path) -> None:
     """Explicit runtime paths cannot create state outside the control root."""
     control = tmp_path / "control"
