@@ -12,7 +12,9 @@ GitHub Issues are the only durable Issue authority. This module never scans,
 creates, edits, or validates an ``issues/`` directory. Offline mode stores a
 packet containing a private body locator and digest under the external
 ``agent-canon-log`` checkout; the body itself never enters AgentCanon source or
-the packet.
+the packet. Successful publisher readback is recorded separately as one stable,
+body-free receipt under the private log's published Issue-packet namespace;
+pending packets are consumed only after that receipt is read back.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ import re
 import subprocess
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -34,10 +37,22 @@ else:
     from checkout_identity import resolve_checkout_identity  # type: ignore[no-redef]
 
 GITHUB_URL_RE = re.compile(r"^https://github\.com/(?P<repo>[^/]+/[^/]+)/issues/(?P<number>[1-9][0-9]*)$")
+UTC = timezone.utc
 PACKET_SCHEMA = "agent-canon.feedback.issue-packet.v1"
 CLAUSE_KINDS = ("problem", "required_action", "done", "close_condition")
 FINDING_SCOPES = frozenset({"changed", "user", "owner-bounded", "repo-wide"})
 ISSUE_WORKER_HANDOFF_SCHEMA = "agent-canon.issue-worker-handoff.v1"
+ISSUE_PUBLICATION_RECEIPT_FIELDS = (
+    "repository",
+    "number",
+    "url",
+    "state",
+    "action",
+    "responsibility",
+    "occurrence_locations",
+    "source_finding_kind",
+    "timestamp",
+)
 NON_DURABLE_FINDING_KINDS = frozenset({
     "count",
     "raw-count",
@@ -129,6 +144,120 @@ class IssueSyncReport:
     github_unavailable: int = 0
 
 
+def _issue_publication_repo_path(repository: str) -> tuple[str, str]:
+    """Return safe owner/repository path components for one Issue receipt."""
+    normalized = normalize_repository(repository)
+    parts = normalized.split("/")
+    if len(parts) != 2 or not all(re.fullmatch(r"[a-z0-9_.-]+", part) for part in parts):
+        raise IssueSyncError(
+            "issue_receipt_repository_invalid",
+            "publication receipt repository must be owner/repository",
+        )
+    return parts[0], parts[1]
+
+
+def issue_publication_receipt_path(
+    log_root: Path,
+    repository: str,
+    number: str,
+) -> Path:
+    """Return the stable private-log path for one repository-qualified Issue."""
+    owner, repo = _issue_publication_repo_path(repository)
+    if not re.fullmatch(r"[1-9][0-9]*", str(number)):
+        raise IssueSyncError("issue_receipt_number_invalid", "Issue number is invalid")
+    return (
+        log_root.expanduser().resolve()
+        / "feedback"
+        / "issue-packets"
+        / "published"
+        / owner
+        / repo
+        / f"{number}.json"
+    )
+
+
+def _issue_publication_receipt_payload(
+    record: GitHubIssueRecord,
+    *,
+    action: str,
+    handoff: IssueWorkerHandoff | None,
+    source_finding_kind: str = "",
+    timestamp: str | None = None,
+) -> dict[str, object]:
+    """Build the body-free, stable-field Issue publication receipt."""
+    repository = normalize_repository(record.repository)
+    reference = parse_issue_reference(record.url, repository)
+    if reference.repo != repository or reference.number != str(record.number):
+        raise IssueSyncError(
+            "issue_receipt_identity_mismatch",
+            "Issue publication receipt URL does not match the readback record",
+        )
+    if action not in {"create", "update", "reopen", "reorganize", "noop"}:
+        raise IssueSyncError("issue_receipt_action_invalid", "Issue publication action is invalid")
+    value = source_finding_kind
+    if not value and handoff is not None:
+        value = handoff.source_finding_kind
+    return {
+        "repository": repository,
+        "number": str(record.number),
+        "url": record.url,
+        "state": record.state,
+        "action": action,
+        "responsibility": list(handoff.responsibility) if handoff is not None else [],
+        "occurrence_locations": list(handoff.occurrence_locations) if handoff is not None else [],
+        "source_finding_kind": value,
+        "timestamp": timestamp
+        or datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+    }
+
+
+def write_issue_publication_receipt(
+    log_root: Path,
+    record: GitHubIssueRecord,
+    *,
+    action: str,
+    handoff: IssueWorkerHandoff | None = None,
+    source_finding_kind: str = "",
+    timestamp: str | None = None,
+) -> Path:
+    """Persist and read back one metadata-only Issue publication result.
+
+    The path is stable per repository/Issue.  A successful ``noop`` reuses an
+    identical existing receipt, while a later update/reopen/reorganization
+    replaces the same file so archive Git history records the transition.
+    """
+    payload = _issue_publication_receipt_payload(
+        record,
+        action=action,
+        handoff=handoff,
+        source_finding_kind=source_finding_kind,
+        timestamp=timestamp,
+    )
+    path = issue_publication_receipt_path(log_root, record.repository, record.number)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.is_symlink() or (path.exists() and not path.is_file()):
+            raise IssueSyncError("issue_receipt_conflict", "receipt target is not a regular file")
+        if path.exists():
+            existing = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(existing, dict):
+                raise IssueSyncError("issue_receipt_conflict", "existing receipt is not an object")
+            immutable = tuple(key for key in ISSUE_PUBLICATION_RECEIPT_FIELDS if key != "timestamp")
+            if action == "noop" and all(existing.get(key) == payload[key] for key in immutable):
+                payload = {key: existing[key] for key in ISSUE_PUBLICATION_RECEIPT_FIELDS}
+        encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+        path.write_text(encoded, encoding="utf-8")
+        path.chmod(0o600)
+        observed = json.loads(path.read_text(encoding="utf-8"))
+    except IssueSyncError:
+        raise
+    except (OSError, json.JSONDecodeError, TypeError) as exc:
+        raise IssueSyncError("issue_receipt_write_failed", "publication receipt could not be written") from exc
+    if observed != payload or set(observed) != set(ISSUE_PUBLICATION_RECEIPT_FIELDS):
+        raise IssueSyncError("issue_receipt_readback_failed", "publication receipt readback differs")
+    return path
+
+
 @dataclass(frozen=True)
 class IssueWorkerHandoff:
     """Typed result of qualifying one finding for the IssueWorker stage.
@@ -149,6 +278,7 @@ class IssueWorkerHandoff:
     related_issue_refs: tuple[str, ...] = ()
     responsibility: tuple[str, ...] = ()
     schema: str = ISSUE_WORKER_HANDOFF_SCHEMA
+    source_finding_kind: str = ""
 
     @property
     def qualifies(self) -> bool:
@@ -172,6 +302,7 @@ class IssueWorkerHandoff:
             "occurrence_locations": list(self.occurrence_locations),
             "related_issue_refs": list(self.related_issue_refs),
             "responsibility": list(self.responsibility),
+            "source_finding_kind": self.source_finding_kind,
         }
 
 
@@ -266,6 +397,7 @@ def _make_handoff(
     occurrence: tuple[str, ...],
     related_refs: tuple[str, ...],
     responsibility: tuple[str, ...],
+    source_finding_kind: str,
 ) -> IssueWorkerHandoff:
     """Construct one handoff while keeping qualification fields together."""
     return IssueWorkerHandoff(
@@ -277,6 +409,8 @@ def _make_handoff(
         occurrence,
         related_refs,
         responsibility,
+        ISSUE_WORKER_HANDOFF_SCHEMA,
+        source_finding_kind,
     )
 
 
@@ -306,31 +440,44 @@ def qualify_issue_worker_finding(
     ) if isinstance(related, (list, tuple)) else ()
     responsibility = _responsibility_tuple(record)
 
+    def finish(status_value: str, reason_value: str) -> IssueWorkerHandoff:
+        return _make_handoff(
+            status_value,
+            reason_value,
+            repository,
+            owner,
+            fix,
+            occurrence,
+            related_refs,
+            responsibility,
+            kind,
+        )
+
     actionable = _record_bool(record, "actionable")
     if actionable is False:
-        return _make_handoff("no-action", "not-actionable", repository, owner, fix, occurrence, related_refs, responsibility)
+        return finish("no-action", "not-actionable")
     if kind in NON_DURABLE_FINDING_KINDS:
-        return _make_handoff("no-action", "non-durable-finding-kind", repository, owner, fix, occurrence, related_refs, responsibility)
+        return finish("no-action", "non-durable-finding-kind")
     if status in {"resolved", "closed", "current-scope-resolved", "current-scope-closed"}:
-        return _make_handoff("no-action", "current-scope-resolved", repository, owner, fix, occurrence, related_refs, responsibility)
+        return finish("no-action", "current-scope-resolved")
     if _record_bool(record, "current_scope_resolved", "closed_by_active_repair") is True:
-        return _make_handoff("no-action", "current-scope-resolved", repository, owner, fix, occurrence, related_refs, responsibility)
+        return finish("no-action", "current-scope-resolved")
 
     if not repository:
-        return _make_handoff("handoff", "repository-unresolved", repository, owner, fix, occurrence, related_refs, responsibility)
+        return finish("handoff", "repository-unresolved")
     if not authenticated_repository:
-        return _make_handoff("handoff", "checkout-identity-unresolved", repository, owner, fix, occurrence, related_refs, responsibility)
+        return finish("handoff", "checkout-identity-unresolved")
     if repository != normalize_repository(authenticated_repository):
-        return _make_handoff("handoff", "other-repository", repository, owner, fix, occurrence, related_refs, responsibility)
+        return finish("handoff", "other-repository")
     if not owner:
-        return _make_handoff("handoff", "owner-unresolved", repository, owner, fix, occurrence, related_refs, responsibility)
+        return finish("handoff", "owner-unresolved")
     if not fix:
-        return _make_handoff("handoff", "fix-unresolved", repository, owner, fix, occurrence, related_refs, responsibility)
+        return finish("handoff", "fix-unresolved")
 
     durable = _record_bool(record, "durable_follow_up", "needs_durable_follow_up", "recurrent", "repeatable")
     if durable is False:
-        return _make_handoff("no-action", "durable-follow-up-not-established", repository, owner, fix, occurrence, related_refs, responsibility)
-    return _make_handoff("qualified", "user-owned-candidate", repository, owner, fix, occurrence, related_refs, responsibility)
+        return finish("no-action", "durable-follow-up-not-established")
+    return finish("qualified", "user-owned-candidate")
 
 
 class IssueWorker:
@@ -525,15 +672,28 @@ class IssueWorker:
         body_digest: str = "",
         run: str = "",
         task: str = "",
+        publication_log_root: Path | None = None,
     ) -> GitHubIssueRecord:
         """Publish and enqueue a metadata-only retry packet on failure."""
         try:
-            return self._publish(
+            record, action = self._publish(
                 handoff,
                 title=title,
                 body=body,
                 related_issues=related_issues,
             )
+            receipt_root = publication_log_root or defer_log_root
+            if receipt_root is None:
+                configured = os.environ.get("AGENT_CANON_LOG_ROOT", "").strip()
+                receipt_root = Path(configured) if configured else None
+            if receipt_root is not None:
+                write_issue_publication_receipt(
+                    receipt_root,
+                    record,
+                    action=action,
+                    handoff=handoff,
+                )
+            return record
         except IssueSyncError as error:
             if (
                 defer_log_root is not None
@@ -563,7 +723,7 @@ class IssueWorker:
         title: str,
         body: str,
         related_issues: Iterable[GitHubIssueRecord] = (),
-    ) -> GitHubIssueRecord:
+    ) -> tuple[GitHubIssueRecord, str]:
         """Apply one planned operation through the host GitHub adapter.
 
         This method is intentionally owned by the publisher role.  Dashboard,
@@ -594,7 +754,7 @@ class IssueWorker:
                     candidate_body,
                     f"handoff relation: foreign Issue {foreign_ref}",
                 )
-            return self.client.create(handoff.repository, title, candidate_body)
+            return self.client.create(handoff.repository, title, candidate_body), "create"
         destination = next(
             (record for record in records if record.url == plan.destination_issue_ref),
             None,
@@ -604,7 +764,7 @@ class IssueWorker:
                 parse_issue_reference(plan.destination_issue_ref, handoff.repository)
             )
         if plan.action == "noop":
-            return destination
+            return destination, "noop"
         if plan.action == "update":
             updated_body = body
             for foreign_ref in plan.foreign_issue_refs:
@@ -613,11 +773,11 @@ class IssueWorker:
                     f"handoff relation: foreign Issue {foreign_ref}",
                 )
             if destination.title == title and destination.body == updated_body:
-                return destination
-            return self.client.edit(destination, title=title, body=updated_body)
+                return destination, "noop"
+            return self.client.edit(destination, title=title, body=updated_body), "update"
         if plan.action == "reopen":
             updated = self.client.edit(destination, title=title, body=body)
-            return self.client.set_state(updated, "OPEN")
+            return self.client.set_state(updated, "OPEN"), "reopen"
         if plan.action == "reorganize":
             destination_body = body
             for source in records:
@@ -651,7 +811,7 @@ class IssueWorker:
                 )
                 if source_body != source.body:
                     self.client.edit(source, title=source.title, body=source_body)
-            return updated
+            return updated, "reorganize"
         raise IssueSyncError("issue_worker_plan_invalid", f"unsupported action: {plan.action}")
 
 
@@ -807,6 +967,7 @@ def write_pending_packet(
     reason: str = "",
     route: str = "issue-publication",
     handoff: Mapping[str, object] | None = None,
+    source_finding_kind: str = "",
 ) -> Path:
     """Write metadata-only packet; body remains at its private locator."""
     if not re.fullmatch(r"sha256:[0-9a-f]{64}", body_digest):
@@ -828,6 +989,8 @@ def write_pending_packet(
         "route": route,
         "status": "pending",
     }
+    if source_finding_kind:
+        payload["source_finding_kind"] = source_finding_kind
     if handoff is not None:
         payload["handoff"] = dict(handoff)
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
@@ -893,9 +1056,16 @@ def sync_pending_packet(
             handoff,
             title=str(payload["title"]),
             body=body,
+            publication_log_root=path.parents[3],
         )
     else:
         record = client.create(repository, str(payload["title"]), body)
+        write_issue_publication_receipt(
+            path.parents[3],
+            record,
+            action="create",
+            source_finding_kind=str(payload.get("source_finding_kind") or ""),
+        )
     path.unlink()
     return record
 

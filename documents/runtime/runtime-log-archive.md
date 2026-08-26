@@ -52,6 +52,18 @@ $RUNTIME/
 $INSTALL_ROOT_PARENT/agent-canon-log/  # host-owned operational archive checkout
 ```
 
+IssueWorker publication receipts use the same private archive checkout and
+host shell sync route. They are written under
+`feedback/issue-packets/published/<owner>/<repository>/<number>.json`; the
+stable path contains only the repository, Issue number/URL/state, operation,
+responsibility and occurrence locators, source finding kind, and timestamp.
+Issue/private bodies, digests, fingerprints, credentials, and generated IDs do
+not enter the receipt. A publisher reads the GitHub result back first, writes
+and reads back this receipt, and only then removes a pending packet. Failed or
+uncertain publication retains the pending packet. `runtime_log_archive_git.py
+sync` stages this published namespace with the existing private archive
+families so the host shell remains the Git publisher.
+
 The durable archive layout and its operational checkout are owned by
 `agent-canon-log`; consumers should use its current branch contract rather
 than hard-code a second local layout. Bootstrap eval publication passes this

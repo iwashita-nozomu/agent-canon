@@ -100,7 +100,7 @@ source checkout is never used as an output directory.
 1. structured summary で足りない観点がある場合は、AgentCanon source
    dashboard API owner に `dashboard_api_contract_gap` として修復を route してから
    API / report profile を拡張します。
-1. API JSON では、少なくとも次の field を normal analysis contract として確認します: `unknown_event_count`, `status_by_hook_family`, `failure_by_hook_family`, `skip_by_hook_family`, `namespace_debt_by_hook_family`, `oop_applicability`。
+1. API JSON では、少なくとも次の field を normal analysis contract として確認します: `unknown_event_count`, `status_by_hook_family`, `failure_by_hook_family`, `skip_by_hook_family`, `namespace_debt_by_hook_family`, `oop_applicability`。IssueWorker の公開結果を扱う場合は、`github_issue_refs` と `issue_publication_action_counts` を private archive の published receipt から読み、`issue_worker.qualified` などの candidate counts と混ぜません。receipt に Issue/private body、digest、fingerprint、認証情報がないことも確認します。
 1. eval family gap を見るときは、dashboard の推測ではなく
    `eval_accumulation_check.py --compact-out ...` を走らせます。missing / stale / fail
    があれば `$agent-eval-accumulation` に移り、`run_accumulated_agent_evals.py`、
