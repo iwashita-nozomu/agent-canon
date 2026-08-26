@@ -45,7 +45,7 @@ CATALOG_RELATIVE = Path("tools/catalog.yaml")
 ID_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789-")
 ALLOWED_RUNTIMES = frozenset({"python", "rust"})
 ALLOWED_PLANES = frozenset({"tool-container"})
-ALLOWED_CWDS = frozenset({"source-root", "task-root", "explicit"})
+ALLOWED_CWDS = frozenset({"source-root", "target-root", "task-root", "explicit"})
 ALLOWED_ENVS = frozenset({"allowlisted", "clean"})
 ALLOWED_IO = frozenset({"inherited", "captured"})
 ALLOWED_EXITS = frozenset({"propagate", "normalize-signal"})
@@ -81,6 +81,8 @@ ENV_ALLOWLIST = frozenset(
         "AGENT_CANON_TARGET_ROOT",
         "AGENT_CANON_EXPLICIT_CWD",
         "AGENT_CANON_MOUNT_REGISTRY",
+        "AGENT_CANON_HOOK_ARCHIVE_DIR",
+        "AGENT_CANON_LOG_ROOT",
     }
 )
 BOOTSTRAP_EXEC_ENV = frozenset(
@@ -518,7 +520,11 @@ def _cwd_for(root: Path, spec: ToolSpec, runtime: Path) -> Path:
         if not cwd.is_dir():
             raise DispatchError("invalid-cwd", str(cwd))
         return cwd
-    if spec.cwd_policy == "task-root":
+    if spec.cwd_policy == "target-root":
+        value = os.environ.get("AGENT_CANON_TARGET_ROOT")
+        if not value:
+            raise DispatchError("missing-target-root", spec.tool_id)
+    elif spec.cwd_policy == "task-root":
         value = os.environ.get("AGENT_CANON_TASK_ROOT")
         if not value:
             raise DispatchError("missing-task-root", spec.tool_id)
@@ -712,6 +718,7 @@ def _bootstrap_command(root: Path, runtime: Path, spec: ToolSpec, args: Sequence
             "target-root-required",
             "set AGENT_CANON_TARGET_ROOT when zero or multiple targets are registered",
         )
+    target_digest = hashlib.sha256(str(target_root).encode("utf-8")).hexdigest()
     request = {
         "schema": "agent-canon.tool-exec-request.v1",
         "tool_id": spec.tool_id,
@@ -742,7 +749,11 @@ def _bootstrap_command(root: Path, runtime: Path, spec: ToolSpec, args: Sequence
         "--repository-root", str(root.resolve()),
         "--control-parent-root", str(control),
         "--runtime-root", str(runtime),
-        "exec", "--request-json", json.dumps(request, sort_keys=True, separators=(",", ":")),
+        "exec",
+        "--target-digest",
+        target_digest,
+        "--request-json",
+        json.dumps(request, sort_keys=True, separators=(",", ":")),
     ]
     environment = {key: value for key, value in os.environ.items() if key in BOOTSTRAP_EXEC_ENV}
     environment.update({"AGENT_CANON_CONTROL_PARENT_ROOT": str(control), "AGENT_CANON_RUNTIME_ROOT": str(runtime)})

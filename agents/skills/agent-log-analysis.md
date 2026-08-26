@@ -80,11 +80,18 @@ python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
    解析対象 repo の root とします。
 
 ```bash
-python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
-  --root <source-root> \
+./bootstrap.sh --control-parent-root <control-parent-root> \
+  --runtime-root <runtime-root> \
+  tool run --root <registered-source-root> generate-agent-runtime-dashboard -- \
+  --root . \
   --compact-out reports/agent-runtime-dashboard/agent-log-analysis-compact.md \
   --api-out reports/agent-runtime-dashboard/agent-log-analysis-api.json
 ```
+
+The outer `--root` selects the registered read-only target for the shared
+container. The dashboard arguments are evaluated inside that container, and
+the relative report paths are resolved below the external runtime root; the
+source checkout is never used as an output directory.
 
 1. `agent-log-analysis-api.json` または `agent-log-analysis-compact.md` を
    既定入力として読みます。log archive repo は append-only evidence を所有し、
@@ -115,7 +122,7 @@ python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
   作成に必要な structured evidence と finding route packet を渡します。
 - Durable report を残す必要がある場合は `$result-artifact-writeout` を使います。
 - Full dashboard は human review 用です。agent の通常分析入力は
-  `generate_agent_runtime_dashboard.py --api-out` の JSON、structured summary、
+   `generate-agent-runtime-dashboard` の API output、structured summary、
   generated evidence cell を既定にします。
 - Normal analysis reads structured API fields first. `unknown_event_count` routes missing event taxonomy, `status_by_hook_family` routes status distribution, `failure_by_hook_family` routes failure ownership, `skip_by_hook_family` routes skipped hook ownership, `namespace_debt_by_hook_family` routes legacy namespace debt, and `oop_applicability` routes OOP hook applicability findings.
 

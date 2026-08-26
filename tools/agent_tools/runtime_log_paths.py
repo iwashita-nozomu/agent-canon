@@ -28,12 +28,14 @@ try:
     from .runtime_artifacts import (
         RUNTIME_ROOT_ENV,
         RuntimeArtifactBoundary,
+        RuntimePathEscape,
         runtime_artifact_boundary,
     )
 except ImportError:
     from runtime_artifacts import (  # type: ignore[no-redef]
         RUNTIME_ROOT_ENV,
         RuntimeArtifactBoundary,
+        RuntimePathEscape,
         runtime_artifact_boundary,
     )
 
@@ -55,6 +57,7 @@ HOOK_EVENT_SPOOL_DIR_ENV = "AGENT_CANON_HOOK_EVENT_SPOOL_DIR"
 LOG_ENV_ENV = "AGENT_CANON_LOG_ENV"
 LOG_ARCHIVE_PARENT = Path("archive") / "agent-canon-log"
 LOG_ARCHIVE_REMOTE = "git@github.com:iwashita-nozomu/agent-canon-log.git"
+PRIVATE_LOG_ROOT_ENV = "AGENT_CANON_LOG_ROOT"
 CODEX_RUNTIME_CHAT_DIR_NAME = "chats"
 CODEX_RUNTIME_INDEX_FILE = "index.jsonl"
 NAMESPACE_HASH_LENGTH = 8
@@ -261,7 +264,29 @@ def _log_archive_root(canon_root: Path, runtime_root: Path | str | None = None) 
     """Return the active hook log archive root."""
     override = os.environ.get(HOOK_ARCHIVE_DIR_ENV, "").strip()
     if override:
-        return runtime_boundary(canon_root, runtime_root).resolve(Path(override))
+        candidate = Path(override).expanduser()
+        if not candidate.is_absolute():
+            return runtime_boundary(canon_root, runtime_root).resolve(candidate)
+        try:
+            if candidate.is_symlink():
+                raise RuntimePathEscape(f"explicit archive root is a symlink: {candidate}")
+            resolved = candidate.resolve(strict=False)
+            source = canon_root.expanduser().resolve()
+            declared = os.environ.get(PRIVATE_LOG_ROOT_ENV, "").strip()
+            if not declared or Path(declared).expanduser().resolve(strict=False) != resolved:
+                raise RuntimePathEscape(
+                    "absolute archive override must equal the declared private-log mount root"
+                )
+            current = Path(candidate.anchor or "/")
+            for part in candidate.parts[1:]:
+                current /= part
+                if current.is_symlink():
+                    raise RuntimePathEscape(f"explicit archive root has a symlink component: {current}")
+        except OSError as exc:
+            raise RuntimePathEscape(f"explicit archive root is unavailable: {candidate}") from exc
+        if resolved == source or source in resolved.parents:
+            raise RuntimePathEscape(f"explicit archive root is inside source: {resolved}")
+        return resolved
     mount = mounted_log_archive_root(canon_root, runtime_root)
     if mount.is_dir():
         return mount

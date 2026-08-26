@@ -19,6 +19,8 @@ from tools.agent_tools.bootstrap_runtime import (  # noqa: E402
     BootstrapRuntime,
     DockerAdapter,
     _container_source_identity,
+    TOOL_SOURCE_DESTINATION,
+    _container_request_environment,
     build_parser,
     run,
     sha256_bytes,
@@ -595,6 +597,209 @@ def test_exec_and_tool_run_return_bounded_io_evidence_and_external_logs(
     routed = manager.tool_run("route", ["--list"])
     assert "route output" in routed["details"]["stdout_preview"]
     assert routed["details"]["argv"][:3] == ["agent-canon-tool", "tool", "run"]
+    routed_external = manager.tool_run("template-bundle", ["export", "--help"])
+    assert routed_external["details"]["argv"][:3] == ["agent-canon-tool", "tool", "run"]
+    docker_exec = next(
+        command
+        for command in reversed(fake_docker.commands)
+        if command[1] == "exec" and "template-bundle" in command
+    )
+    output_env = next(
+        docker_exec[index + 1]
+        for index, value in enumerate(docker_exec)
+        if value == "--env" and docker_exec[index + 1].startswith("AGENT_CANON_OUTPUT_ROOT=")
+    )
+    assert output_env == "AGENT_CANON_OUTPUT_ROOT=/var/lib/agent-canon/runtime/tool-output"
+    assert "AGENT_CANON_HOOK_ARCHIVE_DIR=/var/lib/agent-canon/private-log" in docker_exec
+    assert "AGENT_CANON_LOG_ROOT=/var/lib/agent-canon/private-log" in docker_exec
+
+
+def test_container_control_maps_structured_tool_request_to_registered_mounts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Forward only mapped tool environment and the registered target path."""
+    control = tmp_path / "control"
+    runtime_root = control / "runtime"
+    target = tmp_path / "target"
+    private_log = tmp_path / "agent-canon-log"
+    control.mkdir()
+    target.mkdir()
+    private_log.mkdir()
+    manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
+    manager._ensure_layout()
+    digest = "target-structured"
+    target_record = {
+        "digest": digest,
+        "host_root": str(target),
+        "root": f"/targets/{digest}",
+        "mode": "read-only",
+    }
+    state = manager._new_state()
+    state.update(
+        {
+            "state": "ready",
+            "targets": {digest: target_record},
+            "resources": manager._resource_records(),
+        }
+    )
+    manager._write_mounts(state)
+    manager._write_mount_manifest(state)
+    manager._write_state(state)
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setenv("AGENT_CANON_TARGET_DIGEST", digest)
+    monkeypatch.setenv("AGENT_CANON_PRIVATE_LOG_ROOT", str(private_log))
+
+    output_root = runtime_root / "reports"
+    environment = {
+        "PATH": "/usr/bin:/bin",
+        "AGENT_CANON_SOURCE_ROOT": str(REPOSITORY_ROOT),
+        "AGENT_CANON_ROOT": str(REPOSITORY_ROOT),
+        "AGENT_CANON_DISPATCH_ENTRY_ID": "generate-agent-runtime-dashboard",
+        "AGENT_CANON_DISPATCH_RUNTIME": "python",
+        "AGENT_CANON_RUNTIME_ROOT": str(runtime_root),
+        "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
+        "AGENT_CANON_TARGET_ROOT": str(target),
+        "AGENT_CANON_TASK_ROOT": str(target),
+        "AGENT_CANON_OUTPUT_ROOT": str(output_root),
+        "AGENT_CANON_HOOK_ARCHIVE_DIR": str(private_log),
+    }
+    request = {
+        "schema": "agent-canon.tool-exec-request.v1",
+        "tool_id": "generate-agent-runtime-dashboard",
+        "argv": ["python3", "tools/agent_tools/generate_agent_runtime_dashboard.py"],
+        "child_args": ["--root", ".", "--api-out", "reports/api.json"],
+        "source_root": str(REPOSITORY_ROOT),
+        "cwd": str(target),
+        "cwd_policy": "target-root",
+        "target_root": str(target),
+        "environment": environment,
+        "stdin": "inherited",
+        "stdout": "inherited",
+        "stderr": "inherited",
+        "exit": "propagate",
+        "signal": "propagate",
+        "side_effect": "external-artifact",
+        "output_root": str(output_root),
+        "written_paths": [],
+    }
+    captured: dict[str, Any] = {}
+
+    def fake_tool_run(
+        self: BootstrapRuntime,
+        catalog_id: str,
+        argv: list[str],
+        *,
+        root: Path | None = None,
+        environment: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        captured.update(
+            {"catalog_id": catalog_id, "argv": argv, "root": root, "environment": environment}
+        )
+        return {"code": "completed"}
+
+    monkeypatch.setattr(BootstrapRuntime, "tool_run", fake_tool_run)
+    args = build_parser().parse_args(
+        [
+            "--container-control",
+            "--repository-root",
+            str(REPOSITORY_ROOT),
+            "--control-parent-root",
+            str(control),
+            "--runtime-root",
+            str(runtime_root),
+            "exec",
+            "--target-digest",
+            digest,
+            "--request-json",
+            json.dumps(request),
+        ]
+    )
+
+    result = run(args)
+
+    assert result == {"code": "completed"}
+    assert captured["catalog_id"] == "generate-agent-runtime-dashboard"
+    assert captured["root"] == Path(f"/targets/{digest}")
+    mapped = captured["environment"]
+    assert mapped["AGENT_CANON_SOURCE_ROOT"] == "/usr/local/share/agent-canon/runtime"
+    assert mapped["AGENT_CANON_ROOT"] == "/usr/local/share/agent-canon/runtime"
+    assert mapped["AGENT_CANON_RUNTIME_ROOT"] == "/var/lib/agent-canon/runtime"
+    assert mapped["AGENT_CANON_CONTROL_PARENT_ROOT"] == "/var/lib/agent-canon"
+    assert mapped["AGENT_CANON_TARGET_ROOT"] == f"/targets/{digest}"
+    assert mapped["AGENT_CANON_TASK_ROOT"] == f"/targets/{digest}"
+    assert mapped["AGENT_CANON_OUTPUT_ROOT"] == "/var/lib/agent-canon/runtime/reports"
+    assert mapped["AGENT_CANON_HOOK_ARCHIVE_DIR"] == "/var/lib/agent-canon/private-log"
+    assert "AWS_SECRET_ACCESS_KEY" not in mapped
+
+
+def test_container_control_rejects_unallowlisted_structured_tool_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Credentials cannot cross the structured request boundary."""
+    control = tmp_path / "control"
+    runtime_root = control / "runtime"
+    target = tmp_path / "target"
+    control.mkdir()
+    target.mkdir()
+    (control / "private-log").mkdir()
+    manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
+    manager._ensure_layout()
+    digest = "target-secret"
+    target_record = {
+        "digest": digest,
+        "host_root": str(target),
+        "root": f"/targets/{digest}",
+        "mode": "read-only",
+    }
+    state = manager._new_state()
+    state.update({"state": "ready", "targets": {digest: target_record}, "resources": manager._resource_records()})
+    manager._write_mounts(state)
+    manager._write_mount_manifest(state)
+    manager._write_state(state)
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setenv("AGENT_CANON_TARGET_DIGEST", digest)
+    request = {
+        "schema": "agent-canon.tool-exec-request.v1",
+        "tool_id": "route",
+        "argv": ["python3", "tools/agent_tools/route.py"],
+        "child_args": ["--help"],
+        "source_root": str(REPOSITORY_ROOT),
+        "cwd": str(target),
+        "cwd_policy": "target-root",
+        "target_root": str(target),
+        "environment": {
+            "AGENT_CANON_RUNTIME_ROOT": str(runtime_root),
+            "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
+            "AWS_SECRET_ACCESS_KEY": "must-not-cross-boundary",
+        },
+        "stdin": "inherited",
+        "stdout": "inherited",
+        "stderr": "inherited",
+        "exit": "propagate",
+        "signal": "propagate",
+        "side_effect": "read-only",
+        "output_root": None,
+        "written_paths": [],
+    }
+    args = build_parser().parse_args(
+        [
+            "--container-control",
+            "--repository-root",
+            str(REPOSITORY_ROOT),
+            "--control-parent-root",
+            str(control),
+            "--runtime-root",
+            str(runtime_root),
+            "exec",
+            "--target-digest",
+            digest,
+            "--request-json",
+            json.dumps(request),
+        ]
+    )
+
+    with pytest.raises(BootstrapError, match="invalid_exec_request"):
+        run(args)
 
 
 def test_codex_launch_binds_session_root_to_runtime(
@@ -629,6 +834,39 @@ def test_codex_launch_binds_session_root_to_runtime(
         "runtime_root": str(manager.paths.runtime_root),
     }
     assert (manager.paths.codex_home / "sessions").is_dir()
+
+
+def test_structured_tool_environment_rejects_private_log_self_claim(
+    tmp_path: Path,
+) -> None:
+    """A request cannot replace the host-owned private-log source identity."""
+    source = tmp_path / "agent-canon"
+    target = tmp_path / "target"
+    runtime_root = tmp_path / "runtime"
+    control = tmp_path / "control"
+    private_log = tmp_path / "agent-canon-log"
+    wrong_log = tmp_path / "other-log"
+    for path in (source, target, runtime_root, control, private_log, wrong_log):
+        path.mkdir()
+    request = {
+        "target_root": str(target),
+        "environment": {
+            "AGENT_CANON_RUNTIME_ROOT": str(runtime_root),
+            "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
+            "AGENT_CANON_HOOK_ARCHIVE_DIR": str(wrong_log),
+        },
+        "output_root": None,
+    }
+
+    with pytest.raises(BootstrapError, match="archive path does not match private log mount"):
+        _container_request_environment(
+            request,
+            container_target=Path("/targets/target"),
+            source_root=source,
+            host_runtime=runtime_root,
+            host_control=control,
+            host_private_log=private_log,
+        )
 
 
 def test_exec_preserves_nonzero_command_exit_and_redacts_output(

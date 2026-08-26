@@ -16,9 +16,11 @@ import io
 import json
 import os
 import stat
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 from tools.agent_tools import tool_dispatch
@@ -39,7 +41,7 @@ class ToolDispatchTest(unittest.TestCase):
             self.assertIsInstance(spec.argv, tuple)
             self.assertTrue(spec.argv)
             self.assertEqual(spec.execution_plane, "tool-container")
-            self.assertIn(spec.cwd_policy, {"source-root", "task-root", "explicit"})
+            self.assertIn(spec.cwd_policy, {"source-root", "target-root", "task-root", "explicit"})
             self.assertIn(spec.env_policy, {"allowlisted", "clean"})
             self.assertIn(spec.side_effect_policy, {"read-only", "external-artifact", "explicit-target-write"})
             self.assertTrue(spec.parity_fixture)
@@ -66,8 +68,135 @@ class ToolDispatchTest(unittest.TestCase):
         self.assertEqual(schema["default_parity"], "legacy")
         self.assertEqual(
             {spec.tool_id for spec in specs.values() if spec.parity == "verified"},
-            {"route", "template-bundle"},
+            {
+                "generate-agent-runtime-dashboard",
+                "route",
+                "skill-document-reader",
+                "template-bundle",
+            },
         )
+
+    def test_dashboard_uses_container_and_external_artifact_route(self) -> None:
+        """The canonical dashboard route keeps source read-only and output external."""
+        specs, _schema = tool_dispatch.load_specs(PROJECT_ROOT)
+        dashboard = specs["generate-agent-runtime-dashboard"]
+        self.assertEqual(
+            dashboard.argv,
+            ("python3", "tools/agent_tools/generate_agent_runtime_dashboard.py"),
+        )
+        self.assertEqual(dashboard.execution_plane, "tool-container")
+        self.assertEqual(dashboard.cwd_policy, "target-root")
+        self.assertEqual(dashboard.side_effect_policy, "external-artifact")
+        self.assertEqual(dashboard.output_root, "external-runtime")
+        self.assertEqual(dashboard.written_paths, ())
+        self.assertEqual(dashboard.parity, "verified")
+
+    def test_dashboard_route_builds_typed_bootstrap_request(self) -> None:
+        """Dashboard dispatch starts at bootstrap, never at a host Python path."""
+        root = self._minimal_root(
+            dispatch={
+                "runtime": "python",
+                "argv": [
+                    "python3",
+                    "tools/agent_tools/generate_agent_runtime_dashboard.py",
+                ],
+                "execution_plane": "tool-container",
+                "cwd": "target-root",
+                "env": "allowlisted",
+                "stdin": "inherited",
+                "stdout": "inherited",
+                "stderr": "inherited",
+                "exit": "propagate",
+                "signal": "propagate",
+                "side_effect": "external-artifact",
+                "output_root": "external-runtime",
+                "written_paths": [],
+                "parity": "verified",
+            },
+            tool_id="generate-agent-runtime-dashboard",
+            path="tools/agent_tools/generate_agent_runtime_dashboard.py",
+        )
+        output_root = root / "control" / "runtime" / "reports"
+        output_root.mkdir()
+        previous_target_digest = os.environ.pop("AGENT_CANON_TARGET_DIGEST", None)
+        self.addCleanup(
+            self._restore_optional_environment,
+            "AGENT_CANON_TARGET_DIGEST",
+            previous_target_digest,
+        )
+        previous_output_root = os.environ.get("AGENT_CANON_OUTPUT_ROOT")
+        self.addCleanup(
+            self._restore_optional_environment,
+            "AGENT_CANON_OUTPUT_ROOT",
+            previous_output_root,
+        )
+        os.environ["AGENT_CANON_OUTPUT_ROOT"] = str(output_root)
+        fixture = root / "tests/fixtures/tool_dispatch/public-command-parity.json"
+        parity = json.loads(fixture.read_text(encoding="utf-8"))
+        parity["entries"][0]["id"] = "generate-agent-runtime-dashboard"
+        parity["entries"][0]["observed"]["argv"] = [
+            "python3",
+            "tools/agent_tools/generate_agent_runtime_dashboard.py",
+        ]
+        parity["entries"][0]["observed"]["cwd"] = "target-root"
+        fixture.write_text(json.dumps(parity), encoding="utf-8")
+        with patch(
+            "tools.agent_tools.tool_dispatch.subprocess.run",
+            return_value=subprocess.CompletedProcess([], 0),
+        ) as run:
+            status = tool_dispatch.run_tool(
+                root,
+                tool_dispatch.load_specs(root)[0]["generate-agent-runtime-dashboard"],
+                (
+                    "--root",
+                    ".",
+                    "--compact-out",
+                    "reports/agent-runtime-dashboard/compact.md",
+                    "--api-out",
+                    "reports/agent-runtime-dashboard/api.json",
+                ),
+            )
+
+        self.assertEqual(status, 0)
+        command = run.call_args.args[0]
+        request = json.loads(command[command.index("--request-json") + 1])
+        self.assertEqual(command[0], str(root / "bootstrap.sh"))
+        digest_index = command.index("--target-digest")
+        self.assertEqual(
+            command[digest_index + 1],
+            hashlib.sha256(str(root).encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(request["tool_id"], "generate-agent-runtime-dashboard")
+        self.assertEqual(request["side_effect"], "external-artifact")
+        self.assertEqual(request["output_root"], str(output_root))
+        self.assertEqual(
+            request["argv"],
+            [
+                "python3",
+                "tools/agent_tools/generate_agent_runtime_dashboard.py",
+                "--root",
+                ".",
+                "--compact-out",
+                "reports/agent-runtime-dashboard/compact.md",
+                "--api-out",
+                "reports/agent-runtime-dashboard/api.json",
+            ],
+        )
+
+    def test_dashboard_container_route_selects_container_executor(self) -> None:
+        """The verified dashboard route is delegated to the resident container."""
+        spec = tool_dispatch.load_specs(PROJECT_ROOT)[0][
+            "generate-agent-runtime-dashboard"
+        ]
+        with patch.object(
+            tool_dispatch, "_run_container_spec", return_value=0
+        ) as container_run:
+            status = tool_dispatch._run_spec(
+                PROJECT_ROOT, spec, ("--help",), require_parity=True, container_exec=True
+            )
+
+        self.assertEqual(status, 0)
+        container_run.assert_called_once_with(PROJECT_ROOT, spec, ("--help",))
 
     def test_unknown_dispatch_option_is_rejected_before_catalog_lookup(self) -> None:
         """Dispatcher options cannot be smuggled into a child command."""
@@ -262,11 +391,16 @@ class ToolDispatchTest(unittest.TestCase):
             with self.assertRaisesRegex(tool_dispatch.DispatchError, "duplicate-id"):
                 tool_dispatch.load_specs(root)
 
-    def _entry(self, tool_id: str, dispatch: dict[str, object] | None = None) -> dict[str, object]:
+    def _entry(
+        self,
+        tool_id: str,
+        dispatch: dict[str, object] | None = None,
+        path: str = "tools/echo.py",
+    ) -> dict[str, object]:
         """Build one minimal public entry for a fixture repository."""
         return {
             "id": tool_id,
-            "path": "tools/echo.py",
+            "path": path,
             "summary": "fixture",
             "family": "agent_tools",
             "role": "helper",
@@ -289,14 +423,22 @@ class ToolDispatchTest(unittest.TestCase):
             "entries": entries,
         }
 
-    def _minimal_root(self, dispatch: dict[str, object]) -> Path:
+    def _minimal_root(
+        self,
+        dispatch: dict[str, object],
+        *,
+        tool_id: str = "echo",
+        path: str = "tools/echo.py",
+    ) -> Path:
         """Create a temporary public-tool fixture root."""
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
         (root / "tools").mkdir()
         (root / "tests/fixtures/tool_dispatch").mkdir(parents=True)
-        (root / "tools/echo.py").write_text("print('ok')\n", encoding="utf-8")
+        tool_path = root / path
+        tool_path.parent.mkdir(parents=True, exist_ok=True)
+        tool_path.write_text("print('ok')\n", encoding="utf-8")
         bootstrap = root / "bootstrap.sh"
         bootstrap.write_text(
             "#!/usr/bin/env python3\n"
@@ -326,7 +468,7 @@ class ToolDispatchTest(unittest.TestCase):
             encoding="utf-8",
         )
         (root / "tools/catalog.yaml").write_text(
-            yaml.safe_dump(self._catalog([self._entry("echo", dispatch)])),
+            yaml.safe_dump(self._catalog([self._entry(tool_id, dispatch, path)])),
             encoding="utf-8",
         )
         (root / "tests/fixtures/tool_dispatch/public-command-parity.json").write_text(
@@ -453,6 +595,14 @@ class ToolDispatchTest(unittest.TestCase):
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+
+    @staticmethod
+    def _restore_optional_environment(key: str, value: str | None) -> None:
+        """Restore one optional environment variable after a focused test."""
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
 
 
 if __name__ == "__main__":
