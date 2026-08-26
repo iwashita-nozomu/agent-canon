@@ -132,6 +132,12 @@ REQUIRED_STATIC_OBLIGATION_SETS: Mapping[str, frozenset[str]] = {
     ),
 }
 
+CHECKOUT_IDENTITY_PROMPT = (
+    "Carry one checkout_identity block with cwd, git_root, branch (or detached), head, "
+    "and normalized remote owner/repository at bounded workflow transitions; do not "
+    "repeat it for ordinary commands."
+)
+
 
 def _contains_static_forbidden_prefix(text: str) -> bool:
     lowered = text.casefold()
@@ -899,6 +905,7 @@ def materialize_prompt_capsule(
         request.role_id, request.profile_id
     )
     clauses = " ".join(clause.text for clause in role_clauses)
+    clauses = f"{clauses} {CHECKOUT_IDENTITY_PROMPT}".strip()
     projection_digest = registry.projection_digest_for_role(
         request.role_id, request.profile_id
     )
@@ -1132,6 +1139,7 @@ def generate_role_views(
         logical_role, contract_ref, sandbox = metadata[role_id]
         role_clauses = registry.instruction_clauses_for_role(role_id, profile.id)
         clauses = _render_instruction_clauses(role_clauses, projection)
+        clauses = f"{clauses} {CHECKOUT_IDENTITY_PROMPT}".strip()
         instructions = profile.role_template.format(
             role_id=role_id,
             model_alias=profile.model_alias,

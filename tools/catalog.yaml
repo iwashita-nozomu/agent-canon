@@ -311,6 +311,42 @@ entries:
     tests:
       - tests/agent_tools/test_tool_drift.py
 
+  - id: checkout-identity
+    summary: Reads the current cwd, Git root, branch state, HEAD, and normalized remote owner/repository for bounded workflow transitions.
+    path: tools/agent_tools/checkout_identity.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    audience: agent
+    placement: workflow_helper
+    command: python3 tools/agent_tools/checkout_identity.py --format lines
+    writes: false
+    dispatch:
+      runtime: python
+      argv: [python3, tools/agent_tools/checkout_identity.py]
+      execution_plane: tool-container
+      cwd: source-root
+      env: clean
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: read-only
+      output_root: none
+      written_paths: []
+      parity: legacy
+      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - agents/COMMUNICATION_PROTOCOL.md
+      - agents/skills/agent-orchestration.md
+      - agents/skills/subagent-bootstrap.md
+    tests:
+      - tests/agent_tools/test_checkout_identity.py
+
   - id: responsibility-scope
     summary: Validates responsibility scopes, owner classes, and protecting tool coverage.
     path: tools/agent_tools/responsibility_scope.py

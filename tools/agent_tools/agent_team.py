@@ -211,6 +211,7 @@ else:
 
 if __package__:
     from .manifest_rendering import (
+        checkout_identity_policy_output_lines,
         contract_complete_implementation_policy_output_lines,
         coordination_capability_policy_output_lines,
         default_quality_check_policy_output_lines,
@@ -231,6 +232,7 @@ if __package__:
     )
 else:
     from manifest_rendering import (
+        checkout_identity_policy_output_lines,
         contract_complete_implementation_policy_output_lines,
         coordination_capability_policy_output_lines,
         default_quality_check_policy_output_lines,
@@ -530,6 +532,7 @@ __all__ = (
     "suggested_public_skills",
     "default_review_pack_ids_for_task",
     "default_quality_check_policy_output_lines",
+    "checkout_identity_policy_output_lines",
     "contract_complete_implementation_policy_output_lines",
     "coordination_capability_policy_output_lines",
     "pre_handoff_gate_status_output_lines",
