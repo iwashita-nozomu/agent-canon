@@ -10,7 +10,7 @@ upstream design computational-optimization.md numerical optimization contract wo
 upstream implementation ../../tools/agent_tools/jit_canonical_ir.py builds JIT-canonical IR.
 upstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
 upstream design ../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop capabilities by frontier shape.
-downstream implementation ../../.agents/skills/algorithm-proof-exploration/SKILL.md exposes the skill to Codex.
+downstream implementation ../../.codex/personal/skills/algorithm-proof-exploration/SKILL.md exposes the skill to Codex.
 @dependency-end
 -->
 

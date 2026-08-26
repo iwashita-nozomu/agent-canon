@@ -150,7 +150,7 @@ EXPECTED_CONSUMERS = {
         "reference_mode": "text",
     },
     "runtime-shim": {
-        "path": ".agents/skills/agent-orchestration/SKILL.md",
+        "path": ".codex/personal/skills/agent-orchestration/SKILL.md",
         "kind": "runtime_reference",
         "reference_mode": "reference",
     },
@@ -560,7 +560,7 @@ def _check_required_command(
     runtime_text = consumer_texts.get("runtime-shim", "")
     for path, text in (
         ("agents/skills/agent-orchestration.md", owner_text),
-        (".agents/skills/agent-orchestration/SKILL.md", runtime_text),
+        (".codex/personal/skills/agent-orchestration/SKILL.md", runtime_text),
     ):
         if expected_command in text:
             add(

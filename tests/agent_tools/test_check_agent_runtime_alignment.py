@@ -819,7 +819,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                         "",
                         "| Family | Purpose | Canonical Doc | Discovery Shim |",
                         "| ------ | ------- | ------------- | -------------- |",
-                        "| `example` | Example | `agents/skills/example.md` | `.agents/skills/example/SKILL.md` |",
+                        "| `example` | Example | `agents/skills/example.md` | `.codex/personal/skills/example/SKILL.md` |",
                     ]
                 ),
                 encoding="utf-8",
@@ -840,8 +840,8 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             root = Path(tmp_dir)
             (root / "agents" / "skills").mkdir(parents=True)
             (root / "agents" / "internal-routines").mkdir(parents=True)
-            (root / ".agents" / "skills" / "example").mkdir(parents=True)
-            (root / ".agents" / "skills" / "extra").mkdir(parents=True)
+            (root / ".codex" / "personal" / "skills" / "example").mkdir(parents=True)
+            (root / ".codex" / "personal" / "skills" / "extra").mkdir(parents=True)
             (root / "agents" / "skills" / "README.md").write_text("# Skills\n", encoding="utf-8")
             (root / "agents" / "skills" / "catalog.yaml").write_text(
                 "\n".join(
@@ -851,7 +851,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                         "  - id: example",
                         "    purpose: Example public skill.",
                         "    canonical_doc: agents/skills/example.md",
-                        "    shim: .agents/skills/example/SKILL.md",
+                        "    shim: .codex/personal/skills/example/SKILL.md",
                     ]
                 ),
                 encoding="utf-8",
@@ -862,18 +862,18 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 "# Internal\n",
                 encoding="utf-8",
             )
-            (root / ".agents" / "skills" / "example" / "SKILL.md").write_text(
+            (root / ".codex" / "personal" / "skills" / "example" / "SKILL.md").write_text(
                 "---\nname: example\n---\n# Example\n",
                 encoding="utf-8",
             )
-            (root / ".agents" / "skills" / "extra" / "SKILL.md").write_text(
+            (root / ".codex" / "personal" / "skills" / "extra" / "SKILL.md").write_text(
                 "---\nname: extra\n---\n# Extra\n",
                 encoding="utf-8",
             )
 
             with (
                 patch.object(runtime_alignment, "ROOT", root),
-                patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".agents" / "skills"),
+                patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".codex" / "personal" / "skills"),
                 self.assertRaisesRegex(RuntimeError, "missing catalog entries: extra"),
             ):
                 runtime_alignment.validate_public_skill_shims()
@@ -884,8 +884,8 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             root = Path(tmp_dir)
             (root / "agents" / "skills").mkdir(parents=True)
             (root / "agents" / "internal-routines").mkdir(parents=True)
-            (root / ".agents" / "skills" / "example").mkdir(parents=True)
-            (root / ".agents" / "skills" / "_internal-example").mkdir(parents=True)
+            (root / ".codex" / "personal" / "skills" / "example").mkdir(parents=True)
+            (root / ".codex" / "personal" / "skills" / "_internal-example").mkdir(parents=True)
             (root / "agents" / "skills" / "README.md").write_text("# Skills\n", encoding="utf-8")
             (root / "agents" / "skills" / "catalog.yaml").write_text(
                 "\n".join(
@@ -895,7 +895,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                         "  - id: example",
                         "    purpose: Example public skill.",
                         "    canonical_doc: agents/skills/example.md",
-                        "    shim: .agents/skills/example/SKILL.md",
+                        "    shim: .codex/personal/skills/example/SKILL.md",
                     ]
                 ),
                 encoding="utf-8",
@@ -906,11 +906,11 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 "# Internal\n",
                 encoding="utf-8",
             )
-            (root / ".agents" / "skills" / "example" / "SKILL.md").write_text(
+            (root / ".codex" / "personal" / "skills" / "example" / "SKILL.md").write_text(
                 "---\nname: example\ndescription: Public skill.\n---\n# Example\n",
                 encoding="utf-8",
             )
-            (root / ".agents" / "skills" / "_internal-example" / "SKILL.md").write_text(
+            (root / ".codex" / "personal" / "skills" / "_internal-example" / "SKILL.md").write_text(
                 "---\nname: _internal-example\ndescription: Private skill.\n---\n# Internal\n",
                 encoding="utf-8",
             )
@@ -918,10 +918,10 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
             with (
                 patch.object(runtime_alignment, "ROOT", root),
-                patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".agents" / "skills"),
+                patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".codex" / "personal" / "skills"),
             ):
                 runtime_alignment.validate_public_skill_shims()
-            self.assertTrue((root / ".agents" / "skills" / "_internal-example" / "SKILL.md").is_file())
+            self.assertTrue((root / ".codex" / "personal" / "skills" / "_internal-example" / "SKILL.md").is_file())
 
     def test_public_skill_catalog_rejects_private_skill_id(self) -> None:
         """The public catalog is the user-facing skill surface."""
@@ -929,7 +929,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             root = Path(tmp_dir)
             (root / "agents" / "skills").mkdir(parents=True)
             (root / "agents" / "internal-routines").mkdir(parents=True)
-            (root / ".agents" / "skills" / "_private-example").mkdir(parents=True)
+            (root / ".codex" / "personal" / "skills" / "_private-example").mkdir(parents=True)
             (root / "agents" / "skills" / "README.md").write_text("# Skills\n", encoding="utf-8")
             (root / "agents" / "skills" / "catalog.yaml").write_text(
                 "\n".join(
@@ -939,7 +939,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                         "  - id: _private-example",
                         "    purpose: Private skill.",
                         "    canonical_doc: agents/skills/_private-example.md",
-                        "    shim: .agents/skills/_private-example/SKILL.md",
+                        "    shim: .codex/personal/skills/_private-example/SKILL.md",
                     ]
                 ),
                 encoding="utf-8",
@@ -952,14 +952,14 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 "# Internal\n",
                 encoding="utf-8",
             )
-            (root / ".agents" / "skills" / "_private-example" / "SKILL.md").write_text(
+            (root / ".codex" / "personal" / "skills" / "_private-example" / "SKILL.md").write_text(
                 "---\nname: _private-example\ndescription: Private skill.\n---\n# Private\n",
                 encoding="utf-8",
             )
 
             with (
                 patch.object(runtime_alignment, "ROOT", root),
-                patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".agents" / "skills"),
+                patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".codex" / "personal" / "skills"),
                 self.assertRaisesRegex(RuntimeError, "blocked-by=catalog-gate"),
             ):
                 runtime_alignment.validate_public_skill_shims()
@@ -997,7 +997,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 {
                     "id": "skill-creator",
                     "canonical_doc": "agents/skills/skill-creator.md",
-                    "shim": ".agents/skills/skill-creator/SKILL.md",
+                    "shim": ".codex/personal/skills/skill-creator/SKILL.md",
                 }
             ]
         }
@@ -1025,7 +1025,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_official_skill_delegation_docs(root)
-            shim = root / ".agents" / "skills" / "openai-docs" / "SKILL.md"
+            shim = root / ".codex" / "personal" / "skills" / "openai-docs" / "SKILL.md"
             shim.parent.mkdir(parents=True)
             shim.write_text("---\nname: openai-docs\n---\n# OpenAI Docs\n", encoding="utf-8")
 

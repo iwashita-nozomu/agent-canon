@@ -115,7 +115,7 @@ def _expected_skill_id_from_targets(targets: Sequence[str], packet_id: str) -> s
     for target in targets:
         if target.startswith("agents/skills/") and target.endswith(".md"):
             values.append(Path(target).stem)
-        elif target.startswith(".agents/skills/") and target.endswith("/SKILL.md"):
+        elif target.startswith(".codex/personal/skills/") and target.endswith("/SKILL.md"):
             values.append(Path(target).parent.name)
     if not values:
         raise ProducerError(f"packet_target_skill_id:{packet_id}")

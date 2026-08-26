@@ -11,6 +11,8 @@
 !.codex/agents/
 !.codex/agents/**
 !.codex/config.toml
+.codex/personal/
+.codex/personal/**
 !bootstrap/
 !bootstrap/container/
 !bootstrap/container/**

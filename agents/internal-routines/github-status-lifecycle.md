@@ -8,7 +8,7 @@ upstream design ../../documents/conventions/software-engineering-principles.md s
 upstream design ../../documents/operations/issue-label-taxonomy.toml machine-readable repository label mapping
 upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue packet convention
 downstream design ../skills/pr-processing.md invokes this routine inside the GitHub publication boundary
-downstream implementation ../../.agents/skills/_github-status-lifecycle/SKILL.md exposes this routine as a private runtime skill
+downstream implementation ../../.codex/personal/skills/_github-status-lifecycle/SKILL.md exposes this routine as a private runtime skill
 downstream implementation ../../tools/agent_tools/github_status_lifecycle.py projects the transport and reconciliation contract
 @dependency-end
 -->

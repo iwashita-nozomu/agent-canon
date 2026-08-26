@@ -22,10 +22,10 @@ import sys
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
-
-UTC = timezone.utc
 from pathlib import Path
 from typing import cast
+
+UTC = timezone.utc
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -519,9 +519,18 @@ class AgentImprovementGuide:
         configured = os.environ.get("AGENT_CANON_LOG_ROOT", "").strip()
         if not configured:
             return ()
-        pending = Path(configured).expanduser().resolve() / "feedback/issue-packets/pending"
+        try:
+            pending = (
+                Path(configured).expanduser().resolve()
+                / "feedback/issue-packets/pending"
+            )
+            paths = sorted(pending.glob("*.json")) if pending.is_dir() else ()
+        except OSError:
+            # The private log is optional evidence. Rootless bind mounts can
+            # expose its mode-0700 directory without granting the tool user a
+            # stat/read capability; that must not block guide generation.
+            return ()
         refs: set[str] = set()
-        paths = sorted(pending.glob("*.json")) if pending.is_dir() else ()
         for path in paths:
             try:
                 payload = json.loads(path.read_text(encoding="utf-8"))
@@ -554,8 +563,12 @@ class AgentImprovementGuide:
         configured = os.environ.get("AGENT_CANON_LOG_ROOT", "").strip()
         if not configured:
             return {"agent-canon-log/knowledge": 0}
-        topics = Path(configured).expanduser().resolve() / "knowledge" / "topics"
-        return {"agent-canon-log/knowledge": len(tuple(topics.glob("*/candidate.md")))}
+        try:
+            topics = Path(configured).expanduser().resolve() / "knowledge" / "topics"
+            count = len(tuple(topics.glob("*/candidate.md"))) if topics.is_dir() else 0
+        except OSError:
+            count = 0
+        return {"agent-canon-log/knowledge": count}
 
     def skill_eval_failed(self, path: Path) -> bool:
         """Return whether one accumulated skill eval report is failing."""
@@ -701,6 +714,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="reports/agent-improvement-guide/agent-improvement-guide.md",
         help="Markdown output path.",
     )
+    parser.add_argument(
+        "--output-mode",
+        default="600",
+        choices=("600", "644"),
+        help="Output permission mode; CI guide artifacts use 644 for host readback.",
+    )
     return parser
 
 
@@ -711,20 +730,29 @@ def resolve_agentcanon_root(root: Path) -> Path:
 
 def is_agentcanon_root(root: Path) -> bool:
     """Return whether a path looks like the AgentCanon evidence root."""
-    return (
-        (root / "agents" / "evals" / "README.md").is_file()
-        or (root / ".agents" / "skills").is_dir()
-        or (root / "tools" / "agent_tools" / "generate_agent_improvement_guide.py").is_file()
-        or (root / "agents" / "evals" / "results").is_dir()
-        or (root / ".agents" / "skills").is_dir()
-    )
+    try:
+        return (
+            (root / "agents" / "evals" / "README.md").is_file()
+            or (root / ".codex" / "personal" / "skills").is_dir()
+            or (root / "tools" / "agent_tools" / "generate_agent_improvement_guide.py").is_file()
+            or (root / "agents" / "evals" / "results").is_dir()
+        )
+    except OSError:
+        return False
 
 
 def known_skill_ids(root: Path) -> frozenset[str]:
     """Return AgentCanon-owned skill ids from shim and human docs."""
     skills: set[str] = set()
-    for path in (root / ".agents" / "skills").glob("*/SKILL.md"):
-        skills.add(path.parent.name)
+    try:
+        shim_paths = (root / ".codex" / "personal" / "skills").glob("*/SKILL.md")
+        for path in shim_paths:
+            skills.add(path.parent.name)
+    except OSError:
+        # The generated view can be a mode-0700 host bind mount under a
+        # rootless tool container. Canonical human skill docs are sufficient
+        # for source classification when that optional view is unreadable.
+        pass
     for path in (root / "agents" / "skills").glob("*.md"):
         if path.name != "README.md":
             skills.add(path.stem)
@@ -789,7 +817,7 @@ def skill_source_path_candidates(skill: str) -> tuple[Path, ...]:
     """Return likely source paths that define one skill id."""
     slug = skill.removeprefix("$")
     return (
-        Path(".agents") / "skills" / slug / "SKILL.md",
+        Path(".codex") / "personal" / "skills" / slug / "SKILL.md",
         Path("agents") / "skills" / f"{slug}.md",
     )
 
@@ -932,7 +960,11 @@ def main() -> int:
     output = Path(args.out)
     boundary = runtime_artifact_boundary(root, args.runtime_root)
     guide = AgentImprovementGuide(root, boundary.root)
-    output = boundary.atomic_write_text(output, guide.render(guide.collect()))
+    output = boundary.atomic_write_text(
+        output,
+        guide.render(guide.collect()),
+        mode=int(args.output_mode, 8),
+    )
     print(f"AGENT_IMPROVEMENT_GUIDE={output}")
     return 0
 

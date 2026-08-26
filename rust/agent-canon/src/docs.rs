@@ -24,7 +24,7 @@ const DEFAULT_DOC_TARGETS: &[&str] = &[
     "documents",
     "scripts",
     ".github",
-    ".agents/skills",
+    ".codex/personal/skills",
     ".codex/README.md",
 ];
 

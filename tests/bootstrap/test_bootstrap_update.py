@@ -221,8 +221,29 @@ def test_update_then_codex_prepare_reads_current_tracked_adapters(tmp_path: Path
         assert Path(entry["target"]).resolve() == Path(entry["source"]).resolve()
     skill_links = [entry for entry in result["details"]["links"] if entry["surface"] == "skills"]
     assert skill_links
-    assert all("/.agents/skills/" in entry["source"] for entry in skill_links)
+    assert all("/.codex/personal/skills/" in entry["source"] for entry in skill_links)
     assert all(Path(entry["target"]).is_symlink() for entry in skill_links)
+
+
+def test_non_owned_image_update_materializes_absent_personal_skill_view(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The no-build update path materializes the skill view before linking it."""
+    manager, _docker = _runtime(tmp_path)
+    monkeypatch.setenv("HOME", str(manager.paths.control_parent_root))
+    manager.install()
+    skill_path = ROOT / ".codex" / "personal" / "skills" / "agent-orchestration" / "SKILL.md"
+    original = skill_path.read_bytes()
+    skill_path.unlink()
+    state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    state["resources"]["image"]["owned"] = False
+    manager.paths.state.write_text(json.dumps(state), encoding="utf-8")
+    try:
+        result = manager.update()
+        assert result["code"] == "up_to_date"
+        assert skill_path.read_bytes() == original
+    finally:
+        skill_path.write_bytes(original)
 
 
 def test_install_update_owns_control_root_agents_link_and_uninstall_removes_exact_link(
@@ -235,7 +256,7 @@ def test_install_update_owns_control_root_agents_link_and_uninstall_removes_exac
     assert managed.is_dir() and not managed.is_symlink()
     assert (managed / "skills" / "agent-orchestration").is_symlink()
     assert (managed / "skills" / "agent-orchestration").resolve() == (
-        ROOT / ".agents" / "skills" / "agent-orchestration"
+        ROOT / ".codex" / "personal" / "skills" / "agent-orchestration"
     ).resolve()
     assert manager.update()["code"] == "updated"
     assert manager.status()["details"]["managed_agents_link"]["split"] is True
@@ -285,7 +306,7 @@ def test_legacy_root_agents_symlink_is_migrated_to_split_links(
     assert legacy.is_dir() and not legacy.is_symlink()
     assert (legacy / "skills" / "agent-orchestration").is_symlink()
     assert (legacy / "skills" / "agent-orchestration").resolve() == (
-        ROOT / ".agents" / "skills" / "agent-orchestration"
+        ROOT / ".codex" / "personal" / "skills" / "agent-orchestration"
     ).resolve()
 
     manager.uninstall()

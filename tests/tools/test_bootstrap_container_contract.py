@@ -72,7 +72,9 @@ def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     assert "--manifest /opt/agent-canon/bootstrap/container/dependencies.toml" in text
     assert "COPY bootstrap/container/dependencies.toml" in text
     assert "COPY tools /usr/local/share/agent-canon/runtime/tools" in text
-    assert "COPY .agents /usr/local/share/agent-canon/runtime/.agents" in text
+    assert "skill_shim_materializer.py" in text
+    assert "materialize --root /usr/local/share/agent-canon/runtime --all --image-build" in text
+    assert "COPY .codex/personal/skills" not in text
     assert "COPY .codex/agents /usr/local/share/agent-canon/runtime/.codex/agents" in text
     assert "COPY evidence/agent-evals /usr/local/share/agent-canon/runtime/evidence/agent-evals" in text
     assert "COPY AGENTS.md ROOT_AGENTS.md /usr/local/share/agent-canon/runtime/" in text
@@ -275,7 +277,6 @@ def test_repository_root_dockerignore_exposes_every_copy_source() -> None:
     assert "**" in lines
     for source in (
         "!bootstrap/container/**",
-        "!.agents/**",
         "!.codex/agents/**",
         "!evidence/agent-evals/**",
         "!references/**",
@@ -285,4 +286,5 @@ def test_repository_root_dockerignore_exposes_every_copy_source() -> None:
         "!rust/agent-canon/**",
     ):
         assert source in lines
+    assert ".codex/personal/**" in lines
     assert not any(line.startswith("!.devcontainer") for line in lines)

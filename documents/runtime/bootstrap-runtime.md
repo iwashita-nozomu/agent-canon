@@ -109,7 +109,7 @@ without systemd user support, macOS, and native Windows remain one-shot-only;
 no daemon, webhook listener, cron route, or `loginctl enable-linger` is added.
 `install` and `update` converge the explicit control-root Codex views into split
 per-entry links. With `$HOME` as control root, these are
-`~/.agents/skills/<skill>` to the tracked source skill, `~/.codex/agents/<role>.toml`
+`~/.agents/skills/<skill>` to the ignored source view, `~/.codex/agents/<role>.toml`
 to the tracked role file, and `~/.codex/config.toml` to the ignored personal
 source under the AgentCanon checkout. An existing regular Codex config is moved
 byte-for-byte (including mode) before linking; update preserves it and uninstall

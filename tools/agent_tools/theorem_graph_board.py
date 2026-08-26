@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Builds board-level route summaries for formal-proof theorem graphs.
-# upstream design ../../.agents/skills/formal-proof-workflow/SKILL.md requires problem-level board passes.
-# upstream design ../../.agents/skills/algorithm-proof-exploration/SKILL.md requires route-row batch selection.
+# upstream design ../../.codex/personal/skills/formal-proof-workflow/SKILL.md requires problem-level board passes.
+# upstream design ../../.codex/personal/skills/algorithm-proof-exploration/SKILL.md requires route-row batch selection.
 # upstream implementation theorem_graph_circularity_check.py validates circularity and forbidden reachability.
 # @dependency-end
 

@@ -30,10 +30,10 @@ import yaml
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MANIFEST = Path("vendor/skills/manifest.toml")
-SKILL_ROOT = Path(".agents/skills")
+SKILL_ROOT = Path(".codex/personal/skills")
 VENDOR_SKILL_ROOT = Path("vendor/skills")
 PROMPT_EVAL_MANIFEST = Path("evidence/agent-evals/skill_workflow_prompt_eval.toml")
-RUNTIME_SKILL_TARGET_GLOB = ".agents/skills/*/SKILL.md"
+RUNTIME_SKILL_TARGET_GLOB = ".codex/personal/skills/*/SKILL.md"
 FRONTMATTER_SCAN_LINES = 24
 SKILL_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 PROVIDER_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$")
@@ -324,7 +324,7 @@ def parse_entry(root: Path, raw_entry: object, index: int) -> tuple[VendorSkill 
     adapter_value = mapping.get("adapter")
     adapter_text = str(adapter_value).strip() if isinstance(adapter_value, str) else ""
     if not adapter_text and skill_id:
-        adapter_text = f".agents/skills/{skill_id}"
+        adapter_text = f".codex/personal/skills/{skill_id}"
 
     if skill_id and not SKILL_ID_RE.fullmatch(skill_id):
         findings.append(Finding("manifest", f"skills[{index}].id", "invalid-skill-id"))

@@ -11,7 +11,7 @@ upstream design ../workflows/agent-canon-pr-workflow.md AgentCanon source PR wor
 upstream design ../../documents/agent-canon/agent-canon-update-route.md source PR versus parent pin route
 upstream design ../internal-routines/github-status-lifecycle.md deterministic GitHub Issue status-label reconciliation and evidence contract
 upstream implementation ../../tools/agent_tools/github_publish.py publishes PRs and writes summary artifacts
-downstream implementation ../../.agents/skills/pr-processing/SKILL.md exposes this workflow as a runtime skill
+downstream implementation ../../.codex/personal/skills/pr-processing/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
 

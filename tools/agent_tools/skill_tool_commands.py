@@ -8,7 +8,7 @@
 # upstream design ../../agents/skills/catalog.yaml public skill related-skill metadata
 # upstream implementation ../../tools/agent_tools/route.py parses and validates the public skill catalog
 # upstream implementation ../../tools/agent_tools/agent_canon_source_root.py resolves the selected source checkout
-# downstream implementation ../../.agents/skills/agent-orchestration/SKILL.md materialized runtime skill command entry example
+# downstream implementation ../../.codex/personal/skills/agent-orchestration/SKILL.md materialized runtime skill command entry example
 # downstream implementation ../../tools/agent_tools/check_convention_compliance.py verifies command section wiring
 # downstream implementation ../../tests/agent_tools/test_skill_tool_commands.py tests command extraction and read-only checks
 # @dependency-end
@@ -36,7 +36,7 @@ from route import (
 )
 
 DEFAULT_ROOT = Path.cwd()
-RUNTIME_SKILL_ROOT = Path(".agents/skills")
+RUNTIME_SKILL_ROOT = Path(".codex/personal/skills")
 HUMAN_SKILL_ROOT = Path("agents/skills")
 SECTION_HEADING = "## Tool Commands"
 SECTION_START = "<!-- skill-tool-commands:start -->"

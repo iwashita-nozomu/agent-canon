@@ -245,7 +245,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
                 str(PROJECT_ROOT),
                 "--format",
                 "json",
-                ".agents/skills/subagent-bootstrap/SKILL.md",
+                ".codex/personal/skills/subagent-bootstrap/SKILL.md",
             ],
             check=True,
             capture_output=True,

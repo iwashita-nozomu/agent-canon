@@ -40,5 +40,5 @@ Codex の入口、読順、skill path、subagent path を固定します。
 ## Runtime Paths
 
 - shared canon: `agents/`
-- auto-discovery skill path: `.agents/skills/`
+- auto-discovery skill path: `.codex/personal/skills/`
 - Codex runtime config: `.codex/`

@@ -33,7 +33,7 @@ EXECUTABLE_SCAN_PATHS = (
     "tools/agent_tools/check_convention_compliance.py", "tools/agent_tools/convention_compliance_contracts.toml",
     "tools/agent_tools/generate_agent_runtime_dashboard.py", "tools/agent_tools/skill_lane_detector.py",
     "tools/agent_tools/report_artifact_checks.py", "tools/agent_tools/workflow_monitor.py",
-    "agents/skills/worktree-health.md", ".agents/skills/worktree-health/SKILL.md",
+    "agents/skills/worktree-health.md", ".codex/personal/skills/worktree-health/SKILL.md",
     "documents/experiments/gpu-admission-r5-source-packet.md", "AGENTS.md", "ROOT_AGENTS.md", "README.md",
     "documents/runtime/runtime-log-archive.md", "tools/README.md", "tools/experiments/execution_resource_plan.py",
     "tools/validation/notebook_quality.py",

@@ -9,7 +9,7 @@ upstream design ./structure-refactor.md structure-first ownership repair
 upstream design ./refactor-loop.md behavior-preserving refactor route
 upstream design ./agent-orchestration.md dispatch and review routing owner
 upstream design ./task-routing.md compact route selection owner
-downstream implementation ../../.agents/skills/responsibility-cleanup/SKILL.md runtime discovery shim
+downstream implementation ../../.codex/personal/skills/responsibility-cleanup/SKILL.md runtime discovery shim
 downstream implementation ./catalog.yaml public skill registry
 downstream implementation ./skill-dependencies.yaml public skill dependency DAG
 downstream implementation ../../.codex/config.toml host skill configuration

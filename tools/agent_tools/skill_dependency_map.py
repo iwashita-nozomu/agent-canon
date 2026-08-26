@@ -34,7 +34,13 @@ from pathlib import Path
 from pathlib import PurePosixPath
 from typing import Any, cast
 
-import yaml
+try:
+    import yaml
+except ModuleNotFoundError:  # clean host before the shared tool image exists
+    try:
+        from . import stdlib_yaml as yaml
+    except ImportError:
+        import stdlib_yaml as yaml  # type: ignore[no-redef]
 from agent_canon_source_root import resolve_agent_canon_source_root
 from skill_route_catalog import (
     SKILL_DEPENDENCY_MAP_PATH,
@@ -801,7 +807,7 @@ def build_graph(root: Path) -> dict[str, object]:
                 "id": skill,
                 "catalog_locator": f"agents/skills/catalog.yaml#skill:{skill}",
                 "canonical_doc": f"agents/skills/{skill}.md",
-                "shim": f".agents/skills/{skill}/SKILL.md",
+                "shim": f".codex/personal/skills/{skill}/SKILL.md",
                 "command_ids": command_ids,
                 "capability_ids": capability_ids,
                 "phase_ids": phase_ids,

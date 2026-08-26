@@ -2029,7 +2029,7 @@ entries:
       - documents/tools/README.md
       - agents/COMMUNICATION_PROTOCOL.md
       - agents/skills/codex-task-workflow.md
-      - .agents/skills/codex-task-workflow/SKILL.md
+      - .codex/personal/skills/codex-task-workflow/SKILL.md
     tests:
       - tests/agent_tools/test_tool_rejection_preflight.py
 

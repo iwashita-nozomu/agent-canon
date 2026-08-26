@@ -3,7 +3,7 @@
 # responsibility Defines deterministic evals for skill and workflow prompt drift.
 # upstream design README.md prompt eval directory contract
 # upstream design ../../agents/skills/md-style-check.md Markdown style skill human document contract
-# upstream design ../../.agents/skills/md-style-check/SKILL.md md-style-check skill shim contract
+# upstream design ../../.codex/personal/skills/md-style-check/SKILL.md md-style-check skill shim contract
 # upstream design ../../agents/skills/adaptive-improvement-loop.md adaptive improvement skill contract
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX routing contract
 # upstream design ../../agents/skills/structure-planning.md reusable structure planning skill contract
@@ -18,7 +18,7 @@ version = 1
 
 [[evals]]
 id = "all-discoverable-skill-shims"
-target_glob = ".agents/skills/*/SKILL.md"
+target_glob = ".codex/personal/skills/*/SKILL.md"
 kind = "skill"
 description = "Every discoverable Codex skill shim must be loadable and dependency-linked."
 
@@ -60,7 +60,7 @@ required_regex = ["(?m)^#\\s+"]
 
 [[evals]]
 id = "oop-type-design-runtime-contract"
-target = ".agents/skills/oop-type-design/SKILL.md"
+target = ".codex/personal/skills/oop-type-design/SKILL.md"
 canonical_target = "agents/skills/oop-type-design.md"
 kind = "skill"
 description = "The runtime shim exposes the pre-implementation OOP/type-design contract and forbids post-hoc/static duplication."
@@ -141,7 +141,7 @@ required_regex = ["(?m)^#\\s+"]
 
 [[evals]]
 id = "tool-finding-report-skill"
-target = ".agents/skills/tool-finding-report/SKILL.md"
+target = ".codex/personal/skills/tool-finding-report/SKILL.md"
 canonical_target = "agents/skills/tool-finding-report.md"
 kind = "skill"
 description = "Tool finding reports must preserve raw and structured artifacts, route narrative reports separately, and feed prompt repair decisions into implementation loops."
@@ -178,7 +178,7 @@ required_regex = ["full repository", "scope_exception", "requested_scope", "omit
 
 [[evals]]
 id = "md-style-check-unified-rust-docs"
-target = ".agents/skills/md-style-check/SKILL.md"
+target = ".codex/personal/skills/md-style-check/SKILL.md"
 canonical_target = "agents/skills/md-style-check.md"
 kind = "skill"
 description = "Markdown style skill shim must route formatter-adjacent work through the unified Rust docs tool."
@@ -221,7 +221,7 @@ required_regex = ["\\$prose-reasoning-graph", "\\$structure-planning", "section 
 
 [[evals]]
 id = "subagent-bootstrap-tool-first-gate"
-target = ".agents/skills/subagent-bootstrap/SKILL.md"
+target = ".codex/personal/skills/subagent-bootstrap/SKILL.md"
 canonical_target = "agents/skills/subagent-bootstrap.md"
 kind = "skill"
 description = "Subagent bootstrap must not spend subagent tokens on deterministic checks already owned by tools."
@@ -335,7 +335,7 @@ required_regex = ["reproduction", "reachability evidence", "null-hypothesis"]
 
 [[evals]]
 id = "code-visualization-skill"
-target = ".agents/skills/code-visualization/SKILL.md"
+target = ".codex/personal/skills/code-visualization/SKILL.md"
 canonical_target = "agents/skills/code-visualization.md"
 kind = "skill"
 description = "Code visualization must select diagram kind, source evidence, owner skill or tool, and renderer before drawing."
@@ -415,7 +415,7 @@ required_regex = ["Document Embedded Diagrams", "visual_plan", "section claim", 
 
 [[evals]]
 id = "literature-survey-source-record-shim"
-target = ".agents/skills/literature-survey/SKILL.md"
+target = ".codex/personal/skills/literature-survey/SKILL.md"
 canonical_target = "agents/skills/literature-survey.md"
 kind = "skill"
 description = "Literature survey runtime skill must inspect existing references before external lookup and leave durable source records."
@@ -458,7 +458,7 @@ required_regex = ["Existing Reference Sweep", "Adopted Source Claims", "Excluded
 
 [[evals]]
 id = "formal-proof-workflow-shim"
-target = ".agents/skills/formal-proof-workflow/SKILL.md"
+target = ".codex/personal/skills/formal-proof-workflow/SKILL.md"
 canonical_target = "agents/skills/formal-proof-workflow.md"
 kind = "skill"
 description = "Formal proof runtime skill must route natural-language claims through scaffold, existing-proof search, literature survey, and checker-gated proof status."
@@ -507,7 +507,7 @@ required_regex = ["proof_status=unverified", "checker log", "placeholder"]
 
 [[evals]]
 id = "academic-writing-tex-routing-shim"
-target = ".agents/skills/academic-writing/SKILL.md"
+target = ".codex/personal/skills/academic-writing/SKILL.md"
 canonical_target = "agents/skills/academic-writing.md"
 kind = "skill"
 description = "Academic Writing runtime skill must be the default TeX route for academic documents and figures."
@@ -652,7 +652,7 @@ required_regex = ["URL / DOI", "access date", "browser tab", "download cache"]
 
 [[evals]]
 id = "test-design-numerical-admission-gate-shim"
-target = ".agents/skills/test-design/SKILL.md"
+target = ".codex/personal/skills/test-design/SKILL.md"
 canonical_target = "agents/skills/test-design.md"
 kind = "skill"
 description = "The discoverable test-design skill must gate numerical, randomized, tolerance, solver, convergence, residual, benchmark, and experiment-style tests before proposing them."
@@ -665,7 +665,7 @@ required_regex = ["Numerical Test Admission Gate", "numerical trigger", "non-num
 
 [[evals]]
 id = "test-design-validation-failure-response-shim"
-target_glob = ".agents/skills/test-design/SKILL.md"
+target_glob = ".codex/personal/skills/test-design/SKILL.md"
 expected_count = 1
 canonical_target = "agents/skills/test-design.md"
 kind = "skill"
@@ -717,7 +717,7 @@ required_regex = ["数値テスト採用ゲート", "Numerical Trigger", "Non-Nu
 
 [[evals]]
 id = "computational-optimization-shim"
-target = ".agents/skills/computational-optimization/SKILL.md"
+target = ".codex/personal/skills/computational-optimization/SKILL.md"
 canonical_target = "agents/skills/computational-optimization.md"
 kind = "skill"
 description = "Computational optimization skill must fix numerical contracts and route validation before code or experiment changes."
@@ -760,7 +760,7 @@ required_regex = ["first bad iteration", "converged=false", "KKT", "precondition
 
 [[evals]]
 id = "document-writing-structure-planning"
-target = ".agents/skills/long-form-writing/SKILL.md"
+target = ".codex/personal/skills/long-form-writing/SKILL.md"
 canonical_target = "agents/skills/long-form-writing.md"
 kind = "skill"
 description = "Long-form writing skill must use structure-planning for nontrivial document structure."
@@ -797,7 +797,7 @@ required_regex = ["positive prose contracts", "Boundary, Limitation, or Non-Goal
 
 [[evals]]
 id = "prose-reasoning-graph-selected-ordering-shim"
-target = ".agents/skills/prose-reasoning-graph/SKILL.md"
+target = ".codex/personal/skills/prose-reasoning-graph/SKILL.md"
 canonical_target = "agents/skills/prose-reasoning-graph.md"
 kind = "skill"
 description = "Runtime prose graph skill must hand whole-document selected ordering to writing adapters."
@@ -822,7 +822,7 @@ required_regex = ["selected_ordering\\.ordered_anchors", "whole-document sentenc
 
 [[evals]]
 id = "paper-writing-structure-planning"
-target = ".agents/skills/paper-writing/SKILL.md"
+target = ".codex/personal/skills/paper-writing/SKILL.md"
 canonical_target = "agents/skills/paper-writing.md"
 kind = "skill"
 description = "Paper writing skill must use structure-planning for nontrivial paper section and evidence layout."
@@ -853,7 +853,7 @@ required_regex = ["positive prose contracts", "Boundary, Limitation, or Non-Goal
 
 [[evals]]
 id = "refactor-loop-structure-planning"
-target = ".agents/skills/refactor-loop/SKILL.md"
+target = ".codex/personal/skills/refactor-loop/SKILL.md"
 canonical_target = "agents/skills/refactor-loop.md"
 kind = "skill"
 description = "Refactor loop skill must use structure-planning for nontrivial refactor structure."
@@ -1023,7 +1023,7 @@ required_regex = ["Common Evidence Packet", "Subagent handoffs", "run bundle pat
 
 [[evals]]
 id = "agent-orchestration-skill-call-routing"
-target = ".agents/skills/agent-orchestration/SKILL.md"
+target = ".codex/personal/skills/agent-orchestration/SKILL.md"
 canonical_target = "agents/skills/agent-orchestration.md"
 kind = "skill"
 description = "The discoverable orchestration shim points to the sole policy owner and consumes machine ToolCall tokens."
@@ -1067,7 +1067,7 @@ required_regex = ["Merely naming a delegated path", "docs_first_status=unresolve
 
 [[evals]]
 id = "codex-task-workflow-convention-gate"
-target = ".agents/skills/codex-task-workflow/SKILL.md"
+target = ".codex/personal/skills/codex-task-workflow/SKILL.md"
 canonical_target = "agents/skills/codex-task-workflow.md"
 kind = "skill"
 description = "The discoverable Codex task workflow skill must call convention compliance before closeout."
@@ -1104,7 +1104,7 @@ required_regex = ["Owner-First Readback", "agent-orchestration\\.md#Owner-First-
 
 [[evals]]
 id = "adaptive-improvement-loop-skill-shim"
-target = ".agents/skills/adaptive-improvement-loop/SKILL.md"
+target = ".codex/personal/skills/adaptive-improvement-loop/SKILL.md"
 canonical_target = "agents/skills/adaptive-improvement-loop.md"
 kind = "skill"
 description = "The discoverable Codex skill must route durable iterative state through run-bundle evidence and prompt evals."
@@ -1352,7 +1352,7 @@ required_regex = [
 
 [[evals]]
 id = "change-review-cause-investigation"
-target = ".agents/skills/change-review/SKILL.md"
+target = ".codex/personal/skills/change-review/SKILL.md"
 canonical_target = "agents/skills/change-review.md"
 kind = "skill"
 description = "Change review investigates cause and reachability when causality is unresolved before proposing action."
@@ -1413,7 +1413,7 @@ required_regex = [
 
 [[evals]]
 id = "dependency-analysis-code-improvement-skill"
-target = ".agents/skills/dependency-analysis/SKILL.md"
+target = ".codex/personal/skills/dependency-analysis/SKILL.md"
 canonical_target = "agents/skills/dependency-analysis.md"
 kind = "skill"
 description = "Dependency analysis routes ambiguous fix-surface selection through hypothesis validation."
@@ -1662,7 +1662,7 @@ required_regex = ["typed_boundary_evidence", "signal class outcome", "human revi
 
 [[evals]]
 id = "oop-readability-skill-artifact"
-target = ".agents/skills/oop-readability-check/SKILL.md"
+target = ".codex/personal/skills/oop-readability-check/SKILL.md"
 canonical_target = "agents/skills/oop-readability-check.md"
 kind = "skill"
 description = "The OOP readability runtime skill must create Markdown report artifacts by default."
@@ -1813,7 +1813,7 @@ required_regex = ["runtime_feedback_prompt_update_recorded", "runtime_feedback=o
 
 [[evals]]
 id = "agent-learning-skill-shim-behavior-eval"
-target = ".agents/skills/agent-learning/SKILL.md"
+target = ".codex/personal/skills/agent-learning/SKILL.md"
 canonical_target = "agents/skills/agent-learning.md"
 kind = "skill"
 description = "The discoverable agent-learning skill must route behavior monitoring and behavior eval."
@@ -1940,7 +1940,7 @@ required_regex = ["generate_agent_improvement_guide\\.py", "mounted runtime hook
 
 [[evals]]
 id = "agent-log-analysis-canonical-dashboard-api-skill"
-target = ".agents/skills/agent-log-analysis/SKILL.md"
+target = ".codex/personal/skills/agent-log-analysis/SKILL.md"
 canonical_target = "agents/skills/agent-log-analysis.md"
 kind = "skill"
 description = "The runtime agent-log-analysis skill must call the AgentCanon source dashboard API before reading evidence."
@@ -2001,7 +2001,7 @@ required_regex = ["eval_accumulation_check\\.py", "\\$agent-eval-accumulation", 
 
 [[evals]]
 id = "runtime-log-repair-skill"
-target = ".agents/skills/runtime-log-repair/SKILL.md"
+target = ".codex/personal/skills/runtime-log-repair/SKILL.md"
 canonical_target = "agents/skills/runtime-log-repair.md"
 kind = "skill"
 description = "Runtime log repair must turn dashboard evidence into owner-routed repair packets without taking over raw analysis or owner internals."
@@ -2038,7 +2038,7 @@ required_regex = ["Raw log compaction", "dashboard API schema", "agent-eval-accu
 
 [[evals]]
 id = "agent-eval-accumulation-skill"
-target = ".agents/skills/agent-eval-accumulation/SKILL.md"
+target = ".codex/personal/skills/agent-eval-accumulation/SKILL.md"
 canonical_target = "agents/skills/agent-eval-accumulation.md"
 kind = "skill"
 description = "Accumulated eval repair must use registered producers, compact checker output, and archive sync instead of hand-generated reports."
@@ -2081,7 +2081,7 @@ required_regex = ["append-only", "runtime_log_archive_git\\.py", "\\$report-writ
 
 [[evals]]
 id = "agent-canon-update-routing"
-target = ".agents/skills/agent-canon-update/SKILL.md"
+target = ".codex/personal/skills/agent-canon-update/SKILL.md"
 canonical_target = "agents/skills/agent-canon-update.md"
 kind = "skill"
 description = "The runtime AgentCanon update skill routes standalone source work through the shared bootstrap and qualified PR lifecycle."
@@ -2222,7 +2222,7 @@ required_regex = ["changed subtree", "reverse edges", "owner boundary", "full-tr
 
 [[evals]]
 id = "report-writing-conditional-provenance-and-reader-guide"
-target = ".agents/skills/report-writing/SKILL.md"
+target = ".codex/personal/skills/report-writing/SKILL.md"
 canonical_target = "agents/skills/report-writing.md"
 description = "External provenance and evaluation reader guidance activate when those report claims are in scope."
 
@@ -2361,7 +2361,7 @@ required_regex = ["tool、checker、hook、static analysis", "tool-finding-repor
 
 [[evals]]
 id = "experiment-lifecycle-owner-contract"
-target = ".agents/skills/experiment-lifecycle/SKILL.md"
+target = ".codex/personal/skills/experiment-lifecycle/SKILL.md"
 canonical_target = "agents/skills/experiment-lifecycle.md"
 kind = "skill"
 description = "Experiment lifecycle is the sole run-state owner; artifact, report, HTML, and annex retention work remain explicit owners."
@@ -2398,7 +2398,7 @@ required_regex = ["discourse-relations", "experiment-report", "methods-protocol"
 
 [[evals]]
 id = "result-artifact-writeout-owner-contract"
-target = ".agents/skills/result-artifact-writeout/SKILL.md"
+target = ".codex/personal/skills/result-artifact-writeout/SKILL.md"
 canonical_target = "agents/skills/result-artifact-writeout.md"
 kind = "skill"
 description = "Result artifact writeout owns only concrete file identity, role, checksum, durable readback, and no-overwrite behavior."
@@ -2429,7 +2429,7 @@ required_regex = ["failed", "partial", "status", "exit code"]
 
 [[evals]]
 id = "html-output-owner-contract"
-target = ".agents/skills/html-output/SKILL.md"
+target = ".codex/personal/skills/html-output/SKILL.md"
 canonical_target = "agents/skills/html-output.md"
 kind = "skill"
 description = "HTML output owns artifact generation and validation; preview, serving, and publication are explicit delivery operations."

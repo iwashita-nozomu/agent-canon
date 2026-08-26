@@ -61,7 +61,7 @@ EXCLUDED_PARTS = {
     "reports",
 }
 SKILL_PATTERNS = (
-    ".agents/skills/*/SKILL.md",
+    ".codex/personal/skills/*/SKILL.md",
     "agents/skills/*.md",
 )
 HOOK_PATTERNS = (".codex/hooks/*.py", ".codex/hooks/*.sh")

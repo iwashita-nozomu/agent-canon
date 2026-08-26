@@ -27,13 +27,13 @@ AgentCanon pin. This internal `vendor/` directory is part of AgentCanon itself.
   `vendor/<asset-class>/<github-owner>/<import-id>/`. Do not clone or copy it
   directly into `.agents/`, `agents/`, `tools/`, `mcp/`, `documents/`, or a
   template parent repository root.
-- Runtime exposure goes through `.agents/skills/<skill>` adapter symlinks.
-- `.agents/skills/` remains the discovery surface; it is not the place to copy
+- Runtime exposure goes through `.codex/personal/skills/<skill>` adapter symlinks.
+- `.codex/personal/skills/` remains the discovery surface; it is not the place to copy
   third-party source by hand.
 - Every enabled third-party skill must be listed in
   `vendor/skills/manifest.toml` with provider, upstream URL, revision, and
   license metadata.
-- Canonical AgentCanon skills stay in `agents/skills/` and `.agents/skills/`.
+- Canonical AgentCanon skills stay in `agents/skills/` and `.codex/personal/skills/`.
   Third-party skills must not reuse a canonical skill id.
 
 ## Validation

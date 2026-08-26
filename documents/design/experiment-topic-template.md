@@ -131,7 +131,7 @@ creatorはregistry `defaults.topic_template_dir`またはcanonical defaultを解
 ## Skill route
 
 ```text
-.agents/skills/experiment-lifecycle/SKILL.md
+.codex/personal/skills/experiment-lifecycle/SKILL.md
   -> agents/skills/experiment-lifecycle.md#Topic Preparation
   -> python3 tools/experiments/create_experiment_topic.py <topic>
   -> tools/experiments/create_experiment_topic.py

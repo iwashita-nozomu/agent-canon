@@ -93,10 +93,14 @@ When the explicit control root is `$HOME`, `install` and `update` also converge
 these user-facing links:
 
 ```text
-~/.agents/skills/<skill>       -> ~/agent-canon/.agents/skills/<skill>
+~/.agents/skills/<skill>       -> ~/agent-canon/.codex/personal/skills/<skill>
 ~/.codex/agents/<role>.toml   -> ~/agent-canon/.codex/agents/<role>.toml
 ~/.codex/config.toml           -> ~/agent-canon/.codex/personal/config.toml
 ```
+
+Before building or linking, `install` and `update` materialize the catalog-owned
+skill adapters under the ignored `~/agent-canon/.codex/personal/skills/` view.
+Edit the canonical `agents/skills/<skill>.md` and catalog instead of this view.
 
 An existing regular `~/.codex/config.toml` is migrated byte-for-byte to the
 ignored personal source before the link is created. Update preserves it;

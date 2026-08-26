@@ -51,10 +51,15 @@ hook、設定リンクを作ります。これは global link とは別の実行
 control root に `$HOME` を明示した場合、install / update は次の分割リンクも管理します。
 
 ```text
-~/.agents/skills/<skill>       -> ~/agent-canon/.agents/skills/<skill>
+~/.agents/skills/<skill>       -> ~/agent-canon/.codex/personal/skills/<skill>
 ~/.codex/agents/<role>.toml   -> ~/agent-canon/.codex/agents/<role>.toml
 ~/.codex/config.toml           -> ~/agent-canon/.codex/personal/config.toml
 ```
+
+install / update は先に catalog から ignored な
+`~/agent-canon/.codex/personal/skills/<skill>/SKILL.md` view を生成し、その
+directory を `~/.agents/skills/<skill>` へ個別リンクします。この generated view と
+link は編集せず、変更は `agents/skills/<skill>.md` と catalog に加えます。
 
 既存の regular な `~/.codex/config.toml` は内容と mode を保持したまま ignored な
 personal source に移してからリンクします。update はその内容を保持し、uninstall は

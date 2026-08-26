@@ -13,10 +13,10 @@ downstream design chatgpt-codex-routing.md owns request modality before Codex wo
 
 This directory contains workflow-routed internal review and compatibility
 routines. These files are intentionally outside `agents/skills/` because they
-do not have public `.agents/skills/*/SKILL.md` discovery shims.
+do not have public `.codex/personal/skills/*/SKILL.md` discovery shims.
 
 Public skill instructions live in `agents/skills/`, are listed in
-`agents/skills/catalog.yaml`, and have matching `.agents/skills/<skill>/SKILL.md`
+`agents/skills/catalog.yaml`, and have matching `.codex/personal/skills/<skill>/SKILL.md`
 shims. Internal routines are called by workflow stages, subagent roles, public
 skills, or root entrypoints.
 
@@ -26,7 +26,7 @@ skills, or root entrypoints.
   - repository-changing implementation の前に owning design を read し、clause fingerprint、handoff、forward/reverse review coverage、design drift block を共通化します。
 
 Runtime-internal Codex skill shims, when a shim is needed for agent runtime
-activation, use `.agents/skills/_<name>/SKILL.md`. The leading underscore marks
+activation, use `.codex/personal/skills/_<name>/SKILL.md`. The leading underscore marks
 the shim as private; its human-facing owner remains the workflow, role, public
 skill, entrypoint, or routine that calls it.
 
@@ -45,9 +45,9 @@ skill, entrypoint, or routine that calls it.
 ## Contract
 
 - Add a new public skill under `agents/skills/` only with a catalog entry and a
-  matching `.agents/skills/<skill>/SKILL.md` shim.
+  matching `.codex/personal/skills/<skill>/SKILL.md` shim.
 - Keep workflow-only routines in this directory.
-- Keep runtime-internal shims under `.agents/skills/_<name>/SKILL.md` and route
+- Keep runtime-internal shims under `.codex/personal/skills/_<name>/SKILL.md` and route
   their human-facing explanation through the owner routine, entrypoint, or
   public skill.
 - Promote an internal routine to public skill by moving it into

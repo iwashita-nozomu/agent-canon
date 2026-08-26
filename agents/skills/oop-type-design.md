@@ -9,7 +9,7 @@ upstream design ../../documents/conventions/coding-conventions-cpp.md C++ source
 upstream design ../../documents/design/protocols.md Protocol and dependency-direction policy
 upstream design ../../documents/design/dependency-manifest-design.md dependency-header DSL
 upstream design ../internal-routines/design-implementation-correspondence.md universal design-to-implementation correspondence route
-downstream implementation ../../.agents/skills/oop-type-design/SKILL.md runtime discovery shim
+downstream implementation ../../.codex/personal/skills/oop-type-design/SKILL.md runtime discovery shim
 downstream implementation ../../agents/skills/catalog.yaml public skill and capability metadata
 downstream implementation ../../tools/agent_tools/route.py explicit capability route
 downstream implementation ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt-evaluation targets

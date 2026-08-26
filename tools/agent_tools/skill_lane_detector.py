@@ -111,7 +111,7 @@ PROJECT_SKILL_LANE_CONCEPTS: tuple[StructuralSkillLaneConcept, ...] = (
         route_skills=("task-routing", "structure-refactor"),
         evidence_groups={
             "project_owner": (
-                (".agents/skills",),
+                (".codex/personal/skills",),
                 ("parent", "repo"),
                 ("parent-repo",),
                 ("project-owned",),
@@ -130,7 +130,7 @@ PROJECT_SKILL_LANE_CONCEPTS: tuple[StructuralSkillLaneConcept, ...] = (
             "runtime_boundary_surface": (
                 (".codex", ".agents"),
                 (".codex/config.toml",),
-                (".agents/skills",),
+                (".codex/personal/skills",),
                 ("shared", "public", "catalog"),
             ),
         },

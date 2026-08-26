@@ -6,7 +6,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ./formal-proof-workflow.md checker-backed formal proof workflow
 upstream design ./algorithm-proof-exploration.md implementation-derived algorithm proof exploration
 upstream design ./computational-optimization.md optimization contract for numerical algorithms
-downstream design ../../.agents/skills/lean-algorithm-design/SKILL.md Codex discovery shim
+downstream design ../../.codex/personal/skills/lean-algorithm-design/SKILL.md Codex discovery shim
 downstream design ./catalog.yaml public skill catalog entry
 @dependency-end
 -->

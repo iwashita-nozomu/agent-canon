@@ -151,7 +151,7 @@ UTC = timezone.utc
 PROJECT_CONFIG_PATH = ROOT / ".codex" / "config.toml"
 HOOKS_JSON_PATH = ROOT / ".codex" / "hooks.json"
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
-SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
+SKILL_SHIM_ROOT = ROOT / ".codex" / "personal" / "skills"
 PUBLIC_SKILL_DOC_ROOT = ROOT / "agents" / "skills"
 INTERNAL_ROUTINE_ROOT = ROOT / "agents" / "internal-routines"
 MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
@@ -180,7 +180,7 @@ ALLOWED_AGENT_RUNTIME_KEYS = {
 }
 PRIVATE_SKILL_PREFIX = "_"
 PUBLIC_SKILL_README_DUPLICATE_ROW = re.compile(
-    r"^\|\s*`[^`]+`\s*\|.*`agents/skills/[^`]+\.md`.*`\.agents/skills/[^`]+/SKILL\.md`",
+    r"^\|\s*`[^`]+`\s*\|.*`agents/skills/[^`]+\.md`.*`\.codex/personal/skills/[^`]+/SKILL\.md`",
     re.MULTILINE,
 )
 OFFICIAL_SYSTEM_SKILLS = (
@@ -484,7 +484,7 @@ def validate_project_config() -> None:
     )
     ensure(
         "skills" not in config,
-        "repository skills must use automatic .agents/skills discovery",
+        "repository skills must use the generated .codex/personal/skills view",
     )
     ensure(
         "profiles" not in config,
@@ -1472,7 +1472,7 @@ def validate_official_system_skill_delegation(
             not public_doc.exists(),
             f"move official system skill public doc to host-provided delegation: {public_doc.relative_to(root)}",
         )
-        shim = root / ".agents" / "skills" / skill_id / "SKILL.md"
+        shim = root / ".codex" / "personal" / "skills" / skill_id / "SKILL.md"
         ensure(
             not shim.exists(),
             f"move official system skill local shim to host-provided delegation: {shim.relative_to(root)}",

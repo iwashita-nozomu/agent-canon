@@ -221,7 +221,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertNotIn(
-                ".agents/skills/agent-orchestration/SKILL.md", result.stdout
+                ".codex/personal/skills/agent-orchestration/SKILL.md", result.stdout
             )
 
     def test_tool_rejection_preflight_checks_canonical_owner_skills(self) -> None:
@@ -248,7 +248,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertNotIn(
-                ".agents/skills/codex-task-workflow/SKILL.md", result.stdout
+                ".codex/personal/skills/codex-task-workflow/SKILL.md", result.stdout
             )
 
     def test_kind_mismatch_is_reported(self) -> None:
@@ -632,7 +632,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
             self.assertNotIn(
-                ".agents/skills/agent-orchestration/SKILL.md", result.stdout
+                ".codex/personal/skills/agent-orchestration/SKILL.md", result.stdout
             )
 
     def write_file(self, root: Path, relative: str, text: str) -> None:

@@ -17,7 +17,7 @@ inventing a route from shim prose. Keep the evaluation read-only.
 
 ## Canonical Target Files
 
-- `.agents/skills/agent-orchestration/SKILL.md`
+- `.codex/personal/skills/agent-orchestration/SKILL.md`
 - `agents/skills/agent-orchestration.md`
 
 ## Prompt Dependency Files

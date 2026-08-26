@@ -393,7 +393,7 @@ def add_monitoring_entry_arguments(parser: argparse.ArgumentParser) -> None:
         default=[],
         help=(
             "User- or reviewer-observed runtime feedback as key=value tokens, for "
-            "example 'source=user target=.agents/skills/foo/SKILL.md action=prompt_repair'."
+            "example 'source=user target=.codex/personal/skills/foo/SKILL.md action=prompt_repair'."
         ),
     )
 

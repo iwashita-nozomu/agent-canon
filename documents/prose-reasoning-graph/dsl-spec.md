@@ -16,7 +16,7 @@ downstream design ../tools/semantic_provider_html_report.md documents semantic p
 downstream design ../../tools/agent_tools/jit_canonical_ir.py documents JIT-canonical source facts available to future graph visualization adapters
 downstream design ../../tools/README.md documents graph visualization tool routing from the execution hub
 downstream design ../../agents/skills/prose-reasoning-graph.md documents skill handoff workflow
-downstream implementation ../../.agents/skills/prose-reasoning-graph/SKILL.md runtime skill entrypoint
+downstream implementation ../../.codex/personal/skills/prose-reasoning-graph/SKILL.md runtime skill entrypoint
 @dependency-end
 -->
 

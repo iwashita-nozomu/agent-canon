@@ -49,7 +49,7 @@ downstream design documents/runtime/private-feedback-knowledge.md private knowle
 - 一般的なソフトウェア工学原則と競合時の優先順位は `documents/conventions/software-engineering-principles.md` に置く。
 - OOP、class、state、inheritance、`Protocol`、SOLID の専門判断は `documents/conventions/object-oriented-design.md` に置く。
 - 個別 tool の使い方は `tools/` と tool document に置く。
-- skill の実行契約は `agents/skills/` と `.agents/skills/` に置く。
+- skill の実行契約は `agents/skills/` と `.codex/personal/skills/` に置く。
 - workflow の手順は `agents/workflows/` に置く。
 - validation matrix と policy は `documents/` に置く。
 - 対話から得た raw observation は runtime logs/evidence/Issue/failures の owner に置き、

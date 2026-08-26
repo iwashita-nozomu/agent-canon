@@ -56,7 +56,7 @@ class ExperimentWrapperRemovalTest(unittest.TestCase):
                 (PROJECT_ROOT / "agents/skills" / f"{skill}.md").exists()
             )
             self.assertFalse(
-                (PROJECT_ROOT / ".agents/skills" / skill / "SKILL.md").exists()
+                (PROJECT_ROOT / ".codex/personal/skills" / skill / "SKILL.md").exists()
             )
 
     def test_existing_html_experiment_routes_to_direct_owners(self) -> None:

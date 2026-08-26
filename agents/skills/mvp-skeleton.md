@@ -5,7 +5,7 @@ contract skill
 responsibility Documents MVP skeleton discipline for skeletal app, site, tool, and product scaffolds.
 upstream design README.md shared skill canon index
 upstream design catalog.yaml public skill family catalog
-downstream implementation ../../.agents/skills/mvp-skeleton/SKILL.md exposes this workflow as a runtime skill
+downstream implementation ../../.codex/personal/skills/mvp-skeleton/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
 

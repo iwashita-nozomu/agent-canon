@@ -18,7 +18,7 @@ requests remain outside its authority. Keep the evaluation read-only.
 
 ## Canonical Target Files
 
-- `.agents/skills/task-routing/SKILL.md`
+- `.codex/personal/skills/task-routing/SKILL.md`
 - `agents/skills/task-routing.md`
 
 ## Prompt Dependency Files

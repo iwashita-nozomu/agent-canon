@@ -582,7 +582,7 @@ the projection section and an exact reverse edge from that projection to its evi
 
 | exact changed path | forward: design clause → projection section/ref | reverse: projection section/ref → evidence/readback and design ref |
 | --- | --- | --- |
-| `.agents/skills/cpp-review/SKILL.md` | `D-COMMANDS`, `D-TEST-GRAPH` → `#Activation readback`, `#C++ Review` CMake command step | route path set and CMake command → `tools/bin/agent-canon docs check`, `RDC-CPP-REVIEW`, `D-VALIDATION` |
+| `.codex/personal/skills/cpp-review/SKILL.md` | `D-COMMANDS`, `D-TEST-GRAPH` → `#Activation readback`, `#C++ Review` CMake command step | route path set and CMake command → `tools/bin/agent-canon docs check`, `RDC-CPP-REVIEW`, `D-VALIDATION` |
 | `agents/skills/cpp-review.md` | `D-PROJECT-ROOT`, `D-TEST-GRAPH`, `D-EXPERIMENT-GRAPH`, `D-COMMANDS`, `D-EXPERIMENT-LIFECYCLE` → `#Use When`, `#Required Checks`, `#Target graph readback`, `#Docstring projection route` | `cpp_reviewer` route markers, target graph, and commands → route check, C++ profile checks, `RDC-CPP-REVIEW` |
 | `agents/skills/oop-type-design.md` | `D-SOURCE-OWNERS`, `D-TEST-GRAPH`, `D-EXPERIMENT-GRAPH`, `D-RELATED-DOCUMENT-CLOSURE` → `#Static delegation and test boundary`, `#Downstream handoff and evaluation boundary` | `$cpp-review` delegation and C++ target responsibility readback → `cpp-review`, OOP/readability evidence, `D-RELATED-DOCUMENT-CLOSURE` |
 | `agents/skills/refactor-loop.md` | `D-SOURCE-OWNERS`, `D-COMMANDS`, `D-PARENT-MIGRATION` → `#C++ project migration projection` | path map, consumer/provider graph, and root-anchored commands → refactor trace/readback, `D-SOURCE-BOUNDARIES`, `D-PARENT-MIGRATION` |

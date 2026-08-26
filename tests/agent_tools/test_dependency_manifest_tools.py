@@ -2271,7 +2271,7 @@ class DependencyManifestToolTest(unittest.TestCase):
     def test_agent_runtime_surfaces_pass_manifest_scan_and_format(self) -> None:
         """Agent runtime docs and skill surfaces stay compatible with manifest tools."""
         paths = [
-            ".agents/skills/codex-task-workflow/SKILL.md",
+            ".codex/personal/skills/codex-task-workflow/SKILL.md",
             ".codex/README.md",
             "ROOT_AGENTS.md",
             "agents/TASK_WORKFLOWS.md",

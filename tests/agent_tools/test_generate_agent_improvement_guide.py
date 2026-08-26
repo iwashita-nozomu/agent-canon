@@ -203,7 +203,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         knowledge.mkdir(parents=True)
         (knowledge / "candidate.md").write_text("# Durable learning\n", encoding="utf-8")
         for skill in ("agent-orchestration", "codex-task-workflow", "result-artifact-writeout"):
-            skill_path = root / ".agents" / "skills" / skill / "SKILL.md"
+            skill_path = root / ".codex" / "personal" / "skills" / skill / "SKILL.md"
             skill_path.parent.mkdir(parents=True, exist_ok=True)
             skill_path.write_text(
                 f"---\nname: {skill}\ndescription: test skill\n---\n\n# {skill}\n",
@@ -330,7 +330,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         evals_root = root / "agents" / "evals"
         evals_root.mkdir(parents=True, exist_ok=True)
         (evals_root / "README.md").write_text("# Eval fixture\n", encoding="utf-8")
-        skill_path = root / ".agents" / "skills" / "agent-orchestration" / "SKILL.md"
+        skill_path = root / ".codex" / "personal" / "skills" / "agent-orchestration" / "SKILL.md"
         skill_path.parent.mkdir(parents=True, exist_ok=True)
         skill_path.write_text(
             "---\nname: agent-orchestration\ndescription: test skill\n---\n",
@@ -338,7 +338,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         )
         subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
         subprocess.run(
-            ["git", "add", ".agents/skills/agent-orchestration/SKILL.md"],
+            ["git", "add", ".codex/personal/skills/agent-orchestration/SKILL.md"],
             cwd=root,
             check=True,
             capture_output=True,

@@ -31,12 +31,23 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
         self.assertEqual(
             triggers["pull_request"]["paths"],
             [
+                ".github/workflows/agent-improvement-guide.yml",
                 "tools/agent_tools/generate_agent_improvement_guide.py",
                 "tests/agent_tools/test_generate_agent_improvement_guide.py",
             ],
         )
         self.assertIn("workflow_dispatch", triggers)
         self.assertNotIn("push", triggers)
+
+    def test_pr_checkout_selects_local_runtime_image_build(self) -> None:
+        """PR guide runs must not select an unpublished GHCR merge tag."""
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn(
+            "fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}",
+            text,
+        )
+        self.assertNotIn('mkdir -p "${report_dir}"', text)
+        self.assertIn("--output-mode 644", text)
 
 
 if __name__ == "__main__":

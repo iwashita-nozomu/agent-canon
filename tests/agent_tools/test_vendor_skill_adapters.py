@@ -77,7 +77,7 @@ class VendorSkillAdaptersTest(unittest.TestCase):
                     "",
                     "[[evals]]",
                     'id = "runtime-skill-shims"',
-                    'target_glob = ".agents/skills/*/SKILL.md"',
+                    'target_glob = ".codex/personal/skills/*/SKILL.md"',
                     *count_line,
                     'kind = "skill"',
                     'description = "runtime skill shims"',
@@ -104,7 +104,7 @@ class VendorSkillAdaptersTest(unittest.TestCase):
             self.assertIn("VENDOR_SKILL_ADAPTERS=pass", result.stdout)
 
     def test_sync_creates_runtime_adapter_symlink(self) -> None:
-        """The sync command should expose enabled skills through .agents/skills."""
+        """The sync command should expose enabled skills through .codex/personal/skills."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_file(
@@ -120,7 +120,7 @@ class VendorSkillAdaptersTest(unittest.TestCase):
                         'id = "example-skill"',
                         'provider = "external"',
                         'source = "vendor/skills/external/example-skill"',
-                        'adapter = ".agents/skills/example-skill"',
+                        'adapter = ".codex/personal/skills/example-skill"',
                         "enabled = true",
                         'license = "MIT"',
                         'upstream = "https://github.com/external/example-skill"',
@@ -136,9 +136,9 @@ class VendorSkillAdaptersTest(unittest.TestCase):
 
             sync_result = self.run_cli(root, "--sync")
             self.assertEqual(sync_result.returncode, 0, sync_result.stdout + sync_result.stderr)
-            self.assertIn("create-symlink:.agents/skills/example-skill", sync_result.stdout)
+            self.assertIn("create-symlink:.codex/personal/skills/example-skill", sync_result.stdout)
 
-            adapter = root / ".agents" / "skills" / "example-skill"
+            adapter = root / ".codex" / "personal" / "skills" / "example-skill"
             self.assertTrue(adapter.is_symlink())
             self.assertEqual(
                 adapter.resolve(),
@@ -161,7 +161,7 @@ class VendorSkillAdaptersTest(unittest.TestCase):
                         "skill_families:",
                         "  - id: existing-skill",
                         "    canonical_doc: agents/skills/existing-skill.md",
-                        "    shim: .agents/skills/existing-skill/SKILL.md",
+                        "    shim: .codex/personal/skills/existing-skill/SKILL.md",
                         "",
                     ]
                 ),
@@ -179,7 +179,7 @@ class VendorSkillAdaptersTest(unittest.TestCase):
                         'id = "existing-skill"',
                         'provider = "external"',
                         'source = "vendor/skills/external/existing-skill"',
-                        'adapter = ".agents/skills/existing-skill"',
+                        'adapter = ".codex/personal/skills/existing-skill"',
                         "enabled = true",
                         'license = "MIT"',
                         'upstream = "https://github.com/external/existing-skill"',
@@ -211,7 +211,7 @@ class VendorSkillAdaptersTest(unittest.TestCase):
                         'id = "example-skill"',
                         'provider = "external"',
                         'source = "vendor/skills/external/example-skill"',
-                        'adapter = ".agents/skills/example-skill"',
+                        'adapter = ".codex/personal/skills/example-skill"',
                         "enabled = true",
                         'license = "MIT"',
                         'upstream = "https://github.com/external/example-skill"',
@@ -247,7 +247,7 @@ class VendorSkillAdaptersTest(unittest.TestCase):
                         'id = "example-skill"',
                         'provider = "external"',
                         'source = "vendor/skills/external/example-skill"',
-                        'adapter = ".agents/skills/example-skill"',
+                        'adapter = ".codex/personal/skills/example-skill"',
                         "enabled = true",
                         'license = "MIT"',
                         'upstream = "https://github.com/someone-else/example-skill"',
@@ -279,7 +279,7 @@ class VendorSkillAdaptersTest(unittest.TestCase):
                         'id = "example-skill"',
                         'provider = "external"',
                         'source = "vendor/skills/other/example-skill"',
-                        'adapter = ".agents/skills/example-skill"',
+                        'adapter = ".codex/personal/skills/example-skill"',
                         "enabled = true",
                         'license = "MIT"',
                         'upstream = "https://github.com/external/example-skill"',
@@ -314,7 +314,7 @@ class VendorSkillAdaptersTest(unittest.TestCase):
                         'id = "example-skill"',
                         'provider = "external"',
                         'source = "vendor/skills/external/example-skill"',
-                        'adapter = ".agents/skills/example-skill"',
+                        'adapter = ".codex/personal/skills/example-skill"',
                         "enabled = true",
                         'license = "MIT"',
                         'upstream = "git@github.com:external/example-skill.git"',

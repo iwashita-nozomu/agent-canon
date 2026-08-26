@@ -7,7 +7,7 @@ upstream implementation ../../tools/agent_tools/lean_proof_env.py creates Lean p
 upstream design ../../agents/skills/formal-proof-workflow.md routes checker-backed proof attempts.
 upstream design ../../agents/skills/algorithm-proof-exploration.md routes algorithm-derived proof frontiers.
 upstream design ../../references/agent-canon-technology-bibliography.md records adopted Lean sources.
-downstream design ../../.agents/skills/formal-proof-workflow/SKILL.md exposes the runtime Lean proof route.
+downstream design ../../.codex/personal/skills/formal-proof-workflow/SKILL.md exposes the runtime Lean proof route.
 @dependency-end
 -->
 

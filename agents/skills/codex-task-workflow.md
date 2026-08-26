@@ -13,7 +13,7 @@ upstream design ../internal-routines/design-implementation-correspondence.md des
 upstream design ../../documents/design/request-intent-and-update-relation.md compact task-packet request and update projection
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner allocation
 upstream design ./agent-orchestration.md owner-first read trace and implementation admission
-downstream design ../../.agents/skills/codex-task-workflow/SKILL.md exposes this workflow as a runtime skill
+downstream design ../../.codex/personal/skills/codex-task-workflow/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
 

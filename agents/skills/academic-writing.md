@@ -7,7 +7,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable document structure contract
 upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite handoff overlay
 upstream design ../../CONTAINER_OPERATIONS.md TeX devcontainer tooling boundary
-downstream implementation ../../.agents/skills/academic-writing/SKILL.md Codex skill shim
+downstream implementation ../../.codex/personal/skills/academic-writing/SKILL.md Codex skill shim
 @dependency-end
 -->
 

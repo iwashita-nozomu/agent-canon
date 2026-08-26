@@ -61,7 +61,7 @@ def load_marker_contracts() -> dict[str, dict[str, tuple[str, ...]]]:
         surfaces: dict[str, tuple[str, ...]] = {}
         for surface in contract.get("surfaces", []):
             path = surface["path"]
-            if path.startswith(".agents/skills/") and path.endswith("/SKILL.md"):
+            if path.startswith(".codex/personal/skills/") and path.endswith("/SKILL.md"):
                 raise ValueError(
                     "generated skill shims cannot own convention marker contracts: "
                     f"{path}"

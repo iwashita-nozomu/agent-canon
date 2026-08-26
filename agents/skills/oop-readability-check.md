@@ -7,7 +7,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream implementation ../../tools/oop/python/readability.py OOP readability CLI
 upstream implementation ../../tools/oop/shared/readability_core.py defines mechanical finding categories
 upstream implementation ../../tools/agent_tools/workflow_monitor.py optional timing recorder
-downstream design ../../.agents/skills/oop-readability-check/SKILL.md Codex discovery shim
+downstream design ../../.codex/personal/skills/oop-readability-check/SKILL.md Codex discovery shim
 @dependency-end
 -->
 

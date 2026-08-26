@@ -15,7 +15,7 @@ version = 1
 # # For GitHub imports, provider must be the upstream owner or organization.
 # provider = "upstream-owner"
 # source = "vendor/skills/upstream-owner/third-party-skill"
-# adapter = ".agents/skills/third-party-skill"
+# adapter = ".codex/personal/skills/third-party-skill"
 # enabled = true
 # license = "MIT"
 # upstream = "https://github.com/upstream-owner/skill-repo"

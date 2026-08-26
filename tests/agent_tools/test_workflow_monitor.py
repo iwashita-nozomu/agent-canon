@@ -186,7 +186,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                     "skill_invocation=$agent-orchestration status=observed",
                     "--runtime-feedback",
                     (
-                        "source=user target=.agents/skills/agent-learning/SKILL.md "
+                        "source=user target=.codex/personal/skills/agent-learning/SKILL.md "
                         "action=prompt_repair evidence=observed-drift"
                     ),
                     "--intervention",
@@ -213,7 +213,7 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertIn("skills=$agent-orchestration", text)
             self.assertIn("skill_invocation=$agent-orchestration status=observed", text)
             self.assertIn("runtime_feedback=observed", text)
-            self.assertIn("target=.agents/skills/agent-learning/SKILL.md", text)
+            self.assertIn("target=.codex/personal/skills/agent-learning/SKILL.md", text)
             self.assertIn("action=prompt_repair", text)
             self.assertIn("## Tool Warnings", text)
             self.assertIn("- tool_warnings_status: pending", text)

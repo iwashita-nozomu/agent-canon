@@ -41,7 +41,7 @@ downstream implementation ../../tools/agent_tools/task_close.py enforces closeou
 1. 実装を伴う task では `agents/workflows/implementation-waterfall-workflow.md` を読む
 1. subagent を使う task では `agents/canonical/CODEX_SUBAGENTS.md` を読む
 1. `agents/canonical/ARTIFACT_PLACEMENT.md` で文書の置き場を決める
-1. 必要なら `.agents/skills/` から該当 skill を読む
+1. 必要なら `.codex/personal/skills/` から該当 skill を読む
 
 Base Runtime Packet:
 
@@ -864,7 +864,7 @@ environment, produce resources, or duplicate tests/gates.
 ## Codex-Specific Rules
 
 - `AGENTS.md` は Codex のruntime 入口として保つ
-- `.agents/skills/` を正規 skill path とする
+- `.codex/personal/skills/` を正規 skill path とする
 - repo-changing task では、selected stage の subagent / specialist だけを明示し、候補 stage や未選択 reviewer を work にしない
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` は active な
   distinct unresolved claim/risk がそれぞれ必要とした場合だけ選択し、選択した別 gate

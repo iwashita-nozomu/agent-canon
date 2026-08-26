@@ -9,7 +9,7 @@ upstream design ./dependency-analysis.md dependency and reachability owner
 upstream design ./refactor-loop.md behavior-preserving refactor owner
 upstream design ./change-review.md findings-first review owner
 upstream design ./responsibility-cleanup.md responsibility-unit dispatch owner
-downstream implementation ../../.agents/skills/code-cleanup/SKILL.md runtime discovery shim
+downstream implementation ../../.codex/personal/skills/code-cleanup/SKILL.md runtime discovery shim
 downstream implementation ./catalog.yaml public skill registry
 downstream implementation ./skill-dependencies.yaml public skill dependency DAG
 downstream implementation ../../.codex/config.toml host skill configuration

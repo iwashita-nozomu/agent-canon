@@ -17,7 +17,7 @@ upstream implementation ../../tools/agent_tools/operational_ir_to_lean.py render
 upstream implementation ../../tools/agent_tools/cpp_template_to_lean.py fully expands C++ template roots into Lean evidence.
 upstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers JIT-canonical IR into Lean evidence modules.
 upstream design ../../references/agent-canon-technology-bibliography.md records proof-assistant references.
-downstream implementation ../../.agents/skills/formal-proof-workflow/SKILL.md exposes the skill to Codex.
+downstream implementation ../../.codex/personal/skills/formal-proof-workflow/SKILL.md exposes the skill to Codex.
 upstream design code-visualization.md sole public visualization owner and typed projection contract
 downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this adapter dependency header
 @dependency-end

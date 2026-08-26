@@ -1699,7 +1699,7 @@ mod tests {
     fn source_relative_targets_resolve_parent_current_and_bare_sibling() {
         assert_eq!(
             resolve_source_relative_target(
-                ".agents/skills/academic-writing/SKILL.md",
+                ".codex/personal/skills/academic-writing/SKILL.md",
                 "../../../agents/canonical/skills.md"
             ),
             Ok("agents/canonical/skills.md".to_string())

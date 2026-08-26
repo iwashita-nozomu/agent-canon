@@ -14,7 +14,7 @@ upstream design ../../documents/runtime/private-feedback-knowledge.md private Gi
 upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py emits structured log evidence
 upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py resolves accumulated log archive state
 upstream implementation ../../tools/agent_tools/issue_sync.py resolves GitHub Issues and private packets
-downstream design ../../.agents/skills/issue-finding-report/SKILL.md exposes this workflow as a runtime skill
+downstream design ../../.codex/personal/skills/issue-finding-report/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
 

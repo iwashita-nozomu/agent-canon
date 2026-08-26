@@ -184,7 +184,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
                 ".codex/config.toml",
                 ".codex/agents/local.toml",
                 "agents/skills/local.md",
-                ".agents/skills/local.md",
+                ".codex/personal/skills/local.md",
                 ".devcontainer/devcontainer.json",
                 ".vscode/settings.json",
                 "evidence/run.json",
@@ -205,7 +205,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
             ".codex/config.toml",
             ".codex/agents/local.toml",
             "agents/skills/local.md",
-            ".agents/skills/local.md",
+            ".codex/personal/skills/local.md",
             ".devcontainer/devcontainer.json",
             ".vscode/settings.json",
         ):

@@ -8,7 +8,7 @@
 # upstream implementation ../../tools/agent_tools/capability_route.py owns capability preflight/decision behavior
 # upstream implementation ../../tools/agent_tools/visualization_contract.py owns exact ToolCall validation
 # upstream design ../../documents/design/tool-skill-routing-refactor.md defines naming policy
-# upstream design ../../.agents/skills/code-visualization/SKILL.md owns the runtime direct-route text
+# upstream design ../../.codex/personal/skills/code-visualization/SKILL.md owns the runtime direct-route text
 # upstream design ../../agents/skills/code-visualization.md owns the canonical direct-route contract
 # @dependency-end
 
@@ -1253,7 +1253,7 @@ class RouteToolTest(unittest.TestCase):
                         "  - id: _private-skill",
                         "    purpose: Private skill.",
                         "    canonical_doc: agents/skills/_private-skill.md",
-                        "    shim: .agents/skills/_private-skill/SKILL.md",
+                        "    shim: .codex/personal/skills/_private-skill/SKILL.md",
                     ]
                 ),
                 encoding="utf-8",
@@ -2353,7 +2353,7 @@ class CapabilityRouteTest(unittest.TestCase):
                 f"  - id: {skill}",
                 "    purpose: Capability fixture.",
                 f"    canonical_doc: agents/skills/{skill}.md",
-                f"    shim: .agents/skills/{skill}/SKILL.md",
+                f"    shim: .codex/personal/skills/{skill}/SKILL.md",
                 "    routing:",
                 "      stage_policy: active",
                 "      reason: capability fixture",
@@ -2409,7 +2409,7 @@ class CapabilityRouteTest(unittest.TestCase):
                         "  - id: task-routing",
                         "    purpose: Fixture.",
                         "    canonical_doc: agents/skills/task-routing.md",
-                        "    shim: .agents/skills/task-routing/SKILL.md",
+                        "    shim: .codex/personal/skills/task-routing/SKILL.md",
                         "    routing:",
                         "      stage_policy: explicit_only",
                         "      reason: fixture",
@@ -2432,7 +2432,7 @@ class CapabilityRouteTest(unittest.TestCase):
                         "  - id: task-routing",
                         "    purpose: Fixture.",
                         "    canonical_doc: agents/skills/task-routing.md",
-                        "    shim: .agents/skills/task-routing/SKILL.md",
+                        "    shim: .codex/personal/skills/task-routing/SKILL.md",
                         "    routing:",
                         "      stage_policy: active",
                         "      reason: 3",
@@ -2455,7 +2455,7 @@ class CapabilityRouteTest(unittest.TestCase):
                         "  - id: task-routing",
                         "    purpose: Fixture.",
                         "    canonical_doc: agents/skills/task-routing.md",
-                        "    shim: .agents/skills/task-routing/SKILL.md",
+                        "    shim: .codex/personal/skills/task-routing/SKILL.md",
                     ]
                 ),
             )
@@ -2489,7 +2489,7 @@ class CapabilityRouteTest(unittest.TestCase):
                         "  - id: task-routing",
                         "    purpose: Fixture.",
                         "    canonical_doc: agents/skills/task-routing.md",
-                        "    shim: .agents/skills/task-routing/SKILL.md",
+                        "    shim: .codex/personal/skills/task-routing/SKILL.md",
                     ]
                 ),
             )

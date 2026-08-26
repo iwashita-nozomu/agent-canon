@@ -13,6 +13,7 @@ name: Agent Improvement Guide
 on:
   pull_request:
     paths:
+      - ".github/workflows/agent-improvement-guide.yml"
       - "tools/agent_tools/generate_agent_improvement_guide.py"
       - "tests/agent_tools/test_generate_agent_improvement_guide.py"
   workflow_dispatch:
@@ -34,6 +35,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          # PR runtime images are cache-only and are not available from GHCR.
+          # A full PR checkout makes bootstrap use its normal local Docker build.
+          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
           persist-credentials: false
 
       - name: Setup Python
@@ -51,13 +55,13 @@ jobs:
         id: guide
         run: |
           report_dir="$(realpath -m "${AGENT_CANON_RUNTIME_ROOT}/container-runtime/reports/agent-improvement-guide")"
-          mkdir -p "${report_dir}"
           guide_path="${report_dir}/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
           container_guide="/var/lib/agent-canon/runtime/reports/agent-improvement-guide/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
           ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
             exec --root "${GITHUB_WORKSPACE}" -- python3 \
             /usr/local/share/agent-canon/runtime/tools/agent_tools/generate_agent_improvement_guide.py \
-            --root . --runtime-root /var/lib/agent-canon/runtime --out "${container_guide}"
+            --root . --runtime-root /var/lib/agent-canon/runtime --out "${container_guide}" \
+            --output-mode 644
           cat "${guide_path}" >> "${GITHUB_STEP_SUMMARY}"
           echo "guide_path=${guide_path}" >> "$GITHUB_OUTPUT"
 
