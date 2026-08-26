@@ -142,11 +142,16 @@ Use structured artifacts as the normal evidence input:
 
 ```bash
 python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
-python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
+./bootstrap.sh --control-parent-root <control-parent-root> \
+  --runtime-root <runtime-root> \
+  tool run --root <registered-source-root> generate-agent-runtime-dashboard -- \
   --root . \
   --compact-out reports/agent-runtime-dashboard/agent-log-analysis-compact.md \
   --api-out reports/agent-runtime-dashboard/agent-log-analysis-api.json
 ```
+
+Dashboard generation is a shared tool-container invocation. Its relative
+report paths resolve under the external runtime root, not the source checkout.
 
 Required dashboard fields when that producer is used:
 

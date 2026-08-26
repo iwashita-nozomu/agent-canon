@@ -284,6 +284,59 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assert_selection_and_prompt_sections(dashboard)
         self.assert_reference_and_log_sections(dashboard)
 
+    def test_live_like_api_and_compact_route_writes_only_external_runtime(self) -> None:
+        """Container-style relative outputs stay outside the analyzed checkout."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            output_dir = self.runtime_root / "reports" / "agent-runtime-dashboard"
+            output = output_dir / "dashboard.md"
+            compact_output = output_dir / "agent-log-analysis-compact.md"
+            api_output = output_dir / "agent-log-analysis-api.json"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    ".",
+                    "--out",
+                    "reports/agent-runtime-dashboard/dashboard.md",
+                    "--compact-out",
+                    "reports/agent-runtime-dashboard/agent-log-analysis-compact.md",
+                    "--api-out",
+                    "reports/agent-runtime-dashboard/agent-log-analysis-api.json",
+                ],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            payload = json.loads(api_output.read_text(encoding="utf-8"))
+            compact_dashboard = compact_output.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(output.is_file())
+        self.assertTrue(compact_output.is_file())
+        self.assertTrue(api_output.is_file())
+        self.assertFalse((root / "reports").exists())
+        self.assertEqual(payload["schema"], "agent_runtime_dashboard.v1")
+        for field in (
+            "unknown_event_count",
+            "status_by_hook_family",
+            "failure_by_hook_family",
+            "skip_by_hook_family",
+            "namespace_debt_by_hook_family",
+            "oop_applicability",
+        ):
+            self.assertIn(field, payload)
+        self.assertIn("# Agent Runtime Compact Summary", compact_dashboard)
+        self.assertIn("## Evidence Drilldown", compact_dashboard)
+        self.assertNotIn(
+            "python3 tools/agent_tools/generate_agent_runtime_dashboard.py",
+            compact_dashboard,
+        )
+
     def assert_compact_dashboard(self, dashboard: str) -> None:
         """Verify the token-light summary omits full dashboard-only sections."""
         required = (
