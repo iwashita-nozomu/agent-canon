@@ -87,6 +87,103 @@ def test_bootstrap_defaults_runtime_to_repository_dot_runtime(tmp_path: Path) ->
     assert runtime.paths.runtime_root == repository / ".runtime"
 
 
+def test_bootstrap_maps_only_the_exact_legacy_runtime_default(tmp_path: Path) -> None:
+    """Migrate the removed default without rewriting an explicit runtime root."""
+    repository = tmp_path / "agent-canon"
+    control = tmp_path / "control"
+    (repository / "bootstrap").mkdir(parents=True)
+    (repository / "bootstrap" / "manifest.toml").write_bytes(
+        (ROOT / "bootstrap" / "manifest.toml").read_bytes()
+    )
+    control.mkdir()
+
+    def parse(runtime_root: Path):
+        return _runtime_from_args(
+            build_parser().parse_args(
+                [
+                    "--repository-root",
+                    str(repository),
+                    "--control-parent-root",
+                    str(control),
+                    "--runtime-root",
+                    str(runtime_root),
+                    "status",
+                ]
+            )
+        )
+
+    assert parse(control / "workspace/agent-canon-runtime/host").paths.runtime_root == (
+        repository / ".runtime"
+    )
+    explicit = control / "workspace/agent-canon-runtime/custom"
+    assert parse(explicit).paths.runtime_root == explicit
+
+
+def test_update_adopts_fresh_source_runtime_after_legacy_default_reset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An old default path is rebuilt and scheduled at the source-owned root."""
+    state_path = tmp_path / "docker.json"
+    monkeypatch.setenv("FAKE_DOCKER_STATE", str(state_path))
+    docker = DockerAdapter(str(ROOT / "tests/bootstrap/fake_docker.py"))
+    repository = tmp_path / "agent-canon"
+    control = tmp_path / "control"
+    (repository / "bootstrap").mkdir(parents=True)
+    (repository / "bootstrap" / "manifest.toml").write_bytes(
+        (ROOT / "bootstrap" / "manifest.toml").read_bytes()
+    )
+    control.mkdir()
+    legacy = control / "workspace/agent-canon-runtime/host"
+    old = BootstrapRuntime(
+        control,
+        legacy,
+        repository_root=repository,
+        manifest_path=repository / "bootstrap/manifest.toml",
+        docker=docker,
+    )
+    with old.locked():
+        old_state = old._new_state()
+        old_state["state"] = "installed"
+        old_state["resources"] = old._resource_records()
+        old._write_state(old_state)
+
+    runtime = BootstrapRuntime(
+        control,
+        repository / ".runtime",
+        repository_root=repository,
+        manifest_path=repository / "bootstrap/manifest.toml",
+        docker=docker,
+    )
+    monkeypatch.setattr(runtime, "codex_prepare", lambda: {"code": "prepared"})
+    scheduler_calls: list[str] = []
+    monkeypatch.setattr(
+        runtime,
+        "scheduler_enable",
+        lambda: scheduler_calls.append(str(runtime.paths.runtime_root)) or {"code": "enabled"},
+    )
+
+    image_id = "sha256:fresh-source-image"
+
+    def fake_image(state: dict[str, Any], *, force_build: bool = False) -> dict[str, Any]:
+        assert force_build is True
+        state["resources"]["image"] = {
+            "id": image_id,
+            "tag": "agent-canon-tools:test",
+            "owned": True,
+            "state": "present",
+        }
+        return {"Id": image_id}
+
+    monkeypatch.setattr(runtime, "_image", fake_image)
+    result = runtime.update()
+
+    assert result["code"] == "updated"
+    assert runtime.paths.runtime_root == repository / ".runtime"
+    assert runtime.paths.state.is_file()
+    assert not legacy.exists()
+    assert scheduler_calls == [str(repository / ".runtime")]
+
+
 def test_source_sync_accepts_normal_full_history_checkout(tmp_path: Path) -> None:
     """Source synchronization keeps a normal clone's commit history usable."""
     checkout = tmp_path / "agent-canon"

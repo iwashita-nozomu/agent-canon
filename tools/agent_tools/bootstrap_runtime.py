@@ -1576,7 +1576,16 @@ class BootstrapRuntime:
 
     def _prepare_legacy_runtime_reset(self) -> None:
         """Stop the old owned runtime and prepare a fresh source runtime."""
-        if not self.default_runtime_root or self._legacy_runtime_pending_cleanup:
+        # SourceSync owns the outer migration transaction and invokes the
+        # candidate checkout with the lifecycle lock marker.  The candidate
+        # must only initialize/adopt the verified image; repeating this reset
+        # in the child would remove the parent's rollback backup and make a
+        # failed candidate impossible to restore.
+        if (
+            os.environ.get("AGENT_CANON_LOCK_HELD") == "1"
+            or not self.default_runtime_root
+            or self._legacy_runtime_pending_cleanup
+        ):
             return
         legacy = self.legacy_runtime_root
         if legacy == self.paths.runtime_root or not legacy.exists():
@@ -2352,12 +2361,18 @@ class BootstrapRuntime:
             "mounts": summarized_mounts,
         }
 
-    def install(self) -> dict[str, Any]:
+    def install(self, image_ref: str | None = None) -> dict[str, Any]:
         """Install the initial image or reconcile an existing runtime."""
+        result: dict[str, Any] | None = None
         with self.locked():
             self._prepare_legacy_runtime_reset()
             state = self._read_state(allow_manifest_drift=True)
             if state.get("state") != "uninstalled":
+                if image_ref:
+                    raise BootstrapError(
+                        "install_image_ref_requires_uninstalled",
+                        "immutable install image adoption requires a fresh runtime",
+                    )
                 result = self._update_locked(state, "install")
                 # codex_prepare runs after the lifecycle lock is released.
                 pass
@@ -2365,6 +2380,39 @@ class BootstrapRuntime:
                 if state.get("manifest_digest") != self.manifest_digest:
                     state = self._new_state()
                 before = state["state"]
+                if image_ref:
+                    image_record = self.docker.inspect_image(image_ref)
+                    if image_record is None:
+                        raise BootstrapError(
+                            "image_missing", f"registry image is not pulled: {image_ref}"
+                        )
+                    source_head = _source_snapshot(self.repository_root)["head"]
+                    self.docker.validate_registry_image(
+                        image_record, source_head=source_head, image_ref=image_ref
+                    )
+                    state["state"] = "installed"
+                    state["resources"] = self._resource_records()
+                    state["managed_paths"] = [
+                        STATE_FILE,
+                        OWNER_FILE,
+                        "mounts.toml",
+                        *KNOWN_SUBDIRS,
+                        CONTAINER_RUNTIME_DIR,
+                    ]
+                    self._write_mounts(state)
+                    self._write_state(state)
+                    result = self._adopt_registry_image_locked(
+                        state,
+                        image_ref,
+                        image_record,
+                        source_head,
+                        reconcile_manifest=True,
+                    )
+                    self._ensure_global_links(state)
+                    self._write_state(state)
+                    continue_install = False
+                else:
+                    continue_install = True
                 shallow = False
                 try:
                     shallow = (
@@ -2381,7 +2429,7 @@ class BootstrapRuntime:
                     shallow = False
                 self._materialize_skill_view()
                 registry = self.manifest.get("registry", {})
-                if shallow and isinstance(registry, dict) and registry.get("image"):
+                if continue_install and shallow and isinstance(registry, dict) and registry.get("image"):
                     try:
                         from .source_sync import SourceSync
                     except ImportError:
@@ -2404,34 +2452,36 @@ class BootstrapRuntime:
                         "architecture": correspondence["image_architecture"],
                         "source_head": source_head,
                     }
-                else:
+                elif continue_install:
                     self._image(state)
-                state["state"] = "installed"
-                state.setdefault("resources", self._resource_records()).setdefault(
-                    "container", self._resource_records()["container"]
-                )
-                state["managed_paths"] = [
-                    STATE_FILE,
-                    OWNER_FILE,
-                    "mounts.toml",
-                    *KNOWN_SUBDIRS,
-                    CONTAINER_RUNTIME_DIR,
-                ]
-                self._write_mounts(state)
-                self._write_state(state)
-                self._ensure_global_links(state)
-                self._write_state(state)
-                result = self._result(
-                    self._receipt(
-                        "install",
-                        "ok",
-                        "installed",
-                        before=before,
-                        after=state["state"],
-                        details={"image_id": state["resources"]["image"]["id"]},
-                        state=state,
+                if continue_install:
+                    state["state"] = "installed"
+                    state.setdefault("resources", self._resource_records()).setdefault(
+                        "container", self._resource_records()["container"]
                     )
-                )
+                    state["managed_paths"] = [
+                        STATE_FILE,
+                        OWNER_FILE,
+                        "mounts.toml",
+                        *KNOWN_SUBDIRS,
+                        CONTAINER_RUNTIME_DIR,
+                    ]
+                    self._write_mounts(state)
+                    self._write_state(state)
+                    self._ensure_global_links(state)
+                    self._write_state(state)
+                    result = self._result(
+                        self._receipt(
+                            "install",
+                            "ok",
+                            "installed",
+                            before=before,
+                            after=state["state"],
+                            details={"image_id": state["resources"]["image"]["id"]},
+                            state=state,
+                        )
+                    )
+        assert result is not None
         self.codex_prepare()
         try:
             self.scheduler_enable()
@@ -4906,11 +4956,14 @@ class BootstrapRuntime:
 
 def _runtime_from_args(args: argparse.Namespace) -> BootstrapRuntime:
     repository_root = Path(args.repository_root).resolve()
-    runtime_root = (
-        Path(args.runtime_root)
-        if args.runtime_root
-        else repository_root / ".runtime"
-    )
+    runtime_root = repository_root / ".runtime"
+    if args.runtime_root:
+        supplied = Path(args.runtime_root)
+        legacy_default = (
+            Path(args.control_parent_root).resolve() / LEGACY_RUNTIME_RELATIVE
+        )
+        if supplied.absolute() != legacy_default:
+            runtime_root = supplied
     return BootstrapRuntime(
         Path(args.control_parent_root),
         runtime_root,
@@ -4930,8 +4983,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--manifest")
     sub = parser.add_subparsers(dest="operation", required=True)
-    for operation in ("install", "start", "status", "stop", "rollback", "uninstall"):
+    for operation in ("start", "status", "stop", "rollback", "uninstall"):
         sub.add_parser(operation)
+    install_parser = sub.add_parser("install")
+    install_parser.add_argument("--image-ref")
     update_parser = sub.add_parser("update")
     update_parser.add_argument("--image-ref")
     update_parser.add_argument(
@@ -5003,7 +5058,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     runtime = _runtime_from_args(args)
     operation = args.operation
     if operation == "install":
-        return runtime.install()
+        return runtime.install(image_ref=args.image_ref)
     if operation == "update":
         return runtime.update(image_ref=args.image_ref, source_sync=args.source_sync)
     if operation == "sync":

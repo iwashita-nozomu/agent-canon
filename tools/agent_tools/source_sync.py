@@ -216,11 +216,13 @@ class SourceSync:
             "--runtime-root",
             str(self.runtime.paths.runtime_root),
         ]
+        # A source-owned runtime is empty after the outer migration reset.
+        # Install/adopt the verified immutable image first; ``update`` is
+        # intentionally reserved for an already-installed runtime.
         commands = (
             [
                 *common,
-                "update",
-                "--source-sync",
+                "install",
                 "--image-ref",
                 image_digest,
             ],
