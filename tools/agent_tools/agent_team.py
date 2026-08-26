@@ -5,6 +5,7 @@
 # upstream implementation ./team_config.py provides the approved config APIs.
 # upstream implementation ./packets.py provides the approved packet APIs.
 # upstream implementation ./tool_calls.py provides the approved ToolCall APIs.
+# upstream implementation ./issue_worker_dispatch.py provides the IssueWorker publisher route.
 # upstream implementation ./implementation_dispatch.py provides the approved dispatch APIs.
 # upstream implementation ./manifest_rendering.py provides the approved rendering APIs.
 # upstream implementation ./workspace_scope.py provides the approved scope APIs.
@@ -256,14 +257,25 @@ if __package__:
     from .tool_calls import (
         CloseAgentLifecycleEvidence,
         materialize_close_agent_tool_call,
+        materialize_issue_worker_tool_call,
         materialize_skill_tool_call_token,
     )
 else:
     from tool_calls import (
         CloseAgentLifecycleEvidence,
         materialize_close_agent_tool_call,
+        materialize_issue_worker_tool_call,
         materialize_skill_tool_call_token,
     )
+
+
+def dispatch_issue_worker(*args: object, **kwargs: object) -> object:
+    """Expose the logical IssueWorker route through the AgentTeam facade."""
+    if __package__:
+        from .issue_worker_dispatch import dispatch_issue_worker as dispatch
+    else:
+        from issue_worker_dispatch import dispatch_issue_worker as dispatch  # type: ignore[no-redef]
+    return dispatch(*args, **kwargs)  # type: ignore[arg-type]
 
 del annotations
 
@@ -520,6 +532,8 @@ __all__ = (
     "capacity_start_output_lines",
     "materialize_skill_tool_call_token",
     "materialize_close_agent_tool_call",
+    "materialize_issue_worker_tool_call",
+    "dispatch_issue_worker",
     "CloseAgentLifecycleEvidence",
     "create_run_bundle",
     "prepare_run_bundle",

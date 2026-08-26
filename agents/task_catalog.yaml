@@ -630,6 +630,39 @@ workflow_families:
     tasks:
       - T14
 
+  - id: issue_worker_publication
+    name: IssueWorker Publication
+    logical_route: issue_worker
+    execution_role: publisher
+    subagent_prompt:
+      purpose: Prompt packet for explicit repository-owned feedback publication and related Issue reorganization.
+      prompt_preamble:
+        - Consume only an explicit IssueWorker candidate and the #938 checkout identity readback; counts, status rows, and selection misses are not candidates.
+        - Route same-repository candidates to the logical IssueWorker path executed by publisher. Route other repositories as qualified no-mutation handoffs.
+        - Keep same-repository evidence gaps in publisher investigation; they may produce need verification and must not be silently discarded.
+      dispatch_route: tools/agent_tools/agent_team.py#dispatch_issue_worker
+      execution_role: publisher
+      tool_call_route: tools/agent_tools/tool_calls.py#materialize_issue_worker_tool_call
+      workflow_focus:
+        - Read open and closed related Issues, narrow mixed responsibility, transfer clauses and backlinks, and mutate only when the selected responsibility requires it.
+        - Read back every affected Issue URL, number, body, and state. Do not request an extra approval gate or create a local Issue database.
+      reviewer_prompt:
+        - Verify the candidate boundary, repository routing, no-mutation foreign-repository handoff, and idempotent update/no-op behavior.
+    capacity_request:
+      schema_id: task_catalog_capacity_request_v1
+      policy_id: topology_derived_v1
+      topology_source: role_topology
+      write_scope_source: team_manifest.run.write_scopes
+      capacity_policy_ref: agents/capacity_policy.toml
+      target_state_gate_ref: implementation_execution_contract_v1
+    role_topology: *standard_role_topology
+    roles:
+      always_on: []
+      specialists:
+        - publisher
+    tasks:
+      - T15
+
 tasks:
   - id: T1
     name: local bug fix
@@ -764,6 +797,11 @@ tasks:
     family: skill_evaluation
     specialists:
       - skill_evaluator
+  - id: T15
+    name: explicit IssueWorker feedback publication and Issue reorganization (publisher)
+    family: issue_worker_publication
+    specialists:
+      - publisher
 
 review_packs:
   - id: research_perspective_review

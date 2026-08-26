@@ -2297,6 +2297,13 @@ def render_subagent_prompt_packet(
         f"{indent}  tool_evidence: 'run.repo_tool_routing_policy.dynamic_skill_routing'"
     )
     lines.append(f"{indent}  tool_catalog_matches: 'tools/catalog.yaml'")
+    for key in ("dispatch_route", "execution_role", "tool_call_route"):
+        value = _as_optional_string(
+            prompt.get(key),
+            f"subagent_prompt.{key}",
+        )
+        if value:
+            lines.append(f"{indent}  {key}: {value!r}")
     lines.append(f"{indent}  required_tool_fields:")
     lines.append(f"{indent}    - tool_route")
     lines.append(f"{indent}    - tool_call_tokens")

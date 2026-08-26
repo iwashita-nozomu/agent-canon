@@ -46,6 +46,10 @@ from report_artifact_checks import (  # noqa: E402
 )
 from runtime_log_paths import eval_result_search_dirs  # noqa: E402
 from runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary  # noqa: E402
+from issue_sync import (  # noqa: E402
+    IssueWorkerHandoff,
+    qualify_issue_worker_finding,
+)
 
 STATUS_RE = re.compile(r"\b[A-Z_]*STATUS=(pass|fail|skip)\b")
 
@@ -382,6 +386,7 @@ class RuntimeDashboardSummary:
     markdown_docs_breakdown: MarkdownDocsBreakdown
     reference_capture_breakdown: ReferenceCaptureBreakdown
     selection_metrics_breakdown: SelectionMetricsBreakdown
+    issue_worker_handoffs: tuple[IssueWorkerHandoff, ...] = ()
 
 
 class ResultFamilyReader:
@@ -1186,6 +1191,55 @@ class SelectionMetricsReader:
         return filtered
 
 
+def issue_worker_candidate_records(entry: Mapping[str, object]) -> tuple[Mapping[str, object], ...]:
+    """Return explicit IssueWorker candidate records from one hook event.
+
+    Dashboard collection never infers a finding from counts or selection
+    misses.  Only an event carrying an explicit candidate mapping/list enters
+    the typed qualification route.
+    """
+    values: list[object] = []
+    for key in ("issue_worker_candidates", "issue_worker_candidate"):
+        value = entry.get(key)
+        if isinstance(value, Mapping):
+            values.append(value)
+        elif isinstance(value, list):
+            values.extend(value)
+    return tuple(
+        cast(Mapping[str, object], value)
+        for value in values
+        if isinstance(value, Mapping)
+    )
+
+
+def read_issue_worker_handoffs(
+    hook_files: Sequence[Path],
+    recent_cutoff_epoch: int | None = None,
+) -> tuple[IssueWorkerHandoff, ...]:
+    """Collect typed IssueWorker candidates without performing mutation."""
+    handoffs: list[IssueWorkerHandoff] = []
+    for hook_file in hook_files:
+        for entry in HookWorkflowBreakdownReader.iter_entries(
+            hook_file, recent_cutoff_epoch
+        ):
+            for candidate in issue_worker_candidate_records(entry):
+                # Repository ownership comes from the #938 checkout readback,
+                # never from a candidate's self-claimed authentication field.
+                identity = entry.get("checkout_identity")
+                authenticated_repository = (
+                    str(identity.get("remote") or "").strip()
+                    if isinstance(identity, Mapping)
+                    else ""
+                )
+                handoffs.append(
+                    qualify_issue_worker_finding(
+                        candidate,
+                        authenticated_repository=authenticated_repository,
+                    )
+                )
+    return tuple(handoffs)
+
+
 class RuntimeDashboardVisuals:
     """Renders reader-facing visual dashboard sections."""
 
@@ -1395,11 +1449,12 @@ class RuntimeDashboardVisuals:
 
     def issue_row(self) -> str:
         """Return the durable issue action-map row."""
+        handoff_count = len(getattr(self.summary, "issue_worker_handoffs", ()))
         return action_map_row(
             "durable issues",
-            "triage open issues before claiming workflow health",
-            len(self.summary.evidence.github_issue_refs),
-            bool(self.summary.evidence.github_issue_refs),
+            "route explicit IssueWorker candidates through the host publisher",
+            len(self.summary.evidence.github_issue_refs) + handoff_count,
+            bool(self.summary.evidence.github_issue_refs) or handoff_count > 0,
         )
 
 
@@ -1484,6 +1539,10 @@ class AgentRuntimeDashboard:
             selection_metrics_breakdown=SelectionMetricsReader(
                 self.root, self.runtime_root
             ).read(
+                hook_files,
+                self.recent_cutoff_epoch,
+            ),
+            issue_worker_handoffs=read_issue_worker_handoffs(
                 hook_files,
                 self.recent_cutoff_epoch,
             ),
@@ -1703,6 +1762,10 @@ def compact_evidence_drilldown_lines(summary: RuntimeDashboardSummary) -> list[s
         "",
         *compact_selection_evidence_drilldown_lines(summary),
         "",
+        "### IssueWorker Routing Drilldown",
+        "",
+        *compact_issue_worker_drilldown_lines(summary),
+        "",
         "### Markdown And Prompt Drilldown",
         "",
         *compact_markdown_prompt_drilldown_lines(summary),
@@ -1722,6 +1785,19 @@ def compact_evidence_drilldown_lines(summary: RuntimeDashboardSummary) -> list[s
         "### Reference Capture Drilldown",
         "",
         *compact_reference_capture_drilldown_lines(summary),
+    ]
+
+
+def compact_issue_worker_drilldown_lines(summary: RuntimeDashboardSummary) -> list[str]:
+    """Return typed IssueWorker candidate outcomes without raw log excerpts."""
+    handoffs = getattr(summary, "issue_worker_handoffs", ())
+    counts = Counter(handoff.status for handoff in handoffs)
+    return [
+        "| outcome | count |",
+        "| --- | ---: |",
+        f"| `qualified` | `{counts.get('qualified', 0)}` |",
+        f"| `handoff` | `{counts.get('handoff', 0)}` |",
+        f"| `no-action` | `{counts.get('no-action', 0)}` |",
     ]
 
 
@@ -2019,6 +2095,21 @@ def dashboard_repair_payload(summary: RuntimeDashboardSummary) -> dict[str, obje
             selection_metric_payload(row)
             for row in top_selection_misses(summary)
         ],
+        "issue_worker": issue_worker_payload(summary),
+    }
+
+
+def issue_worker_payload(summary: RuntimeDashboardSummary) -> dict[str, object]:
+    """Return IssueWorker outcomes without exposing raw hook entries."""
+    handoffs = getattr(summary, "issue_worker_handoffs", ())
+    counts = Counter(handoff.status for handoff in handoffs)
+    reasons = Counter(handoff.reason for handoff in handoffs)
+    return {
+        "qualified": counts.get("qualified", 0),
+        "routeable": sum(handoff.can_route for handoff in handoffs),
+        "handoff": counts.get("handoff", 0),
+        "no_action": counts.get("no-action", 0),
+        "reasons": dict(sorted(reasons.items())),
     }
 
 
@@ -2948,7 +3039,7 @@ def issue_route_row(summary: RuntimeDashboardSummary, signal: str, slug: str, re
 
 def issue_by_slug(summary: RuntimeDashboardSummary, slug: str) -> str | None:
     """Return a repository-qualified GitHub Issue URL containing the slug."""
-    for issue in summary.evidence.github_issue_refs:
+    for issue in getattr(summary.evidence, "github_issue_refs", ()):
         if slug in issue:
             return issue
     return None
@@ -3456,7 +3547,38 @@ def token_usage_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboard
 
 
 def durable_issue_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardNextAction, ...]:
-    """Return the next action for open durable issues."""
+    """Return the next host-publisher action for explicit IssueWorker candidates."""
+    handoffs = getattr(summary, "issue_worker_handoffs", ())
+    qualified = tuple(handoff for handoff in handoffs if handoff.qualifies)
+    routeable = tuple(
+        handoff
+        for handoff in handoffs
+        if getattr(handoff, "can_route", handoff.qualifies)
+    )
+    if routeable:
+        repositories = ", ".join(sorted({handoff.repository for handoff in routeable}))
+        unresolved = len(routeable) - len(qualified)
+        action = (
+            "investigate IssueWorker evidence gaps"
+            if unresolved
+            else "publish explicit IssueWorker candidates"
+        )
+        reason = (
+            f"{unresolved} same-repository candidate(s) need publisher investigation"
+            if unresolved
+            else f"{len(qualified)} same-repository candidate(s) require host publication"
+        )
+        return (DashboardNextAction(
+            priority="P1",
+            action=action,
+            reason=reason,
+            evidence=repositories,
+            owner_surface="IssueWorker publisher and GitHub Issue readback",
+            command="route the typed handoff to the publisher role; dashboard remains read-only",
+            done_condition="each candidate is created, updated, reorganized, or explicitly deferred with readback",
+            issue="`issue-worker`",
+            automation="host-publisher",
+        ),)
     if not summary.evidence.github_issue_refs:
         return ()
     issue = summary.evidence.github_issue_refs[0]
@@ -3584,6 +3706,10 @@ def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"AGENT_RUNTIME_DASHBOARD_NEXT_ACTIONS={len(dashboard_next_actions(summary))}",
         f"AGENT_RUNTIME_DASHBOARD_BLOCKING_NEXT_ACTIONS={blocking_next_action_count(summary)}",
         f"AGENT_RUNTIME_DASHBOARD_GITHUB_ISSUE_REFS={len(summary.evidence.github_issue_refs)}",
+        f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_QUALIFIED={sum(handoff.qualifies for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",
+        f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_ROUTEABLE={sum(handoff.can_route for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",
+        f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_HANDOFFS={sum(handoff.status == 'handoff' for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",
+        f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_NO_ACTION={sum(handoff.status == 'no-action' for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",
     ]
 
 
