@@ -18,6 +18,7 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "generate_agent_runtime_dashboard.py"
@@ -288,37 +289,46 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         """Container-style relative outputs stay outside the analyzed checkout."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            self.write_fixture(root)
+            private_log = self.runtime_root.parent / "private-log"
+            private_log.mkdir()
             output_dir = self.runtime_root / "reports" / "agent-runtime-dashboard"
             output = output_dir / "dashboard.md"
             compact_output = output_dir / "agent-log-analysis-compact.md"
             api_output = output_dir / "agent-log-analysis-api.json"
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--root",
-                    ".",
-                    "--out",
-                    "reports/agent-runtime-dashboard/dashboard.md",
-                    "--compact-out",
-                    "reports/agent-runtime-dashboard/agent-log-analysis-compact.md",
-                    "--api-out",
-                    "reports/agent-runtime-dashboard/agent-log-analysis-api.json",
-                ],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            payload = json.loads(api_output.read_text(encoding="utf-8"))
-            compact_dashboard = compact_output.read_text(encoding="utf-8")
+            with patch.dict(
+                os.environ,
+                {"AGENT_CANON_HOOK_ARCHIVE_DIR": str(private_log)},
+            ):
+                self.write_fixture(root)
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT),
+                        "--root",
+                        ".",
+                        "--out",
+                        "reports/agent-runtime-dashboard/dashboard.md",
+                        "--compact-out",
+                        "reports/agent-runtime-dashboard/agent-log-analysis-compact.md",
+                        "--api-out",
+                        "reports/agent-runtime-dashboard/agent-log-analysis-api.json",
+                    ],
+                    cwd=root,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                payload = json.loads(api_output.read_text(encoding="utf-8"))
+                compact_dashboard = compact_output.read_text(encoding="utf-8")
+                dashboard = output.read_text(encoding="utf-8")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(output.is_file())
         self.assertTrue(compact_output.is_file())
         self.assertTrue(api_output.is_file())
+        self.assertTrue(private_log.is_dir())
+        self.assertIn(private_log.as_posix(), dashboard)
         self.assertFalse((root / "reports").exists())
         self.assertEqual(payload["schema"], "agent_runtime_dashboard.v1")
         for field in (

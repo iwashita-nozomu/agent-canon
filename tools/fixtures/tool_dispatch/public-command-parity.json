@@ -7,7 +7,7 @@
       "probe_args": ["--help"],
       "observed": {
         "argv": ["python3", "tools/agent_tools/generate_agent_runtime_dashboard.py"],
-        "cwd": "source-root",
+        "cwd": "target-root",
         "stdin": "inherited",
         "stdout": "inherited",
         "stderr": "inherited",

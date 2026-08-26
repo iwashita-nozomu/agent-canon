@@ -265,6 +265,24 @@ class RuntimeLogPathsTest(unittest.TestCase):
                 with self.assertRaises(RuntimePathEscape):
                     hook_event_spool_root(source, runtime)
 
+    def test_explicit_archive_override_reads_external_private_log_mount(self) -> None:
+        """Dashboard readers may use the already-mounted private archive checkout."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source"
+            runtime = root / "runtime"
+            private_log = root / "private-log"
+            source.mkdir()
+            runtime.mkdir()
+            private_log.mkdir()
+            with patch.dict(
+                os.environ,
+                {"AGENT_CANON_HOOK_ARCHIVE_DIR": str(private_log)},
+            ):
+                dirs = hook_result_search_dirs(source, source, runtime)
+
+        self.assertEqual(dirs[0], private_log / "hook-runs" / repo_log_key(source))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -70,6 +70,57 @@ CONTAINER_RUNTIME_DESTINATION = "/var/lib/agent-canon/runtime"
 PRIVATE_LOG_DESTINATION = "/var/lib/agent-canon/private-log"
 REGISTRY_DESTINATION = "/var/lib/agent-canon/mount-registry.toml"
 CODEX_SESSION_ROOT_ENV = "AGENT_CANON_CODEX_SESSION_ROOT"
+TOOL_SOURCE_DESTINATION = "/usr/local/share/agent-canon/runtime"
+TOOL_ENVIRONMENT_KEYS = frozenset(
+    {
+        "PATH",
+        "PYTHONPATH",
+        "PYTHONHOME",
+        "HOME",
+        "USER",
+        "LOGNAME",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "TZ",
+        "TMPDIR",
+        "RUST_BACKTRACE",
+        "CARGO_TERM_COLOR",
+        "AGENT_CANON_SOURCE_ROOT",
+        "AGENT_CANON_ROOT",
+        "AGENT_CANON_DISPATCH_ENTRY_ID",
+        "AGENT_CANON_DISPATCH_RUNTIME",
+        "AGENT_CANON_RUNTIME_ROOT",
+        "AGENT_CANON_CONTROL_PARENT_ROOT",
+        "AGENT_CANON_TASK_ROOT",
+        "AGENT_CANON_TARGET_ROOT",
+        "AGENT_CANON_EXPLICIT_CWD",
+        "AGENT_CANON_OUTPUT_ROOT",
+        "AGENT_CANON_MOUNT_REGISTRY",
+        "AGENT_CANON_HOOK_ARCHIVE_DIR",
+        "AGENT_CANON_LOG_ROOT",
+        CODEX_SESSION_ROOT_ENV,
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_KEY_0",
+        "GIT_CONFIG_VALUE_0",
+    }
+)
+TOOL_PATH_ENVIRONMENT_KEYS = frozenset(
+    {
+        "AGENT_CANON_SOURCE_ROOT",
+        "AGENT_CANON_ROOT",
+        "AGENT_CANON_RUNTIME_ROOT",
+        "AGENT_CANON_CONTROL_PARENT_ROOT",
+        "AGENT_CANON_TASK_ROOT",
+        "AGENT_CANON_TARGET_ROOT",
+        "AGENT_CANON_EXPLICIT_CWD",
+        "AGENT_CANON_OUTPUT_ROOT",
+        "AGENT_CANON_MOUNT_REGISTRY",
+        "AGENT_CANON_HOOK_ARCHIVE_DIR",
+        "AGENT_CANON_LOG_ROOT",
+        CODEX_SESSION_ROOT_ENV,
+    }
+)
 # This is the only historical source of runtime state that the bootstrap may
 # migrate.  It is intentionally a fixed path; arbitrary source/workspace
 # directories are never scanned or adopted.
@@ -1148,16 +1199,7 @@ class DockerAdapter:
                 ) from exc
         command = [self.executable, "exec", "--workdir", cwd]
         for key, value in sorted((environment or {}).items()):
-            if key not in {
-                "AGENT_CANON_TARGET_ROOT",
-                "AGENT_CANON_TASK_ROOT",
-                "GIT_CONFIG_COUNT",
-                "GIT_CONFIG_KEY_0",
-                "GIT_CONFIG_VALUE_0",
-                "AGENT_CANON_OUTPUT_ROOT",
-                "AGENT_CANON_LOG_ROOT",
-                "AGENT_CANON_RUNTIME_ROOT",
-            }:
+            if key not in TOOL_ENVIRONMENT_KEYS:
                 raise BootstrapError("environment_rejected", key)
             command.extend(("--env", f"{key}={value}"))
         command.extend((identifier, *argv))
@@ -4161,6 +4203,10 @@ class BootstrapRuntime:
                     "GIT_CONFIG_COUNT": "1",
                     "GIT_CONFIG_KEY_0": "safe.directory",
                     "GIT_CONFIG_VALUE_0": f"/targets/{target['digest']}",
+                    # Runtime log readers use the existing explicit archive
+                    # override. The host-owned private-log bind is the sole
+                    # accumulated archive; runtime/ is only task exchange.
+                    "AGENT_CANON_HOOK_ARCHIVE_DIR": PRIVATE_LOG_DESTINATION,
                     "AGENT_CANON_LOG_ROOT": PRIVATE_LOG_DESTINATION,
                     "AGENT_CANON_RUNTIME_ROOT": CONTAINER_RUNTIME_DESTINATION,
                 }
@@ -4293,6 +4339,28 @@ class BootstrapRuntime:
                     raise BootstrapError(
                         "target_not_registered", "tool run root is not registered"
                     )
+        if environment is None:
+            # Direct ``bootstrap.sh tool run`` calls do not carry the host
+            # dispatcher request envelope. Resolve only the catalog's declared
+            # output capability so external-artifact tools still receive a
+            # non-root container runtime output capability; read-only tools
+            # continue to receive no output capability at all.
+            environment = {}
+            try:
+                from .tool_dispatch import load_specs  # type: ignore[import-not-found]
+            except ImportError:
+                from tool_dispatch import load_specs  # type: ignore[no-redef]
+            try:
+                specs, _schema = load_specs(self.repository_root)
+                spec = specs.get(catalog_id)
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                raise BootstrapError("tool_catalog_invalid", "cannot resolve tool output capability") from exc
+            if spec is not None and spec.output_root == "external-runtime":
+                environment = {
+                    "AGENT_CANON_OUTPUT_ROOT": f"{CONTAINER_RUNTIME_DESTINATION}/tool-output"
+                }
+            elif spec is not None and spec.output_root == "explicit-target":
+                environment = {"AGENT_CANON_OUTPUT_ROOT": str(target["root"])}
         return self.exec(
             Path(target["root"]),
             [
@@ -5279,6 +5347,135 @@ def _container_source_identity(
     }
 
 
+def _request_string(request: Mapping[str, Any], key: str) -> str:
+    """Read one non-empty request string without accepting control bytes."""
+    value = request.get(key)
+    if not isinstance(value, str) or not value or any(char in value for char in "\x00\n\r"):
+        raise BootstrapError("invalid_exec_request", f"request field is invalid: {key}")
+    return value
+
+
+def _container_target_for_request(
+    runtime: BootstrapRuntime, request: Mapping[str, Any]
+) -> tuple[Path, Path, Path, Path]:
+    """Resolve a host request to its registered container target and roots."""
+    requested_target = Path(_request_string(request, "target_root")).resolve(strict=False)
+    source_root = Path(_request_string(request, "source_root")).resolve(strict=False)
+    environment = request.get("environment")
+    if not isinstance(environment, Mapping):
+        raise BootstrapError("invalid_exec_request", "request environment must be a mapping")
+    host_runtime = Path(_request_string(environment, "AGENT_CANON_RUNTIME_ROOT")).resolve(strict=False)
+    host_control = Path(_request_string(environment, "AGENT_CANON_CONTROL_PARENT_ROOT")).resolve(strict=False)
+    digest = os.environ.get("AGENT_CANON_TARGET_DIGEST", "")
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", digest):
+        raise BootstrapError("invalid_exec_request", "registered target digest is missing")
+    state = runtime._read_state()
+    targets = state.get("targets", {})
+    target = targets.get(digest) if isinstance(targets, Mapping) else None
+    if not isinstance(target, dict):
+        raise BootstrapError("target_not_registered", "request target is not registered")
+    host_root_value = target.get("host_root")
+    container_root = target.get("root")
+    if (
+        not isinstance(host_root_value, str)
+        or not host_root_value
+        or not isinstance(container_root, str)
+        or container_root != f"/targets/{digest}"
+        or requested_target != Path(host_root_value).resolve(strict=False)
+    ):
+        raise BootstrapError("invalid_exec_request", "request target does not match its registered mount")
+    return source_root, host_runtime, host_control, Path(container_root)
+
+
+def _map_request_path(
+    value: str,
+    *,
+    source_root: Path,
+    host_runtime: Path,
+    host_control: Path,
+    host_target: Path,
+    container_target: Path,
+) -> str:
+    """Map a validated host path into one of the fixed container mounts."""
+    candidate = Path(value)
+    if not candidate.is_absolute():
+        raise BootstrapError("invalid_exec_request", "path-valued environment must be absolute")
+    resolved = candidate.resolve(strict=False)
+    if resolved == source_root:
+        return TOOL_SOURCE_DESTINATION
+    if resolved == host_target or host_target in resolved.parents:
+        relative = resolved.relative_to(host_target)
+        return (container_target / relative).as_posix()
+    if resolved == host_runtime or host_runtime in resolved.parents:
+        relative = resolved.relative_to(host_runtime)
+        return (Path(CONTAINER_RUNTIME_DESTINATION) / relative).as_posix()
+    if resolved == host_control:
+        return "/var/lib/agent-canon"
+    raise BootstrapError(
+        "invalid_exec_request",
+        f"path-valued environment escapes registered mounts: {value}",
+    )
+
+
+def _container_request_environment(
+    request: Mapping[str, Any],
+    *,
+    container_target: Path,
+    source_root: Path,
+    host_runtime: Path,
+    host_control: Path,
+) -> dict[str, str]:
+    """Validate and map the structured tool environment for Docker exec."""
+    raw = request.get("environment")
+    if not isinstance(raw, Mapping) or not all(isinstance(key, str) for key in raw):
+        raise BootstrapError("invalid_exec_request", "request environment must be a string-keyed mapping")
+    host_target_value = _request_string(request, "target_root")
+    host_target = Path(host_target_value).resolve(strict=False)
+    result: dict[str, str] = {}
+    for key, value in raw.items():
+        if key not in TOOL_ENVIRONMENT_KEYS or not isinstance(value, str) or any(
+            char in value for char in "\x00\n\r"
+        ):
+            raise BootstrapError("invalid_exec_request", f"request environment key is not allowlisted: {key}")
+        if key in TOOL_PATH_ENVIRONMENT_KEYS:
+            if key in {"AGENT_CANON_SOURCE_ROOT", "AGENT_CANON_ROOT"} and Path(value).resolve(strict=False) != source_root:
+                raise BootstrapError("invalid_exec_request", f"source path does not match request: {key}")
+            if key == "AGENT_CANON_RUNTIME_ROOT" and Path(value).resolve(strict=False) != host_runtime:
+                raise BootstrapError("invalid_exec_request", "runtime path does not match request")
+            if key == "AGENT_CANON_CONTROL_PARENT_ROOT" and Path(value).resolve(strict=False) != host_control:
+                raise BootstrapError("invalid_exec_request", "control path does not match request")
+            if key in {"AGENT_CANON_TARGET_ROOT", "AGENT_CANON_TASK_ROOT"} and Path(value).resolve(strict=False) != host_target:
+                raise BootstrapError("invalid_exec_request", f"target path does not match request: {key}")
+            if key == "AGENT_CANON_MOUNT_REGISTRY":
+                result[key] = REGISTRY_DESTINATION
+                continue
+            if key in {"AGENT_CANON_HOOK_ARCHIVE_DIR", "AGENT_CANON_LOG_ROOT"}:
+                if Path(value).resolve(strict=False) != host_control / "private-log":
+                    raise BootstrapError("invalid_exec_request", f"archive path does not match private log mount: {key}")
+                result[key] = PRIVATE_LOG_DESTINATION
+                continue
+            result[key] = _map_request_path(
+                value,
+                source_root=source_root,
+                host_runtime=host_runtime,
+                host_control=host_control,
+                host_target=host_target,
+                container_target=container_target,
+            )
+        else:
+            result[key] = value
+    output = request.get("output_root")
+    output_env = raw.get("AGENT_CANON_OUTPUT_ROOT")
+    if output is None:
+        if output_env is not None:
+            raise BootstrapError("invalid_exec_request", "output environment is present without output_root")
+    elif not isinstance(output, str) or not output:
+        raise BootstrapError("invalid_exec_request", "request output_root is invalid")
+    elif output_env != output:
+        raise BootstrapError("invalid_exec_request", "output_root and output environment differ")
+    return result
+
+
 def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
     """Apply only state/tool-plane operations after host Docker activation."""
     operation = args.operation
@@ -5561,9 +5758,47 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
         command = list(args.command)
         command = command[1:] if command and command[0] == "--" else command
         if args.request_json:
-            raise BootstrapError(
-                "container_control_unsupported",
-                "structured exec requests remain on the host adapter route",
+            try:
+                request = json.loads(args.request_json)
+            except json.JSONDecodeError as exc:
+                raise BootstrapError("invalid_exec_request", "request is not JSON") from exc
+            allowed = {
+                "schema", "tool_id", "argv", "child_args", "source_root", "cwd",
+                "cwd_policy", "target_root", "environment", "stdin", "stdout",
+                "stderr", "exit", "signal", "side_effect", "output_root",
+                "written_paths",
+            }
+            if not isinstance(request, dict) or set(request) - allowed:
+                raise BootstrapError("invalid_exec_request", "request fields are invalid")
+            if request.get("schema") != "agent-canon.tool-exec-request.v1":
+                raise BootstrapError("invalid_exec_request", "request schema is invalid")
+            tool_id = request.get("tool_id")
+            child_args = request.get("child_args")
+            descriptor_argv = request.get("argv")
+            if (
+                not isinstance(tool_id, str)
+                or not SAFE_ID.fullmatch(tool_id)
+                or not isinstance(child_args, list)
+                or any(not isinstance(item, str) or "\x00" in item for item in child_args)
+                or not isinstance(descriptor_argv, list)
+                or any(not isinstance(item, str) or "\x00" in item for item in descriptor_argv)
+            ):
+                raise BootstrapError("invalid_exec_request", "tool or argv is invalid")
+            source_root, host_runtime, host_control, container_target = (
+                _container_target_for_request(runtime, request)
+            )
+            environment = _container_request_environment(
+                request,
+                container_target=container_target,
+                source_root=source_root,
+                host_runtime=host_runtime,
+                host_control=host_control,
+            )
+            return runtime.tool_run(
+                tool_id,
+                child_args,
+                root=container_target,
+                environment=environment,
             )
         return runtime.exec(Path(args.root), command)
     if operation == "tool" and args.tool_operation == "run":

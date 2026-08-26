@@ -28,12 +28,14 @@ try:
     from .runtime_artifacts import (
         RUNTIME_ROOT_ENV,
         RuntimeArtifactBoundary,
+        RuntimePathEscape,
         runtime_artifact_boundary,
     )
 except ImportError:
     from runtime_artifacts import (  # type: ignore[no-redef]
         RUNTIME_ROOT_ENV,
         RuntimeArtifactBoundary,
+        RuntimePathEscape,
         runtime_artifact_boundary,
     )
 
@@ -261,7 +263,19 @@ def _log_archive_root(canon_root: Path, runtime_root: Path | str | None = None) 
     """Return the active hook log archive root."""
     override = os.environ.get(HOOK_ARCHIVE_DIR_ENV, "").strip()
     if override:
-        return runtime_boundary(canon_root, runtime_root).resolve(Path(override))
+        candidate = Path(override).expanduser()
+        if not candidate.is_absolute():
+            return runtime_boundary(canon_root, runtime_root).resolve(candidate)
+        try:
+            if candidate.is_symlink():
+                raise RuntimePathEscape(f"explicit archive root is a symlink: {candidate}")
+            resolved = candidate.resolve(strict=False)
+            source = canon_root.expanduser().resolve()
+        except OSError as exc:
+            raise RuntimePathEscape(f"explicit archive root is unavailable: {candidate}") from exc
+        if resolved == source or source in resolved.parents:
+            raise RuntimePathEscape(f"explicit archive root is inside source: {resolved}")
+        return resolved
     mount = mounted_log_archive_root(canon_root, runtime_root)
     if mount.is_dir():
         return mount

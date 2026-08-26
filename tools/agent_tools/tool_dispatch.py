@@ -45,7 +45,7 @@ CATALOG_RELATIVE = Path("tools/catalog.yaml")
 ID_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789-")
 ALLOWED_RUNTIMES = frozenset({"python", "rust"})
 ALLOWED_PLANES = frozenset({"tool-container"})
-ALLOWED_CWDS = frozenset({"source-root", "task-root", "explicit"})
+ALLOWED_CWDS = frozenset({"source-root", "target-root", "task-root", "explicit"})
 ALLOWED_ENVS = frozenset({"allowlisted", "clean"})
 ALLOWED_IO = frozenset({"inherited", "captured"})
 ALLOWED_EXITS = frozenset({"propagate", "normalize-signal"})
@@ -518,7 +518,11 @@ def _cwd_for(root: Path, spec: ToolSpec, runtime: Path) -> Path:
         if not cwd.is_dir():
             raise DispatchError("invalid-cwd", str(cwd))
         return cwd
-    if spec.cwd_policy == "task-root":
+    if spec.cwd_policy == "target-root":
+        value = os.environ.get("AGENT_CANON_TARGET_ROOT")
+        if not value:
+            raise DispatchError("missing-target-root", spec.tool_id)
+    elif spec.cwd_policy == "task-root":
         value = os.environ.get("AGENT_CANON_TASK_ROOT")
         if not value:
             raise DispatchError("missing-task-root", spec.tool_id)

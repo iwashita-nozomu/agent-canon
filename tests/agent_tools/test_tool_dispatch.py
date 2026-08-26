@@ -41,7 +41,7 @@ class ToolDispatchTest(unittest.TestCase):
             self.assertIsInstance(spec.argv, tuple)
             self.assertTrue(spec.argv)
             self.assertEqual(spec.execution_plane, "tool-container")
-            self.assertIn(spec.cwd_policy, {"source-root", "task-root", "explicit"})
+            self.assertIn(spec.cwd_policy, {"source-root", "target-root", "task-root", "explicit"})
             self.assertIn(spec.env_policy, {"allowlisted", "clean"})
             self.assertIn(spec.side_effect_policy, {"read-only", "external-artifact", "explicit-target-write"})
             self.assertTrue(spec.parity_fixture)
@@ -80,7 +80,7 @@ class ToolDispatchTest(unittest.TestCase):
             ("python3", "tools/agent_tools/generate_agent_runtime_dashboard.py"),
         )
         self.assertEqual(dashboard.execution_plane, "tool-container")
-        self.assertEqual(dashboard.cwd_policy, "source-root")
+        self.assertEqual(dashboard.cwd_policy, "target-root")
         self.assertEqual(dashboard.side_effect_policy, "external-artifact")
         self.assertEqual(dashboard.output_root, "external-runtime")
         self.assertEqual(dashboard.written_paths, ())
@@ -96,7 +96,7 @@ class ToolDispatchTest(unittest.TestCase):
                     "tools/agent_tools/generate_agent_runtime_dashboard.py",
                 ],
                 "execution_plane": "tool-container",
-                "cwd": "source-root",
+                "cwd": "target-root",
                 "env": "allowlisted",
                 "stdin": "inherited",
                 "stdout": "inherited",
@@ -127,6 +127,7 @@ class ToolDispatchTest(unittest.TestCase):
             "python3",
             "tools/agent_tools/generate_agent_runtime_dashboard.py",
         ]
+        parity["entries"][0]["observed"]["cwd"] = "target-root"
         fixture.write_text(json.dumps(parity), encoding="utf-8")
         with patch(
             "tools.agent_tools.tool_dispatch.subprocess.run",
