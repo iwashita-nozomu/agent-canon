@@ -22,12 +22,14 @@ from typing import Mapping
 try:
     from .writer_target import (
         WRITER_TARGET_PACKET_RELATIVE,
+        WriterTarget,
         WriterTargetError,
         read_writer_target_packet,
     )
 except ImportError:
     from writer_target import (  # type: ignore[no-redef]
         WRITER_TARGET_PACKET_RELATIVE,
+        WriterTarget,
         WriterTargetError,
         read_writer_target_packet,
     )
@@ -65,6 +67,13 @@ MUTATING_COMMANDS = frozenset(
     {"apply_patch", "cargo", "chmod", "cp", "docker", "make", "mkdir", "mv", "perl", "pytest", "python", "python3", "rm", "sed", "tee", "touch"}
 )
 PATCH_PATH_RE = re.compile(r"^\*\*\*\s+(?:Update|Add|Delete) File:\s*(.+?)\s*$", re.MULTILINE)
+SHELL_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+SHELL_CONTROL_TOKENS = frozenset(
+    {";", "&&", "||", "|", "&", "(", ")", ";;", ";&", ";;&"}
+)
+SHELL_COMMAND_PREFIXES = frozenset({"env", "command", "sudo", "exec", "builtin", "time", "!"})
+OPAQUE_SHELL_COMMANDS = frozenset({".", "source", "eval", "xargs"})
+SHELL_ANALYSIS_MAX_DEPTH = 32
 
 
 @dataclass(frozen=True)
@@ -164,12 +173,372 @@ def _command_segments(command: str) -> tuple[tuple[str, ...], ...]:
         return ()
     segments: list[list[str]] = [[]]
     for token in tokens:
-        if token in {";", "&&", "||", "|", "&", "(", ")"}:
+        if token in SHELL_CONTROL_TOKENS:
             if segments[-1]:
                 segments.append([])
             continue
         segments[-1].append(token)
     return tuple(tuple(segment) for segment in segments if segment)
+
+
+def _backtick_bodies(command: str) -> tuple[tuple[str, ...], bool]:
+    """Extract executable backtick substitutions without treating literals as code."""
+    bodies: list[str] = []
+    current: list[str] | None = None
+    single_quoted = False
+    escaped = False
+    for character in command:
+        if escaped:
+            if current is not None:
+                current.append(character)
+            escaped = False
+            continue
+        if character == "\\" and not single_quoted:
+            escaped = True
+            if current is not None:
+                current.append(character)
+            continue
+        if character == "'" and current is None:
+            single_quoted = not single_quoted
+            continue
+        if character == "#" and current is None and not single_quoted:
+            break
+        if character == "`" and not single_quoted:
+            if current is None:
+                current = []
+            else:
+                bodies.append("".join(current))
+                current = None
+            continue
+        if current is not None:
+            current.append(character)
+    # An unmatched backtick is retained as ordinary shell text here.  The
+    # canonical Git safety parser owns malformed/protected Git substitutions;
+    # treating every unmatched non-Git backtick as a write would regress the
+    # existing read-only command contract.
+    return tuple(bodies), False
+
+
+def _shell_dynamic_expansion(value: str) -> bool:
+    """Return whether a nested shell string contains an unknown variable expansion."""
+    single_quoted = False
+    escaped = False
+    for index, character in enumerate(value):
+        if escaped:
+            escaped = False
+            continue
+        if character == "\\" and not single_quoted:
+            escaped = True
+            continue
+        if character == "'":
+            single_quoted = not single_quoted
+            continue
+        if single_quoted or character != "$" or index + 1 >= len(value):
+            continue
+        following = value[index + 1]
+        if following.isalpha() or following == "_" or following == "{":
+            return True
+    return False
+
+
+def _shell_path(
+    value: str,
+    *,
+    cwd: Path,
+    active_root: Path | None,
+) -> tuple[str, bool]:
+    """Normalize a shell path and report whether it leaves the active checkout."""
+    candidate = Path(value).expanduser()
+    if not candidate.is_absolute():
+        candidate = cwd / candidate
+    if active_root is None:
+        return str(candidate), candidate.is_absolute()
+    resolved = candidate.resolve(strict=False)
+    root = active_root.resolve(strict=False)
+    try:
+        relative = resolved.relative_to(root)
+    except ValueError:
+        return str(resolved), True
+    return (relative.as_posix() if relative.parts else "."), False
+
+
+def _command_index(segment: tuple[str, ...]) -> int | None:
+    """Find the executable token after assignments and shell command prefixes."""
+    index = 0
+    while index < len(segment):
+        token = segment[index]
+        if SHELL_ASSIGNMENT_RE.match(token):
+            index += 1
+            continue
+        if token in SHELL_COMMAND_PREFIXES:
+            index += 1
+            if token == "env":
+                while index < len(segment) and SHELL_ASSIGNMENT_RE.match(segment[index]):
+                    index += 1
+            continue
+        return index
+    return None
+
+
+def _git_subcommand(git_args: tuple[str, ...]) -> tuple[str, tuple[str, ...]]:
+    """Find a Git subcommand while consuming global options with their values."""
+    index = 0
+    value_options = {"-C", "--git-dir", "--work-tree", "-c", "--config-env"}
+    while index < len(git_args):
+        token = git_args[index]
+        if token == "--":
+            index += 1
+            break
+        if token in value_options:
+            index += 2
+            continue
+        if any(token.startswith(option + "=") for option in value_options):
+            index += 1
+            continue
+        if token.startswith("-"):
+            index += 1
+            continue
+        break
+    if index >= len(git_args):
+        return "", ()
+    return git_args[index], git_args[index + 1 :]
+
+
+def _git_repository_redirect(
+    git_args: tuple[str, ...],
+    *,
+    cwd: Path,
+    active_root: Path | None,
+) -> tuple[tuple[str, ...], str | None]:
+    """Find Git options that redirect work-tree or repository metadata."""
+    paths: list[str] = []
+    index = 0
+    for index, token in enumerate(git_args):
+        option: str | None = None
+        value: str | None = None
+        if token in {"--git-dir", "--work-tree"}:
+            option = token
+            if index + 1 >= len(git_args):
+                return tuple(paths), "git_repository_redirect_unresolved"
+            value = git_args[index + 1]
+        elif token.startswith("--git-dir="):
+            option, value = "--git-dir", token.removeprefix("--git-dir=")
+        elif token.startswith("--work-tree="):
+            option, value = "--work-tree", token.removeprefix("--work-tree=")
+        if option is None or value is None:
+            continue
+        if not value:
+            return tuple(paths), "git_repository_redirect_unresolved"
+        normalized, _outside = _shell_path(value, cwd=cwd, active_root=active_root)
+        paths.append(normalized)
+        return tuple(paths), "git_repository_redirect"
+    return tuple(paths), None
+
+
+def _analysis_reason(reasons: list[str]) -> str:
+    """Prefer reasons that must fail closed over ordinary command descriptions."""
+    if not reasons:
+        return "read_only_command"
+    for marker in (
+        "unparseable",
+        "unresolved",
+        "repository_redirect",
+        "cd_outside_checkout",
+        "checkout_root_mismatch",
+        "shell_redirection",
+        "opaque",
+    ):
+        for reason in reasons:
+            if marker in reason:
+                return reason
+    return reasons[-1]
+
+
+def _bash_mutation_inner(
+    command: str,
+    *,
+    active_root: Path | None,
+    cwd: Path,
+    depth: int,
+) -> tuple[bool, tuple[str, ...], str]:
+    if depth > SHELL_ANALYSIS_MAX_DEPTH:
+        return True, (), "shell_wrapper_unparseable_depth"
+    segments = _command_segments(command)
+    if not segments:
+        return True, (), "command_unparseable"
+    paths: list[str] = []
+    reasons: list[str] = []
+    mutation = False
+
+    backticks, unterminated_backtick = _backtick_bodies(command)
+    if unterminated_backtick:
+        mutation = True
+        reasons.append("shell_wrapper_unparseable_backtick")
+    for body in backticks:
+        nested_mutation, nested_paths, nested_reason = _bash_mutation_inner(
+            body,
+            active_root=active_root,
+            cwd=cwd,
+            depth=depth + 1,
+        )
+        mutation = mutation or nested_mutation
+        paths.extend(nested_paths)
+        if nested_mutation:
+            reasons.append(f"shell_substitution_{nested_reason}")
+
+    for segment in segments:
+        if any(token in {">", ">>"} for token in segment):
+            mutation = True
+            reasons.append("shell_redirection")
+            for index, token in enumerate(segment[:-1]):
+                if token in {">", ">>"}:
+                    normalized, _outside = _shell_path(
+                        segment[index + 1], cwd=cwd, active_root=active_root
+                    )
+                    paths.append(normalized)
+        elif "<" in segment:
+            mutation = True
+            reasons.append("shell_redirection")
+        command_index = _command_index(segment)
+        if command_index is None:
+            if not any(token in SHELL_CONTROL_TOKENS for token in segment):
+                mutation = True
+                reasons.append("command_missing")
+            continue
+        verb = segment[command_index]
+        if verb == "cd":
+            operands = [token for token in segment[command_index + 1 :] if token != "--"]
+            if not operands or len(operands) > 1 or operands[0].startswith("-"):
+                mutation = True
+                reasons.append("shell_cd_unresolved")
+                continue
+            normalized, outside = _shell_path(
+                operands[0], cwd=cwd, active_root=active_root
+            )
+            if outside:
+                mutation = True
+                paths.append(normalized)
+                reasons.append("shell_cd_outside_checkout")
+            elif active_root is not None:
+                cwd = (active_root.resolve(strict=False) / normalized).resolve(strict=False)
+            else:
+                cwd = (cwd / operands[0]).resolve(strict=False)
+            continue
+        if verb == "git":
+            git_args = segment[command_index + 1 :]
+            redirect_paths, redirect_reason = _git_repository_redirect(
+                git_args, cwd=cwd, active_root=active_root
+            )
+            if redirect_reason is not None:
+                mutation = True
+                paths.extend(redirect_paths)
+                reasons.append(redirect_reason)
+                continue
+            subcommand, sub_args = _git_subcommand(git_args)
+            if subcommand in {"worktree", "stash"}:
+                nested = next((token for token in sub_args if not token.startswith("-")), "")
+                if (subcommand == "worktree" and nested in {"list", "lock", "unlock"}) or (
+                    subcommand == "stash" and nested in {"list", "show"}
+                ):
+                    continue
+            if subcommand == "clean" and any(
+                token in {"-n", "--dry-run"}
+                or (token.startswith("-") and "n" in token[1:])
+                for token in sub_args
+            ):
+                continue
+            if subcommand in {"switch", "checkout"} and any(
+                token in {"-h", "--help"} for token in sub_args
+            ):
+                continue
+            if subcommand in READONLY_GIT_SUBCOMMANDS and subcommand not in {
+                "branch",
+                "worktree",
+                "stash",
+            }:
+                continue
+            if subcommand == "branch" and (
+                not sub_args
+                or any(
+                    token
+                    in {
+                        "--list",
+                        "-a",
+                        "-r",
+                        "-v",
+                        "-vv",
+                        "--show-current",
+                        "--edit-description",
+                        "--set-upstream-to",
+                        "--unset-upstream",
+                        "-u",
+                    }
+                    or token.startswith("--set-upstream-to=")
+                    or token.startswith("-u")
+                    for token in sub_args
+                )
+            ):
+                continue
+            mutation = True
+            paths.extend(
+                _shell_path(token, cwd=cwd, active_root=active_root)[0]
+                for token in sub_args
+                if not token.startswith("-")
+            )
+            reasons.append(f"git_{subcommand or 'unknown'}")
+            continue
+        if verb in {"bash", "sh", "zsh"}:
+            wrapper_args = segment[command_index + 1 :]
+            command_flag = next(
+                (
+                    index
+                    for index, token in enumerate(wrapper_args)
+                    if token in {"-c", "-lc", "--command"}
+                ),
+                None,
+            )
+            if command_flag is None or command_flag + 1 >= len(wrapper_args):
+                mutation = True
+                reasons.append("shell_wrapper_unresolved")
+                continue
+            inner = wrapper_args[command_flag + 1]
+            if _shell_dynamic_expansion(inner):
+                mutation = True
+                reasons.append("shell_wrapper_unparseable_expansion")
+                continue
+            nested_mutation, nested_paths, nested_reason = _bash_mutation_inner(
+                inner,
+                active_root=active_root,
+                cwd=cwd,
+                depth=depth + 1,
+            )
+            mutation = mutation or nested_mutation
+            paths.extend(nested_paths)
+            if nested_mutation:
+                reasons.append(f"{verb}_wrapper_{nested_reason}")
+            continue
+        if verb in OPAQUE_SHELL_COMMANDS:
+            mutation = True
+            reasons.append("shell_opaque_command")
+            continue
+        if verb in MUTATING_COMMANDS:
+            operands = [
+                token
+                for token in segment[command_index + 1 :]
+                if not token.startswith("-")
+            ]
+            if verb in {"cp", "mv"} and len(operands) > 1:
+                operands = operands[-1:]
+            mutation = True
+            paths.extend(
+                _shell_path(token, cwd=cwd, active_root=active_root)[0]
+                for token in operands
+            )
+            reasons.append(f"command_{verb}")
+            continue
+        if verb not in READONLY_COMMANDS:
+            continue
+    return mutation, tuple(paths), _analysis_reason(reasons)
 
 
 def _repository_topic_clone_operation(command: str) -> str | None:
@@ -209,71 +578,29 @@ def _repository_topic_clone_operation(command: str) -> str | None:
     return None
 
 
-def _bash_mutation(command: str) -> tuple[bool, tuple[str, ...], str]:
-    segments = _command_segments(command)
-    if not segments:
-        return True, (), "command_unparseable"
-    paths: list[str] = []
-    for segment in segments:
-        if any(token in {">", ">>", "<"} for token in segment):
-            return True, tuple(paths), "shell_redirection"
-        command_index = next((index for index, token in enumerate(segment) if "=" not in token or token.startswith("./")), None)
-        if command_index is None:
-            return True, tuple(paths), "command_missing"
-        verb = segment[command_index]
-        while verb in {"env", "command", "sudo", "exec"} and command_index + 1 < len(segment):
-            command_index += 1
-            while command_index < len(segment) and "=" in segment[command_index]:
-                command_index += 1
-            if command_index >= len(segment):
-                return True, tuple(paths), "command_missing"
-            verb = segment[command_index]
-        if verb == "git":
-            git_args = segment[command_index + 1 :]
-            sub_index = next((index for index, token in enumerate(git_args) if not token.startswith("-")), None)
-            subcommand = git_args[sub_index] if sub_index is not None else ""
-            sub_args = git_args[sub_index + 1 :] if sub_index is not None else ()
-            if subcommand in {"worktree", "stash"}:
-                nested = next((token for token in sub_args if not token.startswith("-")), "")
-                if (subcommand == "worktree" and nested in {"list", "lock", "unlock"}) or (subcommand == "stash" and nested in {"list", "show"}):
-                    continue
-            if subcommand == "clean" and any(token in {"-n", "--dry-run"} or (token.startswith("-") and "n" in token[1:]) for token in sub_args):
-                continue
-            if subcommand in {"switch", "checkout"} and any(token in {"-h", "--help"} for token in sub_args):
-                continue
-            if subcommand in READONLY_GIT_SUBCOMMANDS and subcommand not in {"branch", "worktree", "stash"}:
-                continue
-            if subcommand == "branch" and (not sub_args or any(token in {"--list", "-a", "-r", "-v", "-vv", "--show-current", "--edit-description", "--set-upstream-to", "--unset-upstream", "-u"} or token.startswith("--set-upstream-to=") or token.startswith("-u") for token in sub_args)):
-                continue
-            paths.extend(token for token in sub_args if not token.startswith("-"))
-            if subcommand == "checkout" and any(
-                token in {"--ours", "--theirs", "--"} for token in sub_args
-            ):
-                return True, tuple(paths), "git_checkout_paths"
-            return True, tuple(paths), f"git_{subcommand or 'unknown'}"
-        if verb in {"bash", "sh", "zsh"}:
-            wrapper_args = segment[command_index + 1 :]
-            command_flag = next((index for index, token in enumerate(wrapper_args) if token in {"-c", "-lc", "--command"}), None)
-            if command_flag is None or command_flag + 1 >= len(wrapper_args):
-                return True, tuple(paths), "shell_wrapper_unresolved"
-            inner = " ".join(wrapper_args[command_flag + 1 :])
-            inner_mutation, inner_paths, inner_reason = _bash_mutation(inner)
-            return inner_mutation, inner_paths, f"{verb}_wrapper_{inner_reason}"
-        if verb in MUTATING_COMMANDS:
-            operands = [
-                token for token in segment[command_index + 1 :] if not token.startswith("-")
-            ]
-            if verb in {"cp", "mv"} and len(operands) > 1:
-                paths.append(operands[-1])
-            else:
-                paths.extend(operands)
-            return True, tuple(paths), f"command_{verb}"
-        if verb not in READONLY_COMMANDS:
-            continue
-    return False, (), "read_only_command"
+def _bash_mutation(
+    command: str,
+    *,
+    active_root: Path | None = None,
+    initial_cwd: Path | None = None,
+) -> tuple[bool, tuple[str, ...], str]:
+    """Classify every shell segment, retaining the effective cwd across segments."""
+    root = active_root.resolve(strict=False) if active_root is not None else None
+    cwd = (initial_cwd or root or Path.cwd()).resolve(strict=False)
+    return _bash_mutation_inner(
+        command,
+        active_root=root,
+        cwd=cwd,
+        depth=0,
+    )
 
 
-def _mutation_request(tool_name: str, tool_input: Mapping[str, object]) -> tuple[bool, tuple[str, ...], str, str]:
+def _mutation_request(
+    tool_name: str,
+    tool_input: Mapping[str, object],
+    *,
+    active_root: Path | None = None,
+) -> tuple[bool, tuple[str, ...], str, str]:
     if tool_name == "apply_patch":
         patch = tool_input.get("patch")
         if not isinstance(patch, str):
@@ -285,12 +612,19 @@ def _mutation_request(tool_name: str, tool_input: Mapping[str, object]) -> tuple
         command = tool_input.get("command", tool_input.get("cmd"))
         if not isinstance(command, str):
             return True, (), "bash_command_missing", ""
-        mutation, paths, reason = _bash_mutation(command)
+        mutation, paths, reason = _bash_mutation(command, active_root=active_root)
         lifecycle_operation = _repository_topic_clone_operation(command)
-        if lifecycle_operation is not None:
+        if lifecycle_operation is not None and lifecycle_operation != "repository_topic_clone_compound":
             return (
                 mutation,
                 (),
+                lifecycle_operation,
+                hashlib.sha256(command.encode()).hexdigest(),
+            )
+        if lifecycle_operation == "repository_topic_clone_compound":
+            return (
+                mutation,
+                paths,
                 lifecycle_operation,
                 hashlib.sha256(command.encode()).hexdigest(),
             )
@@ -333,29 +667,32 @@ def _writer_target_violation(
             for path in parsed_paths
         ):
             return "writer_target_allowed_paths_invalid"
-    target_root = Path(declared_root).expanduser()
-    if not target_root.is_absolute():
+    target_root_path = Path(declared_root).expanduser()
+    if not target_root_path.is_absolute():
         return "writer_target_checkout_root_not_absolute"
-    if target_root.resolve(strict=False) != active_root.resolve(strict=False):
+    if target_root_path.resolve(strict=False) != active_root.resolve(strict=False):
         return "writer_target_checkout_root_mismatch"
     if reason in {"git_checkout", "git_switch", "git_worktree", "git_branch"}:
         return "writer_target_branch_switch_forbidden"
+    if "git_repository_redirect" in reason:
+        return "writer_target_git_repository_redirect_forbidden"
+    if "cd_outside_checkout" in reason or reason == "shell_cd_unresolved":
+        return "writer_target_checkout_root_mismatch"
     for segment in _command_segments(command):
-        if not segment:
-            continue
-        if segment[0] == "cd" and len(segment) > 1:
+        if len(segment) > 1 and segment[0] == "cd":
             candidate = Path(segment[1]).expanduser()
             if not candidate.is_absolute():
-                candidate = target_root / candidate
-            if candidate.resolve(strict=False) != target_root.resolve(strict=False):
+                candidate = target_root_path / candidate
+            if candidate.resolve(strict=False) != target_root_path.resolve(strict=False):
                 return "writer_target_checkout_root_mismatch"
-        if segment[0] == "git":
-            for index, token in enumerate(segment[:-1]):
+        if segment and segment[0] == "git":
+            for index in range(len(segment) - 1):
+                token = segment[index]
                 if token == "-C":
                     candidate = Path(segment[index + 1]).expanduser()
                     if not candidate.is_absolute():
-                        candidate = target_root / candidate
-                    if candidate.resolve(strict=False) != target_root.resolve(strict=False):
+                        candidate = target_root_path / candidate
+                    if candidate.resolve(strict=False) != target_root_path.resolve(strict=False):
                         return "writer_target_checkout_root_mismatch"
     return None
 
@@ -363,7 +700,7 @@ def _writer_target_violation(
 def _read_writer_target_packet(
     active_root: Path,
     environment: Mapping[str, str],
-) -> tuple[object | None, Mapping[str, object] | None, str | None]:
+) -> tuple[WriterTarget | None, Mapping[str, object] | None, str | None]:
     """Read and validate the ignored static target packet for this checkout."""
     try:
         target, identity = read_writer_target_packet(active_root)
@@ -407,7 +744,11 @@ def evaluate_mutation_authority(
     tool_input = payload.get("tool_input")
     if not isinstance(tool_name, str) or not isinstance(tool_input, dict):
         return MutationAuthorityDecision("blocked", "tool_identity_missing", True)
-    mutation, paths, reason, command_sha = _mutation_request(tool_name, tool_input)
+    mutation, paths, reason, command_sha = _mutation_request(
+        tool_name,
+        tool_input,
+        active_root=active_root,
+    )
     if not mutation:
         return MutationAuthorityDecision("not_applicable", reason, False)
     command_value = ""
@@ -483,10 +824,20 @@ def evaluate_mutation_authority(
         "repository_topic_clone_resume_merge",
         "repository_topic_clone_finalize_merge",
     }
-    canonical_route = canonical_lifecycle or reason in {
-        "repository_topic_clone_preservation_inputs_missing",
-        "repository_topic_clone_compound",
-    }
+    canonical_route = canonical_lifecycle or reason == "repository_topic_clone_preservation_inputs_missing"
+    if reason == "repository_topic_clone_compound":
+        return MutationAuthorityDecision(
+            "blocked",
+            "repository_topic_clone_compound",
+            True,
+            actor_id,
+            role_id,
+            parent_agent_id,
+            str(identity.get("scope_digest", "")),
+            paths,
+            evidence_ref,
+            command_sha,
+        )
     if canonical_route:
         if role_id != "integration_executor":
             return MutationAuthorityDecision(

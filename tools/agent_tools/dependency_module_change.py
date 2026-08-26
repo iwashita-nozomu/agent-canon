@@ -47,6 +47,13 @@ class DependencyModuleChangeError(RuntimeError):
     """Raised when dependency module lifecycle metadata cannot be projected."""
 
 
+# A dependency topic clone is itself the owning write surface.  Keep this
+# value explicit at the adapter boundary so generic lifecycle calls never
+# acquire an unreviewed implicit scope; callers may replace it with a
+# narrower repeated --allowed-path value.
+CANONICAL_DEPENDENCY_ALLOWED_PATHS = (".",)
+
+
 def _attested_workspace_root(root: Path) -> Path:
     """Resolve the selected parent through the shared side-effect boundary."""
     try:
@@ -188,6 +195,7 @@ def _topic_request_from_args(
     module_path: str,
     branch: str,
     owner_evidence: Path,
+    allowed_paths: Sequence[str],
 ) -> RepositoryTopicCloneRequest:
     root = _attested_workspace_root(root)
     modules = _parse_gitmodules(root)
@@ -208,6 +216,7 @@ def _topic_request_from_args(
         topic=topic,
         branch=branch,
         owner_evidence=owner_evidence,
+        allowed_paths=tuple(allowed_paths),
     )
 
 
@@ -215,12 +224,14 @@ def _prepare(args: argparse.Namespace, *, command: str) -> int:
     """Handle prepare and merge-main by deferring to generic owner implementation."""
     workspace_root = Path(args.root).absolute()
     owner_evidence = workspace_root / args.owner_evidence
+    allowed_paths = tuple(args.allowed_path) or CANONICAL_DEPENDENCY_ALLOWED_PATHS
     request = _topic_request_from_args(
         workspace_root,
         args.topic,
         args.module,
         args.branch,
         owner_evidence,
+        allowed_paths,
     )
     if command == "prepare":
         receipt = generic_request(
@@ -230,6 +241,7 @@ def _prepare(args: argparse.Namespace, *, command: str) -> int:
             request.topic,
             request.branch,
             request.owner_evidence,
+            allowed_paths=request.allowed_paths,
         )
         topic_root = receipt.clone.parent
         print(f"TOPIC_ROOT={topic_root}")
@@ -268,12 +280,14 @@ def _cleanup(args: argparse.Namespace) -> int:
     """Handle cleanup by delegating to generic cleanup."""
     workspace_root = Path(args.root).absolute()
     owner_evidence = workspace_root / args.owner_evidence
+    allowed_paths = tuple(args.allowed_path) or CANONICAL_DEPENDENCY_ALLOWED_PATHS
     request = _topic_request_from_args(
         workspace_root,
         args.topic,
         args.module,
         args.branch,
         owner_evidence,
+        allowed_paths,
     )
     result = generic_cleanup(
         request,
@@ -299,12 +313,24 @@ def _build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--module", required=True)
     prepare.add_argument("--branch", required=True)
     prepare.add_argument("--owner-evidence", required=True)
+    prepare.add_argument(
+        "--allowed-path",
+        action="append",
+        default=[],
+        help="Relative writer scope; defaults explicitly to the whole dependency clone (.).",
+    )
 
     merge = commands.add_parser("merge-main")
     merge.add_argument("--topic", required=True)
     merge.add_argument("--module", required=True)
     merge.add_argument("--branch", required=True)
     merge.add_argument("--owner-evidence", required=True)
+    merge.add_argument(
+        "--allowed-path",
+        action="append",
+        default=[],
+        help="Relative writer scope; defaults explicitly to the whole dependency clone (.).",
+    )
 
     status = commands.add_parser("status")
     status.add_argument("--topic", required=True)
@@ -315,6 +341,12 @@ def _build_parser() -> argparse.ArgumentParser:
     cleanup.add_argument("--module", required=True)
     cleanup.add_argument("--branch", required=True)
     cleanup.add_argument("--owner-evidence", required=True)
+    cleanup.add_argument(
+        "--allowed-path",
+        action="append",
+        default=[],
+        help="Relative writer scope; defaults explicitly to the whole dependency clone (.).",
+    )
     cleanup.add_argument("--candidate-cas")
     cleanup.add_argument("--pr-lifecycle")
     cleanup.add_argument("--publication-readback")

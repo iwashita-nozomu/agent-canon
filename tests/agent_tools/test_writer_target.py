@@ -445,6 +445,82 @@ def test_raw_merge_and_rebase_are_rejected_even_inside_target() -> None:
             assert decision.reason == "raw_git_merge_or_rebase_forbidden"
 
 
+@pytest.mark.parametrize(
+    "command",
+    (
+        "git --work-tree=/tmp/foreign status",
+        "git --work-tree /tmp/foreign status",
+        "git --git-dir=/tmp/foreign/.git status",
+        "git --git-dir /tmp/foreign/.git status",
+    ),
+)
+def test_writer_rejects_git_repository_redirection_forms(command: str) -> None:
+    """A normal writer cannot redirect Git's tree or metadata root."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        decision = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": command}},
+            report_dir=root,
+            active_root=root,
+            environment={
+                "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+                "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+                "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+            },
+            hook_spool_root=root,
+        )
+        assert decision.status == "blocked"
+        assert decision.reason == "writer_target_git_repository_redirect_forbidden"
+
+
+def test_writer_aggregates_all_shell_segments_and_preserves_effective_cwd() -> None:
+    """Later mutations and nested shell cwd changes cannot escape the packet."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        environment = {
+            "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+            "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+            "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+        }
+        outside = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "touch src/owned.py && rm outside.py"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert outside.status == "blocked"
+        assert outside.reason == "mutation_scope_outside_child_receipt"
+        nested_outside = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "bash -c 'cd /tmp && touch src/owned.py'"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert nested_outside.status == "blocked"
+        assert nested_outside.reason == "writer_target_checkout_root_mismatch"
+        all_allowed = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "bash -c 'cd src && touch owned.py'"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert all_allowed.status == "allowed"
+
+
 def test_canonical_merge_main_is_integration_only_and_preservation_gated() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
