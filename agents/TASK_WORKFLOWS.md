@@ -117,6 +117,7 @@ reader path.
 | Platform And Environment | `agents/task_catalog.yaml` `workflow_families[].id=platform_and_environment` |
 | Comprehensive Development | `agents/task_catalog.yaml` `workflow_families[].id=comprehensive_development` |
 | Adaptive Improvement Loop | `agents/task_catalog.yaml` `workflow_families[].id=adaptive_improvement_loop` |
+| IssueWorker Publication | `agents/task_catalog.yaml` `workflow_families[].id=issue_worker_publication`; logical route executes the `publisher` role |
 
 `documents/runtime/runtime-profiles-and-check-matrix.md` selects the active validation
 matrix for the changed path and risk class.
