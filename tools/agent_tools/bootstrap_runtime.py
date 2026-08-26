@@ -100,6 +100,7 @@ TOOL_ENVIRONMENT_KEYS = frozenset(
         "AGENT_CANON_HOOK_ARCHIVE_DIR",
         "AGENT_CANON_LOG_ROOT",
         CODEX_SESSION_ROOT_ENV,
+        "AGENT_CANON_PRIVATE_LOG_ROOT",
         "GIT_CONFIG_COUNT",
         "GIT_CONFIG_KEY_0",
         "GIT_CONFIG_VALUE_0",
@@ -1461,7 +1462,7 @@ class BootstrapRuntime:
         checkout under an unrelated workspace.
         """
         if self._container_control():
-            return self.paths.control_parent_root / "private-log"
+            return Path(PRIVATE_LOG_DESTINATION)
         return self.repository_root.parent / "agent-canon-log"
 
     @property
@@ -5429,6 +5430,7 @@ def _container_request_environment(
     source_root: Path,
     host_runtime: Path,
     host_control: Path,
+    host_private_log: Path | None,
 ) -> dict[str, str]:
     """Validate and map the structured tool environment for Docker exec."""
     raw = request.get("environment")
@@ -5455,7 +5457,7 @@ def _container_request_environment(
                 result[key] = f"{CONTAINER_RUNTIME_DESTINATION}/mounts.toml"
                 continue
             if key in {"AGENT_CANON_HOOK_ARCHIVE_DIR", "AGENT_CANON_LOG_ROOT"}:
-                if Path(value).resolve(strict=False) != host_control / "private-log":
+                if host_private_log is None or Path(value).resolve(strict=False) != host_private_log:
                     raise BootstrapError("invalid_exec_request", f"archive path does not match private log mount: {key}")
                 result[key] = PRIVATE_LOG_DESTINATION
                 continue
@@ -5803,6 +5805,11 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
                 source_root=source_root,
                 host_runtime=host_runtime,
                 host_control=host_control,
+                host_private_log=(
+                    Path(os.environ["AGENT_CANON_PRIVATE_LOG_ROOT"]).resolve(strict=False)
+                    if os.environ.get("AGENT_CANON_PRIVATE_LOG_ROOT", "").strip()
+                    else None
+                ),
             )
             return runtime.tool_run(
                 tool_id,

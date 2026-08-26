@@ -20,6 +20,7 @@ from tools.agent_tools.bootstrap_runtime import (  # noqa: E402
     DockerAdapter,
     _container_source_identity,
     TOOL_SOURCE_DESTINATION,
+    _container_request_environment,
     build_parser,
     run,
     sha256_bytes,
@@ -620,9 +621,10 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
     control = tmp_path / "control"
     runtime_root = control / "runtime"
     target = tmp_path / "target"
+    private_log = tmp_path / "agent-canon-log"
     control.mkdir()
     target.mkdir()
-    (control / "private-log").mkdir()
+    private_log.mkdir()
     manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
     manager._ensure_layout()
     digest = "target-structured"
@@ -645,6 +647,7 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
     manager._write_state(state)
     monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
     monkeypatch.setenv("AGENT_CANON_TARGET_DIGEST", digest)
+    monkeypatch.setenv("AGENT_CANON_PRIVATE_LOG_ROOT", str(private_log))
 
     output_root = runtime_root / "reports"
     environment = {
@@ -658,7 +661,7 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
         "AGENT_CANON_TARGET_ROOT": str(target),
         "AGENT_CANON_TASK_ROOT": str(target),
         "AGENT_CANON_OUTPUT_ROOT": str(output_root),
-        "AGENT_CANON_HOOK_ARCHIVE_DIR": str(control / "private-log"),
+        "AGENT_CANON_HOOK_ARCHIVE_DIR": str(private_log),
     }
     request = {
         "schema": "agent-canon.tool-exec-request.v1",
@@ -831,6 +834,39 @@ def test_codex_launch_binds_session_root_to_runtime(
         "runtime_root": str(manager.paths.runtime_root),
     }
     assert (manager.paths.codex_home / "sessions").is_dir()
+
+
+def test_structured_tool_environment_rejects_private_log_self_claim(
+    tmp_path: Path,
+) -> None:
+    """A request cannot replace the host-owned private-log source identity."""
+    source = tmp_path / "agent-canon"
+    target = tmp_path / "target"
+    runtime_root = tmp_path / "runtime"
+    control = tmp_path / "control"
+    private_log = tmp_path / "agent-canon-log"
+    wrong_log = tmp_path / "other-log"
+    for path in (source, target, runtime_root, control, private_log, wrong_log):
+        path.mkdir()
+    request = {
+        "target_root": str(target),
+        "environment": {
+            "AGENT_CANON_RUNTIME_ROOT": str(runtime_root),
+            "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
+            "AGENT_CANON_HOOK_ARCHIVE_DIR": str(wrong_log),
+        },
+        "output_root": None,
+    }
+
+    with pytest.raises(BootstrapError, match="archive path does not match private log mount"):
+        _container_request_environment(
+            request,
+            container_target=Path("/targets/target"),
+            source_root=source,
+            host_runtime=runtime_root,
+            host_control=control,
+            host_private_log=private_log,
+        )
 
 
 def test_exec_preserves_nonzero_command_exit_and_redacts_output(

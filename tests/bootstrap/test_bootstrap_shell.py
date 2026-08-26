@@ -75,6 +75,17 @@ def test_structured_exec_target_digest_is_shell_validated_before_container_hando
     assert 'install|update|start|stop|rollback|uninstall|target|tool|template|task|gc|eval|exec)' in text
 
 
+def test_private_log_source_is_read_back_from_the_owned_mount() -> None:
+    """Structured handoff uses the declared install-sibling private log source."""
+    text = ADAPTER.read_text(encoding="utf-8")
+    assert "_agent_canon_validate_private_log_mount" in text
+    assert "AGENT_CANON_PRIVATE_LOG_ROOT=$AGENT_CANON_PRIVATE_LOG_ROOT" in text
+    assert 'AGENT_CANON_PRIVATE_LOG_DESTINATION"' in text
+    assert 'control_parent_root / "private-log"' not in (
+        ROOT / "tools/agent_tools/bootstrap_runtime.py"
+    ).read_text(encoding="utf-8")
+
+
 def test_uninstall_preserves_foreign_links_and_restores_owned_config() -> None:
     """Uninstall scopes symlink removal by exact AgentCanon source prefixes."""
     text = ADAPTER.read_text(encoding="utf-8")

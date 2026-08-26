@@ -175,6 +175,21 @@ _agent_canon_extract_exec_target_digest() {
   _agent_canon_json_error target_not_registered "exec target digest is absent from the strict mount registry"
 }
 
+_agent_canon_validate_private_log_mount() {
+  local container=$1 source destination writable
+  local found=0
+  while IFS=$'\t' read -r source destination writable; do
+    [[ "$destination" == "$AGENT_CANON_PRIVATE_LOG_DESTINATION" ]] || continue
+    ((found == 0)) || _agent_canon_json_error mount_manifest_invalid "private log mount is duplicated"
+    [[ "$writable" == false && "$source" == "$AGENT_CANON_PRIVATE_LOG_ROOT" ]] ||
+      _agent_canon_json_error mount_manifest_invalid "private log mount differs from the declared source"
+    found=1
+  done < <("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{range .Mounts}}{{printf "%s\t%s\t%t\n" .Source .Destination .RW}}{{end}}' \
+    "$container")
+  ((found == 1)) || _agent_canon_json_error mount_manifest_invalid "private log mount is absent"
+}
+
 _agent_canon_prepare_host_runtime() {
   AGENT_CANON_STATE_ROOT="$AGENT_CANON_RUNTIME_ROOT/container-state"
   export AGENT_CANON_STATE_ROOT
@@ -228,6 +243,8 @@ _agent_canon_container_exec() {
     extra_env+=(--env "AGENT_CANON_TARGET_CONTAINER_ROOT=$AGENT_CANON_TARGET_CONTAINER_ROOT")
   [[ -n "${AGENT_CANON_TARGET_DIGEST:-}" ]] &&
     extra_env+=(--env "AGENT_CANON_TARGET_DIGEST=$AGENT_CANON_TARGET_DIGEST")
+  [[ -n "${AGENT_CANON_PRIVATE_LOG_ROOT:-}" ]] &&
+    extra_env+=(--env "AGENT_CANON_PRIVATE_LOG_ROOT=$AGENT_CANON_PRIVATE_LOG_ROOT")
   "$AGENT_CANON_DOCKER_CMD" exec \
     --workdir "$AGENT_CANON_RUNTIME_DESTINATION" \
     --env "AGENT_CANON_CONTAINER_CONTROL=1" \
@@ -1629,6 +1646,7 @@ bootstrap_host_entrypoint() {
       container=$(_agent_canon_ensure_container)
       if [[ "$operation" == exec && " ${command_args[*]} " == *" --request-json "* ]]; then
         _agent_canon_extract_exec_target_digest
+        _agent_canon_validate_private_log_mount "$container"
       elif [[ "$operation" == tool || "$operation" == template || "$operation" == eval || "$operation" == exec ]]; then
         _agent_canon_rewrite_target_args "${command_args[@]}"
       fi
