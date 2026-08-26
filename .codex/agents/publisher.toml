@@ -1,5 +1,5 @@
 # generated role view: generated_role_view_v1
-# source canonical digest: 72dc6a284a9fcc7786aa866355318abc5d80247b58d5943d1bbe7073e849d3ad
+# source canonical digest: 925ed476797889124e308dab1a647dbba5caa5b858eae6eb9b1beb1d5868c8be
 
 name = "publisher"
 description = "Workspace-write child for authorized Issue/PR publication and remote readback."

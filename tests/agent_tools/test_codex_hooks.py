@@ -917,6 +917,66 @@ class CodexHooksTest(unittest.TestCase):
                     cast("str", cast("dict[str, object]", payload)["reason"]),
                 )
 
+    def test_conflict_inventory_blocks_unbound_whole_file_operations(self) -> None:
+        """An existing conflict inventory binds destructive Git to a preservation plan."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "source"
+            root.mkdir()
+            conflict_dir = root / ".agent-canon"
+            conflict_dir.mkdir()
+            (conflict_dir / "conflict-preservation.json").write_text("{}\n", encoding="utf-8")
+            command = (
+                "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
+                "AGENT_CANON_DESTRUCTIVE_GIT_REASON=conflict-resolution "
+                "git --no-pager checkout --ours -- file.py"
+            )
+            payload = self._run_hook_in_root(
+                root,
+                "PreToolUse",
+                {
+                    "hookEventName": "PreToolUse",
+                    "tool_name": "Bash",
+                    "tool_input": {"cmd": command},
+                },
+            )
+            body = cast("dict[str, object]", json.loads(payload.stdout))
+            self.assertIn("CONFLICT_PRESERVATION_GUARD=block", body["reason"])
+
+            attached = (
+                "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
+                "AGENT_CANON_DESTRUCTIVE_GIT_REASON=conflict-resolution "
+                "AGENT_CANON_CONFLICT_PRESERVATION_INVENTORY=inventory.json "
+                "AGENT_CANON_CONFLICT_PRESERVATION_PLAN=plan.json "
+                "git --no-pager checkout --ours -- file.py"
+            )
+            attached_result = self._run_hook_in_root(
+                root,
+                "PreToolUse",
+                {
+                    "hookEventName": "PreToolUse",
+                    "tool_name": "Bash",
+                    "tool_input": {"cmd": attached},
+                },
+            )
+            if attached_result.stdout:
+                attached_body = cast("dict[str, object]", json.loads(attached_result.stdout))
+                self.assertIn(
+                    "CONFLICT_PRESERVATION_GUARD=block",
+                    attached_body.get("reason", ""),
+                )
+
+            commit_result = self._run_hook_in_root(
+                root,
+                "PreToolUse",
+                {
+                    "hookEventName": "PreToolUse",
+                    "tool_name": "Bash",
+                    "tool_input": {"cmd": "git commit --no-edit"},
+                },
+            )
+            commit_body = cast("dict[str, object]", json.loads(commit_result.stdout))
+            self.assertIn("CONFLICT_PRESERVATION_GUARD=block", commit_body["reason"])
+
     def test_shared_checkout_guard_authority_is_same_segment_and_one_shot(self) -> None:
         """Ambient, incomplete, and earlier-segment authority never leaks to Git."""
         destructive = (

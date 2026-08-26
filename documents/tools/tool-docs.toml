@@ -152,6 +152,13 @@ language = "python"
 summary = "Generic repository topic clone lifecycle and reconstructibility cleanup documentation."
 
 [[tool]]
+id = "conflict-preservation"
+tool = "tools/agent_tools/conflict_preservation.py"
+doc = "documents/tools/conflict_preservation.md"
+language = "python"
+summary = "Three-way conflict and focused rework content-preservation packet documentation."
+
+[[tool]]
 id = "compose-consumer-entrypoint"
 tool = "tools/agent_tools/entrypoint_composer.py"
 doc = "documents/tools/entrypoint_composer.md"

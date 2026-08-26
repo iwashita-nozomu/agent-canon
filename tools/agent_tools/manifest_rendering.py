@@ -2055,6 +2055,14 @@ def manifest_write_policy_lines(
     lines.append("      allowed_directories:")
     for path in scope.allowed_directories:
         lines.append(f"        - {str(path)!r}")
+    if role.write_policy.conditional_artifacts:
+        lines.append("      conditional_artifacts:")
+        for condition, artifact_keys in sorted(role.write_policy.conditional_artifacts.items()):
+            lines.append(f"        {condition}:")
+            for artifact_key in artifact_keys:
+                lines.append(
+                    f"          - {artifact_key!r}: {spec.config.artifacts[artifact_key]!r}"
+                )
     return lines
 
 

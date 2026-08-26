@@ -26,8 +26,10 @@ from route import implementation_handoff_required, load_skill_route_rules
 if TYPE_CHECKING:
     if __package__:
         from .packets import ActiveDesignPacketConfig
+        from .workspace_scope import RepositoryRoots
     else:
         from packets import ActiveDesignPacketConfig
+        from workspace_scope import RepositoryRoots
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -54,6 +56,7 @@ class WritePolicy:
 
     mode: str
     allowed_artifacts: tuple[str, ...]
+    conditional_artifacts: dict[str, tuple[str, ...]]
     allowed_directories: tuple[str, ...] = ()
     requires_worktree_scope: bool = False
     notes: str = ""
@@ -517,6 +520,16 @@ def _parse_role(raw_role: dict[str, object], default_activation: str) -> Role:
             raw_write_policy.get("allowed_artifacts"),
             f"roles[{role_id}].write_policy.allowed_artifacts",
         ),
+        conditional_artifacts={
+            str(condition): _as_string_tuple(
+                artifacts,
+                f"roles[{role_id}].write_policy.conditional_artifacts.{condition}",
+            )
+            for condition, artifacts in _as_object_mapping(
+                raw_write_policy.get("conditional_artifacts", {}),
+                f"roles[{role_id}].write_policy.conditional_artifacts",
+            ).items()
+        },
         allowed_directories=_as_string_tuple(
             raw_write_policy.get("allowed_directories"),
             f"roles[{role_id}].write_policy.allowed_directories",

@@ -1401,6 +1401,27 @@ entries:
     tests:
       - tests/agent_tools/test_repository_topic_clone.py
 
+  - id: conflict-preservation
+    summary: Captures and validates three-way conflict and focused rework content-preservation packets.
+    path: tools/agent_tools/conflict_preservation.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: python3 tools/agent_tools/conflict_preservation.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/conflict_preservation.md
+      - agents/skills/pr-processing.md
+    tests:
+      - tests/agent_tools/test_conflict_preservation.py
+
   - id: dependency-module-change
     summary: Decorates generic repository topic clones with .gitmodules, gitlink, pin, and projection policy.
     path: tools/agent_tools/dependency_module_change.py

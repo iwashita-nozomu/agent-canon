@@ -222,6 +222,14 @@ structured handoff または、coordination/resumption が必要な場合の dur
 - `canon_refs`: 必要な AgentCanon / project canon の節。
 - `do_not_read`: unrelated modules、generated raw logs、historical reports、他 role の scope など、読まない surface。
 - `expected_output`: findings schema、decision vocabulary、uncertainty / residual risk、test gaps。
+- `conflict_or_rework_packet`: merge conflict resolution または validation
+  finding の repair を行う handoff は、repository-qualified base/head/merge-base、
+  affected path、base/ours/theirs の immutable blob reference と hunk inventory、
+  staged/unmerged state、unaffected user/unknown content、selected cause、expected
+  mechanism、exact owning edit delta、disposition (`keep`/`replace`/`manual`)、
+  rationale、focused preservation readback を含めます。preserved changed/context
+  lines は captured source hunk から導出し、caller-supplied content は許可しません。
+  path list や clean merge だけでは十分な handoff としません。
 - `implementation_surface_route`: implementation handoff では `PRIMARY_PATHS` を `allowed_paths` の seed、`FORBIDDEN_PATHS` を `do_not_read` の seed にします。router が unavailable なら、その blocker または deterministic router recovery output を local provisional route evidence として渡し、path selection を packet output に基づけます。
 - `decision_sufficiency_packet_ref`: coordination/resumption が必要な場合だけ使う
   durable decision-sufficiency record の参照。意味上は owner、replaceable unit、
@@ -256,6 +264,13 @@ list. Implementation bugs, test-oracle/spec mismatches, fixture or environment
 issues, stale generated artifacts, unrelated failures, and approved-design /
 user-request conflicts follow the owner routes named by the runtime profile
 taxonomy.
+
+For conflict/rework handoffs, the integration executor or repair worker must
+preserve the packet's unaffected paths and hunks. Whole-file checkout, reset,
+reclone, overwrite, or regeneration is not a resolution shortcut: it requires
+the captured stage/hunk inventory and an explicit reconstruction map. A failed
+preservation readback returns work to the owning path/hunk; it does not permit
+deleting the candidate or reopening broad review.
 
 ## Wave Plan Contract
 

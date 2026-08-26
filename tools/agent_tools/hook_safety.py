@@ -12,8 +12,10 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import shlex
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -35,6 +37,8 @@ DESTRUCTIVE_AUTHORITY_ENV = "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY"
 DESTRUCTIVE_REASON_ENV = "AGENT_CANON_DESTRUCTIVE_GIT_REASON"
 ALLOWED_BRANCH_AUTHORITIES = {"user_request", "agent_canon_workflow"}
 DESTRUCTIVE_AUTHORITY = "explicit_user_approval"
+PRESERVATION_INVENTORY_ENV = "AGENT_CANON_CONFLICT_PRESERVATION_INVENTORY"
+PRESERVATION_PLAN_ENV = "AGENT_CANON_CONFLICT_PRESERVATION_PLAN"
 READ_ONLY_BRANCH_OPTIONS = {
     "--all", "--color", "--contains", "--format", "--ignore-case", "--list",
     "--merged", "--no-color", "--no-contains", "--no-merged", "--points-at",
@@ -75,6 +79,7 @@ class GitIntent:
     evidence: str
     requires_creation: bool = False
     requires_destructive: bool = False
+    requires_preservation: bool = False
 
 
 def payload_tool_name(payload: dict[str, object]) -> str:
@@ -583,13 +588,37 @@ def git_intent(command: GitCommand) -> GitIntent | None:
         return None
     subcommand = command.tokens[0]
     arguments = command.tokens[1:]
-    if subcommand in {"restore", "reset"}:
-        return GitIntent("destructive_git", subcommand, f"git {subcommand}", False, True)
+    if subcommand == "restore":
+        return GitIntent(
+            "destructive_git",
+            subcommand,
+            "git restore",
+            requires_destructive=True,
+            requires_preservation=True,
+        )
+    if subcommand == "reset":
+        return GitIntent(
+            "destructive_git",
+            subcommand,
+            "git reset",
+            requires_destructive=True,
+            requires_preservation=True,
+        )
     if subcommand == "clean":
         letters = short_option_letters(arguments)
         dry_run = "n" in letters or has_long_option(arguments, "--dry-run")
         forced = "f" in letters or has_long_option(arguments, "--force")
-        return GitIntent("destructive_git", "clean", "git clean force", False, True) if forced and not dry_run else None
+        return (
+            GitIntent(
+                "destructive_git",
+                "clean",
+                "git clean force",
+                requires_destructive=True,
+                requires_preservation=True,
+            )
+            if forced and not dry_run
+            else None
+        )
     if subcommand in {"checkout", "switch"}:
         if has_long_option(arguments, "--help") or "h" in short_option_letters(arguments):
             return None
@@ -600,7 +629,16 @@ def git_intent(command: GitCommand) -> GitIntent | None:
             return GitIntent("destructive_branch_creation", subcommand, "force-create/ref-overwrite", True, True)
         if normal_create:
             return GitIntent("branch_creation", subcommand, "create/orphan", True, False)
-        return GitIntent("destructive_git", subcommand, "current-checkout mutation", False, True)
+        preserve = subcommand == "checkout" or "--" in arguments or has_long_option(
+            arguments, "--ours", "--theirs"
+        )
+        return GitIntent(
+            "destructive_git",
+            subcommand,
+            "current-checkout mutation",
+            requires_destructive=True,
+            requires_preservation=preserve,
+        )
     if subcommand == "stash":
         if arguments and arguments[0] in {"list", "show"}:
             return None
@@ -685,6 +723,337 @@ def first_block(command: str) -> GitIntent | None:
     return _first_block_without_backticks(command)
 
 
+def _preservation_intent_without_backticks(command: str) -> GitIntent | None:
+    """Return a normalized whole-file mutation, independent of authority."""
+    tokens = shell_tokens(command)
+    for segment in command_segments(tokens):
+        script = wrapper_script(segment)
+        if script:
+            if intent := preservation_intent(script):
+                return intent
+            continue
+        git_command = normalized_git_command(segment)
+        if git_command is not None:
+            if git_command.tokens and git_command.tokens[0] == "clone":
+                return GitIntent(
+                    "whole_file_replacement",
+                    "clone",
+                    "git clone/reclone",
+                    requires_preservation=True,
+                )
+            if git_command.tokens and git_command.tokens[0] == "commit":
+                return GitIntent(
+                    "conflict_finalize",
+                    "commit",
+                    "direct commit during conflict",
+                    requires_preservation=True,
+                )
+            intent = git_intent(git_command)
+            if intent is not None and intent.requires_preservation:
+                return intent
+            continue
+        normalized = strip_grouping(segment)
+        values: dict[str, str] = {}
+        index = 0
+        while index < len(normalized):
+            pair = assignment(normalized[index])
+            if pair is None:
+                break
+            values[pair[0]] = pair[1]
+            index += 1
+        index = consume_time_prefix(normalized, index)
+        index = consume_command_prefix(normalized, index)
+        index = consume_env_prefix(normalized, index, values)
+        normalized = normalized[index:]
+        if not normalized:
+            continue
+        command_name = command_basename(normalized[0])
+        arguments = normalized[1:]
+        if command_name in {"cp", "mv", "rm", "tee", "truncate", "reclone"}:
+            return GitIntent(
+                "whole_file_replacement",
+                command_name,
+                f"{command_name} whole-file replacement",
+                requires_preservation=True,
+            )
+        if command_name in {"sed", "perl"} and any(
+            argument == "-i" or argument.startswith("-i") for argument in arguments
+        ):
+            return GitIntent(
+                "whole_file_replacement",
+                command_name,
+                f"{command_name} in-place replacement",
+                requires_preservation=True,
+            )
+    return None
+
+
+def preservation_intent(command: str) -> GitIntent | None:
+    """Return a normalized content-replacing operation regardless of authority."""
+    complete, uncertain = backtick_command_substitutions(command)
+    for substitution in (*complete, *uncertain):
+        if intent := preservation_intent(substitution):
+            return intent
+    return _preservation_intent_without_backticks(command)
+
+
+def _segment_assignments(segment: tuple[str, ...]) -> dict[str, str]:
+    """Read assignments attached to one normalized shell command segment."""
+    git_command = normalized_git_command(segment)
+    if git_command is not None:
+        return assignment_map(git_command)
+    normalized = strip_grouping(segment)
+    values: dict[str, str] = {}
+    index = 0
+    while index < len(normalized):
+        pair = assignment(normalized[index])
+        if pair is None:
+            break
+        values[pair[0]] = pair[1]
+        index += 1
+    index = consume_time_prefix(normalized, index)
+    index = consume_command_prefix(normalized, index)
+    consume_env_prefix(normalized, index, values)
+    return values
+
+
+def _non_git_segment(segment: tuple[str, ...]) -> tuple[str, tuple[str, ...]]:
+    """Return one shell command name and argv after prefixes are removed."""
+    normalized = strip_grouping(segment)
+    values: dict[str, str] = {}
+    index = 0
+    while index < len(normalized):
+        pair = assignment(normalized[index])
+        if pair is None:
+            break
+        values[pair[0]] = pair[1]
+        index += 1
+    index = consume_time_prefix(normalized, index)
+    index = consume_command_prefix(normalized, index)
+    index = consume_env_prefix(normalized, index, values)
+    if index >= len(normalized):
+        return "", ()
+    return command_basename(normalized[index]), normalized[index + 1 :]
+
+
+def _git_target_operands(command: GitCommand) -> tuple[str, ...] | None:
+    """Return bounded path operands for a content-changing Git command."""
+    if not command.tokens:
+        return None
+    subcommand = command.tokens[0]
+    arguments = list(command.tokens[1:])
+    if subcommand in {"checkout", "restore"}:
+        option_values = {"-c", "--conflict", "--pathspec-from-file", "--source", "-s"}
+        filtered: list[str] = []
+        index = 0
+        while index < len(arguments):
+            argument = arguments[index]
+            if argument in option_values:
+                index += 2
+                continue
+            if any(argument.startswith(f"{option}=") for option in option_values if option.startswith("--")):
+                index += 1
+                continue
+            filtered.append(argument)
+            index += 1
+        arguments = filtered
+        if "--" in arguments:
+            return tuple(arguments[arguments.index("--") + 1 :]) or None
+        return tuple(
+            argument
+            for argument in arguments
+            if not argument.startswith("-")
+        ) or None
+    if subcommand == "reset":
+        if "--" not in arguments:
+            return None
+        return tuple(arguments[arguments.index("--") + 1 :]) or None
+    if subcommand == "clean":
+        if "--" not in arguments:
+            return None
+        return tuple(arguments[arguments.index("--") + 1 :]) or None
+    return None
+
+
+def _non_git_target_operands(
+    command_name: str, arguments: tuple[str, ...]
+) -> tuple[str, ...] | None:
+    """Return bounded mutation targets for copy/remove/in-place commands."""
+    if command_name in {"rm", "tee", "truncate"}:
+        operands = tuple(
+            argument
+            for argument in arguments[arguments.index("--") + 1 :]
+            if argument
+        ) if "--" in arguments else tuple(
+            argument for argument in arguments if not argument.startswith("-")
+        )
+        return operands or None
+    if command_name in {"cp", "mv"}:
+        operands = tuple(
+            argument
+            for argument in arguments[arguments.index("--") + 1 :]
+        ) if "--" in arguments else tuple(
+            argument for argument in arguments if not argument.startswith("-")
+        )
+        if len(operands) != 2:
+            return None
+        return (operands[-1],)
+    if command_name in {"sed", "perl"}:
+        operands = [argument for argument in arguments if not argument.startswith("-")]
+        if len(operands) < 2:
+            return None
+        return tuple(operands[1:])
+    return None
+
+
+def preservation_target_operands(segment: tuple[str, ...]) -> tuple[str, ...] | None:
+    """Return path operands for one normalized preservation mutation segment."""
+    git_command = normalized_git_command(segment)
+    if git_command is not None:
+        if git_command.tokens and git_command.tokens[0] == "clone":
+            return None
+        if git_command.tokens and git_command.tokens[0] == "commit":
+            return ()
+        return _git_target_operands(git_command)
+    command_name, arguments = _non_git_segment(segment)
+    return _non_git_target_operands(command_name, arguments)
+
+
+def _under(path: Path, root: Path) -> bool:
+    try:
+        return path == root or root in path.parents
+    except (OSError, RuntimeError):
+        return False
+
+
+def _packet_path(value: str, roots: tuple[Path, ...]) -> Path | None:
+    raw = Path(value)
+    candidates = (raw,) if raw.is_absolute() else tuple(root / raw for root in roots)
+    for candidate in candidates:
+        try:
+            resolved = candidate.resolve(strict=True)
+        except (OSError, RuntimeError):
+            continue
+        if resolved.is_file():
+            return resolved
+    return None
+
+
+def _load_packet(path: Path) -> Mapping[str, object] | None:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, Mapping) else None
+
+
+def _target_paths(
+    operands: tuple[str, ...], clone: Path, *, relative_root: Path
+) -> tuple[str, ...] | None:
+    """Resolve every bounded mutation operand against the active clone."""
+    if not operands:
+        return None
+    paths: list[str] = []
+    for operand in operands:
+        if not operand or operand in {".", ".."} or any(mark in operand for mark in "*?["):
+            return None
+        candidate = Path(operand)
+        if not candidate.is_absolute():
+            candidate = relative_root / candidate
+        try:
+            resolved = candidate.resolve(strict=False)
+            relative = resolved.relative_to(clone.resolve())
+        except (OSError, RuntimeError, ValueError):
+            return None
+        if not relative.parts or resolved.is_dir() or operand.endswith("/"):
+            return None
+        paths.append(relative.as_posix())
+    return tuple(dict.fromkeys(paths))
+
+
+def _inventory_paths(inventory: Mapping[str, object]) -> set[str]:
+    entries = inventory.get("paths")
+    if not isinstance(entries, list):
+        return set()
+    return {
+        str(entry["path"])
+        for entry in entries
+        if isinstance(entry, Mapping) and isinstance(entry.get("path"), str)
+    }
+
+
+def preservation_authorized(
+    command: str, *, active_root: Path | None = None
+) -> bool:
+    """Validate packets attached to the same destructive command segment."""
+    tokens = shell_tokens(command)
+    for segment in command_segments(tokens):
+        segment_text = " ".join(segment)
+        intent = preservation_intent(segment_text)
+        if intent is None:
+            continue
+        assignments = _segment_assignments(segment)
+        inventory_value = assignments.get(PRESERVATION_INVENTORY_ENV, "").strip()
+        plan_value = assignments.get(PRESERVATION_PLAN_ENV, "").strip()
+        if not inventory_value or not plan_value:
+            continue
+        explicit_roots = preservation_command_roots(segment_text)
+        roots = tuple(
+            path.resolve() for path in explicit_roots
+        ) or (Path.cwd().resolve(), *( (active_root.resolve(),) if active_root else ()))
+        inventory_path = _packet_path(inventory_value, roots)
+        plan_path = _packet_path(plan_value, roots)
+        if inventory_path is None or plan_path is None:
+            continue
+        for root in roots:
+            try:
+                clone = root.resolve(strict=True)
+                scope = (clone / ".agent-canon").resolve(strict=True)
+            except (OSError, RuntimeError):
+                continue
+            if not (clone / ".git").exists() or not _under(inventory_path, scope) or not _under(plan_path, scope):
+                continue
+            inventory = _load_packet(inventory_path)
+            plan = _load_packet(plan_path)
+            if inventory is None or plan is None:
+                continue
+            operands = preservation_target_operands(segment)
+            if operands is None:
+                continue
+            relative_root = clone if normalized_git_command(segment) is not None else Path.cwd().resolve()
+            target_paths = _target_paths(
+                operands, clone, relative_root=relative_root
+            )
+            if target_paths is None:
+                continue
+            covered = _inventory_paths(inventory)
+            if not covered or not set(target_paths).issubset(covered):
+                continue
+            try:
+                try:
+                    from .conflict_preservation import validate_plan, validate_snapshot
+                except ImportError:
+                    from conflict_preservation import validate_plan, validate_snapshot
+                validate_plan(inventory, plan, repo=clone, readback=False)
+                validate_snapshot(clone, inventory, target_paths)
+            except (OSError, TypeError, ValueError, RuntimeError):
+                continue
+            return True
+    return False
+
+
+def preservation_command_roots(command: str) -> tuple[Path, ...]:
+    """Return explicit Git ``-C`` roots so hooks can find a clone inventory."""
+    roots: list[Path] = []
+    for segment in command_segments(shell_tokens(command)):
+        for index, token in enumerate(segment):
+            if token == "-C" and index + 1 < len(segment):
+                roots.append(Path(segment[index + 1]))
+            elif token.startswith("-C") and len(token) > 2:
+                roots.append(Path(token[2:]))
+    return tuple(roots)
+
+
 def branch_block_payload(command: str, intent: GitIntent) -> dict[str, object]:
     """Return a redacted block payload; command text never crosses the leaf boundary."""
     markers = []
@@ -699,6 +1068,10 @@ def branch_block_payload(command: str, intent: GitIntent) -> dict[str, object]:
         )
     if intent.requires_destructive:
         requirements.append(f"same-segment {DESTRUCTIVE_AUTHORITY_ENV}=explicit_user_approval and nonempty {DESTRUCTIVE_REASON_ENV}")
+    if intent.requires_preservation:
+        requirements.append(
+            f"same-segment {PRESERVATION_INVENTORY_ENV} and {PRESERVATION_PLAN_ENV}"
+        )
     if intent.requires_creation and intent.requires_destructive:
         next_action = "request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason"
     elif intent.requires_creation:
@@ -717,6 +1090,28 @@ def branch_block_payload(command: str, intent: GitIntent) -> dict[str, object]:
             "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
             "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git.",
         ],
+        "operation": f"{intent.kind}:{intent.subcommand}",
+        "command_sha256": command_sha256(command),
+    }
+
+
+def preservation_block_payload(command: str, intent: GitIntent) -> dict[str, object]:
+    """Return a redacted block payload for an unbound whole-file mutation."""
+    if intent.subcommand == "commit":
+        next_action = "use_repository_topic_clone_finalize_merge_after_preservation_readback"
+    else:
+        next_action = (
+            "capture_conflict_inventory_then_attach_same-segment_"
+            f"{PRESERVATION_INVENTORY_ENV}_and_{PRESERVATION_PLAN_ENV}"
+        )
+    return {
+        "decision": "block",
+        "reason": (
+            "CONFLICT_PRESERVATION_GUARD=block: whole-file or conflict mutation "
+            "requires an inventory and reconstruction/preservation plan; "
+            f"operation={intent.kind}:{intent.subcommand}"
+        ),
+        "next_action": next_action,
         "operation": f"{intent.kind}:{intent.subcommand}",
         "command_sha256": command_sha256(command),
     }

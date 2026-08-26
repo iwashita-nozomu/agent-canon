@@ -705,8 +705,14 @@ def test_merge_main_preserves_conflict_with_typed_state(tmp_path: Path) -> None:
     run_git(source, "commit", "-m", "main conflict")
     run_git(source, "push", "origin", "main")
 
-    with pytest.raises(rtc.RepositoryTopicCloneError, match="merge-conflict-preserve"):
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="merge-conflict-preserve") as raised:
         rtc.merge_main(receipt.request)
+    inventory_path = receipt.clone / ".agent-canon" / "conflict-preservation.json"
+    assert inventory_path.is_file()
+    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+    assert inventory["conflict_paths"] == ["base.txt"]
+    assert "inventory=" in str(raised.value)
+    assert "base" in inventory["paths"][0]["stages"]
     with pytest.raises(rtc.RepositoryTopicCloneError, match="merge-conflict-preserve"):
         rtc.request(
             remote_url,
@@ -716,6 +722,78 @@ def test_merge_main_preserves_conflict_with_typed_state(tmp_path: Path) -> None:
             "feature/conflict",
             evidence,
         )
+
+
+def test_finalize_merge_requires_preservation_plan_and_readback(tmp_path: Path) -> None:
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    source = tmp_path / "source"
+    receipt = rtc.request(
+        remote_url,
+        "repo-finalize",
+        workspace,
+        "topic-finalize",
+        "feature/finalize",
+        evidence,
+    )
+    run_git(receipt.clone, "config", "user.name", "Test")
+    run_git(receipt.clone, "config", "user.email", "test@example.invalid")
+    (receipt.clone / "base.txt").write_text("topic\n", encoding="utf-8")
+    run_git(receipt.clone, "add", "base.txt")
+    run_git(receipt.clone, "commit", "-m", "topic conflict")
+    run_git(receipt.clone, "push", "-u", "origin", "feature/finalize")
+
+    (source / "base.txt").write_text("main\n", encoding="utf-8")
+    run_git(source, "add", "base.txt")
+    run_git(source, "commit", "-m", "main conflict")
+    run_git(source, "push", "origin", "main")
+
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="merge-conflict-preserve"):
+        rtc.merge_main(receipt.request)
+    inventory_path = receipt.clone / ".agent-canon" / "conflict-preservation.json"
+    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="preservation plan"):
+        rtc.finalize_merge_main(receipt.request)
+
+    source_hunk = inventory["paths"][0]["hunks"]["base_to_ours"][0]
+    plan = {
+        "repository": inventory["repository"],
+        "base": inventory["base"]["commit"],
+        "head": inventory["ours"]["commit"],
+        "merge_base": inventory["merge_base"],
+        "selected_cause": "the two branch edits target one line",
+        "expected_mechanism": "resolve the line manually and keep the candidate value",
+        "exact_edit_delta": "retain base.txt line one from ours",
+        "paths": [
+            {
+                "path": "base.txt",
+                "owner": "integration_executor",
+                "disposition": "manual",
+                "operation": "manual",
+                "rationale": "the captured stages are reviewed before manual resolution",
+                "expected_edit_delta": "retain topic line",
+                "unaffected_content": [
+                    {
+                        "path": "base.txt",
+                        "hunk_identity": {
+                            "source_sha256": source_hunk["sha256"],
+                            "source_header": source_hunk["header"],
+                            "required_lines": ["+topic\n"],
+                        },
+                    }
+                ],
+            }
+        ],
+    }
+    plan_path = receipt.clone / ".agent-canon" / "conflict-preservation-plan.json"
+    plan_path.write_text(json.dumps(plan) + "\n", encoding="utf-8")
+    (receipt.clone / "base.txt").write_text("topic\n", encoding="utf-8")
+    run_git(receipt.clone, "add", "base.txt")
+    finalized = rtc.finalize_merge_main(receipt.request)
+    assert finalized.merged_sha != finalized.candidate_sha
+    assert run_git(receipt.clone, "status", "--porcelain") == ""
 
 
 def test_cleanup_without_publication_packet_matches_remote_head(tmp_path: Path) -> None:

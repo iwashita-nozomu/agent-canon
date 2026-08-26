@@ -852,6 +852,10 @@ skill_families:
       - gh pr view <n> --json ...
       - gh pr checks <n>
       - git merge origin/<base>
+      - python3 tools/agent_tools/conflict_preservation.py capture --repo-root <clone> --base <merge-base> --ours <head> --theirs <origin-main> --output <clone>/.agent-canon/conflict-preservation.json
+      - python3 tools/agent_tools/conflict_preservation.py validate --inventory <inventory> --plan <preservation-plan> --repo-root <clone>
+      - python3 tools/agent_tools/conflict_preservation.py validate-rework --packet <rework-preservation>
+      - python3 tools/agent_tools/repository_topic_clone.py finalize-merge ... --inventory <inventory> --plan <preservation-plan>
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check

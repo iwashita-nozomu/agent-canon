@@ -451,6 +451,12 @@ enough to execute the role and owned enough to avoid unrelated repo reading.
 - `allowed_paths` / `do_not_read`: role-specific path boundaries
 - `expected_output_schema`: artifact name, findings format, or patch summary
 - `validation_route`: commands or review gate the parent will use
+- `conflict_or_rework_preservation`: when merge or repair work is in scope,
+  carry the repository-qualified base/head/merge-base, affected paths,
+  base/ours/theirs blob and hunk inventory, staged/unmerged state, unaffected
+  user/unknown content, selected cause, expected mechanism, exact owning edit
+  delta, disposition, rationale, and preservation readback. Omit this field
+  only when the handoff cannot mutate or rework repository content.
 - `return_contract`: what changed, what evidence supports it, unresolved
   blockers, and whether more context is needed
 - `design_issue_policy`: if the role finds an API shape, responsibility
@@ -570,6 +576,9 @@ this schema.
 - `revert_or_discard_authority`: rollback、revert、または slice discard を求める
   場合だけ、撤回 / 置換 / owner 外 / unsafe replacement / escalation の根拠を書く
 - `evidence`
+- `preservation_readback`: for conflict/rework findings, the inventory,
+  disposition/reconstruction map, and post-resolution proof that unaffected
+  content remains; a clean path list is not sufficient
 - `status`
 
 ## Write Scope Packet

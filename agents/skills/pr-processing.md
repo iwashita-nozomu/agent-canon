@@ -77,8 +77,23 @@ snapshot -> refresh_base -> integrate_on_pr_branch -> resolve
    rebase policy. Never commit conflict resolution directly to the base branch;
    preserve unrelated user-owned state.
 4. Resolve each conflict against current production/design/test/document and
-   generated-surface owners. Remove markers and temporary workflows, and update
-   stale PR claims about SHA, paths, ownership, or validation.
+   generated-surface owners. Before changing an unmerged path, the
+   `integration_executor` captures the merge base plus base/ours/theirs index
+   stages (immutable blob references), staged/unmerged state, diff hunks, and
+   unaffected user/unknown paths or hunks. The disposition for every path is
+   `keep`, `replace`, or `manual`, with its owner and rationale. Use
+   `python3 tools/agent_tools/conflict_preservation.py capture ...` for the
+   inventory. The plan binds preserved content to the captured hunk identity
+   (source blob/hunk hash, base path/range/context, and resolved diff); its
+   changed/context lines are derived from the captured hunk, so a caller cannot
+   substitute arbitrary content and duplicate text in another hunk cannot
+   satisfy readback.
+   `repository_topic_clone.py finalize-merge ...` is the only route
+   that can complete the stopped merge; it invokes preservation validation and
+   readback with the plan. Direct `validate` calls are diagnostic and cannot
+   authorize completion. Remove markers
+   and temporary workflows only after the inventory exists, and update stale
+   PR claims about SHA, paths, ownership, or validation.
 5. Validate the exact integrated head. Pre-integration checks are stale.
 6. Push the same branch without force and read back remote head/tree,
    mergeability, checks, reviews, and threads. Remote head must equal the
@@ -87,6 +102,18 @@ snapshot -> refresh_base -> integrate_on_pr_branch -> resolve
 8. Read back merge method/commit/tree, post-merge base HEAD, merged paths,
    temporary-workflow absence, relevant gitlink state, and Issue close
    conditions.
+
+`conflict_paths=empty` is not a semantic preservation result. The integrated
+head is accepted only when the preservation packet has a selected cause,
+expected mechanism, exact owning edit delta, explicit unaffected content, and
+an after-resolution readback. A whole-file `ours`/`theirs` checkout, path
+checkout, reset, reclone, overwrite, or regeneration is rejected unless the
+inventory and an explicit reconstruction map preserve every unrelated hunk.
+The same packet shape is required for rework after a validation finding:
+record the observed failure, selected cause, expected mechanism/behavior,
+exact owning delta, and content that remains outside the repair. One finding
+changes one owning hunk/unit; broad investigation does not authorize a broad
+diff or a new review wave.
 
 ```text
 automatic_merge_ready :=
