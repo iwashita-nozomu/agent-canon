@@ -142,6 +142,8 @@ def test_resident_dashboard_route_uses_target_and_private_archive(tmp_path: Path
         assert api["hook_entries"] == 1
         assert (runtime / "reports/live-dashboard/dashboard.md").is_file()
         assert (runtime / "reports/live-dashboard/compact.md").is_file()
+        dashboard_text = (runtime / "reports/live-dashboard/dashboard.md").read_text(encoding="utf-8")
+        assert "/var/lib/agent-canon/private-log" in dashboard_text
         assert not (target / "reports").exists()
         assert not (source / "reports/live-dashboard").exists()
         assert subprocess.run(
