@@ -319,6 +319,16 @@ format成功を、完成形の十分条件や全責務の証明へ自動昇格�
 変わる判断をrouting packetまたはtool artifactで示します。判断が変わらない
 確認は重複確認として削除し、warningだけの確認はcompletion gateに昇格させません。
 
+### Checkout Identity Readback
+
+Git 状態に関係する agent / work unit は、`checkout_identity` を一つの観測ブロック
+として扱います。`python3 tools/agent_tools/checkout_identity.py --format lines` が
+絶対 `cwd`、Git root、branch または `detached`、HEAD、normalized remote
+`owner/repository` を出力します。開始時、cwd / checkout 変更後、conflict 解消前、
+commit / push / PR 前、cleanup または destructive Git 前、handoff / final handback
+で一度だけ読み、状態が変わらない通常コマンドでは再実行しません。これは場所の
+readback であり、権限、承認、branch 操作、Issue / PR 操作を追加しません。
+
 mode の意味:
 
 - `repo-changing execution`

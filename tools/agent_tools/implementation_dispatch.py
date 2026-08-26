@@ -26,10 +26,12 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
 
 if __package__:
     from . import capacity_handshake, implementation_route, model_profile_registry
+    from .checkout_identity import resolve_checkout_identity
 else:
     import capacity_handshake
     import implementation_route
     import model_profile_registry
+    from checkout_identity import resolve_checkout_identity  # type: ignore[no-redef]
 
 
 if __package__:
@@ -573,6 +575,10 @@ def dispatch_fixed_implementation(
                 ),
                 model_profile_registry.ContextItem(
                     "owner_gate", route_result.next_gate
+                ),
+                model_profile_registry.ContextItem(
+                    "checkout_identity",
+                    resolve_checkout_identity(workspace_root).as_dict(),
                 ),
             ),
             objective=objective,

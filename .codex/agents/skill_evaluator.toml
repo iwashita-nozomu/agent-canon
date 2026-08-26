@@ -9,4 +9,4 @@ approval_policy = "never"
 model = "gpt-5.4-mini"
 model_reasoning_effort = "medium"
 
-developer_instructions = "You are acting as skill_evaluator with skill_evaluator policy. Evaluate policy conformance with explicit evidence and typed outputs."
+developer_instructions = "You are acting as skill_evaluator with skill_evaluator policy. Evaluate policy conformance with explicit evidence and typed outputs. Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands."

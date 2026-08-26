@@ -127,6 +127,10 @@ repo-changing task では、`--task-id` は catalog の候補を参照するだ�
 specialist と review pack は owner-critical decision、artifact operation、
 または selected review gate が必要な場合だけ有効化します。
 handoff / capsule fields の正本は `agents/COMMUNICATION_PROTOCOL.md` です。この skill は launch timing、role selection、wave ledger、authorization、closeout mechanics を所有し、capsule field list を第二の正本にしません。
+Git 状態に関係する handoff は `python3 tools/agent_tools/checkout_identity.py --format lines` の
+`checkout_identity` block（絶対 cwd、Git root、branch または detached、HEAD、normalized
+remote owner/repository）を開始、checkout 遷移、Git mutation 境界、handoff、final handback
+で一度だけ渡します。通常の各コマンドで繰り返さず、これは authority や承認を追加しません。
 subagent-only startup / internal skill routes are owned by `agents/internal-routines/subagent-startup.md`. Bootstrap cites that routine and carries `run.subagent_prompt_packet.subagent_startup_route` into handoff routing when present; it does not add `_...` labels to public skill routing or duplicate the capsule schema.
 prompt / routing / subagent-config drift を直す task では、shared policy prose を
 直接広く書き換える前に `prompt_config_reviewer` を prompt/config audit wave として起動し、

@@ -429,6 +429,27 @@ Raw search hits, chat memory, and a list of nearest files are not sufficient.
 If the packet is missing, implementation returns to investigation instead of
 guessing an edit path.
 
+## Checkout Identity Readback
+
+Every agent and work unit that can inspect or change repository state carries
+one observational `checkout_identity` block at bounded lifecycle transitions.
+The block is produced by
+`python3 tools/agent_tools/checkout_identity.py --format lines` and contains
+exactly these fields:
+
+- `cwd`: absolute directory in which the operation is acting
+- `git_root`: absolute Git toplevel, or `unknown`
+- `branch`: the current branch name, or `detached` for a detached `HEAD`
+- `head`: the resolved `HEAD` commit, or `unknown`
+- `remote`: normalized remote `owner/repository`, or `unknown`
+
+Read it once at agent/work-unit start, after a cwd or checkout change, before
+conflict resolution, before commit/push/PR, before cleanup or destructive Git,
+and in subagent handoff/final handback. Reuse the same block while checkout
+state is unchanged; ordinary commands do not trigger another read. The block
+describes where an operation runs and does not grant authority or replace any
+branch, worktree, merge, cleanup, or publication policy.
+
 ## Fresh Subagent Context Capsule
 
 Subagents are fresh per launch and do not inherit accumulated context. Each
@@ -437,8 +458,8 @@ enough to execute the role and owned enough to avoid unrelated repo reading.
 
 - `objective`: one sentence with active non-goals
 - `request_clause_ids`: clauses the subagent owns
-- `state_snapshot`: branch, relevant commit or run-id, current stage, and
-  integration executor owner
+- `state_snapshot`: one `checkout_identity` block, relevant commit or run-id,
+  current stage, and integration executor owner
 - `read_before_work`: exact files or sections to read within role-owned
   surfaces
 - `context_artifacts`: router output, dashboard summary, checker finding
@@ -459,6 +480,8 @@ enough to execute the role and owned enough to avoid unrelated repo reading.
   only when the handoff cannot mutate or rework repository content.
 - `return_contract`: what changed, what evidence supports it, unresolved
   blockers, and whether more context is needed
+- `checkout_identity`: repeat the same block in final handback, or provide the
+  new block after the checkout transition that changed it
 - `design_issue_policy`: if the role finds an API shape, responsibility
   boundary, path layout, naming, algorithm, theorem target, test oracle,
   dependency direction, runtime contract, or config-surface gap, it records

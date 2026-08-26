@@ -767,6 +767,21 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 - 論文 draft では `citation_evidence_reviewer` も追加します
 - research-driven change では `report_reviewer` と perspective reviewers を default にします
 
+## Checkout Identity at Git Boundaries
+
+各 agent / work unit は、Git 状態に関係する作業単位の開始時に、既存の
+`checkout_identity` readback を一度 handoff context に含めます。cwd または
+checkout が変わった後、conflict 解消前、commit / push / PR 前、cleanup または
+destructive Git 前、subagent handoff と final handback でも同じ block を更新します。
+通常のコマンドごとには繰り返しません。
+
+readback は `python3 tools/agent_tools/checkout_identity.py --format lines` で取得し、
+絶対 `cwd`、Git root、branch（detached を含む）、HEAD、normalized remote
+`owner/repository` を運びます。これは観測情報だけであり、branch / worktree authority、
+approval、merge、cleanup、Issue、publication の権限を追加しません。Git root または
+remote を解決できない場合は `unknown` をそのまま伝え、対象操作が identity を必要と
+するときだけ既存の owner route で停止します。
+
 ## Parallel Write Safety
 
 - parent が `team_manifest.yaml` の write policy と handoff で writer ごとの allowed path / directory を管理します

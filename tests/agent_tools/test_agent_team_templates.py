@@ -597,6 +597,9 @@ class AgentTeamTemplateTest(unittest.TestCase):
         self.assertEqual(dispatch.worker_agent_id, "spark-1")
         self.assertEqual(calls[0][0], "spark_worker")
         self.assertIn("SPARK::", calls[0][1])
+        self.assertIn("checkout_identity", calls[0][1])
+        self.assertIn("cwd", calls[0][1])
+        self.assertIn("git_root", calls[0][1])
         self.assertIsNotNone(dispatch.close_agent_token)
         self.assertEqual(
             dispatch.close_agent_token.arguments,

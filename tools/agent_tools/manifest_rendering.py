@@ -42,6 +42,11 @@ else:
     )
 
 if __package__:
+    from .checkout_identity import resolve_checkout_identity
+else:
+    from checkout_identity import resolve_checkout_identity  # type: ignore[no-redef]
+
+if __package__:
     from .agent_canon_source_root import resolve_agent_canon_source_root
 else:
     from agent_canon_source_root import resolve_agent_canon_source_root
@@ -272,6 +277,27 @@ DOC_OR_RUNTIME_PATH_MARKERS = (
 )
 
 SUBAGENT_STARTUP_ROUTE = "agents/internal-routines/subagent-startup.md"
+
+CHECKOUT_IDENTITY_FIELDS = (
+    "cwd",
+    "git_root",
+    "branch",
+    "head",
+    "remote",
+)
+
+CHECKOUT_IDENTITY_BOUNDARIES = (
+    "agent_or_work_unit_start",
+    "after_cwd_or_checkout_change",
+    "before_conflict_resolution",
+    "before_commit_push_or_pr",
+    "before_cleanup_or_destructive_git",
+    "subagent_handoff_and_final_handback",
+)
+
+CHECKOUT_IDENTITY_COMMAND = (
+    "python3 tools/agent_tools/checkout_identity.py --format lines"
+)
 
 DEFERRED_SPAWN_ROLE_IDS = {
     "implementer",
@@ -587,6 +613,7 @@ COMMON_PROMPT_MUST_INCLUDE = (
     "pre_edit_rejection_prediction",
     "dependency_files_header_plan",
     "next_review_gate",
+    "checkout_identity",
 )
 
 EVALUATOR_PROMPT_MUST_INCLUDE = (
@@ -604,6 +631,18 @@ def same_role_subagent_policy_output_lines() -> tuple[str, ...]:
         f"SAME_ROLE_SUBAGENT_INSTANCE_KEY={SAME_ROLE_SUBAGENT_INSTANCE_POLICY['identity_key']}",
         "SAME_ROLE_SUBAGENT_REQUIRED_FIELDS="
         f"{','.join(SAME_ROLE_SUBAGENT_REQUIRED_FIELDS)}",
+    )
+
+
+def checkout_identity_policy_output_lines() -> tuple[str, ...]:
+    """Return the bounded checkout readback contract for run output."""
+    return (
+        "CHECKOUT_IDENTITY_POLICY=bounded_transition_readback",
+        f"CHECKOUT_IDENTITY_FIELDS={','.join(CHECKOUT_IDENTITY_FIELDS)}",
+        f"CHECKOUT_IDENTITY_BOUNDARIES={','.join(CHECKOUT_IDENTITY_BOUNDARIES)}",
+        f"CHECKOUT_IDENTITY_COMMAND={CHECKOUT_IDENTITY_COMMAND}",
+        "CHECKOUT_IDENTITY_AUTHORITY=observational_only",
+        "CHECKOUT_IDENTITY_REPETITION=do_not_repeat_unchanged_state",
     )
 
 
@@ -1262,6 +1301,11 @@ def manifest_run_lines(
         f"  team_config: {str(source_root / 'agents' / 'agents_config.json')!r}",
         f"  team_runtime: {str(source_root / 'tools' / 'agent_tools' / 'agent_team.py')!r}",
         f"  task_catalog: {str(source_root / str(spec.config.team['task_catalog']))!r}",
+        "  checkout_identity:",
+        *(
+            f"    {field}: {value!r}"
+            for field, value in resolve_checkout_identity(spec.workspace_root).as_dict().items()
+        ),
         "  active_design_packet:",
     ]
     packet_yaml = yaml.safe_dump(
@@ -1556,6 +1600,7 @@ def manifest_run_lines(
         lines.append("      - expected_output")
         lines.append("      - write_scope")
         lines.append("      - remaining_spawn_budget")
+        lines.append("      - checkout_identity")
         lines.append("    handoff_optional_fields:")
         lines.append("      - decision_sufficiency_packet_ref")
         lines.append("      - unresolved_branch")
@@ -1606,6 +1651,10 @@ def manifest_run_lines(
         lines.append(
             "      - structured handoff with allowed_paths, do_not_read, expected_output, "
             "and write_policy; durable packet transport is conditional"
+        )
+        lines.append(
+            "      - one checkout_identity readback at start, checkout transitions, "
+            "Git mutation boundaries, handoff, and final handback"
         )
         lines.append("    closeout_required_evidence:")
         lines.append(
@@ -2253,6 +2302,17 @@ def render_subagent_prompt_packet(
     lines.append(f"{indent}    - tool_call_tokens")
     lines.append(f"{indent}    - tool_evidence")
     lines.append(f"{indent}    - tool_rejection_prediction")
+    lines.append(f"{indent}  checkout_identity:")
+    lines.append(f"{indent}    command: {CHECKOUT_IDENTITY_COMMAND!r}")
+    lines.append(f"{indent}    fields:")
+    for field in CHECKOUT_IDENTITY_FIELDS:
+        lines.append(f"{indent}      - {field}")
+    lines.append(f"{indent}    readback_boundaries:")
+    for boundary in CHECKOUT_IDENTITY_BOUNDARIES:
+        lines.append(f"{indent}      - {boundary}")
+    lines.append(
+        f"{indent}    repetition: 'reuse the same block until checkout state changes'"
+    )
     for key in ("prompt_preamble", "workflow_focus", "reviewer_prompt"):
         lines.append(f"{indent}  {key}:")
         for value in _as_prompt_entry_tuple(prompt.get(key), f"subagent_prompt.{key}"):
@@ -2283,6 +2343,9 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         "Carry the owner-produced DecisionSufficiencyPacket reference and "
         "run.repo_tool_routing_policy tool_route, machine-readable ToolCall tokens, and tool_evidence into "
         "the next handoff or review result when repo-owned tools are part of the selected route. "
+        "Carry one checkout_identity block with cwd, git_root, branch (or detached), head, "
+        "and normalized remote owner/repository at the bounded transition points; do not "
+        "repeat it for ordinary commands. "
         "Return findings or outputs tied to request_clause_ids, artifact paths, dependency-file "
         "headers for every edited or created text file, remaining planned work, and the next "
         "required gate."
@@ -2314,6 +2377,7 @@ def compact_role_prompt_contract(
         "role-specific packet, common packet only when active, allowed paths, "
         "subagent startup route when present, repo tool route fields, and the listed "
         "output fields."
+        " Include checkout_identity in every handoff where Git state matters."
     )
 
 
@@ -2327,6 +2391,7 @@ def role_prompt_must_include(role: Role) -> tuple[str, ...]:
             "no_nested_agents",
             "fixed_output_grammar",
         )
+    common.append("checkout_identity")
     if role.write_policy.mode != "read_only":
         common.extend(("write_policy", "allowed_files_or_directories"))
     if role.id == "designer":
