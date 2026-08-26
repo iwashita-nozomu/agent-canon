@@ -19,14 +19,17 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from tools.agent_tools import private_feedback
-from tools.agent_tools.bootstrap_runtime import BootstrapRuntime, PRIVATE_LOG_DESTINATION
+from tools.agent_tools.bootstrap_runtime import (
+    PRIVATE_LOG_DESTINATION,
+    BootstrapRuntime,
+)
 from tools.agent_tools.log_repository_identity import stable_log_branch
-
 
 SOURCE_ROOT = Path(__file__).resolve().parents[2]
 
 
 def invoke(runtime: Path, *argv: str, log_root: Path | None = None) -> int:
+    """Invoke the private feedback adapter against a test-owned runtime."""
     args = ["--runtime-root", str(runtime), "--source-root", str(SOURCE_ROOT)]
     if log_root is not None:
         args.extend(["--log-root", str(log_root)])
@@ -244,6 +247,11 @@ def test_bootstrap_consumes_container_runtime_private_feedback_spool(
     runtime = control / "runtime"
     manager = BootstrapRuntime(
         control, runtime, repository_root=Path(__file__).resolve().parents[2]
+    )
+    monkeypatch.setattr(
+        type(manager),
+        "private_log_root",
+        property(lambda _manager: control / "agent-canon-log"),
     )
     manager._ensure_layout()
     container_runtime = manager.paths.container_runtime

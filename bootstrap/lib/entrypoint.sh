@@ -21,6 +21,7 @@ AGENT_CANON_RUNTIME_DESTINATION=/var/lib/agent-canon/runtime
 AGENT_CANON_PRIVATE_LOG_DESTINATION=/var/lib/agent-canon/private-log
 AGENT_CANON_MOUNT_REGISTRY_DESTINATION=/var/lib/agent-canon/mount-registry.toml
 AGENT_CANON_HEALTH_ATTEMPTS=120
+AGENT_CANON_PRIVATE_LOG_ROOT=
 
 _agent_canon_json_error() {
   local code=$1 detail=$2
@@ -51,7 +52,7 @@ _agent_canon_control_digest() {
 }
 
 _agent_canon_validate_roots() {
-  local control runtime default_runtime
+  local control runtime default_runtime legacy_runtime
   if ! control=$(realpath -e -- "$AGENT_CANON_CONTROL_ROOT" 2>/dev/null); then
     control=
   fi
@@ -60,11 +61,18 @@ _agent_canon_validate_roots() {
   }
   AGENT_CANON_CONTROL_ROOT=$control
   default_runtime=$(realpath -m -- "$AGENT_CANON_REPOSITORY_ROOT/.runtime")
+  AGENT_CANON_PRIVATE_LOG_ROOT=$(realpath -m -- "$AGENT_CANON_REPOSITORY_ROOT/../agent-canon-log")
   if [[ "${AGENT_CANON_RUNTIME_REQUEST:-$AGENT_CANON_RUNTIME_ROOT}" == "$AGENT_CANON_REPOSITORY_ROOT/.runtime" &&
         -L "$AGENT_CANON_REPOSITORY_ROOT/.runtime" ]]; then
     _agent_canon_json_error runtime_root_symlink "default runtime root must not be a symlink"
   fi
   runtime=$(realpath -m -- "$AGENT_CANON_RUNTIME_ROOT")
+  legacy_runtime=$(realpath -m -- "$AGENT_CANON_CONTROL_ROOT/workspace/agent-canon-runtime/host")
+  if [[ "$runtime" == "$legacy_runtime" ]]; then
+    # The historical default is migration input only.  New state belongs to
+    # the source-owned runtime and must never be created under workspace/.
+    runtime=$default_runtime
+  fi
   if [[ "$runtime" != "$default_runtime" ]]; then
     case "$runtime" in
       "$control"/*) ;;
@@ -72,7 +80,7 @@ _agent_canon_validate_roots() {
     esac
   fi
   AGENT_CANON_RUNTIME_ROOT=$runtime
-  export AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
+  export AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_PRIVATE_LOG_ROOT
 }
 
 _agent_canon_target_digest() {
@@ -123,9 +131,9 @@ _agent_canon_prepare_host_runtime() {
     "$AGENT_CANON_STATE_ROOT/archive" \
     "$AGENT_CANON_STATE_ROOT/cache" \
     "$AGENT_CANON_STATE_ROOT/codex-home" \
-    "$AGENT_CANON_CONTROL_ROOT/agent-canon-log"
+    "$AGENT_CANON_PRIVATE_LOG_ROOT"
   chmod 700 "$AGENT_CANON_RUNTIME_ROOT" "$AGENT_CANON_RUNTIME_ROOT/host-state" "$AGENT_CANON_STATE_ROOT"
-  chmod 700 "$AGENT_CANON_CONTROL_ROOT/agent-canon-log"
+  chmod 700 "$AGENT_CANON_PRIVATE_LOG_ROOT"
   chmod 1777 "$AGENT_CANON_STATE_ROOT/container-runtime"
   [[ -e "$AGENT_CANON_STATE_ROOT/mounts.toml" ]] || : > "$AGENT_CANON_STATE_ROOT/mounts.toml"
   [[ -e "$AGENT_CANON_STATE_ROOT/mounts.tsv" ]] || : > "$AGENT_CANON_STATE_ROOT/mounts.tsv"
@@ -362,7 +370,7 @@ _agent_canon_write_rollback_plan() {
     printf 'image-id\t%s\n' "$image_id"
     printf 'image-ref\t%s\n' "$rollback_ref"
     printf 'mount\tmount\t%s\t%s\tfalse\n' "$AGENT_CANON_STATE_ROOT" "$AGENT_CANON_RUNTIME_DESTINATION"
-    printf 'mount\tmount\t%s\t%s\ttrue\n' "$AGENT_CANON_CONTROL_ROOT/agent-canon-log" "$AGENT_CANON_PRIVATE_LOG_DESTINATION"
+    printf 'mount\tmount\t%s\t%s\ttrue\n' "$AGENT_CANON_PRIVATE_LOG_ROOT" "$AGENT_CANON_PRIVATE_LOG_DESTINATION"
     printf 'mount\tmount\t%s\t%s\ttrue\n' "$AGENT_CANON_STATE_ROOT/mounts.toml" "$AGENT_CANON_MOUNT_REGISTRY_DESTINATION"
     if [[ -f "$AGENT_CANON_STATE_ROOT/mounts.tsv" && ! -L "$AGENT_CANON_STATE_ROOT/mounts.tsv" ]]; then
       local kind digest source destination mode
@@ -469,7 +477,7 @@ _agent_canon_validate_existing_container() {
   expected_mounts=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.expected-mounts.XXXXXX")
   observed_mounts=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.observed-mounts.XXXXXX")
   printf '%s\t%s\ttrue\n' "$AGENT_CANON_STATE_ROOT" "$AGENT_CANON_RUNTIME_DESTINATION" > "$expected_mounts"
-  printf '%s\t%s\tfalse\n' "$AGENT_CANON_CONTROL_ROOT/agent-canon-log" "$AGENT_CANON_PRIVATE_LOG_DESTINATION" >> "$expected_mounts"
+  printf '%s\t%s\tfalse\n' "$AGENT_CANON_PRIVATE_LOG_ROOT" "$AGENT_CANON_PRIVATE_LOG_DESTINATION" >> "$expected_mounts"
   printf '%s\t%s\tfalse\n' "$AGENT_CANON_STATE_ROOT/mounts.toml" "$AGENT_CANON_MOUNT_REGISTRY_DESTINATION" >> "$expected_mounts"
   if [[ -f "$mount_manifest" && ! -L "$mount_manifest" ]]; then
     local kind digest source destination mode
@@ -539,7 +547,7 @@ _agent_canon_ensure_container() {
       --label io.agent-canon.runtime=shared-v1 \
       --label "io.agent-canon.control-root-digest=$(_agent_canon_control_digest)" \
       --mount "type=bind,src=$AGENT_CANON_STATE_ROOT,dst=$AGENT_CANON_RUNTIME_DESTINATION" \
-      --mount "type=bind,src=$AGENT_CANON_CONTROL_ROOT/agent-canon-log,dst=$AGENT_CANON_PRIVATE_LOG_DESTINATION,readonly" \
+      --mount "type=bind,src=$AGENT_CANON_PRIVATE_LOG_ROOT,dst=$AGENT_CANON_PRIVATE_LOG_DESTINATION,readonly" \
       --mount "type=bind,src=$AGENT_CANON_STATE_ROOT/mounts.toml,dst=$AGENT_CANON_MOUNT_REGISTRY_DESTINATION,readonly" \
       "${target_mount_args[@]}" \
       "$AGENT_CANON_IMAGE_REF" >/dev/null
@@ -644,7 +652,7 @@ _agent_canon_private_feedback_sync() {
   fi
   python3 "$AGENT_CANON_REPOSITORY_ROOT/tools/agent_tools/private_feedback.py" \
     --runtime-root "$AGENT_CANON_STATE_ROOT" \
-    --log-root "$AGENT_CANON_CONTROL_ROOT/agent-canon-log" \
+    --log-root "$AGENT_CANON_PRIVATE_LOG_ROOT" \
     --source-root "$AGENT_CANON_REPOSITORY_ROOT" host-sync
 }
 

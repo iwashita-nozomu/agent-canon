@@ -106,6 +106,7 @@ def test_default_source_runtime_rebuilds_without_copying_legacy_state(
         manager._write_state(fresh)
         manager._finalize_legacy_runtime_reset()
     assert not legacy.exists()
+    assert not legacy.parent.exists()
 
 
 def test_explicit_roots_canonicalize_dot_segments_after_symlink_validation(

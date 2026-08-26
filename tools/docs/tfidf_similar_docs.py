@@ -17,7 +17,7 @@ and missing runtime capability fails before a report is opened.
 
 Usage:
   python3 tools/docs/tfidf_similar_docs.py \
-    --runtime-root /abs/path/to/workspace/agent-canon-runtime/<run> --min 0.5 \
+    --runtime-root /abs/path/to/external/agent-canon-runtime/<run> --min 0.5 \
     [--documents-root /path/to/documents]
 
 No external dependencies.

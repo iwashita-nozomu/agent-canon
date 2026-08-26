@@ -32,10 +32,10 @@ COMMON=(--control-parent-root "$ROOT")
 ./bootstrap.sh "${COMMON[@]}" uninstall
 ```
 
-The control root must be the authorized parent checkout. The default runtime
-is the bootstrap-owned ignored `.runtime/` under the source checkout; an
-explicit runtime must be its descendant and must not escape through a symlink.
-Runtime cache,
+The control root must be the authorized parent checkout. Runtime state is
+always the bootstrap-owned ignored `.runtime/` under the source checkout;
+legacy runtime arguments are migration input only and do not select a new
+placement. Runtime cache,
 reports, eval collections, Codex home, Cargo output, and temporary files stay
 under the external runtime root.
 

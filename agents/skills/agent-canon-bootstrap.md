@@ -24,11 +24,11 @@ evidence.
 - `bootstrap.sh` is the only host entrypoint. The host adapter invokes no
   AgentCanon Python; it builds/adopts the image and starts exactly one resident
   container before using `docker exec` for the controller. Always pass explicit
-  `--repository-root` and `--control-parent-root`; omitting `--runtime-root`
-  selects the bootstrap-owned, ignored `<repository-root>/.runtime/`. The
-  control root must be the authorized parent workspace and an explicitly
-  selected runtime root a child of it. Do not fall back to an arbitrary source
-  path or a global `$HOME` path.
+  `--repository-root` and `--control-parent-root`; the effective runtime is
+  always the bootstrap-owned, ignored `<repository-root>/.runtime/`.
+  `--control-parent-root` authorizes access but never selects runtime or log
+  placement. The historical `--runtime-root` value is accepted only as a
+  migration-compatible input and cannot create new state at that path.
 - Host pre-container values are the fixed bootstrap constants in
   `bootstrap/lib/entrypoint.sh` (install/runtime paths, image/container limits,
   and mount destinations). Do not add a generic TOML parser or duplicate the
@@ -53,8 +53,10 @@ evidence.
 - Project code is tested through the project-owned `docker/` image and
   `test/testrunner.sh`/test list. Do not mount a project's tests into the
   AgentCanon tool container and do not make AgentCanon know project test names.
-- Bootstrap lifecycle state and cache may live in the ignored,
-  reconstructible `<repository-root>/.runtime/`. General eval/report/SQLite/log/
+- Bootstrap lifecycle state and cache live in the ignored, reconstructible
+  `<repository-root>/.runtime/`. The private `agent-canon-log` checkout is the
+  sibling `<repository-root>/../agent-canon-log`, independent of the control
+  root. General eval/report/SQLite/log/
   analysis artifacts remain outside the source checkout; the artifact output
   boundary does not permit `.runtime` as a source-local exception.
 - When the explicit control root is `$HOME`, install/update also manage split
@@ -73,8 +75,8 @@ evidence.
 1. Resolve the task and project owner first. Use the project repository's
    normal Docker/test runner for project execution; select this skill only for
    AgentCanon tools or their lifecycle.
-2. Choose task-qualified control/runtime roots under the authorized parent
-   workspace, then run `status`. Install/start the shared runtime only when
+2. Choose the source install root and its authorized control root, then run
+   `status`. Install/start the shared runtime only when
    status says it is absent or stale. Keep at most one task-owned AgentCanon
    tool container and one image generation; record IDs for cleanup.
 3. Add the exact project root as a read-only target, or request the explicit
@@ -102,8 +104,8 @@ update, and sync paths derive a new image reference.
 
 ## Command Shape
 
-The control root is a task input; the omitted runtime root is the fixed
-bootstrap default `<repository-root>/.runtime`:
+The control root is a task input; the effective runtime is always the fixed
+bootstrap path `<repository-root>/.runtime`:
 
 ```bash
 bash bootstrap.sh \

@@ -45,7 +45,7 @@ is runtime state and must be below the explicit external AgentCanon runtime
 root; a checkout-local `reports/` or package directory is not a valid target.
 
 ```bash
-RUNTIME_ROOT=/abs/path/to/workspace/agent-canon-runtime/<run>
+RUNTIME_ROOT=/abs/path/to/external/agent-canon-runtime/<run>
 python3 tools/agent_tools/lean_proof_env.py init \
   --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env"
 ```

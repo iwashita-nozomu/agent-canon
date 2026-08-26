@@ -14,8 +14,7 @@ downstream design runtime-log-archive-migration.md archive migration route
 
 AgentCanon runtime evidence is runtime state. Hook events, accumulated evals,
 Codex runtime summaries, and archived task bundles are collected under the
-runtime root selected by `bootstrap.sh` (the bootstrap-owned ignored
-`<install-root>/.runtime/` by default) and published to the separate
+bootstrap-owned ignored `<install-root>/.runtime/` and published to the separate
 [`iwashita-nozomu/agent-canon-log`](https://github.com/iwashita-nozomu/agent-canon-log)
 repository. Outside that exact `.runtime/` directory, they are not written to
 the AgentCanon source checkout, a parent repository, a vendor directory, or a
@@ -88,9 +87,9 @@ The supported user route is:
 
 ```bash
 ./bootstrap.sh --control-parent-root <root> \
-  --runtime-root <runtime> eval collect --root <project-root> --run-id <run-id>
+  eval collect --root <project-root> --run-id <run-id>
 ./bootstrap.sh --control-parent-root <root> \
-  --runtime-root <runtime> eval sync --run-id <run-id>
+  eval sync --run-id <run-id>
 ```
 
 The typed host Git adapter performs the following bounded sequence:

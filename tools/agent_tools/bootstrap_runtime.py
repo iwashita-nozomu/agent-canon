@@ -47,7 +47,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
-
 SCHEMA_STATE = "agent-canon.bootstrap-state.v2"
 SCHEMA_RECEIPT = "agent-canon.bootstrap-receipt.v2"
 SCHEMA_MOUNTS = "agent-canon.mount-registry.v2"
@@ -1409,6 +1408,19 @@ class BootstrapRuntime:
         return self.global_codex_home / "config.toml"
 
     @property
+    def private_log_root(self) -> Path:
+        """Return the log checkout sibling of the source install.
+
+        The container controller sees the host checkout through its fixed
+        private-log mount.  The host-side runtime derives the real checkout
+        from the install root, so a caller's control root cannot create a log
+        checkout under an unrelated workspace.
+        """
+        if self._container_control():
+            return self.paths.control_parent_root / "private-log"
+        return self.repository_root.parent / "agent-canon-log"
+
+    @property
     def personal_codex_config(self) -> Path:
         """Return AgentCanon's ignored, persistent personal-config source."""
         return self.repository_root / ".codex" / "personal" / "config.toml"
@@ -1462,9 +1474,7 @@ class BootstrapRuntime:
             os.close(fd)
         elif self.paths.lock.is_symlink():
             raise BootstrapError("symlink_path_rejected", "lifecycle lock is a symlink")
-        private_log = self.paths.control_parent_root / (
-            "private-log" if self._container_control() else "agent-canon-log"
-        )
+        private_log = self.private_log_root
         if private_log.exists() and private_log.is_symlink():
             raise BootstrapError("symlink_path_rejected", "private log checkout is a symlink")
         if not private_log.exists():
@@ -1705,6 +1715,14 @@ class BootstrapRuntime:
         if owner_source and Path(str(owner_source)).resolve() != self.repository_root:
             raise BootstrapError("legacy_runtime_invalid", "legacy runtime source owner changed")
         shutil.rmtree(legacy)
+        legacy_parent = legacy.parent
+        if (
+            legacy_parent == self.paths.control_parent_root / "workspace" / "agent-canon-runtime"
+            and legacy_parent.is_dir()
+            and not legacy_parent.is_symlink()
+            and not any(legacy_parent.iterdir())
+        ):
+            legacy_parent.rmdir()
         self._legacy_runtime_pending_cleanup = None
 
     def _write_state(self, state: dict[str, Any]) -> None:
@@ -1980,8 +1998,7 @@ class BootstrapRuntime:
             },
             {
                 "source": str(
-                    self.paths.control_parent_root
-                    / ("private-log" if self._container_control() else "agent-canon-log")
+                    self.private_log_root
                 ),
                 "destination": PRIVATE_LOG_DESTINATION,
                 "mode": "read-only",
@@ -2586,7 +2603,8 @@ class BootstrapRuntime:
         return result
 
     def _scheduler_paths(self) -> tuple[Path, Path]:
-        root = Path.home() / ".config" / "systemd" / "user"
+        config_root = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+        root = config_root / "systemd" / "user"
         return root / "agent-canon-sync.service", root / "agent-canon-sync.timer"
 
     def scheduler_enable(self) -> dict[str, Any]:
@@ -4114,7 +4132,7 @@ class BootstrapRuntime:
                 "--runtime-root",
                 str(container_runtime),
                 "--log-root",
-                str(self.paths.control_parent_root / "agent-canon-log"),
+                str(self.private_log_root),
                 "--source-root",
                 str(self.repository_root),
                 "host-sync",

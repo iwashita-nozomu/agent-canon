@@ -56,10 +56,11 @@ ROOT=<authorized-parent-root>
 COMMON=(--control-parent-root "$ROOT")
 ```
 
-`--control-parent-root` is the authorized parent repository root. The runtime
-root must be beneath it and must not escape through a symlink. The only
-source-local state is the bootstrap-owned `<install-root>/.runtime/`; it is
-ignored and reconstructible. Eval, report, SQLite, log, and analysis output
+`--control-parent-root` is the authorized parent repository root. It authorizes
+access but does not select storage. The effective runtime is always the
+bootstrap-owned `<install-root>/.runtime/`; the private log checkout is its
+sibling `<install-root-parent>/agent-canon-log`. Both are ignored or external
+to the source checkout as appropriate. Eval, report, SQLite, log, and analysis output
 remains under its declared external artifact root. There is no implicit
 `$HOME`, `$HOME/.cache`, or `$HOME/.local` fallback.
 

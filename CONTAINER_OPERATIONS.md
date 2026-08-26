@@ -27,10 +27,12 @@ The only supported lifecycle entrypoint is top-level `bootstrap.sh`:
   <operation>
 ```
 
-The control root is an authorized parent repository. The default runtime is
-the bootstrap-owned `<install-root>/.runtime/` directory and is ignored by
-Git. An explicit runtime root must be inside the control root after realpath
-resolution, with no symlink escape. Do not use
+The control root is an authorized parent repository. The effective runtime is
+always the bootstrap-owned `<install-root>/.runtime/` directory and is ignored
+by Git. The historical `--runtime-root` option is migration-compatible input
+only and never changes new runtime placement. The private log checkout is the
+install root's sibling `<install-root-parent>/agent-canon-log`; it is not
+derived from the control root. Do not use
 an arbitrary AgentCanon source directory, an implicit current-directory state directory,
 `$HOME/.cache`, `$HOME/.local`, global `$CODEX_HOME`, or a whole workspace/home
 mount as a runtime fallback.
@@ -173,7 +175,7 @@ the typed host operation when appropriate:
 
 ```bash
 ./bootstrap.sh --control-parent-root <root> \
-  --runtime-root <runtime> exec --root <registered-project> -- <existing-command> <args...>
+  exec --root <registered-project> -- <existing-command> <args...>
 ```
 
 There is no compatibility alias that silently changes a command's plane or

@@ -59,13 +59,14 @@ secret value、authorization header、credential path を stdout、receipt、eva
 
 ## Runtime And Cache Roots
 
-Bootstrap は `--control-parent-root` を必須とし、`--runtime-root` を省略した場合は
-install root の ignored `.runtime/` を persistent runtime として使います。これは
-bootstrap が所有する唯一の source-local state で、完全に再構築可能です。明示した
-runtime root は control-plane owner repository の realpath 配下でなければならず、
-symlink で外へ逃がす指定も拒否します。一般の eval/report/SQLite/log/analysis
-artifact は source tree 外の declared runtime root に残し、`$HOME/.local`、
-`$HOME/.cache`、その他の source-tree fallback は使いません。
+Bootstrap は `--control-parent-root` を必須とし、install root の ignored
+`.runtime/` を persistent runtime として使います。これは bootstrap が所有する
+唯一の source-local state で、完全に再構築可能です。`--runtime-root` は旧 default
+の migration input としてのみ解釈し、新しい state の配置を変更しません。一般の
+eval/report/SQLite/log/analysis artifact は source tree 外の declared runtime root
+に残し、`$HOME/.local`、`$HOME/.cache`、その他の source-tree fallback は使いません。
+外部 private log checkout は常に `<install-root-parent>/agent-canon-log` であり、
+control-plane root は認可だけを担います。
 
 control-plane root は installation に一つだけで、project root ではありません。
 複数 project は同じ `mounts.toml` に target として登録し、同じ container ID

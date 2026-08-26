@@ -33,7 +33,7 @@ operation: choose a runtime root outside the checkout and place `--out-dir`
 below that root.  There is no source-local `reports/` fallback.
 
 ```bash
-RUNTIME_ROOT=/abs/path/to/workspace/agent-canon-runtime/<run>
+RUNTIME_ROOT=/abs/path/to/external/agent-canon-runtime/<run>
 python3 tools/agent_tools/formal_proof.py \
   --claim-file /path/to/claim.md \
   --target lean \

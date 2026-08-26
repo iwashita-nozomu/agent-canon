@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -142,6 +142,45 @@ def test_missing_docker_is_typed_without_host_python(tmp_path: Path) -> None:
     assert completed.returncode == 2
     receipt = json.loads(completed.stderr)
     assert receipt["code"] == "runtime_unavailable"
+
+
+def test_legacy_runtime_argument_keeps_install_state_at_source_sibling_paths(
+    tmp_path: Path,
+) -> None:
+    """The removed workspace default cannot receive new runtime or log state."""
+    repository = tmp_path / "agent-canon"
+    control = tmp_path / "control"
+    repository.mkdir()
+    control.mkdir()
+    legacy = control / "workspace" / "agent-canon-runtime" / "host"
+    fake_docker = tmp_path / "docker"
+    fake_docker.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    fake_docker.chmod(0o755)
+
+    completed = subprocess.run(
+        [
+            str(BOOTSTRAP),
+            "--repository-root",
+            str(repository),
+            "--control-parent-root",
+            str(control),
+            "--runtime-root",
+            str(legacy),
+            "status",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={"PATH": "/usr/bin:/bin", "AGENT_CANON_DOCKER": str(fake_docker)},
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    receipt = json.loads(completed.stdout)
+    assert receipt["runtime_root"] == str(repository / ".runtime")
+    assert (repository / ".runtime" / "container-state").is_dir()
+    assert not legacy.exists()
+    assert not (control / "agent-canon-log").exists()
+    assert (tmp_path / "agent-canon-log").is_dir()
 
 
 def test_runtime_escape_is_rejected_before_mkdir(tmp_path: Path) -> None:
@@ -423,7 +462,12 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
     control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
     container_name = f"agent-canon-tools-{control_digest[:16]}"
     environment = os.environ.copy()
-    environment.update({"AGENT_CANON_FORCE_BUILD": "1"})
+    environment.update(
+        {
+            "AGENT_CANON_FORCE_BUILD": "1",
+            "XDG_CONFIG_HOME": str(tmp_path / "xdg-config"),
+        }
+    )
     common = [
         str(BOOTSTRAP),
         "--repository-root",

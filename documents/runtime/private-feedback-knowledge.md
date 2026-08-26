@@ -15,13 +15,14 @@ AgentCanon records reusable private feedback outside the source checkout. The
 private remote is `iwashita-nozomu/agent-canon-log`; at this revision its
 schema is read from `db3722b817be8574c682949db733df0fb5c2674a`.
 
-The operational checkout is selected by the explicit bootstrap control root:
+The operational checkout is the private sibling of the AgentCanon install:
 
 ```text
-<control-parent-root>/agent-canon-log
+<install-root-parent>/agent-canon-log
 ```
 
-For the live installation this is normally `~/agent-canon-log`. The checkout
+The control root authorizes access but never selects this storage location.
+For the live installation this is `~/agent-canon-log`. The checkout
 is a private (`0700`) normal Git clone on the source-qualified stable branch
 resolved by `runtime_log_archive_git.py repo-key`, with the exact private
 remote. The log repository's `main` branch is schema/configuration content and
