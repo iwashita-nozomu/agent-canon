@@ -642,6 +642,34 @@ def test_writer_allows_scoped_git_output_and_preserves_tree_reads() -> None:
             assert read.status == "not_applicable"
 
 
+@pytest.mark.parametrize(
+    "command",
+    (
+        "git diff --output - HEAD",
+        "git diff --output=- HEAD",
+        "git show --output - HEAD",
+        "git show --output=- HEAD",
+        "git log --output - HEAD",
+        "git log --output=- HEAD",
+        "git archive -o - HEAD",
+        "git archive -o- HEAD",
+        "git archive --output - HEAD",
+        "git archive --output=- HEAD",
+    ),
+)
+def test_git_output_dash_is_stdout_not_a_writer_target(command: str) -> None:
+    """The exact Git dash sentinel does not create a filesystem mutation."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        read = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": command}},
+            report_dir=None,
+            active_root=root,
+            environment={},
+        )
+        assert read.status == "not_applicable"
+
+
 def test_canonical_merge_main_is_integration_only_and_preservation_gated() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)

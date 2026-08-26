@@ -423,6 +423,10 @@ def _git_output_paths(
             index += 1
         if value is None:
             continue
+        if value == "-":
+            # Git's exact dash sentinel writes to stdout, not a filesystem
+            # path.  Keep the surrounding command read-only.
+            continue
         if not value:
             return tuple(paths), "git_output_path_unresolved"
         paths.append(_shell_path(value, cwd=cwd, active_root=active_root)[0])
