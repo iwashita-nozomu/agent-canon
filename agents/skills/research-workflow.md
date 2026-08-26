@@ -36,6 +36,10 @@ upstream design ../canonical/skills.md skill canon registry
 1. critical review と report review を通す
 1. `report_rewrite_required`、`extra_validation_required`、`rerun_required`、`approved` の decision に応じて loop を戻す
 
+ここでの decision は run 後の report / iteration 遷移です。実験 plan は question、
+comparison、observables、evidence targets、protocol、resource、operational stop condition を宣言すればよく、
+研究上の support / reject / inconclusive や reviewer decision を run 開始・完了の前提にしません。
+
 ## Boundary
 
 - 単一 run の設計、実行、rerun 分岐は `experiment-lifecycle` を使います。

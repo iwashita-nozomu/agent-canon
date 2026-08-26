@@ -20,6 +20,11 @@ upstream design ../canonical/skills.md skill canon registry
 - Boundary: individual runs do not count as accepted results without backlog,
   evidence, and review closure.
 
+実験開始前の plan は question、comparison、observables、evidence targets、protocol、resource、
+operational stop condition を宣言するだけです。`supported`、`rejected`、
+`inconclusive`、`approved` は run 後の結果解釈または iteration 遷移として記録し、
+plan の completion や run 開始条件にはしません。
+
 ## Purpose
 
 実験、調査、チューニング、比較検証をまとめて回しながら、改善 backlog を iteration 単位で潰していく outer loop を定めます。
@@ -60,7 +65,7 @@ upstream design ../canonical/skills.md skill canon registry
 - `action=prompt_repair` または `action=eval_update` の feedback は、対応する `evidence/agent-evals/skill_workflow_prompt_eval.toml` の entry を先に更新または確認し、prompt repair 後に同じ eval を rerun します。
 - static analysis が workflow / skill / prompt の弱さを示した場合は、結果を `static_analysis_feedback=applied|recorded` として監視し、還元先の skill / workflow / eval を明示します。未処理の `static_analysis_feedback=pending` を残して loop を閉じません。
 - 同じ goal に対して 2 回の実行経路があり得る場合は、`tools/agent_tools/compare_agent_run_paths.py --baseline-run <run-a> --candidate-run <run-b>` で `execution_path`、`route_efficiency`、`static_analysis_feedback` を比較します。`route_efficiency=inefficient` または `selected_inefficient_route=yes` が出た場合は、agent behavior eval が fail するようにし、非効率経路を選ばないよう skill / workflow prompt を修正します。
-- コード改善 iteration では、`agents/workflows/hypothesis-validation-workflow.md` を overlay にし、`Observation`、`Hypothesis`、`Expected Mechanism`、`Candidate Comparison`、`Disconfirming Evidence`、`Support Evidence`、`Hypothesis Decision` を iteration artifact に残します。`Hypothesis Decision` が `supported` でない場合は、同じ pass を拡張せず次仮説へ戻します。
+- コード改善 iteration では、`agents/workflows/hypothesis-validation-workflow.md` を overlay にし、`Observation`、`Hypothesis`、`Expected Mechanism`、`Candidate Comparison`、`Disconfirming Evidence`、`Support Evidence`、`Hypothesis Decision` を run 後の iteration artifact に残します。`Hypothesis Decision` が `supported` でない場合は、同じ pass を拡張せず次仮説へ戻します。
 - closeout 前に `python3 tools/agent_tools/evaluate_agent_run.py --report-dir <run> --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write` を実行し、`AGENT_EVALUATION_STATUS=pass` まで workflow artifact または prompt を修正します。
 - 2 つ目の extension に進む前に、直前 extension の selected `waterfall-gate-check`、selected review gate（final review は活性化された場合のみ）、`task-close`、commit / push を完了させます。
 - baseline、comparison target、fairness rule は iteration ごとに勝手にずらしません。
@@ -124,7 +129,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. If static analysis exposes a skill/workflow weakness, record `static_analysis_feedback=applied|recorded` with the prompt or eval target that received the feedback. Do not close the loop while `static_analysis_feedback=pending` remains.
 1. When two executions can take different paths, run `python3 tools/agent_tools/compare_agent_run_paths.py --baseline-run <run-a> --candidate-run <run-b>` and feed its `execution_path_comparison`, `route_efficiency`, `selected_inefficient_route`, and `static_analysis_feedback` tokens into workflow monitoring.
 1. If `route_efficiency=inefficient` or `selected_inefficient_route=yes` appears, repair the skill/workflow prompt and behavior eval until the inefficient route no longer passes.
-1. For code-improvement iterations, add `agents/workflows/hypothesis-validation-workflow.md` as an overlay and record `Observation`, `Hypothesis`, `Expected Mechanism`, `Candidate Comparison`, `Disconfirming Evidence`, `Support Evidence`, and `Hypothesis Decision`.
+1. For code-improvement iterations, add `agents/workflows/hypothesis-validation-workflow.md` as an overlay and record `Observation`, `Hypothesis`, `Expected Mechanism`, `Candidate Comparison`, `Disconfirming Evidence`, `Support Evidence`, and the post-run `Hypothesis Decision`.
 1. If `Hypothesis Decision` is `rejected` or `inconclusive`, return to hypothesis selection instead of widening the current implementation pass.
 1. Before closeout, run `python3 tools/agent_tools/evaluate_agent_run.py --report-dir <run> --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write` and repair workflow artifacts or prompts until `AGENT_EVALUATION_STATUS=pass`.
 1. Keep the outer loop agile and backlog-driven, but keep each repo-changing pass inside `agents/workflows/implementation-waterfall-workflow.md`.

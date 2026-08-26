@@ -42,7 +42,9 @@ downstream design ../../documents/design/algorithm-implementation-boundary.md eq
 - run は fresh 実行で完走させます。途中停止 run を resume の正本にせず、停止理由を記録して 0 からやり直します。
 - claim は evidence に合わせます。実験範囲を越えた一般化を避け、仮定と限界を本文で明示します。
 - correctness evidence と performance evidence を混同しません。正しさの parity test は性能の証拠ではなく、速度比較は数式上の正しさの証拠ではありません。
-- runtime success や smoke pass は acceptance の十分条件ではありません。本体実装が `Equation:`、`Assumptions:`、仕様記述、method contract と一致しているかを別に確認します。
+- runtime success や smoke pass は研究上の結論ではありません。実験計画はそれらの合否を
+  先に要求せず、実行後に本体実装が `Equation:`、`Assumptions:`、仕様記述、method contract と
+  一致しているかを別に解釈します。
 - code change、protocol change、XLA / runtime flag change を 1 iteration に混ぜません。1 iteration では 1 種類の変更だけを入れ、差分の原因を追えるようにします。
 - user request が generic path の usable smoke を求めている場合、specialized path の tuning や bounded smoke だけで close しません。
 - 外部論文、公式 docs、web 記事、download artifact を参照する前に、既存の
@@ -69,6 +71,11 @@ downstream design ../../documents/design/algorithm-implementation-boundary.md eq
 1. decision に応じて loop を戻す
 
 decision は次の 4 つに固定します。
+
+ここでの decision は run 後の report / iteration の扱いを決めるものです。計画時点の
+completion gate や run 開始条件には使いません。計画は問い、比較、観測、evidence targets、protocol、
+operational stop condition を宣言し、結果の support / reject / inconclusive は実行後に
+research owner が記録します。
 
 - `report_rewrite_required`
   - 同じ result を使って report だけを書き直します

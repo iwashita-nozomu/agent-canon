@@ -93,18 +93,18 @@ def _case_state_counts(records: tuple[CaseResult, ...]) -> tuple[int, int, int]:
     )
 
 
-def _run_acceptance(
+def _derive_run_state(
     records: tuple[CaseResult, ...],
     completion: CompletionProvenance,
 ) -> tuple[RunState, str, str]:
     """
-    実行 case record から run status、failure class、close condition を導出します.
+    実行 case record から operational state、failure class、close condition を導出します.
 
     Args:
         records: preserved failure を含む complete case execution records。
 
     Returns:
-        導出した state、安定した failure class、required close condition。
+        導出した operational state、安定した failure class、required close condition。
 
     Side effects:
         artifact を書かず、record も変更しません。
@@ -138,7 +138,7 @@ def _run_acceptance(
     return (
         RunState.SUCCESS,
         "not_applicable",
-        "summary、cases、manifest、validation oracle の readback が完了しました",
+        "summary、cases、manifest、artifact readback が完了しました",
     )
 
 
@@ -183,7 +183,7 @@ def run_experiment(run_dir: Path) -> RunSummary:
     records = tuple(records_list)
     write_case_records(summary_dir, records)
     success_count, failed_count, blocked_count = _case_state_counts(records)
-    status, failure_class, close_condition = _run_acceptance(records, completion)
+    status, failure_class, close_condition = _derive_run_state(records, completion)
     failure_records = tuple(record for record in records if record.state != "success")
     failure_evidence = "not_applicable"
     if failure_records or not records:
@@ -243,11 +243,11 @@ def run_experiment(run_dir: Path) -> RunSummary:
         failure_evidence=failure_evidence,
         preserved_artifacts=tuple(preserved),
         close_condition=close_condition,
-        validation_oracle=(
-            "pass: complete provenance、non-empty cases、terminal state invariant、"
+        execution_evidence=(
+            "complete provenance、non-empty cases、terminal state invariant、"
             "全 artifact digest の readback"
             if status is RunState.SUCCESS
-            else "incomplete: completion provenance が success の条件を満たしていません"
+            else "completion provenance または case execution の operational evidence が未完了"
         ),
         visualization_status=visualization_status,
         template_complete=completion.is_complete,
@@ -281,7 +281,7 @@ def main() -> int:
     選択した module を通して一つの managed experiment run を調整します.
 
     `main()` は引数なしの execution entrypoint です。algorithm、case、schema、serialization、
-    visualization、oracle の選択は各 owning contract と replaceable module に残します。
+    visualization と観測方法の選択は各 owning contract と replaceable module に残します。
 
     Returns:
         空でない成功 run では zero、failed または blocked result では one。
@@ -324,7 +324,7 @@ REQUIRED_CONFIG_FIELDS = (
     "metric",
     "runtime",
     "algorithm_contract",
-    "oracle",
+    "observables",
     "provenance",
     "failure",
     "lifecycle",
@@ -337,19 +337,25 @@ REQUIRED_COMPLETION_FIELDS = (
     "experiment.plan_digest",
     "plan.baseline",
     "plan.candidate",
+    "plan.variables",
     "plan.cases",
+    "plan.observables",
+    "plan.evidence_targets",
     "plan.metrics",
+    "plan.comparison",
+    "plan.calculation",
+    "plan.expected_mechanism",
+    "plan.protocol",
     "plan.stopping_rule",
-    "plan.acceptance_oracle",
+    "plan.impossibility_conditions",
+    "plan.input_conditions",
+    "plan.environment_conditions",
     "plan.algorithm_contract.public_entrypoint",
     "plan.algorithm_contract.input_schema",
     "plan.algorithm_contract.state_transition",
     "plan.algorithm_contract.invariants",
     "plan.algorithm_contract.stopping_rule",
     "plan.algorithm_contract.failure_semantics",
-    "plan.oracle_boundary.necessary_observations",
-    "plan.oracle_boundary.sufficient_observations",
-    "plan.oracle_boundary.test_activation",
     "source.repository",
     "source.branch",
     "source.commit",
@@ -370,31 +376,9 @@ REQUIRED_COMPLETION_FIELDS = (
     "reproducibility.cleanup_command",
     "reproducibility.reconstructibility_readback",
 )
-REQUIRED_COMPLETION_STRUCTURES = (
-    (
-        "plan.options",
-        2,
-        ("id", "mechanism", "status", "rejected_rationale", "selection_evidence"),
-    ),
-    (
-        "plan.selection",
-        1,
-        ("selected_option", "rejected_rationale", "selection_evidence"),
-    ),
-    (
-        "review",
-        1,
-        (
-            "independent_reviewer",
-            "source_snapshot",
-            "selection_evidence",
-            "review_decision",
-        ),
-    ),
-)
 PLACEHOLDER_RE = re.compile(r"<[^>\n]+>")
 UNRESOLVED_MARKER_RE = re.compile(
-    r"\b(?:IMPLEMENT HERE|TODO|TBD|FIXME|REPLACE ME|selected-or-rejected)\b",
+    r"\b(?:IMPLEMENT HERE|TODO|TBD|FIXME|REPLACE ME)\b",
     re.IGNORECASE,
 )
 
@@ -438,7 +422,7 @@ class CompletionProvenance:
         immutable な判定 record を作るだけで、file I/O は行いません。
 
     Ownership:
-        `run.py` が source を読み、acceptance に利用します。
+        `run.py` が source を読み、実行開始に必要な operational declaration に利用します。
     """
 
     template_complete: bool
@@ -455,7 +439,7 @@ class CompletionProvenance:
 
     @property
     def is_complete(self) -> bool:
-        """Required fields が全て埋まり success を許可できるか返します."""
+        """Required plan and provenance fields が埋まり execution を開始できるか返します."""
         return (
             self.template_complete
             and self.completion_status == "complete"
@@ -591,7 +575,7 @@ class ArtifactManifest:
 @dataclass(frozen=True)
 class RunSummary:
     """
-    全 case record を run-level acceptance state へ集約します.
+    全 case record を run-level operational state へ集約します.
 
     invariant は `status` を materialized case state と case 後の infrastructure evidence
     だけから導出することです。空または部分書き込みの result file から success を推測しません。
@@ -610,7 +594,7 @@ class RunSummary:
         failure_evidence: evidence filename または not_applicable。
         preserved_artifacts: readback 必須 artifact filename。
         close_condition: non-success rerun を閉じる前に必要な人間の action。
-        validation_oracle: 必要十分な run acceptance oracle。
+        execution_evidence: exit status、case state、artifact readback の operational evidence。
         visualization_status: visualization consumer state。
         template_complete: template が完成条件を満たすか。
         completion_provenance: 完成条件の readback mapping。
@@ -638,7 +622,7 @@ class RunSummary:
     failure_evidence: str
     preserved_artifacts: tuple[str, ...]
     close_condition: str
-    validation_oracle: str
+    execution_evidence: str
     visualization_status: str
     template_complete: bool
     completion_provenance: dict[str, object]
@@ -689,6 +673,8 @@ class RunSummary:
             raise ValueError("summary state counts must equal case_count")
         if not self.failure_class.strip() or not self.failure_evidence.strip():
             raise ValueError("summary failure fields must be explicit")
+        if not self.execution_evidence.strip():
+            raise ValueError("summary execution evidence must be explicit")
         if not isinstance(self.template_complete, bool):
             raise ValueError("summary template_complete must be boolean")
         if not isinstance(self.completion_provenance, dict):
@@ -762,7 +748,7 @@ class RunSummary:
         この run の summary.json projection 全体を返します.
 
         Returns:
-            count、status、oracle、artifact を含む JSON-compatible mapping。
+            count、status、execution evidence、artifact を含む JSON-compatible mapping。
         """
         return {
             "schema_version": 1,
@@ -778,11 +764,9 @@ class RunSummary:
             "blocked_count": self.blocked_count,
             "failure_class": self.failure_class,
             "failure_evidence": self.failure_evidence,
-            "accepted_failure": False,
-            "accepted_failure_reason": "not_applicable",
             "preserved_artifacts": list(self.preserved_artifacts),
             "close_condition": self.close_condition,
-            "validation_oracle": self.validation_oracle,
+            "execution_evidence": self.execution_evidence,
             "visualization_status": self.visualization_status,
             "template_complete": self.template_complete,
             "completion_provenance": self.completion_provenance,
@@ -820,87 +804,6 @@ def _is_completed_value(value: object) -> bool:
     if isinstance(value, dict):
         return bool(value)
     return True
-
-
-def _missing_completion_structures(provenance: object) -> list[str]:
-    """Provenance の必須 table 構造と fields の不足を列挙します."""
-    missing: list[str] = []
-    for path, minimum_count, fields in REQUIRED_COMPLETION_STRUCTURES:
-        value = _completion_value(provenance, path)
-        if path == "plan.options":
-            records = value if isinstance(value, list) else []
-            if len(records) < minimum_count:
-                missing.append(
-                    f"provenance.{path} requires at least {minimum_count} records"
-                )
-        else:
-            records = [value] if isinstance(value, dict) else []
-            if not records:
-                missing.append(f"provenance.{path} is required")
-        for index, record in enumerate(records):
-            if not isinstance(record, dict):
-                missing.append(f"provenance.{path}[{index}] must be a mapping")
-                continue
-            for field in fields:
-                if not _is_completed_value(record.get(field)):
-                    field_path = (
-                        f"provenance.{path}[{index}].{field}"
-                        if path == "plan.options"
-                        else f"provenance.{path}.{field}"
-                    )
-                    missing.append(field_path)
-    missing.extend(_missing_option_selection_invariants(provenance))
-    return missing
-
-
-def _missing_option_selection_invariants(provenance: object) -> list[str]:
-    """plan.options と plan.selection の cross-field invariant を検証します."""
-    options = _completion_value(provenance, "plan.options")
-    selection = _completion_value(provenance, "plan.selection")
-    if not isinstance(options, list) or not all(
-        isinstance(item, dict) for item in options
-    ):
-        return []
-    if not isinstance(selection, dict):
-        return []
-
-    records = [item for item in options if isinstance(item, dict)]
-    option_ids = [record.get("id") for record in records]
-    missing: list[str] = []
-    if any(
-        option_ids[left] == option_ids[right]
-        for left in range(len(option_ids))
-        for right in range(left + 1, len(option_ids))
-    ):
-        missing.append("provenance.plan.options.id must be unique")
-
-    selected_option = selection.get("selected_option")
-    if selected_option not in option_ids:
-        missing.append(
-            "provenance.plan.selection.selected_option must reference an option id"
-        )
-
-    selected_records = [
-        record for record in records if record.get("status") == "selected"
-    ]
-    if len(selected_records) != 1:
-        missing.append(
-            "provenance.plan.options must contain exactly one selected option"
-        )
-    elif selected_records[0].get("id") != selected_option:
-        missing.append(
-            "provenance.plan.selection.selected_option must identify the selected option"
-        )
-
-    if selected_option in option_ids:
-        if any(
-            record.get("id") != selected_option and record.get("status") != "rejected"
-            for record in records
-        ):
-            missing.append(
-                "provenance.plan.options must mark every non-selected option as rejected"
-            )
-    return missing
 
 
 def load_completion_provenance(template_dir: Path) -> CompletionProvenance:
@@ -981,7 +884,6 @@ def load_completion_provenance(template_dir: Path) -> CompletionProvenance:
     for field in REQUIRED_COMPLETION_FIELDS:
         if not _is_completed_value(_completion_value(provenance, field)):
             missing.append(field)
-    missing.extend(_missing_completion_structures(provenance))
     return CompletionProvenance(
         template_complete=config_complete and template_complete,
         completion_status=completion_status,

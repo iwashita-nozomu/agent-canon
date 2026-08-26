@@ -11,7 +11,7 @@ template_complete: false
 # IMPLEMENT HERE: 実験の case set または sweep space を定義する。
 cases: {}
 
-# IMPLEMENT HERE: 評価 metric、denominator、direction、baseline、必要十分 oracle を定義する。
+# IMPLEMENT HERE: 観測値、評価 metric、denominator、direction、baseline を定義する。
 metric: {}
 
 # IMPLEMENT HERE: execution-only controls を定義する。GPU番号、CUDA_VISIBLE_DEVICES、
@@ -21,8 +21,8 @@ runtime: {}
 # IMPLEMENT HERE: tests より前に algorithm/state contract と failure semantics を埋める。
 algorithm_contract: {}
 
-# IMPLEMENT HERE: necessary-and-sufficient oracle と test activation boundary を埋める。
-oracle: {}
+# IMPLEMENT HERE: 実行時に生成する観測値とその record shape を定義する。
+observables: {}
 
 # IMPLEMENT HERE: caller/scheduler、environment snapshot、result manifest、cleanup owner を記録する。
 provenance: {}
