@@ -265,6 +265,71 @@ class RuntimeLogPathsTest(unittest.TestCase):
                 with self.assertRaises(RuntimePathEscape):
                     hook_event_spool_root(source, runtime)
 
+    def test_explicit_archive_override_reads_external_private_log_mount(self) -> None:
+        """Dashboard readers may use the already-mounted private archive checkout."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source"
+            runtime = root / "runtime"
+            private_log = root / "private-log"
+            source.mkdir()
+            runtime.mkdir()
+            private_log.mkdir()
+            with patch.dict(
+                os.environ,
+                {
+                    "AGENT_CANON_HOOK_ARCHIVE_DIR": str(private_log),
+                    "AGENT_CANON_LOG_ROOT": str(private_log),
+                },
+            ):
+                dirs = hook_result_search_dirs(source, source, runtime)
+
+        self.assertEqual(dirs[0], private_log / "hook-runs" / repo_log_key(source))
+
+    def test_absolute_archive_override_rejects_unowned_path(self) -> None:
+        """An absolute archive override cannot select an arbitrary external tree."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source"
+            runtime = root / "runtime"
+            private_log = root / "private-log"
+            external = root / "external"
+            source.mkdir()
+            runtime.mkdir()
+            private_log.mkdir()
+            external.mkdir()
+            with patch.dict(
+                os.environ,
+                {
+                    "AGENT_CANON_HOOK_ARCHIVE_DIR": str(external),
+                    "AGENT_CANON_LOG_ROOT": str(private_log),
+                },
+            ):
+                with self.assertRaises(RuntimePathEscape):
+                    hook_result_search_dirs(source, source, runtime)
+
+    def test_absolute_archive_override_rejects_symlinked_private_mount(self) -> None:
+        """A private-log alias cannot redirect the archive reader."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source"
+            runtime = root / "runtime"
+            private_log = root / "private-log"
+            private_alias = root / "private-log-alias"
+            source.mkdir()
+            runtime.mkdir()
+            private_log.mkdir()
+            private_alias.symlink_to(private_log, target_is_directory=True)
+            with patch.dict(
+                os.environ,
+                {
+                    "AGENT_CANON_HOOK_ARCHIVE_DIR": str(private_alias),
+                    "AGENT_CANON_LOG_ROOT": str(private_alias),
+                },
+            ):
+                with self.assertRaises(RuntimePathEscape):
+                    hook_result_search_dirs(source, source, runtime)
+
 
 if __name__ == "__main__":
     unittest.main()

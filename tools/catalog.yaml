@@ -32,6 +32,7 @@ runtime_schema:
     - tool-container
   cwd_policies:
     - source-root
+    - target-root
     - task-root
     - explicit
   env_policies:
@@ -2187,6 +2188,22 @@ entries:
     status: canonical
     command: python3 tools/agent_tools/generate_agent_runtime_dashboard.py
     writes: true
+    dispatch:
+      runtime: python
+      argv: [python3, tools/agent_tools/generate_agent_runtime_dashboard.py]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: inherited
+      stderr: inherited
+      exit: propagate
+      signal: propagate
+      side_effect: external-artifact
+      output_root: external-runtime
+      written_paths: []
+      parity: verified
+      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
     default_wiring:
       ci: false
       pr_check: false

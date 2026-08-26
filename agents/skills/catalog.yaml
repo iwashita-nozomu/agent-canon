@@ -545,12 +545,15 @@ skill_families:
     shim: .codex/personal/skills/issue-finding-report/SKILL.md
     discovery:
       name: issue-finding-report
-      description: "Use when creating, splitting, merging, re-parenting, reopening, or superseding Issues by owner, decision, mechanism, validation, and completion responsibility; investigates cause hypotheses without overclaiming, preserves unique clauses, and can also convert accumulated runtime evidence into durable AgentCanon Issues."
+      description: "Use when creating, splitting, merging, re-parenting, reopening, or superseding Issues by owner, decision, mechanism, validation, and completion responsibility; investigates cause hypotheses without overclaiming, preserves unique clauses, and can also convert accumulated runtime evidence into durable AgentCanon Issues through the shared dashboard tool."
     tool_commands:
       required: []
       conditional:
       - python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
-      - python3 tools/agent_tools/generate_agent_runtime_dashboard.py
+      - ./bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root>
+        tool run --root <registered-source-root> generate-agent-runtime-dashboard -- --root .
+        --compact-out reports/agent-runtime-dashboard/agent-log-analysis-compact.md
+        --api-out reports/agent-runtime-dashboard/agent-log-analysis-api.json
       - git grep -n "<cause keywords>" -- documents/notes/knowledge documents/notes/failures documents agents
       - python3 tools/agent_tools/issue_sync.py --issue-url <owner/repository#number>
       - bash tools/agent_tools/run_repo_dependency_review.sh
@@ -587,7 +590,7 @@ skill_families:
     shim: .codex/personal/skills/agent-log-analysis/SKILL.md
     discovery:
       name: agent-log-analysis
-      description: "Use when analyzing accumulated AgentCanon skill/tool/workflow/hook/eval logs, missed or late skill invocation, routing misses, weak skills, over-constrained related-skill coverage, or selection gaps; first convert raw logs into a structured dashboard summary with AgentCanon source generate_agent_runtime_dashboard.py before reading or interpreting evidence."
+      description: "Use when analyzing accumulated AgentCanon skill/tool/workflow/hook/eval logs, missed or late skill invocation, routing misses, weak skills, over-constrained related-skill coverage, or selection gaps; first convert raw logs into a structured dashboard summary through the AgentCanon source generate-agent-runtime-dashboard tool before reading or interpreting evidence."
     tool_commands:
       required: []
       conditional:
@@ -595,7 +598,10 @@ skill_families:
       - python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
       - python3 tools/agent_tools/runtime_log_archive_git.py sync
       - python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
-      - python3 tools/agent_tools/generate_agent_runtime_dashboard.py
+      - ./bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root>
+        tool run --root <registered-source-root> generate-agent-runtime-dashboard -- --root .
+        --compact-out reports/agent-runtime-dashboard/agent-log-analysis-compact.md
+        --api-out reports/agent-runtime-dashboard/agent-log-analysis-api.json
       - python3 tools/agent_tools/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json
         --format text
       - git grep -n

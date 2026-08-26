@@ -3,6 +3,32 @@
   "version": 2,
   "entries": [
     {
+      "id": "generate-agent-runtime-dashboard",
+      "probe_args": ["--help"],
+      "observed": {
+        "argv": ["python3", "tools/agent_tools/generate_agent_runtime_dashboard.py"],
+        "cwd": "target-root",
+        "stdin": "inherited",
+        "stdout": "inherited",
+        "stderr": "inherited",
+        "exit": "propagate",
+        "signal": "propagate",
+        "written_paths": []
+      },
+      "legacy_result": {
+        "exit_code": 0,
+        "stdout_sha256": "f639f4e926e06243e6f0929e9e531d9aca4d771640f42e6b3a429161dbd21355",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_paths": []
+      },
+      "container_result": {
+        "exit_code": 0,
+        "stdout_sha256": "f639f4e926e06243e6f0929e9e531d9aca4d771640f42e6b3a429161dbd21355",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_paths": []
+      }
+    },
+    {
       "id": "route",
       "probe_args": ["--list"],
       "observed": {

@@ -130,6 +130,11 @@ TOKEN_USAGE_EVIDENCE_TARGET = "compact report Token Consumption Drilldown"
 SKILL_EVAL_EVIDENCE_TARGET = "compact report Skill Eval Failure Drilldown"
 WAVE_EXECUTION_EVIDENCE_TARGET = "compact report Wave And Subagent Execution Drilldown"
 SELECTION_RESPONSIBILITIES = ("skill", "workflow", "tool")
+DASHBOARD_TOOL_ROUTE = (
+    "./bootstrap.sh --control-parent-root <control-parent-root> "
+    "--runtime-root <runtime-root> tool run --root <registered-source-root> "
+    "generate-agent-runtime-dashboard -- --root ."
+)
 SELECTED_WORKFLOW_FIELDS = (
     "workflows",
     "workflow",
@@ -3360,7 +3365,7 @@ def reference_capture_next_action(summary: RuntimeDashboardSummary) -> tuple[Das
             reason="no reference_capture_guard entries are present",
             evidence=REFERENCE_CAPTURE_EVIDENCE_TARGET,
             owner_surface="tools/agent_tools/reference_materializer.py",
-            command="python3 tools/agent_tools/generate_agent_runtime_dashboard.py --root .",
+            command=DASHBOARD_TOOL_ROUTE,
             done_condition="AGENT_RUNTIME_DASHBOARD_REFERENCE_CAPTURE_ENTRIES>0",
             issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
             automation="agent-fix",
@@ -3391,7 +3396,7 @@ def workflow_attribution_next_action(summary: RuntimeDashboardSummary) -> tuple[
         reason=f"{breakdown.entries_without_workflow} hook entries lack workflow attribution",
         evidence=WORKFLOW_ATTRIBUTION_EVIDENCE_TARGET,
             owner_surface="tools/agent_tools/behavior_event_assembly.py and workflow_monitoring.md",
-        command="python3 tools/agent_tools/generate_agent_runtime_dashboard.py --root .",
+        command=DASHBOARD_TOOL_ROUTE,
         done_condition="AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING=0 or entries are explicitly exempt",
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
         automation="agent-fix",
@@ -3452,7 +3457,7 @@ def selection_metrics_next_action(summary: RuntimeDashboardSummary) -> tuple[Das
         reason=f"{missed} candidate selections were not confirmed",
         evidence=SELECTION_EVIDENCE_TARGET,
         owner_surface=row.reset_path,
-        command="python3 tools/agent_tools/generate_agent_runtime_dashboard.py --root .",
+        command=DASHBOARD_TOOL_ROUTE,
         done_condition=f"{row.responsibility}:{row.name} miss rate is 0% after its reset window",
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
         automation="human-review-then-agent-fix",
@@ -3517,7 +3522,7 @@ def prompt_tool_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboard
         reason="prompt excerpts or tool selection entries are missing",
         evidence=PROMPT_TOOL_EVIDENCE_TARGET,
             owner_surface="tools/agent_tools/behavior_event_assembly.py",
-        command="python3 tools/agent_tools/generate_agent_runtime_dashboard.py --root .",
+        command=DASHBOARD_TOOL_ROUTE,
         done_condition="prompt_entries>0, tool_selection_entries>0, prompt_missing_excerpt_entries=0",
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
         automation="agent-fix",
