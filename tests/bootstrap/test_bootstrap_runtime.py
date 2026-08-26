@@ -1295,7 +1295,7 @@ def test_top_level_entrypoint_reports_typed_docker_failure_without_fallback(
 
 
 def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
-    tmp_path: Path, fake_docker: DockerAdapter
+    tmp_path: Path, fake_docker: DockerAdapter, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Collect a real producer matrix, prove source stability, and read back Git blobs."""
     source = tmp_path / "source"
@@ -1374,23 +1374,25 @@ def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
     spool = manager.paths.runtime_root / "spool" / "eval-e2e"
     assert (spool / "collection.json").is_file()
     assert (source / "README.md").read_bytes() == before
+    monkeypatch.delenv("AGENT_CANON_TARGET_DIGEST", raising=False)
     synced = manager.eval_sync("eval-e2e")
-    assert synced["code"] == "archive_published"
-    assert not spool.exists()
-    assert (manager.paths.control_parent_root / "agent-canon-log" / ".git").is_dir()
-    assert not (manager.paths.runtime_root / "archive" / "agent-canon-log").exists()
-    clone = tmp_path / "archive-clone"
-    subprocess.run(["git", "clone", "-q", str(remote), str(clone)], check=True)
-    from tools.agent_tools.log_repository_identity import stable_source_id
-
-    branch = f"logs/{stable_source_id(source)}"
-    branch_result = subprocess.run(
-        ["git", "-C", str(clone), "ls-tree", "-r", "--name-only", f"origin/{branch}"],
-        check=True,
-        capture_output=True,
-        text=True,
+    assert synced["code"] == "host_archive_requested"
+    assert synced["details"] == {
+        "execution_plane": "host_archive_adapter",
+        "run_id": "eval-e2e",
+        "status": "requested",
+    }
+    request = spool / "sync-request.tsv"
+    assert request.read_text(encoding="utf-8") == (
+        "schema\tagent-canon.eval-sync-request.v1\n"
+        "operation\tsync\n"
+        "execution-plane\tagentcanon_tool_container\n"
+        "run-id\teval-e2e\n"
+        "target-digest\t\n"
+        f"source-root\t{source}\n"
     )
-    assert "eval-results/skill-workflow-prompt/skill-eval-20260101T000000000000Z-0123456789-pass-bootstrap.md" in branch_result.stdout
+    assert spool.is_dir()
+    assert not (manager.paths.runtime_root / "archive" / "agent-canon-log").exists()
 
 
 def test_eval_producer_failure_is_not_masked_by_missing_export(

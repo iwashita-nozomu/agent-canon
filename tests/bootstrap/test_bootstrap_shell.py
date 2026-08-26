@@ -439,6 +439,9 @@ def test_active_image_state_owns_ordinary_route_selection() -> None:
 def test_archive_and_codex_crossings_are_host_owned() -> None:
     """Resident routes produce requests; host owns archive and Codex launch."""
     text = ADAPTER.read_text(encoding="utf-8")
+    eval_archive = text.split("_agent_canon_archive_eval_sync()", 1)[1].split(
+        "_agent_canon_remove_global_links()", 1
+    )[0]
     assert '_agent_canon_private_feedback_sync' in text
     assert '_agent_canon_private_feedback_identity' in text
     assert 'private_feedback.py' not in text
@@ -452,6 +455,10 @@ def test_archive_and_codex_crossings_are_host_owned() -> None:
     assert 'identity_args+=(--repository-id "$AGENT_CANON_SOURCE_REPOSITORY_ID")' in text
     assert 'git -C "$log_root" merge --ff-only "origin/$branch"' in text
     assert 'runtime_log_archive_git.py' in text
+    assert '--archive-root "$AGENT_CANON_PRIVATE_LOG_ROOT"' in eval_archive
+    assert eval_archive.index('--archive-root "$AGENT_CANON_PRIVATE_LOG_ROOT"') < eval_archive.index(
+        'archive-eval --spool-root'
+    )
     assert 'AGENT_CANON_CODEX' in text
     assert 'AGENT_CANON_CODEX_SESSION_ROOT' in text
     assert 'CODEX_HOME="$AGENT_CANON_STATE_ROOT/codex-home"' in text
@@ -468,6 +475,11 @@ def test_archive_and_codex_crossings_are_host_owned() -> None:
     )[0]
     assert 'runtime_log_archive_git' not in container_control
     assert '_host_private_feedback_sync' not in container_control
+    eval_sync = controller.split('    def eval_sync(', 1)[1].split(
+        '    def eval_sync_prepare(', 1
+    )[0]
+    assert 'runtime_log_archive_git' not in eval_sync
+    assert 'return self.eval_sync_prepare(run_id)' in eval_sync
 
 
 def test_forced_rollback_recovery_failure_retains_mounted_backup(tmp_path: Path) -> None:

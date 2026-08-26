@@ -962,6 +962,7 @@ _agent_canon_archive_eval_sync() {
   python3 "$AGENT_CANON_REPOSITORY_ROOT/tools/agent_tools/runtime_log_archive_git.py" \
     --source-root "$resolved_source" \
     --canon-root "$AGENT_CANON_REPOSITORY_ROOT" \
+    --archive-root "$AGENT_CANON_PRIVATE_LOG_ROOT" \
     --runtime-root "$AGENT_CANON_STATE_ROOT" \
     --remote "${AGENT_CANON_LOG_REMOTE:-git@github.com:iwashita-nozomu/agent-canon-log.git}" \
     archive-eval --spool-root "$spool" --run-id "$run_id" || adapter_rc=$?

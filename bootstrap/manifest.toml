@@ -44,4 +44,3 @@ sync_on_boot_delay_seconds = 300
 # receives the external runtime spool and never receives Git credentials.
 remote = "git@github.com:iwashita-nozomu/agent-canon-log.git"
 operational_clone = "install-root-parent/agent-canon-log"
-legacy_clone = "runtime-root/archive/agent-canon-log"

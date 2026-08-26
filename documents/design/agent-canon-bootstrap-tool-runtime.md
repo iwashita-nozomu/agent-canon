@@ -84,7 +84,6 @@ Docker label readback で既存 owner を検出し、`shared_runtime_owned_elsew
   tasks/<task-id>/{tmp,locks,reports,logs,receipts}
   container-runtime/  # 01777 exchange only; no control state or credentials
   spool/
-  archive/agent-canon-log/
 
 <install-root>/.runtime/cache/{cargo,pycache,semantic-index,tool-metadata}/
 ```
