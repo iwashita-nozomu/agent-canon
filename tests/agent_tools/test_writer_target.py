@@ -11,30 +11,36 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 import tempfile
 from pathlib import Path
 import pytest
 
-from tools.agent_tools.implementation_dispatch import (
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+
+from tools.agent_tools.implementation_dispatch import (  # noqa: E402
+    dispatch_subagent_wave,
     recommended_dynamic_expansion_wave_slots,
     recommended_initial_subagent_wave,
     validate_writer_handoff_waves,
     workflow_spawn_budget,
 )
-from tools.agent_tools.mutation_authority import evaluate_mutation_authority
-from tools.agent_tools.team_config import (
+from tools.agent_tools.mutation_authority import evaluate_mutation_authority  # noqa: E402
+from tools.agent_tools.team_config import (  # noqa: E402
     SubagentWaveSlot,
     load_task_catalog,
     load_team_config,
     select_roles,
 )
-from tools.agent_tools.writer_target import (
+from tools.agent_tools.writer_target import (  # noqa: E402
     WriterTarget,
     WriterTargetError,
     materialize_writer_target_packet,
     validate_writer_target_allocations,
     validate_writer_target_identity,
 )
+from tool_calls import materialize_subagent_spawn_tool_call  # noqa: E402
 
 
 def target(root: str, branch: str = "fix/942") -> WriterTarget:
@@ -124,7 +130,7 @@ def test_distinct_topic_clones_and_readers_remain_admissible() -> None:
 
 
 def test_writer_target_is_required_for_writer_and_not_for_reader() -> None:
-    with pytest.raises(WriterTargetError, match="required_before_spawn"):
+    with pytest.raises(ValueError, match="required_before_spawn"):
         validate_writer_target_allocations(
             ({"owner": "worker", "write_capable": True, "writer_target": None},)
         )
@@ -157,6 +163,81 @@ def test_wave_materializer_allows_distinct_writer_slots() -> None:
         waves,
         {waves[0][0].executable_identity: target("/tmp/one")},
     )[0].branch == "fix/942"
+
+
+def test_spawn_tool_call_validates_writer_target_before_materialization() -> None:
+    identity = {
+        "cwd": "/tmp/spawn",
+        "git_root": "/tmp/spawn",
+        "branch": "fix/942",
+        "head": "c" * 40,
+        "remote": "local/repo",
+    }
+    writer = WriterTarget("/tmp/spawn", "fix/942", "local/repo", ("tools/",))
+    call = materialize_subagent_spawn_tool_call(
+        role="worker",
+        agent_type="worker",
+        input="write the assigned files",
+        checkout_identity=identity,
+        writer_target=writer,
+    )
+    assert call["arguments"]["writer_target"] == writer.as_dict()
+    with pytest.raises(ValueError, match="required_before_spawn"):
+        materialize_subagent_spawn_tool_call(
+            role="worker",
+            agent_type="worker",
+            input="write the assigned files",
+            checkout_identity=identity,
+        )
+    publisher_call = materialize_subagent_spawn_tool_call(
+        role="publisher",
+        agent_type="worker",
+        input="publish the assigned Issue",
+        checkout_identity=identity,
+        workspace_write_capable=False,
+    )
+    assert "writer_target" not in publisher_call["arguments"]
+
+
+def test_normal_wave_dispatch_rejects_duplicate_targets_before_callback() -> None:
+    slots = (
+        SubagentWaveSlot("implementer", "worker-1", "worker", True),
+        SubagentWaveSlot("integration_executor", "integration-1", "worker", True),
+    )
+    shared = target("/tmp/wave-shared")
+    prompts = {slot.executable_identity: "bounded work" for slot in slots}
+    calls: list[str] = []
+    with pytest.raises(WriterTargetError, match="checkout_root_collision"):
+        dispatch_subagent_wave(
+            slots,
+            prompts,
+            lambda role, prompt: calls.append(role) or role,
+            {
+                slots[0].executable_identity: shared,
+                slots[1].executable_identity: shared,
+            },
+        )
+    assert calls == []
+
+
+def test_normal_wave_dispatch_calls_callback_for_distinct_targets() -> None:
+    slots = (
+        SubagentWaveSlot("implementer", "worker-1", "worker", True),
+        SubagentWaveSlot("integration_executor", "integration-1", "worker", True),
+    )
+    prompts = {slot.executable_identity: "bounded work" for slot in slots}
+    calls: list[str] = []
+    spawned = dispatch_subagent_wave(
+        slots,
+        prompts,
+        lambda role, prompt: calls.append(role) or f"{role}-id",
+        {
+            slots[0].executable_identity: target("/tmp/wave-a"),
+            slots[1].executable_identity: target("/tmp/wave-b"),
+        },
+    )
+    assert spawned == ("worker-id", "worker-id")
+    assert calls == ["worker", "worker"]
 
 
 def test_normal_stage_materializer_carries_targets_into_writer_slots() -> None:
@@ -404,6 +485,18 @@ def test_canonical_merge_main_is_integration_only_and_preservation_gated() -> No
             hook_spool_root=root,
         )
         assert ordinary.reason == "repository_topic_clone_lifecycle_requires_integration_executor"
+        for compound in (
+            "touch README.md && " + command,
+            command + " && rm README.md",
+        ):
+            blocked = evaluate_mutation_authority(
+                {"tool_name": "Bash", "tool_input": {"command": compound}},
+                report_dir=root,
+                active_root=root,
+                environment=runtime_environment,
+                hook_spool_root=root,
+            )
+            assert blocked.status == "blocked"
 
 
 def test_workspace_writer_without_static_packet_is_blocked() -> None:

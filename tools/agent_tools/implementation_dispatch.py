@@ -1317,3 +1317,32 @@ def validate_writer_handoff_waves(
     """Reject missing or colliding writer targets before a wave is spawned."""
     slots = tuple(slot for wave in waves for slot in wave)
     return validate_wave_writer_targets(slots, writer_targets)
+
+
+def dispatch_subagent_wave(
+    slots: tuple[SubagentWaveSlot, ...],
+    prompts: Mapping[str, str],
+    spawn: Callable[[str, str], str | None],
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None],
+) -> tuple[str, ...]:
+    """Validate one complete wave before invoking any spawn callback."""
+    validate_writer_handoff_waves((slots,), writer_targets)
+    missing_prompts = [
+        slot.executable_identity
+        for slot in slots
+        if not isinstance(prompts.get(slot.executable_identity), str)
+        or not prompts[slot.executable_identity].strip()
+    ]
+    if missing_prompts:
+        raise RuntimeError(
+            "subagent_wave_prompt_missing:" + ",".join(missing_prompts)
+        )
+    spawned: list[str] = []
+    for slot in slots:
+        agent_id = spawn(slot.agent_type, prompts[slot.executable_identity])
+        if not agent_id:
+            raise RuntimeError(
+                f"subagent_wave_spawn_failed:{slot.executable_identity}"
+            )
+        spawned.append(agent_id)
+    return tuple(spawned)

@@ -22,18 +22,14 @@ from typing import Mapping
 try:
     from .writer_target import (
         WRITER_TARGET_PACKET_RELATIVE,
-        WRITER_TARGET_PACKET_SCHEMA,
         WriterTargetError,
-        parse_writer_target,
-        validate_writer_target_identity,
+        read_writer_target_packet,
     )
 except ImportError:
     from writer_target import (  # type: ignore[no-redef]
         WRITER_TARGET_PACKET_RELATIVE,
-        WRITER_TARGET_PACKET_SCHEMA,
         WriterTargetError,
-        parse_writer_target,
-        validate_writer_target_identity,
+        read_writer_target_packet,
     )
 
 IDENTITY_SCHEMA = "agent-canon.runtime-agent-identity.v1"
@@ -178,7 +174,8 @@ def _command_segments(command: str) -> tuple[tuple[str, ...], ...]:
 
 def _repository_topic_clone_operation(command: str) -> str | None:
     """Classify only the canonical conflict-preserving clone lifecycle command."""
-    for segment in _command_segments(command):
+    segments = _command_segments(command)
+    for segment in segments:
         if not segment:
             continue
         try:
@@ -201,6 +198,8 @@ def _repository_topic_clone_operation(command: str) -> str | None:
         operation = arguments[script_index + 1]
         if operation not in {"merge-main", "resume-merge", "finalize-merge"}:
             continue
+        if len(segments) != 1:
+            return "repository_topic_clone_compound"
         if operation in {"resume-merge", "finalize-merge"} and not {
             "--inventory",
             "--plan",
@@ -366,37 +365,10 @@ def _read_writer_target_packet(
     environment: Mapping[str, str],
 ) -> tuple[object | None, Mapping[str, object] | None, str | None]:
     """Read and validate the ignored static target packet for this checkout."""
-    packet_path = active_root.resolve(strict=False) / WRITER_TARGET_PACKET_RELATIVE
     try:
-        packet_value = json.loads(packet_path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return None, None, "writer_target_packet_missing"
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        return None, None, "writer_target_packet_invalid"
-    if not isinstance(packet_value, dict) or packet_value.get("schema") != WRITER_TARGET_PACKET_SCHEMA:
-        return None, None, "writer_target_packet_invalid"
-    try:
-        target = parse_writer_target(
-            {
-                "schema": "agent-canon.writer-target.v1",
-                **{
-                    key: value
-                    for key, value in packet_value.items()
-                    if key not in {"schema", "checkout_identity"}
-                },
-            }
-        )
-    except WriterTargetError:
-        return None, None, "writer_target_packet_invalid"
-    identity = packet_value.get("checkout_identity")
-    if not isinstance(identity, Mapping):
-        return None, None, "writer_target_packet_invalid"
-    try:
-        validate_writer_target_identity(target, identity)
-    except WriterTargetError:
-        return None, None, "writer_target_packet_identity_mismatch"
-    if target.normalized_root != str(active_root.resolve(strict=False)):
-        return None, None, "writer_target_packet_identity_mismatch"
+        target, identity = read_writer_target_packet(active_root)
+    except WriterTargetError as exc:
+        return None, None, str(exc)
     declared_root = environment.get(WRITER_CHECKOUT_ROOT_ENV, "").strip()
     declared_branch = environment.get(WRITER_BRANCH_ENV, "").strip()
     if declared_root and Path(declared_root).expanduser().resolve(strict=False) != Path(target.normalized_root):
@@ -506,8 +478,16 @@ def evaluate_mutation_authority(
             evidence_ref,
             command_sha,
         )
-    canonical_lifecycle = reason.startswith("repository_topic_clone_")
-    if canonical_lifecycle:
+    canonical_lifecycle = reason in {
+        "repository_topic_clone_merge_main",
+        "repository_topic_clone_resume_merge",
+        "repository_topic_clone_finalize_merge",
+    }
+    canonical_route = canonical_lifecycle or reason in {
+        "repository_topic_clone_preservation_inputs_missing",
+        "repository_topic_clone_compound",
+    }
+    if canonical_route:
         if role_id != "integration_executor":
             return MutationAuthorityDecision(
                 "blocked",

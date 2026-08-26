@@ -33,6 +33,11 @@ file size、diff size で owner route を固定しません。
 - `python3 tools/agent_tools/repository_topic_clone.py finalize-merge ...`
 - `python3 tools/agent_tools/repository_topic_clone.py cleanup ...`
 
+`prepare` の write-capable clone は repeated `--allowed-path <relative-path>` を handoff
+から forward します。既存の `.agent-canon/writer-target.json` がある場合はその
+`allowed_paths` を検証して引き継ぎ、別の値で上書きしません。新規の write-capable
+prepare に allowed path を渡さない場合は target packet を materialize しません。
+
 `--workspace-root` は既存 topic root を再利用し、指定 topic の
 `workspace/<topic-slug>` だけを管理します。task owner の非空 `--owner-evidence` と
 computed path / remote / branch identity が検証できる場合、canonical `prepare` と

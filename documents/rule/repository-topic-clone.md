@@ -46,7 +46,12 @@ gitlink/pin/projection の共有責務を担い、この文書の clone 実装�
   computed path の occupant、URL、owner evidence、branch upstream が不一致なら typed
   collision として状態を保持する。
 - requested branch が local/remote のどちらにも無い場合だけ、最新 `origin/main` から作る。
+- write-capable clone の `writer-target.json` は handoff の repeated `--allowed-path` を
+  materialize する。既存 packet の `allowed_paths` は検証して引き継ぎ、別の値で上書きしない。
+  新規 prepare に allowed path がない場合は packet を作らない。
 - merge 前に PR/PR head 更新を前倒しせず、`merge-main` は通常 merge を要求する。
+- raw `git merge` / `git rebase` は writer route では使わず、integration executor が
+  `repository_topic_clone.py merge-main`、`finalize-merge`、`resume-merge` を通す。
 - task owner の非空 `--owner-evidence` と computed path、remote、branch identity が一致
   する限り、canonical `prepare` と `merge-main` は operation-level の追加承認なしで
   実行できます。reuse は `prepare` に含まれます。これは repo-local workspace lifecycle
@@ -58,7 +63,8 @@ gitlink/pin/projection の共有責務を担い、この文書の clone 実装�
 ```bash
 python3 tools/agent_tools/repository_topic_clone.py prepare \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
-  --topic <topic> --branch <task-branch> --owner-evidence <evidence-file>
+  --topic <topic> --branch <task-branch> --owner-evidence <evidence-file> \
+  --allowed-path <relative-path>
 
 python3 tools/agent_tools/repository_topic_clone.py merge-main \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \

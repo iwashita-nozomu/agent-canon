@@ -147,6 +147,7 @@ def dispatch_issue_worker(
         agent_type="worker",
         input=prompt.body,
         checkout_identity=identity.as_dict(),
+        workspace_write_capable=False,
     )
     if spawn is None:
         return IssueWorkerDispatch(

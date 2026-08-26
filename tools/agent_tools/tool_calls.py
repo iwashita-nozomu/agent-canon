@@ -19,8 +19,13 @@ from typing import cast
 
 if __package__:
     from .artifact_identity import canonical_json_bytes
+    from .writer_target import (
+        WriterTarget,
+        validate_spawn_handoff,
+    )
 else:
     from artifact_identity import canonical_json_bytes
+    from writer_target import WriterTarget, validate_spawn_handoff  # type: ignore[no-redef]
 
 from update_lifecycle_contract import (
     materialize_close_agent_tool_call as materialize_lifecycle_close_agent_tool_call,
@@ -222,6 +227,8 @@ def materialize_subagent_spawn_tool_call(
     agent_type: str,
     input: str,
     checkout_identity: Mapping[str, object],
+    workspace_write_capable: bool | None = None,
+    writer_target: WriterTarget | Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Return the parent-runtime ToolCall for one stage-owner spawn handoff."""
     if not role.strip() or not agent_type.strip() or not input.strip():
@@ -231,24 +238,40 @@ def materialize_subagent_spawn_tool_call(
     identity = dict(checkout_identity)
     if not identity:
         raise RuntimeError("subagent_spawn_tool_call checkout identity is required")
+    workspace_write_capable = (
+        role != "publisher"
+        if workspace_write_capable is None
+        else workspace_write_capable
+    )
+    targets = validate_spawn_handoff(
+        role,
+        workspace_write_capable=workspace_write_capable,
+        writer_target=writer_target,
+    )
+    argument_properties: dict[str, Mapping[str, object]] = {
+        "role": {"type": "string", "minLength": 1},
+        "agent_type": {"type": "string", "minLength": 1},
+        "input": {"type": "string", "minLength": 1},
+        "checkout_identity": {"type": "object"},
+    }
+    arguments: dict[str, object] = {
+        "role": role,
+        "agent_type": agent_type,
+        "input": input,
+        "checkout_identity": identity,
+    }
+    if targets:
+        arguments["writer_target"] = targets[0].as_dict()
+        argument_properties["writer_target"] = {"type": "object"}
     return materialize_tool_call_token(
         tool_id="spawn_agent",
         argument_schema_id=SUBAGENT_SPAWN_TOOL_CALL_ARGUMENT_SCHEMA,
-        argument_properties={
-            "role": {"type": "string", "minLength": 1},
-            "agent_type": {"type": "string", "minLength": 1},
-            "input": {"type": "string", "minLength": 1},
-            "checkout_identity": {"type": "object"},
-        },
-        arguments={
-            "role": role,
-            "agent_type": agent_type,
-            "input": input,
-            "checkout_identity": identity,
-        },
+        argument_properties=argument_properties,
+        arguments=arguments,
         intent=(
-            "Ask the parent runtime to spawn the selected stage owner with the "
-            "typed input and checkout identity; the child owns subsequent work."
+            "Ask the parent runtime to use the canonical AgentTeam dispatch route "
+            "and writer-target validator for the selected stage owner; raw "
+            "spawn_agent is not an admission path."
         ),
         typed_failure_semantics=(
             {

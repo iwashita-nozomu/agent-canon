@@ -149,12 +149,19 @@ WRITER_TARGET_PROMPT = (
     "checkout, branch rename, or git worktree operations; a target mismatch is a hard "
     "stop before mutation."
 )
+CANONICAL_SPAWN_PROMPT = (
+    "Spawn only through the canonical AgentTeam dispatch and ToolCall route; "
+    "raw spawn_agent is not an admission path."
+)
+CANONICAL_SPAWN_ROLE_IDS = frozenset({"sol_parent", "manager", "manager_reviewer"})
 
 
 def role_boundary_prompt(role_id: str) -> str:
     """Return the bounded checkout prompt for one generated role."""
     if role_id in WRITER_TARGET_ROLE_IDS:
-        return f"{CHECKOUT_IDENTITY_PROMPT} {WRITER_TARGET_PROMPT}"
+        return f"{CHECKOUT_IDENTITY_PROMPT} {WRITER_TARGET_PROMPT} {CANONICAL_SPAWN_PROMPT}"
+    if role_id in CANONICAL_SPAWN_ROLE_IDS:
+        return f"{CHECKOUT_IDENTITY_PROMPT} {CANONICAL_SPAWN_PROMPT}"
     return CHECKOUT_IDENTITY_PROMPT
 
 

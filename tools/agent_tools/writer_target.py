@@ -125,6 +125,16 @@ def parse_writer_target(value: WriterTarget | Mapping[str, object]) -> WriterTar
     """Parse one writer target without creating files or consulting Git."""
     if isinstance(value, WriterTarget):
         return value
+    if not isinstance(value, Mapping) and all(
+        hasattr(value, field)
+        for field in ("checkout_root", "branch", "remote", "allowed_paths")
+    ):
+        return WriterTarget(
+            str(value.checkout_root),  # type: ignore[attr-defined]
+            str(value.branch),  # type: ignore[attr-defined]
+            str(value.remote),  # type: ignore[attr-defined]
+            tuple(value.allowed_paths),  # type: ignore[attr-defined]
+        )
     if not isinstance(value, Mapping):
         raise WriterTargetError("writer_target:must_be_mapping")
     allowed_keys = {"schema", "checkout_root", "branch", "remote", "allowed_paths"}
@@ -179,7 +189,11 @@ def materialize_writer_target_packet(
     path.parent.mkdir(parents=True, exist_ok=True)
     packet = {
         "schema": WRITER_TARGET_PACKET_SCHEMA,
-        **parsed.as_dict(),
+        **{
+            key: value
+            for key, value in parsed.as_dict().items()
+            if key != "schema"
+        },
         "checkout_identity": dict(checkout_identity),
     }
     path.write_text(
@@ -188,6 +202,45 @@ def materialize_writer_target_packet(
         encoding="utf-8",
     )
     return path
+
+
+def read_writer_target_packet(
+    checkout_root: Path | str,
+) -> tuple[WriterTarget, Mapping[str, object]]:
+    """Read and validate one existing static packet without rewriting it."""
+    root = Path(checkout_root).expanduser().resolve(strict=False)
+    path = root / WRITER_TARGET_PACKET_RELATIVE
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise WriterTargetError("writer_target_packet_missing") from exc
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise WriterTargetError("writer_target_packet_invalid") from exc
+    if not isinstance(value, Mapping) or value.get("schema") != WRITER_TARGET_PACKET_SCHEMA:
+        raise WriterTargetError("writer_target_packet_invalid")
+    try:
+        target = parse_writer_target(
+            {
+                "schema": WRITER_TARGET_SCHEMA,
+                **{
+                    key: item
+                    for key, item in value.items()
+                    if key not in {"schema", "checkout_identity"}
+                },
+            }
+        )
+    except WriterTargetError as exc:
+        raise WriterTargetError("writer_target_packet_invalid") from exc
+    identity = value.get("checkout_identity")
+    if not isinstance(identity, Mapping):
+        raise WriterTargetError("writer_target_packet_invalid")
+    try:
+        validate_writer_target_identity(target, identity)
+    except WriterTargetError as exc:
+        raise WriterTargetError("writer_target_packet_identity_mismatch") from exc
+    if target.normalized_root != str(root):
+        raise WriterTargetError("writer_target_packet_identity_mismatch")
+    return target, identity
 
 
 def validate_writer_target_allocations(
@@ -233,6 +286,24 @@ def validate_writer_target_allocations(
     return tuple(writers)
 
 
+def validate_spawn_handoff(
+    role_id: str,
+    *,
+    workspace_write_capable: bool,
+    writer_target: WriterTarget | Mapping[str, object] | None,
+) -> tuple[WriterTarget, ...]:
+    """Validate one spawn boundary, exempting external-only publication roles."""
+    return validate_writer_target_allocations(
+        (
+            {
+                "owner": role_id,
+                "write_capable": workspace_write_capable,
+                "writer_target": writer_target,
+            },
+        )
+    )
+
+
 def validate_wave_writer_targets(
     slots: Sequence[object],
     writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
@@ -266,7 +337,9 @@ __all__ = (
     "WriterTargetError",
     "parse_writer_target",
     "materialize_writer_target_packet",
+    "read_writer_target_packet",
     "validate_wave_writer_targets",
     "validate_writer_target_allocations",
+    "validate_spawn_handoff",
     "validate_writer_target_identity",
 )
