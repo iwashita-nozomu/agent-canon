@@ -14,10 +14,14 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import tomllib
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 
 
 @dataclass(frozen=True)

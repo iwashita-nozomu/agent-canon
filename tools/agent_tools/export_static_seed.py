@@ -19,11 +19,15 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import cast
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 
 ALLOWLIST_PATH = "documents/contracts/static-seed-allowlist.toml"
 PROVENANCE_PATH = "agent-canon-static-seed.json"
