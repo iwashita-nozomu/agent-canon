@@ -92,6 +92,7 @@ GIT_NON_PATH_VALUE_OPTIONS = frozenset(
         "--output",
     }
 )
+GIT_OUTPUT_SUBCOMMANDS = frozenset({"archive", "diff", "log", "show"})
 
 
 @dataclass(frozen=True)
@@ -392,6 +393,42 @@ def _git_mutation_paths(
     return tuple(paths)
 
 
+def _git_output_paths(
+    subcommand: str,
+    sub_args: tuple[str, ...],
+    *,
+    cwd: Path,
+    active_root: Path | None,
+) -> tuple[tuple[str, ...], str | None]:
+    """Extract file-producing Git output paths from otherwise read-only commands."""
+    if subcommand not in GIT_OUTPUT_SUBCOMMANDS:
+        return (), None
+    paths: list[str] = []
+    index = 0
+    while index < len(sub_args):
+        token = sub_args[index]
+        value: str | None = None
+        if token in {"-o", "--output"}:
+            if index + 1 >= len(sub_args):
+                return tuple(paths), "git_output_path_unresolved"
+            value = sub_args[index + 1]
+            index += 2
+        elif token.startswith("--output="):
+            value = token.removeprefix("--output=")
+            index += 1
+        elif token.startswith("-o") and token != "-o":
+            value = token.removeprefix("-o")
+            index += 1
+        else:
+            index += 1
+        if value is None:
+            continue
+        if not value:
+            return tuple(paths), "git_output_path_unresolved"
+        paths.append(_shell_path(value, cwd=cwd, active_root=active_root)[0])
+    return tuple(paths), ("git_output_path" if paths else None)
+
+
 def _analysis_reason(reasons: list[str]) -> str:
     """Prefer reasons that must fail closed over ordinary command descriptions."""
     if not reasons:
@@ -492,6 +529,21 @@ def _bash_mutation_inner(
                 reasons.append(redirect_reason)
                 continue
             subcommand, sub_args = _git_subcommand(git_args)
+            output_paths, output_reason = _git_output_paths(
+                subcommand,
+                sub_args,
+                cwd=cwd,
+                active_root=active_root,
+            )
+            if output_reason is not None:
+                mutation = True
+                paths.extend(output_paths)
+                reasons.append(output_reason)
+                continue
+            if subcommand == "archive":
+                # Without -o/--output, archive streams to stdout and does not
+                # create a filesystem mutation target.
+                continue
             if subcommand in {"worktree", "stash"}:
                 nested = next((token for token in sub_args if not token.startswith("-")), "")
                 if (subcommand == "worktree" and nested in {"list", "lock", "unlock"}) or (

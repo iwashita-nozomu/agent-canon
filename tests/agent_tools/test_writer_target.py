@@ -574,6 +574,74 @@ def test_writer_does_not_treat_git_commit_message_as_a_path() -> None:
         assert decision.mutation_paths == ()
 
 
+@pytest.mark.parametrize(
+    "command",
+    (
+        "git diff --output outside.diff HEAD",
+        "git diff --output=outside.diff HEAD",
+        "git show --output outside.patch HEAD",
+        "git show --output=outside.patch HEAD",
+        "git log --output outside.log HEAD",
+        "git log --output=outside.log HEAD",
+        "git archive -o outside.tar HEAD",
+        "git archive --output outside.tar HEAD",
+        "git archive --output=outside.tar HEAD",
+        "git status && git diff --output outside.diff HEAD",
+        "bash -c 'git diff --output outside.diff HEAD'",
+    ),
+)
+def test_writer_rejects_git_output_files_outside_scope(command: str) -> None:
+    """File-producing Git flags are mutation targets, including nested commands."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        decision = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": command}},
+            report_dir=root,
+            active_root=root,
+            environment={
+                "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+                "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+                "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+            },
+            hook_spool_root=root,
+        )
+        assert decision.status == "blocked"
+        assert decision.reason == "mutation_scope_outside_child_receipt"
+
+
+def test_writer_allows_scoped_git_output_and_preserves_tree_reads() -> None:
+    """An explicit allowed output file passes while normal reads stay read-only."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        environment = {
+            "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+            "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+            "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+        }
+        allowed = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git diff --output src/owned.py HEAD"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert allowed.status == "allowed"
+        assert allowed.mutation_paths == ("src/owned.py",)
+        for command in ("git diff HEAD", "git show HEAD", "git log HEAD", "git archive HEAD"):
+            read = evaluate_mutation_authority(
+                {"tool_name": "Bash", "tool_input": {"command": command}},
+                report_dir=None,
+                active_root=root,
+                environment={},
+            )
+            assert read.status == "not_applicable"
+
+
 def test_canonical_merge_main_is_integration_only_and_preservation_gated() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
