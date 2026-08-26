@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import json
+import os
 import re
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
@@ -1503,6 +1504,9 @@ def emit_behavior_projection(
 def main() -> int:
     """Run the CLI."""
     args = build_parser().parse_args()
+    effective_runtime_root = args.runtime_root or os.environ.get(
+        "AGENT_CANON_RUNTIME_ROOT", ""
+    ).strip() or None
     decisions = dict(parse_decision(item) for item in args.decision)
     signals = list(args.signal)
     behavior_events = list(args.behavior_event)
@@ -1524,13 +1528,13 @@ def main() -> int:
             decisions=decisions,
             timestamp=str(args.timestamp),
         ),
-        runtime_root=args.runtime_root,
+        runtime_root=effective_runtime_root,
     )
     # Structured runtime feedback is also accumulated in the private log
     # spool.  This is deliberately best-effort: monitoring remains usable
     # when private feedback is not configured, while the feedback body never
     # enters the monitoring receipt or dashboard.
-    if args.runtime_feedback and args.runtime_root:
+    if args.runtime_feedback and effective_runtime_root:
         try:
             from .private_feedback import capture_runtime_feedback
         except ImportError:
@@ -1539,7 +1543,7 @@ def main() -> int:
             try:
                 capture_runtime_feedback(
                     entry,
-                    runtime_root=args.runtime_root,
+                    runtime_root=effective_runtime_root,
                     run=path.parent.name,
                 )
             except Exception:

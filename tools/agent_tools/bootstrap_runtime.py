@@ -69,6 +69,7 @@ CONTAINER_RUNTIME_DIR = "container-runtime"
 CONTAINER_RUNTIME_DESTINATION = "/var/lib/agent-canon/runtime"
 PRIVATE_LOG_DESTINATION = "/var/lib/agent-canon/private-log"
 REGISTRY_DESTINATION = "/var/lib/agent-canon/mount-registry.toml"
+CODEX_SESSION_ROOT_ENV = "AGENT_CANON_CODEX_SESSION_ROOT"
 # This is the only historical source of runtime state that the bootstrap may
 # migrate.  It is intentionally a fixed path; arbitrary source/workspace
 # directories are never scanned or adopted.
@@ -1155,6 +1156,7 @@ class DockerAdapter:
                 "GIT_CONFIG_VALUE_0",
                 "AGENT_CANON_OUTPUT_ROOT",
                 "AGENT_CANON_LOG_ROOT",
+                "AGENT_CANON_RUNTIME_ROOT",
             }:
                 raise BootstrapError("environment_rejected", key)
             command.extend(("--env", f"{key}={value}"))
@@ -4078,6 +4080,9 @@ class BootstrapRuntime:
         """Launch Codex with a process-local isolated home."""
         project = _existing_no_symlink(project_root, field="Codex project root")
         prepared = self.codex_prepare()
+        session_root = self.paths.codex_home / "sessions"
+        _ensure_directory(session_root)
+        self._enforce_private_directory(session_root)
         executable = os.environ.get("AGENT_CANON_CODEX", "codex")
         env = os.environ.copy()
         env["CODEX_HOME"] = str(self.paths.codex_home)
@@ -4085,6 +4090,7 @@ class BootstrapRuntime:
             self.paths.control_parent_root
         )
         env["AGENT_CANON_RUNTIME_ROOT"] = str(self.paths.runtime_root)
+        env[CODEX_SESSION_ROOT_ENV] = str(session_root)
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         try:
             result = subprocess.run(
@@ -4103,71 +4109,6 @@ class BootstrapRuntime:
                 "codex_failed", f"Codex exited with {result.returncode}"
             )
         return prepared
-
-    def _host_private_feedback_sync(self) -> dict[str, Any] | None:
-        """Publish a container-created private sync request on the host."""
-        if self._container_control():
-            # A resident has no credentials, network, or host archive checkout.
-            # The shell adapter consumes the body-free request after this
-            # command returns; never invoke the host Git helper here.
-            return {
-                "execution_plane": "host_archive_adapter",
-                "status": "deferred",
-            }
-        # The container's /var/lib/agent-canon/runtime is the existing
-        # container-runtime bind mount.  Keep request discovery and adapter
-        # consumption on that one host-side path; the control runtime root is
-        # host-only and never contains container feedback payloads.
-        container_runtime = self.paths.container_runtime
-        request = container_runtime / "spool" / "private-feedback" / "sync-request.json"
-        if not request.is_file() or request.is_symlink():
-            return None
-        adapter = self.repository_root / "tools" / "agent_tools" / "private_feedback.py"
-        if not adapter.is_file():
-            raise BootstrapError("private_feedback_sync_unavailable", "host archive adapter is unavailable")
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(adapter),
-                "--runtime-root",
-                str(container_runtime),
-                "--log-root",
-                str(self.private_log_root),
-                "--source-root",
-                str(self.repository_root),
-                "host-sync",
-            ],
-            cwd=str(self.repository_root),
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        payload: dict[str, Any] = {}
-        for line in reversed((result.stdout or "").splitlines()):
-            try:
-                candidate = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(candidate, dict):
-                payload = candidate
-                break
-        if result.returncode != 0:
-            raise BootstrapError(
-                "private_feedback_sync_failed",
-                str(payload.get("code", "host_archive_adapter_failed")),
-                evidence={
-                    "adapter_exit": result.returncode,
-                    "adapter_status": payload.get("status", "error"),
-                    "request_sha256": sha256_bytes(request.read_bytes()),
-                },
-            )
-        return {
-            "execution_plane": "host_archive_adapter",
-            "status": payload.get("status", "synced"),
-            "commit": payload.get("commit"),
-            "tree": payload.get("tree"),
-            "copied": payload.get("copied", "0"),
-        }
 
     def exec(
         self,
@@ -4221,6 +4162,7 @@ class BootstrapRuntime:
                     "GIT_CONFIG_KEY_0": "safe.directory",
                     "GIT_CONFIG_VALUE_0": f"/targets/{target['digest']}",
                     "AGENT_CANON_LOG_ROOT": PRIVATE_LOG_DESTINATION,
+                    "AGENT_CANON_RUNTIME_ROOT": CONTAINER_RUNTIME_DESTINATION,
                 }
                 environment.update(extra_environment or {})
                 result = self.docker.exec_container(
@@ -4301,37 +4243,6 @@ class BootstrapRuntime:
                             "stderr_truncated": io["stderr_truncated"],
                         },
                     )
-                if len(argv) >= 3 and argv[0] == "agent-canon" and argv[1] in {"knowledge", "k", "feedback", "f"} and argv[2] == "sync":
-                    if self._container_control():
-                        details["private_feedback_sync"] = {
-                            "execution_plane": "host_archive_adapter",
-                            "status": "deferred",
-                        }
-                    else:
-                        try:
-                            details["private_feedback_sync"] = self._host_private_feedback_sync()
-                        except BootstrapError as exc:
-                            details["private_feedback_sync"] = {
-                                "execution_plane": "host_archive_adapter",
-                                "status": "error",
-                                "code": exc.code,
-                            }
-                            failure_receipt = self._result(
-                                self._receipt(
-                                    "exec",
-                                    "error",
-                                    exc.code,
-                                    before="running",
-                                    after="running",
-                                    details=details,
-                                    state=state,
-                                )
-                            )
-                            raise BootstrapError(
-                                exc.code,
-                                exc.detail,
-                                evidence={**exc.evidence, "receipt_path": failure_receipt["receipt_path"]},
-                            ) from exc
                 return self._result(
                     self._receipt(
                         "exec",
@@ -4671,191 +4582,14 @@ class BootstrapRuntime:
                     self._release_task_locked(state, task_id, outcome=task_outcome)
 
     def eval_sync(self, run_id: str) -> dict[str, Any]:
-        """Publish one retained eval spool through the canonical Host archive adapter."""
-        _slug(run_id)
-        spool = self.paths.runtime_root / "spool" / run_id
-        if not spool.is_dir() or spool.is_symlink():
-            raise BootstrapError("eval_spool_missing", f"eval spool does not exist: {run_id}")
-        collection_path = spool / "collection.json"
-        try:
-            collection = json.loads(_safe_read(collection_path, field="eval collection").decode("utf-8"))
-        except (BootstrapError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise BootstrapError("eval_collection_invalid", f"invalid eval collection: {run_id}") from exc
-        if not isinstance(collection, dict) or collection.get("run_id") != run_id:
-            raise BootstrapError("eval_collection_invalid", "eval collection run id mismatch")
-        if (
-            collection.get("status") != "collected"
-            or collection.get("source_tree_unchanged") is not True
-        ):
-            raise BootstrapError(
-                "eval_collection_failed",
-                "only a successful source-unchanged collection may be published",
-            )
-        with self.locked():
-            state = self._read_state(allow_manifest_drift=True)
-        if collection.get("manifest_digest") != state.get("manifest_digest"):
-            raise BootstrapError(
-                "eval_collection_generation_mismatch",
-                "eval collection is not bound to the installed runtime generation",
-            )
-        source = _existing_no_symlink(Path(str(collection.get("source_repository", ""))), field="eval source root")
-        remote = str(self.manifest.get("archive", {}).get("remote", ""))
-        if not remote:
-            raise BootstrapError("archive_remote_missing", "archive remote is not configured")
-        marker: dict[str, Any] = {
-            "schema": "agent_canon.eval_sync.v1",
-            "run_id": run_id,
-            "state": "publishing",
-            "spool": str(spool),
-            "updated_at": _now(),
-        }
-        _atomic_json(spool / "sync.json", marker)
-        command = [
-            sys.executable,
-            str(self.repository_root / "tools" / "agent_tools" / "runtime_log_archive_git.py"),
-            "--source-root",
-            str(source),
-            "--canon-root",
-            str(self.repository_root),
-            "--runtime-root",
-            str(self.paths.runtime_root),
-            "--remote",
-            remote,
-            "archive-eval",
-            "--spool-root",
-            str(spool),
-            "--run-id",
-            run_id,
-        ]
-        try:
-            result = subprocess.run(
-                command,
-                shell=False,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=int(self.manifest["container"]["task_timeout_seconds"]),
-            )
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            marker.update({"state": "failed", "failure": "archive_adapter_unavailable"})
-            _atomic_json(spool / "sync.json", marker)
-            raise BootstrapError("archive_sync_failed", "archive adapter unavailable") from exc
-        stdout = _redact_output(result.stdout or "")
-        stderr = _redact_output(result.stderr or "")
-        sync_bytes = len(stdout.encode("utf-8")) + len(stderr.encode("utf-8"))
-        log_quota = int(self.manifest["container"]["task_log_quota_bytes"])
-        if log_quota > 0 and sync_bytes > log_quota:
-            marker.update(
-                {
-                    "state": "failed",
-                    "failure": "task_log_quota_exceeded",
-                    "stdout_digest": sha256_text(stdout),
-                    "stderr_digest": sha256_text(stderr),
-                }
-            )
-            _atomic_json(spool / "sync.json", marker)
-            raise BootstrapError(
-                "task_log_quota_exceeded",
-                f"archive adapter logs require {sync_bytes} bytes; quota is {log_quota}",
-            )
-        try:
-            _atomic_bytes(spool / "sync.stdout.log", stdout.encode("utf-8"))
-            _atomic_bytes(spool / "sync.stderr.log", stderr.encode("utf-8"))
-        except BootstrapError:
-            marker.update({"state": "failed", "failure": "archive_log_write_failed"})
-            _atomic_json(spool / "sync.json", marker)
-            raise
-        status_match = re.search(r"RUNTIME_LOG_ARCHIVE_EVAL_STATUS=([^\n]+)", stdout)
-        archive_status = status_match.group(1).strip() if status_match else "unknown"
-        archive_fields: dict[str, str] = {}
-        for field in ("COMMIT", "TREE", "REMOTE_REF", "BLOBS"):
-            match = re.search(
-                rf"RUNTIME_LOG_ARCHIVE_EVAL_{field}=([^\n]+)", stdout
-            )
-            archive_fields[field.lower()] = match.group(1).strip() if match else ""
-        try:
-            blob_identities = json.loads(archive_fields["blobs"])
-        except json.JSONDecodeError:
-            blob_identities = None
-        archive_identity_ok = (
-            bool(re.fullmatch(r"[0-9a-f]{40,64}", archive_fields["commit"]))
-            and bool(re.fullmatch(r"[0-9a-f]{40,64}", archive_fields["tree"]))
-            and archive_fields["remote_ref"].startswith("refs/heads/")
-            and isinstance(blob_identities, dict)
-            and bool(blob_identities)
-            and all(
-                isinstance(path, str)
-                and isinstance(digest, str)
-                and bool(re.fullmatch(r"[0-9a-f]{64}", digest))
-                for path, digest in blob_identities.items()
-            )
-        )
-        if (
-            result.returncode != 0
-            or archive_status not in {"committed", "duplicate_noop"}
-            or not archive_identity_ok
-        ):
-            marker.update(
-                {
-                    "state": "failed",
-                    "failure": "archive_publish_failed",
-                    "adapter_exit": result.returncode,
-                    "adapter_status": archive_status,
-                    "archive_identity_valid": archive_identity_ok,
-                    "stdout_digest": sha256_text(stdout),
-                    "stderr_digest": sha256_text(stderr),
-                }
-            )
-            _atomic_json(spool / "sync.json", marker)
-            raise BootstrapError(
-                "archive_sync_failed",
-                "archive publication failed; spool retained",
-                evidence={
-                    "spool": str(spool),
-                    "adapter_exit": result.returncode,
-                    "adapter_status": archive_status,
-                    "stdout_digest": sha256_text(stdout),
-                    "stderr_digest": sha256_text(stderr),
-                },
-            )
-        marker.update(
-            {
-                "state": "published",
-                "adapter_exit": result.returncode,
-                "adapter_status": archive_status,
-                "archive_commit": archive_fields["commit"],
-                "archive_tree": archive_fields["tree"],
-                "remote_ref": archive_fields["remote_ref"],
-                "blob_identities": blob_identities,
-                "stdout_digest": sha256_text(stdout),
-                "stderr_digest": sha256_text(stderr),
-            }
-        )
-        _atomic_json(spool / "sync.json", marker)
-        details = {
-            "run_id": run_id,
-            "status": archive_status,
-            "source": str(source),
-            "stdout_digest": sha256_text(stdout),
-            "stderr_digest": sha256_text(stderr),
-            "remote_readback": "verified",
-            "archive_commit": archive_fields["commit"],
-            "archive_tree": archive_fields["tree"],
-            "remote_ref": archive_fields["remote_ref"],
-            "blob_identities": blob_identities,
-        }
-        shutil.rmtree(spool)
-        return self._result(
-            self._receipt(
-                "eval_sync",
-                "ok",
-                "archive_published" if archive_status == "committed" else "archive_duplicate_noop",
-                before=None,
-                after=None,
-                details=details,
-                state=state,
-            )
-        )
+        """Prepare one retained eval spool for the Host archive adapter.
+
+        The resident validates the collection and writes only the body-free
+        request consumed by the host shell.  Credentialed Git operations and
+        the operational archive checkout are never reachable from this
+        container-side method.
+        """
+        return self.eval_sync_prepare(run_id)
 
     def eval_sync_prepare(self, run_id: str) -> dict[str, Any]:
         """Prepare a body-free eval publication request for the Host adapter.
@@ -5484,10 +5218,77 @@ def _container_restore_target_manifest(
     )
 
 
+def _container_source_identity(
+    remote: str, repository_id: str = "", *, mode: str = "source"
+) -> dict[str, str]:
+    """Return a canonical source or generic remote identity without I/O."""
+    try:
+        from .log_repository_identity import (  # type: ignore[import-not-found]
+            normalize_remote,
+            stable_source_repository_id,
+        )
+    except ImportError:  # pragma: no cover - direct container script execution
+        from log_repository_identity import normalize_remote, stable_source_repository_id
+
+    try:
+        normalized = normalize_remote(remote)
+    except ValueError as exc:
+        raise BootstrapError(
+            "source_repository_identity_unavailable",
+            str(exc),
+        ) from exc
+    if mode == "remote":
+        if repository_id:
+            raise BootstrapError(
+                "source_repository_id_invalid",
+                "generic remote identity does not accept a source override",
+            )
+        return {
+            "schema": "agent-canon.remote-identity.v1",
+            "normalized_remote": normalized,
+        }
+    if mode != "source":
+        raise BootstrapError(
+            "source_repository_identity_unavailable",
+            "identity mode is invalid",
+        )
+    try:
+        derived = stable_source_repository_id(remote)
+    except ValueError as exc:
+        raise BootstrapError(
+            "source_repository_identity_unavailable",
+            str(exc),
+        ) from exc
+    if repository_id:
+        if not re.fullmatch(r"[a-z0-9][a-z0-9.-]{0,95}", repository_id):
+            raise BootstrapError(
+                "source_repository_id_invalid",
+                "source repository identity override is invalid",
+            )
+        if repository_id != derived:
+            raise BootstrapError(
+                "source_repository_id_mismatch",
+                "source repository identity override does not match its remote",
+            )
+        derived = repository_id
+    return {
+        "schema": "agent-canon.source-identity.v1",
+        "normalized_remote": normalized,
+        "repository_id": derived,
+        "stable_branch": f"logs/{derived}",
+    }
+
+
 def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
     """Apply only state/tool-plane operations after host Docker activation."""
-    runtime = _runtime_from_args(args)
     operation = args.operation
+    if operation == "source-identity":
+        return _container_source_identity(
+            args.remote,
+            args.repository_id,
+            mode=args.mode,
+        )
+    runtime = _runtime_from_args(args)
     if operation in {"install", "update", "start", "stop", "uninstall"}:
         with runtime.locked():
             state = runtime._read_state(allow_manifest_drift=True)
@@ -5836,6 +5637,18 @@ def build_parser() -> argparse.ArgumentParser:
     sync_parser.add_argument("--install-root", required=True)
     sync_parser.add_argument("--remote", default="origin")
     sync_parser.add_argument("--branch", default="main")
+    source_identity = sub.add_parser(
+        "source-identity",
+        help=argparse.SUPPRESS,
+    )
+    source_identity.add_argument("--remote", required=True)
+    source_identity.add_argument("--repository-id", default="")
+    source_identity.add_argument(
+        "--mode",
+        choices=("source", "remote"),
+        default="source",
+        help=argparse.SUPPRESS,
+    )
     scheduler = sub.add_parser("scheduler")
     scheduler_sub = scheduler.add_subparsers(dest="scheduler_operation", required=True)
     for scheduler_operation in ("enable", "disable", "status", "uninstall"):

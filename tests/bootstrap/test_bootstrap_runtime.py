@@ -18,12 +18,132 @@ from tools.agent_tools.bootstrap_runtime import (  # noqa: E402
     BootstrapError,
     BootstrapRuntime,
     DockerAdapter,
+    _container_source_identity,
     build_parser,
     run,
     sha256_bytes,
     validate_roots,
 )
 from tools.agent_tools.runtime_exchange_cleanup import clear_exchange  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    ("remote", "normalized"),
+    (
+        (
+            "git@github.com:iwashita-nozomu/agent-canon.git",
+            "github.com/iwashita-nozomu/agent-canon",
+        ),
+        (
+            "ssh://git@github.com/iwashita-nozomu/agent-canon.git",
+            "github.com/iwashita-nozomu/agent-canon",
+        ),
+        (
+            "https://reader:credential@example.com:8443/owner/repo.git",
+            "example.com/owner/repo",
+        ),
+        (
+            "https://github.com/iwashita-nozomu/agent-canon.GIT",
+            "github.com/iwashita-nozomu/agent-canon",
+        ),
+    ),
+)
+def test_container_source_identity_matches_canonical_remote_normalization(
+    remote: str, normalized: str
+) -> None:
+    """The resident identity operation delegates to the canonical resolver."""
+    from tools.agent_tools.log_repository_identity import stable_source_repository_id
+
+    result = _container_source_identity(remote)
+    repository_id = stable_source_repository_id(remote)
+    assert result == {
+        "schema": "agent-canon.source-identity.v1",
+        "normalized_remote": normalized,
+        "repository_id": repository_id,
+        "stable_branch": f"logs/{repository_id}",
+    }
+
+
+def test_container_source_identity_preserves_live_agent_canon_branch() -> None:
+    """The current AgentCanon source identity remains on its existing branch."""
+    result = _container_source_identity(
+        "git@github.com:iwashita-nozomu/agent-canon.git"
+    )
+    assert result["stable_branch"] == (
+        "logs/github.com-iwashita-nozomu-agent-canon-"
+        "9680c2230417944f4dd780e2"
+    )
+
+
+def test_source_identity_operation_has_no_runtime_side_effects(tmp_path: Path) -> None:
+    """The internal identity operation needs neither state nor network access."""
+    args = build_parser().parse_args(
+        [
+            "--container-control",
+            "--repository-root",
+            str(REPOSITORY_ROOT),
+            "--control-parent-root",
+            str(tmp_path),
+            "source-identity",
+            "--remote",
+            "git@github.com:iwashita-nozomu/agent-canon.git",
+        ]
+    )
+    assert run(args)["stable_branch"] == (
+        "logs/github.com-iwashita-nozomu-agent-canon-"
+        "9680c2230417944f4dd780e2"
+    )
+
+
+def test_source_identity_accepts_transport_variants_and_rejects_other_repo() -> None:
+    """The host comparison can accept equivalent URLs without merging repositories."""
+    equivalent = (
+        "git@github.com:iwashita-nozomu/agent-canon.git",
+        "ssh://git@github.com/iwashita-nozomu/agent-canon",
+        "https://reader:credential@github.com:443/iwashita-nozomu/agent-canon.git",
+    )
+    identities = {_container_source_identity(remote)["repository_id"] for remote in equivalent}
+    assert len(identities) == 1
+    assert _container_source_identity(
+        "https://github.com/iwashita-nozomu/agent-canon-log.git"
+    )["repository_id"] not in identities
+
+
+def test_remote_identity_mode_never_accepts_source_override() -> None:
+    """Generic log remotes return only normalized identity and no branch override."""
+    remote = "https://reader:credential@github.com:443/iwashita-nozomu/agent-canon.git"
+    identity = _container_source_identity(remote, mode="remote")
+    assert identity == {
+        "schema": "agent-canon.remote-identity.v1",
+        "normalized_remote": "github.com/iwashita-nozomu/agent-canon",
+    }
+    with pytest.raises(BootstrapError, match="source_repository_id_invalid"):
+        _container_source_identity(remote, "unexpected", mode="remote")
+
+
+def test_source_identity_override_is_validated_only_for_source_mode() -> None:
+    """A valid source override is accepted, while a mismatch rejects the branch."""
+    remote = "git@github.com:iwashita-nozomu/agent-canon.git"
+    repository_id = _container_source_identity(remote)["repository_id"]
+    assert _container_source_identity(remote, repository_id)["stable_branch"].endswith(
+        repository_id
+    )
+    with pytest.raises(BootstrapError, match="source_repository_id_mismatch"):
+        _container_source_identity(remote, "wrong-source-id")
+
+
+def test_source_override_does_not_constrain_distinct_log_repository() -> None:
+    """Source branch identity and the separate private log remote stay independent."""
+    source = "git@github.com:iwashita-nozomu/agent-canon.git"
+    source_id = _container_source_identity(source)["repository_id"]
+    log = _container_source_identity(
+        "https://reader:credential@github.com:443/iwashita-nozomu/agent-canon-log.git",
+        mode="remote",
+    )
+    source_result = _container_source_identity(source, source_id, mode="source")
+    assert source_result["stable_branch"].endswith(source_id)
+    assert log["normalized_remote"] == "github.com/iwashita-nozomu/agent-canon-log"
+    assert log["normalized_remote"] != source_result["normalized_remote"]
 
 
 @pytest.fixture()
@@ -475,6 +595,40 @@ def test_exec_and_tool_run_return_bounded_io_evidence_and_external_logs(
     routed = manager.tool_run("route", ["--list"])
     assert "route output" in routed["details"]["stdout_preview"]
     assert routed["details"]["argv"][:3] == ["agent-canon-tool", "tool", "run"]
+
+
+def test_codex_launch_binds_session_root_to_runtime(
+    tmp_path: Path, fake_docker: DockerAdapter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Codex receives a session root below the bootstrap-owned runtime."""
+    manager = runtime(tmp_path, fake_docker)
+    project = tmp_path / "project"
+    project.mkdir()
+    capture = tmp_path / "codex-env.json"
+    executable = tmp_path / "fake-codex.py"
+    executable.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, os\n"
+        "from pathlib import Path\n"
+        "Path(os.environ['CAPTURE']).write_text(json.dumps({\n"
+        "  'session_root': os.environ.get('AGENT_CANON_CODEX_SESSION_ROOT'),\n"
+        "  'runtime_root': os.environ.get('AGENT_CANON_RUNTIME_ROOT'),\n"
+        "}), encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    monkeypatch.setenv("AGENT_CANON_CODEX", str(executable))
+    monkeypatch.setenv("CAPTURE", str(capture))
+    manager.install()
+
+    manager.codex_launch(project)
+
+    payload = json.loads(capture.read_text(encoding="utf-8"))
+    assert payload == {
+        "session_root": str(manager.paths.codex_home / "sessions"),
+        "runtime_root": str(manager.paths.runtime_root),
+    }
+    assert (manager.paths.codex_home / "sessions").is_dir()
 
 
 def test_exec_preserves_nonzero_command_exit_and_redacts_output(
@@ -1141,7 +1295,7 @@ def test_top_level_entrypoint_reports_typed_docker_failure_without_fallback(
 
 
 def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
-    tmp_path: Path, fake_docker: DockerAdapter
+    tmp_path: Path, fake_docker: DockerAdapter, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Collect a real producer matrix, prove source stability, and read back Git blobs."""
     source = tmp_path / "source"
@@ -1220,21 +1374,25 @@ def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
     spool = manager.paths.runtime_root / "spool" / "eval-e2e"
     assert (spool / "collection.json").is_file()
     assert (source / "README.md").read_bytes() == before
+    monkeypatch.delenv("AGENT_CANON_TARGET_DIGEST", raising=False)
     synced = manager.eval_sync("eval-e2e")
-    assert synced["code"] == "archive_published"
-    assert not spool.exists()
-    clone = tmp_path / "archive-clone"
-    subprocess.run(["git", "clone", "-q", str(remote), str(clone)], check=True)
-    from tools.agent_tools.log_repository_identity import stable_source_id
-
-    branch = f"logs/{stable_source_id(source)}"
-    branch_result = subprocess.run(
-        ["git", "-C", str(clone), "ls-tree", "-r", "--name-only", f"origin/{branch}"],
-        check=True,
-        capture_output=True,
-        text=True,
+    assert synced["code"] == "host_archive_requested"
+    assert synced["details"] == {
+        "execution_plane": "host_archive_adapter",
+        "run_id": "eval-e2e",
+        "status": "requested",
+    }
+    request = spool / "sync-request.tsv"
+    assert request.read_text(encoding="utf-8") == (
+        "schema\tagent-canon.eval-sync-request.v1\n"
+        "operation\tsync\n"
+        "execution-plane\tagentcanon_tool_container\n"
+        "run-id\teval-e2e\n"
+        "target-digest\t\n"
+        f"source-root\t{source}\n"
     )
-    assert "eval-results/skill-workflow-prompt/skill-eval-20260101T000000000000Z-0123456789-pass-bootstrap.md" in branch_result.stdout
+    assert spool.is_dir()
+    assert not (manager.paths.runtime_root / "archive" / "agent-canon-log").exists()
 
 
 def test_eval_producer_failure_is_not_masked_by_missing_export(

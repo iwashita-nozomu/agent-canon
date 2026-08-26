@@ -46,15 +46,17 @@ the runtime-local layout is:
 ```text
 $RUNTIME/
   spool/<run-id>/                 # pending eval/event/archive inputs
-  archive/agent-canon-log/        # leased archive checkout, if used
   tasks/<task-id>/                # logs, reports, locks, receipts
   codex-home/                     # managed isolated Codex surfaces
+
+$INSTALL_ROOT_PARENT/agent-canon-log/  # host-owned operational archive checkout
 ```
 
-The durable archive layout is owned by `agent-canon-log`; consumers should use
-its current branch contract rather than hard-code a second local layout. The
-archive lease is ignored by AgentCanon source Git and is never a submodule or
-symlink.
+The durable archive layout and its operational checkout are owned by
+`agent-canon-log`; consumers should use its current branch contract rather
+than hard-code a second local layout. Bootstrap eval publication passes this
+checkout explicitly to the host archive adapter. The resident container sees
+only the external spool and never creates an archive clone under `$RUNTIME`.
 
 ## Collection contract
 

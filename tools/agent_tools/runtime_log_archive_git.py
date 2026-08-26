@@ -4483,6 +4483,13 @@ def ensure_archive(
 ) -> None:
     """Ensure the ignored clone exists and is on the runtime log branch."""
     created = False
+    if context.archive_root.is_dir() and not is_archive_clone(context.archive_root):
+        # Bootstrap creates the control-root mount point before the first
+        # publication.  Treat that empty directory as a clone placeholder;
+        # never remove or replace a non-empty path owned by somebody else.
+        if any(context.archive_root.iterdir()):
+            raise ArchiveGitError(f"archive path is not a Git clone: {context.archive_root}")
+        context.archive_root.rmdir()
     if not context.archive_root.exists():
         _parent_ensure_directory(context.archive_root.parent, "runtime-archive-clone")
         run(["git", "clone", context.remote, str(context.archive_root)])
