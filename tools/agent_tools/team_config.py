@@ -155,6 +155,7 @@ class RunBundleSpec:
     repository_roots: "RepositoryRoots | None" = None
     workflow_family_id: str = ""
     issue_worker_candidate: Mapping[str, object] | None = None
+    issue_worker_dispatch: Mapping[str, object] | None = None
     manual_specialists: tuple[str, ...] = ()
     task_default_specialists: tuple[str, ...] = ()
     language_review_candidates: tuple[str, ...] = ()

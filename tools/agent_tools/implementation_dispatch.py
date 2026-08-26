@@ -1085,6 +1085,31 @@ def recommended_initial_subagent_wave(
     """Return executable agent_type values for active catalog intake roles."""
     return tuple(
         slot.agent_type
+        for slot in recommended_initial_subagent_wave_slots(
+            roles,
+            active_subagents,
+            catalog,
+            agent_type_selections,
+            agent_root,
+            workflow_family_id=workflow_family_id,
+            issue_worker_candidate=issue_worker_candidate,
+        )
+    )
+
+
+def recommended_initial_subagent_wave_slots(
+    roles: tuple[Role, ...],
+    active_subagents: int,
+    catalog: TaskCatalog,
+    agent_type_selections: tuple[AgentTypeSelection, ...] = (),
+    agent_root: Path = CODEX_AGENT_ROOT,
+    *,
+    workflow_family_id: str | None = None,
+    issue_worker_candidate: Mapping[str, object] | None = None,
+) -> tuple[SubagentWaveSlot, ...]:
+    """Return role-aware initial-wave slots for the selected workflow."""
+    return tuple(
+        slot
         for slot in _initial_stage_wave_slots(
             roles,
             active_subagents,

@@ -160,6 +160,7 @@ if __package__:
         default_quality_check_role_ids,
         recommended_dynamic_expansion_wave_slots,
         recommended_initial_subagent_wave,
+        recommended_initial_subagent_wave_slots,
         workflow_spawn_budget,
     )
 else:
@@ -174,6 +175,7 @@ else:
         default_quality_check_role_ids,
         recommended_dynamic_expansion_wave_slots,
         recommended_initial_subagent_wave,
+        recommended_initial_subagent_wave_slots,
         workflow_spawn_budget,
     )
 
@@ -1310,8 +1312,11 @@ def manifest_run_lines(
             f"    {field}: {value!r}"
             for field, value in resolve_checkout_identity(spec.workspace_root).as_dict().items()
         ),
-        "  active_design_packet:",
     ]
+    if spec.issue_worker_dispatch is not None:
+        lines.append("  issue_worker_dispatch:")
+        lines.extend(_yaml_mapping_lines(spec.issue_worker_dispatch, indent=4))
+    lines.append("  active_design_packet:")
     packet_yaml = yaml.safe_dump(
         active_design_packet_mapping(active_design_packet),
         sort_keys=False,
@@ -1487,6 +1492,15 @@ def manifest_run_lines(
             workflow_family_id=spec.workflow_family_id,
             issue_worker_candidate=spec.issue_worker_candidate,
         )
+        initial_wave_slots = recommended_initial_subagent_wave_slots(
+            spec.roles,
+            active_subagents,
+            spec.task_catalog,
+            spec.agent_type_selections,
+            _required_spec_source_root(spec) / ".codex" / "agents",
+            workflow_family_id=spec.workflow_family_id,
+            issue_worker_candidate=spec.issue_worker_candidate,
+        )
         expansion_wave_slots = recommended_dynamic_expansion_wave_slots(
             spec.roles,
             active_subagents,
@@ -1503,6 +1517,12 @@ def manifest_run_lines(
         )
         lines.append("    standard_sequence_ref: run.standard_wave_sequence")
         lines.append("    initial_wave_id: WAVE-1")
+        lines.append("    initial_wave_role_ids:")
+        if initial_wave_slots:
+            for slot in initial_wave_slots:
+                lines.append(f"      - {slot.role_id}")
+        else:
+            lines[-1] = "    initial_wave_role_ids: []"
         lines.append("    initial_wave_agent_types:")
         if initial_wave:
             for agent_type in initial_wave:
