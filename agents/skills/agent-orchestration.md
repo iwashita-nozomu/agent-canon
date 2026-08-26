@@ -329,6 +329,8 @@ commit / push / PR 前、cleanup または destructive Git 前、handoff / final
 で一度だけ読み、状態が変わらない通常コマンドでは再実行しません。これは場所の
 readback であり、権限、承認、branch 操作、Issue / PR 操作を追加しません。
 
+write-capable handoff は、この観測ブロックとは別に task-scoped `writer_target` を持ちます。target は絶対 `checkout_root`、固定 `branch`、正規化済み `remote`、`allowed_paths` で構成し、`repository-topic-clone.prepare` 後に materialize します。同じ `checkout_root` を持つ writer packet、または target のない writer packet は spawn 前に拒否します。reader packet は target を省略できます。target は短命な handoff 値であり、claim/PID/expiry/daemon/registry は作りません。
+
 mode の意味:
 
 - `repo-changing execution`

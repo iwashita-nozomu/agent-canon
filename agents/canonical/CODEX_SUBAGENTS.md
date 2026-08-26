@@ -785,14 +785,18 @@ remote を解決できない場合は `unknown` をそのまま伝え、対象�
 ## Parallel Write Safety
 
 - parent が `team_manifest.yaml` の write policy と handoff で writer ごとの allowed path / directory を管理します
-- repository write は `worker` または `spark_worker` に限定します。reviewer と artifact-only role は read-only とし、artifact role に write capability が必要な場合も manifest で明示した artifact path と理由に限定します
+- write-capable handoff は `writer_target`（絶対 `checkout_root`、固定 `branch`、正規化済み `remote`、`allowed_paths`）を必須とし、branch は handoff 前に `repository-topic-clone.prepare` で用意します
+- 同一 wave の writer target が同じ `checkout_root` を持つ場合、agent team は spawn callback 前に typed collision として拒否します。reader は `writer_target` を持たず同じ checkout を共有できます
+- repository write は `worker`、`spark_worker`、`integration_executor`、`publisher` の各 write-capable route に限定します。reviewer と artifact-only role は read-only とし、artifact role に write capability が必要な場合も manifest で明示した artifact path と理由に限定します
 - 同一 path、同一 directory ownership、同一 public API surface、shared Git index/HEAD、generated output、formatter output は順序制約つきの writer に割り当てます
-- 同一 worktree の write-capable subagent instance は既定 1 人から始めますが、parent が dependency order、wave plan、dependency-expanded disjoint write scope、integration order、review gate を handoff packet に載せた場合は同じ role type を含む複数 writer instance を同一 wave で使えます
+- 同一 worktree の write-capable subagent instance は、writer target が distinct である場合だけ同じ role type を含む複数 writer instance を同一 wave で使えます
 - same directory / same file / same canonical surface を同時に触る writer は先行 / 後続 wave に分けます
 - 衝突する target は順序制約として扱い、先行 wave の validation と tool rerun 後に後続 wave で統合します
 - writer は current checkout 内の wave plan で分離し、追加判断が要る writer は後続 wave へ直列化します
 - isolated worktree は通常の衝突回避には使わず、明示 workflow が要求する genuinely independent alternative implementation experiment に限定します
 - review role は常に read-only とし、parent-managed write-scope discipline と writer-instance separation の確認は `plan_reviewer` と `project_reviewer` の固定責務です
+
+writer target は短命な handoff 値であり、claim file、PID、expiry、daemon、または別の writer registry を作りません。worker、integration_executor、publisher の生成 prompt は target の checkout で開始し、`git switch`、`git checkout`、branch rename、`git worktree` を実行しないことを明示します。
 
 ## Codex Model Settings
 

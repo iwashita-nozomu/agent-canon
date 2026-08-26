@@ -26,11 +26,23 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
 
 if __package__:
     from . import capacity_handshake, implementation_route, model_profile_registry
+    from .writer_target import (
+        WriterTarget,
+        WriterTargetError,
+        validate_wave_writer_targets,
+        validate_writer_target_identity,
+    )
     from .checkout_identity import resolve_checkout_identity
 else:
     import capacity_handshake
     import implementation_route
     import model_profile_registry
+    from writer_target import (  # type: ignore[no-redef]
+        WriterTarget,
+        WriterTargetError,
+        validate_wave_writer_targets,
+        validate_writer_target_identity,
+    )
     from checkout_identity import resolve_checkout_identity  # type: ignore[no-redef]
 
 
@@ -77,6 +89,13 @@ DEFAULT_QUALITY_CHECK_ROLE_IDS = (
     "change_reviewer",
 )
 NON_SPAWN_WAVE_ROLE_IDS = {"manager", "verifier", "auditor"}
+WRITE_CAPABLE_ROLE_IDS = {
+    "worker",
+    "spark_worker",
+    "implementer",
+    "integration_executor",
+    "publisher",
+}
 
 
 @dataclass(frozen=True)
@@ -527,6 +546,8 @@ def dispatch_fixed_implementation(
     workspace_root: Path = ROOT,
     source_root: Path | None = None,
     capacity_runtime: _CapacityRuntime | None = None,
+    writer_target: WriterTarget | Mapping[str, object] | None = None,
+    checkout_identity: Mapping[str, object] | None = None,
 ) -> ImplementationDispatch:
     """Route, materialize, and launch exactly one fixed Spark implementation worker."""
     route_result = implementation_route.route_implementation(request)
@@ -544,6 +565,26 @@ def dispatch_fixed_implementation(
         or route_result.failure is not None
     ):
         raise RuntimeError("implementation_dispatch:fixed_route_violation")
+    if writer_target is None:
+        return ImplementationDispatch(
+            route_result,
+            None,
+            None,
+            None,
+            "writer_target:required_before_spawn",
+            1,
+            0,
+            "blocked",
+        )
+    if checkout_identity is None:
+        checkout_identity = resolve_checkout_identity(workspace_root).as_dict()
+    try:
+        parsed_writer_target = validate_writer_target_identity(
+            writer_target,
+            checkout_identity,
+        )
+    except WriterTargetError as exc:
+        raise RuntimeError(str(exc)) from exc
     if isinstance(request, implementation_route.ImplementationRouteRequest):
         packet_payload: object = request.fixed_implementation_packet
     else:
@@ -579,6 +620,15 @@ def dispatch_fixed_implementation(
                 model_profile_registry.ContextItem(
                     "checkout_identity",
                     resolve_checkout_identity(workspace_root).as_dict(),
+                ),
+                *(
+                    (
+                        model_profile_registry.ContextItem(
+                            "writer_target", parsed_writer_target.as_dict()
+                        ),
+                    )
+                    if parsed_writer_target is not None
+                    else ()
                 ),
             ),
             objective=objective,
@@ -1006,6 +1056,10 @@ def _materialize_stage_wave_slots(
                 role_id=role.id,
                 instance_id=f"{role.id}_{agent_type}",
                 agent_type=agent_type,
+                write_capable=(
+                    role.id in WRITE_CAPABLE_ROLE_IDS
+                    or role.write_policy.mode not in {"read_only", "artifacts_only"}
+                ),
             )
         )
     return tuple(slots)
@@ -1202,3 +1256,12 @@ def recommended_dynamic_expansion_wave_slots(
         used_role_ids.update(slot.role_id for slot in stage_slots)
         waves.extend(_chunk_wave_slots(stage_slots, active_subagents))
     return tuple(waves)
+
+
+def validate_writer_handoff_waves(
+    waves: tuple[tuple[SubagentWaveSlot, ...], ...],
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None],
+) -> tuple[WriterTarget, ...]:
+    """Reject missing or colliding writer targets before a wave is spawned."""
+    slots = tuple(slot for wave in waves for slot in wave)
+    return validate_wave_writer_targets(slots, writer_targets)

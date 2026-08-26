@@ -24,6 +24,8 @@ MUTATION_DECISION_SCHEMA = "agent-canon.mutation-authority.v1"
 RUNTIME_AGENT_ID_ENV = "AGENT_CANON_RUNTIME_AGENT_ID"
 RUNTIME_ROLE_ID_ENV = "AGENT_CANON_RUNTIME_ROLE_ID"
 RUNTIME_PARENT_AGENT_ID_ENV = "AGENT_CANON_RUNTIME_PARENT_AGENT_ID"
+WRITER_CHECKOUT_ROOT_ENV = "AGENT_CANON_CHECKOUT_ROOT"
+WRITER_BRANCH_ENV = "AGENT_CANON_CHECKOUT_BRANCH"
 IDENTITY_RECEIPT_RELATIVE = Path("runtime") / "agent_identity.json"
 PARENT_ROLE_IDS = frozenset({"parent", "sol_parent", "manager", "manager_reviewer"})
 MUTATING_TOOLS = frozenset({"apply_patch", "python", "python3", "Bash", "bash"})
@@ -227,6 +229,46 @@ def _mutation_request(tool_name: str, tool_input: Mapping[str, object]) -> tuple
     return False, (), "not_mutating_tool", ""
 
 
+def _writer_target_violation(
+    environment: Mapping[str, str],
+    active_root: Path,
+    reason: str,
+    command: str,
+) -> str | None:
+    """Return a target-boundary failure when the active writer target is set."""
+    declared_root = environment.get(WRITER_CHECKOUT_ROOT_ENV, "").strip()
+    declared_branch = environment.get(WRITER_BRANCH_ENV, "").strip()
+    if not declared_root and not declared_branch:
+        return None
+    if not declared_root or not declared_branch:
+        return "writer_target_required"
+    target_root = Path(declared_root).expanduser()
+    if not target_root.is_absolute():
+        return "writer_target_checkout_root_not_absolute"
+    if target_root.resolve(strict=False) != active_root.resolve(strict=False):
+        return "writer_target_checkout_root_mismatch"
+    if reason in {"git_checkout", "git_switch"}:
+        return "writer_target_branch_switch_forbidden"
+    for segment in _command_segments(command):
+        if not segment:
+            continue
+        if segment[0] == "cd" and len(segment) > 1:
+            candidate = Path(segment[1]).expanduser()
+            if not candidate.is_absolute():
+                candidate = target_root / candidate
+            if candidate.resolve(strict=False) != target_root.resolve(strict=False):
+                return "writer_target_checkout_root_mismatch"
+        if segment[0] == "git":
+            for index, token in enumerate(segment[:-1]):
+                if token == "-C":
+                    candidate = Path(segment[index + 1]).expanduser()
+                    if not candidate.is_absolute():
+                        candidate = target_root / candidate
+                    if candidate.resolve(strict=False) != target_root.resolve(strict=False):
+                        return "writer_target_checkout_root_mismatch"
+    return None
+
+
 def _allowed_path(path: str, active_root: Path, allowed_files: tuple[str, ...], allowed_directories: tuple[str, ...]) -> bool:
     candidate = Path(path)
     if candidate.is_absolute() or ".." in candidate.parts:
@@ -255,6 +297,25 @@ def evaluate_mutation_authority(
     mutation, paths, reason, command_sha = _mutation_request(tool_name, tool_input)
     if not mutation:
         return MutationAuthorityDecision("not_applicable", reason, False)
+    command_value = ""
+    if tool_name in {"Bash", "bash"}:
+        candidate = tool_input.get("command", tool_input.get("cmd"))
+        if isinstance(candidate, str):
+            command_value = candidate
+    target_violation = _writer_target_violation(
+        environment,
+        active_root,
+        reason,
+        command_value,
+    )
+    if target_violation is not None:
+        return MutationAuthorityDecision(
+            "blocked",
+            target_violation,
+            True,
+            mutation_paths=paths,
+            command_sha256=command_sha,
+        )
     if report_dir is None:
         return MutationAuthorityDecision("blocked", "blocked_authority_required", True, mutation_paths=paths, command_sha256=command_sha)
     identity, evidence_ref = _read_identity(report_dir)

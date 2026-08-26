@@ -209,7 +209,7 @@ runtime が `/agent` を提供する場合は subagent inventory の確認に使
 claims が同じ owner、responsibility、context、write authority、validation route を
 共有する場合は active instance を再利用し、独立 review や distinct unresolved
 claim/risk のために分ける場合だけ fresh instance を使います。
-包括的開発では、parent が `team_manifest.yaml` の write policy で writer ごとの path / directory を管理します。scope が重なる場合は current checkout 内の後続 wave に serialize し、別 `git worktree` へ分けません。
+包括的開発では、parent が `team_manifest.yaml` の write policy で writer ごとの path / directory を管理します。write-capable handoff には `writer_target`（絶対 `checkout_root`、固定 `branch`、正規化済み `remote`、`allowed_paths`）を必ず付け、branch は handoff 前に `repository-topic-clone.prepare` で用意します。同じ `checkout_root` を持つ writer handoff は agent team の materializer が spawn 前に拒否し、reader は target なしで共有できます。
 各 user input は `same_active_task_delta`、`scope_or_contract_change`、または
 `new_task` として分類しますが、新しい turn や名前を変えた packet だけでは
 fresh agent の理由になりません。owner、responsibility、context、write authority、
@@ -218,6 +218,7 @@ validation route が互換なら active agent を再利用し、revision scope �
 failed context integrity の場合だけ fresh agent / wave を起こします。coordination または
 resumption が必要な場合は checkpoint と updated packet path を durable に残し、それ以外
 は structured handoff message/tool result を使います。
+writer の生成 prompt は target の `cwd` / `git_root` / `branch` / `remote` と一致する状態から開始し、`git switch`、`git checkout`、branch rename、`git worktree` を実行しません。target は handoff の値としてのみ扱い、claim、PID、expiry、daemon、writer registry は作成しません。
 subagent handoff prompt には lifecycle decision と fresh-agent 条件を含めますが、
 `fresh_subagents_required: true` や `reuse_for_new_task: forbidden` を一律の機械契約には
 しません。

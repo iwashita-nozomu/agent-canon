@@ -114,6 +114,7 @@ if __package__:
         subagent_wave_record_command,
         suggested_public_skills,
         user_facing_language_policy_output_lines,
+        writer_target_policy_output_lines,
         implementation_handoff_required,
     )
 else:
@@ -135,6 +136,7 @@ else:
         subagent_wave_record_command,
         suggested_public_skills,
         user_facing_language_policy_output_lines,
+        writer_target_policy_output_lines,
         implementation_handoff_required,
     )
 
@@ -711,6 +713,8 @@ def emit_bootstrap_output(
         for line in standard_agent_wave_sequence_output_lines():
             print(line)
         for line in same_role_subagent_policy_output_lines():
+            print(line)
+        for line in writer_target_policy_output_lines():
             print(line)
         print(f"TASK_DEFAULT_SPECIALISTS={','.join(context.task_default_specialists)}")
         print(f"PLANNED_ACTIVE_ROLE_COUNT={len(runtime.roles)}")

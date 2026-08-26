@@ -153,7 +153,7 @@ HOOK_EVENT_CONTRACTS: dict[str, HookEventContract] = {
     "PreToolUse": HookEventContract(
         active=True,
         matchers=("Bash|apply_patch|python|python3",),
-        failure="unauthorized_destructive_git=block; malformed_payload=fail_open; spool_failure=fail_open",
+        failure="unauthorized_destructive_git=block; writer_target_mismatch=block; malformed_payload=fail_open; spool_failure=fail_open",
         telemetry="one bounded fingerprint-only local spool event",
     ),
     "PostToolUse": HookEventContract(
@@ -537,9 +537,10 @@ def dispatch_event(event: str, raw_payload: bytes) -> int:
         hook_spool_root=context.spool_root(),
     ) if event == "PreToolUse" else None
     if mutation_decision is not None and mutation_decision.status == "blocked":
-        if output is None:
+        target_blocked = mutation_decision.reason.startswith("writer_target")
+        if output is None or target_blocked:
             output = official_payload(event, mutation_block_payload(mutation_decision))
-            status = "blocked_parent_mutation"
+            status = "blocked_writer_target" if target_blocked else "blocked_parent_mutation"
     if mutation_decision is not None:
         spool_entry["mutation_control"] = mutation_decision.as_dict()
         spool_entry["status"] = status

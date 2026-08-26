@@ -34,6 +34,7 @@ from agent_team import (  # noqa: E402
     create_run_bundle,
 )
 from implementation_dispatch import dispatch_fixed_implementation  # noqa: E402
+from writer_target import WriterTarget  # noqa: E402
 from manifest_rendering import (  # noqa: E402
     language_review_candidates,
     render_code_template,
@@ -585,11 +586,29 @@ class AgentTeamTemplateTest(unittest.TestCase):
             },
         }
         calls: list[tuple[str, str]] = []
+        missing_target = dispatch_fixed_implementation(
+            request,
+            "materialize P3",
+            lambda role, prompt: calls.append((role, prompt)) or "missing-target",
+            workspace_root=PROJECT_ROOT,
+        )
+        self.assertEqual(missing_target.status, "blocked")
+        self.assertEqual(
+            missing_target.owner_gate_id,
+            "writer_target:required_before_spawn",
+        )
+        target = WriterTarget(
+            str(PROJECT_ROOT),
+            "fix/942-writer-targets",
+            "iwashita-nozomu/agent-canon",
+            ("tools/agent_tools",),
+        )
         dispatch = dispatch_fixed_implementation(
             request,
             "materialize P3",
             lambda role, prompt: calls.append((role, prompt)) or "spark-1",
             workspace_root=PROJECT_ROOT,
+            writer_target=target,
         )
         self.assertEqual(dispatch.status, "spawned")
         self.assertEqual(dispatch.spawn_count, 1)
@@ -610,6 +629,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
             "materialize P3",
             lambda role, prompt: None,
             workspace_root=PROJECT_ROOT,
+            writer_target=target,
         )
         self.assertEqual(blocked.status, "blocked")
         self.assertEqual(blocked.owner_gate_id, "WRITE_SUBAGENT_AUTHORIZATION=required")
