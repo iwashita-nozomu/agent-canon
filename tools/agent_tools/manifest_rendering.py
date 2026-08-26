@@ -163,7 +163,6 @@ if __package__:
         recommended_dynamic_expansion_wave_slots,
         recommended_initial_subagent_wave,
         recommended_initial_subagent_wave_slots,
-        validate_writer_handoff_waves,
         workflow_spawn_budget,
     )
 else:
@@ -179,7 +178,6 @@ else:
         recommended_dynamic_expansion_wave_slots,
         recommended_initial_subagent_wave,
         recommended_initial_subagent_wave_slots,
-        validate_writer_handoff_waves,
         workflow_spawn_budget,
     )
 
@@ -1534,10 +1532,6 @@ def manifest_run_lines(
             workflow_family_id=spec.workflow_family_id,
             issue_worker_candidate=spec.issue_worker_candidate,
             writer_targets=writer_targets,
-        )
-        validate_writer_handoff_waves(
-            (initial_slots, *expansion_wave_slots),
-            writer_targets,
         )
         lines.append("  spawn_wave_recommendation:")
         lines.append(

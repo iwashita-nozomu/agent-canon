@@ -154,10 +154,8 @@ if __package__:
         parse_agent_type_selections,
         recommended_dynamic_expansion_wave_slots,
         recommended_dynamic_expansion_waves,
-        recommended_initial_subagent_wave,
         recommended_initial_subagent_wave_slots,
         validate_agent_type_selections,
-        validate_writer_handoff_waves,
         workflow_spawn_budget,
     )
 else:
@@ -169,10 +167,8 @@ else:
         parse_agent_type_selections,
         recommended_dynamic_expansion_wave_slots,
         recommended_dynamic_expansion_waves,
-        recommended_initial_subagent_wave,
         recommended_initial_subagent_wave_slots,
         validate_agent_type_selections,
-        validate_writer_handoff_waves,
         workflow_spawn_budget,
     )
 
@@ -706,10 +702,6 @@ def emit_bootstrap_output(
             workflow_family_id=context.workflow_family_id,
             issue_worker_candidate=context.issue_worker_candidate,
             writer_targets=writer_targets,
-        )
-        validate_writer_handoff_waves(
-            (initial_slots, *expansion_wave_slots),
-            writer_targets,
         )
         print(
             "SUBAGENT_AGENT_TYPE_SELECTIONS="

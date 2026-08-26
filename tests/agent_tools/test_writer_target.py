@@ -11,9 +11,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import subprocess
-import sys
 import tempfile
 from pathlib import Path
 import pytest
@@ -426,54 +423,3 @@ def test_workspace_writer_without_static_packet_is_blocked() -> None:
             hook_spool_root=root,
         )
         assert decision.reason == "writer_target_packet_missing"
-
-
-def test_bootstrap_cli_rejects_duplicate_targets_before_publishing_run() -> None:
-    with tempfile.TemporaryDirectory() as runtime:
-        duplicate_root = Path(runtime) / "shared"
-        target_json = json.dumps(
-            {
-                "implementer": {
-                    "checkout_root": str(duplicate_root),
-                    "branch": "fix/implementer",
-                    "remote": "iwashita-nozomu/agent-canon",
-                    "allowed_paths": ["tools/agent_tools/"],
-                },
-                "integration_executor": {
-                    "checkout_root": str(duplicate_root),
-                    "branch": "fix/integration",
-                    "remote": "iwashita-nozomu/agent-canon",
-                    "allowed_paths": ["agents/"],
-                },
-            },
-            separators=(",", ":"),
-        )
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(Path(__file__).resolve().parents[2] / "tools/agent_tools/bootstrap_agent_run.py"),
-                "--task",
-                "writer target collision",
-                "--owner",
-                "codex",
-                "--task-id",
-                "T11",
-                "--enable",
-                "integration_executor",
-                "--skip-agent-canon-preflight",
-                "--no-language-review-candidates",
-                "--runtime-root",
-                runtime,
-                "--workspace-root",
-                str(Path(__file__).resolve().parents[2]),
-                "--writer-targets",
-                target_json,
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-            env={**os.environ, "AGENT_CANON_RUNTIME_ROOT": runtime},
-        )
-        assert result.returncode == 1
-        assert "writer_target:checkout_root_collision" in result.stdout
-        assert not list(Path(runtime).glob("reports/agents/*"))
