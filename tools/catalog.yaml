@@ -1698,6 +1698,24 @@ entries:
     tests:
       - tests/agent_tools/test_skill_tool_commands.py
 
+  - id: skill-document-reader
+    summary: Reads compact Skills and task-relevant canonical sections in bounded UTF-8 chunks.
+    path: tools/agent_tools/skill_document_reader.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    command: python3 tools/agent_tools/skill_document_reader.py
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - agents/skills/agent-orchestration.md
+      - agents/canonical/CODEX_WORKFLOW.md
+    tests:
+      - tests/agent_tools/test_skill_document_reader.py
+
   - id: vendor-skill-adapters
     summary: Validates and materializes third-party skill adapters from AgentCanon internal vendor storage.
     path: tools/agent_tools/vendor_skill_adapters.py

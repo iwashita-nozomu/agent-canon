@@ -47,6 +47,7 @@ global Python executable, or Host Cargo fallback.
 | runtime artifact boundary | `runtime_artifacts.py`, `bootstrap_runtime.py` |
 | eval and archive | `run_accumulated_agent_evals.py`, `runtime_log_archive_git.py` |
 | docs and structure | Rust `agent-canon docs`, `repo_structure_contract.py`, `check_design_doc_claims.py` |
+| Skill loading | `skill_document_reader.py` (bounded UTF-8 chunks and EOF admission) |
 | review and closeout | `review_dispatch.py`, `task_close.py`, canonical workflow |
 
 Each tool that writes requires an external runtime/output root or an explicit

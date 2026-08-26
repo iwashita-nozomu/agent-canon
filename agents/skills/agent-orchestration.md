@@ -12,6 +12,7 @@ upstream design ./skill-dependencies.yaml typed public-skill prerequisites, succ
 upstream design ../internal-routines/design-implementation-correspondence.md universal design-to-implementation correspondence route
 upstream design ../../documents/design/request-intent-and-update-relation.md compact question, write-clause, and update-overlay flow
 upstream design ../../documents/tools/search-coordination.md unresolved owner/path search fallback
+upstream implementation ../../tools/agent_tools/skill_document_reader.py bounded Skill read and EOF admission
 downstream implementation ../../tools/agent_tools/check_execution_time_aware_orchestration.py execution contract checker
 downstream implementation ../../tools/agent_tools/skill_route_catalog.py derives canonical invocation order
 downstream implementation ../../tools/agent_tools/skill_dependency_map.py validates and projects the dependency graph
@@ -107,13 +108,20 @@ fixed route:
    The root row only needs to identify the routing owner; it does not need one
    row per public Skill. Record the bridge as `Reader Map row -> routing owner
    -> selected Skill` when `task-routing` performs the final selection.
-2. Read that canonical Skill completely. The Skill body is the first
-   operational owner. If its body resolves the responsibility, operation, and
-   validation route, record the owning section and do not follow a registry or
-   rationale edge merely to fill the trace. Follow a task-relevant `upstream
-   design` edge from its `@dependency-start` header only when the Skill body
-   delegates a decision there or one of those three items remains unresolved.
-   Never open a `downstream implementation` edge first.
+2. Read the generated discovered `SKILL.md` completely in bounded chunks. It is
+   the complete compact Skill used for discovery, not a prefix of the canonical
+   prose. Continue the same path from `next_offset` until `file_eof=true` using
+   `tools/agent_tools/skill_document_reader.py`. The compact Skill is the first
+   operational owner. The Skill body is the first operational owner; here that
+   body is the complete compact discovery text. If it resolves responsibility,
+   operation, and validation,
+   do not follow a registry or rationale edge merely to fill the trace. Follow a
+   task-relevant `upstream design` edge from its `@dependency-start` header only
+   when the Skill delegates a decision there or one of those three items remains
+   unresolved. Never open a `downstream implementation` edge first.
+   Canonical `agents/skills/<skill>.md` is a referenced owner document: use the
+   reader's heading index and bounded section chunks, and read only the sections
+   needed to resolve that delegated responsibility, operation, or validation.
 3. Present the following short working update before implementation reading.
    It is a transient readback in the existing task update, not a new packet,
    schema, artifact, or closeout gate.
@@ -127,14 +135,21 @@ fixed route:
    implementation_read=locked|ready
    ```
 
-4. Set `implementation_read=ready` only when the Skill body and any owner it
-   explicitly delegates to have been read and resolve the responsibility,
-   intended operation, and validation route. Merely naming a delegated path
-   leaves `docs_first_status=unresolved` and `implementation_read=locked` until
-   that owner is read. A known source path is not sufficient by itself.
-   `ready` is an admission state, not a claim that source was already opened;
-   a read-only planner or evaluator can report `ready` while leaving the
-   implementation unread.
+4. Set `implementation_read=ready` only when the generated compact Skill has
+   `file_eof=true` and every explicitly delegated canonical owner section has
+   `section_eof=true`, with each read continuing from its returned
+   `next_offset`. The canonical file itself need not reach `file_eof` when only
+   a task-relevant section is delegated. A truncated compact response, a
+   section prefix, or merely naming a delegated path leaves
+   `docs_first_status=unresolved` and `implementation_read=locked`. A known
+   source path is not sufficient by itself. This is transient readback; do not
+   create a per-read receipt, identifier, approval gate, or duplicate canonical
+   Skill body.
+   `ready` is an admission state, not a claim that source was already opened.
+   Merely naming a delegated path does not unlock implementation.
+   The existing-tool-before-read exception remains available for the tool
+   action itself; it does not satisfy the read needed to interpret or repair
+   that tool's result.
 5. If the Skill body and its task-relevant delegated edge do not resolve one
    operational owner, report the unresolved item and use the bounded purpose search in
    `documents/tools/search-coordination.md`. Search results nominate an owner;

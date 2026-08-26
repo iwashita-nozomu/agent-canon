@@ -13,6 +13,7 @@ upstream design ../internal-routines/design-implementation-correspondence.md des
 upstream design ../../documents/design/request-intent-and-update-relation.md compact task-packet request and update projection
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner allocation
 upstream design ./agent-orchestration.md owner-first read trace and implementation admission
+upstream implementation ../../tools/agent_tools/skill_document_reader.py bounded Skill read and EOF admission
 downstream design ../../.codex/personal/skills/codex-task-workflow/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
@@ -80,13 +81,21 @@ Codex が会話コンテキストに依存せず、毎回同じ順序で task �
 ## Owner-First Readback
 
 Before the implementation stage, consume
-`agents/skills/agent-orchestration.md#Owner-First-Read-Trace`. The current task
-update must name the active root Reader Map row, selected canonical Skill,
-operational owner and route, then show
-`docs_first_status=resolved` and `implementation_read=ready`. If the trace is
-unresolved, implementation remains locked and the existing coordinated-search
-route owns the bounded lookup. Do not replace this readback with an
-implementation-path list, a repository sweep, or a new durable packet.
+`agents/skills/agent-orchestration.md#Owner-First-Read-Trace`. Read the
+generated discovered `SKILL.md` in bounded chunks with
+`tools/agent_tools/skill_document_reader.py` until `file_eof=true`; it is the
+complete compact Skill. When that Skill delegates a decision, read only the
+indexed canonical owner sections needed for the task until
+`section_eof=true`. The current task update must name the active root Reader
+Map row, selected canonical Skill, operational owner and route, then show
+`docs_first_status=resolved` and `implementation_read=ready` only after those
+EOF conditions hold. If the trace is unresolved, implementation remains locked
+and the existing coordinated-search route owns the bounded lookup. A
+partial response, known path, or whole-file canonical read is not a substitute;
+do not create a per-read receipt, identifier, approval gate, or duplicate Skill
+body.
+Do not replace this readback with an implementation-path list, a repository
+sweep, or a new durable packet.
 
 ## CompletionCoverage Reader Projection
 
@@ -255,11 +264,13 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. When skills are explicitly named in the task or handoff, use `$skill-name` notation and preserve it in `skills=<...>`.
 1. Treat `run.repo_tool_routing_policy` from `bootstrap_agent_run.py` as the selected repo-owned tool route. Carry `tool_route`, `tool_commands`, and `tool_evidence` into subagent handoff packets, and run each selected skill packet in the manifest order before replacing it with prose review.
 1. For repo-changing edits, existing tool execution and bounded owner patching
-   proceed from tool-owned evidence. Runtime `SKILL.md` reading is optional
-   follow-up context after the existing tool or selected command packet runs for
-   the covered property. Read only the owner surface needed to interpret or
-   repair the tool result. Route bounded edits through the normal owner route
-   and record owner, existing-tool route, and targeted-validation evidence.
+   proceed from tool-owned evidence. Existing tools may run before the Skill
+   read for the covered property, but interpretation or repair remains locked
+   until the generated compact `SKILL.md` reaches `file_eof=true` and any
+   delegated canonical section reaches `section_eof=true`. Read only the owner
+   surface needed to interpret or repair the tool result. Route bounded edits
+   through the normal owner route and record owner, existing-tool route, and
+   targeted-validation evidence.
 1. For research-backed implementation, benchmark, external-research change,
    prior-art adoption, official-docs method claims, or literature-derived design
    decisions, the emitted `skills=...` / run-bundle skill call sequence calls
