@@ -24,7 +24,13 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Literal, cast
 
-import yaml
+try:
+    import yaml
+except ModuleNotFoundError:  # clean host before the shared tool image exists
+    try:
+        from . import stdlib_yaml as yaml
+    except ImportError:
+        import stdlib_yaml as yaml  # type: ignore[no-redef]
 from visualization_contract import (
     TOOL_ARGUMENT_SCHEMAS,
     ArgumentSchemaID,

@@ -34,7 +34,13 @@ from pathlib import Path
 from pathlib import PurePosixPath
 from typing import Any, cast
 
-import yaml
+try:
+    import yaml
+except ModuleNotFoundError:  # clean host before the shared tool image exists
+    try:
+        from . import stdlib_yaml as yaml
+    except ImportError:
+        import stdlib_yaml as yaml  # type: ignore[no-redef]
 from agent_canon_source_root import resolve_agent_canon_source_root
 from skill_route_catalog import (
     SKILL_DEPENDENCY_MAP_PATH,

@@ -26,7 +26,13 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Protocol, cast
 
-import yaml
+try:
+    import yaml
+except ModuleNotFoundError:  # clean host before the shared tool image exists
+    try:
+        from . import stdlib_yaml as yaml
+    except ImportError:
+        import stdlib_yaml as yaml  # type: ignore[no-redef]
 from agent_canon_source_root import resolve_agent_canon_source_root
 
 if __package__:
