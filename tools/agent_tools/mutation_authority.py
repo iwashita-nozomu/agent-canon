@@ -19,6 +19,23 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
+try:
+    from .writer_target import (
+        WRITER_TARGET_PACKET_RELATIVE,
+        WRITER_TARGET_PACKET_SCHEMA,
+        WriterTargetError,
+        parse_writer_target,
+        validate_writer_target_identity,
+    )
+except ImportError:
+    from writer_target import (  # type: ignore[no-redef]
+        WRITER_TARGET_PACKET_RELATIVE,
+        WRITER_TARGET_PACKET_SCHEMA,
+        WriterTargetError,
+        parse_writer_target,
+        validate_writer_target_identity,
+    )
+
 IDENTITY_SCHEMA = "agent-canon.runtime-agent-identity.v1"
 MUTATION_DECISION_SCHEMA = "agent-canon.mutation-authority.v1"
 RUNTIME_AGENT_ID_ENV = "AGENT_CANON_RUNTIME_AGENT_ID"
@@ -196,6 +213,10 @@ def _bash_mutation(command: str) -> tuple[bool, tuple[str, ...], str]:
             if subcommand == "branch" and (not sub_args or any(token in {"--list", "-a", "-r", "-v", "-vv", "--show-current", "--edit-description", "--set-upstream-to", "--unset-upstream", "-u"} or token.startswith("--set-upstream-to=") or token.startswith("-u") for token in sub_args)):
                 continue
             paths.extend(token for token in sub_args if not token.startswith("-"))
+            if subcommand == "checkout" and any(
+                token in {"--ours", "--theirs", "--"} for token in sub_args
+            ):
+                return True, tuple(paths), "git_checkout_paths"
             return True, tuple(paths), f"git_{subcommand or 'unknown'}"
         if verb in {"bash", "sh", "zsh"}:
             wrapper_args = segment[command_index + 1 :]
@@ -241,13 +262,17 @@ def _writer_target_violation(
     active_root: Path,
     reason: str,
     command: str,
+    target_root: str = "",
+    target_branch: str = "",
 ) -> str | None:
     """Return a target-boundary failure when the active writer target is set."""
     declared_root = environment.get(WRITER_CHECKOUT_ROOT_ENV, "").strip()
     declared_branch = environment.get(WRITER_BRANCH_ENV, "").strip()
     declared_paths = environment.get(WRITER_ALLOWED_PATHS_ENV, "").strip()
-    if not declared_root and not declared_branch and not declared_paths:
+    if not declared_root and not declared_branch and not declared_paths and not target_root:
         return None
+    declared_root = declared_root or target_root
+    declared_branch = declared_branch or target_branch
     if not declared_root or not declared_branch:
         return "writer_target_required"
     if declared_paths:
@@ -272,7 +297,7 @@ def _writer_target_violation(
         return "writer_target_checkout_root_not_absolute"
     if target_root.resolve(strict=False) != active_root.resolve(strict=False):
         return "writer_target_checkout_root_mismatch"
-    if reason in {"git_checkout", "git_switch"}:
+    if reason in {"git_checkout", "git_switch", "git_worktree", "git_branch"}:
         return "writer_target_branch_switch_forbidden"
     for segment in _command_segments(command):
         if not segment:
@@ -294,11 +319,60 @@ def _writer_target_violation(
     return None
 
 
+def _read_writer_target_packet(
+    active_root: Path,
+    environment: Mapping[str, str],
+) -> tuple[object | None, Mapping[str, object] | None, str | None]:
+    """Read and validate the ignored static target packet for this checkout."""
+    packet_path = active_root.resolve(strict=False) / WRITER_TARGET_PACKET_RELATIVE
+    try:
+        packet_value = json.loads(packet_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None, None, "writer_target_packet_missing"
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None, None, "writer_target_packet_invalid"
+    if not isinstance(packet_value, dict) or packet_value.get("schema") != WRITER_TARGET_PACKET_SCHEMA:
+        return None, None, "writer_target_packet_invalid"
+    try:
+        target = parse_writer_target(
+            {
+                "schema": "agent-canon.writer-target.v1",
+                **{
+                    key: value
+                    for key, value in packet_value.items()
+                    if key not in {"schema", "checkout_identity"}
+                },
+            }
+        )
+    except WriterTargetError:
+        return None, None, "writer_target_packet_invalid"
+    identity = packet_value.get("checkout_identity")
+    if not isinstance(identity, Mapping):
+        return None, None, "writer_target_packet_invalid"
+    try:
+        validate_writer_target_identity(target, identity)
+    except WriterTargetError:
+        return None, None, "writer_target_packet_identity_mismatch"
+    if target.normalized_root != str(active_root.resolve(strict=False)):
+        return None, None, "writer_target_packet_identity_mismatch"
+    declared_root = environment.get(WRITER_CHECKOUT_ROOT_ENV, "").strip()
+    declared_branch = environment.get(WRITER_BRANCH_ENV, "").strip()
+    if declared_root and Path(declared_root).expanduser().resolve(strict=False) != Path(target.normalized_root):
+        return None, None, "writer_target_packet_identity_mismatch"
+    if declared_branch and declared_branch != target.branch:
+        return None, None, "writer_target_packet_identity_mismatch"
+    return target, identity, None
+
+
 def _allowed_path(path: str, active_root: Path, allowed_files: tuple[str, ...], allowed_directories: tuple[str, ...]) -> bool:
     candidate = Path(path)
     if candidate.is_absolute() or ".." in candidate.parts:
         return False
     normalized = candidate.as_posix()
+    if normalized == "." and "." in allowed_files:
+        return True
+    if "." in allowed_files:
+        return True
     if normalized in allowed_files:
         return True
     return any(normalized == directory or normalized.startswith(directory.rstrip("/") + "/") for directory in allowed_directories)
@@ -327,20 +401,6 @@ def evaluate_mutation_authority(
         candidate = tool_input.get("command", tool_input.get("cmd"))
         if isinstance(candidate, str):
             command_value = candidate
-    target_violation = _writer_target_violation(
-        environment,
-        active_root,
-        reason,
-        command_value,
-    )
-    if target_violation is not None:
-        return MutationAuthorityDecision(
-            "blocked",
-            target_violation,
-            True,
-            mutation_paths=paths,
-            command_sha256=command_sha,
-        )
     if report_dir is None:
         return MutationAuthorityDecision("blocked", "blocked_authority_required", True, mutation_paths=paths, command_sha256=command_sha)
     identity, evidence_ref = _read_identity(report_dir)
@@ -353,21 +413,95 @@ def evaluate_mutation_authority(
         return MutationAuthorityDecision("blocked", "runtime_identity_mismatch", True, actor_id, role_id, parent_agent_id, str(identity.get("scope_digest", "")), paths, evidence_ref, command_sha)
     if role_id in PARENT_ROLE_IDS or identity.get("authority") != "write_capable_child":
         return MutationAuthorityDecision("blocked", "parent_mutation_forbidden", True, actor_id, role_id, parent_agent_id, str(identity.get("scope_digest", "")), paths, evidence_ref, command_sha)
+    writer_target, _packet_identity, packet_error = _read_writer_target_packet(
+        active_root,
+        environment,
+    )
+    if packet_error is not None:
+        return MutationAuthorityDecision(
+            "blocked",
+            packet_error,
+            True,
+            actor_id,
+            role_id,
+            parent_agent_id,
+            str(identity.get("scope_digest", "")),
+            paths,
+            evidence_ref,
+            command_sha,
+        )
+    target_violation = _writer_target_violation(
+        environment,
+        active_root,
+        reason,
+        command_value,
+        writer_target.normalized_root if writer_target is not None else "",
+        writer_target.branch if writer_target is not None else "",
+    )
+    if target_violation is not None:
+        return MutationAuthorityDecision(
+            "blocked",
+            target_violation,
+            True,
+            actor_id,
+            role_id,
+            parent_agent_id,
+            str(identity.get("scope_digest", "")),
+            paths,
+            evidence_ref,
+            command_sha,
+        )
     if hook_spool_root is None or not any(
         _spawn_event_matches(path, actor_id, role_id, str(identity.get("scope_digest", "")))
         for path in hook_spool_root.glob("**/*.json")
     ):
         return MutationAuthorityDecision("blocked", "child_spawn_evidence_missing", True, actor_id, role_id, parent_agent_id, str(identity.get("scope_digest", "")), paths, evidence_ref, command_sha)
-    allowed_files = _relative_paths(identity.get("allowed_files")) or ()
-    allowed_directories = _relative_paths(identity.get("allowed_directories")) or ()
+    if writer_target is None:
+        return MutationAuthorityDecision(
+            "blocked",
+            "writer_target_packet_missing",
+            True,
+            actor_id,
+            role_id,
+            parent_agent_id,
+            str(identity.get("scope_digest", "")),
+            paths,
+            evidence_ref,
+            command_sha,
+        )
+    packet_paths = writer_target.allowed_paths
+    allowed_files = tuple(
+        path.rstrip("/") for path in packet_paths if not path.endswith("/")
+    )
+    allowed_directories = tuple(
+        path.rstrip("/") for path in packet_paths if path.endswith("/")
+    )
+    packet_path = WRITER_TARGET_PACKET_RELATIVE.as_posix()
+    if packet_path in command_value.replace("\\", "/") or packet_path in {
+        str(path).replace("\\", "/") for path in paths
+    }:
+        return MutationAuthorityDecision(
+            "blocked",
+            "writer_target_packet_mutation_forbidden",
+            True,
+            actor_id,
+            role_id,
+            parent_agent_id,
+            str(identity.get("scope_digest", "")),
+            paths,
+            evidence_ref,
+            command_sha,
+        )
     explicit_allowed = environment.get(WRITER_ALLOWED_PATHS_ENV, "").strip()
     if explicit_allowed:
         try:
             parsed_allowed = json.loads(explicit_allowed)
         except (TypeError, json.JSONDecodeError):
+            parsed_allowed = None
+        if not isinstance(parsed_allowed, list) or tuple(parsed_allowed) != packet_paths:
             return MutationAuthorityDecision(
                 "blocked",
-                "writer_target_allowed_paths_invalid",
+                "writer_target_allowed_paths_mismatch",
                 True,
                 actor_id,
                 role_id,
@@ -377,28 +511,6 @@ def evaluate_mutation_authority(
                 evidence_ref,
                 command_sha,
             )
-        if not isinstance(parsed_allowed, list) or not all(
-            isinstance(path, str) and path for path in parsed_allowed
-        ):
-            return MutationAuthorityDecision(
-                "blocked",
-                "writer_target_allowed_paths_invalid",
-                True,
-                actor_id,
-                role_id,
-                parent_agent_id,
-                str(identity.get("scope_digest", "")),
-                paths,
-                evidence_ref,
-                command_sha,
-            )
-        normalized_allowed = tuple(str(path) for path in parsed_allowed)
-        allowed_files = tuple(
-            path.rstrip("/") for path in normalized_allowed if not path.endswith("/")
-        )
-        allowed_directories = tuple(
-            path.rstrip("/") for path in normalized_allowed if path.endswith("/")
-        )
     target_metadata_only = (
         bool(environment.get(WRITER_CHECKOUT_ROOT_ENV, "").strip())
         and reason in {"git_commit", "git_merge", "git_rebase"}

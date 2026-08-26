@@ -787,7 +787,7 @@ remote を解決できない場合は `unknown` をそのまま伝え、対象�
 - parent が `team_manifest.yaml` の write policy と handoff で writer ごとの allowed path / directory を管理します
 - write-capable handoff は `writer_target`（絶対 `checkout_root`、固定 `branch`、正規化済み `remote`、`allowed_paths`）を必須とし、branch は handoff 前に `repository-topic-clone.prepare` で用意します
 - 同一 wave の writer target が同じ `checkout_root` を持つ場合、agent team は spawn callback 前に typed collision として拒否します。reader は `writer_target` を持たず同じ checkout を共有できます
-- PreToolUse には target の `AGENT_CANON_CHECKOUT_ROOT`、`AGENT_CANON_CHECKOUT_BRANCH`、JSON 配列 `AGENT_CANON_WRITER_ALLOWED_PATHS` を渡し、modified path が `allowed_paths` の外なら拒否します。read-only command はこの writer path gate の対象外です
+- `repository-topic-clone.prepare` は dedicated clone の ignored `.agent-canon/writer-target.json` に target と検証済み checkout identity を materialize します。PreToolUse はこの packet を正本として読み、環境変数は readback 一致確認に限って使い、modified path が `allowed_paths` の外なら拒否します。packet が無い checkout や packet 自身の変更は拒否し、read-only command はこの writer path gate の対象外です
 - repository write は `worker`、`spark_worker`、`integration_executor` の各 write-capable route に限定します。IssueWorker の `publisher` は外部 GitHub publication 専用で target を持たず、reviewer と artifact-only role は read-only とします
 - 同一 path、同一 directory ownership、同一 public API surface、shared Git index/HEAD、generated output、formatter output は順序制約つきの writer に割り当てます
 - 同一 worktree の write-capable subagent instance は、writer target が distinct である場合だけ同じ role type を含む複数 writer instance を同一 wave で使えます

@@ -707,11 +707,10 @@ def emit_bootstrap_output(
             issue_worker_candidate=context.issue_worker_candidate,
             writer_targets=writer_targets,
         )
-        if writer_targets:
-            validate_writer_handoff_waves(
-                (initial_slots, *expansion_wave_slots),
-                writer_targets,
-            )
+        validate_writer_handoff_waves(
+            (initial_slots, *expansion_wave_slots),
+            writer_targets,
+        )
         print(
             "SUBAGENT_AGENT_TYPE_SELECTIONS="
             f"{format_agent_type_selections(runtime.agent_type_selections)}"

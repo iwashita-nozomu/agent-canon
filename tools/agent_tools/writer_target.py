@@ -26,6 +26,8 @@ from pathlib import Path
 
 REMOTE_RE = re.compile(r"^[^/\s]+/[^/\s]+$")
 WRITER_TARGET_SCHEMA = "agent-canon.writer-target.v1"
+WRITER_TARGET_PACKET_SCHEMA = "agent-canon.writer-target-packet.v1"
+WRITER_TARGET_PACKET_RELATIVE = Path(".agent-canon") / "writer-target.json"
 
 
 class WriterTargetError(ValueError):
@@ -57,7 +59,7 @@ class WriterTarget:
                 not path
                 or candidate.is_absolute()
                 or ".." in candidate.parts
-                or "." in candidate.parts
+                or ("." in candidate.parts and path != ".")
                 or "\\" in path
                 or "//" in path
             ):
@@ -111,7 +113,7 @@ def _relative_paths(value: object) -> tuple[str, ...]:
         if (
             candidate.is_absolute()
             or ".." in candidate.parts
-            or "." in candidate.parts
+            or ("." in candidate.parts and path != ".")
             or "\\" in path
             or "//" in path
         ):
@@ -165,6 +167,27 @@ def validate_writer_target_identity(
     if remote != parsed.normalized_remote:
         raise WriterTargetError("writer_target:remote_identity_mismatch")
     return parsed
+
+
+def materialize_writer_target_packet(
+    target: WriterTarget | Mapping[str, object],
+    checkout_identity: Mapping[str, object],
+) -> Path:
+    """Write the ignored static handoff packet for one prepared clone."""
+    parsed = validate_writer_target_identity(target, checkout_identity)
+    path = Path(parsed.normalized_root) / WRITER_TARGET_PACKET_RELATIVE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    packet = {
+        "schema": WRITER_TARGET_PACKET_SCHEMA,
+        **parsed.as_dict(),
+        "checkout_identity": dict(checkout_identity),
+    }
+    path.write_text(
+        json.dumps(packet, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
 
 
 def validate_writer_target_allocations(
@@ -237,9 +260,12 @@ def validate_wave_writer_targets(
 
 __all__ = (
     "WRITER_TARGET_SCHEMA",
+    "WRITER_TARGET_PACKET_SCHEMA",
+    "WRITER_TARGET_PACKET_RELATIVE",
     "WriterTarget",
     "WriterTargetError",
     "parse_writer_target",
+    "materialize_writer_target_packet",
     "validate_wave_writer_targets",
     "validate_writer_target_allocations",
     "validate_writer_target_identity",

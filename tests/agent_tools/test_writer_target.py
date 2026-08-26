@@ -34,6 +34,7 @@ from tools.agent_tools.team_config import (
 from tools.agent_tools.writer_target import (
     WriterTarget,
     WriterTargetError,
+    materialize_writer_target_packet,
     validate_writer_target_allocations,
     validate_writer_target_identity,
 )
@@ -84,6 +85,23 @@ def write_identity(root: Path) -> None:
         ),
         encoding="utf-8",
     )
+    packet = {
+        "schema": "agent-canon.writer-target-packet.v1",
+        "checkout_root": str(root),
+        "branch": "fix/942",
+        "remote": "iwashita-nozomu/agent-canon",
+        "allowed_paths": ["src/owned.py"],
+        "checkout_identity": {
+            "cwd": str(root),
+            "git_root": str(root),
+            "branch": "fix/942",
+            "head": "a" * 40,
+            "remote": "iwashita-nozomu/agent-canon",
+        },
+    }
+    packet_path = root / ".agent-canon" / "writer-target.json"
+    packet_path.parent.mkdir()
+    packet_path.write_text(json.dumps(packet, sort_keys=True), encoding="utf-8")
 
 
 def test_shared_checkout_writer_targets_are_rejected_before_spawn() -> None:
@@ -200,19 +218,34 @@ def test_hook_target_blocks_foreign_checkout_and_branch_switch() -> None:
         active_root=Path("/tmp/foreign"),
         environment=env,
     )
-    assert foreign.reason == "writer_target_checkout_root_mismatch"
+    assert foreign.reason == "blocked_authority_required"
     switch = evaluate_mutation_authority(
         {"tool_name": "Bash", "tool_input": {"command": "git switch fix/942"}},
         report_dir=None,
         active_root=Path("/tmp/target"),
         environment=env,
     )
-    assert switch.reason == "writer_target_branch_switch_forbidden"
+    assert switch.reason == "blocked_authority_required"
 
 
 def test_writer_target_rejects_relative_root() -> None:
     with pytest.raises(WriterTargetError, match="checkout_root_must_be_absolute"):
         target("relative/path")
+
+
+def test_materialized_packet_contains_validated_identity(tmp_path: Path) -> None:
+    writer = WriterTarget(str(tmp_path), "fix/942", "local/repo", ("src/",))
+    identity = {
+        "cwd": str(tmp_path),
+        "git_root": str(tmp_path),
+        "branch": "fix/942",
+        "head": "b" * 40,
+        "remote": "local/repo",
+    }
+    packet_path = materialize_writer_target_packet(writer, identity)
+    packet = json.loads(packet_path.read_text(encoding="utf-8"))
+    assert packet["checkout_root"] == str(tmp_path)
+    assert packet["checkout_identity"] == identity
 
 
 def test_pretooluse_uses_exact_structured_allowed_paths() -> None:
@@ -257,6 +290,58 @@ def test_pretooluse_uses_exact_structured_allowed_paths() -> None:
             hook_spool_root=root,
         )
         assert commit.status == "allowed"
+        switch = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git switch fix/other"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert switch.reason == "writer_target_branch_switch_forbidden"
+        rename = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git branch -m fix/renamed"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert rename.reason == "writer_target_branch_switch_forbidden"
+        packet_mutation = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "touch .agent-canon/writer-target.json"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert packet_mutation.reason == "writer_target_packet_mutation_forbidden"
+
+
+def test_workspace_writer_without_static_packet_is_blocked() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        (root / ".agent-canon" / "writer-target.json").unlink()
+        decision = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": "touch src/owned.py"}},
+            report_dir=root,
+            active_root=root,
+            environment={
+                "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+                "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+                "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+            },
+            hook_spool_root=root,
+        )
+        assert decision.reason == "writer_target_packet_missing"
 
 
 def test_bootstrap_cli_rejects_duplicate_targets_before_publishing_run() -> None:

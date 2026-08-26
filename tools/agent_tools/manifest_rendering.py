@@ -1535,11 +1535,10 @@ def manifest_run_lines(
             issue_worker_candidate=spec.issue_worker_candidate,
             writer_targets=writer_targets,
         )
-        if writer_targets:
-            validate_writer_handoff_waves(
-                (initial_slots, *expansion_wave_slots),
-                writer_targets,
-            )
+        validate_writer_handoff_waves(
+            (initial_slots, *expansion_wave_slots),
+            writer_targets,
+        )
         lines.append("  spawn_wave_recommendation:")
         lines.append(
             "    source: 'stage-ready AgentCanon wave policy filtered by workflow spawn budget'"

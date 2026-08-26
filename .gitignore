@@ -16,6 +16,7 @@ __pycache__/
 .agent-canon/semantic-index/
 .agent-canon/log-archive/
 .agent-canon/knowledge-graph/
+.agent-canon/writer-target.json
 rust/agent-canon/target/
 
 # Local run artifacts

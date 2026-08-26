@@ -4,6 +4,7 @@
 # responsibility Implements repository-topic clone lifecycle with strict cleanup and evidence checks.
 # upstream design ../../documents/rule/repository-topic-clone.md defines generic clone and cleanup behavior
 # upstream implementation ./conflict_preservation.py captures conflict stages and validates finalization readback.
+# upstream implementation ./writer_target.py materializes the ignored static writer handoff packet.
 # downstream implementation ../../tests/agent_tools/test_repository_topic_clone.py validates repository-topic clone lifecycle.
 # @dependency-end
 """Manage repository-topic clones with explicit receipts and strict cleanup gates."""
@@ -24,8 +25,12 @@ from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
 try:
     from .conflict_preservation import capture_inventory, validate_plan
+    from .checkout_identity import resolve_checkout_identity
+    from .writer_target import WriterTarget, materialize_writer_target_packet
 except ImportError:  # direct CLI execution
     from conflict_preservation import capture_inventory, validate_plan
+    from checkout_identity import resolve_checkout_identity  # type: ignore[no-redef]
+    from writer_target import WriterTarget, materialize_writer_target_packet  # type: ignore[no-redef]
 
 if TYPE_CHECKING:
     from . import parent_root_side_effects as _parent_boundary
@@ -133,6 +138,7 @@ class RepositoryTopicCloneRequest:
     topic: str
     branch: str
     owner_evidence: Path
+    allowed_paths: tuple[str, ...] = (".",)
     parent_attestation: _parent_boundary.ParentRootAttestationReceipt | None = None
 
 
@@ -147,6 +153,7 @@ class PrepareReceipt:
     candidate_tree: str
     clone_dev: int | None = None
     clone_ino: int | None = None
+    writer_target_packet: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -709,6 +716,7 @@ def request(
     branch: str,
     owner_evidence: Path | str,
     *,
+    allowed_paths: Sequence[str] = (".",),
     policy: RepositoryPolicyCallback | None = None,
 ) -> PrepareReceipt:
     """Prepare a topic clone and return a typed receipt."""
@@ -720,6 +728,7 @@ def request(
         topic=topic,
         branch=_normalise_branch(branch),
         owner_evidence=_require_evidence(owner_evidence, repository_root),
+        allowed_paths=tuple(allowed_paths),
     )
     try:
         request_state = RepositoryTopicCloneRequest(
@@ -729,6 +738,7 @@ def request(
             topic=request_state.topic,
             branch=request_state.branch,
             owner_evidence=request_state.owner_evidence,
+            allowed_paths=request_state.allowed_paths,
             parent_attestation=_attest_parent(
                 _parent_request(repository_root, purpose="repository-topic-clone")
             ),
@@ -812,6 +822,18 @@ def request(
         )
     candidate_sha = _run_git(clone, ["rev-parse", branch_name]).strip()
     candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]).strip()
+    checkout_identity = resolve_checkout_identity(clone).as_dict()
+    writer_target_packet: Path | None = None
+    if checkout_identity["remote"] != "unknown":
+        writer_target_packet = materialize_writer_target_packet(
+            WriterTarget(
+                str(clone),
+                branch_name,
+                checkout_identity["remote"],
+                request_state.allowed_paths,
+            ),
+            checkout_identity,
+        )
     clone_identity = clone.stat()
     receipt = PrepareReceipt(
         request=request_state,
@@ -821,6 +843,7 @@ def request(
         candidate_tree=candidate_tree,
         clone_dev=clone_identity.st_dev,
         clone_ino=clone_identity.st_ino,
+        writer_target_packet=writer_target_packet,
     )
     if policy is not None:
         policy.apply(operation="prepare", request=request_state, receipt=receipt)
@@ -1194,6 +1217,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     prepare.add_argument("--topic", required=True)
     prepare.add_argument("--branch", required=True)
     prepare.add_argument("--owner-evidence", required=True)
+    prepare.add_argument(
+        "--allowed-path",
+        action="append",
+        default=[],
+        help="Relative path or directory (trailing slash) allowed for the writer target.",
+    )
 
     merge = commands.add_parser("merge-main")
     merge.add_argument("--url", required=True)
@@ -1266,6 +1295,7 @@ def main(argv: list[str] | None = None) -> None:
                 args.topic,
                 args.branch,
                 args.owner_evidence,
+                allowed_paths=tuple(args.allowed_path) or (".",),
             )
             print("REQUEST_STATE=ready")
             print(f"REQUEST_REPO={receipt.request.repository}")
@@ -1274,6 +1304,8 @@ def main(argv: list[str] | None = None) -> None:
             print(f"REQUEST_CLONE={receipt.clone}")
             print(f"REQUEST_CANDIDATE_SHA={receipt.candidate_sha}")
             print(f"REQUEST_CANDIDATE_TREE={receipt.candidate_tree}")
+            if receipt.writer_target_packet is not None:
+                print(f"REQUEST_WRITER_TARGET_PACKET={receipt.writer_target_packet}")
         elif args.command == "merge-main":
             receipt = merge_main(request_state)
             print("MERGE_STATUS=done")

@@ -530,6 +530,24 @@ class CodexHooksTest(unittest.TestCase):
         target = report_dir / "runtime" / "agent_identity.json"
         target.parent.mkdir(parents=True)
         target.write_text(json.dumps(value, sort_keys=True), encoding="utf-8")
+        packet_root = report_dir.parent
+        packet = {
+            "schema": "agent-canon.writer-target-packet.v1",
+            "checkout_root": str(packet_root),
+            "branch": "test",
+            "remote": "local/repo",
+            "allowed_paths": ["src/"],
+            "checkout_identity": {
+                "cwd": str(packet_root),
+                "git_root": str(packet_root),
+                "branch": "test",
+                "head": "a" * 40,
+                "remote": "local/repo",
+            },
+        }
+        packet_path = packet_root / ".agent-canon" / "writer-target.json"
+        packet_path.parent.mkdir(parents=True, exist_ok=True)
+        packet_path.write_text(json.dumps(packet, sort_keys=True), encoding="utf-8")
 
     def test_pretooluse_rejects_parent_mutation_and_allows_child_scope(self) -> None:
         """The active hook enforces runtime identity and child write scope."""
