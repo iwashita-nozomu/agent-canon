@@ -724,19 +724,29 @@ def resolve_agentcanon_root(root: Path) -> Path:
 
 def is_agentcanon_root(root: Path) -> bool:
     """Return whether a path looks like the AgentCanon evidence root."""
-    return (
-        (root / "agents" / "evals" / "README.md").is_file()
-        or (root / ".codex" / "personal" / "skills").is_dir()
-        or (root / "tools" / "agent_tools" / "generate_agent_improvement_guide.py").is_file()
-        or (root / "agents" / "evals" / "results").is_dir()
-    )
+    try:
+        return (
+            (root / "agents" / "evals" / "README.md").is_file()
+            or (root / ".codex" / "personal" / "skills").is_dir()
+            or (root / "tools" / "agent_tools" / "generate_agent_improvement_guide.py").is_file()
+            or (root / "agents" / "evals" / "results").is_dir()
+        )
+    except OSError:
+        return False
 
 
 def known_skill_ids(root: Path) -> frozenset[str]:
     """Return AgentCanon-owned skill ids from shim and human docs."""
     skills: set[str] = set()
-    for path in (root / ".codex" / "personal" / "skills").glob("*/SKILL.md"):
-        skills.add(path.parent.name)
+    try:
+        shim_paths = (root / ".codex" / "personal" / "skills").glob("*/SKILL.md")
+        for path in shim_paths:
+            skills.add(path.parent.name)
+    except OSError:
+        # The generated view can be a mode-0700 host bind mount under a
+        # rootless tool container. Canonical human skill docs are sufficient
+        # for source classification when that optional view is unreadable.
+        pass
     for path in (root / "agents" / "skills").glob("*.md"):
         if path.name != "README.md":
             skills.add(path.stem)
