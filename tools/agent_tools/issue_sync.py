@@ -32,6 +32,15 @@ GITHUB_URL_RE = re.compile(r"^https://github\.com/(?P<repo>[^/]+/[^/]+)/issues/(
 PACKET_SCHEMA = "agent-canon.feedback.issue-packet.v1"
 CLAUSE_KINDS = ("problem", "required_action", "done", "close_condition")
 FINDING_SCOPES = frozenset({"changed", "user", "owner-bounded", "repo-wide"})
+ISSUE_WORKER_HANDOFF_SCHEMA = "agent-canon.issue-worker-handoff.v1"
+NON_DURABLE_FINDING_KINDS = frozenset({
+    "count",
+    "raw-count",
+    "raw_count",
+    "status",
+    "one-off",
+    "one_off",
+})
 
 
 class IssueSyncError(RuntimeError):
@@ -92,6 +101,167 @@ class IssueSyncReport:
     pending_packets: tuple[str, ...] = ()
     github_checked: int = 0
     github_unavailable: int = 0
+
+
+@dataclass(frozen=True)
+class IssueWorkerHandoff:
+    """Typed result of qualifying one finding for the IssueWorker stage.
+
+    ``qualified`` is the only status that authorizes the logical IssueWorker
+    to inspect and mutate GitHub Issues.  ``handoff`` preserves a
+    repository-qualified no-mutation route when ownership or occurrence
+    evidence is incomplete, while ``no-action`` preserves the #638 boundary
+    for transient or current-scope findings.
+    """
+
+    status: str
+    reason: str
+    repository: str
+    owner: str
+    fix: str
+    occurrence_locations: tuple[str, ...]
+    related_issue_refs: tuple[str, ...] = ()
+    schema: str = ISSUE_WORKER_HANDOFF_SCHEMA
+
+    @property
+    def qualifies(self) -> bool:
+        """Return whether this finding should be handed to IssueWorker."""
+        return self.status == "qualified"
+
+    def as_dict(self) -> dict[str, object]:
+        """Return the stable machine-readable handoff projection."""
+        return {
+            "schema": self.schema,
+            "status": self.status,
+            "reason": self.reason,
+            "repository": self.repository,
+            "owner": self.owner,
+            "fix": self.fix,
+            "occurrence_locations": list(self.occurrence_locations),
+            "related_issue_refs": list(self.related_issue_refs),
+        }
+
+
+def _record_text(record: Mapping[str, object], *keys: str) -> str:
+    """Return the first non-empty textual field from a finding record."""
+    for key in keys:
+        value = record.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _record_bool(record: Mapping[str, object], *keys: str) -> bool | None:
+    """Return an explicitly supplied boolean without guessing missing evidence."""
+    for key in keys:
+        value = record.get(key)
+        if isinstance(value, bool):
+            return value
+    return None
+
+
+def _occurrence_locations(record: Mapping[str, object]) -> tuple[str, ...]:
+    """Return only explicitly confirmed occurrence locators."""
+    value = record.get("occurrence_locations", record.get("occurrence_location"))
+    if isinstance(value, str) and value.strip():
+        return (value.strip(),) if record.get("occurrence_confirmed") is True else ()
+    if not isinstance(value, (list, tuple)):
+        return ()
+    locations: list[str] = []
+    for item in value:
+        if isinstance(item, str) and item.strip():
+            locations.append(item.strip())
+            continue
+        if not isinstance(item, Mapping):
+            continue
+        path = _record_text(item, "path")
+        locator = _record_text(item, "locator", "symbol", "heading")
+        if path and locator:
+            locations.append(f"{path}::{locator}")
+    confirmed = _record_bool(record, "occurrence_confirmed")
+    return tuple(dict.fromkeys(locations)) if confirmed is True else ()
+
+
+def qualify_issue_worker_finding(
+    record: Mapping[str, object],
+    *,
+    authenticated_repository: str = "",
+) -> IssueWorkerHandoff:
+    """Classify one finding for the logical IssueWorker stage.
+
+    Qualification is deliberately evidence-first.  Missing repository,
+    owner, or occurrence confirmation yields a repository-qualified handoff
+    with no mutation authority.  Counts, status-only observations, one-offs,
+    and findings already closed by the active repair remain local under #638.
+    """
+    repository = _record_text(record, "repository", "repo")
+    owner = _record_text(record, "owner", "owner_id")
+    fix = _record_text(record, "fix", "required_action", "action")
+    status = _record_text(record, "status", "resolution").casefold().replace("_", "-")
+    kind = _record_text(record, "finding_kind", "kind", "category").casefold().replace("_", "-")
+    occurrence = _occurrence_locations(record)
+    related = record.get("related_issue_refs", record.get("issue_refs", ()))
+    related_refs = tuple(
+        value.strip()
+        for value in related
+        if isinstance(value, str) and value.strip()
+    ) if isinstance(related, (list, tuple)) else ()
+
+    actionable = _record_bool(record, "actionable")
+    if actionable is False:
+        return IssueWorkerHandoff("no-action", "not-actionable", repository, owner, fix, occurrence, related_refs)
+    if kind in NON_DURABLE_FINDING_KINDS:
+        return IssueWorkerHandoff("no-action", "non-durable-finding-kind", repository, owner, fix, occurrence, related_refs)
+    if status in {"resolved", "closed", "current-scope-resolved", "current-scope-closed"}:
+        return IssueWorkerHandoff("no-action", "current-scope-resolved", repository, owner, fix, occurrence, related_refs)
+    if _record_bool(record, "current_scope_resolved", "closed_by_active_repair") is True:
+        return IssueWorkerHandoff("no-action", "current-scope-resolved", repository, owner, fix, occurrence, related_refs)
+
+    if not repository:
+        return IssueWorkerHandoff("handoff", "repository-unresolved", repository, owner, fix, occurrence, related_refs)
+    if not owner:
+        return IssueWorkerHandoff("handoff", "owner-unresolved", repository, owner, fix, occurrence, related_refs)
+    if _record_bool(record, "repository_confirmed", "repository_identity_confirmed") is not True:
+        return IssueWorkerHandoff("handoff", "repository-unconfirmed", repository, owner, fix, occurrence, related_refs)
+    if _record_bool(record, "owner_confirmed", "owner_identity_confirmed") is not True:
+        return IssueWorkerHandoff("handoff", "owner-unconfirmed", repository, owner, fix, occurrence, related_refs)
+    if not occurrence:
+        return IssueWorkerHandoff("handoff", "occurrence-unconfirmed", repository, owner, fix, occurrence, related_refs)
+    if not authenticated_repository:
+        return IssueWorkerHandoff("handoff", "authenticated-repository-unresolved", repository, owner, fix, occurrence, related_refs)
+    if repository != authenticated_repository:
+        return IssueWorkerHandoff("handoff", "other-repository", repository, owner, fix, occurrence, related_refs)
+
+    durable = _record_bool(record, "durable_follow_up", "needs_durable_follow_up", "recurrent", "repeatable")
+    if durable is not True and _record_text(record, "scope").casefold() not in {"owner-bounded", "repo-wide"}:
+        return IssueWorkerHandoff("no-action", "durable-follow-up-not-established", repository, owner, fix, occurrence, related_refs)
+    return IssueWorkerHandoff("qualified", "user-owned-durable-follow-up", repository, owner, fix, occurrence, related_refs)
+
+
+class IssueWorker:
+    """Logical IssueWorker boundary over the existing GitHub host adapter."""
+
+    def __init__(self, client: GitHubIssueClient, authenticated_repository: str) -> None:
+        self.client = client
+        self.authenticated_repository = authenticated_repository
+
+    def qualify(self, record: Mapping[str, object]) -> IssueWorkerHandoff:
+        """Return a qualification handoff without mutating GitHub."""
+        return qualify_issue_worker_finding(
+            record, authenticated_repository=self.authenticated_repository
+        )
+
+    def related_issue_set(
+        self, references: Iterable[str]
+    ) -> tuple[GitHubIssueRecord, ...]:
+        """Read the repository-qualified open/closed related Issue set."""
+        records: list[GitHubIssueRecord] = []
+        for value in references:
+            reference = parse_issue_reference(value, self.authenticated_repository)
+            if reference.repo != self.authenticated_repository:
+                continue
+            records.append(self.client.read(reference))
+        return tuple(records)
 
 
 def parse_issue_reference(value: str, default_repo: str = "") -> GitHubIssueReference:

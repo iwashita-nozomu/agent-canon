@@ -46,6 +46,10 @@ from report_artifact_checks import (  # noqa: E402
 )
 from runtime_log_paths import eval_result_search_dirs  # noqa: E402
 from runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary  # noqa: E402
+from issue_sync import (  # noqa: E402
+    IssueWorkerHandoff,
+    qualify_issue_worker_finding,
+)
 
 STATUS_RE = re.compile(r"\b[A-Z_]*STATUS=(pass|fail|skip)\b")
 
@@ -382,6 +386,7 @@ class RuntimeDashboardSummary:
     markdown_docs_breakdown: MarkdownDocsBreakdown
     reference_capture_breakdown: ReferenceCaptureBreakdown
     selection_metrics_breakdown: SelectionMetricsBreakdown
+    issue_worker_handoffs: tuple[IssueWorkerHandoff, ...] = ()
 
 
 class ResultFamilyReader:
@@ -1186,6 +1191,54 @@ class SelectionMetricsReader:
         return filtered
 
 
+def issue_worker_candidate_records(entry: Mapping[str, object]) -> tuple[Mapping[str, object], ...]:
+    """Return explicit IssueWorker candidate records from one hook event.
+
+    Dashboard collection never infers a finding from counts or selection
+    misses.  Only an event carrying an explicit candidate mapping/list enters
+    the typed qualification route.
+    """
+    values: list[object] = []
+    for key in ("issue_worker_candidates", "issue_candidates", "issue_candidate"):
+        value = entry.get(key)
+        if isinstance(value, Mapping):
+            values.append(value)
+        elif isinstance(value, list):
+            values.extend(value)
+    return tuple(
+        cast(Mapping[str, object], value)
+        for value in values
+        if isinstance(value, Mapping)
+    )
+
+
+def read_issue_worker_handoffs(
+    hook_files: Sequence[Path],
+    recent_cutoff_epoch: int | None = None,
+) -> tuple[IssueWorkerHandoff, ...]:
+    """Collect typed IssueWorker candidates without performing mutation."""
+    handoffs: list[IssueWorkerHandoff] = []
+    for hook_file in hook_files:
+        for entry in HookWorkflowBreakdownReader.iter_entries(
+            hook_file, recent_cutoff_epoch
+        ):
+            for candidate in issue_worker_candidate_records(entry):
+                # Authentication is an explicit evidence field.  The
+                # dashboard must not infer repository ownership from a path.
+                authenticated_repository = str(
+                    candidate.get("authenticated_repository")
+                    or entry.get("authenticated_repository")
+                    or ""
+                ).strip()
+                handoffs.append(
+                    qualify_issue_worker_finding(
+                        candidate,
+                        authenticated_repository=authenticated_repository,
+                    )
+                )
+    return tuple(handoffs)
+
+
 class RuntimeDashboardVisuals:
     """Renders reader-facing visual dashboard sections."""
 
@@ -1487,6 +1540,10 @@ class AgentRuntimeDashboard:
                 hook_files,
                 self.recent_cutoff_epoch,
             ),
+            issue_worker_handoffs=read_issue_worker_handoffs(
+                hook_files,
+                self.recent_cutoff_epoch,
+            ),
         )
 
     def collect_evidence(self) -> tuple[EvidenceSummary, tuple[Path, ...]]:
@@ -1703,6 +1760,10 @@ def compact_evidence_drilldown_lines(summary: RuntimeDashboardSummary) -> list[s
         "",
         *compact_selection_evidence_drilldown_lines(summary),
         "",
+        "### IssueWorker Routing Drilldown",
+        "",
+        *compact_issue_worker_drilldown_lines(summary),
+        "",
         "### Markdown And Prompt Drilldown",
         "",
         *compact_markdown_prompt_drilldown_lines(summary),
@@ -1722,6 +1783,19 @@ def compact_evidence_drilldown_lines(summary: RuntimeDashboardSummary) -> list[s
         "### Reference Capture Drilldown",
         "",
         *compact_reference_capture_drilldown_lines(summary),
+    ]
+
+
+def compact_issue_worker_drilldown_lines(summary: RuntimeDashboardSummary) -> list[str]:
+    """Return typed IssueWorker candidate outcomes without raw log excerpts."""
+    handoffs = getattr(summary, "issue_worker_handoffs", ())
+    counts = Counter(handoff.status for handoff in handoffs)
+    return [
+        "| outcome | count |",
+        "| --- | ---: |",
+        f"| `qualified` | `{counts.get('qualified', 0)}` |",
+        f"| `handoff` | `{counts.get('handoff', 0)}` |",
+        f"| `no-action` | `{counts.get('no-action', 0)}` |",
     ]
 
 

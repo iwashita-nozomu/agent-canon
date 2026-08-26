@@ -135,3 +135,62 @@ def test_group_findings_keeps_owner_clause_routing_without_path_records() -> Non
     assert len(grouped) == 1
     assert grouped[0]["evidence"] == ["run-1", "run-2"]
     assert "paths" not in grouped[0]
+
+
+def _qualified_finding(**overrides: object) -> dict[str, object]:
+    record: dict[str, object] = {
+        "repository": "owner/repo",
+        "repository_confirmed": True,
+        "owner": "issue-owner",
+        "owner_confirmed": True,
+        "fix": "repair the missing route",
+        "actionable": True,
+        "durable_follow_up": True,
+        "occurrence_confirmed": True,
+        "occurrence_locations": [{"path": "tools/route.py", "locator": "route"}],
+    }
+    record.update(overrides)
+    return record
+
+
+def test_issue_worker_qualifies_confirmed_user_owned_durable_finding() -> None:
+    handoff = issue_sync.qualify_issue_worker_finding(
+        _qualified_finding(), authenticated_repository="owner/repo"
+    )
+    assert handoff.status == "qualified"
+    assert handoff.qualifies
+    assert handoff.reason == "user-owned-durable-follow-up"
+    assert handoff.occurrence_locations == ("tools/route.py::route",)
+    assert handoff.as_dict()["schema"] == issue_sync.ISSUE_WORKER_HANDOFF_SCHEMA
+
+
+def test_issue_worker_preserves_no_issue_boundary_for_transient_observations() -> None:
+    for finding in (
+        _qualified_finding(finding_kind="count"),
+        _qualified_finding(finding_kind="status"),
+        _qualified_finding(finding_kind="one-off"),
+        _qualified_finding(current_scope_resolved=True),
+        _qualified_finding(durable_follow_up=False),
+    ):
+        handoff = issue_sync.qualify_issue_worker_finding(
+            finding, authenticated_repository="owner/repo"
+        )
+        assert handoff.status == "no-action"
+
+
+def test_issue_worker_returns_no_mutation_handoff_for_other_or_unresolved_repo() -> None:
+    other = issue_sync.qualify_issue_worker_finding(
+        _qualified_finding(repository="other/repo"), authenticated_repository="owner/repo"
+    )
+    unresolved = issue_sync.qualify_issue_worker_finding(
+        _qualified_finding(repository_confirmed=False), authenticated_repository="owner/repo"
+    )
+    assert (other.status, other.reason) == ("handoff", "other-repository")
+    assert (unresolved.status, unresolved.reason) == ("handoff", "repository-unconfirmed")
+
+
+def test_issue_worker_requires_confirmed_occurrence_before_qualification() -> None:
+    handoff = issue_sync.qualify_issue_worker_finding(
+        _qualified_finding(occurrence_confirmed=False), authenticated_repository="owner/repo"
+    )
+    assert (handoff.status, handoff.reason) == ("handoff", "occurrence-unconfirmed")
