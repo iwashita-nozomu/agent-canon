@@ -96,6 +96,20 @@ def test_resident_dashboard_route_uses_target_and_private_archive(tmp_path: Path
         + "\n",
         encoding="utf-8",
     )
+    source_status_before = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=source,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    target_status_before = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=target,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
 
     try:
         installed = run_bootstrap(source, control, "install")
@@ -129,13 +143,13 @@ def test_resident_dashboard_route_uses_target_and_private_archive(tmp_path: Path
         assert (runtime / "reports/live-dashboard/dashboard.md").is_file()
         assert (runtime / "reports/live-dashboard/compact.md").is_file()
         assert not (target / "reports").exists()
-        assert not (source / "reports").exists()
-        assert not subprocess.run(
+        assert not (source / "reports/live-dashboard").exists()
+        assert subprocess.run(
             ["git", "status", "--porcelain"], cwd=target, check=True, capture_output=True, text=True
-        ).stdout
-        assert not subprocess.run(
+        ).stdout == target_status_before
+        assert subprocess.run(
             ["git", "status", "--porcelain"], cwd=source, check=True, capture_output=True, text=True
-        ).stdout
+        ).stdout == source_status_before
     finally:
         removed = run_bootstrap(source, control, "uninstall")
         assert removed.returncode == 0, removed.stdout + removed.stderr
