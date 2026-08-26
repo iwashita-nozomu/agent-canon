@@ -51,6 +51,7 @@ from packets import (  # noqa: E402
 from team_config import load_task_catalog, load_team_config, resolve_role  # noqa: E402
 from task_authority import hash_baseline_bytes  # noqa: E402
 from runtime_artifacts import RuntimeArtifactBoundary  # noqa: E402
+from checkout_identity import resolve_checkout_identity  # noqa: E402
 
 class AgentTeamTemplateTest(unittest.TestCase):
     """Verify reusable template partial expansion."""
@@ -597,12 +598,27 @@ class AgentTeamTemplateTest(unittest.TestCase):
             missing_target.owner_gate_id,
             "writer_target:required_before_spawn",
         )
+        identity = resolve_checkout_identity(PROJECT_ROOT).as_dict()
         target = WriterTarget(
             str(PROJECT_ROOT),
-            "fix/942-writer-targets",
-            "iwashita-nozomu/agent-canon",
+            identity["branch"],
+            identity["remote"],
             ("tools/agent_tools",),
         )
+        with patch(
+            "implementation_dispatch.resolve_checkout_identity",
+            side_effect=AssertionError("checkout identity must be reused"),
+        ):
+            snapshot_dispatch = dispatch_fixed_implementation(
+                request,
+                "materialize P3",
+                lambda role, prompt: "snapshot-worker",
+                workspace_root=PROJECT_ROOT,
+                writer_target=target,
+                checkout_identity=identity,
+            )
+        self.assertEqual(snapshot_dispatch.status, "spawned")
+        self.assertIn(identity["head"], snapshot_dispatch.prompt_capsule.body)
         dispatch = dispatch_fixed_implementation(
             request,
             "materialize P3",

@@ -139,7 +139,7 @@ CHECKOUT_IDENTITY_PROMPT = (
 )
 
 WRITER_TARGET_ROLE_IDS = frozenset(
-    {"worker", "spark_worker", "implementer", "integration_executor", "publisher"}
+    {"worker", "spark_worker", "implementer", "integration_executor"}
 )
 WRITER_TARGET_PROMPT = (
     "Write-capable handoffs must carry writer_target with an absolute checkout_root, "

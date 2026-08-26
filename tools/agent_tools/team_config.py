@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -172,6 +172,7 @@ class RunBundleSpec:
     decision_sufficiency_packet: dict[str, object] | None = None
     decision_sufficiency_packet_ref: str = ""
     active_design_packet: ActiveDesignPacketConfig | None = None
+    writer_targets: Mapping[str, object] = field(default_factory=dict)
 
 
 def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:

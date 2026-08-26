@@ -533,6 +533,7 @@ __all__ = (
     "recommended_initial_subagent_wave_slots",
     "recommended_dynamic_expansion_waves",
     "recommended_dynamic_expansion_wave_slots",
+    "recommended_initial_subagent_wave_slots",
     "unique_codex_agents_for_roles",
     "default_quality_check_agent_types",
     "parse_agent_type_selections",

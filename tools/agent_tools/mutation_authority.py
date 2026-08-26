@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Enforces runtime parent-orchestration-only mutation authority from authenticated child identity and scope receipts.
+# responsibility Enforces runtime parent-orchestration-only mutation authority from authenticated child identity, writer-target environment, and scope receipts.
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns parent orchestration and child write contracts.
 # upstream implementation ./workspace_scope.py owns canonical role write-scope derivation.
 # downstream implementation ../../.codex/hooks/hook_dispatcher.py applies the PreToolUse decision.
@@ -26,6 +26,7 @@ RUNTIME_ROLE_ID_ENV = "AGENT_CANON_RUNTIME_ROLE_ID"
 RUNTIME_PARENT_AGENT_ID_ENV = "AGENT_CANON_RUNTIME_PARENT_AGENT_ID"
 WRITER_CHECKOUT_ROOT_ENV = "AGENT_CANON_CHECKOUT_ROOT"
 WRITER_BRANCH_ENV = "AGENT_CANON_CHECKOUT_BRANCH"
+WRITER_ALLOWED_PATHS_ENV = "AGENT_CANON_WRITER_ALLOWED_PATHS"
 IDENTITY_RECEIPT_RELATIVE = Path("runtime") / "agent_identity.json"
 PARENT_ROLE_IDS = frozenset({"parent", "sol_parent", "manager", "manager_reviewer"})
 MUTATING_TOOLS = frozenset({"apply_patch", "python", "python3", "Bash", "bash"})
@@ -205,7 +206,13 @@ def _bash_mutation(command: str) -> tuple[bool, tuple[str, ...], str]:
             inner_mutation, inner_paths, inner_reason = _bash_mutation(inner)
             return inner_mutation, inner_paths, f"{verb}_wrapper_{inner_reason}"
         if verb in MUTATING_COMMANDS:
-            paths.extend(token for token in segment[command_index + 1 :] if not token.startswith("-"))
+            operands = [
+                token for token in segment[command_index + 1 :] if not token.startswith("-")
+            ]
+            if verb in {"cp", "mv"} and len(operands) > 1:
+                paths.append(operands[-1])
+            else:
+                paths.extend(operands)
             return True, tuple(paths), f"command_{verb}"
         if verb not in READONLY_COMMANDS:
             continue
@@ -238,10 +245,28 @@ def _writer_target_violation(
     """Return a target-boundary failure when the active writer target is set."""
     declared_root = environment.get(WRITER_CHECKOUT_ROOT_ENV, "").strip()
     declared_branch = environment.get(WRITER_BRANCH_ENV, "").strip()
-    if not declared_root and not declared_branch:
+    declared_paths = environment.get(WRITER_ALLOWED_PATHS_ENV, "").strip()
+    if not declared_root and not declared_branch and not declared_paths:
         return None
     if not declared_root or not declared_branch:
         return "writer_target_required"
+    if declared_paths:
+        try:
+            parsed_paths = json.loads(declared_paths)
+        except (TypeError, json.JSONDecodeError):
+            return "writer_target_allowed_paths_invalid"
+        if not isinstance(parsed_paths, list) or not parsed_paths:
+            return "writer_target_allowed_paths_invalid"
+        if any(
+            not isinstance(path, str)
+            or not path
+            or Path(path).is_absolute()
+            or ".." in Path(path).parts
+            or "\\" in path
+            or "//" in path
+            for path in parsed_paths
+        ):
+            return "writer_target_allowed_paths_invalid"
     target_root = Path(declared_root).expanduser()
     if not target_root.is_absolute():
         return "writer_target_checkout_root_not_absolute"
@@ -335,7 +360,56 @@ def evaluate_mutation_authority(
         return MutationAuthorityDecision("blocked", "child_spawn_evidence_missing", True, actor_id, role_id, parent_agent_id, str(identity.get("scope_digest", "")), paths, evidence_ref, command_sha)
     allowed_files = _relative_paths(identity.get("allowed_files")) or ()
     allowed_directories = _relative_paths(identity.get("allowed_directories")) or ()
-    if not paths or not all(_allowed_path(path, active_root, allowed_files, allowed_directories) for path in paths):
+    explicit_allowed = environment.get(WRITER_ALLOWED_PATHS_ENV, "").strip()
+    if explicit_allowed:
+        try:
+            parsed_allowed = json.loads(explicit_allowed)
+        except (TypeError, json.JSONDecodeError):
+            return MutationAuthorityDecision(
+                "blocked",
+                "writer_target_allowed_paths_invalid",
+                True,
+                actor_id,
+                role_id,
+                parent_agent_id,
+                str(identity.get("scope_digest", "")),
+                paths,
+                evidence_ref,
+                command_sha,
+            )
+        if not isinstance(parsed_allowed, list) or not all(
+            isinstance(path, str) and path for path in parsed_allowed
+        ):
+            return MutationAuthorityDecision(
+                "blocked",
+                "writer_target_allowed_paths_invalid",
+                True,
+                actor_id,
+                role_id,
+                parent_agent_id,
+                str(identity.get("scope_digest", "")),
+                paths,
+                evidence_ref,
+                command_sha,
+            )
+        normalized_allowed = tuple(str(path) for path in parsed_allowed)
+        allowed_files = tuple(
+            path.rstrip("/") for path in normalized_allowed if not path.endswith("/")
+        )
+        allowed_directories = tuple(
+            path.rstrip("/") for path in normalized_allowed if path.endswith("/")
+        )
+    target_metadata_only = (
+        bool(environment.get(WRITER_CHECKOUT_ROOT_ENV, "").strip())
+        and reason in {"git_commit", "git_merge", "git_rebase"}
+    )
+    if not target_metadata_only and (
+        not paths
+        or not all(
+            _allowed_path(path, active_root, allowed_files, allowed_directories)
+            for path in paths
+        )
+    ):
         return MutationAuthorityDecision("blocked", "mutation_scope_outside_child_receipt", True, actor_id, role_id, parent_agent_id, str(identity.get("scope_digest", "")), paths, evidence_ref, command_sha)
     return MutationAuthorityDecision("allowed", "child_scope_verified", True, actor_id, role_id, parent_agent_id, str(identity.get("scope_digest", "")), paths, evidence_ref, command_sha)
 

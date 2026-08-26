@@ -101,8 +101,10 @@ else:
 
 if __package__:
     from .subagent_selection import COLLABORATION_OPERATIONS
+    from .writer_target import parse_writer_target
 else:
     from subagent_selection import COLLABORATION_OPERATIONS  # type: ignore[no-redef]
+    from writer_target import parse_writer_target  # type: ignore[no-redef]
 
 if __package__:
     from .team_config import (
@@ -161,6 +163,7 @@ if __package__:
         recommended_dynamic_expansion_wave_slots,
         recommended_initial_subagent_wave,
         recommended_initial_subagent_wave_slots,
+        validate_writer_handoff_waves,
         workflow_spawn_budget,
     )
 else:
@@ -176,6 +179,7 @@ else:
         recommended_dynamic_expansion_wave_slots,
         recommended_initial_subagent_wave,
         recommended_initial_subagent_wave_slots,
+        validate_writer_handoff_waves,
         workflow_spawn_budget,
     )
 
@@ -651,6 +655,7 @@ def writer_target_policy_output_lines() -> tuple[str, ...]:
         "WRITER_TARGET_PREPARED_BY=repository-topic-clone.prepare",
         "WRITER_TARGET_COLLISION=reject_same_checkout_root_before_spawn",
         f"WRITER_TARGET_FIELDS={','.join(WRITER_TARGET_REQUIRED_FIELDS)}",
+        "WRITER_TARGET_PRETOOLUSE_ENV=AGENT_CANON_CHECKOUT_ROOT,AGENT_CANON_CHECKOUT_BRANCH,AGENT_CANON_WRITER_ALLOWED_PATHS(JSON)",
         "WRITER_TARGET_READERS=target_omitted_and_shareable",
         "WRITER_TARGET_REGISTRY=none",
     )
@@ -1503,7 +1508,11 @@ def manifest_run_lines(
         )
         lines.append("    initial_three_agent_intake_is_total_cap: false")
         lines.append("    max_write_subagents_scope: 'write-capable subagents only'")
-        initial_wave = recommended_initial_subagent_wave(
+        writer_targets = cast(
+            Mapping[str, object],
+            spec.writer_targets,
+        )
+        initial_slots = recommended_initial_subagent_wave_slots(
             spec.roles,
             active_subagents,
             spec.task_catalog,
@@ -1511,16 +1520,10 @@ def manifest_run_lines(
             _required_spec_source_root(spec) / ".codex" / "agents",
             workflow_family_id=spec.workflow_family_id,
             issue_worker_candidate=spec.issue_worker_candidate,
+            writer_targets=writer_targets,
         )
-        initial_wave_slots = recommended_initial_subagent_wave_slots(
-            spec.roles,
-            active_subagents,
-            spec.task_catalog,
-            spec.agent_type_selections,
-            _required_spec_source_root(spec) / ".codex" / "agents",
-            workflow_family_id=spec.workflow_family_id,
-            issue_worker_candidate=spec.issue_worker_candidate,
-        )
+        initial_wave_slots = initial_slots
+        initial_wave = tuple(slot.agent_type for slot in initial_slots)
         expansion_wave_slots = recommended_dynamic_expansion_wave_slots(
             spec.roles,
             active_subagents,
@@ -1530,7 +1533,13 @@ def manifest_run_lines(
             _required_spec_source_root(spec) / ".codex" / "agents",
             workflow_family_id=spec.workflow_family_id,
             issue_worker_candidate=spec.issue_worker_candidate,
+            writer_targets=writer_targets,
         )
+        if writer_targets:
+            validate_writer_handoff_waves(
+                (initial_slots, *expansion_wave_slots),
+                writer_targets,
+            )
         lines.append("  spawn_wave_recommendation:")
         lines.append(
             "    source: 'stage-ready AgentCanon wave policy filtered by workflow spawn budget'"
@@ -1578,6 +1587,16 @@ def manifest_run_lines(
             lines.append("        standard_sequence_ref: run.standard_wave_sequence")
             lines.append("        agent_types: []")
             lines.append("        role_instances: []")
+        lines.append("    writer_targets:")
+        if writer_targets:
+            for owner, raw_target in sorted(writer_targets.items()):
+                target = parse_writer_target(raw_target)  # type: ignore[arg-type]
+                lines.append(f"      - owner: {str(owner)!r}")
+                lines.append("        target:")
+                for field, value in target.as_dict().items():
+                    lines.append(f"          {field}: {value!r}")
+        else:
+            lines.append("      []")
         lines.extend(render_role_topology(workflow_family, indent="    "))
         lines.append("  delegated_spawn_policy:")
         lines.append("    dynamic_mid_task_spawn: allowed")
@@ -1652,6 +1671,7 @@ def manifest_run_lines(
         lines.append("      - write_scope")
         lines.append("      - remaining_spawn_budget")
         lines.append("      - checkout_identity")
+        lines.append("      - writer_target")
         lines.append("    handoff_optional_fields:")
         lines.append("      - decision_sufficiency_packet_ref")
         lines.append("      - unresolved_branch")
@@ -1725,6 +1745,10 @@ def manifest_run_lines(
         lines.append("    required_for: write_capable_handoffs")
         lines.append("    prepared_by: repository-topic-clone.prepare")
         lines.append("    collision: reject_same_checkout_root_before_spawn")
+        lines.append(
+            "    pretooluse_environment: "
+            "AGENT_CANON_CHECKOUT_ROOT,AGENT_CANON_CHECKOUT_BRANCH,AGENT_CANON_WRITER_ALLOWED_PATHS(JSON)"
+        )
         lines.append("    fields:")
         for field in WRITER_TARGET_REQUIRED_FIELDS:
             lines.append(f"      - {field}")
@@ -2403,7 +2427,7 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         " Carry writer_target with absolute checkout_root, fixed branch, normalized remote, "
         "and allowed_paths; start in that checkout and do not switch/checkout/rename branches "
         "or create worktrees."
-        if role.id in {"implementer", "integration_executor", "publisher"}
+        if role.id in {"implementer", "integration_executor"}
         else ""
     )
     return (
@@ -2450,7 +2474,7 @@ def compact_role_prompt_contract(
     writer_target = (
         " carry writer_target (absolute checkout_root, fixed branch, normalized remote, allowed_paths); "
         "do not switch or rename branches or create worktrees"
-        if role.id in {"implementer", "integration_executor", "publisher"}
+        if role.id in {"implementer", "integration_executor"}
         else ""
     )
     return (
@@ -2475,7 +2499,7 @@ def role_prompt_must_include(role: Role) -> tuple[str, ...]:
     common.append("checkout_identity")
     if role.write_policy.mode != "read_only":
         common.extend(("write_policy", "allowed_files_or_directories"))
-    if role.id in {"implementer", "integration_executor", "publisher"}:
+    if role.id in {"implementer", "integration_executor"}:
         common.append("writer_target")
     if role.id == "designer":
         common.extend(

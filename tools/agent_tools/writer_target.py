@@ -18,6 +18,7 @@ packet has no target and remains shareable.
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -82,6 +83,16 @@ class WriterTarget:
             "branch": self.branch,
             "remote": self.normalized_remote,
             "allowed_paths": list(self.allowed_paths),
+        }
+
+    def environment(self) -> dict[str, str]:
+        """Return the safe structured environment projection for PreToolUse."""
+        return {
+            "AGENT_CANON_CHECKOUT_ROOT": self.normalized_root,
+            "AGENT_CANON_CHECKOUT_BRANCH": self.branch,
+            "AGENT_CANON_WRITER_ALLOWED_PATHS": json.dumps(
+                list(self.allowed_paths), separators=(",", ":")
+            ),
         }
 
 

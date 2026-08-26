@@ -9,12 +9,28 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 import pytest
 
-from tools.agent_tools.implementation_dispatch import validate_writer_handoff_waves
+from tools.agent_tools.implementation_dispatch import (
+    recommended_dynamic_expansion_wave_slots,
+    recommended_initial_subagent_wave,
+    validate_writer_handoff_waves,
+    workflow_spawn_budget,
+)
 from tools.agent_tools.mutation_authority import evaluate_mutation_authority
-from tools.agent_tools.team_config import SubagentWaveSlot
+from tools.agent_tools.team_config import (
+    SubagentWaveSlot,
+    load_task_catalog,
+    load_team_config,
+    select_roles,
+)
 from tools.agent_tools.writer_target import (
     WriterTarget,
     WriterTargetError,
@@ -25,6 +41,49 @@ from tools.agent_tools.writer_target import (
 
 def target(root: str, branch: str = "fix/942") -> WriterTarget:
     return WriterTarget(root, branch, "iwashita-nozomu/agent-canon", ("tools/",))
+
+
+def write_identity(root: Path) -> None:
+    value: dict[str, object] = {
+        "schema": "agent-canon.runtime-agent-identity.v1",
+        "run_id": "run-942",
+        "agent_id": "writer-942",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-942",
+        "authority": "write_capable_child",
+        "allowed_files": ["src/owned.py"],
+        "allowed_directories": [],
+        "scope_digest": "",
+        "status": "active",
+        "receipt_sha256": "",
+    }
+    value["scope_digest"] = hashlib.sha256(
+        json.dumps(
+            {"allowed_files": value["allowed_files"], "allowed_directories": []},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+    unsigned = dict(value)
+    unsigned.pop("receipt_sha256")
+    value["receipt_sha256"] = hashlib.sha256(
+        json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    target_path = root / "runtime" / "agent_identity.json"
+    target_path.parent.mkdir()
+    target_path.write_text(json.dumps(value, sort_keys=True), encoding="utf-8")
+    (root / "spawn.json").write_text(
+        json.dumps(
+            {
+                "subagent_event_kind": "spawn",
+                "subagent_target": "writer-942",
+                "subagent_agent_type": "worker",
+                "mutation_scope_digest": value["scope_digest"],
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
 
 
 def test_shared_checkout_writer_targets_are_rejected_before_spawn() -> None:
@@ -85,6 +144,37 @@ def test_wave_materializer_allows_distinct_writer_slots() -> None:
     )[0].branch == "fix/942"
 
 
+def test_normal_stage_materializer_carries_targets_into_writer_slots() -> None:
+    config = load_team_config()
+    catalog = load_task_catalog(config)
+    roles = select_roles(
+        config,
+        ["implementer", "integration_executor"],
+        full_team=False,
+        catalog=catalog,
+        workflow_family_id="comprehensive_development",
+    )
+    active, _ = workflow_spawn_budget(catalog, "comprehensive_development")
+    initial = recommended_initial_subagent_wave(roles, active, catalog)
+    writer_targets = {
+        "implementer": target("/tmp/implementer"),
+        "integration_executor": target("/tmp/integration"),
+    }
+    waves = recommended_dynamic_expansion_wave_slots(
+        roles,
+        active,
+        initial,
+        catalog,
+        writer_targets=writer_targets,
+    )
+    writer_slots = [slot for wave in waves for slot in wave if slot.write_capable]
+    assert {slot.role_id for slot in writer_slots} == {
+        "implementer",
+        "integration_executor",
+    }
+    assert all(slot.writer_target is not None for slot in writer_slots)
+
+
 def test_identity_must_match_prepared_target() -> None:
     writer = target("/tmp/prepared")
     identity = {
@@ -123,3 +213,98 @@ def test_hook_target_blocks_foreign_checkout_and_branch_switch() -> None:
 def test_writer_target_rejects_relative_root() -> None:
     with pytest.raises(WriterTargetError, match="checkout_root_must_be_absolute"):
         target("relative/path")
+
+
+def test_pretooluse_uses_exact_structured_allowed_paths() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write_identity(root)
+        environment = {
+            **WriterTarget(
+                str(root),
+                "fix/942",
+                "iwashita-nozomu/agent-canon",
+                ("src/owned.py",),
+            ).environment(),
+            "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+            "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+            "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+        }
+        allowed = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": "touch src/owned.py"}},
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert allowed.status == "allowed"
+        escaped = evaluate_mutation_authority(
+            {"tool_name": "Bash", "tool_input": {"command": "touch README.md"}},
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert escaped.reason == "mutation_scope_outside_child_receipt"
+        commit = evaluate_mutation_authority(
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "git commit -qm update"},
+            },
+            report_dir=root,
+            active_root=root,
+            environment=environment,
+            hook_spool_root=root,
+        )
+        assert commit.status == "allowed"
+
+
+def test_bootstrap_cli_rejects_duplicate_targets_before_publishing_run() -> None:
+    with tempfile.TemporaryDirectory() as runtime:
+        duplicate_root = Path(runtime) / "shared"
+        target_json = json.dumps(
+            {
+                "implementer": {
+                    "checkout_root": str(duplicate_root),
+                    "branch": "fix/implementer",
+                    "remote": "iwashita-nozomu/agent-canon",
+                    "allowed_paths": ["tools/agent_tools/"],
+                },
+                "integration_executor": {
+                    "checkout_root": str(duplicate_root),
+                    "branch": "fix/integration",
+                    "remote": "iwashita-nozomu/agent-canon",
+                    "allowed_paths": ["agents/"],
+                },
+            },
+            separators=(",", ":"),
+        )
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).resolve().parents[2] / "tools/agent_tools/bootstrap_agent_run.py"),
+                "--task",
+                "writer target collision",
+                "--owner",
+                "codex",
+                "--task-id",
+                "T11",
+                "--enable",
+                "integration_executor",
+                "--skip-agent-canon-preflight",
+                "--no-language-review-candidates",
+                "--runtime-root",
+                runtime,
+                "--workspace-root",
+                str(Path(__file__).resolve().parents[2]),
+                "--writer-targets",
+                target_json,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "AGENT_CANON_RUNTIME_ROOT": runtime},
+        )
+        assert result.returncode == 1
+        assert "writer_target:checkout_root_collision" in result.stdout
+        assert not list(Path(runtime).glob("reports/agents/*"))

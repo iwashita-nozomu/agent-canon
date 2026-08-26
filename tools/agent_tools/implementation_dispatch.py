@@ -29,6 +29,7 @@ if __package__:
     from .writer_target import (
         WriterTarget,
         WriterTargetError,
+        parse_writer_target,
         validate_wave_writer_targets,
         validate_writer_target_identity,
     )
@@ -40,6 +41,7 @@ else:
     from writer_target import (  # type: ignore[no-redef]
         WriterTarget,
         WriterTargetError,
+        parse_writer_target,
         validate_wave_writer_targets,
         validate_writer_target_identity,
     )
@@ -94,7 +96,6 @@ WRITE_CAPABLE_ROLE_IDS = {
     "spark_worker",
     "implementer",
     "integration_executor",
-    "publisher",
 }
 
 
@@ -619,12 +620,16 @@ def dispatch_fixed_implementation(
                 ),
                 model_profile_registry.ContextItem(
                     "checkout_identity",
-                    resolve_checkout_identity(workspace_root).as_dict(),
+                    dict(checkout_identity),
                 ),
                 *(
                     (
                         model_profile_registry.ContextItem(
                             "writer_target", parsed_writer_target.as_dict()
+                        ),
+                        model_profile_registry.ContextItem(
+                            "writer_target_environment",
+                            parsed_writer_target.environment(),
                         ),
                     )
                     if parsed_writer_target is not None
@@ -664,6 +669,32 @@ def dispatch_fixed_implementation(
                     0,
                     "queued",
                 )
+        try:
+            validate_writer_handoff_waves(
+                (
+                    (
+                        SubagentWaveSlot(
+                            role_id="implementer",
+                            instance_id="fixed_spark",
+                            agent_type="spark_worker",
+                            write_capable=True,
+                            writer_target=parsed_writer_target,
+                        ),
+                    ),
+                ),
+                {"implementer": parsed_writer_target},
+            )
+        except WriterTargetError as exc:
+            return ImplementationDispatch(
+                route_result,
+                prompt,
+                None,
+                None,
+                str(exc),
+                1,
+                0,
+                "blocked",
+            )
         worker_agent_id = spawn("spark_worker", prompt.body)
         spawn_count = 1
         if not worker_agent_id:
@@ -1041,6 +1072,7 @@ def _materialize_stage_wave_slots(
     available_agents: set[str],
     used_role_ids: set[str],
     selections: dict[str, AgentTypeSelection],
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
 ) -> tuple[SubagentWaveSlot, ...]:
     """Return one default executable slot for each active role in the stage."""
     slots: list[SubagentWaveSlot] = []
@@ -1051,6 +1083,17 @@ def _materialize_stage_wave_slots(
         agent_type = _select_codex_agent_candidate(role, available_agents, selections)
         if agent_type is None:
             continue
+        target_value = None
+        if writer_targets:
+            instance_id = f"{role.id}_{agent_type}"
+            executable_identity = f"{role.id}:{instance_id}:{agent_type}"
+            target_value = writer_targets.get(
+                executable_identity,
+                writer_targets.get(role.id),
+            )
+        target = None
+        if target_value is not None:
+            target = parse_writer_target(target_value)  # type: ignore[arg-type]
         slots.append(
             SubagentWaveSlot(
                 role_id=role.id,
@@ -1060,6 +1103,7 @@ def _materialize_stage_wave_slots(
                     role.id in WRITE_CAPABLE_ROLE_IDS
                     or role.write_policy.mode not in {"read_only", "artifacts_only"}
                 ),
+                writer_target=target,
             )
         )
     return tuple(slots)
@@ -1074,6 +1118,7 @@ def _initial_stage_wave_slots(
     *,
     workflow_family_id: str | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
 ) -> tuple[SubagentWaveSlot, ...]:
     """Return intake-stage slots derived from active roles and catalog topology."""
     if active_subagents < 1:
@@ -1106,6 +1151,7 @@ def _initial_stage_wave_slots(
         available_agents,
         set(),
         selections,
+        writer_targets,
     )
     return tuple(slot for slot in slots if slot.role_id not in {"verifier", "auditor"})[
         :active_subagents
@@ -1135,6 +1181,7 @@ def recommended_initial_subagent_wave(
     *,
     workflow_family_id: str | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
 ) -> tuple[str, ...]:
     """Return executable agent_type values for active catalog intake roles."""
     return tuple(
@@ -1147,6 +1194,7 @@ def recommended_initial_subagent_wave(
             agent_root,
             workflow_family_id=workflow_family_id,
             issue_worker_candidate=issue_worker_candidate,
+            writer_targets=writer_targets,
         )
     )
 
@@ -1160,19 +1208,18 @@ def recommended_initial_subagent_wave_slots(
     *,
     workflow_family_id: str | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
 ) -> tuple[SubagentWaveSlot, ...]:
-    """Return role-aware initial-wave slots for the selected workflow."""
-    return tuple(
-        slot
-        for slot in _initial_stage_wave_slots(
-            roles,
-            active_subagents,
-            catalog,
-            agent_type_selections,
-            agent_root,
-            workflow_family_id=workflow_family_id,
-            issue_worker_candidate=issue_worker_candidate,
-        )
+    """Return role-aware initial-wave slots carrying writer targets."""
+    return _initial_stage_wave_slots(
+        roles,
+        active_subagents,
+        catalog,
+        agent_type_selections,
+        agent_root,
+        workflow_family_id=workflow_family_id,
+        issue_worker_candidate=issue_worker_candidate,
+        writer_targets=writer_targets,
     )
 
 
@@ -1186,6 +1233,7 @@ def recommended_dynamic_expansion_waves(
     *,
     workflow_family_id: str | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
 ) -> tuple[tuple[str, ...], ...]:
     """Return executable follow-up stage waves inside the active budget."""
     return tuple(
@@ -1199,6 +1247,7 @@ def recommended_dynamic_expansion_waves(
             agent_root,
             workflow_family_id=workflow_family_id,
             issue_worker_candidate=issue_worker_candidate,
+            writer_targets=writer_targets,
         )
     )
 
@@ -1213,6 +1262,7 @@ def recommended_dynamic_expansion_wave_slots(
     *,
     workflow_family_id: str | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
 ) -> tuple[tuple[SubagentWaveSlot, ...], ...]:
     """Return executable follow-up role-instance waves inside the active budget."""
     initial_slots = _initial_stage_wave_slots(
@@ -1223,6 +1273,7 @@ def recommended_dynamic_expansion_wave_slots(
         agent_root,
         workflow_family_id=workflow_family_id,
         issue_worker_candidate=issue_worker_candidate,
+        writer_targets=writer_targets,
     )
     expected_initial_wave = tuple(slot.agent_type for slot in initial_slots)
     if initial_wave != expected_initial_wave:
@@ -1246,6 +1297,7 @@ def recommended_dynamic_expansion_wave_slots(
             available_agents,
             used_role_ids,
             selections,
+            writer_targets,
         )
         stage_slots = tuple(
             slot

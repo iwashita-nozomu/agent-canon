@@ -218,7 +218,7 @@ validation route が互換なら active agent を再利用し、revision scope �
 failed context integrity の場合だけ fresh agent / wave を起こします。coordination または
 resumption が必要な場合は checkpoint と updated packet path を durable に残し、それ以外
 は structured handoff message/tool result を使います。
-writer の生成 prompt は target の `cwd` / `git_root` / `branch` / `remote` と一致する状態から開始し、`git switch`、`git checkout`、branch rename、`git worktree` を実行しません。target は handoff の値としてのみ扱い、claim、PID、expiry、daemon、writer registry は作成しません。
+workspace を変更する writer の生成 prompt は target の `cwd` / `git_root` / `branch` / `remote` と一致する状態から開始し、`git switch`、`git checkout`、branch rename、`git worktree` を実行しません。外部 GitHub publication 専用の publisher は target を持ちません。target は handoff の値としてのみ扱い、claim、PID、expiry、daemon、writer registry は作成しません。
 subagent handoff prompt には lifecycle decision と fresh-agent 条件を含めますが、
 `fresh_subagents_required: true` や `reuse_for_new_task: forbidden` を一律の機械契約には
 しません。
