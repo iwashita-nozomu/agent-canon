@@ -7,7 +7,7 @@ responsibility Defines the standalone shared AgentCanon tool container and its h
 upstream design documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
 upstream design documents/runtime/bootstrap-runtime.md user lifecycle contract
 upstream implementation bootstrap/container/Dockerfile shared tool image
-upstream implementation tools/agent_tools/bootstrap_runtime.py Host lifecycle owner
+upstream implementation tools/agent_tools/bootstrap_runtime.py container controller
 downstream implementation tests/bootstrap/test_bootstrap_runtime.py lifecycle validation
 @dependency-end
 -->
@@ -41,6 +41,23 @@ and language-server tools. It receives exact allowlisted target mounts and a
 task-scoped exchange directory; it does not receive a Docker socket, SSH agent,
 GitHub token, host home, arbitrary Git state, or a general network.
 
+`bootstrap.sh` is usable on a host with Docker and Git but without AgentCanon's
+Python dependencies. Its shell adapter uses only fixed bootstrap constants in
+`bootstrap/lib/entrypoint.sh`, builds or adopts the image, and starts the
+resident container. The controller and all structured TOML/JSON, state, tool,
+check, and eval work run through `docker exec` in that container; the
+controller has no Docker lifecycle or Docker RPC path. The writable mount is
+the credential-free `<install-root>/.runtime/container-state/`. Container-side
+target state is exported as a strict `mounts.tsv`; host Docker validates and
+applies each target row at resident replacement. Systemd and credentialed
+source/archive Git remain host operations.
+
+When the control root is the real home, host install/update records every
+managed Codex config, agent, and skill link in
+`<install-root>/.runtime/container-state/global-links.tsv`. Uninstall verifies
+the exact recorded target/source pair before removing or restoring it, so a
+foreign link with a similar source prefix remains untouched.
+
 Bootstrap treats the Docker CLI/daemon as available. It does not run Docker
 version, daemon, buildx, context, architecture, rootless, rootful, or UID/GID
 preflights. Docker command failures are returned with Docker's exit code and
@@ -61,6 +78,11 @@ per effective owner and control-root digest. Docker labels and manifest
 readback prevent a second bootstrap installation from adopting or deleting
 another installation. A matching pre-existing image tag is adopted by exact ID
 without overwrite; an unowned pre-existing image remains outside uninstall.
+After install/update/rollback readback, the exact resident `Config.Image`
+reference and immutable ID are stored in
+`<runtime-root>/host-state/active-image.tsv`. Start, status,
+target, tool, and Codex routes consume that state; only install/update/sync
+select a new candidate image reference.
 The runtime uses one image/container across registered projects; task
 separation is provided by exact target mounts and runtime-root task directories.
 

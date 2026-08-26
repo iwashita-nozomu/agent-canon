@@ -18,11 +18,32 @@ which adopts one shared, bounded tool container from the published
 multi-architecture GHCR image and then
 launches tools against explicitly registered targets.
 
-The bootstrap owns lifecycle and host adapters. The container owns Python,
+The bootstrap owns only shell/Docker/Git adapters. The container owns Python,
 Rust, and language-server tools. Project builds, product tests, GPU access,
 GitHub actions, and arbitrary host commands remain owned by the project or
 host workflow. No project-specific AgentCanon image, container, virtualenv,
 Cargo toolchain, volume, or source checkout is created.
+
+## Host/container activation boundary
+
+`bootstrap.sh` and `bootstrap/lib/entrypoint.sh` are executable by a host that
+has Docker and Git but no Python package environment. They never import or
+execute AgentCanon Python directly. Lifecycle and tool operations first build
+or adopt the image, create/start exactly one resident container with
+`--network none`, then invoke the Python controller through `docker exec`.
+
+The controller never issues Docker operations. The host shell owns the fixed
+Docker lifecycle transaction and invokes the controller only after the
+resident is healthy. Target sources are exported by the controller as a strict
+`mounts.tsv` manifest and are validated by the shell before each create. No Docker socket, host `$HOME`,
+Git credentials, or network capability is mounted into the resident. The
+credential-free `container-state` subtree is the only runtime state mount;
+host-only Docker config and archive credentials remain outside it. Systemd
+units and source synchronization remain host shell/Git operations. Sync stages
+a full-history candidate under `.runtime/source-staging/` and replaces the
+resident only after candidate image health; live source fast-forward happens
+afterward and failure restores the old resident. Product
+code verification remains in the project's own Docker test runner.
 
 ## One command family
 
@@ -90,6 +111,13 @@ create a user, pass `--user`, or validate that policy. A matching pre-existing
 image tag is adopted by exact ID without overwrite; an unowned pre-existing
 image remains outside uninstall.
 
+After install, update, or rollback readback, `host-state/active-image.tsv`
+atomically records the exact resident `Config.Image` reference and immutable
+image ID. Ordinary `start`, `status`, `target`, `tool`, and Codex routes consume
+that record; they do not recompute a source-derived image tag. Candidate image
+selection is limited to install/update/sync, and rollback may persist the
+immutable ID used to recreate the resident.
+
 `update` reads only the current AgentCanon checkout. It never fetches,
 checks out, merges, rebases, resets, or pulls Git state. Without `--image-ref`
 it performs one ordinary Docker build; with an immutable `--image-ref` it
@@ -135,9 +163,10 @@ selected runtime root and `codex launch` sets `CODEX_HOME` only for the launched
 process. Separately, with `$HOME` as explicit control root, install/update own
 split global skill and role links plus the one personal `~/.codex/config.toml`
 link described above. Existing conflicting paths fail closed; only links
-recorded as owned by this installation can be removed by `uninstall`, which
-restores the regular personal config. Start a new Codex session after an
-install or update and read back both global links and runtime-local targets.
+recorded in the strict runtime `global-links.tsv` manifest can be removed by
+`uninstall`, which restores the regular personal config. Foreign links are not
+scanned or removed. Start a new Codex session after an install or update and
+read back both global links and runtime-local targets.
 
 ## Targets, generations, and failure recovery
 

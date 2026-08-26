@@ -116,8 +116,18 @@ capability を受けた場合だけ source を変更します。
 ./bootstrap.sh --control-parent-root <path> uninstall
 ```
 
-Bootstrap は Docker が無い場合に Host Python / Cargo install へ fallback せず、
+Bootstrap はホストの Python / Cargo install へ fallback しません。Host
+`bootstrap/lib/entrypoint.sh` は Docker/Git の argv adapter だけを実行し、image を
+build/pull して resident container を起動した後、`docker exec` 経由で
+`bootstrap_runtime.py` を実行します。Docker が無い場合は Host Python を import せず
 typed `runtime_unavailable` を返します。
+
+container-side controller は Docker lifecycle を所有しません。Host shell が固定
+Docker transaction を完了してから controller を起動します。これにより container
+は Docker socket、host `$HOME`、Git credential、network を持たずに
+TOML/JSON/state/tool/check/eval を実行できます。Target は controller が
+`mounts.tsv` の strict allowlist として出力し、Host shell が scope と destination を
+検証して resident replacement の mount に反映します。
 
 ## Bootstrap Manifest
 
@@ -154,7 +164,7 @@ target = "runtime-root/codex-home/skills"
 remote = "git@github.com:iwashita-nozomu/agent-canon-log.git"
 ```
 
-`tools/agent_tools/bootstrap_runtime.py` は Docker CLI/daemon の版、daemon
+`tools/agent_tools/bootstrap_runtime.py` は container-side controller であり、Docker CLI/daemon の版、daemon
 mode、buildx、context、host architecture、rootless/rootful、UID/GID を事前
 検証しません。`DockerAdapter.run` の Docker command failure はその exit code と
 stderr を結果に残します。`bootstrap/container/Dockerfile` と
@@ -166,6 +176,11 @@ container name と label
 digest と manifest digest が一致しない adopt を拒否します。
 
 `bootstrap/manifest.toml` は current、rollback、in-use、pre-existing、gc-eligible を区別します。
+target add/remove が成功すると resident state owner は同じ
+`agent-canon.rollback-plan.v1` を `rollback_generation` の image identity と
+target mount snapshot から更新します。従って target だけが変わった世代も
+Host rollback の一つの plan で復元でき、成功後は反対方向の plan を再生成して
+同一 image の世代を切り替えられます。
 runtime/cache/archive は 80% high-water mark で GC を開始し、completed かつ
 unpinned な task/lease/cache を LRU で削除します。active、current、rollback、
 unpublished spool は削除しません。image は current/rollback の2世代、container は
@@ -277,7 +292,7 @@ argv、cwd、stdout、stderr、exit code、signal、written paths の parity fix
 作ります。`tools/fixtures/tool_dispatch/public-command-parity.json` が通らない entry は旧 route を維持し、cutover しません。全 internal
 Python file を自動的に public catalog 化しません。
 
-## Typed Host Adapter Registry
+## Shell/Container Adapter Registry
 
 Bootstrap v1 の Host adapter operation は次の enum だけです。
 
@@ -301,7 +316,10 @@ embedding.https.request
 ```
 
 Issue/PR/comment など GitHub 操作は Bootstrap の authority に含めず、Host workflow
-の GitHub owner が実行します。`tools/agent_tools/bootstrap_runtime.py` の Host operationはargv listとexact pathで実行し、shell fragmentを拒否します。
+の GitHub owner が実行します。上記の Docker/Git 操作は Host shell が実行し、
+`tools/agent_tools/bootstrap_runtime.py` は Docker argv を発行しません。Host
+entrypoint はこの Python module を resident container の `docker exec` で起動し、
+shell fragment ではなく固定された Docker argv と exact path を扱います。
 receipt は operation、digest、byte count、exitだけを
 保存し、secret、header、raw embedding payload を保存しません。
 redaction test に canary secret を渡し、stdout/stderr/receipt/eval/spool の byte scan で
@@ -334,7 +352,11 @@ dashboard、report、tmp、cache を対象にします。
 
 Bootstrap の `codex prepare` は global `$CODEX_HOME` を変更せず、明示 runtime
 root 内の `codex-home/` に skills、agents、hooks、config の verified
-manifest-managed link を作ります。加えて、control root に `$HOME` を明示した
+manifest-managed link を作ります。resident は image 内の canonical source を
+検証しますが、container-control の host projection root を使って link target を
+live AgentCanon checkout の `<install-root>/.codex/...` にします。従って host
+Codex が読む config は `CODEX_HOME/config.toml`、skills/agents はそれぞれの
+runtime-local surface から live checkout を参照します。加えて、control root に `$HOME` を明示した
 install/update は `~/.codex/personal/skills/<skill>`、`~/.codex/agents/<role>.toml`、および
 `~/.codex/config.toml` を個別に管理します。最後のリンク先は AgentCanon checkout
 内の ignored な personal source で、既存の regular config は bytes と mode を保持
@@ -365,9 +387,20 @@ discovery entry とし、project-local `AGENTS.md` は親 repository の責務�
 source HEAD、AgentCanon commit/tool digest、family status、metrics、timestamp、
 `source_tree_unchanged` を必須にします。
 
-`eval sync` はHost adapterでexternal spoolを既存archive ownerへ渡します。network /
-archive unavailable時はspoolとfailure receiptを保持し、source treeを汚しません。
-non-force push後にremote ref/tree/blob digestをreadbackしてfinalizeします。
+`eval sync` はresidentで collection と世代を検証して body-free な TSV requestだけを
+external spoolへ書き、Host shell adapterが target mount を実パスへ解決して既存の
+archive ownerへ渡します。residentからは network、credentials、archive checkoutへ
+到達できません。network / archive unavailable時はspoolとfailure receiptを保持し、
+source treeを汚しません。non-force push後にremote ref/tree/blob digestをreadbackして
+finalizeします。`exec` 成功後の private feedback sync も同じく resident は request
+だけを作り、Host shellが credentialed adapterを一度だけ実行します。
+
+`sync` のcandidate checkoutはruntimeのignored `source-staging/`でimage healthを
+確認し、live checkoutをfast-forwardするまでglobal skill/agent/config linkを投影
+しません。live fast-forward後だけlive sourceからリンクを更新し、stagingを削除
+します。rollbackは停止前にcurrent mount manifestを検証し、Hostが旧imageを作成
+した後にresident state ownerが旧target setとgeneration pointerを一つのlocked state
+更新として復元し、Hostが完全なbind mount集合をreadbackします。
 
 local bare remoteを使い、collect -> spool -> clone -> commit -> push -> fetch ->
 ref/tree/blob readback -> duplicate no-op / conflict failureをE2E testします。

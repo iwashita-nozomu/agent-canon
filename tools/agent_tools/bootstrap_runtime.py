@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract agent-runtime
-# responsibility Owns typed Host bootstrap and the shared AgentCanon tool container without implicit source writes.
+# responsibility Owns container-side TOML/JSON/state/tool/check/eval logic for
+# the shared AgentCanon tool container without implicit source writes.
 # upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
 # downstream implementation ../../bootstrap.sh fixed host entrypoint
 # downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py lifecycle validation
 # @dependency-end
-"""Host control plane for the AgentCanon tool runtime.
+"""Container control plane for the AgentCanon tool runtime.
 
-DockerAdapter is the only owner of Docker and accepts argv arrays only.
+The host-side DockerAdapter is the only owner of Docker and accepts argv arrays only.
 BootstrapRuntime owns durable state and performs state/path readback under an
-external lifecycle lock. Build results are Docker results; immutable container
-ownership and security invariants are checked once after create/adopt, while
-health polling reads only the mutable Running/Health fields.
+external lifecycle lock. The resident container never instantiates the host
+Docker lifecycle path; its control mode owns only state/tool/check/eval work.
+Build results are Docker results; immutable container ownership and security
+invariants are checked once after create/adopt, while health polling reads
+only the mutable Running/Health fields.
 """
 
 from __future__ import annotations
@@ -1122,6 +1125,27 @@ class DockerAdapter:
             raise BootstrapError(
                 "argv_required", "container exec requires a non-empty argv list"
             )
+        if os.environ.get("AGENT_CANON_CONTAINER_CONTROL") == "1":
+            # Container-side tool execution is local to the resident image.
+            # Lifecycle Docker operations are not available on this path.
+            try:
+                return subprocess.run(
+                    list(argv),
+                    cwd=cwd,
+                    env={**os.environ, **dict(environment or {})},
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=self.timeout,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise BootstrapError(
+                    "docker_command_timeout", "container tool execution timed out"
+                ) from exc
+            except OSError as exc:
+                raise BootstrapError(
+                    "tool_execution_failed", "container tool execution is unavailable"
+                ) from exc
         command = [self.executable, "exec", "--workdir", cwd]
         for key, value in sorted((environment or {}).items()):
             if key not in {
@@ -1223,6 +1247,22 @@ class DockerAdapter:
             raise BootstrapError(
                 "docker_copy_rejected", f"unsafe container export: {source}"
             )
+        if os.environ.get("AGENT_CANON_CONTAINER_CONTROL") == "1":
+            source_local = Path(source)
+            if source_local.is_symlink() or not source_local.exists():
+                raise BootstrapError("docker_copy_rejected", f"container export is missing: {source}")
+            destination_resolved = destination.resolve(strict=False)
+            allowed_resolved = allowed_root.resolve()
+            if destination_resolved != allowed_resolved and allowed_resolved not in destination_resolved.parents:
+                raise BootstrapError(
+                    "docker_copy_rejected", f"export destination escapes runtime: {destination}"
+                )
+            if source_local.is_dir():
+                shutil.copytree(source_local, destination, dirs_exist_ok=False)
+            else:
+                _ensure_directory(destination.parent)
+                shutil.copy2(source_local, destination)
+            return
         destination_resolved = destination.resolve(strict=False)
         allowed_resolved = allowed_root.resolve()
         if destination_resolved != allowed_resolved and allowed_resolved not in destination_resolved.parents:
@@ -1343,7 +1383,9 @@ class BootstrapRuntime:
         self.manifest_path = _manifest_path(self.repository_root, manifest_path)
         self.manifest, policy_digest = load_manifest(self.manifest_path)
         self.manifest_digest = policy_digest
-        self.control_digest = sha256_text(str(control))
+        self.control_digest = os.environ.get(
+            "AGENT_CANON_CONTROL_ROOT_DIGEST", sha256_text(str(control))
+        )
         self.docker = docker or DockerAdapter(
             os.environ.get("AGENT_CANON_DOCKER", "docker"),
             timeout=int(self.manifest["container"]["task_timeout_seconds"]),
@@ -1374,6 +1416,11 @@ class BootstrapRuntime:
     def _global_home_scope(self) -> bool:
         """Return whether global projection is explicitly bound to the real HOME."""
         return self.paths.control_parent_root == Path.home().resolve()
+
+    @staticmethod
+    def _container_control() -> bool:
+        """Return whether this controller is running behind the host adapter."""
+        return os.environ.get("AGENT_CANON_CONTAINER_CONTROL") == "1"
 
     @property
     def default_runtime_root(self) -> bool:
@@ -1415,15 +1462,23 @@ class BootstrapRuntime:
             os.close(fd)
         elif self.paths.lock.is_symlink():
             raise BootstrapError("symlink_path_rejected", "lifecycle lock is a symlink")
-        private_log = self.paths.control_parent_root / "agent-canon-log"
+        private_log = self.paths.control_parent_root / (
+            "private-log" if self._container_control() else "agent-canon-log"
+        )
         if private_log.exists() and private_log.is_symlink():
             raise BootstrapError("symlink_path_rejected", "private log checkout is a symlink")
         if not private_log.exists():
+            if self._container_control():
+                raise BootstrapError(
+                    "private_log_mount_invalid",
+                    "resident container is missing the host-owned private log mount",
+                )
             try:
                 private_log.mkdir(mode=0o700)
             except OSError as exc:
                 raise BootstrapError("private_log_mount_invalid", "cannot create private log mount") from exc
-        self._enforce_private_directory(private_log)
+        if not self._container_control():
+            self._enforce_private_directory(private_log)
 
     def _enforce_private_directory(self, path: Path) -> None:
         """Make an owned Host control directory private and verify readback."""
@@ -1668,6 +1723,9 @@ class BootstrapRuntime:
         )
 
     def _image_tag(self) -> str:
+        container_image = os.environ.get("AGENT_CANON_IMAGE_REF")
+        if self._container_control() and container_image:
+            return container_image
         return (
             f"agent-canon-tools:{self.control_digest[:16]}-"
             f"{self.manifest_digest[:16]}"
@@ -1680,9 +1738,11 @@ class BootstrapRuntime:
         }
 
     def _resource_records(self) -> dict[str, Any]:
-        name = str(self.manifest["container"]["name_template"]).replace(
-            "<effective-uid>", self.control_digest[:16]
-        )
+        name = os.environ.get("AGENT_CANON_CONTAINER_NAME") if self._container_control() else None
+        if not name:
+            name = str(self.manifest["container"]["name_template"]).replace(
+                "<effective-uid>", self.control_digest[:16]
+            )
         return {
             "image": {
                 "id": None,
@@ -1766,6 +1826,7 @@ class BootstrapRuntime:
             bool(previous.get("owned"))
             if previous.get("id")
             else bool(self.docker.last_image_created)
+            or os.environ.get("AGENT_CANON_IMAGE_OWNED") == "1"
         )
         resources["image"] = {
             "id": image_id,
@@ -1909,21 +1970,32 @@ class BootstrapRuntime:
     def _mounts(self, targets: Mapping[str, Mapping[str, Any]]) -> list[dict[str, str]]:
         mounts = [
             {
-                "source": str(self.paths.container_runtime),
+                "source": str(
+                    self.paths.runtime_root
+                    if self._container_control()
+                    else self.paths.container_runtime
+                ),
                 "destination": CONTAINER_RUNTIME_DESTINATION,
                 "mode": "explicit-target-write",
             },
             {
-                "source": str(self.paths.mounts),
-                "destination": REGISTRY_DESTINATION,
-                "mode": "read-only",
-            },
-            {
-                "source": str(self.paths.control_parent_root / "agent-canon-log"),
+                "source": str(
+                    self.paths.control_parent_root
+                    / ("private-log" if self._container_control() else "agent-canon-log")
+                ),
                 "destination": PRIVATE_LOG_DESTINATION,
                 "mode": "read-only",
             },
         ]
+        if not self._container_control():
+            mounts.insert(
+                1,
+                {
+                    "source": str(self.paths.mounts),
+                    "destination": REGISTRY_DESTINATION,
+                    "mode": "read-only",
+                },
+            )
         for digest, record in sorted(targets.items()):
             mounts.append(
                 {
@@ -2017,7 +2089,7 @@ class BootstrapRuntime:
             )
         observed_id = _required_string(record.get("Id"), "container.Id")
         expected_id = state.get("resources", {}).get("container", {}).get("id")
-        if expected_id and observed_id != expected_id:
+        if expected_id and observed_id != expected_id and not self._container_control():
             raise BootstrapError(
                 "docker_readback_invalid", "container ID differs from state"
             )
@@ -2103,6 +2175,20 @@ class BootstrapRuntime:
                 if Path(source).is_absolute()
                 else source
             )
+            if self._container_control():
+                host_runtime = os.environ.get("AGENT_CANON_HOST_STATE_ROOT")
+                host_private_log = os.environ.get("AGENT_CANON_HOST_PRIVATE_LOG")
+                if host_runtime and normalized_source == str(Path(host_runtime).resolve()):
+                    normalized_source = str(Path("/var/lib/agent-canon/runtime"))
+                elif host_runtime and normalized_source.startswith(
+                    str(Path(host_runtime).resolve()) + "/"
+                ):
+                    relative = normalized_source.removeprefix(
+                        str(Path(host_runtime).resolve()) + "/"
+                    )
+                    normalized_source = f"/var/lib/agent-canon/runtime/{relative}"
+                elif host_private_log and normalized_source == str(Path(host_private_log).resolve()):
+                    normalized_source = str(Path("/var/lib/agent-canon/private-log"))
             observed_mounts.add(
                 (normalized_source, str(mount.get("Destination")), mode)
             )
@@ -2153,6 +2239,8 @@ class BootstrapRuntime:
         self, state: Mapping[str, Any], container_id: str
     ) -> None:
         """Verify registry content visible through the container bind mount."""
+        if self._container_control():
+            return
         expected = _safe_read(self.paths.mounts, field="mount registry")
         result = self.docker.exec_container(
             container_id, cwd="/", argv=["cat", REGISTRY_DESTINATION]
@@ -2476,11 +2564,12 @@ class BootstrapRuntime:
             self._prepare_legacy_runtime_reset()
             result = self._install_locked(image_ref)
         self.codex_prepare()
-        try:
-            self.scheduler_enable()
-        except BootstrapError as exc:
-            if exc.code != "systemd_user_unavailable":
-                raise
+        if not self._container_control():
+            try:
+                self.scheduler_enable()
+            except BootstrapError as exc:
+                if exc.code != "systemd_user_unavailable":
+                    raise
         self._finalize_legacy_runtime_reset()
         return result
 
@@ -2695,6 +2784,7 @@ class BootstrapRuntime:
                     STATE_FILE,
                     OWNER_FILE,
                     "mounts.toml",
+                    "mounts.tsv",
                     *KNOWN_SUBDIRS,
                     CONTAINER_RUNTIME_DIR,
                 ]
@@ -2748,6 +2838,11 @@ class BootstrapRuntime:
         c = resources.setdefault("container", self._resource_records()["container"])
         name = str(c["name"])
         existing = self.docker.inspect_container(c.get("id") or name)
+        if existing is None and self._container_control():
+            # The host adapter may have replaced the resident before invoking
+            # this controller. Re-adopt the exact name when the old ID is
+            # naturally stale; never enumerate or claim another container.
+            existing = self.docker.inspect_container(name)
         if existing is not None:
             labels = (
                 existing.get("Config", {}).get("Labels", {})
@@ -3073,6 +3168,29 @@ class BootstrapRuntime:
             ]
         _atomic_bytes(self.paths.mounts, "\n".join(lines).encode("utf-8"), mode=0o444)
 
+    def _write_mount_manifest(self, state: Mapping[str, Any]) -> None:
+        """Write the strict host-readable target mount manifest."""
+        path = self.paths.runtime_root / "mounts.tsv"
+        lines: list[str] = []
+        targets = state.get("targets", {})
+        if isinstance(targets, Mapping):
+            for digest, record in sorted(targets.items()):
+                if not isinstance(record, Mapping):
+                    continue
+                source = record.get("host_root")
+                mode = record.get("mode")
+                if not isinstance(source, str) or not isinstance(mode, str):
+                    continue
+                if any(char in source or char in str(digest) for char in ("\t", "\n", "\r")):
+                    raise BootstrapError("mount_manifest_invalid", "target mount contains a control character")
+                if mode != "read-only":
+                    raise BootstrapError(
+                        "mount_manifest_invalid",
+                        "only read-only targets may be projected into the resident mount manifest",
+                    )
+                lines.append(f"target\t{digest}\t{source}\t/targets/{digest}\tread-only")
+        _atomic_bytes(path, ("\n".join(lines) + ("\n" if lines else "")).encode("utf-8"))
+
     def target_add(
         self,
         root: Path,
@@ -3237,6 +3355,10 @@ class BootstrapRuntime:
                 "task_capacity_exhausted", "max parallel task slots are reserved"
             )
         target = self._target_record(target_root, "read-only") if target_root else None
+        if target and self._container_control():
+            target_digest = os.environ.get("AGENT_CANON_TARGET_DIGEST")
+            if target_digest and target_digest in state.get("targets", {}):
+                target = state["targets"][target_digest]
         if target and target["digest"] not in state.get("targets", {}):
             raise BootstrapError(
                 "target_not_registered",
@@ -3329,6 +3451,9 @@ class BootstrapRuntime:
 
     def _materialize_skill_view(self) -> dict[str, Any]:
         """Generate the ignored project-local skill view before image/link use."""
+        if self._container_control():
+            self._validate_source_adapters()
+            return {"mode": "image-owned", "materialized": False}
         tools_root = self.repository_root / "tools" / "agent_tools"
         if str(tools_root) not in sys.path:
             sys.path.insert(0, str(tools_root))
@@ -3736,6 +3861,29 @@ class BootstrapRuntime:
         }
 
     def _managed_links(self) -> list[dict[str, str]]:
+        projection_root: Path | None = None
+        if self._container_control():
+            raw_projection_root = os.environ.get("AGENT_CANON_HOST_INSTALL_ROOT", "").strip()
+            if raw_projection_root:
+                if not raw_projection_root.startswith("/") or any(
+                    character in raw_projection_root for character in "\x00\t\n\r"
+                ):
+                    raise BootstrapError(
+                        "codex_projection_root_invalid",
+                        "host install root must be an absolute path without controls",
+                    )
+                projection_root = Path(raw_projection_root)
+
+        def projection_source(source: Path) -> Path:
+            """Map an image-owned source to its corresponding host checkout."""
+            if projection_root is None:
+                return source
+            try:
+                relative = source.relative_to(self.repository_root)
+            except ValueError:
+                return source
+            return projection_root / relative
+
         entries: list[dict[str, str]] = []
         for surface, source in (
             ("skills", self.repository_root / ".codex" / "personal" / "skills"),
@@ -3747,7 +3895,8 @@ class BootstrapRuntime:
                 entries.append(
                     {
                         "surface": surface,
-                        "source": str(source),
+                        "source": str(projection_source(source)),
+                        "validation_source": str(source),
                         "relative": source.name,
                         "digest": sha256_bytes(
                             _safe_read(source, field="Codex source")
@@ -3760,7 +3909,8 @@ class BootstrapRuntime:
                         entries.append(
                             {
                                 "surface": surface,
-                                "source": str(path),
+                                "source": str(projection_source(path)),
+                                "validation_source": str(path),
                                 "relative": str(path.relative_to(source)),
                                 "digest": sha256_bytes(
                                     _safe_read(path, field="Codex source")
@@ -3792,8 +3942,15 @@ class BootstrapRuntime:
             state = self._read_state()
             _ensure_directory(self.paths.codex_home)
             desired = self._managed_links()
+
+            def link_target(entry: Mapping[str, Any]) -> Path:
+                """Return the path Codex actually reads for one surface."""
+                if entry.get("surface") == "config":
+                    return self.paths.codex_home / str(entry["relative"])
+                return self.paths.codex_home / str(entry["surface"]) / str(entry["relative"])
+
             desired_targets = {
-                str(self.paths.codex_home / entry["surface"] / entry["relative"])
+                str(link_target(entry))
                 for entry in desired
             }
             previous_entries: list[Mapping[str, Any]] = []
@@ -3806,6 +3963,15 @@ class BootstrapRuntime:
                 raw_previous = previous_payload.get("links", []) if isinstance(previous_payload, dict) else []
                 if isinstance(raw_previous, list):
                     previous_entries = [entry for entry in raw_previous if isinstance(entry, dict)]
+            previous_sources = {
+                str(
+                    Path(str(entry["target"]))
+                    if entry.get("target")
+                    else link_target(entry)
+                ): entry
+                for entry in previous_entries
+                if entry.get("managed") is True
+            }
             stale_links: list[str] = []
             for entry in previous_entries:
                 target = Path(str(entry.get("target", "")))
@@ -3817,18 +3983,33 @@ class BootstrapRuntime:
                     stale_links.append(str(target))
             links: list[dict[str, Any]] = []
             for entry in desired:
-                target = self.paths.codex_home / entry["surface"] / entry["relative"]
+                target = link_target(entry)
                 _ensure_directory(target.parent)
                 if target.exists() or target.is_symlink():
                     if (
                         not target.is_symlink()
                         or target.resolve() != Path(entry["source"]).resolve()
                     ):
-                        raise BootstrapError(
-                            "skill_collision",
-                            f"managed Codex target already exists: {target}",
+                        previous = previous_sources.get(str(target))
+                        previous_source = (
+                            Path(str(previous.get("source", "")))
+                            if previous is not None
+                            else None
                         )
-                    created = False
+                        if (
+                            previous_source is None
+                            or not target.is_symlink()
+                            or target.resolve() != previous_source.resolve()
+                        ):
+                            raise BootstrapError(
+                                "skill_collision",
+                                f"managed Codex target already exists: {target}",
+                            )
+                        target.unlink()
+                        target.symlink_to(entry["source"])
+                        created = True
+                    else:
+                        created = False
                 else:
                     target.symlink_to(entry["source"])
                     created = True
@@ -3844,7 +4025,9 @@ class BootstrapRuntime:
                 self.paths.codex_home / "manifest.json",
                 {
                     "schema": SCHEMA_SKILLS,
-                    "source_root": str(self.repository_root),
+                    "source_root": str(
+                        os.environ.get("AGENT_CANON_HOST_INSTALL_ROOT", self.repository_root)
+                    ),
                     "manifest_digest": self.manifest_digest,
                     "stale_links_removed": stale_links,
                     "links": links,
@@ -3905,6 +4088,14 @@ class BootstrapRuntime:
 
     def _host_private_feedback_sync(self) -> dict[str, Any] | None:
         """Publish a container-created private sync request on the host."""
+        if self._container_control():
+            # A resident has no credentials, network, or host archive checkout.
+            # The shell adapter consumes the body-free request after this
+            # command returns; never invoke the host Git helper here.
+            return {
+                "execution_plane": "host_archive_adapter",
+                "status": "deferred",
+            }
         # The container's /var/lib/agent-canon/runtime is the existing
         # container-runtime bind mount.  Keep request discovery and adapter
         # consumption on that one host-side path; the control runtime root is
@@ -3972,6 +4163,13 @@ class BootstrapRuntime:
         target = self._target_record(root, "read-only")
         with self.locked():
             state = self._read_state()
+            target_digest = (
+                os.environ.get("AGENT_CANON_TARGET_DIGEST")
+                if self._container_control()
+                else target["digest"]
+            )
+            if target_digest and target_digest in state.get("targets", {}):
+                target = state["targets"][target_digest]
             if target["digest"] not in state.get("targets", {}):
                 raise BootstrapError(
                     "target_not_registered", "exec root is not registered"
@@ -3988,7 +4186,16 @@ class BootstrapRuntime:
             task_id = f"exec-{secrets.token_hex(6)}"
             self._admit_task_locked(state, task_id, target_root=root)
             try:
-                c = self._ensure_container(state, start=True)
+                c = (
+                    {"id": os.environ.get("AGENT_CANON_CONTAINER_ID")}
+                    if self._container_control()
+                    else self._ensure_container(state, start=True)
+                )
+                if not c.get("id"):
+                    raise BootstrapError(
+                        "container_control_missing_identity",
+                        "resident container identity was not provided",
+                    )
                 environment = {
                     "AGENT_CANON_TARGET_ROOT": f"/targets/{target['digest']}",
                     "AGENT_CANON_TASK_ROOT": f"/targets/{target['digest']}",
@@ -4077,30 +4284,36 @@ class BootstrapRuntime:
                         },
                     )
                 if len(argv) >= 3 and argv[0] == "agent-canon" and argv[1] in {"knowledge", "k", "feedback", "f"} and argv[2] == "sync":
-                    try:
-                        details["private_feedback_sync"] = self._host_private_feedback_sync()
-                    except BootstrapError as exc:
+                    if self._container_control():
                         details["private_feedback_sync"] = {
                             "execution_plane": "host_archive_adapter",
-                            "status": "error",
-                            "code": exc.code,
+                            "status": "deferred",
                         }
-                        failure_receipt = self._result(
-                            self._receipt(
-                                "exec",
-                                "error",
-                                exc.code,
-                                before="running",
-                                after="running",
-                                details=details,
-                                state=state,
+                    else:
+                        try:
+                            details["private_feedback_sync"] = self._host_private_feedback_sync()
+                        except BootstrapError as exc:
+                            details["private_feedback_sync"] = {
+                                "execution_plane": "host_archive_adapter",
+                                "status": "error",
+                                "code": exc.code,
+                            }
+                            failure_receipt = self._result(
+                                self._receipt(
+                                    "exec",
+                                    "error",
+                                    exc.code,
+                                    before="running",
+                                    after="running",
+                                    details=details,
+                                    state=state,
+                                )
                             )
-                        )
-                        raise BootstrapError(
-                            exc.code,
-                            exc.detail,
-                            evidence={**exc.evidence, "receipt_path": failure_receipt["receipt_path"]},
-                        ) from exc
+                            raise BootstrapError(
+                                exc.code,
+                                exc.detail,
+                                evidence={**exc.evidence, "receipt_path": failure_receipt["receipt_path"]},
+                            ) from exc
                 return self._result(
                     self._receipt(
                         "exec",
@@ -4141,7 +4354,12 @@ class BootstrapRuntime:
                 target = next(iter(targets.values()))
             else:
                 requested = self._target_record(root, "read-only")
-                target = targets.get(requested["digest"])
+                requested_digest = (
+                    os.environ.get("AGENT_CANON_TARGET_DIGEST")
+                    if self._container_control()
+                    else requested["digest"]
+                )
+                target = targets.get(requested_digest)
                 if not isinstance(target, dict):
                     raise BootstrapError(
                         "target_not_registered", "tool run root is not registered"
@@ -4219,7 +4437,11 @@ class BootstrapRuntime:
             "source_head_before": before_source["head"],
             "source_git_status_before": before_source["git_status"],
             "source_tree_digest_before": before_source["tree_digest"],
-            "agent_canon_commit": _source_snapshot(self.repository_root)["head"],
+            "agent_canon_commit": (
+                os.environ.get("AGENT_CANON_SOURCE_HEAD")
+                if self._container_control()
+                else _source_snapshot(self.repository_root)["head"]
+            ),
             "manifest_digest": self.manifest_digest,
             "tool_image_digest": None,
             "exchange_nonce": exchange_nonce,
@@ -4255,7 +4477,16 @@ class BootstrapRuntime:
                     raise BootstrapError(
                         "eval_exchange_invalid", "eval exchange mode mismatch"
                     )
-                container = self._ensure_container(state, start=True)
+                container = (
+                    {"id": os.environ.get("AGENT_CANON_CONTAINER_ID")}
+                    if self._container_control()
+                    else self._ensure_container(state, start=True)
+                )
+                if not container.get("id"):
+                    raise BootstrapError(
+                        "container_control_missing_identity",
+                        "resident container identity was not provided",
+                    )
                 image = state.get("resources", {}).get("image", {})
                 collection["tool_image_digest"] = image.get("id")
                 target_path = f"/targets/{target['digest']}"
@@ -4604,6 +4835,79 @@ class BootstrapRuntime:
                 before=None,
                 after=None,
                 details=details,
+                state=state,
+            )
+        )
+
+    def eval_sync_prepare(self, run_id: str) -> dict[str, Any]:
+        """Prepare a body-free eval publication request for the Host adapter.
+
+        The resident validates the collection and records only fixed metadata.
+        The credentialed archive clone, Git network, and publication transaction
+        remain exclusively on the host side of the bootstrap boundary.
+        """
+        _slug(run_id)
+        spool = self.paths.runtime_root / "spool" / run_id
+        if not spool.is_dir() or spool.is_symlink():
+            raise BootstrapError("eval_spool_missing", f"eval spool does not exist: {run_id}")
+        collection_path = spool / "collection.json"
+        try:
+            collection = json.loads(
+                _safe_read(collection_path, field="eval collection").decode("utf-8")
+            )
+        except (BootstrapError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise BootstrapError("eval_collection_invalid", f"invalid eval collection: {run_id}") from exc
+        if not isinstance(collection, dict) or collection.get("run_id") != run_id:
+            raise BootstrapError("eval_collection_invalid", "eval collection run id mismatch")
+        if (
+            collection.get("status") != "collected"
+            or collection.get("source_tree_unchanged") is not True
+        ):
+            raise BootstrapError(
+                "eval_collection_failed",
+                "only a successful source-unchanged collection may be published",
+            )
+        with self.locked():
+            state = self._read_state(allow_manifest_drift=True)
+        if collection.get("manifest_digest") != state.get("manifest_digest"):
+            raise BootstrapError(
+                "eval_collection_generation_mismatch",
+                "eval collection is not bound to the installed runtime generation",
+            )
+        source_root = collection.get("source_repository")
+        target_digest = os.environ.get("AGENT_CANON_TARGET_DIGEST", "")
+        if not isinstance(source_root, str) or not source_root.startswith("/"):
+            raise BootstrapError("eval_collection_invalid", "eval source root is not absolute")
+        if any(character in source_root for character in "\x00\t\n\r"):
+            raise BootstrapError("eval_collection_invalid", "eval source root contains a control character")
+        if not target_digest and source_root.startswith("/targets/"):
+            target_digest = source_root.removeprefix("/targets/")
+        if target_digest and not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", target_digest):
+            raise BootstrapError("eval_collection_invalid", "eval target digest is invalid")
+        request_path = spool / "sync-request.tsv"
+        if request_path.is_symlink():
+            raise BootstrapError("eval_sync_request_invalid", "eval sync request is a symlink")
+        lines = [
+            "schema\tagent-canon.eval-sync-request.v1",
+            "operation\tsync",
+            "execution-plane\tagentcanon_tool_container",
+            f"run-id\t{run_id}",
+            f"target-digest\t{target_digest}",
+            f"source-root\t{source_root}",
+        ]
+        _atomic_bytes(request_path, ("\n".join(lines) + "\n").encode("utf-8"), mode=0o600)
+        return self._result(
+            self._receipt(
+                "eval_sync",
+                "ok",
+                "host_archive_requested",
+                before=None,
+                after=None,
+                details={
+                    "execution_plane": "host_archive_adapter",
+                    "status": "requested",
+                    "run_id": run_id,
+                },
                 state=state,
             )
         )
@@ -4975,6 +5279,514 @@ def _runtime_from_args(args: argparse.Namespace) -> BootstrapRuntime:
     )
 
 
+def _container_resource_state(runtime: BootstrapRuntime) -> dict[str, Any]:
+    """Build lifecycle resources from host readback passed at exec time."""
+    resources = runtime._resource_records()
+    image = resources["image"]
+    container = resources["container"]
+    image_id = os.environ.get("AGENT_CANON_IMAGE_ID")
+    container_id = os.environ.get("AGENT_CANON_CONTAINER_ID")
+    if image_id:
+        image.update({"id": image_id, "state": "present", "owned": True})
+    if container_id:
+        container.update({"id": container_id, "state": "running", "owned": True})
+    return resources
+
+
+def _container_target_generation(
+    state: dict[str, Any], targets: Mapping[str, Any]
+) -> None:
+    """Record a target change through the normal current/rollback snapshot owner."""
+    image = state.get("resources", {}).get("image", {})
+    image_snapshot = {
+        "image_id": image.get("id"),
+        "image_ref": image.get("tag"),
+    }
+    old_generation = state.get("current_generation")
+    state["generation_counter"] = int(state.get("generation_counter", 0)) + 1
+    generation = f"generation-{state['generation_counter']}"
+    if old_generation:
+        previous_targets = json.loads(_json(state.get("targets", {})))
+        state.setdefault("generations", {})[str(old_generation)] = {
+            **image_snapshot,
+            "targets": previous_targets,
+            "state": "rollback",
+        }
+    new_targets = json.loads(_json(dict(targets)))
+    state.setdefault("generations", {})[generation] = {
+        **image_snapshot,
+        "targets": new_targets,
+        "state": "current",
+    }
+    state["targets"] = new_targets
+    state["current_generation"] = generation
+    state["rollback_generation"] = old_generation
+
+
+def _container_materialize_rollback_plan(
+    runtime: BootstrapRuntime, state: Mapping[str, Any]
+) -> None:
+    """Materialize the one strict rollback plan from the active snapshots.
+
+    This is state-only: Docker tags and host mount creation remain owned by
+    the shell adapter.  The target source paths are carried as opaque host
+    metadata and are revalidated by the host when the plan is consumed.
+    """
+    plan = runtime.paths.runtime_root / "rollback-plan.tsv"
+    rollback_id = state.get("rollback_generation")
+    generations = state.get("generations", {})
+    if not isinstance(rollback_id, str) or not isinstance(generations, Mapping):
+        if plan.exists() or plan.is_symlink():
+            if plan.is_symlink():
+                raise BootstrapError("rollback_plan_invalid", "rollback plan is a symlink")
+            plan.unlink()
+        return
+    previous = generations.get(rollback_id)
+    resources = state.get("resources", {})
+    image = resources.get("image", {}) if isinstance(resources, Mapping) else {}
+    if not isinstance(previous, Mapping):
+        raise BootstrapError("rollback_plan_invalid", "rollback generation is unavailable")
+    image_id = previous.get("image_id") or image.get("id")
+    image_ref = previous.get("image_ref") or image.get("tag") or image_id
+    if (
+        not isinstance(image_id, str)
+        or not image_id.startswith("sha256:")
+        or not isinstance(image_ref, str)
+        or not image_ref
+        or any(character in image_ref for character in "\x00\t\n\r")
+    ):
+        raise BootstrapError("rollback_plan_invalid", "rollback image identity is incomplete")
+    targets = previous.get("targets", {})
+    if not isinstance(targets, Mapping):
+        raise BootstrapError("rollback_plan_invalid", "rollback target snapshot is invalid")
+    lines = [
+        "schema\tagent-canon.rollback-plan.v1",
+        f"image-id\t{image_id}",
+        f"image-ref\t{image_ref}",
+    ]
+    for digest, record in sorted(targets.items()):
+        if not isinstance(digest, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", digest):
+            raise BootstrapError("rollback_plan_invalid", "rollback target digest is invalid")
+        if not isinstance(record, Mapping):
+            raise BootstrapError("rollback_plan_invalid", "rollback target record is invalid")
+        source = record.get("host_root")
+        destination = record.get("root", f"/targets/{digest}")
+        mode = record.get("mode")
+        if (
+            not isinstance(source, str)
+            or not source.startswith("/")
+            or any(character in source for character in "\x00\t\n\r")
+            or destination != f"/targets/{digest}"
+            or mode != "read-only"
+        ):
+            raise BootstrapError("rollback_plan_invalid", "rollback target mount is invalid")
+        lines.append(f"mount\tmount\t{source}\t{destination}\ttrue")
+    _atomic_bytes(plan, ("\n".join(lines) + "\n").encode("utf-8"), mode=0o600)
+
+
+def _container_target_manifest(
+    runtime: BootstrapRuntime,
+    path: Path,
+    *,
+    missing_code: str,
+    invalid_code: str,
+) -> dict[str, Any]:
+    """Read one host-provided target set without touching Docker.
+
+    The rollback manifest is a deliberately small TSV exchange.  The resident
+    cannot see host source paths, so it validates only the fixed schema and
+    carries those paths forward as opaque mount-source metadata; the host
+    adapter performs source existence/scope checks before creating a container.
+    """
+    if path.is_symlink() or not path.is_file():
+        raise BootstrapError(
+            missing_code,
+            "host did not provide the requested target mount manifest",
+        )
+    targets: dict[str, Any] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise BootstrapError(
+            invalid_code,
+            "target mount manifest is unreadable",
+        ) from exc
+    for line_number, line in enumerate(lines, start=1):
+        fields = line.split("\t")
+        if len(fields) != 5:
+            raise BootstrapError(
+                invalid_code,
+                f"previous target mount row {line_number} is not TSV",
+            )
+        kind, digest, source, destination, mode = fields
+        if (
+            kind != "target"
+            or not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", digest)
+            or not source.startswith("/")
+            or any(character in source for character in "\x00\n\r")
+            or destination != f"/targets/{digest}"
+            or mode != "read-only"
+            or digest in targets
+        ):
+            raise BootstrapError(
+                invalid_code,
+                f"previous target mount row {line_number} is invalid",
+            )
+        targets[digest] = {
+            "digest": digest,
+            "host_root": source,
+            "root": destination,
+            "mode": mode,
+        }
+    return targets
+
+
+def _container_previous_target_manifest(runtime: BootstrapRuntime) -> dict[str, Any]:
+    """Read the host-provided previous target set without touching Docker."""
+    return _container_target_manifest(
+        runtime,
+        runtime.paths.runtime_root / "rollback-mounts.tsv",
+        missing_code="rollback_target_manifest_missing",
+        invalid_code="rollback_target_manifest_invalid",
+    )
+
+
+def _container_restore_target_manifest(
+    runtime: BootstrapRuntime,
+) -> dict[str, Any] | None:
+    """Read an optional target set used only when a rollback must recover."""
+    raw_path = os.environ.get("AGENT_CANON_RESTORE_TARGETS_FILE", "")
+    if not raw_path:
+        return None
+    return _container_target_manifest(
+        runtime,
+        Path(raw_path),
+        missing_code="restore_target_manifest_missing",
+        invalid_code="restore_target_manifest_invalid",
+    )
+
+
+def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
+    """Apply only state/tool-plane operations after host Docker activation."""
+    runtime = _runtime_from_args(args)
+    operation = args.operation
+    if operation in {"install", "update", "start", "stop", "uninstall"}:
+        with runtime.locked():
+            state = runtime._read_state(allow_manifest_drift=True)
+            before = str(state.get("state"))
+            resources = state.setdefault("resources", _container_resource_state(runtime))
+            resources.update(_container_resource_state(runtime))
+            if operation == "install":
+                state["state"] = "ready"
+                state["managed_paths"] = [
+                    STATE_FILE,
+                    OWNER_FILE,
+                    "mounts.toml",
+                    "mounts.tsv",
+                    *KNOWN_SUBDIRS,
+                    CONTAINER_RUNTIME_DIR,
+                ]
+            elif operation == "update":
+                state["state"] = "ready"
+                previous_image_id = os.environ.get("AGENT_CANON_PREVIOUS_IMAGE_ID")
+                if previous_image_id:
+                    state["previous_image_id"] = previous_image_id
+                    previous_generation = str(
+                        state.get("current_generation") or f"generation-{previous_image_id[7:19]}"
+                    )
+                    current_generation = f"generation-{resources['image']['id'][7:19]}"
+                    state.setdefault("generations", {})[previous_generation] = {
+                        "image_id": previous_image_id,
+                        "image_ref": os.environ.get("AGENT_CANON_PREVIOUS_IMAGE_REF"),
+                        "state": "rollback",
+                    }
+                    state.setdefault("generations", {})[current_generation] = {
+                        "image_id": resources["image"]["id"],
+                        "image_ref": resources["image"].get("tag"),
+                        "state": "current",
+                    }
+                    state["rollback_generation"] = previous_generation
+                    state["current_generation"] = current_generation
+            elif operation == "start":
+                state["state"] = "ready"
+            elif operation == "stop":
+                state["state"] = "stopped"
+                resources["container"].update({"id": None, "state": "absent"})
+            else:
+                state["state"] = "uninstalled"
+                for resource in resources.values():
+                    resource["id"] = None
+                    resource["state"] = "absent"
+            runtime._write_mounts(state)
+            runtime._write_mount_manifest(state)
+            runtime._write_state(state)
+            result = runtime._result(
+                runtime._receipt(
+                    operation,
+                    "ok",
+                    {
+                        "install": "installed",
+                        "update": "updated",
+                        "start": "ready",
+                        "stop": "stopped",
+                        "uninstall": "owned_resources_released",
+                    }[operation],
+                    before=before,
+                    after=state["state"],
+                    state=state,
+                )
+            )
+        if operation == "install":
+            runtime.codex_prepare()
+        return result
+    if operation == "rollback":
+        with runtime.locked():
+            state = runtime._read_state(allow_manifest_drift=True)
+            before = str(state.get("state"))
+            resources = state.setdefault("resources", _container_resource_state(runtime))
+            image = resources.setdefault("image", {})
+            restored_image_id = os.environ.get("AGENT_CANON_RESTORE_IMAGE_ID")
+            current_image_id = os.environ.get("AGENT_CANON_CURRENT_IMAGE_ID") or image.get("id")
+            if not restored_image_id:
+                raise BootstrapError("rollback_image_missing", "host did not provide a rollback image ID")
+            previous_targets = _container_previous_target_manifest(runtime)
+            current_targets = json.loads(_json(state.get("targets", {})))
+            candidate_image_id = str(image.get("id") or restored_image_id)
+            image.update(
+                {
+                    "id": restored_image_id,
+                    "tag": os.environ.get("AGENT_CANON_RESTORE_IMAGE_REF", restored_image_id),
+                    "owned": True,
+                    "state": "present",
+                }
+            )
+            previous_generation = str(
+                state.get("rollback_generation")
+                or f"generation-{restored_image_id[7:19]}"
+            )
+            rollback_generation = str(
+                state.get("current_generation")
+                or f"generation-{str(current_image_id)[7:19]}"
+            )
+            if previous_generation == rollback_generation:
+                raise BootstrapError(
+                    "rollback_generation_invalid",
+                    "current and rollback generations are not distinct",
+                )
+            generations = state.setdefault("generations", {})
+            generations[previous_generation] = {
+                "image_id": restored_image_id,
+                "image_ref": os.environ.get("AGENT_CANON_RESTORE_IMAGE_REF", restored_image_id),
+                "targets": previous_targets,
+                "state": "current",
+            }
+            generations[rollback_generation] = {
+                "image_id": current_image_id,
+                "image_ref": os.environ.get("AGENT_CANON_CURRENT_IMAGE_REF", current_image_id),
+                "targets": current_targets,
+                "state": "rollback",
+            }
+            state["targets"] = previous_targets
+            state["rollback_generation"] = rollback_generation
+            state["current_generation"] = previous_generation
+            state["previous_image_id"] = None
+            state["state"] = "ready"
+            runtime._write_mounts(state)
+            runtime._write_mount_manifest(state)
+            runtime._write_state(state)
+            _container_materialize_rollback_plan(runtime, state)
+            return runtime._result(
+                runtime._receipt(
+                    "rollback",
+                    "ok",
+                    "previous_generation_restored",
+                    before=before,
+                    after=state["state"],
+                    state=state,
+                )
+            )
+    if operation == "restore":
+        with runtime.locked():
+            state = runtime._read_state(allow_manifest_drift=True)
+            before = str(state.get("state"))
+            resources = state.setdefault("resources", _container_resource_state(runtime))
+            image = resources.setdefault("image", {})
+            restored_image_id = os.environ.get("AGENT_CANON_RESTORE_IMAGE_ID")
+            if not restored_image_id:
+                raise BootstrapError("restore_image_missing", "host did not provide the previous image ID")
+            candidate_image_id = str(image.get("id") or restored_image_id)
+            candidate_targets = json.loads(_json(state.get("targets", {})))
+            restored_targets = _container_restore_target_manifest(runtime)
+            if restored_targets is not None:
+                state["targets"] = restored_targets
+            image.update(
+                {
+                    "id": restored_image_id,
+                    "tag": restored_image_id,
+                    "owned": True,
+                    "state": "present",
+                }
+            )
+            restored_generation = f"generation-{restored_image_id[7:19]}"
+            candidate_generation = f"generation-{candidate_image_id[7:19]}"
+            generations = state.setdefault("generations", {})
+            generations[restored_generation] = {
+                "image_id": restored_image_id,
+                "targets": json.loads(_json(state.get("targets", {}))),
+                "state": "current",
+            }
+            if candidate_generation != restored_generation:
+                generations[candidate_generation] = {
+                    "image_id": candidate_image_id,
+                    "targets": candidate_targets,
+                    "state": "rollback",
+                }
+                state["rollback_generation"] = candidate_generation
+            state["current_generation"] = restored_generation
+            state["previous_image_id"] = None
+            state["state"] = "ready"
+            runtime._write_mounts(state)
+            runtime._write_mount_manifest(state)
+            runtime._write_state(state)
+            _container_materialize_rollback_plan(runtime, state)
+            return runtime._result(
+                runtime._receipt(
+                    "restore",
+                    "ok",
+                    "previous_generation_restored",
+                    before=before,
+                    after=state["state"],
+                    state=state,
+                )
+            )
+    if operation == "status":
+        with runtime.locked():
+            state = runtime._read_state(allow_manifest_drift=True)
+            return runtime._result(
+                runtime._receipt(
+                    "status",
+                    "ok",
+                    "status",
+                    before=state["state"],
+                    after=state["state"],
+                    details={"state": runtime._state_summary(state)},
+                    state=state,
+                )
+            )
+    if operation == "codex":
+        if args.codex_operation == "prepare":
+            return runtime.codex_prepare()
+        if args.codex_operation == "launch":
+            return runtime.codex_launch(Path(args.project_root))
+        raise BootstrapError(
+            "container_control_unsupported",
+            "unsupported Codex operation in resident controller",
+        )
+    if operation == "target" and args.target_operation == "add":
+        with runtime.locked():
+            state = runtime._read_state()
+            target = runtime._target_record(Path(args.root), args.mode)
+            host_root = os.environ.get("AGENT_CANON_TARGET_HOST_ROOT")
+            container_root = os.environ.get("AGENT_CANON_TARGET_CONTAINER_ROOT")
+            if host_root:
+                target["host_root"] = host_root
+            if container_root:
+                target["root"] = container_root
+            if host_digest := os.environ.get("AGENT_CANON_TARGET_DIGEST"):
+                target["digest"] = host_digest
+            targets = dict(state.get("targets", {}))
+            targets[target["digest"]] = target
+            _container_target_generation(state, targets)
+            state["state"] = "ready"
+            runtime._write_mounts(state)
+            runtime._write_mount_manifest(state)
+            runtime._write_state(state)
+            _container_materialize_rollback_plan(runtime, state)
+            return runtime._result(
+                runtime._receipt(
+                    "target_add",
+                    "ok",
+                    "target_registered",
+                    before="ready",
+                    after="ready",
+                    details={"target": target},
+                    state=state,
+                )
+            )
+    if operation == "target" and args.target_operation == "remove":
+        with runtime.locked():
+            state = runtime._read_state()
+            target = runtime._target_record(Path(args.root), args.mode)
+            target_digest = os.environ.get("AGENT_CANON_TARGET_DIGEST", target["digest"])
+            if target_digest not in state.get("targets", {}):
+                raise BootstrapError("target_not_registered", "target root is not registered")
+            targets = dict(state.get("targets", {}))
+            del targets[target_digest]
+            _container_target_generation(state, targets)
+            runtime._write_mounts(state)
+            runtime._write_mount_manifest(state)
+            runtime._write_state(state)
+            _container_materialize_rollback_plan(runtime, state)
+            return runtime._result(
+                runtime._receipt(
+                    "target_remove",
+                    "ok",
+                    "target_removed",
+                    before="ready",
+                    after="ready",
+                    details={"target_digest": target_digest},
+                    state=state,
+                )
+            )
+    if operation == "exec":
+        command = list(args.command)
+        command = command[1:] if command and command[0] == "--" else command
+        if args.request_json:
+            raise BootstrapError(
+                "container_control_unsupported",
+                "structured exec requests remain on the host adapter route",
+            )
+        return runtime.exec(Path(args.root), command)
+    if operation == "tool" and args.tool_operation == "run":
+        command = list(args.command)
+        command = command[1:] if command and command[0] == "--" else command
+        return runtime.tool_run(
+            args.catalog_id,
+            command,
+            root=Path(args.root) if args.root else None,
+        )
+    if operation == "template" and args.template_operation == "export":
+        return runtime.template_export(Path(args.root), args.profile, args.output)
+    if operation == "eval" and args.eval_operation == "collect":
+        return runtime.eval_collect(Path(args.root), args.run_id)
+    if operation == "eval" and args.eval_operation == "sync":
+        return runtime.eval_sync_prepare(args.run_id)
+    if operation == "task" and args.task_operation == "admit":
+        return runtime.admit_task(
+            args.task_id, target_root=Path(args.root) if args.root else None
+        )
+    if operation == "task" and args.task_operation == "release":
+        return runtime.release_task(args.task_id, outcome=args.outcome)
+    if operation == "gc":
+        with runtime.locked():
+            state = runtime._read_state(allow_manifest_drift=True)
+            return runtime._result(
+                runtime._receipt(
+                    "gc",
+                    "ok",
+                    "state_gc_complete",
+                    before=state["state"],
+                    after=state["state"],
+                    details={"docker_resources": "host-owned"},
+                    state=state,
+                )
+            )
+    raise BootstrapError(
+        "container_control_unsupported",
+        f"{operation} requires host-owned Docker or a project execution plane",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the typed bootstrap command parser."""
     parser = argparse.ArgumentParser(description="AgentCanon shared runtime bootstrap")
@@ -4985,8 +5797,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="persistent runtime directory (default: <repository-root>/.runtime)",
     )
     parser.add_argument("--manifest")
+    parser.add_argument(
+        "--container-control",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
     sub = parser.add_subparsers(dest="operation", required=True)
-    for operation in ("start", "status", "stop", "rollback", "uninstall"):
+    for operation in ("start", "status", "stop", "rollback", "uninstall", "restore"):
         sub.add_parser(operation)
     install_parser = sub.add_parser("install")
     install_parser.add_argument("--image-ref")
@@ -5015,6 +5832,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--mode", choices=("read-only", "explicit-target-write"), default="read-only"
     )
     add.add_argument("--mutation-capability-json")
+    remove = target_sub.add_parser("remove")
+    remove.add_argument("--root", required=True)
+    remove.add_argument(
+        "--mode", choices=("read-only", "explicit-target-write"), default="read-only"
+    )
     execute = sub.add_parser("exec")
     execute_group = execute.add_mutually_exclusive_group(required=True)
     execute_group.add_argument("--root")
@@ -5058,6 +5880,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
     """Route parsed arguments to one lifecycle operation."""
+    if getattr(args, "container_control", False):
+        return _container_control_run(args)
     runtime = _runtime_from_args(args)
     operation = args.operation
     if operation == "install":

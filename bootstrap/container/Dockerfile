@@ -12,13 +12,23 @@
 # an image build input other than the canonical Rust CLI source, public tool
 # assets, and this standalone dependency manifest.
 ARG TARGETPLATFORM
-FROM --platform=$TARGETPLATFORM node:22.14.0-bullseye-slim@sha256:73a9dfbb6c761aebdf4666cce2627635a30d1d4c20f67ff642d01b8f09e709a3 AS node-provider
+FROM node:22.14.0-bullseye-slim@sha256:73a9dfbb6c761aebdf4666cce2627635a30d1d4c20f67ff642d01b8f09e709a3 AS node-provider
 
-FROM --platform=$TARGETPLATFORM ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc
+FROM ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc
 
 ENV PYTHONDONTWRITEBYTECODE=1
 
-LABEL org.opencontainers.image.title="AgentCanon shared tool runtime"
+LABEL org.opencontainers.image.title="AgentCanon shared tool runtime" \
+      io.agent-canon.runtime="shared-v1" \
+      io.agent-canon.container.max-instances="1" \
+      io.agent-canon.run.read-only-rootfs="true" \
+      io.agent-canon.run.network="none" \
+      io.agent-canon.run.cap-drop="ALL" \
+      io.agent-canon.run.no-new-privileges="true" \
+      io.agent-canon.run.cpus="2" \
+      io.agent-canon.run.memory="4g" \
+      io.agent-canon.run.pids-limit="512" \
+      io.agent-canon.run.tmpfs="/tmp"
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -109,6 +119,7 @@ RUN python3 /opt/agent-canon/tools/agent_tools/dependency_plan.py \
 COPY tools /usr/local/share/agent-canon/runtime/tools
 COPY agents /usr/local/share/agent-canon/runtime/agents
 COPY documents /usr/local/share/agent-canon/runtime/documents
+COPY bootstrap/manifest.toml /usr/local/share/agent-canon/runtime/bootstrap/manifest.toml
 # The generated host view is intentionally excluded from the build context.
 # Reuse the canonical materializer in the image layer so this path is derived
 # from the tracked catalog and canonical skill documents at build time.
