@@ -22,10 +22,10 @@ import sys
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
-
-UTC = timezone.utc
 from pathlib import Path
 from typing import cast
+
+UTC = timezone.utc
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -519,9 +519,18 @@ class AgentImprovementGuide:
         configured = os.environ.get("AGENT_CANON_LOG_ROOT", "").strip()
         if not configured:
             return ()
-        pending = Path(configured).expanduser().resolve() / "feedback/issue-packets/pending"
+        try:
+            pending = (
+                Path(configured).expanduser().resolve()
+                / "feedback/issue-packets/pending"
+            )
+            paths = sorted(pending.glob("*.json")) if pending.is_dir() else ()
+        except OSError:
+            # The private log is optional evidence. Rootless bind mounts can
+            # expose its mode-0700 directory without granting the tool user a
+            # stat/read capability; that must not block guide generation.
+            return ()
         refs: set[str] = set()
-        paths = sorted(pending.glob("*.json")) if pending.is_dir() else ()
         for path in paths:
             try:
                 payload = json.loads(path.read_text(encoding="utf-8"))
@@ -554,8 +563,12 @@ class AgentImprovementGuide:
         configured = os.environ.get("AGENT_CANON_LOG_ROOT", "").strip()
         if not configured:
             return {"agent-canon-log/knowledge": 0}
-        topics = Path(configured).expanduser().resolve() / "knowledge" / "topics"
-        return {"agent-canon-log/knowledge": len(tuple(topics.glob("*/candidate.md")))}
+        try:
+            topics = Path(configured).expanduser().resolve() / "knowledge" / "topics"
+            count = len(tuple(topics.glob("*/candidate.md"))) if topics.is_dir() else 0
+        except OSError:
+            count = 0
+        return {"agent-canon-log/knowledge": count}
 
     def skill_eval_failed(self, path: Path) -> bool:
         """Return whether one accumulated skill eval report is failing."""
