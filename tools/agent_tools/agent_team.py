@@ -184,6 +184,7 @@ if __package__:
         recommended_dynamic_expansion_wave_slots,
         recommended_dynamic_expansion_waves,
         recommended_initial_subagent_wave,
+        recommended_initial_subagent_wave_slots,
         unique_codex_agents_for_roles,
         validate_agent_type_selections,
         workflow_spawn_budget,
@@ -204,6 +205,7 @@ else:
         recommended_dynamic_expansion_wave_slots,
         recommended_dynamic_expansion_waves,
         recommended_initial_subagent_wave,
+        recommended_initial_subagent_wave_slots,
         unique_codex_agents_for_roles,
         validate_agent_type_selections,
         workflow_spawn_budget,
@@ -258,6 +260,7 @@ if __package__:
         CloseAgentLifecycleEvidence,
         materialize_close_agent_tool_call,
         materialize_issue_worker_tool_call,
+        materialize_subagent_spawn_tool_call,
         materialize_skill_tool_call_token,
     )
 else:
@@ -265,6 +268,7 @@ else:
         CloseAgentLifecycleEvidence,
         materialize_close_agent_tool_call,
         materialize_issue_worker_tool_call,
+        materialize_subagent_spawn_tool_call,
         materialize_skill_tool_call_token,
     )
 
@@ -521,6 +525,7 @@ __all__ = (
     "capacity_runtime_for_spec",
     "dispatch_fixed_implementation",
     "recommended_initial_subagent_wave",
+    "recommended_initial_subagent_wave_slots",
     "recommended_dynamic_expansion_waves",
     "recommended_dynamic_expansion_wave_slots",
     "unique_codex_agents_for_roles",
@@ -533,6 +538,7 @@ __all__ = (
     "materialize_skill_tool_call_token",
     "materialize_close_agent_tool_call",
     "materialize_issue_worker_tool_call",
+    "materialize_subagent_spawn_tool_call",
     "dispatch_issue_worker",
     "CloseAgentLifecycleEvidence",
     "create_run_bundle",

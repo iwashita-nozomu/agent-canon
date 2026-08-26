@@ -2022,10 +2022,16 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
             ):
                 if agent_type not in total_agent_candidates:
                     total_agent_candidates.append(agent_type)
-    ensure(
-        len(initial_wave) >= 1,
-        f"task {task_id} manifest must recommend at least one initial agent type",
-    )
+    # T15 has no initial work until an explicit IssueWorker candidate is
+    # supplied.  The catalog smoke bundle intentionally carries no candidate,
+    # so its empty wave is the expected no-action projection.  Candidate-bound
+    # T15 runs are materialized through the publisher route and are validated
+    # by that route's focused tests.
+    if task_id != "T15":
+        ensure(
+            len(initial_wave) >= 1,
+            f"task {task_id} manifest must recommend at least one initial agent type",
+        )
     if (
         expected_active > MIN_DYNAMIC_SPAWN_BUDGET
         and len(total_agent_candidates) > len(initial_wave)
@@ -2176,13 +2182,15 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         == "evaluate_owner_context_compatibility",
         f"task {task_id} manifest missing scope-change compatibility policy",
     )
-    ensure(
-        "prompt_contract:" in manifest_text,
-        f"task {task_id} manifest missing role prompt_contract",
-    )
+    if task_id != "T15" or manifest_roles:
+        ensure(
+            "prompt_contract:" in manifest_text,
+            f"task {task_id} manifest missing role prompt_contract",
+        )
     if task_id == "T14":
         ensure_skill_evaluator_manifest_contract(config, manifest)
-    ensure_manifest_abstract_design_prompt_contracts(manifest, task_id)
+    if task_id != "T15" or manifest_roles:
+        ensure_manifest_abstract_design_prompt_contracts(manifest, task_id)
 
 
 def ensure_skill_evaluator_manifest_contract(

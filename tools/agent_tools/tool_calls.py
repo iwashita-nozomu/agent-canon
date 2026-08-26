@@ -45,6 +45,7 @@ SKILL_TOOL_CALL_PHASES = (
 )
 
 ROUTE_TOOL_CALL_ARGUMENT_SCHEMA = "agent-canon.route.args.v1"
+SUBAGENT_SPAWN_TOOL_CALL_ARGUMENT_SCHEMA = "agent-canon.spawn-agent.args.v1"
 
 
 def materialize_tool_call_token(
@@ -210,6 +211,55 @@ def materialize_issue_worker_tool_call(
                 "code": "issue_worker:readback_failed",
                 "retryable": True,
                 "next": "retain_packet_and_retry_issue_worker",
+            },
+        ),
+    )
+
+
+def materialize_subagent_spawn_tool_call(
+    *,
+    role: str,
+    agent_type: str,
+    input: str,
+    checkout_identity: Mapping[str, object],
+) -> dict[str, object]:
+    """Return the parent-runtime ToolCall for one stage-owner spawn handoff."""
+    if not role.strip() or not agent_type.strip() or not input.strip():
+        raise RuntimeError(
+            "subagent_spawn_tool_call role, agent type, and input are required"
+        )
+    identity = dict(checkout_identity)
+    if not identity:
+        raise RuntimeError("subagent_spawn_tool_call checkout identity is required")
+    return materialize_tool_call_token(
+        tool_id="spawn_agent",
+        argument_schema_id=SUBAGENT_SPAWN_TOOL_CALL_ARGUMENT_SCHEMA,
+        argument_properties={
+            "role": {"type": "string", "minLength": 1},
+            "agent_type": {"type": "string", "minLength": 1},
+            "input": {"type": "string", "minLength": 1},
+            "checkout_identity": {"type": "object"},
+        },
+        arguments={
+            "role": role,
+            "agent_type": agent_type,
+            "input": input,
+            "checkout_identity": identity,
+        },
+        intent=(
+            "Ask the parent runtime to spawn the selected stage owner with the "
+            "typed input and checkout identity; the child owns subsequent work."
+        ),
+        typed_failure_semantics=(
+            {
+                "code": "spawn_agent:authorization_required",
+                "retryable": True,
+                "next": "retain_handoff_until_parent_runtime_authorizes_spawn",
+            },
+            {
+                "code": "spawn_agent:launch_failed",
+                "retryable": True,
+                "next": "retain_handoff_and_retry_parent_runtime_spawn",
             },
         ),
     )

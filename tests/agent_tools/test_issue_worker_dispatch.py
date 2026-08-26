@@ -8,13 +8,31 @@
 
 from __future__ import annotations
 
+import io
+import json
+import os
+import subprocess
 import sys
+import tempfile
+from contextlib import redirect_stdout
 from pathlib import Path
+
+import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 import issue_worker_dispatch  # noqa: E402
+from bootstrap_agent_run import main as bootstrap_main  # noqa: E402
 from checkout_identity import CheckoutIdentity  # noqa: E402
+from implementation_dispatch import (  # noqa: E402
+    recommended_initial_subagent_wave,
+    workflow_spawn_budget,
+)
+from team_config import (  # noqa: E402
+    load_task_catalog,
+    load_team_config,
+    select_roles,
+)
 
 
 def _candidate(**overrides: object) -> dict[str, object]:
@@ -54,6 +72,273 @@ def test_same_repository_candidate_materializes_publisher_tool_call() -> None:
     assert calls and calls[0][0] == "publisher"
     assert "checkout_identity" in calls[0][1]
     assert "remote" in calls[0][1]
+
+    config = load_team_config(PROJECT_ROOT / "agents" / "agents_config.json")
+    catalog = load_task_catalog(config, PROJECT_ROOT)
+    roles = select_roles(
+        config,
+        [],
+        full_team=False,
+        catalog=catalog,
+        workflow_family_id="issue_worker_publication",
+        issue_worker_candidate=_candidate(),
+    )
+    active_subagents, _ = workflow_spawn_budget(catalog, "issue_worker_publication")
+    assert tuple(role.id for role in roles) == ("publisher",)
+    assert recommended_initial_subagent_wave(
+        roles,
+        active_subagents,
+        catalog,
+        agent_root=PROJECT_ROOT / ".codex" / "agents",
+        workflow_family_id="issue_worker_publication",
+        issue_worker_candidate=_candidate(),
+    ) == ("worker",)
+
+
+def test_t15_without_explicit_candidate_has_no_initial_publisher() -> None:
+    config = load_team_config(PROJECT_ROOT / "agents" / "agents_config.json")
+    catalog = load_task_catalog(config, PROJECT_ROOT)
+    roles = select_roles(
+        config,
+        [],
+        full_team=False,
+        catalog=catalog,
+        workflow_family_id="issue_worker_publication",
+    )
+    active_subagents, _ = workflow_spawn_budget(catalog, "issue_worker_publication")
+
+    assert roles == ()
+    assert recommended_initial_subagent_wave(
+        roles,
+        active_subagents,
+        catalog,
+        agent_root=PROJECT_ROOT / ".codex" / "agents",
+        workflow_family_id="issue_worker_publication",
+    ) == ()
+
+
+def test_explicit_issue_worker_candidate_does_not_change_generic_intake() -> None:
+    config = load_team_config(PROJECT_ROOT / "agents" / "agents_config.json")
+    catalog = load_task_catalog(config, PROJECT_ROOT)
+    roles = select_roles(
+        config,
+        [],
+        full_team=False,
+        catalog=catalog,
+        workflow_family_id="comprehensive_development",
+        issue_worker_candidate=_candidate(),
+    )
+    active_subagents, _ = workflow_spawn_budget(catalog, "comprehensive_development")
+
+    assert all(role.id != "publisher" for role in roles)
+    assert recommended_initial_subagent_wave(
+        roles,
+        active_subagents,
+        catalog,
+        agent_root=PROJECT_ROOT / ".codex" / "agents",
+        workflow_family_id="comprehensive_development",
+        issue_worker_candidate=_candidate(),
+    ) == ("requirements_organizer",)
+
+
+def test_bootstrap_t15_dispatches_candidate_once_and_persists_tool_call() -> None:
+    calls: list[tuple[str, str]] = []
+
+    def spawn(agent_type: str, prompt: str) -> str:
+        calls.append((agent_type, prompt))
+        return "publisher-bootstrap-1"
+
+    candidate = _candidate(durable_follow_up=True)
+    with tempfile.TemporaryDirectory(prefix="issue-worker-bootstrap-") as root:
+        runtime_root = Path(root) / "runtime"
+        report_root = runtime_root / "reports"
+        run_id = "t15-bootstrap-dispatch"
+        output = io.StringIO()
+        with redirect_stdout(output):
+            return_code = bootstrap_main(
+                [
+                    "--task",
+                    "publish explicit feedback",
+                    "--task-id",
+                    "T15",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--workspace-root",
+                    str(PROJECT_ROOT),
+                    "--report-root",
+                    str(report_root),
+                    "--runtime-root",
+                    str(runtime_root),
+                    "--skip-agent-canon-preflight",
+                    "--issue-worker-candidate",
+                    json.dumps(candidate),
+                ],
+                spawn=spawn,
+            )
+
+        assert return_code == 0
+        assert len(calls) == 1
+        assert calls[0][0] == "publisher"
+        assert "ISSUE_WORKER_TOOL_CALL=" in output.getvalue()
+        assert "RECOMMENDED_INITIAL_SUBAGENT_ROLES=publisher" in output.getvalue()
+        manifest = yaml.safe_load(
+            (report_root / run_id / "team_manifest.yaml").read_text(encoding="utf-8")
+        )
+        run = manifest["run"]
+        assert run["spawn_wave_recommendation"]["initial_wave_agent_types"] == [
+            "worker"
+        ]
+        dispatch = run["issue_worker_dispatch"]
+        assert dispatch["status"] == "spawned"
+        assert dispatch["publisher_agent_id"] == "publisher-bootstrap-1"
+        assert dispatch["checkout_identity"]["remote"] == "iwashita-nozomu/agent-canon"
+        assert dispatch["tool_call"]["tool_id"] == "issue-worker"
+        assert dispatch["tool_call"]["arguments"]["publisher_agent_id"] == (
+            "publisher-bootstrap-1"
+        )
+
+
+def test_bootstrap_t15_without_candidate_does_not_dispatch_publisher() -> None:
+    calls: list[tuple[str, str]] = []
+
+    with tempfile.TemporaryDirectory(prefix="issue-worker-bootstrap-empty-") as root:
+        runtime_root = Path(root) / "runtime"
+        report_root = runtime_root / "reports"
+        run_id = "t15-bootstrap-no-candidate"
+        output = io.StringIO()
+        with redirect_stdout(output):
+            return_code = bootstrap_main(
+                [
+                    "--task",
+                    "publish explicit feedback",
+                    "--task-id",
+                    "T15",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--workspace-root",
+                    str(PROJECT_ROOT),
+                    "--report-root",
+                    str(report_root),
+                    "--runtime-root",
+                    str(runtime_root),
+                    "--skip-agent-canon-preflight",
+                ],
+                spawn=lambda agent_type, prompt: calls.append((agent_type, prompt))
+                or "unexpected-publisher",
+            )
+
+        assert return_code == 0
+        assert calls == []
+        assert "ISSUE_WORKER_TOOL_CALL=" not in output.getvalue()
+        assert "RECOMMENDED_INITIAL_SUBAGENT_ROLES=" in output.getvalue()
+        manifest = yaml.safe_load(
+            (report_root / run_id / "team_manifest.yaml").read_text(encoding="utf-8")
+        )
+        run = manifest["run"]
+        assert run["spawn_wave_recommendation"]["initial_wave_role_ids"] == []
+        assert "issue_worker_dispatch" not in run
+
+
+def test_bootstrap_t15_foreign_candidate_is_handoff_without_spawn() -> None:
+    calls: list[tuple[str, str]] = []
+    candidate = _candidate(repository="other/repository")
+
+    with tempfile.TemporaryDirectory(prefix="issue-worker-bootstrap-foreign-") as root:
+        runtime_root = Path(root) / "runtime"
+        report_root = runtime_root / "reports"
+        run_id = "t15-bootstrap-foreign"
+        return_code = bootstrap_main(
+            [
+                "--task",
+                "publish foreign feedback",
+                "--task-id",
+                "T15",
+                "--owner",
+                "codex",
+                "--run-id",
+                run_id,
+                "--workspace-root",
+                str(PROJECT_ROOT),
+                "--report-root",
+                str(report_root),
+                "--runtime-root",
+                str(runtime_root),
+                "--skip-agent-canon-preflight",
+                "--issue-worker-candidate",
+                json.dumps(candidate),
+            ],
+            spawn=lambda agent_type, prompt: calls.append((agent_type, prompt))
+            or "unexpected-publisher",
+        )
+
+        assert return_code == 0
+        assert calls == []
+        manifest = yaml.safe_load(
+            (report_root / run_id / "team_manifest.yaml").read_text(encoding="utf-8")
+        )
+        dispatch = manifest["run"]["issue_worker_dispatch"]
+        assert dispatch["status"] == "deferred"
+        assert dispatch["handoff"]["reason"] == "other-repository"
+        assert dispatch["tool_call"] is None
+
+
+def test_bootstrap_cli_materializes_spawn_handoff_without_injected_callback() -> None:
+    candidate = _candidate(durable_follow_up=True)
+
+    with tempfile.TemporaryDirectory(prefix="issue-worker-bootstrap-cli-") as root:
+        runtime_root = Path(root) / "runtime"
+        report_root = runtime_root / "reports"
+        run_id = "t15-bootstrap-cli"
+        environment = os.environ.copy()
+        environment["AGENT_CANON_RUNTIME_ROOT"] = str(runtime_root)
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"),
+                "--task",
+                "publish explicit feedback",
+                "--task-id",
+                "T15",
+                "--owner",
+                "codex",
+                "--run-id",
+                run_id,
+                "--workspace-root",
+                str(PROJECT_ROOT),
+                "--report-root",
+                str(report_root),
+                "--runtime-root",
+                str(runtime_root),
+                "--skip-agent-canon-preflight",
+                "--issue-worker-candidate",
+                json.dumps(candidate),
+            ],
+            cwd=PROJECT_ROOT,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert "ISSUE_WORKER_DISPATCH_STATUS=pending" in result.stdout
+        assert "ISSUE_WORKER_SPAWN_TOOL_CALL=" in result.stdout
+        manifest = yaml.safe_load(
+            (report_root / run_id / "team_manifest.yaml").read_text(encoding="utf-8")
+        )
+        dispatch = manifest["run"]["issue_worker_dispatch"]
+        assert dispatch["status"] == "pending"
+        spawn_tool_call = dispatch["spawn_tool_call"]
+        assert spawn_tool_call["tool_id"] == "spawn_agent"
+        assert spawn_tool_call["arguments"]["role"] == "publisher"
+        assert spawn_tool_call["arguments"]["agent_type"] == "worker"
+        assert spawn_tool_call["arguments"]["checkout_identity"]["remote"] == (
+            "iwashita-nozomu/agent-canon"
+        )
 
 
 def test_other_repository_candidate_is_no_mutation_handoff() -> None:

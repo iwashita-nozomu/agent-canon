@@ -10,10 +10,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import tempfile
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -147,6 +148,7 @@ if __package__:
         recommended_dynamic_expansion_wave_slots,
         recommended_dynamic_expansion_waves,
         recommended_initial_subagent_wave,
+        recommended_initial_subagent_wave_slots,
         validate_agent_type_selections,
         workflow_spawn_budget,
     )
@@ -160,6 +162,7 @@ else:
         recommended_dynamic_expansion_wave_slots,
         recommended_dynamic_expansion_waves,
         recommended_initial_subagent_wave,
+        recommended_initial_subagent_wave_slots,
         validate_agent_type_selections,
         workflow_spawn_budget,
     )
@@ -167,11 +170,13 @@ else:
 if __package__:
     from .agent_team import (
         PreparedRunBundle,
+        dispatch_issue_worker,
         prepare_run_bundle,
     )
 else:
     from agent_team import (  # type: ignore[no-redef]
         PreparedRunBundle,
+        dispatch_issue_worker,
         prepare_run_bundle,
     )
 
@@ -211,6 +216,7 @@ class BootstrapRunContext:
     workflow_family_name: str | None
     workflow_active_spawn_budget: int | None
     workflow_max_write_subagents: int | None
+    issue_worker_candidate: Mapping[str, object] | None = None
     repository_roots: object | None = None
 
 
@@ -223,6 +229,7 @@ class BootstrapRuntime:
     active_pointer: Path
     agent_type_selections: tuple[AgentTypeSelection, ...]
     active_design_packet: ActiveDesignPacketConfig
+    issue_worker_dispatch: Mapping[str, object] | None = None
 
 
 def suggested_skills(
@@ -317,6 +324,14 @@ def build_parser(
         ),
     )
     parser.add_argument(
+        "--issue-worker-candidate",
+        metavar="JSON",
+        help=(
+            "Explicit JSON IssueWorker candidate that activates the T15 publisher "
+            "initial wave. Other workflows ignore this input."
+        ),
+    )
+    parser.add_argument(
         "--run-id",
         help="Optional explicit run id. Defaults to a timestamped slug.",
     )
@@ -401,12 +416,26 @@ def build_parser(
     return parser
 
 
+def parse_issue_worker_candidate(value: str | None) -> Mapping[str, object] | None:
+    """Parse one explicit IssueWorker candidate without inferring candidates."""
+    if value is None:
+        return None
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("issue_worker_candidate:invalid_json") from exc
+    if not isinstance(parsed, dict) or not parsed:
+        raise RuntimeError("issue_worker_candidate:must_be_nonempty_object")
+    return parsed
+
+
 def resolve_bootstrap_context(
     args: argparse.Namespace,
     config: TeamConfig,
     catalog: TaskCatalog,
     workspace_root: Path,
     repository_roots: object | None = None,
+    issue_worker_candidate: Mapping[str, object] | None = None,
 ) -> BootstrapRunContext:
     """Resolve workflow family, specialists, and report paths for one run."""
     if implementation_handoff_required(args.task):
@@ -487,6 +516,7 @@ def resolve_bootstrap_context(
         workflow_family_name=workflow_family_name,
         workflow_active_spawn_budget=workflow_active_spawn_budget,
         workflow_max_write_subagents=workflow_max_write_subagents,
+        issue_worker_candidate=issue_worker_candidate,
         repository_roots=repository_roots,
     )
 
@@ -582,6 +612,25 @@ def emit_bootstrap_output(
         )
         if context.workflow_family_id == "issue_worker_publication":
             print(
+                "ISSUE_WORKER_CANDIDATE_STATUS="
+                + ("explicit" if context.issue_worker_candidate else "absent")
+            )
+            if runtime.issue_worker_dispatch is not None:
+                dispatch_status = runtime.issue_worker_dispatch.get("status", "unknown")
+                print(f"ISSUE_WORKER_DISPATCH_STATUS={dispatch_status}")
+                tool_call = runtime.issue_worker_dispatch.get("tool_call")
+                if isinstance(tool_call, Mapping):
+                    print(
+                        "ISSUE_WORKER_TOOL_CALL="
+                        + json.dumps(dict(tool_call), sort_keys=True)
+                    )
+                spawn_tool_call = runtime.issue_worker_dispatch.get("spawn_tool_call")
+                if isinstance(spawn_tool_call, Mapping):
+                    print(
+                        "ISSUE_WORKER_SPAWN_TOOL_CALL="
+                        + json.dumps(dict(spawn_tool_call), sort_keys=True)
+                    )
+            print(
                 "ISSUE_WORKER_DISPATCH_ROUTE="
                 "tools/agent_tools/agent_team.py#dispatch_issue_worker"
             )
@@ -601,6 +650,17 @@ def emit_bootstrap_output(
             catalog,
             runtime.agent_type_selections,
             source_root / ".codex" / "agents",
+            workflow_family_id=context.workflow_family_id,
+            issue_worker_candidate=context.issue_worker_candidate,
+        )
+        initial_wave_slots = recommended_initial_subagent_wave_slots(
+            runtime.roles,
+            active_budget,
+            catalog,
+            runtime.agent_type_selections,
+            source_root / ".codex" / "agents",
+            workflow_family_id=context.workflow_family_id,
+            issue_worker_candidate=context.issue_worker_candidate,
         )
         if initial_wave:
             print("PARENT_WAVE_EXECUTION_GATE=required_before_implementation")
@@ -619,6 +679,8 @@ def emit_bootstrap_output(
             catalog,
             runtime.agent_type_selections,
             source_root / ".codex" / "agents",
+            workflow_family_id=context.workflow_family_id,
+            issue_worker_candidate=context.issue_worker_candidate,
         )
         expansion_wave_slots = recommended_dynamic_expansion_wave_slots(
             runtime.roles,
@@ -627,12 +689,18 @@ def emit_bootstrap_output(
             catalog,
             runtime.agent_type_selections,
             source_root / ".codex" / "agents",
+            workflow_family_id=context.workflow_family_id,
+            issue_worker_candidate=context.issue_worker_candidate,
         )
         print(
             "SUBAGENT_AGENT_TYPE_SELECTIONS="
             f"{format_agent_type_selections(runtime.agent_type_selections)}"
         )
         print(f"RECOMMENDED_INITIAL_SUBAGENT_WAVE={format_subagent_wave(initial_wave)}")
+        print(
+            "RECOMMENDED_INITIAL_SUBAGENT_ROLES="
+            + ",".join(slot.role_id for slot in initial_wave_slots)
+        )
         print(
             f"RECOMMENDED_DYNAMIC_EXPANSION_WAVES={format_subagent_wave_chunks(expansion_waves)}"
         )
@@ -922,7 +990,14 @@ def publish_prepared_run(
         raise
 
 
-def main() -> int:
+PublisherSpawn = Callable[[str, str], str | None]
+
+
+def main(
+    argv: Sequence[str] | None = None,
+    *,
+    spawn: PublisherSpawn | None = None,
+) -> int:
     """Run the bootstrap command."""
     # Source resolution itself uses the external runtime boundary.  Parse only
     # that capability before loading source-owned config so an unrelated
@@ -958,7 +1033,14 @@ def main() -> int:
     except (RuntimeError, OSError) as exc:
         print(str(exc), flush=True)
         return 1
-    args = build_parser(enable_choices(config, catalog), task_ids(catalog)).parse_args()
+    args = build_parser(enable_choices(config, catalog), task_ids(catalog)).parse_args(argv)
+    try:
+        issue_worker_candidate = parse_issue_worker_candidate(
+            args.issue_worker_candidate
+        )
+    except RuntimeError as exc:
+        print(str(exc), flush=True)
+        return 2
     try:
         explicit_active_design_packet = parse_active_design_packet_input(
             args.active_design_packet
@@ -992,6 +1074,7 @@ def main() -> int:
         catalog,
         workspace_root,
         repository_roots,
+        issue_worker_candidate,
     )
     roles = select_roles(
         config,
@@ -999,6 +1082,7 @@ def main() -> int:
         args.full_team,
         catalog=catalog,
         workflow_family_id=context.workflow_family_id,
+        issue_worker_candidate=context.issue_worker_candidate,
     )
     try:
         agent_type_selections = validate_agent_type_selections(
@@ -1009,6 +1093,26 @@ def main() -> int:
     except RuntimeError as exc:
         print(str(exc), flush=True)
         return 1
+    issue_worker_dispatch: Mapping[str, object] | None = None
+    if (
+        context.workflow_family_id == "issue_worker_publication"
+        and context.issue_worker_candidate
+    ):
+        try:
+            dispatched = dispatch_issue_worker(
+                context.issue_worker_candidate,
+                args.task,
+                spawn,
+                workspace_root=workspace_root,
+                source_root=repository_roots.agentcanon_source_root,
+            )
+            as_dict = getattr(dispatched, "as_dict", None)
+            if not callable(as_dict):
+                raise RuntimeError("issue_worker_dispatch:projection_missing")
+            issue_worker_dispatch = as_dict()
+        except (RuntimeError, OSError) as exc:
+            print(str(exc), flush=True)
+            return 1
     selected_skills = suggested_skills(
         args.task_id,
         context.workflow_family_id,
@@ -1029,6 +1133,8 @@ def main() -> int:
             repository_roots=repository_roots,
             active_design_packet=explicit_active_design_packet,
             workflow_family_id=context.workflow_family_id or "",
+            issue_worker_candidate=context.issue_worker_candidate,
+            issue_worker_dispatch=issue_worker_dispatch,
             manual_specialists=context.manual_specialists,
             task_default_specialists=context.task_default_specialists,
             language_review_candidates=context.language_review_candidates,
@@ -1052,6 +1158,7 @@ def main() -> int:
         active_pointer=active_pointer,
         agent_type_selections=agent_type_selections,
         active_design_packet=active_design_packet,
+        issue_worker_dispatch=issue_worker_dispatch,
     )
     try:
         publish_prepared_run(
