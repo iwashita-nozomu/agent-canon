@@ -298,7 +298,10 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
 
             with patch.dict(
                 os.environ,
-                {"AGENT_CANON_HOOK_ARCHIVE_DIR": str(private_log)},
+                {
+                    "AGENT_CANON_HOOK_ARCHIVE_DIR": str(private_log),
+                    "AGENT_CANON_LOG_ROOT": str(private_log),
+                },
             ):
                 self.write_fixture(root)
                 result = subprocess.run(
