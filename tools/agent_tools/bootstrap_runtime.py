@@ -3228,15 +3228,11 @@ class BootstrapRuntime:
                 f"digest = {json.dumps(record['digest'])}",
                 "",
             ]
-        registry_path = os.environ.get("AGENT_CANON_MOUNT_REGISTRY", "").strip()
-        if self._container_control() and registry_path and registry_path != REGISTRY_DESTINATION:
-            raise BootstrapError("mount_registry_invalid", "container registry destination is not fixed")
-        destination = (
-            Path(registry_path)
-            if self._container_control() and registry_path
-            else self.paths.mounts
-        )
-        _atomic_bytes(destination, "\n".join(lines).encode("utf-8"), mode=0o444)
+        # The controller writes the directory-mounted registry. The separate
+        # file bind at REGISTRY_DESTINATION is read-only and is only a host
+        # readback surface; replacing that inode from inside the container
+        # would fail and leave a stale registry visible to the tool process.
+        _atomic_bytes(self.paths.mounts, "\n".join(lines).encode("utf-8"), mode=0o444)
 
     def _write_mount_manifest(self, state: Mapping[str, Any]) -> None:
         """Write the strict host-readable target mount manifest."""
@@ -4211,6 +4207,7 @@ class BootstrapRuntime:
                     "GIT_CONFIG_COUNT": "1",
                     "GIT_CONFIG_KEY_0": "safe.directory",
                     "GIT_CONFIG_VALUE_0": f"/targets/{target['digest']}",
+                    "AGENT_CANON_MOUNT_REGISTRY": f"{CONTAINER_RUNTIME_DESTINATION}/mounts.toml",
                     # Runtime log readers use the existing explicit archive
                     # override. The host-owned private-log bind is the sole
                     # accumulated archive; runtime/ is only task exchange.
@@ -5455,7 +5452,7 @@ def _container_request_environment(
             if key in {"AGENT_CANON_TARGET_ROOT", "AGENT_CANON_TASK_ROOT"} and Path(value).resolve(strict=False) != host_target:
                 raise BootstrapError("invalid_exec_request", f"target path does not match request: {key}")
             if key == "AGENT_CANON_MOUNT_REGISTRY":
-                result[key] = REGISTRY_DESTINATION
+                result[key] = f"{CONTAINER_RUNTIME_DESTINATION}/mounts.toml"
                 continue
             if key in {"AGENT_CANON_HOOK_ARCHIVE_DIR", "AGENT_CANON_LOG_ROOT"}:
                 if Path(value).resolve(strict=False) != host_control / "private-log":
