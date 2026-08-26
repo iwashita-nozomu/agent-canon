@@ -18,10 +18,10 @@ if [ -n "${AGENT_CANON_SOURCE_ROOT:-}" ]; then
   canon_root="$(cd "${AGENT_CANON_SOURCE_ROOT}" && pwd -P)"
 fi
 
-runtime_root="${AGENT_CANON_RUNTIME_ROOT:-}"
+runtime_root="${AGENT_CANON_RUNTIME_ROOT:-${canon_root}/.runtime}"
 control_root="${AGENT_CANON_CONTROL_PARENT_ROOT:-}"
-if [ -z "$runtime_root" ] || [ -z "$control_root" ]; then
-  echo "agent-canon requires AGENT_CANON_CONTROL_PARENT_ROOT and AGENT_CANON_RUNTIME_ROOT" >&2
+if [ -z "$control_root" ]; then
+  echo "agent-canon requires AGENT_CANON_CONTROL_PARENT_ROOT" >&2
   exit 2
 fi
 if [ ! -d "$runtime_root" ] || [ ! -d "$control_root" ]; then

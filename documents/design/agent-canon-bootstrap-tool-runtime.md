@@ -28,7 +28,8 @@ downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py bootst
 - Host は Skill、`AGENTS.md`、workflow shell、Git、GitHub、Docker、Codex 起動を所有する。
 - 共有 tool container は AgentCanon の Python / Rust / LSP tool だけを実行する。
 - project build / test / experiment / GPU は project-owned execution environment が所有する。
-- runtime、cache、eval、report、archive clone は AgentCanon source tree 外に置く。
+- runtime lifecycle state は bootstrap-owned で ignored な `<install-root>/.runtime/` に置く。
+  一般の eval、report、SQLite、log、analysis、archive artifact は source tree 外に置く。
 - public command の互換性、resource lifecycle、eval publication、skill discovery を
   完了条件に含める。
 
@@ -58,12 +59,13 @@ secret value、authorization header、credential path を stdout、receipt、eva
 
 ## Runtime And Cache Roots
 
-implicit な Host-global 既定値は持ちません。Bootstrap は `--control-parent-root` と
-`--runtime-root` を必須とし、runtime root が宣言された control-plane owner
-repository の
-realpath 配下にある場合だけ実行します。symlink で外へ逃がす指定も
-拒否します。`$HOME/.local`、`$HOME/.cache`、AgentCanon source tree を
-fallback にしません。
+Bootstrap は `--control-parent-root` を必須とし、`--runtime-root` を省略した場合は
+install root の ignored `.runtime/` を persistent runtime として使います。これは
+bootstrap が所有する唯一の source-local state で、完全に再構築可能です。明示した
+runtime root は control-plane owner repository の realpath 配下でなければならず、
+symlink で外へ逃がす指定も拒否します。一般の eval/report/SQLite/log/analysis
+artifact は source tree 外の declared runtime root に残し、`$HOME/.local`、
+`$HOME/.cache`、その他の source-tree fallback は使いません。
 
 control-plane root は installation に一つだけで、project root ではありません。
 複数 project は同じ `mounts.toml` に target として登録し、同じ container ID
@@ -72,7 +74,7 @@ Docker label readback で既存 owner を検出し、`shared_runtime_owned_elsew
 既存 control root の明示指定を返します。
 
 ```text
-<control-parent-root>/workspace/agent-canon-runtime/<installation-id>/
+<install-root>/.runtime/
   current-generation
   rollback-generation
   lifecycle.lock
@@ -83,33 +85,35 @@ Docker label readback で既存 owner を検出し、`shared_runtime_owned_elsew
   spool/
   archive/agent-canon-log/
 
-<runtime-root>/cache/{cargo,pycache,semantic-index,tool-metadata}/
+<install-root>/.runtime/cache/{cargo,pycache,semantic-index,tool-metadata}/
 ```
 
-AgentCanon source内を runtime default にしません。`tools/agent_tools/runtime_artifacts.py` により分析 tool は source read-only、telemetry は external root、
-mutation tool は明示 target capability を受けた場合だけ source を変更します。
+Bootstrap lifecycle codeだけが固定された `.runtime/` surfaces を直接管理します。
+`tools/agent_tools/runtime_artifacts.py` は source-local artifact を例外なく拒否し、
+分析 tool は source read-only、telemetry は external root、mutation tool は明示 target
+capability を受けた場合だけ source を変更します。
 
 ## Top-Level Bootstrap
 
 唯一の入口は repository top-level `bootstrap.sh` です。
 
 ```bash
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> install
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> update
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> start
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> status
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> target add --root <project-a> --mode read-only
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> target add --root <project-b> --mode read-only
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> tool run <catalog-id> -- <args...>
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> template export --root <registered-source> --profile <profile> --output <runtime-relative-directory>
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> codex prepare
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> codex --project-root <path>
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> eval collect --root <path> --run-id <id>
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> eval sync --run-id <id>
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> stop
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> rollback
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> gc
-./bootstrap.sh --control-parent-root <path> --runtime-root <path>/workspace/agent-canon-runtime/<id> uninstall
+./bootstrap.sh --control-parent-root <path> install
+./bootstrap.sh --control-parent-root <path> update
+./bootstrap.sh --control-parent-root <path> start
+./bootstrap.sh --control-parent-root <path> status
+./bootstrap.sh --control-parent-root <path> target add --root <project-a> --mode read-only
+./bootstrap.sh --control-parent-root <path> target add --root <project-b> --mode read-only
+./bootstrap.sh --control-parent-root <path> tool run <catalog-id> -- <args...>
+./bootstrap.sh --control-parent-root <path> template export --root <registered-source> --profile <profile> --output <runtime-relative-directory>
+./bootstrap.sh --control-parent-root <path> codex prepare
+./bootstrap.sh --control-parent-root <path> codex --project-root <path>
+./bootstrap.sh --control-parent-root <path> eval collect --root <path> --run-id <id>
+./bootstrap.sh --control-parent-root <path> eval sync --run-id <id>
+./bootstrap.sh --control-parent-root <path> stop
+./bootstrap.sh --control-parent-root <path> rollback
+./bootstrap.sh --control-parent-root <path> gc
+./bootstrap.sh --control-parent-root <path> uninstall
 ```
 
 Bootstrap は Docker が無い場合に Host Python / Cargo install へ fallback せず、

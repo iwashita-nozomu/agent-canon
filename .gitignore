@@ -35,6 +35,7 @@ reports/*.patch
 .venv/
 venv/
 workspace/
+.runtime/
 
 # Personal Codex config is migrated here and linked from the user's Codex home.
 .codex/personal/

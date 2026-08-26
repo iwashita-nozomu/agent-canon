@@ -24,13 +24,14 @@ The only supported lifecycle entrypoint is top-level `bootstrap.sh`:
 ```bash
 ./bootstrap.sh \
   --control-parent-root <authorized-parent-root> \
-  --runtime-root <authorized-parent-root>/workspace/agent-canon-runtime/<id> \
   <operation>
 ```
 
-The control root is an authorized parent repository. The runtime root must be
-inside that root after realpath resolution, with no symlink escape. Do not use
-the AgentCanon source tree, an implicit current-directory state directory,
+The control root is an authorized parent repository. The default runtime is
+the bootstrap-owned `<install-root>/.runtime/` directory and is ignored by
+Git. An explicit runtime root must be inside the control root after realpath
+resolution, with no symlink escape. Do not use
+an arbitrary AgentCanon source directory, an implicit current-directory state directory,
 `$HOME/.cache`, `$HOME/.local`, global `$CODEX_HOME`, or a whole workspace/home
 mount as a runtime fallback.
 
@@ -109,7 +110,6 @@ Register each exact project root before execution:
 
 ```bash
 ./bootstrap.sh --control-parent-root <root> \
-  --runtime-root <root>/workspace/agent-canon-runtime/<id> \
   target add --root <project-root> --mode read-only
 ```
 

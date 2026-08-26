@@ -43,6 +43,12 @@ class RuntimeArtifactBoundaryTest(unittest.TestCase):
             source.mkdir()
             with self.assertRaises(SourceLocalArtifact):
                 RuntimeArtifactBoundary.for_source(source, source / ".agent-canon", create=True)
+            with self.assertRaises(SourceLocalArtifact):
+                RuntimeArtifactBoundary.for_source(source, source / ".runtime", create=True)
+            with self.assertRaises(SourceLocalArtifact):
+                RuntimeArtifactBoundary.for_source(source, source, create=True)
+            with self.assertRaises(SourceLocalArtifact):
+                RuntimeArtifactBoundary.for_source(source, source, create=True)
 
     def test_atomic_write_is_external_and_preserves_source_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

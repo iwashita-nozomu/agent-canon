@@ -21,8 +21,7 @@ runtime from the standalone AgentCanon source checkout:
 
 ```bash
 ROOT=<authorized-parent-root>
-RUNTIME="$ROOT/workspace/agent-canon-runtime/<installation>"
-COMMON=(--control-parent-root "$ROOT" --runtime-root "$RUNTIME")
+COMMON=(--control-parent-root "$ROOT")
 
 ./bootstrap.sh "${COMMON[@]}" install
 ./bootstrap.sh "${COMMON[@]}" start
@@ -33,9 +32,10 @@ COMMON=(--control-parent-root "$ROOT" --runtime-root "$RUNTIME")
 ./bootstrap.sh "${COMMON[@]}" uninstall
 ```
 
-The control root must be the authorized parent checkout and the runtime must
-be its descendant but outside the source checkout. The source checkout cannot
-be either root. Runtime cache,
+The control root must be the authorized parent checkout. The default runtime
+is the bootstrap-owned ignored `.runtime/` under the source checkout; an
+explicit runtime must be its descendant and must not escape through a symlink.
+Runtime cache,
 reports, eval collections, Codex home, Cargo output, and temporary files stay
 under the external runtime root.
 

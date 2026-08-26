@@ -21,8 +21,8 @@ owner = "agent-canon"
 install_surface = "bootstrap/container/dependencies.toml"
 manual_install_summary = "Use bootstrap.sh to build or reuse the shared image-owned Rust toolchain."
 manual_install_commands = [
-  "bash bootstrap.sh --control-parent-root <parent> --runtime-root <parent>/workspace/agent-canon-runtime install",
-  "bash bootstrap.sh --control-parent-root <parent> --runtime-root <parent>/workspace/agent-canon-runtime start",
+  "bash bootstrap.sh --control-parent-root <parent> install",
+  "bash bootstrap.sh --control-parent-root <parent> start",
 ]
 required_binaries = [
   "cargo",
@@ -43,7 +43,7 @@ install_root = "/usr/local/share/agent-canon"
 install_binary = "/usr/local/bin/agent-canon"
 path_shim = "forbidden; executable exists only in the shared tool image"
 compatibility_symlink = "forbidden; no host /usr/local projection"
-rebuild_command = "bash bootstrap.sh --control-parent-root <root> --runtime-root <runtime> install"
+rebuild_command = "bash bootstrap.sh --control-parent-root <root> install"
 validation_commands = [
   "agent-canon --version",
   "agent-canon rust-migration-audit --root .",

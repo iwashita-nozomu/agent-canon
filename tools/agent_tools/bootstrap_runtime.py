@@ -67,6 +67,10 @@ CONTAINER_RUNTIME_DIR = "container-runtime"
 CONTAINER_RUNTIME_DESTINATION = "/var/lib/agent-canon/runtime"
 PRIVATE_LOG_DESTINATION = "/var/lib/agent-canon/private-log"
 REGISTRY_DESTINATION = "/var/lib/agent-canon/mount-registry.toml"
+# This is the only historical source of runtime state that the bootstrap may
+# migrate.  It is intentionally a fixed path; arbitrary source/workspace
+# directories are never scanned or adopted.
+LEGACY_RUNTIME_RELATIVE = Path("workspace") / "agent-canon-runtime" / "host"
 REQUIRED_LABELS = frozenset(
     {
         "io.agent-canon.runtime=shared-v1",
@@ -558,14 +562,32 @@ def _validate_new_path(path: Path, *, field: str, beneath: Path) -> Path:
     return normalized
 
 
-def validate_roots(control_parent_root: Path, runtime_root: Path) -> tuple[Path, Path]:
+def validate_roots(
+    control_parent_root: Path,
+    runtime_root: Path,
+    *,
+    source_root: Path | None = None,
+) -> tuple[Path, Path]:
     """Validate explicit roots; effective host UID 0 is intentionally allowed."""
     control = _existing_no_symlink(
         Path(control_parent_root), field="control-parent-root"
     )
-    runtime = _validate_new_path(
-        Path(runtime_root), field="runtime-root", beneath=control
-    )
+    runtime_path = Path(runtime_root)
+    if source_root is not None:
+        source = _normalize_absolute_path(Path(source_root))
+        runtime_path = _normalize_absolute_path(runtime_path)
+        if runtime_path == source / ".runtime":
+            runtime = _validate_new_path(
+                runtime_path, field="runtime-root", beneath=runtime_path.parent
+            )
+        else:
+            runtime = _validate_new_path(
+                runtime_path, field="runtime-root", beneath=control
+            )
+    else:
+        runtime = _validate_new_path(
+            runtime_path, field="runtime-root", beneath=control
+        )
     if runtime == control:
         raise BootstrapError(
             "runtime_root_escape", "runtime root must be a child of control root"
@@ -1309,11 +1331,15 @@ class BootstrapRuntime:
         docker: DockerAdapter | None = None,
     ) -> None:
         """Create a lifecycle manager bound to explicit control and runtime roots."""
-        control, runtime = validate_roots(Path(control_parent_root), Path(runtime_root))
-        self.paths = RuntimePaths(control, runtime)
         self.repository_root = (
             repository_root or Path(__file__).resolve().parents[2]
         ).resolve()
+        control, runtime = validate_roots(
+            Path(control_parent_root),
+            Path(runtime_root),
+            source_root=self.repository_root,
+        )
+        self.paths = RuntimePaths(control, runtime)
         self.manifest_path = _manifest_path(self.repository_root, manifest_path)
         self.manifest, policy_digest = load_manifest(self.manifest_path)
         self.manifest_digest = policy_digest
@@ -1322,6 +1348,8 @@ class BootstrapRuntime:
             os.environ.get("AGENT_CANON_DOCKER", "docker"),
             timeout=int(self.manifest["container"]["task_timeout_seconds"]),
         )
+        self._legacy_runtime_pending_cleanup: Path | None = None
+        self._legacy_runtime_expected_running = False
 
     @property
     def global_agents_home(self) -> Path:
@@ -1346,6 +1374,16 @@ class BootstrapRuntime:
     def _global_home_scope(self) -> bool:
         """Return whether global projection is explicitly bound to the real HOME."""
         return self.paths.control_parent_root == Path.home().resolve()
+
+    @property
+    def default_runtime_root(self) -> bool:
+        """Return whether this manager uses the source-owned default runtime."""
+        return self.paths.runtime_root == self.repository_root / ".runtime"
+
+    @property
+    def legacy_runtime_root(self) -> Path:
+        """Return the one fixed pre-source-owned runtime migration path."""
+        return self.paths.control_parent_root / LEGACY_RUNTIME_RELATIVE
 
     def _ensure_layout(self) -> None:
         _ensure_directory(self.paths.runtime_root)
@@ -1405,12 +1443,6 @@ class BootstrapRuntime:
     def locked(self) -> Iterator[None]:
         """Serialize lifecycle transitions using the external lock file."""
         self._ensure_layout()
-        if os.environ.get("AGENT_CANON_LOCK_HELD") == "1":
-            # SourceSync owns the lock while handing the verified candidate to
-            # the new checkout. The child bootstrap must not deadlock on the
-            # same transaction; the marker is set only for that child.
-            yield
-            return
         handle = os.fdopen(os.open(self.paths.lock, os.O_RDWR | os.O_NOFOLLOW), "r+")
         try:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
@@ -1424,6 +1456,7 @@ class BootstrapRuntime:
             "schema": SCHEMA_STATE,
             "control_parent_root": str(self.paths.control_parent_root),
             "runtime_root": str(self.paths.runtime_root),
+            "repository_root": str(self.repository_root),
             "control_root_digest": self.control_digest,
             "manifest_digest": self.manifest_digest,
             "state": "uninstalled",
@@ -1455,6 +1488,7 @@ class BootstrapRuntime:
                     "runtime owner exists but lifecycle state is missing",
                 ) from exc
             raise
+
         try:
             value = json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -1475,6 +1509,16 @@ class BootstrapRuntime:
                     "requested_control_root_digest": self.control_digest,
                 },
             )
+        recorded_source = value.get("repository_root")
+        if recorded_source and Path(str(recorded_source)).resolve() != self.repository_root:
+            raise BootstrapError(
+                "source_runtime_owned_elsewhere",
+                "runtime is owned by another AgentCanon source root",
+                evidence={
+                    "owner_source_root": recorded_source,
+                    "requested_source_root": str(self.repository_root),
+                },
+            )
         if (
             value.get("manifest_digest") != self.manifest_digest
             and not allow_manifest_drift
@@ -1484,6 +1528,129 @@ class BootstrapRuntime:
                 "runtime manifest digest differs from selected manifest",
             )
         return value
+
+    def _preflight_runtime_reset(
+        self, root: Path, state: Mapping[str, Any] | None
+    ) -> None:
+        """Reject only active or pending work before reconstructive cleanup."""
+        if state is not None and int(state.get("active_task_count", 0)):
+            raise BootstrapError(
+                "runtime_reset_blocked",
+                "active tasks prevent reconstructive runtime cleanup",
+            )
+        tasks = state.get("tasks", {}) if isinstance(state, Mapping) else {}
+        if isinstance(tasks, Mapping) and any(
+            isinstance(item, Mapping) and item.get("state") == "active"
+            for item in tasks.values()
+        ):
+            raise BootstrapError(
+                "runtime_reset_blocked",
+                "active task records prevent reconstructive runtime cleanup",
+            )
+        spool = root / "spool"
+        if spool.is_dir() and any(spool.iterdir()):
+            raise BootstrapError(
+                "runtime_reset_blocked",
+                "pending runtime spool prevents reconstructive cleanup",
+            )
+
+    def _clear_source_runtime(self) -> None:
+        """Clear only bootstrap-owned source runtime children, retaining its lock."""
+        for child in self.paths.runtime_root.iterdir():
+            if child.name == "lifecycle.lock":
+                continue
+            if child.is_symlink():
+                raise BootstrapError(
+                    "symlink_path_rejected", f"runtime child is a symlink: {child}"
+                )
+            if child.is_dir():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+
+    def _prepare_legacy_runtime_reset(self) -> None:
+        """Stop the old owned runtime and prepare a fresh source runtime."""
+        if not self.default_runtime_root or self._legacy_runtime_pending_cleanup:
+            return
+        legacy = self.legacy_runtime_root
+        if legacy == self.paths.runtime_root or not legacy.exists():
+            return
+        if legacy.is_symlink() or not legacy.is_dir():
+            raise BootstrapError(
+                "legacy_runtime_invalid", f"legacy runtime is not a directory: {legacy}"
+            )
+        if not (legacy / STATE_FILE).is_file() or not (legacy / OWNER_FILE).is_file():
+            return
+        old = BootstrapRuntime(
+            self.paths.control_parent_root,
+            legacy,
+            repository_root=self.repository_root,
+            manifest_path=self.manifest_path,
+            docker=self.docker,
+        )
+        old_state = old._read_state(allow_manifest_drift=True)
+        recorded_runtime = old_state.get("runtime_root")
+        if recorded_runtime and Path(str(recorded_runtime)).resolve() != legacy.resolve():
+            raise BootstrapError(
+                "legacy_runtime_invalid", "legacy runtime state points at a different root"
+            )
+        self._preflight_runtime_reset(legacy, old_state)
+        current_state: dict[str, Any] | None = None
+        if self.paths.state.exists():
+            current_state = self._read_state(allow_manifest_drift=True)
+            self._preflight_runtime_reset(self.paths.runtime_root, current_state)
+        try:
+            old.scheduler_disable()
+        except BootstrapError as exc:
+            if exc.code != "systemd_user_unavailable":
+                raise
+        old._stop_owned_container(old_state)
+        old._write_state(old_state)
+        if current_state is not None:
+            self._stop_owned_container(current_state)
+        self._legacy_runtime_expected_running = bool(
+            old_state.get("state") in {"ready", "running"}
+            or old_state.get("resources", {}).get("container", {}).get("id")
+        )
+        self._clear_source_runtime()
+        self._legacy_runtime_pending_cleanup = legacy
+
+    def _finalize_legacy_runtime_reset(self) -> None:
+        """Validate fresh state, then remove only the exact old owned root."""
+        legacy = self._legacy_runtime_pending_cleanup
+        if legacy is None:
+            return
+        state = self._read_state(allow_manifest_drift=True)
+        if self._legacy_runtime_expected_running:
+            if state.get("state") == "uninstalled":
+                raise BootstrapError(
+                    "runtime_reset_unhealthy", "fresh runtime was not installed"
+                )
+            self._write_mounts(state)
+            self._ensure_container(state, start=True)
+            state["state"] = "ready"
+            self._write_state(state)
+            container = self._container_inspect(state, require_running=True)
+            if container is None:
+                raise BootstrapError(
+                    "runtime_reset_unhealthy", "fresh runtime has no healthy container"
+                )
+            self._verify_registry_mount(state, str(container["Id"]))
+        try:
+            self.scheduler_enable()
+        except BootstrapError as exc:
+            if exc.code != "systemd_user_unavailable":
+                raise
+        if legacy.is_symlink() or not legacy.is_dir():
+            raise BootstrapError("legacy_runtime_invalid", f"legacy runtime changed: {legacy}")
+        owner = json.loads(_safe_read(legacy / OWNER_FILE, field="legacy runtime owner"))
+        if not isinstance(owner, dict) or owner.get("control_root_digest") != self.control_digest:
+            raise BootstrapError("legacy_runtime_invalid", "legacy runtime owner changed")
+        owner_source = owner.get("repository_root")
+        if owner_source and Path(str(owner_source)).resolve() != self.repository_root:
+            raise BootstrapError("legacy_runtime_invalid", "legacy runtime source owner changed")
+        shutil.rmtree(legacy)
+        self._legacy_runtime_pending_cleanup = None
 
     def _write_state(self, state: dict[str, Any]) -> None:
         state["schema"], state["updated_at"] = SCHEMA_STATE, _now()
@@ -1495,6 +1662,7 @@ class BootstrapRuntime:
                 "control_root_digest": self.control_digest,
                 "control_parent_root": str(self.paths.control_parent_root),
                 "runtime_root": str(self.paths.runtime_root),
+                "repository_root": str(self.repository_root),
                 "manifest_digest": state.get("manifest_digest", self.manifest_digest),
             },
         )
@@ -2178,11 +2346,19 @@ class BootstrapRuntime:
             "mounts": summarized_mounts,
         }
 
-    def install(self) -> dict[str, Any]:
-        """Install the initial image or reconcile an existing runtime."""
-        with self.locked():
+    def _install_locked(self, image_ref: str | None = None) -> dict[str, Any]:
+        """Install while the caller owns the lifecycle lock."""
+        result: dict[str, Any] | None = None
+        # Keep this implementation lock-free so SourceSync can invoke it for
+        # the swapped checkout while retaining its transaction lock.
+        with contextlib.nullcontext():
             state = self._read_state(allow_manifest_drift=True)
             if state.get("state") != "uninstalled":
+                if image_ref:
+                    raise BootstrapError(
+                        "install_image_ref_requires_uninstalled",
+                        "immutable install image adoption requires a fresh runtime",
+                    )
                 result = self._update_locked(state, "install")
                 # codex_prepare runs after the lifecycle lock is released.
                 pass
@@ -2190,6 +2366,39 @@ class BootstrapRuntime:
                 if state.get("manifest_digest") != self.manifest_digest:
                     state = self._new_state()
                 before = state["state"]
+                if image_ref:
+                    image_record = self.docker.inspect_image(image_ref)
+                    if image_record is None:
+                        raise BootstrapError(
+                            "image_missing", f"registry image is not pulled: {image_ref}"
+                        )
+                    source_head = _source_snapshot(self.repository_root)["head"]
+                    self.docker.validate_registry_image(
+                        image_record, source_head=source_head, image_ref=image_ref
+                    )
+                    state["state"] = "installed"
+                    state["resources"] = self._resource_records()
+                    state["managed_paths"] = [
+                        STATE_FILE,
+                        OWNER_FILE,
+                        "mounts.toml",
+                        *KNOWN_SUBDIRS,
+                        CONTAINER_RUNTIME_DIR,
+                    ]
+                    self._write_mounts(state)
+                    self._write_state(state)
+                    result = self._adopt_registry_image_locked(
+                        state,
+                        image_ref,
+                        image_record,
+                        source_head,
+                        reconcile_manifest=True,
+                    )
+                    self._ensure_global_links(state)
+                    self._write_state(state)
+                    continue_install = False
+                else:
+                    continue_install = True
                 shallow = False
                 try:
                     shallow = (
@@ -2206,7 +2415,7 @@ class BootstrapRuntime:
                     shallow = False
                 self._materialize_skill_view()
                 registry = self.manifest.get("registry", {})
-                if shallow and isinstance(registry, dict) and registry.get("image"):
+                if continue_install and shallow and isinstance(registry, dict) and registry.get("image"):
                     try:
                         from .source_sync import SourceSync
                     except ImportError:
@@ -2229,40 +2438,50 @@ class BootstrapRuntime:
                         "architecture": correspondence["image_architecture"],
                         "source_head": source_head,
                     }
-                else:
+                elif continue_install:
                     self._image(state)
-                state["state"] = "installed"
-                state.setdefault("resources", self._resource_records()).setdefault(
-                    "container", self._resource_records()["container"]
-                )
-                state["managed_paths"] = [
-                    STATE_FILE,
-                    OWNER_FILE,
-                    "mounts.toml",
-                    *KNOWN_SUBDIRS,
-                    CONTAINER_RUNTIME_DIR,
-                ]
-                self._write_mounts(state)
-                self._write_state(state)
-                self._ensure_global_links(state)
-                self._write_state(state)
-                result = self._result(
-                    self._receipt(
-                        "install",
-                        "ok",
-                        "installed",
-                        before=before,
-                        after=state["state"],
-                        details={"image_id": state["resources"]["image"]["id"]},
-                        state=state,
+                if continue_install:
+                    state["state"] = "installed"
+                    state.setdefault("resources", self._resource_records()).setdefault(
+                        "container", self._resource_records()["container"]
                     )
-                )
+                    state["managed_paths"] = [
+                        STATE_FILE,
+                        OWNER_FILE,
+                        "mounts.toml",
+                        *KNOWN_SUBDIRS,
+                        CONTAINER_RUNTIME_DIR,
+                    ]
+                    self._write_mounts(state)
+                    self._write_state(state)
+                    self._ensure_global_links(state)
+                    self._write_state(state)
+                    result = self._result(
+                        self._receipt(
+                            "install",
+                            "ok",
+                            "installed",
+                            before=before,
+                            after=state["state"],
+                            details={"image_id": state["resources"]["image"]["id"]},
+                            state=state,
+                        )
+                    )
+        assert result is not None
+        return result
+
+    def install(self, image_ref: str | None = None) -> dict[str, Any]:
+        """Install the initial image or reconcile an existing runtime."""
+        with self.locked():
+            self._prepare_legacy_runtime_reset()
+            result = self._install_locked(image_ref)
         self.codex_prepare()
         try:
             self.scheduler_enable()
         except BootstrapError as exc:
             if exc.code != "systemd_user_unavailable":
                 raise
+        self._finalize_legacy_runtime_reset()
         return result
 
     def _systemctl(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -2457,14 +2676,46 @@ class BootstrapRuntime:
     ) -> dict[str, Any]:
         """Reconcile only the current checkout; never acquires a Git revision."""
         with self.locked():
+            self._prepare_legacy_runtime_reset()
             state = self._read_state(allow_manifest_drift=True)
-            if state.get("state") == "uninstalled":
+            fresh_reset = self._legacy_runtime_pending_cleanup is not None
+            if state.get("state") == "uninstalled" and not fresh_reset:
                 raise BootstrapError("not_installed", "install must complete before update")
             if source_sync and not image_ref:
                 raise BootstrapError(
                     "source_sync_image_required",
                     "source-sync update requires an immutable image reference",
                 )
+            fresh_result: dict[str, Any] | None = None
+            if state.get("state") == "uninstalled":
+                before = state["state"]
+                state["state"] = "installed"
+                state["resources"] = self._resource_records()
+                state["managed_paths"] = [
+                    STATE_FILE,
+                    OWNER_FILE,
+                    "mounts.toml",
+                    *KNOWN_SUBDIRS,
+                    CONTAINER_RUNTIME_DIR,
+                ]
+                if not image_ref:
+                    self._image(state, force_build=True)
+                    self._write_mounts(state)
+                    self._write_state(state)
+                    fresh_result = self._result(
+                        self._receipt(
+                            "update",
+                            "ok",
+                            "updated",
+                            before=before,
+                            after=state["state"],
+                            details={"image_id": state["resources"]["image"]["id"]},
+                            state=state,
+                        )
+                    )
+                else:
+                    self._write_mounts(state)
+                    self._write_state(state)
             if image_ref:
                 image_record = self.docker.inspect_image(image_ref)
                 if image_record is None:
@@ -2482,9 +2733,12 @@ class BootstrapRuntime:
                 )
                 self._ensure_global_links(state)
                 self._write_state(state)
+            elif fresh_result is not None:
+                result = fresh_result
             else:
                 result = self._update_locked(state, "update")
         self.codex_prepare()
+        self._finalize_legacy_runtime_reset()
         return result
 
     def _ensure_container(
@@ -2585,9 +2839,9 @@ class BootstrapRuntime:
             c["state"] = "running"
         return c
 
-    def start(self) -> dict[str, Any]:
-        """Create or adopt exactly one constrained healthy container."""
-        with self.locked():
+    def _start_locked(self) -> dict[str, Any]:
+        """Start while the caller owns the lifecycle lock."""
+        with contextlib.nullcontext():
             state = self._read_state()
             if state["state"] == "uninstalled":
                 raise BootstrapError(
@@ -2612,6 +2866,11 @@ class BootstrapRuntime:
                     state=state,
                 )
             )
+
+    def start(self) -> dict[str, Any]:
+        """Create or adopt exactly one constrained healthy container."""
+        with self.locked():
+            return self._start_locked()
 
     def status(self) -> dict[str, Any]:
         """Return state plus Docker inspect readback."""
@@ -3527,9 +3786,9 @@ class BootstrapRuntime:
                     )
         return entries
 
-    def codex_prepare(self) -> dict[str, Any]:
-        """Install only manifest-managed links into isolated ``CODEX_HOME``."""
-        with self.locked():
+    def _codex_prepare_locked(self) -> dict[str, Any]:
+        """Prepare links while the caller owns the lifecycle lock."""
+        with contextlib.nullcontext():
             state = self._read_state()
             _ensure_directory(self.paths.codex_home)
             desired = self._managed_links()
@@ -3608,6 +3867,11 @@ class BootstrapRuntime:
                     state=state,
                 )
             )
+
+    def codex_prepare(self) -> dict[str, Any]:
+        """Install only manifest-managed links into isolated ``CODEX_HOME``."""
+        with self.locked():
+            return self._codex_prepare_locked()
 
     def codex_launch(self, project_root: Path) -> dict[str, Any]:
         """Launch Codex with a process-local isolated home."""
@@ -4694,10 +4958,19 @@ class BootstrapRuntime:
 
 
 def _runtime_from_args(args: argparse.Namespace) -> BootstrapRuntime:
+    repository_root = Path(args.repository_root).resolve()
+    runtime_root = repository_root / ".runtime"
+    if args.runtime_root:
+        supplied = Path(args.runtime_root)
+        legacy_default = (
+            Path(args.control_parent_root).resolve() / LEGACY_RUNTIME_RELATIVE
+        )
+        if supplied.absolute() != legacy_default:
+            runtime_root = supplied
     return BootstrapRuntime(
         Path(args.control_parent_root),
-        Path(args.runtime_root),
-        repository_root=Path(args.repository_root),
+        runtime_root,
+        repository_root=repository_root,
         manifest_path=Path(args.manifest) if args.manifest else None,
     )
 
@@ -4707,11 +4980,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="AgentCanon shared runtime bootstrap")
     parser.add_argument("--repository-root", required=True)
     parser.add_argument("--control-parent-root", required=True)
-    parser.add_argument("--runtime-root", required=True)
+    parser.add_argument(
+        "--runtime-root",
+        help="persistent runtime directory (default: <repository-root>/.runtime)",
+    )
     parser.add_argument("--manifest")
     sub = parser.add_subparsers(dest="operation", required=True)
-    for operation in ("install", "start", "status", "stop", "rollback", "uninstall"):
+    for operation in ("start", "status", "stop", "rollback", "uninstall"):
         sub.add_parser(operation)
+    install_parser = sub.add_parser("install")
+    install_parser.add_argument("--image-ref")
     update_parser = sub.add_parser("update")
     update_parser.add_argument("--image-ref")
     update_parser.add_argument(
@@ -4783,7 +5061,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     runtime = _runtime_from_args(args)
     operation = args.operation
     if operation == "install":
-        return runtime.install()
+        return runtime.install(image_ref=args.image_ref)
     if operation == "update":
         return runtime.update(image_ref=args.image_ref, source_sync=args.source_sync)
     if operation == "sync":

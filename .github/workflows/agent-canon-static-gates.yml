@@ -19,7 +19,7 @@ permissions:
 
 env:
   AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
-  AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/../workspace/agent-canon-runtime/static-gates
+  AGENT_CANON_RUNTIME_ROOT: ${{ github.workspace }}/.runtime
 
 concurrency:
   group: agent-canon-static-gates-${{ github.event.pull_request.head.sha || github.sha }}

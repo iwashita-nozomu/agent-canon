@@ -28,7 +28,7 @@ except ImportError:  # direct script/module compatibility
 
 
 class SourceSync:
-    """Own the live shallow-checkout and immutable OCI update transaction."""
+    """Own the live full-checkout and immutable OCI update transaction."""
 
     def __init__(
         self,
@@ -80,13 +80,13 @@ class SourceSync:
         status = self._git(["status", "--porcelain"], cwd=self.install_root).stdout
         if status:
             raise BootstrapError("install_root_dirty", "live install root has uncommitted changes")
-        shallow = self._git(["rev-parse", "--is-shallow-repository"], cwd=self.install_root).stdout.strip()
-        count = self._git(["rev-list", "--count", "HEAD"], cwd=self.install_root).stdout.strip()
-        if shallow != "true" or count != "1":
-            raise BootstrapError(
-                "install_root_not_shallow",
-                "live install root must be a clean depth-one checkout",
-                evidence={"shallow": shallow, "commit_count": count},
+        shallow = self._git(
+            ["rev-parse", "--is-shallow-repository"], cwd=self.install_root
+        ).stdout.strip()
+        if shallow == "true":
+            self._git(
+                ["fetch", "--unshallow", self.remote, self.branch],
+                cwd=self.install_root,
             )
         return self._source_identity(self.install_root)
 
@@ -164,36 +164,63 @@ class SourceSync:
     def _write_sync_state(self, payload: dict[str, Any]) -> None:
         _atomic_json(self.runtime.paths.source_sync, {"schema": "agent-canon.source-sync.v1", **payload})
 
-    def _run_candidate_bootstrap(self, image_digest: str) -> None:
-        common = [
-            str(self.install_root / "bootstrap.sh"),
-            "--control-parent-root",
-            str(self.runtime.paths.control_parent_root),
-            "--runtime-root",
-            str(self.runtime.paths.runtime_root),
-        ]
-        commands = (
-            [
-                *common,
-                "update",
-                "--source-sync",
-                "--image-ref",
-                image_digest,
-            ],
-            [*common, "start"],
-            [*common, "codex", "prepare"],
-        )
-        environment = {**os.environ, "AGENT_CANON_LOCK_HELD": "1"}
-        for args in commands:
-            result = subprocess.run(
-                args, check=False, capture_output=True, text=True, env=environment
+    def _source_owned_runtime(self) -> bool:
+        """Return whether the runtime path is nested in the live checkout."""
+        return self.runtime.paths.runtime_root == self.install_root / ".runtime"
+
+    def _swap_source_tree_preserving_runtime(self, staging: Path, backup: Path) -> None:
+        """Replace source entries while retaining the live ``.runtime`` root."""
+        backup.mkdir(parents=True, mode=0o700)
+        if any(child.name == ".runtime" for child in staging.iterdir()):
+            raise BootstrapError(
+                "source_sync_path_rejected", "candidate checkout contains a source-local runtime"
             )
-            if result.returncode:
+        moved_old: list[str] = []
+        moved_candidate: list[str] = []
+        try:
+            for child in list(self.install_root.iterdir()):
+                if child.name == ".runtime":
+                    continue
+                os.rename(child, backup / child.name)
+                moved_old.append(child.name)
+            for child in list(staging.iterdir()):
+                os.rename(child, self.install_root / child.name)
+                moved_candidate.append(child.name)
+        except OSError as exc:
+            try:
+                for name in reversed(moved_candidate):
+                    os.rename(self.install_root / name, staging / name)
+                for name in reversed(moved_old):
+                    os.rename(backup / name, self.install_root / name)
+            except OSError as restore_error:
                 raise BootstrapError(
-                    "candidate_bootstrap_failed",
-                    f"candidate bootstrap command failed: {args[-2] if len(args) > 1 else args[-1]}",
-                    evidence={"exit": result.returncode},
-                )
+                    "source_sync_restore_failed", "candidate source restore failed"
+                ) from restore_error
+            raise BootstrapError("source_sync_swap_failed", "candidate source swap failed") from exc
+
+    def _restore_source_tree_preserving_runtime(self, staging: Path, backup: Path) -> None:
+        """Restore source entries after a candidate bootstrap failure."""
+        staging.mkdir(parents=True, mode=0o700, exist_ok=True)
+        for child in list(self.install_root.iterdir()):
+            if child.name == ".runtime":
+                continue
+            os.rename(child, staging / child.name)
+        for child in list(backup.iterdir()):
+            os.rename(child, self.install_root / child.name)
+
+    def _run_candidate_bootstrap(self, image_digest: str) -> None:
+        # The outer SourceSync transaction owns this runtime lock.  Invoke the
+        # candidate's lock-owned implementations in-process so a fresh source
+        # cannot be made to bypass the lock through an environment marker.
+        candidate = BootstrapRuntime(
+            self.runtime.paths.control_parent_root,
+            self.runtime.paths.runtime_root,
+            repository_root=self.install_root,
+            docker=self.runtime.docker,
+        )
+        candidate._install_locked(image_digest)
+        candidate._start_locked()
+        candidate._codex_prepare_locked()
 
     def sync(self) -> dict[str, Any]:
         """Synchronize source and image once; unchanged main is a no-op."""
@@ -211,6 +238,8 @@ class SourceSync:
                 }
                 self._write_sync_state(payload)
                 return {"code": "unchanged", **payload}
+            self.runtime._prepare_legacy_runtime_reset()
+            state = self.runtime._read_state(allow_manifest_drift=True)
             staging = self.runtime.paths.source_staging
             backup = self.runtime.paths.source_backup
             self._remove_exact(staging)
@@ -219,31 +248,35 @@ class SourceSync:
             backup.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
             try:
                 self._git(
-                    ["clone", "--depth=1", "--single-branch", "--branch", self.branch, remote_url, str(staging)],
+                    ["clone", "--single-branch", "--branch", self.branch, remote_url, str(staging)],
                     cwd=self.runtime.paths.runtime_root,
                 )
                 staged_head, staged_tree = self._source_identity(staging)
                 if staged_head != target_head:
                     raise BootstrapError("source_sync_git_failed", "staged checkout differs from remote main")
-                count = self._git(["rev-list", "--count", "HEAD"], cwd=staging).stdout.strip()
-                if count != "1":
-                    raise BootstrapError("source_sync_git_failed", "staged checkout accumulated history")
                 image_ref = self._registry_image(staged_head)
                 record = self._pull(image_ref)
                 correspondence = self.runtime.docker.validate_registry_image(
                     record, source_head=staged_head, image_ref=image_ref
                 )
                 digest = correspondence["image_repo_digest"]
-                os.rename(self.install_root, backup)
-                os.rename(staging, self.install_root)
+                source_owned_runtime = self._source_owned_runtime()
+                if source_owned_runtime:
+                    self._swap_source_tree_preserving_runtime(staging, backup)
+                else:
+                    os.rename(self.install_root, backup)
+                    os.rename(staging, self.install_root)
                 try:
                     self._run_candidate_bootstrap(digest)
                 except BootstrapError:
                     current = self.runtime._read_state(allow_manifest_drift=True)
                     self.runtime._stop_owned_container(current)
                     self.runtime._write_state(state)
-                    os.rename(self.install_root, staging)
-                    os.rename(backup, self.install_root)
+                    if source_owned_runtime:
+                        self._restore_source_tree_preserving_runtime(staging, backup)
+                    else:
+                        os.rename(self.install_root, staging)
+                        os.rename(backup, self.install_root)
                     restored = self.runtime._read_state(allow_manifest_drift=True)
                     self.runtime._ensure_container(restored, start=bool(state.get("state") in {"ready", "running"}))
                     self.runtime._write_state(restored)
@@ -262,6 +295,7 @@ class SourceSync:
                     "updated_at": _now(),
                 }
                 self._write_sync_state(payload)
+                self.runtime._finalize_legacy_runtime_reset()
                 self._remove_exact(backup)
                 self._remove_exact(staging)
                 return {"code": "updated", **payload}
