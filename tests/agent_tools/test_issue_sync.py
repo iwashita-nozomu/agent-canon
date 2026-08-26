@@ -196,7 +196,7 @@ def test_issue_worker_plan_reorganizes_mixed_related_issues_without_mutation() -
             "https://github.com/owner/repo/issues/1",
         ),
         issue_sync.GitHubIssueRecord(
-            "owner/repo", "2", "old closed", "## Finding\nrepair the missing route", "CLOSED",
+            "owner/repo", "2", "old closed", "owner: issue-owner\n## Finding\nrepair the missing route", "CLOSED",
             "https://github.com/owner/repo/issues/2",
         ),
     )
@@ -211,7 +211,7 @@ def test_issue_worker_plan_rerun_is_noop_for_existing_destination() -> None:
         _qualified_finding(), authenticated_repository="owner/repo"
     )
     issue = issue_sync.GitHubIssueRecord(
-        "owner/repo", "2", "route", "repair the missing route", "OPEN",
+        "owner/repo", "2", "route", "owner: issue-owner\n## Finding\nrepair the missing route", "OPEN",
         "https://github.com/owner/repo/issues/2",
     )
     plan = issue_sync.IssueWorker(None, "owner/repo").plan_publication(handoff, (issue,))  # type: ignore[arg-type]
@@ -226,3 +226,129 @@ def test_publisher_projection_carries_checkout_identity_without_approval_gate() 
     assert "checkout_identity" in publisher
     assert "cwd" in publisher and "branch" in publisher and "remote owner/repository" in publisher
     assert "extra approval" in publisher
+
+
+def test_repository_normalization_matches_common_git_transports() -> None:
+    assert issue_sync.normalize_repository("git@github.com:Owner/Repo.git") == "owner/repo"
+    assert issue_sync.normalize_repository("https://github.com/Owner/Repo.git") == "owner/repo"
+    assert issue_sync.normalize_repository("OWNER/REPO") == "owner/repo"
+
+
+class _IssueWorkerClient:
+    def __init__(self, records: tuple[issue_sync.GitHubIssueRecord, ...]) -> None:
+        self.records = {record.number: record for record in records}
+        self.calls: list[tuple[str, str]] = []
+
+    def create(self, repository: str, title: str, body: str) -> issue_sync.GitHubIssueRecord:
+        raise issue_sync.IssueSyncError("github_unavailable", "test client unavailable")
+
+    def read(self, reference: issue_sync.GitHubIssueReference) -> issue_sync.GitHubIssueRecord:
+        return self.records[reference.number]
+
+    def edit(self, issue: issue_sync.GitHubIssueRecord, *, title: str, body: str) -> issue_sync.GitHubIssueRecord:
+        self.calls.append(("edit", issue.number))
+        updated = issue_sync.GitHubIssueRecord(
+            issue.repository, issue.number, title, body, issue.state, issue.url
+        )
+        self.records[issue.number] = updated
+        return updated
+
+    def set_state(self, issue: issue_sync.GitHubIssueRecord, state: str) -> issue_sync.GitHubIssueRecord:
+        self.calls.append(("state", issue.number))
+        updated = issue_sync.GitHubIssueRecord(
+            issue.repository, issue.number, issue.title, issue.body, state, issue.url
+        )
+        self.records[issue.number] = updated
+        return updated
+
+
+class _SuccessfulIssueWorkerClient(_IssueWorkerClient):
+    def create(self, repository: str, title: str, body: str) -> issue_sync.GitHubIssueRecord:
+        record = issue_sync.GitHubIssueRecord(
+            repository,
+            "42",
+            title,
+            body,
+            "OPEN",
+            f"https://github.com/{repository}/issues/42",
+        )
+        self.records[record.number] = record
+        return record
+
+def test_issue_worker_reorganization_removes_transferred_clause_and_adds_backlinks() -> None:
+    handoff = issue_sync.qualify_issue_worker_finding(
+        _qualified_finding(
+            responsibility={"owner": "issue-owner", "decision": "repair route"}
+        ),
+        authenticated_repository="owner/repo",
+    )
+    source = issue_sync.GitHubIssueRecord(
+        "owner/repo", "1", "mixed", "## Finding\nrepair the missing route", "OPEN",
+        "https://github.com/owner/repo/issues/1",
+    )
+    destination = issue_sync.GitHubIssueRecord(
+        "owner/repo", "2", "closed", "## Responsibility Boundary\nowner: issue-owner\ndecision: repair route\n## Finding\nrepair the missing route", "CLOSED",
+        "https://github.com/owner/repo/issues/2",
+    )
+    client = _IssueWorkerClient((source, destination))
+    result = issue_sync.IssueWorker(client, "owner/repo").publish(
+        handoff,
+        title="route",
+        body=destination.body,
+        related_issues=(source, destination),
+    )
+    assert result.state == "OPEN"
+    assert "repair the missing route" not in client.records["1"].body
+    assert "clauses transferred to https://github.com/owner/repo/issues/2" in client.records["1"].body
+    assert "transferred from https://github.com/owner/repo/issues/1" in result.body
+    assert client.calls.count(("edit", "1")) == 1
+
+
+def test_issue_worker_failure_writes_metadata_only_retry_packet(tmp_path: Path) -> None:
+    handoff = issue_sync.qualify_issue_worker_finding(
+        _qualified_finding(), authenticated_repository="owner/repo"
+    )
+    body = tmp_path / "private-body.md"
+    body.write_text("private Issue body\n", encoding="utf-8")
+    digest = "sha256:" + hashlib.sha256(body.read_bytes()).hexdigest()
+    client = _IssueWorkerClient(())
+    worker = issue_sync.IssueWorker(client, "owner/repo")
+    with pytest.raises(issue_sync.IssueSyncError, match="github_unavailable"):
+        worker.publish(
+            handoff,
+            title="retry me",
+            body=body.read_text(encoding="utf-8"),
+            defer_log_root=tmp_path / "agent-canon-log",
+            body_locator=str(body),
+            body_digest=digest,
+        )
+    packets = tuple((tmp_path / "agent-canon-log" / "feedback/issue-packets/pending").glob("*.json"))
+    assert len(packets) == 1
+    packet = packets[0].read_text(encoding="utf-8")
+    assert "github_unavailable" in packet
+    assert "issue-worker" in packet
+    assert "private Issue body" not in packet
+
+
+def test_issue_worker_retry_packet_returns_through_issue_worker_route(tmp_path: Path) -> None:
+    handoff = issue_sync.qualify_issue_worker_finding(
+        _qualified_finding(), authenticated_repository="owner/repo"
+    )
+    body = tmp_path / "private-body.md"
+    body.write_text("private Issue body\n", encoding="utf-8")
+    digest = "sha256:" + hashlib.sha256(body.read_bytes()).hexdigest()
+    packet = issue_sync.write_pending_packet(
+        log_root=tmp_path / "agent-canon-log",
+        repository="owner/repo",
+        title="retry route",
+        body_locator=str(body),
+        body_digest=digest,
+        route="issue-worker",
+        handoff=handoff.as_dict(),
+    )
+    result = issue_sync.sync_pending_packet(
+        packet,
+        _SuccessfulIssueWorkerClient(()),
+    )
+    assert result.url.endswith("/42")
+    assert not packet.exists()

@@ -414,11 +414,17 @@ rows, and selection misses are observations and never synthesize candidates.
 `checkout_identity.remote` value from the #938 readback. The same repository
 may proceed to the logical IssueWorker route, which is executed by the host
 `publisher`; another repository receives a qualified no-mutation handoff.
+Missing owner or mechanism evidence remains in that publisher investigation
+and may become `need verification`; it is not silently discarded.
 `IssueWorker.plan_publication()` reads the related open/closed set and returns
 `create`, `update`, `reopen`, `reorganize`, or `noop`. The publisher performs
 the required GitHub mutation through the existing adapter and reads back the
 URL, number, body, and state. The dashboard, resident runtime, and parent
-Python remain read-only and do not receive GitHub credentials.
+Python remain read-only and do not receive GitHub credentials. Orchestration
+materializes a publisher ToolCall with the checkout identity and typed handoff;
+publication failure writes only the existing metadata-only pending packet
+(repository, reason, private locator, and digest) and retries through this
+same IssueWorker route.
 
 ## Multi-Agent Partition
 

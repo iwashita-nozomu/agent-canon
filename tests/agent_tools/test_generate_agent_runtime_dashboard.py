@@ -95,6 +95,29 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertTrue(handoffs[0].qualifies)
         self.assertEqual(handoffs[0].reason, "user-owned-candidate")
 
+    def test_issue_worker_does_not_use_authenticated_repository_log_fallback(self) -> None:
+        """A self-claimed log field cannot replace checkout identity readback."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            hook = Path(temp_dir) / "events.jsonl"
+            hook.write_text(
+                json.dumps(
+                    {
+                        "authenticated_repository": "owner/repo",
+                        "issue_worker_candidate": {
+                            "repository": "owner/repo",
+                            "owner": "issue-owner",
+                            "fix": "repair the missing route",
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            handoffs = read_issue_worker_handoffs((hook,))
+
+        assert len(handoffs) == 1
+        assert handoffs[0].reason == "checkout-identity-unresolved"
+
     def test_issue_worker_candidate_creates_host_publisher_action(self) -> None:
         """A qualified candidate creates a host action, not a dashboard mutation."""
         handoff = SimpleNamespace(

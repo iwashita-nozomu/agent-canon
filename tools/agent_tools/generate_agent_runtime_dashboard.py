@@ -1229,7 +1229,7 @@ def read_issue_worker_handoffs(
                 authenticated_repository = (
                     str(identity.get("remote") or "").strip()
                     if isinstance(identity, Mapping)
-                    else str(entry.get("authenticated_repository") or "").strip()
+                    else ""
                 )
                 handoffs.append(
                     qualify_issue_worker_finding(
@@ -2106,6 +2106,7 @@ def issue_worker_payload(summary: RuntimeDashboardSummary) -> dict[str, object]:
     reasons = Counter(handoff.reason for handoff in handoffs)
     return {
         "qualified": counts.get("qualified", 0),
+        "routeable": sum(handoff.can_route for handoff in handoffs),
         "handoff": counts.get("handoff", 0),
         "no_action": counts.get("no-action", 0),
         "reasons": dict(sorted(reasons.items())),
@@ -3549,12 +3550,28 @@ def durable_issue_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboa
     """Return the next host-publisher action for explicit IssueWorker candidates."""
     handoffs = getattr(summary, "issue_worker_handoffs", ())
     qualified = tuple(handoff for handoff in handoffs if handoff.qualifies)
-    if qualified:
-        repositories = ", ".join(sorted({handoff.repository for handoff in qualified}))
+    routeable = tuple(
+        handoff
+        for handoff in handoffs
+        if getattr(handoff, "can_route", handoff.qualifies)
+    )
+    if routeable:
+        repositories = ", ".join(sorted({handoff.repository for handoff in routeable}))
+        unresolved = len(routeable) - len(qualified)
+        action = (
+            "investigate IssueWorker evidence gaps"
+            if unresolved
+            else "publish explicit IssueWorker candidates"
+        )
+        reason = (
+            f"{unresolved} same-repository candidate(s) need publisher investigation"
+            if unresolved
+            else f"{len(qualified)} same-repository candidate(s) require host publication"
+        )
         return (DashboardNextAction(
             priority="P1",
-            action="publish explicit IssueWorker candidates",
-            reason=f"{len(qualified)} same-repository candidate(s) require host publication",
+            action=action,
+            reason=reason,
             evidence=repositories,
             owner_surface="IssueWorker publisher and GitHub Issue readback",
             command="route the typed handoff to the publisher role; dashboard remains read-only",
@@ -3690,6 +3707,7 @@ def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"AGENT_RUNTIME_DASHBOARD_BLOCKING_NEXT_ACTIONS={blocking_next_action_count(summary)}",
         f"AGENT_RUNTIME_DASHBOARD_GITHUB_ISSUE_REFS={len(summary.evidence.github_issue_refs)}",
         f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_QUALIFIED={sum(handoff.qualifies for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",
+        f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_ROUTEABLE={sum(handoff.can_route for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",
         f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_HANDOFFS={sum(handoff.status == 'handoff' for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",
         f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_NO_ACTION={sum(handoff.status == 'no-action' for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",
     ]

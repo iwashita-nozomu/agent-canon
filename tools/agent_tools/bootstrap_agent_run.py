@@ -580,6 +580,17 @@ def emit_bootstrap_output(
         print(
             "DYNAMIC_SUBAGENT_EXPANSION_MONITOR=workflow_monitoring.md#Behavior Events"
         )
+        if context.workflow_family_id == "issue_worker_publication":
+            print(
+                "ISSUE_WORKER_DISPATCH_ROUTE="
+                "tools/agent_tools/agent_team.py#dispatch_issue_worker"
+            )
+            print("ISSUE_WORKER_EXECUTION_ROLE=publisher")
+            print(
+                "ISSUE_WORKER_TOOL_CALL_ROUTE="
+                "tools/agent_tools/tool_calls.py#materialize_issue_worker_tool_call"
+            )
+            print("ISSUE_WORKER_READBACK=URL,number,body,state")
         print(
             f"SUBAGENT_WAVE_RECORD_COMMAND={subagent_wave_record_command(context.report_dir, layout=public_layout)}"
         )
