@@ -142,9 +142,13 @@ _agent_canon_rewrite_target_args() {
 _agent_canon_extract_exec_target_digest() {
   local -a original=("${command_args[@]}")
   local -a rewritten=()
-  local digest= index=0 token value found=0
+  local digest= index=0 token found=0
   while ((index < ${#original[@]})); do
     token=${original[index]}
+    if [[ "$token" == -- ]]; then
+      rewritten+=("${original[@]:index}")
+      break
+    fi
     if [[ "$token" == --target-digest ]]; then
       ((found == 0)) || _agent_canon_json_error argument_duplicate "exec target digest was provided more than once"
       ((index + 1 < ${#original[@]})) || _agent_canon_json_error argument_missing "--target-digest requires a value"
@@ -154,6 +158,16 @@ _agent_canon_extract_exec_target_digest() {
       rewritten+=(--target-digest "$digest")
       found=1
       index=$((index + 2))
+      continue
+    fi
+    if [[ "$token" == --target-digest=* ]]; then
+      ((found == 0)) || _agent_canon_json_error argument_duplicate "exec target digest was provided more than once"
+      digest=${token#--target-digest=}
+      [[ "$digest" =~ ^[A-Za-z0-9_.-]{1,128}$ ]] ||
+        _agent_canon_json_error argument_invalid "exec target digest is invalid"
+      rewritten+=(--target-digest "$digest")
+      found=1
+      index=$((index + 1))
       continue
     fi
     rewritten+=("$token")
@@ -173,6 +187,17 @@ _agent_canon_extract_exec_target_digest() {
     fi
   done < "$AGENT_CANON_STATE_ROOT/mounts.tsv"
   _agent_canon_json_error target_not_registered "exec target digest is absent from the strict mount registry"
+}
+
+_agent_canon_exec_is_structured_request() {
+  local index=1 token
+  while ((index < ${#command_args[@]})); do
+    token=${command_args[index]}
+    [[ "$token" == -- ]] && return 1
+    [[ "$token" == --request-json || "$token" == --request-json=* ]] && return 0
+    index=$((index + 1))
+  done
+  return 1
 }
 
 _agent_canon_validate_private_log_mount() {
@@ -1644,7 +1669,7 @@ bootstrap_host_entrypoint() {
       fi
       local container
       container=$(_agent_canon_ensure_container)
-      if [[ "$operation" == exec && " ${command_args[*]} " == *" --request-json "* ]]; then
+      if [[ "$operation" == exec ]] && _agent_canon_exec_is_structured_request; then
         _agent_canon_extract_exec_target_digest
         _agent_canon_validate_private_log_mount "$container"
       elif [[ "$operation" == tool || "$operation" == template || "$operation" == eval || "$operation" == exec ]]; then

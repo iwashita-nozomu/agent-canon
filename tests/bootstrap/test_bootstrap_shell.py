@@ -73,6 +73,53 @@ def test_structured_exec_target_digest_is_shell_validated_before_container_hando
     assert 'AGENT_CANON_STATE_ROOT/mounts.tsv' in text
     assert 'AGENT_CANON_TARGET_DIGEST=$digest' in text
     assert 'install|update|start|stop|rollback|uninstall|target|tool|template|task|gc|eval|exec)' in text
+    assert '" ${command_args[*]} " == *" --request-json "*' not in text
+
+
+def test_exec_child_request_json_does_not_switch_to_structured_mode(tmp_path: Path) -> None:
+    """A child argv token after ``--`` remains a generic exec command."""
+    script = (
+        f'source "{ADAPTER}"\n'
+        'command_args=(exec --root /tmp/target -- tool --request-json value)\n'
+        '_agent_canon_exec_is_structured_request\n'
+    )
+    result = subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+
+
+def test_exec_request_json_before_separator_uses_typed_digest(tmp_path: Path) -> None:
+    """A pre-separator request option consumes its digest and preserves its value."""
+    state_root = tmp_path / "state"
+    target = tmp_path / "target"
+    state_root.mkdir()
+    target.mkdir()
+    digest = "typed-target"
+    (state_root / "mounts.tsv").write_text(
+        f"target\t{digest}\t{target}\t/targets/{digest}\tread-only\n",
+        encoding="utf-8",
+    )
+    script = (
+        f'source "{ADAPTER}"\n'
+        f'AGENT_CANON_STATE_ROOT="{state_root}"\n'
+        'AGENT_CANON_DOCKER_CMD=true\n'
+        f'command_args=(exec --request-json "quoted value" --target-digest={digest})\n'
+        '_agent_canon_exec_is_structured_request\n'
+        '_agent_canon_extract_exec_target_digest\n'
+        'printf "%s\\n" "$AGENT_CANON_TARGET_DIGEST" "${command_args[*]}"\n'
+    )
+    result = subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [digest, f'exec --request-json quoted value --target-digest {digest}']
 
 
 def test_private_log_source_is_read_back_from_the_owned_mount() -> None:
