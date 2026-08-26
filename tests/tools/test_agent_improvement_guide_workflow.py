@@ -46,6 +46,7 @@ class AgentImprovementGuideWorkflowTest(unittest.TestCase):
             "fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}",
             text,
         )
+        self.assertNotIn('mkdir -p "${report_dir}"', text)
 
 
 if __name__ == "__main__":
