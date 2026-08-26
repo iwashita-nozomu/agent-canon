@@ -85,7 +85,9 @@ def test_pending_packet_online_create_readback_removes_packet(tmp_path: Path) ->
     )
     client = issue_sync.GitHubIssueClient("owner/repo")
     with patch.object(client, "create", return_value=record) as create:
-        result = issue_sync.sync_pending_packet(packet, client)
+        result = issue_sync.sync_pending_packet(
+            packet, client, checkout_identity={"remote": "owner/repo"}
+        )
     assert result.url.endswith("/42")
     create.assert_called_once_with("owner/repo", "Online packet", "Issue body\n")
     assert not packet.exists()
@@ -102,7 +104,45 @@ def test_pending_packet_digest_mismatch_is_retained(tmp_path: Path) -> None:
         body_digest="sha256:" + "0" * 64,
     )
     with pytest.raises(issue_sync.IssueSyncError, match="body_digest_mismatch"):
-        issue_sync.sync_pending_packet(packet, issue_sync.GitHubIssueClient("owner/repo"))
+        issue_sync.sync_pending_packet(
+            packet,
+            issue_sync.GitHubIssueClient("owner/repo"),
+            checkout_identity={"remote": "owner/repo"},
+        )
+    assert packet.exists()
+
+
+def test_pending_packet_requires_current_checkout_identity(tmp_path: Path) -> None:
+    body = tmp_path / "body.md"
+    body.write_text("body\n", encoding="utf-8")
+    packet = issue_sync.write_pending_packet(
+        log_root=tmp_path / "log",
+        repository="owner/repo",
+        title="identity required",
+        body_locator=str(body),
+        body_digest="sha256:" + hashlib.sha256(body.read_bytes()).hexdigest(),
+    )
+    with pytest.raises(issue_sync.IssueSyncError, match="checkout-identity-unresolved"):
+        issue_sync.sync_pending_packet(packet, issue_sync.GitHubIssueClient())
+    assert packet.exists()
+
+
+def test_pending_packet_rejects_different_current_checkout(tmp_path: Path) -> None:
+    body = tmp_path / "body.md"
+    body.write_text("body\n", encoding="utf-8")
+    packet = issue_sync.write_pending_packet(
+        log_root=tmp_path / "log",
+        repository="owner/repo",
+        title="identity mismatch",
+        body_locator=str(body),
+        body_digest="sha256:" + hashlib.sha256(body.read_bytes()).hexdigest(),
+    )
+    with pytest.raises(issue_sync.IssueSyncError, match="checkout-repository-mismatch"):
+        issue_sync.sync_pending_packet(
+            packet,
+            issue_sync.GitHubIssueClient(),
+            checkout_identity={"remote": "other/repo"},
+        )
     assert packet.exists()
 
 
@@ -196,7 +236,7 @@ def test_issue_worker_plan_reorganizes_mixed_related_issues_without_mutation() -
             "https://github.com/owner/repo/issues/1",
         ),
         issue_sync.GitHubIssueRecord(
-            "owner/repo", "2", "old closed", "owner: issue-owner\n## Finding\nrepair the missing route", "CLOSED",
+            "owner/repo", "2", "old closed", "## Responsibility Boundary\nowner: issue-owner\n## Required Fix\nrepair the missing route\n## Finding\nrepair the missing route", "CLOSED",
             "https://github.com/owner/repo/issues/2",
         ),
     )
@@ -211,7 +251,7 @@ def test_issue_worker_plan_rerun_is_noop_for_existing_destination() -> None:
         _qualified_finding(), authenticated_repository="owner/repo"
     )
     issue = issue_sync.GitHubIssueRecord(
-        "owner/repo", "2", "route", "owner: issue-owner\n## Finding\nrepair the missing route", "OPEN",
+        "owner/repo", "2", "route", "## Responsibility Boundary\nowner: issue-owner\n## Required Fix\nrepair the missing route\n## Finding\nrepair the missing route", "OPEN",
         "https://github.com/owner/repo/issues/2",
     )
     plan = issue_sync.IssueWorker(None, "owner/repo").plan_publication(handoff, (issue,))  # type: ignore[arg-type]
@@ -283,11 +323,11 @@ def test_issue_worker_reorganization_removes_transferred_clause_and_adds_backlin
         authenticated_repository="owner/repo",
     )
     source = issue_sync.GitHubIssueRecord(
-        "owner/repo", "1", "mixed", "## Finding\nrepair the missing route", "OPEN",
+        "owner/repo", "1", "mixed", "## Finding\nrepair the missing route\n## Evidence\nrepair the missing route", "OPEN",
         "https://github.com/owner/repo/issues/1",
     )
     destination = issue_sync.GitHubIssueRecord(
-        "owner/repo", "2", "closed", "## Responsibility Boundary\nowner: issue-owner\ndecision: repair route\n## Finding\nrepair the missing route", "CLOSED",
+        "owner/repo", "2", "closed", "## Responsibility Boundary\nowner: issue-owner\ndecision: repair route\n## Required Fix\nrepair the missing route\n## Finding\nrepair the missing route", "CLOSED",
         "https://github.com/owner/repo/issues/2",
     )
     client = _IssueWorkerClient((source, destination))
@@ -298,10 +338,48 @@ def test_issue_worker_reorganization_removes_transferred_clause_and_adds_backlin
         related_issues=(source, destination),
     )
     assert result.state == "OPEN"
-    assert "repair the missing route" not in client.records["1"].body
+    assert issue_sync.parse_sections(client.records["1"].body).get("finding", "") == ""
+    assert "## Evidence\nrepair the missing route" in client.records["1"].body
     assert "clauses transferred to https://github.com/owner/repo/issues/2" in client.records["1"].body
     assert "transferred from https://github.com/owner/repo/issues/1" in result.body
     assert client.calls.count(("edit", "1")) == 1
+
+
+def test_issue_worker_foreign_related_issue_is_handoff_relation_without_mutation() -> None:
+    handoff = issue_sync.qualify_issue_worker_finding(
+        _qualified_finding(), authenticated_repository="owner/repo"
+    )
+    local = issue_sync.GitHubIssueRecord(
+        "owner/repo", "2", "local", "## Responsibility Boundary\nowner: issue-owner\n## Required Fix\nrepair the missing route\n## Finding\nlocal clause", "OPEN",
+        "https://github.com/owner/repo/issues/2",
+    )
+    foreign = issue_sync.GitHubIssueRecord(
+        "other/repo", "8", "foreign", "owner: issue-owner\n## Finding\nforeign clause", "OPEN",
+        "https://github.com/other/repo/issues/8",
+    )
+    client = _IssueWorkerClient((local, foreign))
+    result = issue_sync.IssueWorker(client, "owner/repo").publish(
+        handoff,
+        title="route",
+        body=local.body,
+        related_issues=(local, foreign),
+    )
+    assert result.number == "2"
+    assert client.calls == [("edit", "2")]
+    assert client.records["8"].body == foreign.body
+    assert "handoff relation: foreign Issue https://github.com/other/repo/issues/8" in result.body
+
+
+def test_issue_worker_changed_fix_clause_requires_update() -> None:
+    handoff = issue_sync.qualify_issue_worker_finding(
+        _qualified_finding(fix="new fix"), authenticated_repository="owner/repo"
+    )
+    old = issue_sync.GitHubIssueRecord(
+        "owner/repo", "3", "old", "## Responsibility Boundary\nowner: issue-owner\n## Required Fix\nold fix", "OPEN",
+        "https://github.com/owner/repo/issues/3",
+    )
+    plan = issue_sync.IssueWorker(None, "owner/repo").plan_publication(handoff, (old,))  # type: ignore[arg-type]
+    assert plan.action == "update"
 
 
 def test_issue_worker_failure_writes_metadata_only_retry_packet(tmp_path: Path) -> None:
@@ -349,6 +427,7 @@ def test_issue_worker_retry_packet_returns_through_issue_worker_route(tmp_path: 
     result = issue_sync.sync_pending_packet(
         packet,
         _SuccessfulIssueWorkerClient(()),
+        checkout_identity={"remote": "owner/repo"},
     )
     assert result.url.endswith("/42")
     assert not packet.exists()

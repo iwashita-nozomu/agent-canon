@@ -140,6 +140,7 @@ def dispatch_issue_worker(
     tool_call = materialize_issue_worker_tool_call(
         handoff=handoff.as_dict(),
         publisher_agent_id=publisher_agent_id,
+        checkout_repository=normalize_repository(identity.remote),
     )
     return IssueWorkerDispatch(
         "spawned",

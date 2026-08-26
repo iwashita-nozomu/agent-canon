@@ -176,19 +176,24 @@ def materialize_issue_worker_tool_call(
     *,
     handoff: Mapping[str, object],
     publisher_agent_id: str,
+    checkout_repository: str,
 ) -> dict[str, object]:
     """Return a host-publisher ToolCall for one typed IssueWorker handoff."""
-    if not publisher_agent_id.strip():
-        raise RuntimeError("issue_worker_tool_call publisher agent is required")
+    if not publisher_agent_id.strip() or not checkout_repository.strip():
+        raise RuntimeError(
+            "issue_worker_tool_call publisher agent and checkout repository are required"
+        )
     return materialize_tool_call_token(
         tool_id="issue-worker",
         argument_schema_id="agent-canon.issue-worker.args.v1",
         argument_properties={
             "publisher_agent_id": {"type": "string", "minLength": 1},
+            "checkout_repository": {"type": "string", "minLength": 1},
             "handoff": {"type": "object"},
         },
         arguments={
             "publisher_agent_id": publisher_agent_id,
+            "checkout_repository": checkout_repository,
             "handoff": dict(handoff),
         },
         intent=(

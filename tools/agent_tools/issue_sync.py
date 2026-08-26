@@ -28,6 +28,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
 
+if __package__:
+    from .checkout_identity import resolve_checkout_identity
+else:
+    from checkout_identity import resolve_checkout_identity  # type: ignore[no-redef]
+
 GITHUB_URL_RE = re.compile(r"^https://github\.com/(?P<repo>[^/]+/[^/]+)/issues/(?P<number>[1-9][0-9]*)$")
 PACKET_SCHEMA = "agent-canon.feedback.issue-packet.v1"
 CLAUSE_KINDS = ("problem", "required_action", "done", "close_condition")
@@ -184,6 +189,7 @@ class IssueWorkerPlan:
     handoff: IssueWorkerHandoff
     related_issue_refs: tuple[str, ...] = ()
     destination_issue_ref: str = ""
+    foreign_issue_refs: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, object]:
         """Return the machine-readable, mutation-free plan projection."""
@@ -193,6 +199,7 @@ class IssueWorkerPlan:
             "handoff": self.handoff.as_dict(),
             "related_issue_refs": list(self.related_issue_refs),
             "destination_issue_ref": self.destination_issue_ref,
+            "foreign_issue_refs": list(self.foreign_issue_refs),
         }
 
 
@@ -358,13 +365,34 @@ class IssueWorker:
     ) -> bool:
         """Return whether an Issue contains the candidate responsibility tuple."""
         sections = parse_sections(issue.body)
-        if not any(
-            sections.get(kind, "") for kind in (*CLAUSE_KINDS, "finding")
-        ):
+        if not any(sections.get(kind, "") for kind in (*CLAUSE_KINDS, "finding")):
             return False
         terms = handoff.responsibility or (handoff.owner,)
-        body = issue.body.casefold()
-        return all(term.casefold() in body for term in terms if term)
+        responsibility = sections.get("responsibility_boundary", "").casefold()
+        if not all(term.casefold() in responsibility for term in terms if term):
+            return False
+        return any(
+            handoff.fix.casefold() in sections.get(kind, "").casefold()
+            for kind in ("required_fix", "required_action", "required_investigation_or_fix")
+        )
+
+    def _filter_related_issues(
+        self,
+        handoff: IssueWorkerHandoff,
+        related_issues: Iterable[GitHubIssueRecord],
+    ) -> tuple[tuple[GitHubIssueRecord, ...], tuple[str, ...]]:
+        """Keep only active-checkout Issues; retain foreign refs as handoffs."""
+        active = self.authenticated_repository
+        candidate = normalize_repository(handoff.repository)
+        trusted: list[GitHubIssueRecord] = []
+        foreign: list[str] = []
+        for issue in related_issues:
+            issue_repo = normalize_repository(issue.repository)
+            if issue_repo == active and issue_repo == candidate:
+                trusted.append(issue)
+            else:
+                foreign.append(issue.url)
+        return tuple(trusted), tuple(dict.fromkeys(foreign))
 
     def plan_publication(
         self,
@@ -386,8 +414,9 @@ class IssueWorker:
         refs = tuple(record.url for record in records)
         if not handoff.qualifies:
             return IssueWorkerPlan("no-action", handoff, refs)
+        records, foreign_refs = self._filter_related_issues(handoff, records)
         if not records:
-            return IssueWorkerPlan("create", handoff)
+            return IssueWorkerPlan("create", handoff, refs, foreign_issue_refs=foreign_refs)
         exact = tuple(
             record
             for record in records
@@ -396,13 +425,18 @@ class IssueWorker:
         )
         if len(records) > 1:
             destination = exact[0].url if exact else records[0].url
-            return IssueWorkerPlan("reorganize", handoff, refs, destination)
+            return IssueWorkerPlan(
+                "reorganize", handoff, refs, destination, foreign_refs
+            )
         destination = exact[0].url if exact else records[0].url
         if exact:
-            action = "reopen" if exact[0].state.upper() == "CLOSED" else "noop"
+            if foreign_refs:
+                action = "update"
+            else:
+                action = "reopen" if exact[0].state.upper() == "CLOSED" else "noop"
         else:
             action = "update"
-        return IssueWorkerPlan(action, handoff, refs, destination)
+        return IssueWorkerPlan(action, handoff, refs, destination, foreign_refs)
 
     @staticmethod
     def _append_relation(body: str, relation: str) -> str:
@@ -421,19 +455,37 @@ class IssueWorker:
     ) -> str:
         """Remove clause lines copied to the destination Issue."""
         destination_sections = parse_sections(destination_body)
-        transferred = {
-            line.strip()
-            for kind in (*CLAUSE_KINDS, "finding")
-            for line in destination_sections.get(kind, "").splitlines()
-            if line.strip()
+        transferred_by_section = {
+            kind: {
+                line.strip()
+                for line in destination_sections.get(kind, "").splitlines()
+                if line.strip()
+            }
+            for kind in (
+                *CLAUSE_KINDS,
+                "finding",
+                "required_fix",
+                "required_action",
+                "required_investigation_or_fix",
+            )
         }
-        if not transferred:
+        transferred_by_section = {
+            kind: values for kind, values in transferred_by_section.items() if values
+        }
+        if not transferred_by_section:
             return source_body
-        remaining = [
-            line
-            for line in source_body.splitlines()
-            if not line.strip() or line.strip() not in transferred
-        ]
+        remaining: list[str] = []
+        section = ""
+        for line in source_body.splitlines():
+            match = re.match(r"^##\s+(.+?)\s*$", line)
+            if match:
+                section = match.group(1).strip().casefold().replace(" ", "_")
+            if (
+                line.strip()
+                and line.strip() in transferred_by_section.get(section, set())
+            ):
+                continue
+            remaining.append(line)
         compact: list[str] = []
         index = 0
         while index < len(remaining):
@@ -446,7 +498,13 @@ class IssueWorker:
                     r"^##\s+(.+?)\s*$", remaining[end]
                 ):
                     end += 1
-                if kind in (*CLAUSE_KINDS, "finding") and not any(
+                if kind in (
+                    *CLAUSE_KINDS,
+                    "finding",
+                    "required_fix",
+                    "required_action",
+                    "required_investigation_or_fix",
+                ) and not any(
                     item.strip() for item in remaining[index + 1 : end]
                 ):
                     index = end
@@ -519,12 +577,24 @@ class IssueWorker:
             )
         if not title.strip() or not body.strip():
             raise IssueSyncError("issue_worker_content_required", "Issue title and body are required")
-        records = tuple(related_issues)
-        if not records and handoff.related_issue_refs:
-            records = self.related_issue_set(handoff.related_issue_refs)
-        plan = self.plan_publication(handoff, records)
+        if handoff.repository != self.authenticated_repository:
+            raise IssueSyncError(
+                "checkout-repository-mismatch",
+                "candidate repository does not match the active checkout identity",
+            )
+        all_records = tuple(related_issues)
+        if not all_records and handoff.related_issue_refs:
+            all_records = self.related_issue_set(handoff.related_issue_refs)
+        records, _foreign_refs = self._filter_related_issues(handoff, all_records)
+        plan = self.plan_publication(handoff, all_records)
         if plan.action == "create":
-            return self.client.create(handoff.repository, title, body)
+            candidate_body = body
+            for foreign_ref in plan.foreign_issue_refs:
+                candidate_body = self._append_relation(
+                    candidate_body,
+                    f"handoff relation: foreign Issue {foreign_ref}",
+                )
+            return self.client.create(handoff.repository, title, candidate_body)
         destination = next(
             (record for record in records if record.url == plan.destination_issue_ref),
             None,
@@ -536,7 +606,15 @@ class IssueWorker:
         if plan.action == "noop":
             return destination
         if plan.action == "update":
-            return self.client.edit(destination, title=title, body=body)
+            updated_body = body
+            for foreign_ref in plan.foreign_issue_refs:
+                updated_body = self._append_relation(
+                    updated_body,
+                    f"handoff relation: foreign Issue {foreign_ref}",
+                )
+            if destination.title == title and destination.body == updated_body:
+                return destination
+            return self.client.edit(destination, title=title, body=updated_body)
         if plan.action == "reopen":
             updated = self.client.edit(destination, title=title, body=body)
             return self.client.set_state(updated, "OPEN")
@@ -548,6 +626,11 @@ class IssueWorker:
                         destination_body,
                         f"transfer receipt: transferred from {source.url} to {destination.url}",
                     )
+            for foreign_ref in plan.foreign_issue_refs:
+                destination_body = self._append_relation(
+                    destination_body,
+                    f"handoff relation: foreign Issue {foreign_ref}",
+                )
             updated = destination
             if updated.title != title or updated.body != destination_body:
                 updated = self.client.edit(
@@ -764,7 +847,21 @@ def _read_private_body(locator: str, digest: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def sync_pending_packet(path: Path, client: GitHubIssueClient) -> GitHubIssueRecord:
+def checkout_repository(identity: object | None) -> str:
+    """Read normalized repository only from an explicit #938 identity block."""
+    if identity is None:
+        return ""
+    if isinstance(identity, Mapping):
+        return normalize_repository(str(identity.get("remote") or ""))
+    return normalize_repository(str(getattr(identity, "remote", "")))
+
+
+def sync_pending_packet(
+    path: Path,
+    client: GitHubIssueClient,
+    *,
+    checkout_identity: object | None = None,
+) -> GitHubIssueRecord:
     """Publish one packet through the host adapter and remove it after readback."""
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -772,8 +869,20 @@ def sync_pending_packet(path: Path, client: GitHubIssueClient) -> GitHubIssueRec
         raise IssueSyncError("packet_invalid", "pending packet is not valid JSON") from exc
     if payload.get("schema") != PACKET_SCHEMA or payload.get("status") != "pending":
         raise IssueSyncError("packet_invalid", "pending packet schema/status is invalid")
+    current_repository = checkout_repository(checkout_identity)
+    if not current_repository:
+        raise IssueSyncError(
+            "checkout-identity-unresolved",
+            "pending Issue publication requires the current #938 checkout identity",
+        )
+    packet_repository = normalize_repository(str(payload["repository"]))
+    if not packet_repository or packet_repository != current_repository:
+        raise IssueSyncError(
+            "checkout-repository-mismatch",
+            "pending Issue repository does not match the current checkout identity",
+        )
     body = _read_private_body(str(payload["body_locator"]), str(payload["body_digest"]))
-    repository = normalize_repository(str(payload["repository"]))
+    repository = current_repository
     raw_handoff = payload.get("handoff")
     if payload.get("route") == "issue-worker" and isinstance(raw_handoff, Mapping):
         handoff = qualify_issue_worker_finding(
@@ -907,7 +1016,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.sync_pending:
             root = log_root or _log_root(None)
             packets = sorted((root / "feedback/issue-packets/pending").glob("*.json"))
-            records = [sync_pending_packet(path, client) for path in packets]
+            identity = resolve_checkout_identity(Path.cwd())
+            records = [
+                sync_pending_packet(path, client, checkout_identity=identity)
+                for path in packets
+            ]
             print(json.dumps({"schema": PACKET_SCHEMA, "status": "synced", "issues": [record.url for record in records]}, sort_keys=True))
             return 0
         if not args.issue_url:

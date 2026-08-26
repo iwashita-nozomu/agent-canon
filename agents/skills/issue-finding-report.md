@@ -426,6 +426,16 @@ publication failure writes only the existing metadata-only pending packet
 (repository, reason, private locator, and digest) and retries through this
 same IssueWorker route.
 
+The publisher filters every related Issue against both the candidate repository
+and the current checkout identity before editing. Foreign Issues are retained
+as handoff relations only. `noop` requires the same responsibility tuple and a
+candidate fix/mechanism clause in the structured required-fix section; an old
+or missing clause is an update/reorganization case. Clause transfer removes
+only the matching lines inside the owning Markdown section and preserves the
+same text in Evidence or other sections. Pending retries must receive a fresh
+#938 checkout identity; the packet's repository is checked against it but is
+never treated as authentication authority.
+
 ## Multi-Agent Partition
 
 Use a parent-created `Issue Finding Packet` before spawning. Each packet fixes:

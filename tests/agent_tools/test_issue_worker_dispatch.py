@@ -50,6 +50,7 @@ def test_same_repository_candidate_materializes_publisher_tool_call() -> None:
     assert result.tool_call is not None
     assert result.tool_call["tool_id"] == "issue-worker"
     assert result.tool_call["arguments"]["publisher_agent_id"] == "publisher-1"
+    assert result.tool_call["arguments"]["checkout_repository"] == "iwashita-nozomu/agent-canon"
     assert calls and calls[0][0] == "publisher"
     assert "checkout_identity" in calls[0][1]
     assert "remote" in calls[0][1]
