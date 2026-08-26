@@ -17,10 +17,14 @@ import stat
 import subprocess
 import sys
 import tempfile
-import tomllib
 import unittest
 from pathlib import Path
 from types import ModuleType
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib  # type: ignore[no-redef]
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "export_static_seed.py"
