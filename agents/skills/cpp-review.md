@@ -115,6 +115,25 @@ workload、compiler、thread / device 条件を明記して handoff します。
 
 ## Performance review order
 
+### Numerical solver handoff boundary
+
+対象が C / C++ の数値 solver または反復 algorithm である場合、性能差の
+最初の判定は `computational-optimization` の convergence-first numerical
+performance diagnosis に委譲します。cpp review はその post-run record を
+受け取り、数学 / algorithm の観測と native implementation evidence を混ぜません。
+
+- iteration count、residual / objective / KKT trajectory、step acceptance / size、
+  termination、conditioning、inner-solver work、または per-iteration numerical
+  work が変わった場合は、math / algorithm owner へ返します。JIT、backend、
+  compiler、architecture の編集を cpp review の第一手段にしません。
+- 数値 trajectory と iteration count が同じで、compile/JIT または systems cost
+  だけが分離計測された場合に限り、該当 systems / JIT sibling handoff を受けます。
+- total time しかない場合は `evidence_missing` として追加 metrics を要求し、
+  JIT 境界の変更を提案しません。
+- 数値 solver ではない C++ performance は、既存のこの文書の workload、data
+  movement、native benchmark の順序をそのまま使います。数値 solver 用の
+  convergence record や compile/JIT 分解を一律に要求しません。
+
 ### 1. Contract、workload、metric
 
 - latency、throughput、peak / steady-state memory、allocation count、startup、binary size、

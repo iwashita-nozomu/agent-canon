@@ -170,6 +170,34 @@ AI に要約や論点抽出を補助させても、math validity、figure validi
 `Blocker:`
 主要な更新式や評価式が本文にも補足にも見当たらず、読者が code を読まないと method を再構成できない状態です。
 
+### 4.7 数値性能を収束軌跡先に診断しているか
+
+数値 solver / iterative algorithm の速度差は、結果を得た後にだけ解釈します。
+run 前の pass / fail、合否、または experiment acceptance を数値性能の仮定から
+作りません。before / after は同じ problem、initial state、stopping policy、
+dtype / device contract、workload で比較し、少なくとも次を一つの性能記録へ
+まとめます。
+
+\[
+T_{total} = T_{compile/JIT} + N_{iter} \times
+(T_{iter\_eval} + T_{linear\_solve} + T_{communication}) + T_{other}.
+\]
+
+total time だけでなく、residual / objective / KKT trajectory、iteration count、
+step acceptance / size、termination status、conditioning、inner-solver work、
+per-iteration cost、cold compile/JIT と warm execution、transfer / synchronization
+を区別します。iteration、trajectory、受理、conditioning、または inner solver が
+変わった場合は数学 / algorithm の原因として `computational-optimization` に
+返し、JIT / backend / architecture を変更しません。同じ trajectory、iteration
+count、termination、conditioning、inner-solver work、per-iteration numerical work
+が保たれ、compile/JIT または systems cost だけが分離された場合に限って、その
+sibling owner へ handoff します。証拠が不足する場合は `evidence_missing` として
+metrics collection を残し、JIT 修正へ進みません。
+
+この節は数値 performance に限定されます。非数値 C++ performance は既存の
+`cpp-review` の workload / algorithm / native implementation review を使い、
+compile/JIT や収束軌跡の必須化によって別の合否判定を作りません。
+
 ## 5. 実験コードレビューの詳細チェック
 
 実験コード review では、少なくとも次を順に確認します。

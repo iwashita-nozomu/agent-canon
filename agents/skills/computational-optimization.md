@@ -224,6 +224,48 @@ surfaces when the route packet makes them part of the product contract.
 - Randomized or stochastic optimization では seed、sample budget、variance / confidence、rerun policy を保存します。
 - Performance claim は correctness evidence と分け、同じ run を両方の根拠にしません。
 
+## Convergence-First Numerical Performance Diagnosis
+
+数値 solver または反復 algorithm の速度差を扱うときは、run 後の観測を
+収束・反復の変化と実行基盤の cost に分けてから、次の owner へ handoff
+します。これは数値 performance observation にだけ適用し、非数値の C++
+performance へ compile/JIT 指標を要求する規則ではありません。run 前の
+pass / fail や experiment acceptance を作らず、実行結果の解釈として記録します。
+
+### Required post-run record
+
+before / after は、同じ mathematical problem、initial state、stopping policy、
+dtype / device contract、workload で比較します。少なくとも次の decomposition を
+同じ record に残します。
+
+\[
+T_{total} = T_{compile/JIT} + N_{iter} \times
+(T_{iter\_eval} + T_{linear\_solve} + T_{communication}) + T_{other}.
+\]
+
+`T_iter_eval`、`T_linear_solve`、`T_communication` を可能な範囲で分離し、cold
+compile/JIT、warm execution、transfer / synchronization、algorithmic iteration
+cost を合計時間だけで代用しません。数値側の evidence は residual / objective /
+KKT trajectory、iteration count、step acceptance / size、termination status、
+conditioning、inner-solver work、finite / non-finite event、および per-iteration
+cost を含めます。
+
+### Classification and handoff
+
+| classification | required evidence | first owner and write boundary |
+| --- | --- | --- |
+| `convergence_changed` | trajectory、iteration count、residual / objective / KKT、step acceptance / size、termination、conditioning、または inner-solver work のいずれかが変化 | `computational-optimization` の数学 / algorithm owner。JIT、architecture、backend、compiler、runtime writer はこの math route から起動しない |
+| `systems_cost_isolated` | 数値 trajectory、iteration count、termination、conditioning、inner-solver work、per-iteration numerical work が同値で、compile/JIT または systems cost の差だけが実測で分離されている | JIT / backend / systems performance の sibling handoff。math writer はその surface を編集しない |
+| `evidence_missing` | total time だけ、または上記の分解・trajectory の一部が欠落 | 未解決の metrics collection。JIT / architecture の修正へ進まず、必要な run evidence を集める |
+| `non_numeric` | solver / iterative numerical semantics を含まない native performance | 既存の `cpp-review` performance route。数値 decomposition を追加要求しない |
+
+iteration count の増加、residual / objective trajectory の悪化、rejected step、
+conditioning の悪化、または inner solver work の増加は、JIT 境界の変更ではなく
+数学 / algorithm の原因候補です。逆に `systems_cost_isolated` は数値 trajectory
+が保たれた場合だけ成立し、compile/JIT の印象や total-time-only の観測では成立
+しません。どの classification でも tolerance、stopping rule、case mix、数値
+semantics を変えて速度差を作らないでください。
+
 ## Review Route
 
 - Mathematical or scientific-computing risk: `scientific_computing_reviewer`
