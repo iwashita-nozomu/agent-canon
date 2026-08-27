@@ -162,6 +162,56 @@ def test_source_sync_mount_migration_ignores_only_declared_destination(
     assert validate(1, old_mounts) == 2
 
 
+def test_install_target_pruning_removes_only_stale_derived_rows(tmp_path: Path) -> None:
+    """Convergence drops missing/file/symlink targets and preserves valid rows."""
+    runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
+    state_root.mkdir(parents=True)
+    valid = tmp_path / "valid"
+    valid.mkdir()
+    regular_file = tmp_path / "file"
+    regular_file.write_text("not a target directory\n", encoding="utf-8")
+    symlink = tmp_path / "symlink"
+    symlink.symlink_to(valid, target_is_directory=True)
+    missing = tmp_path / "missing"
+
+    def digest(path: Path) -> str:
+        return hashlib.sha256(str(path).encode("utf-8")).hexdigest()
+
+    manifest = state_root / "mounts.tsv"
+    manifest.write_text(
+        "\n".join(
+            (
+                f"target\t{digest(missing)}\t{missing}\t/targets/{digest(missing)}\tread-only",
+                f"target\t{digest(regular_file)}\t{regular_file}\t/targets/{digest(regular_file)}\tread-only",
+                f"target\t{digest(symlink)}\t{symlink}\t/targets/{digest(symlink)}\tread-only",
+                f"target\t{digest(valid)}\t{valid}\t/targets/{digest(valid)}\tread-only",
+                "invalid\trow",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    script = f"""
+source {str(ADAPTER)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(state_root)!r}
+_agent_canon_prune_stale_target_manifest
+printf '%s\\n' "$AGENT_CANON_TARGET_PRUNE_DIGESTS"
+"""
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.strip() == ",".join(
+        (digest(missing), digest(regular_file), digest(symlink))
+    )
+    assert manifest.read_text(encoding="utf-8") == (
+        f"target\t{digest(valid)}\t{valid}\t/targets/{digest(valid)}\tread-only\n"
+        "invalid\trow\n"
+    )
+
+
 @pytest.mark.parametrize("install_option", ["separate", "equals"])
 def test_sync_resolves_install_root_before_runtime_initialization(
     tmp_path: Path, install_option: str
@@ -795,9 +845,9 @@ exit "$rc"
         (
             "owned",
             "target\tmissing-digest\t/tmp/does-not-exist\t/targets/missing-digest\tread-only\n",
-            2,
-            "target_root_invalid",
-            False,
+            0,
+            None,
+            True,
         ),
         (
             "owned",
@@ -1009,6 +1059,18 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     old_image_id = resident["image_id"]
     container_name = f"agent-canon-tools-{control_digest[:16]}"
     private_log = tmp_path / "agent-canon-log"
+    valid_target = tmp_path / "valid-target"
+    valid_target.mkdir()
+    stale_target = tmp_path / "removed-agent-canon"
+    stale_digest = hashlib.sha256(str(stale_target).encode("utf-8")).hexdigest()
+    valid_digest = hashlib.sha256(str(valid_target).encode("utf-8")).hexdigest()
+    mount_manifest = runtime / "container-state" / "mounts.tsv"
+    mount_manifest.parent.mkdir(parents=True)
+    mount_manifest.write_text(
+        f"target\t{stale_digest}\t{stale_target}\t/targets/{stale_digest}\tread-only\n"
+        f"target\t{valid_digest}\t{valid_target}\t/targets/{valid_digest}\tread-only\n",
+        encoding="utf-8",
+    )
     old_mount_sources = {
         "container-state": (runtime / "container-state", "/var/lib/agent-canon/runtime", True),
         "private-log": (private_log, "/var/lib/agent-canon/private-log", False),
@@ -1106,8 +1168,12 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         "/var/lib/agent-canon/source-sync.json",
         "/var/lib/agent-canon/private-log",
         "/var/lib/agent-canon/mount-registry.toml",
+        f"/targets/{valid_digest}",
     }
     assert {mount["Destination"] for mount in replacement["Mounts"]} == expected_mounts
+    assert f"/targets/{stale_digest}" not in {
+        mount["Destination"] for mount in replacement["Mounts"]
+    }
     security = fixture["expected"]["security"]
     assert replacement["HostConfig"]["ReadonlyRootfs"] is security["readonly_rootfs"]
     assert replacement["HostConfig"]["NetworkMode"] == security["network"]

@@ -91,6 +91,14 @@ or mounts a whole home directory. `read-only` is the default and is required
 for analysis. `explicit-target-write` is available only for an operation whose
 documented mutation capability names its target and allowed paths.
 
+`install` and `update` may remove only syntactically valid, derived target
+registry entries whose host source is missing, not a directory, or a symlink;
+all live target entries remain unchanged. `target add` applies the same stale
+entry cleanup before adding the requested mapping and returns an unchanged
+receipt when that mapping and the resident are already current. `start`,
+`exec`, and `tool` never prune the registry: a missing registered target is a
+terminal error in those execution paths.
+
 The command emits a typed JSON receipt. Keep receipts under the selected
 runtime root; they are operational evidence, not source files. A failed
 operation returns a stable error code and preserves the previous state where
