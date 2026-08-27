@@ -563,7 +563,7 @@ def test_archive_and_codex_crossings_are_host_owned() -> None:
     assert 'AGENT_CANON_HOST_INSTALL_ROOT=$AGENT_CANON_REPOSITORY_ROOT' in text
     assert '_agent_canon_run_controller "$codex_container" codex prepare' in text
     assert '"$codex_executable" --project-root "$codex_project"' in text
-    assert 'if ((rc == 0)) && [[ "$operation" == exec ]]; then' in text
+    assert 'if ((rc == 0)) && [[ "$operation" == exec || "$operation" == tool ]]; then' in text
     controller = (ROOT / "tools/agent_tools/bootstrap_runtime.py").read_text(encoding="utf-8")
     assert 'source_identity = sub.add_parser' in controller
     assert 'normalize_remote' in controller

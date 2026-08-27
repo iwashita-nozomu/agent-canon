@@ -117,8 +117,6 @@ def build_issue_receipt_stage_command(
         "issue-sync",
         "--",
         "--receipt-preflight" if preflight else "--stage-publication-receipt",
-        "--runtime-root",
-        runtime_root,
     ]
     if not preflight:
         command.extend(
@@ -137,12 +135,9 @@ def build_issue_receipt_stage_command(
         )
     identity = checkout_identity or {}
     checkout_head = str(identity.get("head") or "").strip()
-    checkout_root = str(identity.get("git_root") or "").strip()
     checkout_remote = str(identity.get("remote") or "").strip()
     if checkout_head:
         command.extend(("--checkout-head", checkout_head))
-    if checkout_root:
-        command.extend(("--checkout-root", checkout_root))
     if checkout_remote:
         command.extend(("--checkout-repository", checkout_remote))
     for value in responsibility:

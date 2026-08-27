@@ -48,6 +48,9 @@ def test_issue_worker_tool_call_contains_post_publication_container_command() ->
     assert command[command.index("--root") + 1] == str(PROJECT_ROOT)
     assert token["arguments"]["agentcanon_source_root"] == str(PROJECT_ROOT)
     assert token["arguments"]["target_root"] == str(PROJECT_ROOT)
+    child_args = command[command.index("--") + 1 :]
+    assert "--runtime-root" not in child_args
+    assert "--checkout-root" not in child_args
     assert "--stage-publication-receipt" in command
     assert "--checkout-head" in command
     assert "--checkout-repository" in command
@@ -90,6 +93,9 @@ def test_receipt_stage_command_contains_readback_metadata_without_body() -> None
     assert "42" in command
     assert "--receipt-url" in command
     assert "private body" not in " ".join(command)
+    child_args = command[command.index("--") + 1 :]
+    assert "/runtime" not in child_args
+    assert "/project" not in child_args
 
 
 def test_receipt_stage_command_rejects_non_github_issue_state() -> None:

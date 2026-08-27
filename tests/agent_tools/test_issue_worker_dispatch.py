@@ -120,8 +120,9 @@ def test_same_repository_candidate_materializes_publisher_tool_call(
     assert stage_command[0] == str(PROJECT_ROOT / "bootstrap.sh")
     assert str(PROJECT_ROOT) != str(product_root)
     assert stage_command[stage_command.index("--root") + 1] == str(product_root)
-    assert "--checkout-root" in stage_command
-    assert stage_command[stage_command.index("--checkout-root") + 1] == str(product_root)
+    child_args = stage_command[stage_command.index("--") + 1 :]
+    assert "--runtime-root" not in child_args
+    assert "--checkout-root" not in child_args
     assert str(runtime_root) in stage_command
     assert str(control_parent) in stage_command
     preflight_command = result.tool_call["arguments"]["receipt_preflight_command"]

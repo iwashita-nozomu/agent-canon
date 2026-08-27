@@ -1689,7 +1689,7 @@ bootstrap_host_entrypoint() {
       cat "$output_file"
       cat "$error_file" >&2
       rm -f -- "$output_file" "$error_file"
-      if ((rc == 0)) && [[ "$operation" == exec ]]; then
+      if ((rc == 0)) && [[ "$operation" == exec || "$operation" == tool ]]; then
         _agent_canon_private_feedback_sync "$container" || rc=$?
       fi
       return "$rc"

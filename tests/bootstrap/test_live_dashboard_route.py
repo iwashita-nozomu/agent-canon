@@ -47,22 +47,45 @@ def git(*arguments: str, cwd: Path) -> None:
     subprocess.run(["git", *arguments], cwd=cwd, check=True, capture_output=True, text=True)
 
 
-def test_resident_dashboard_route_uses_target_and_private_archive(tmp_path: Path) -> None:
+def test_resident_dashboard_route_uses_target_and_private_archive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Run the logical dashboard tool against a read-only target mount."""
     source = tmp_path / "agent-canon"
     target = tmp_path / "target"
     control = tmp_path / "control"
     private_log = tmp_path / "agent-canon-log"
+    private_remote = tmp_path / "agent-canon-log.git"
+    git_config = tmp_path / "gitconfig"
+    log_remote = "https://github.com/example/agent-canon-log.git"
     subprocess.run(
         ["git", "clone", "--local", str(ROOT), str(source)],
         check=True,
         capture_output=True,
         text=True,
     )
+    git("remote", "set-url", "origin", "https://github.com/iwashita-nozomu/agent-canon.git", cwd=source)
     target.mkdir()
     control.mkdir()
     private_log.mkdir()
     private_log.chmod(0o700)
+    subprocess.run(["git", "init", "-q", "--bare", str(private_remote)], check=True)
+    subprocess.run(
+        [
+            "git",
+            "config",
+            "--file",
+            str(git_config),
+            "url.file://" + str(private_remote) + ".insteadOf",
+            log_remote,
+        ],
+        check=True,
+    )
+    monkeypatch.setenv("AGENT_CANON_PRIVATE_LOG_ROOT", str(private_log))
+    monkeypatch.setenv("AGENT_CANON_LOG_REMOTE", log_remote)
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(git_config))
+    git("init", "-q", "-b", "main", cwd=private_log)
+    git("remote", "add", "origin", log_remote, cwd=private_log)
     git("init", "-q", "-b", "main", cwd=target)
     (target / "KNOWN_TARGET_MARKER").write_text("target\n", encoding="utf-8")
     git("add", "KNOWN_TARGET_MARKER", cwd=target)
@@ -96,6 +119,18 @@ def test_resident_dashboard_route_uses_target_and_private_archive(tmp_path: Path
         + "\n",
         encoding="utf-8",
     )
+    git("add", ".", cwd=private_log)
+    git(
+        "-c",
+        "user.name=AgentCanon live test",
+        "-c",
+        "user.email=agent-canon-live@example.invalid",
+        "commit",
+        "-qm",
+        "private log seed",
+        cwd=private_log,
+    )
+    git("push", "-u", "origin", "main", cwd=private_log)
     source_status_before = subprocess.run(
         ["git", "status", "--porcelain"],
         cwd=source,
@@ -175,6 +210,19 @@ def test_resident_dashboard_route_uses_target_and_private_archive(tmp_path: Path
         receipt_text = receipt_path.read_text(encoding="utf-8")
         assert "body" not in receipt_text
         assert "private" not in receipt_text
+        assert not (runtime / "spool" / "private-feedback" / "sync-request.json").exists()
+        archive_receipt = (
+            private_log / "feedback" / "issue-packets" / "published"
+            / "example" / "live-target" / "1.json"
+        )
+        assert archive_receipt.is_file()
+        assert subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=private_log,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout == ""
         dashboard = run_bootstrap(
             source,
             control,
