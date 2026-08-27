@@ -48,13 +48,79 @@ def find(state: dict, identifier: str) -> tuple[str, dict] | None:
     return None
 
 
+def _formatted_image(record: dict, fmt: str) -> str | None:
+    """Return the scalar image fields used by the host shell adapter."""
+    if fmt == "{{.Id}}":
+        return str(record["Id"])
+    return None
+
+
+def _formatted_container(record: dict, fmt: str) -> str | None:
+    """Return the scalar/container-list fields used by bootstrap readback."""
+    if fmt == "{{.Id}}":
+        return str(record["Id"])
+    if fmt == "{{.Config.Image}}":
+        return str(record.get("Config", {}).get("Image", ""))
+    if fmt == '{{index .Config.Labels "io.agent-canon.runtime"}}':
+        return str(record.get("Config", {}).get("Labels", {}).get("io.agent-canon.runtime", ""))
+    if fmt == '{{index .Config.Labels "io.agent-canon.control-root-digest"}}':
+        return str(record.get("Config", {}).get("Labels", {}).get("io.agent-canon.control-root-digest", ""))
+    if fmt == "{{.State.Running}}":
+        return "true" if record.get("State", {}).get("Running") else "false"
+    if fmt == "{{if .State.Health}}{{.State.Health.Status}}{{else}}starting{{end}}":
+        health = record.get("State", {}).get("Health")
+        return str(health.get("Status", "starting")) if health else "starting"
+    host = record.get("HostConfig", {})
+    if fmt == "{{.HostConfig.NetworkMode}}":
+        return str(host.get("NetworkMode", ""))
+    if fmt == "{{.HostConfig.ReadonlyRootfs}}":
+        return "true" if host.get("ReadonlyRootfs") else "false"
+    if fmt == '{{join .HostConfig.CapDrop ","}}':
+        return ",".join(host.get("CapDrop", []))
+    if fmt == '{{join .HostConfig.SecurityOpt ","}}':
+        return ",".join(host.get("SecurityOpt", []))
+    if fmt == "{{.HostConfig.NanoCpus}}":
+        return str(host.get("NanoCpus", 0))
+    if fmt == "{{.HostConfig.Memory}}":
+        return str(host.get("Memory", 0))
+    if fmt == "{{.HostConfig.PidsLimit}}":
+        return str(host.get("PidsLimit", 0))
+    if fmt == "{{range .Mounts}}{{printf \"%s\\t%s\\t%t\\n\" .Source .Destination .RW}}{{end}}":
+        return "".join(
+            f"{mount['Source']}\t{mount['Destination']}\t"
+            f"{'true' if mount.get('RW') else 'false'}\n"
+            for mount in record.get("Mounts", [])
+        )
+    return None
+
+
+def _memory_bytes(value: str) -> int:
+    """Parse the small Docker memory notation used by the shell adapter."""
+    if value.endswith("g"):
+        return int(value[:-1]) * 1024**3
+    if value.endswith("m"):
+        return int(value[:-1]) * 1024**2
+    return int(value)
+
+
 def main(argv: list[str]) -> int:
     """Implement the small Docker command subset used by tests."""
+    call_log = os.environ.get("FAKE_DOCKER_CALLS")
+    if call_log:
+        with Path(call_log).open("a", encoding="utf-8") as handle:
+            handle.write("\t".join(argv) + "\n")
     state = load()
-    if argv[:2] == ["image", "inspect"] and len(argv) == 3:
-        found = find(state, argv[2])
+    if argv[:2] == ["image", "inspect"]:
+        identifier = argv[-1]
+        found = find(state, identifier)
         if not found or found[0] != "image":
             return 1
+        if "--format" in argv:
+            formatted = _formatted_image(found[1], argv[argv.index("--format") + 1])
+            if formatted is None:
+                return 2
+            print(formatted)
+            return 0
         print(json.dumps([found[1]]))
         return 0
     if argv[:2] == ["image", "ls"]:
@@ -72,16 +138,22 @@ def main(argv: list[str]) -> int:
             }
         image_number = int(state.get("next_image", 1))
         state["next_image"] = image_number + 1
+        image_id = (
+            f"sha256:{image_number:064x}"
+            if os.environ.get("FAKE_DOCKER_VALID_IMAGE_IDS") == "1"
+            else f"sha256:fake-image-{image_number}"
+        )
         record = {
-            "Id": f"sha256:fake-image-{image_number}",
+            "Id": image_id,
             "RepoTags": [tag],
             "Config": {"Labels": labels(argv)},
         }
         state["images"][tag] = record
         save(state)
         return 0
-    if argv[:2] == ["container", "inspect"] and len(argv) == 3:
-        found = find(state, argv[2])
+    if argv[:2] == ["container", "inspect"]:
+        identifier = argv[-1]
+        found = find(state, identifier)
         if not found or found[0] != "container":
             return 1
         health = found[1].get("State", {}).get("Health", {})
@@ -103,6 +175,12 @@ def main(argv: list[str]) -> int:
                         ] = "foreign-control-root"
                     found[1]["drift_applied"] = True
             save(state)
+        if "--format" in argv:
+            formatted = _formatted_container(found[1], argv[argv.index("--format") + 1])
+            if formatted is None:
+                return 2
+            print(formatted, end="" if formatted.endswith("\n") else "\n")
+            return 0
         print(json.dumps([found[1]]))
         return 0
     if argv[:2] == ["container", "ls"]:
@@ -140,13 +218,17 @@ def main(argv: list[str]) -> int:
             "Id": cid,
             "Name": "/" + name,
             "Config": {
+                "Image": next(
+                    (item for item in reversed(argv) if item and not item.startswith("--")),
+                    "",
+                ),
                 "Labels": labels(argv),
             },
             "State": {"Running": False, "Health": {"Status": "starting"}},
             "HostConfig": {
                 "ReadonlyRootfs": "--read-only" in argv,
                 "NetworkMode": argv[argv.index("--network") + 1],
-                "Memory": int(argv[argv.index("--memory") + 1]),
+                "Memory": _memory_bytes(argv[argv.index("--memory") + 1]),
                 "PidsLimit": int(argv[argv.index("--pids-limit") + 1]),
                 "NanoCpus": int(float(argv[argv.index("--cpus") + 1]) * 1_000_000_000),
                 "CapDrop": ["ALL"],
@@ -159,6 +241,13 @@ def main(argv: list[str]) -> int:
         state["containers"][name] = value
         save(state)
         print(cid)
+        return 0
+    if argv[:1] == ["tag"] and len(argv) == 3:
+        found = find(state, argv[1])
+        if not found or found[0] != "image":
+            return 1
+        state["images"][argv[2]] = {**found[1], "RepoTags": [argv[2]]}
+        save(state)
         return 0
     if argv[:1] == ["start"]:
         found = find(state, argv[1])
@@ -234,6 +323,30 @@ def main(argv: list[str]) -> int:
         command = argv[index + 1 :]
         found = find(state, identifier)
         if not found:
+            return 0
+        if command[:2] == [
+            "python3",
+            "/usr/local/share/agent-canon/runtime/tools/agent_tools/bootstrap_runtime.py",
+        ]:
+            operations = {"install", "update", "start", "stop", "uninstall"}
+            operation = next((item for item in command[2:] if item in operations), "")
+            if operation:
+                print(
+                    json.dumps(
+                        {
+                            "schema": "agent-canon.bootstrap-receipt.v2",
+                            "status": "ok",
+                            "operation": operation,
+                            "code": {
+                                "install": "installed",
+                                "update": "updated",
+                                "start": "ready",
+                                "stop": "stopped",
+                                "uninstall": "owned_resources_released",
+                            }[operation],
+                        }
+                    )
+                )
             return 0
         if command == ["agent-canon", "--version"]:
             print("agent-canon 0.1.0")

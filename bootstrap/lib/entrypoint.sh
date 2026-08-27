@@ -883,9 +883,10 @@ _agent_canon_migrate_active_image() {
   AGENT_CANON_IMAGE_REF=$image_ref
   AGENT_CANON_EXPECTED_IMAGE_ID=$image_id
   export AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID
-  # Full owner/security/mount validation is the migration gate.  The exact
-  # Config.Image and immutable ID are adopted only after that readback.
-  _agent_canon_validate_existing_container "$container"
+  # Ownership is the migration gate. Configuration drift is repairable by the
+  # caller and must not prevent it from learning the old image identity for
+  # the replacement transaction.
+  _agent_canon_classify_existing_container "$container"
   _agent_canon_write_active_image "$image_ref" "$image_id"
 }
 
@@ -900,6 +901,76 @@ _agent_canon_record_active_container() {
     _agent_canon_json_error active_image_readback_failed "resident image ID readback failed"
   fi
   _agent_canon_write_active_image "$image_ref" "$image_id"
+}
+
+_agent_canon_read_container_identity() {
+  local container=$1 error_code=${2:-container_ownership_mismatch}
+  local observed_id observed_runtime observed_control
+  if ! observed_id=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{.Id}}' "$container" 2>/dev/null); then
+    _agent_canon_json_error "$error_code" \
+      "named resident container identity could not be read"
+  fi
+  if ! observed_runtime=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{index .Config.Labels "io.agent-canon.runtime"}}' "$container" 2>/dev/null); then
+    _agent_canon_json_error "$error_code" \
+      "named resident ownership labels could not be read"
+  fi
+  if ! observed_control=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{index .Config.Labels "io.agent-canon.control-root-digest"}}' "$container" 2>/dev/null); then
+    _agent_canon_json_error "$error_code" \
+      "named resident control-root ownership could not be read"
+  fi
+  [[ -n "$observed_id" ]] ||
+    _agent_canon_json_error "$error_code" \
+      "named resident container identity is empty"
+  AGENT_CANON_OBSERVED_CONTAINER_ID=$observed_id
+  AGENT_CANON_OBSERVED_CONTAINER_RUNTIME=$observed_runtime
+  AGENT_CANON_OBSERVED_CONTAINER_CONTROL=$observed_control
+}
+
+_agent_canon_classify_existing_container() {
+  local container=$1
+  _agent_canon_read_container_identity "$container"
+  if [[ "$AGENT_CANON_OBSERVED_CONTAINER_RUNTIME" != shared-v1 ||
+        "$AGENT_CANON_OBSERVED_CONTAINER_CONTROL" != "$(_agent_canon_control_digest)" ]]; then
+    _agent_canon_json_error container_ownership_mismatch \
+      "named resident is not owned by this AgentCanon control root"
+  fi
+}
+
+_agent_canon_require_existing_container_identity() {
+  local container=$1 expected_id=$2 expected_runtime=$3 expected_control=$4
+  _agent_canon_read_container_identity "$container" replacement_readback_failed
+  if [[ "$AGENT_CANON_OBSERVED_CONTAINER_ID" != "$expected_id" ||
+        "$AGENT_CANON_OBSERVED_CONTAINER_RUNTIME" != "$expected_runtime" ||
+        "$AGENT_CANON_OBSERVED_CONTAINER_CONTROL" != "$expected_control" ]]; then
+    _agent_canon_json_error replacement_readback_failed \
+      "named resident identity changed before teardown"
+  fi
+}
+
+_agent_canon_validate_target_manifest() {
+  local manifest=${1:-$AGENT_CANON_STATE_ROOT/mounts.tsv}
+  [[ -f "$manifest" && ! -L "$manifest" ]] ||
+    _agent_canon_json_error mount_manifest_invalid \
+      "target mount manifest is unavailable before resident replacement"
+  local kind digest source destination mode
+  while IFS=$'\t' read -r kind digest source destination mode; do
+    [[ -z "$kind" ]] && continue
+    [[ "$kind" == target && "$digest" =~ ^[A-Za-z0-9_.-]{1,128}$ &&
+       "$source" = /* && "$destination" == "/targets/$digest" &&
+       "$mode" == read-only ]] ||
+      _agent_canon_json_error mount_manifest_invalid \
+        "target mount manifest is invalid before resident replacement"
+    [[ "$source" != "$AGENT_CANON_CONTROL_ROOT" &&
+       "$source" != "$(realpath -e -- "$HOME")" ]] ||
+      _agent_canon_json_error mount_manifest_invalid \
+        "broad control or home mount is forbidden"
+    [[ -d "$source" && ! -L "$source" ]] ||
+      _agent_canon_json_error target_root_invalid \
+        "target root does not exist: $source"
+  done < "$manifest"
 }
 
 _agent_canon_write_rollback_plan() {
@@ -1205,12 +1276,30 @@ _agent_canon_restore_candidate_failure() {
 
 _agent_canon_replace_resident_locked() {
   local candidate_image_ref=$1 candidate_image_id=$2
+  local replacement_operation=${3:-update}
   local old_image_id old_image_ref old_container candidate restored rc
+  local old_container_present=0 current_resident_valid=0
+  local old_container_id old_container_runtime old_container_control
   if ! candidate_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Id}}' "$candidate_image_ref"); then
     _agent_canon_json_error candidate_image_missing "candidate resident image disappeared before replacement"
     return 2
   fi
   old_container=$(_agent_canon_container_name)
+  if "$AGENT_CANON_DOCKER_CMD" container inspect "$old_container" >/dev/null 2>&1; then
+    # A named resident is claimable only by its immutable AgentCanon labels.
+    # Image, mount, and security drift is repaired below after the target
+    # manifest has been re-read.
+    _agent_canon_classify_existing_container "$old_container"
+    old_container_id=$AGENT_CANON_OBSERVED_CONTAINER_ID
+    old_container_runtime=$AGENT_CANON_OBSERVED_CONTAINER_RUNTIME
+    old_container_control=$AGENT_CANON_OBSERVED_CONTAINER_CONTROL
+    old_container_present=1
+  fi
+  if ((old_container_present == 1)); then
+    # The manifest is a pre-teardown input. A missing target must stop the
+    # transaction while the old resident is still intact.
+    _agent_canon_validate_target_manifest "$AGENT_CANON_STATE_ROOT/mounts.tsv"
+  fi
   old_image_ref=
   old_image_id=
   AGENT_CANON_IMAGE_REF=$candidate_image_ref
@@ -1231,9 +1320,17 @@ _agent_canon_replace_resident_locked() {
     if [[ -n "$old_image_id" && "$old_image_id" == "$candidate_image_id" &&
           "$old_image_ref" == "$candidate_image_ref" &&
           -n "$candidate_image_id" ]] &&
-       "$AGENT_CANON_DOCKER_CMD" container inspect "$old_container" >/dev/null 2>&1; then
+       ((old_container_present == 1)); then
       # The first updater already completed the transaction.  Revalidate the
-      # exact resident and health path, then converge without stop/rm/create.
+      # exact resident and health path. A mismatch is owned drift, so continue
+      # through the serialized replacement below instead of returning an
+      # ownership error.
+      if _agent_canon_validate_existing_container "$old_container" \
+        "$AGENT_CANON_STATE_ROOT/mounts.tsv" 1 0 >/dev/null 2>/dev/null; then
+        current_resident_valid=1
+      fi
+    fi
+    if ((current_resident_valid == 1)); then
       AGENT_CANON_IMAGE_REF=$candidate_image_ref
       AGENT_CANON_EXPECTED_IMAGE_ID=$candidate_image_id
       export AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID
@@ -1245,7 +1342,8 @@ _agent_canon_replace_resident_locked() {
         _agent_canon_json_error active_image_write_failed "active candidate image state could not be updated"
         return 2
       fi
-      printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"update","code":"up_to_date","changed":false}\n'
+      printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"%s","code":"up_to_date","changed":false}\n' \
+        "$replacement_operation"
       return 0
     fi
     AGENT_CANON_IMAGE_REF=$old_image_ref
@@ -1254,11 +1352,7 @@ _agent_canon_replace_resident_locked() {
     printf '%s\n' "$old_image_id" > "$AGENT_CANON_STATE_ROOT/previous-image-id"
     AGENT_CANON_PREVIOUS_IMAGE_REF=$old_image_ref
     export AGENT_CANON_PREVIOUS_IMAGE_REF
-    if "$AGENT_CANON_DOCKER_CMD" container inspect "$old_container" >/dev/null 2>&1; then
-      if ! _agent_canon_validate_existing_container "$old_container" "$AGENT_CANON_STATE_ROOT/mounts.tsv" 1 0; then
-        _agent_canon_json_error replacement_readback_failed "old resident mount readback failed before replacement"
-        return 2
-      fi
+    if ((old_container_present == 1)); then
       if ! _agent_canon_write_rollback_plan "$old_image_id" "$old_image_ref"; then
         _agent_canon_json_error rollback_plan_invalid "old resident rollback plan could not be written"
         return 2
@@ -1272,13 +1366,18 @@ _agent_canon_replace_resident_locked() {
   AGENT_CANON_EXPECTED_IMAGE_ID=$candidate_image_id
   AGENT_CANON_PREVIOUS_IMAGE_ID=$old_image_id
   export AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID AGENT_CANON_PREVIOUS_IMAGE_ID
-  if [[ -n "$old_image_id" ]] &&
-     "$AGENT_CANON_DOCKER_CMD" container inspect "$old_container" >/dev/null 2>&1; then
-    if ! "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$old_container" >/dev/null; then
+  if ((old_container_present == 1)); then
+    # This is deliberately the final readback before teardown. Stop/remove by
+    # the captured immutable ID so a name swap cannot redirect the mutation.
+    _agent_canon_require_existing_container_identity "$old_container" \
+      "$old_container_id" "$old_container_runtime" "$old_container_control"
+  fi
+  if [[ -n "$old_image_id" ]] && ((old_container_present == 1)); then
+    if ! "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$old_container_id" >/dev/null; then
       _agent_canon_json_error replacement_stop_failed "old resident could not be stopped"
       return 2
     fi
-    if ! "$AGENT_CANON_DOCKER_CMD" rm "$old_container" >/dev/null; then
+    if ! "$AGENT_CANON_DOCKER_CMD" rm "$old_container_id" >/dev/null; then
       _agent_canon_json_error replacement_remove_failed "old resident could not be removed"
       return 2
     fi
@@ -1316,7 +1415,7 @@ _agent_canon_replace_resident_locked() {
     return 2
   fi
   rc=0
-  if _agent_canon_run_controller "$candidate" update; then
+  if _agent_canon_run_controller "$candidate" "$replacement_operation"; then
     :
   else
     rc=$?
@@ -1347,6 +1446,7 @@ _agent_canon_replace_resident_locked() {
 
 _agent_canon_replace_resident() {
   local candidate_image_ref=$1 candidate_image_id=$2
+  local replacement_operation=${3:-update}
   local lock_path="$AGENT_CANON_RUNTIME_ROOT/host-state/replacement.lock"
   local lock_fd rc unlock_rc
   if [[ -z "$candidate_image_ref" || -z "$candidate_image_id" ]]; then
@@ -1375,7 +1475,8 @@ _agent_canon_replace_resident() {
   set +e
   (
     set -e
-    _agent_canon_replace_resident_locked "$candidate_image_ref" "$candidate_image_id"
+    _agent_canon_replace_resident_locked "$candidate_image_ref" "$candidate_image_id" \
+      "$replacement_operation"
   )
   rc=$?
   set -e
@@ -1387,6 +1488,27 @@ _agent_canon_replace_resident() {
     return 2
   fi
   return "$rc"
+}
+
+_agent_canon_ensure_start_resident() {
+  local container=$(_agent_canon_container_name)
+  if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
+    _agent_canon_classify_existing_container "$container"
+    _agent_canon_validate_target_manifest "$AGENT_CANON_STATE_ROOT/mounts.tsv"
+    if _agent_canon_validate_existing_container "$container" \
+      "$AGENT_CANON_STATE_ROOT/mounts.tsv" 1 0 >/dev/null 2>/dev/null; then
+      _agent_canon_ensure_container
+    else
+      # Start has no new image candidate. Reuse the active image through the
+      # same serialized replacement path so stale mounts/security are rebuilt
+      # from the current manifest before the requested start transition.
+      _agent_canon_replace_resident "$AGENT_CANON_IMAGE_REF" \
+        "$AGENT_CANON_EXPECTED_IMAGE_ID" start >/dev/null
+      printf '%s\n' "$container"
+    fi
+  else
+    _agent_canon_ensure_container
+  fi
 }
 
 _agent_canon_private_feedback_identity() {
@@ -1906,6 +2028,15 @@ bootstrap_host_entrypoint() {
      [[ ! -x "$AGENT_CANON_DOCKER_CMD" ]]; then
     _agent_canon_json_error runtime_unavailable "Docker executable is unavailable"
   fi
+  if [[ "$operation" == install || "$operation" == update ]]; then
+    # Ownership is resolved before image build or runtime-state preparation.
+    # A foreign collision therefore cannot trigger any candidate build or
+    # host-state mutation.
+    local preflight_container=$(_agent_canon_container_name)
+    if "$AGENT_CANON_DOCKER_CMD" container inspect "$preflight_container" >/dev/null 2>&1; then
+      _agent_canon_classify_existing_container "$preflight_container"
+    fi
+  fi
   _agent_canon_prepare_host_runtime
   local index
   for index in "${!command_args[@]}"; do
@@ -1916,12 +2047,18 @@ bootstrap_host_entrypoint() {
   case "$operation" in
     status)
       local container=$(_agent_canon_container_name)
-      local running health
+      local running health resident_drift=false
       if [[ -f "$AGENT_CANON_RUNTIME_ROOT/host-state/active-image.tsv" ]] ||
          "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
         _agent_canon_use_active_image "$container"
         if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
-          _agent_canon_validate_existing_container "$container"
+          _agent_canon_classify_existing_container "$container"
+          if _agent_canon_validate_existing_container "$container" \
+            "$AGENT_CANON_STATE_ROOT/mounts.tsv" 1 0 >/dev/null 2>/dev/null; then
+            :
+          else
+            resident_drift=true
+          fi
         fi
       fi
       running=$("$AGENT_CANON_DOCKER_CMD" container inspect --format '{{.State.Running}}' "$container" 2>/dev/null || printf false)
@@ -1932,8 +2069,8 @@ bootstrap_host_entrypoint() {
       if ! source_sync_json=$(_agent_canon_source_sync_json); then
         source_sync_json=null
       fi
-      printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"status","container":{"name":"%s","running":%s,"health":"%s"},"runtime_root":"%s","source_sync":%s}\n' \
-        "$container" "$running" "$health" "$AGENT_CANON_RUNTIME_ROOT" "$source_sync_json"
+      printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"status","container":{"name":"%s","running":%s,"health":"%s","drift":%s},"runtime_root":"%s","source_sync":%s}\n' \
+        "$container" "$running" "$health" "$resident_drift" "$AGENT_CANON_RUNTIME_ROOT" "$source_sync_json"
       return 0
       ;;
     stop)
@@ -2009,6 +2146,8 @@ bootstrap_host_entrypoint() {
       return
       ;;
     install)
+      local install_container
+      install_container=$(_agent_canon_container_name)
       AGENT_CANON_ALLOW_BUILD=1
       export AGENT_CANON_ALLOW_BUILD
       _agent_canon_image "$image_ref"
@@ -2017,6 +2156,10 @@ bootstrap_host_entrypoint() {
         --format '{{.Id}}' "$AGENT_CANON_IMAGE_REF")
       AGENT_CANON_EXPECTED_IMAGE_ID=$install_image_id
       export AGENT_CANON_EXPECTED_IMAGE_ID
+      if "$AGENT_CANON_DOCKER_CMD" container inspect "$install_container" >/dev/null 2>&1; then
+        _agent_canon_replace_resident "$AGENT_CANON_IMAGE_REF" "$install_image_id" install
+        return $?
+      fi
       container=$(_agent_canon_ensure_container)
       local install_rc=0
       _agent_canon_run_controller "$container" install || install_rc=$?
@@ -2305,7 +2448,11 @@ bootstrap_host_entrypoint() {
         _agent_canon_use_active_image "$(_agent_canon_container_name)"
       fi
       local container
-      container=$(_agent_canon_ensure_container)
+      if [[ "$operation" == start ]]; then
+        container=$(_agent_canon_ensure_start_resident)
+      else
+        container=$(_agent_canon_ensure_container)
+      fi
       if [[ "$operation" == exec ]] && _agent_canon_exec_is_structured_request; then
         _agent_canon_extract_exec_target_digest
         _agent_canon_validate_private_log_mount "$container"
