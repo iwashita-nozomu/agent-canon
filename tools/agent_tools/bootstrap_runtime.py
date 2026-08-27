@@ -1994,6 +1994,10 @@ class BootstrapRuntime:
                 "active tasks prevent registry image adoption",
                 evidence={"active_task_count": state.get("active_task_count", 0)},
             )
+        stale = self._prune_stale_targets(state)
+        if stale:
+            self._write_mounts(state)
+            self._write_mount_manifest(state)
         image_id = _required_string(image_record.get("Id"), "registry image.Id")
         old_state = json.loads(_json(state))
         before = str(state.get("state"))
@@ -2579,6 +2583,12 @@ class BootstrapRuntime:
         # the swapped checkout while retaining its transaction lock.
         with contextlib.nullcontext():
             state = self._read_state(allow_manifest_drift=True)
+            if state.get("state") == "uninstalled":
+                stale = self._prune_stale_targets(state)
+                if stale:
+                    self._write_mounts(state)
+                    self._write_mount_manifest(state)
+                    self._write_state(state)
             if state.get("state") != "uninstalled":
                 if image_ref:
                     raise BootstrapError(
@@ -2796,6 +2806,11 @@ class BootstrapRuntime:
                 "active tasks prevent update; candidate build was not started",
                 evidence={"active_task_count": state.get("active_task_count", 0)},
             )
+        stale = self._prune_stale_targets(state)
+        if stale:
+            self._write_mounts(state)
+            self._write_mount_manifest(state)
+            self._write_state(state)
         resources = state.get("resources", {})
         image = resources.get("image", {}) if isinstance(resources, dict) else {}
         if image.get("owned") is not True:
@@ -2909,6 +2924,12 @@ class BootstrapRuntime:
             fresh_reset = self._legacy_runtime_pending_cleanup is not None
             if state.get("state") == "uninstalled" and not fresh_reset:
                 raise BootstrapError("not_installed", "install must complete before update")
+            if state.get("state") == "uninstalled":
+                stale = self._prune_stale_targets(state)
+                if stale:
+                    self._write_mounts(state)
+                    self._write_mount_manifest(state)
+                    self._write_state(state)
             if source_sync and not image_ref:
                 raise BootstrapError(
                     "source_sync_image_required",
@@ -3296,6 +3317,56 @@ class BootstrapRuntime:
             raise BootstrapError("mutation_capability_unexpected", "read-only target cannot accept mutation capability")
         return record
 
+    def _prune_stale_targets(self, state: dict[str, Any]) -> list[str]:
+        """Remove only target records whose derived source is unavailable.
+
+        Host records use ``host_root`` when present; the resident controller
+        must instead inspect the mounted ``root`` path because host paths are
+        intentionally outside its namespace.  Malformed records are left for
+        the normal manifest/readback validators to reject.
+        """
+        raw_targets = state.get("targets")
+        if not isinstance(raw_targets, Mapping):
+            return []
+        targets = dict(raw_targets)
+        stale: list[str] = []
+        for digest, record in targets.items():
+            if not isinstance(digest, str) or not isinstance(record, Mapping):
+                continue
+            source_value = record.get("root") if self._container_control() else record.get("host_root", record.get("root"))
+            if not isinstance(source_value, str) or not source_value:
+                continue
+            source = Path(source_value)
+            if source.is_symlink() or not source.is_dir():
+                stale.append(digest)
+        if not stale:
+            return []
+        for digest in stale:
+            targets.pop(digest, None)
+        state["targets"] = targets
+        generations = state.get("generations")
+        if isinstance(generations, Mapping):
+            for generation in generations.values():
+                if not isinstance(generation, dict):
+                    continue
+                generation_targets = generation.get("targets")
+                if not isinstance(generation_targets, Mapping):
+                    continue
+                generation["targets"] = {
+                    digest: record
+                    for digest, record in generation_targets.items()
+                    if digest not in stale
+                }
+        return stale
+
+    @staticmethod
+    def _same_target_record(
+        existing: Mapping[str, Any], candidate: Mapping[str, Any]
+    ) -> bool:
+        """Compare target identity/capability while ignoring host-only metadata."""
+        keys = ("root", "mode", "digest", "allowed_paths", "purpose", "authority")
+        return all(existing.get(key) == candidate.get(key) for key in keys)
+
     def _write_mounts(self, state: Mapping[str, Any]) -> None:
         lines = [f"schema = {json.dumps(SCHEMA_MOUNTS)}", ""]
         for key, record in sorted(state.get("targets", {}).items()):
@@ -3358,8 +3429,39 @@ class BootstrapRuntime:
                     "runtime_unavailable",
                     f"target updates require idle runtime, got {state.get('state')}",
                 )
+            stale = self._prune_stale_targets(state)
+            if stale:
+                self._write_mounts(state)
+                self._write_mount_manifest(state)
+                self._write_state(state)
             before, old_generation = state["state"], state.get("current_generation")
             old_targets = dict(state.get("targets", {}))
+            existing_target = old_targets.get(candidate_target["digest"])
+            if (
+                not stale
+                and health_ok
+                and readback_ok
+                and stop_ok
+                and isinstance(existing_target, Mapping)
+                and self._same_target_record(existing_target, candidate_target)
+            ):
+                try:
+                    if self._container_inspect(state, require_running=True) is not None:
+                        return self._result(
+                            self._receipt(
+                                "target_add",
+                                "ok",
+                                "target_unchanged",
+                                before=before,
+                                after=before,
+                                details={"target": dict(existing_target), "changed": False},
+                                state=state,
+                            )
+                        )
+                except BootstrapError:
+                    # A valid registry entry with a missing/drifted resident
+                    # still needs the normal replacement path below.
+                    pass
             old_container = dict(state.get("resources", {}).get("container", {}))
             old_registry = _safe_read(self.paths.mounts, field="mount registry")
             candidate_targets = dict(old_targets)
@@ -5573,6 +5675,8 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
     if operation in {"install", "update", "start", "stop", "uninstall"}:
         with runtime.locked():
             state = runtime._read_state(allow_manifest_drift=True)
+            if operation in {"install", "update"}:
+                runtime._prune_stale_targets(state)
             before = str(state.get("state"))
             resources = state.setdefault("resources", _container_resource_state(runtime))
             resources.update(_container_resource_state(runtime))
@@ -5785,6 +5889,7 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
     if operation == "target" and args.target_operation == "add":
         with runtime.locked():
             state = runtime._read_state()
+            stale = runtime._prune_stale_targets(state)
             target = runtime._target_record(Path(args.root), args.mode)
             host_root = os.environ.get("AGENT_CANON_TARGET_HOST_ROOT")
             container_root = os.environ.get("AGENT_CANON_TARGET_CONTAINER_ROOT")
@@ -5795,6 +5900,26 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
             if host_digest := os.environ.get("AGENT_CANON_TARGET_DIGEST"):
                 target["digest"] = host_digest
             targets = dict(state.get("targets", {}))
+            existing_target = targets.get(target["digest"])
+            if (
+                not stale
+                and isinstance(existing_target, Mapping)
+                and runtime._same_target_record(existing_target, target)
+            ):
+                runtime._write_mounts(state)
+                runtime._write_mount_manifest(state)
+                runtime._write_state(state)
+                return runtime._result(
+                    runtime._receipt(
+                        "target_add",
+                        "ok",
+                        "target_unchanged",
+                        before=str(state.get("state")),
+                        after=str(state.get("state")),
+                        details={"target": dict(existing_target), "changed": False},
+                        state=state,
+                    )
+                )
             targets[target["digest"]] = target
             _container_target_generation(state, targets)
             state["state"] = "ready"

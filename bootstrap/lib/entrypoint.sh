@@ -23,6 +23,7 @@ AGENT_CANON_MOUNT_REGISTRY_DESTINATION=/var/lib/agent-canon/mount-registry.toml
 AGENT_CANON_SOURCE_SYNC_DESTINATION=/var/lib/agent-canon/source-sync.json
 AGENT_CANON_HEALTH_ATTEMPTS=120
 AGENT_CANON_PRIVATE_LOG_ROOT=
+AGENT_CANON_TARGET_PRUNE_DIGESTS=
 
 _agent_canon_json_error() {
   local code=$1 detail=$2
@@ -560,6 +561,42 @@ _agent_canon_target_digest() {
     fi
   done < "$AGENT_CANON_STATE_ROOT/mounts.tsv"
   return 1
+}
+
+_agent_canon_prune_stale_target_manifest() {
+  local manifest=${1:-$AGENT_CANON_STATE_ROOT/mounts.tsv}
+  local temporary raw kind digest source destination mode
+  local previous_pruned=${AGENT_CANON_TARGET_PRUNE_DIGESTS:-}
+  local -a stale=()
+  AGENT_CANON_TARGET_PRUNE_DIGESTS=
+  [[ -f "$manifest" && ! -L "$manifest" ]] || return 0
+  temporary=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.mounts.tsv.XXXXXX") ||
+    _agent_canon_json_error mount_manifest_write_failed \
+      "target mount manifest could not be staged for stale-entry cleanup"
+  while IFS= read -r raw || [[ -n "$raw" ]]; do
+    IFS=$'\t' read -r kind digest source destination mode <<<"$raw"
+    if [[ "$kind" == target &&
+          "$digest" =~ ^[A-Za-z0-9_.-]{1,128}$ &&
+          "$source" = /* &&
+          "$destination" == "/targets/$digest" &&
+          "$mode" == read-only &&
+          ( ! -d "$source" || -L "$source" ) ]]; then
+      stale+=("$digest")
+      continue
+    fi
+    printf '%s\n' "$raw" >> "$temporary"
+  done < "$manifest"
+  if ((${#stale[@]} == 0)); then
+    rm -f -- "$temporary"
+    AGENT_CANON_TARGET_PRUNE_DIGESTS=$previous_pruned
+    return 0
+  fi
+  if ! mv -f -- "$temporary" "$manifest"; then
+    rm -f -- "$temporary"
+    _agent_canon_json_error mount_manifest_write_failed \
+      "stale target entries could not be removed from the mount manifest"
+  fi
+  AGENT_CANON_TARGET_PRUNE_DIGESTS=$(IFS=,; printf '%s' "${stale[*]}")
 }
 
 _agent_canon_rewrite_target_args() {
@@ -1279,7 +1316,7 @@ _agent_canon_replace_resident_locked() {
   local replacement_operation=${3:-update}
   local old_image_id old_image_ref old_container candidate restored rc
   local old_container_present=0 current_resident_valid=0
-  local old_container_id old_container_runtime old_container_control
+  local old_container_id old_container_runtime old_container_control stale_target_pruned=
   if ! candidate_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Id}}' "$candidate_image_ref"); then
     _agent_canon_json_error candidate_image_missing "candidate resident image disappeared before replacement"
     return 2
@@ -1296,9 +1333,15 @@ _agent_canon_replace_resident_locked() {
     old_container_present=1
   fi
   if ((old_container_present == 1)); then
-    # The manifest is a pre-teardown input. A missing target must stop the
-    # transaction while the old resident is still intact.
+    # A missing target is stale derived registry state. Remove only those
+    # entries before the complete manifest validation; malformed or otherwise
+    # invalid records remain validation errors.
+    _agent_canon_prune_stale_target_manifest
+    stale_target_pruned=$AGENT_CANON_TARGET_PRUNE_DIGESTS
     _agent_canon_validate_target_manifest "$AGENT_CANON_STATE_ROOT/mounts.tsv"
+  else
+    _agent_canon_prune_stale_target_manifest
+    stale_target_pruned=$AGENT_CANON_TARGET_PRUNE_DIGESTS
   fi
   old_image_ref=
   old_image_id=
@@ -1317,7 +1360,7 @@ _agent_canon_replace_resident_locked() {
     fi
     old_image_ref=$AGENT_CANON_IMAGE_REF
     old_image_id=$AGENT_CANON_ACTIVE_IMAGE_ID
-    if [[ -n "$old_image_id" && "$old_image_id" == "$candidate_image_id" &&
+    if [[ -z "$stale_target_pruned" && -n "$old_image_id" && "$old_image_id" == "$candidate_image_id" &&
           "$old_image_ref" == "$candidate_image_ref" &&
           -n "$candidate_image_id" ]] &&
        ((old_container_present == 1)); then
@@ -2038,6 +2081,13 @@ bootstrap_host_entrypoint() {
     fi
   fi
   _agent_canon_prepare_host_runtime
+  if [[ "$operation" == install || "$operation" == update ]]; then
+    # mounts.tsv is the host-owned projection consumed before the resident
+    # controller runs.  Drop only syntactically valid target rows whose
+    # source is already gone, so candidate creation can converge instead of
+    # failing on stale derived state.
+    _agent_canon_prune_stale_target_manifest
+  fi
   local index
   for index in "${!command_args[@]}"; do
     if [[ "${command_args[index]}" == --image-ref && $((index + 1)) -lt ${#command_args[@]} ]]; then
@@ -2319,10 +2369,30 @@ bootstrap_host_entrypoint() {
         _agent_canon_json_error target_root_invalid "target root must be a regular directory"
       target_digest=$(printf '%s' "$target_host_root" | sha256sum | awk '{print $1}')
       target_container_root="/targets/$target_digest"
-      _agent_canon_use_active_image "$(_agent_canon_container_name)"
-      local target_current_image target_current_image_id target_candidate target_rc=0
+      local target_container=$(_agent_canon_container_name)
+      if [[ "$target_action" == add ]] &&
+         "$AGENT_CANON_DOCKER_CMD" container inspect "$target_container" >/dev/null 2>&1; then
+        # A foreign resident is classified before any registry cleanup.  Only
+        # an AgentCanon-owned resident may enter target convergence.
+        _agent_canon_classify_existing_container "$target_container"
+        _agent_canon_prune_stale_target_manifest
+      elif [[ "$target_action" == add ]]; then
+        _agent_canon_prune_stale_target_manifest
+      fi
+      local target_current_image target_current_image_id target_candidate target_rc=0 existing_target_digest=
+      existing_target_digest=$(_agent_canon_target_digest "$target_host_root" || true)
+      _agent_canon_use_active_image "$target_container"
       target_current_image=$AGENT_CANON_IMAGE_REF
       target_current_image_id=$AGENT_CANON_ACTIVE_IMAGE_ID
+      if [[ "$target_action" == add && "$existing_target_digest" == "$target_digest" &&
+            -z "${AGENT_CANON_TARGET_PRUNE_DIGESTS:-}" ]] &&
+         "$AGENT_CANON_DOCKER_CMD" container inspect "$target_container" >/dev/null 2>&1 &&
+         _agent_canon_validate_existing_container "$target_container" \
+           "$AGENT_CANON_STATE_ROOT/mounts.tsv" 0 >/dev/null 2>/dev/null; then
+        printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"target_add","code":"target_unchanged","changed":false,"target_digest":"%s"}\n' \
+          "$target_digest"
+        return 0
+      fi
       if [[ "$target_action" == add ]]; then
         if ! _agent_canon_target_digest "$target_host_root" >/dev/null; then
           AGENT_CANON_TARGET_PENDING_SOURCE=$target_host_root
@@ -2333,13 +2403,16 @@ bootstrap_host_entrypoint() {
       if [[ -n "$target_current_image" ]]; then
         AGENT_CANON_IMAGE_REF=$target_current_image
         export AGENT_CANON_IMAGE_REF
-        # Validate the resident against its active generation before adding a
-        # pending target mount.  The pending mount belongs only to the new
-        # container created after the old resident is removed.
-        _agent_canon_validate_existing_container "$(_agent_canon_container_name)" \
-          "$AGENT_CANON_STATE_ROOT/mounts.tsv" 0
-        "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$(_agent_canon_container_name)" >/dev/null
-        "$AGENT_CANON_DOCKER_CMD" rm "$(_agent_canon_container_name)" >/dev/null
+        # Target add can repair owned resident drift (including stale mounts),
+        # but ownership was already classified above.  Full configuration
+        # readback remains the fast no-op gate and is not a precondition for
+        # replacement.
+        if _agent_canon_validate_existing_container "$target_container" \
+          "$AGENT_CANON_STATE_ROOT/mounts.tsv" 0 >/dev/null 2>/dev/null; then
+          :
+        fi
+        "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$target_container" >/dev/null
+        "$AGENT_CANON_DOCKER_CMD" rm "$target_container" >/dev/null
       fi
       target_candidate=$(_agent_canon_ensure_container)
       command_args=("target" "$target_action" --root "$target_container_root" --mode read-only)
