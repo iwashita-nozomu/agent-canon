@@ -1,6 +1,6 @@
 {
   "schema": "agent-canon.environment-resolution.gpu-build-capability",
-  "version": 1,
+  "version": 2,
   "builder": {
     "platform": "wsl2-ubuntu-24.04",
     "builder_name": "rootless",
@@ -29,6 +29,7 @@
   "evidence": {
     "device_entitlement": {
       "summary": "BuildKit advertised device entitlement and accepted the bounded allow list.",
+      "probe_kind": "device_entitlement",
       "command": [
         "docker",
         "buildx",
@@ -43,6 +44,7 @@
     },
     "cdi_inventory": {
       "summary": "The builder advertised the exact requested NVIDIA CDI device.",
+      "probe_kind": "cdi_inventory",
       "command": [
         "docker",
         "buildx",
@@ -57,6 +59,7 @@
     },
     "run_device_request": {
       "summary": "BuildKit accepted RUN --device and entered the probe step.",
+      "probe_kind": "run_device_request",
       "command": [
         "docker",
         "buildx",
@@ -71,6 +74,7 @@
     },
     "device_nodes": {
       "summary": "The build step observed the WSL GPU transport device node.",
+      "probe_kind": "device_nodes",
       "command": [
         "test",
         "-c",
@@ -83,6 +87,7 @@
     },
     "driver_loader": {
       "summary": "The driver body was mounted but the WSL libcuda thunk and hook-produced loader state were incomplete.",
+      "probe_kind": "driver_loader",
       "command": [
         "find",
         "/usr/lib/wsl",
@@ -100,6 +105,7 @@
     },
     "cuda_driver_api": {
       "summary": "The CUDA count probe ran but driver initialization failed with status 35.",
+      "probe_kind": "cuda_runtime_api",
       "command": [
         "/tmp/cuda-count-probe"
       ],
@@ -110,6 +116,7 @@
     },
     "cuda_compile_run": {
       "summary": "The compiled CUDA probe executed but could not enumerate a device.",
+      "probe_kind": "cuda_compile_run",
       "command": [
         "/tmp/cuda-count-probe"
       ],
@@ -120,6 +127,7 @@
     },
     "runtime_cdi": {
       "summary": "The same image passed runtime CDI admission and exposed both RTX 2080 devices.",
+      "probe_kind": "runtime_cdi",
       "command": [
         "docker",
         "run",

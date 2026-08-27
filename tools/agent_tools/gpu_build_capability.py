@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
@@ -20,7 +21,7 @@ from types import MappingProxyType
 from typing import Any, TypeVar
 
 SCHEMA = "agent-canon.environment-resolution.gpu-build-capability"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 FINDING_GPU_BUILD_ENVIRONMENT_UNAVAILABLE = "gpu_build_environment_unavailable"
 HANDOFF_OWNER = "project-environment-or-cppdev-provider"
 HANDOFF_REQUIREMENTS = (
@@ -71,6 +72,21 @@ class State(str, Enum):  # noqa: UP042
     RUN_FAILED = "run_failed"
     FAILED = "failed"
     PASSED = "passed"
+
+
+class ProbeKind(str, Enum):  # noqa: UP042
+    """Stage-owned probe identity; free-form text cannot promote a stage."""
+
+    DEVICE_ENTITLEMENT = "device_entitlement"
+    CDI_INVENTORY = "cdi_inventory"
+    RUN_DEVICE_REQUEST = "run_device_request"
+    DEVICE_NODES = "device_nodes"
+    DRIVER_LOADER = "driver_loader"
+    CUDA_DRIVER_API = "cuda_driver_api"
+    CUDA_RUNTIME_API = "cuda_runtime_api"
+    CUDA_COMPILE_RUN = "cuda_compile_run"
+    NVML = "nvml"
+    RUNTIME_CDI = "runtime_cdi"
 
 
 class DaemonMode(str, Enum):  # noqa: UP042
@@ -209,6 +225,7 @@ class StageEvidence:
     """Bounded evidence for one explicitly named stage."""
 
     summary: str
+    probe_kind: ProbeKind
     command: tuple[str, ...]
     exit_code: int | None
     observations: tuple[str, ...]
@@ -217,7 +234,11 @@ class StageEvidence:
     def parse(cls, raw: Mapping[str, Any], stage: Stage) -> StageEvidence:
         """Parse one bounded evidence record."""
         field = f"evidence.{stage.value}"
-        _exact_keys(raw, {"summary", "command", "exit_code", "observations"}, field)
+        _exact_keys(
+            raw,
+            {"summary", "probe_kind", "command", "exit_code", "observations"},
+            field,
+        )
         exit_code = raw["exit_code"]
         if exit_code is not None and (
             isinstance(exit_code, bool) or not isinstance(exit_code, int)
@@ -225,6 +246,7 @@ class StageEvidence:
             raise ReceiptError(f"{field}.exit_code must be an integer or null")
         return cls(
             summary=_text(raw["summary"], f"{field}.summary"),
+            probe_kind=_probe_kind(stage, raw["probe_kind"], field),
             command=_strings(
                 raw["command"], f"{field}.command", allow_empty=True, unique=False
             ),
@@ -383,6 +405,7 @@ def _validate_evidence_consistency(
     states: Mapping[Stage, State],
     evidence: Mapping[Stage, StageEvidence],
 ) -> None:
+    _validate_evidence_presence(states, evidence)
     success_states = {**SUCCESS_STATE, Stage.RUNTIME_CDI: State.PASSED}
     for stage, success in success_states.items():
         if states[stage] is success and evidence[stage].exit_code != 0:
@@ -402,6 +425,79 @@ def _validate_evidence_consistency(
                 f"{stage.value}={states[stage].value} requires non-zero evidence.exit_code"
             )
 
+    _validate_cuda_driver_api_evidence(states, evidence)
+
+
+_EMPTY_EVIDENCE_STATES = {
+    (Stage.RUN_DEVICE_REQUEST, State.NOT_ATTEMPTED),
+    (Stage.CUDA_DRIVER_API, State.UNVERIFIED),
+    (Stage.CUDA_COMPILE_RUN, State.NOT_ATTEMPTED),
+    (Stage.RUNTIME_CDI, State.UNVERIFIED),
+}
+
+
+def _validate_evidence_presence(
+    states: Mapping[Stage, State],
+    evidence: Mapping[Stage, StageEvidence],
+) -> None:
+    """Require an executable argv and observations for every attempted stage."""
+    for stage, item in evidence.items():
+        empty_allowed = (stage, states[stage]) in _EMPTY_EVIDENCE_STATES
+        if not item.command or not item.observations:
+            if empty_allowed and not item.command and not item.observations:
+                if item.exit_code is not None:
+                    raise ReceiptError(
+                        f"{stage.value}={states[stage].value} may be empty only with "
+                        "exit_code=null"
+                    )
+                continue
+            if not empty_allowed:
+                raise ReceiptError(
+                    f"{stage.value}={states[stage].value} requires non-empty "
+                    "executable command and observations"
+                )
+            raise ReceiptError(
+                f"{stage.value} evidence requires command and observations together"
+            )
+        if item.command and item.command[0].startswith("<"):
+            raise ReceiptError(
+                f"{stage.value}.command must start with an executable, not a placeholder"
+            )
+
+
+def _validate_cuda_driver_api_evidence(
+    states: Mapping[Stage, State],
+    evidence: Mapping[Stage, StageEvidence],
+) -> None:
+    """Require a typed direct-driver/NVML witness before declaring API readiness."""
+    stage = Stage.CUDA_DRIVER_API
+    item = evidence[stage]
+    if states[stage] is not State.READY:
+        return
+    if item.probe_kind is ProbeKind.CUDA_DRIVER_API:
+        required = (
+            re.compile(r"\bcuInit\s+status=0\b"),
+            re.compile(r"\bcuDeviceGetCount\s+status=0\s+count=\d+\b"),
+        )
+    elif item.probe_kind is ProbeKind.NVML:
+        required = (
+            re.compile(r"\bnvmlInit(?:_v2)?\s+status=0\b"),
+            re.compile(
+                r"\bnvmlDeviceGetCount\s+status=0\s+count=\d+\b"
+            ),
+        )
+    else:
+        raise ReceiptError(
+            "cuda_driver_api=ready requires probe_kind=cuda_driver_api or nvml"
+        )
+    observations = "\n".join(item.observations)
+    missing = [pattern.pattern for pattern in required if not pattern.search(observations)]
+    if missing:
+        raise ReceiptError(
+            "cuda_driver_api=ready evidence is missing typed success observations: "
+            + ", ".join(missing)
+        )
+
 
 def _validate_cdi_identity(builder: BuilderIdentity, state: State) -> None:
     missing = tuple(
@@ -420,6 +516,37 @@ def _validate_cdi_identity(builder: BuilderIdentity, state: State) -> None:
         raise ReceiptError(
             "cdi_inventory=unresolved requires at least one requested device to be absent"
         )
+
+
+def _probe_kind(stage: Stage, value: Any, field: str) -> ProbeKind:
+    if not isinstance(value, str):
+        raise ReceiptError(f"{field}.probe_kind must be a string")
+    try:
+        kind = ProbeKind(value)
+    except ValueError as error:
+        allowed = sorted(item.value for item in _allowed_probe_kinds(stage))
+        raise ReceiptError(
+            f"{field}.probe_kind has unknown value {value!r}; expected one of {allowed}"
+        ) from error
+    if kind not in _allowed_probe_kinds(stage):
+        allowed = sorted(item.value for item in _allowed_probe_kinds(stage))
+        raise ReceiptError(
+            f"{field}.probe_kind={value!r} is not accepted for {stage.value}; "
+            f"expected one of {allowed}"
+        )
+    return kind
+
+
+def _allowed_probe_kinds(stage: Stage) -> frozenset[ProbeKind]:
+    if stage is Stage.CUDA_DRIVER_API:
+        return frozenset(
+            {
+                ProbeKind.CUDA_DRIVER_API,
+                ProbeKind.CUDA_RUNTIME_API,
+                ProbeKind.NVML,
+            }
+        )
+    return frozenset({ProbeKind(stage.value)})
 
 
 def _mapping(value: Any, field: str) -> Mapping[str, Any]:

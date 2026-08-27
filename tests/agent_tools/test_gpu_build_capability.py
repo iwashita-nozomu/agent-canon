@@ -28,6 +28,7 @@ from tools.agent_tools.gpu_build_capability import (  # noqa: E402
     GpuBuildCapabilityReceipt,
     HANDOFF_OWNER,
     HANDOFF_REQUIREMENTS,
+    ProbeKind,
     ReceiptError,
     State,
     Stage,
@@ -112,6 +113,70 @@ class GpuBuildCapabilityReceiptTest(unittest.TestCase):
         self.assertEqual(decision.capability, BuildCapability.READY)
         self.assertEqual(decision.runtime_cdi, State.UNVERIFIED)
         self.assertIsNone(decision.blocking_stage)
+
+    def test_empty_attempted_evidence_is_rejected(self) -> None:
+        raw = json.loads(REPAIRED_FIXTURE.read_text(encoding="utf-8"))
+        raw["evidence"]["driver_loader"]["command"] = []
+        with self.assertRaisesRegex(ReceiptError, "requires non-empty"):
+            GpuBuildCapabilityReceipt.from_mapping(raw)
+
+        raw = json.loads(REPAIRED_FIXTURE.read_text(encoding="utf-8"))
+        raw["evidence"]["driver_loader"]["observations"] = []
+        with self.assertRaisesRegex(ReceiptError, "requires non-empty"):
+            GpuBuildCapabilityReceipt.from_mapping(raw)
+
+    def test_explicit_unverified_or_unattempted_may_omit_evidence(self) -> None:
+        raw = json.loads(REPAIRED_FIXTURE.read_text(encoding="utf-8"))
+        raw["stages"]["cuda_driver_api"] = "unverified"
+        raw["evidence"]["cuda_driver_api"] = {
+            "summary": "The direct driver probe was not attempted.",
+            "probe_kind": "cuda_driver_api",
+            "command": [],
+            "exit_code": None,
+            "observations": [],
+        }
+        receipt = GpuBuildCapabilityReceipt.from_mapping(raw)
+        self.assertEqual(receipt.state(Stage.CUDA_DRIVER_API), State.UNVERIFIED)
+
+    def test_cuda_driver_api_ready_rejects_runtime_count_text(self) -> None:
+        raw = json.loads(REPAIRED_FIXTURE.read_text(encoding="utf-8"))
+        raw["evidence"]["cuda_driver_api"]["probe_kind"] = "cuda_runtime_api"
+        raw["evidence"]["cuda_driver_api"]["observations"] = [
+            "CUDA_COUNT status=0 count=2"
+        ]
+        with self.assertRaisesRegex(ReceiptError, "probe_kind=cuda_driver_api or nvml"):
+            GpuBuildCapabilityReceipt.from_mapping(raw)
+
+    def test_direct_driver_api_probe_is_typed_and_accepted(self) -> None:
+        receipt = load_gpu_build_capability_receipt(REPAIRED_FIXTURE)
+        evidence = receipt.evidence[Stage.CUDA_DRIVER_API]
+        self.assertEqual(evidence.probe_kind, ProbeKind.CUDA_DRIVER_API)
+        self.assertIn("cuInit status=0", evidence.observations)
+        self.assertIn("cuDeviceGetCount status=0 count=2", evidence.observations)
+
+    def test_typed_nvml_probe_can_establish_driver_readiness(self) -> None:
+        raw = json.loads(REPAIRED_FIXTURE.read_text(encoding="utf-8"))
+        raw["evidence"]["cuda_driver_api"]["probe_kind"] = "nvml"
+        raw["evidence"]["cuda_driver_api"]["command"] = [
+            "/tmp/nvml-device-count-probe"
+        ]
+        raw["evidence"]["cuda_driver_api"]["observations"] = [
+            "nvmlInit status=0",
+            "nvmlDeviceGetCount status=0 count=2",
+        ]
+        receipt = GpuBuildCapabilityReceipt.from_mapping(raw)
+        self.assertEqual(receipt.state(Stage.CUDA_DRIVER_API), State.READY)
+        self.assertEqual(receipt.evidence[Stage.CUDA_DRIVER_API].probe_kind, ProbeKind.NVML)
+
+    def test_runtime_cdi_probe_kind_does_not_become_driver_api_evidence(self) -> None:
+        raw = json.loads(REPAIRED_FIXTURE.read_text(encoding="utf-8"))
+        raw["evidence"]["runtime_cdi"]["observations"] = [
+            "cuInit status=0",
+            "cuDeviceGetCount status=0 count=2",
+        ]
+        receipt = GpuBuildCapabilityReceipt.from_mapping(raw)
+        self.assertEqual(receipt.evidence[Stage.RUNTIME_CDI].probe_kind, ProbeKind.RUNTIME_CDI)
+        self.assertEqual(receipt.state(Stage.CUDA_DRIVER_API), State.READY)
 
     def test_independent_stage_observations_fail_closed_at_first_gap(self) -> None:
         raw = copy.deepcopy(self.failed_raw)

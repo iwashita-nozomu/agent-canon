@@ -1,6 +1,6 @@
 {
   "schema": "agent-canon.environment-resolution.gpu-build-capability",
-  "version": 1,
+  "version": 2,
   "builder": {
     "platform": "wsl2-ubuntu-24.04",
     "builder_name": "rootless",
@@ -31,6 +31,7 @@
   "evidence": {
     "device_entitlement": {
       "summary": "The build request limited entitlement to the NVIDIA and WSL CUDA build devices.",
+      "probe_kind": "device_entitlement",
       "command": [
         "docker",
         "buildx",
@@ -47,6 +48,7 @@
     },
     "cdi_inventory": {
       "summary": "The builder resolved both exact requested CDI devices.",
+      "probe_kind": "cdi_inventory",
       "command": [
         "docker",
         "buildx",
@@ -62,6 +64,7 @@
     },
     "run_device_request": {
       "summary": "BuildKit entered a step requesting the NVIDIA device and read-only WSL thunk addon.",
+      "probe_kind": "run_device_request",
       "command": [
         "docker",
         "buildx",
@@ -76,6 +79,7 @@
     },
     "device_nodes": {
       "summary": "The repaired build step retained the WSL GPU transport device.",
+      "probe_kind": "device_nodes",
       "command": [
         "test",
         "-c",
@@ -88,6 +92,7 @@
     },
     "driver_loader": {
       "summary": "The read-only WSL addon supplied the thunk and complete loader surface.",
+      "probe_kind": "driver_loader",
       "command": [
         "test",
         "-e",
@@ -101,19 +106,26 @@
     },
     "cuda_driver_api": {
       "summary": "The CUDA count probe initialized the driver and read both devices.",
+      "probe_kind": "cuda_driver_api",
       "command": [
-        "/tmp/cuda-count-probe"
+        "/tmp/cuda-driver-api-probe"
       ],
       "exit_code": 0,
       "observations": [
-        "CUDA_COUNT status=0 count=2",
+        "cuInit status=0",
+        "cuDeviceGetCount status=0 count=2",
         "RTX 2080 capability=7.5"
       ]
     },
     "cuda_compile_run": {
       "summary": "The parent-owned CUDA/Kokkos build and GPU-profile C++ tests completed.",
+      "probe_kind": "cuda_compile_run",
       "command": [
-        "<parent-owned-build-and-test-command>"
+        "cmake",
+        "--build",
+        "build",
+        "--target",
+        "gpu-profile-tests"
       ],
       "exit_code": 0,
       "observations": [
@@ -124,8 +136,16 @@
     },
     "runtime_cdi": {
       "summary": "The rebuilt parent image resolved and executed the CUDA runtime route.",
+      "probe_kind": "runtime_cdi",
       "command": [
-        "<parent-owned-runtime-command>"
+        "docker",
+        "run",
+        "--rm",
+        "--device",
+        "nvidia.com/gpu=all",
+        "<parent-image>",
+        "nvidia-smi",
+        "-L"
       ],
       "exit_code": 0,
       "observations": [

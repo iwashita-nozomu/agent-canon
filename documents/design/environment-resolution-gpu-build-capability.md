@@ -27,6 +27,14 @@ architecture固定、project testの代行を行いません。
 
 ## GPU build capability receipt
 
+The receipt uses schema version `2`. Every evidence object has the exact keys
+`summary`, `probe_kind`, `command`, `exit_code`, and `observations`. `probe_kind`
+is closed and owned by its stage; a free-form summary cannot make a probe valid.
+For every attempted state, `command` is a non-empty argv whose first item is an
+executable and `observations` is a non-empty bounded list. Only
+`not_attempted` and `unverified` states may omit both arrays (with
+`exit_code=null`).
+
 一つのbuilderについて、次の状態を独立に記録します。
 
 | field | closed states | success state |
@@ -70,18 +78,21 @@ receiptは少なくとも次を構造化して保持します。
 - Docker、Buildx、BuildKit version;
 - exact requested CDI device列とbuilderが返したexact inventory;
 - 各stageのclosed state;
-- bounded single-line summary、argv、exit code、observed paths/messages。
+- stage-specific `probe_kind`;
+- bounded single-line summary、実行可能なargv、exit code、non-empty observed paths/messages。
 
 `cdi_inventory=matched`は要求した全device identityがinventoryに存在する場合だけ受理します。
 stateをstdoutの部分一致、PATH上の`nvidia-smi`の有無、runtimeの成功から推測しません。未知のstate、
 欠けたstage、余分なstage、unbounded summary、success/non-zeroやexecuted-failure/zeroの矛盾は
 receipt不正としてfail closedにします。
 
-CUDA Driver APIの`ready`はCUDA device count probeがdriver initializationに成功した場合だけです。
-NVML成功や`nvidia-smi`のPATH解決だけでは`ready`にしません。NVML failureはdriver loader evidenceとして
-保持し、CUDA probeのstatusを`cuda_driver_api`へ別に記録します。2026-08-24のhistorical receiptは
-`cudaGetDeviceCount`を保持しますが、current live closureではdirect `cuInit` / `cuDeviceGetCount` receiptも
-read backし、runtime APIだけをdirect Driver API検証の代用にはしません。
+CUDA Driver APIの`ready`は、`probe_kind=cuda_driver_api` の
+`cuInit status=0` と `cuDeviceGetCount status=0 count=N`、または
+`probe_kind=nvml` の同等の `nvmlInit` / `nvmlDeviceGetCount` success
+observation がある場合だけです。`nvidia-smi`のPATH解決、runtime CDI、または
+`probe_kind=cuda_runtime_api` の `CUDA_COUNT` / `cudaGetDeviceCount` は、
+`ready`の代用になりません。runtime API failureは失敗診断として typed
+`cuda_runtime_api` evidence に保持できます。
 
 ## 2026-08-24 WSL2/rootless readback
 
@@ -95,7 +106,7 @@ cdi_inventory       = matched (nvidia.com/gpu=all)
 run_device_request  = accepted
 device_nodes        = present (/dev/dxg)
 driver_loader        = partial (libcuda.so.1.1 body only; WSL thunk absent)
-cuda_driver_api     = failed_initialization (cudaGetDeviceCount status 35)
+cuda_driver_api     = failed_initialization (probe_kind=cuda_runtime_api; cudaGetDeviceCount status 35)
 cuda_compile_run    = run_failed
 runtime_cdi         = passed
 ```
@@ -112,7 +123,7 @@ parent側で`local.wsl/cuda-build=all`を追加して`/usr/lib/wsl/lib`をread-o
 ```text
 requested_devices   = nvidia.com/gpu=all, local.wsl/cuda-build=all
 driver_loader        = complete
-cuda_driver_api     = ready (status=0, count=2, capability=7.5)
+cuda_driver_api     = ready (probe_kind=cuda_driver_api; cuInit status=0; cuDeviceGetCount status=0 count=2; capability=7.5)
 cuda_compile_run    = passed (CUDA/Kokkos provider, GPU-profile tests 3/3)
 runtime_cdi         = passed
 ```
