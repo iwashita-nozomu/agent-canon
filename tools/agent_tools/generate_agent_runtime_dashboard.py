@@ -25,10 +25,10 @@ from collections import Counter, defaultdict
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-
-UTC = timezone.utc
 from pathlib import Path
 from typing import cast
+
+UTC = timezone.utc
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -58,6 +58,81 @@ from issue_sync import (  # noqa: E402
 )
 
 STATUS_RE = re.compile(r"\b[A-Z_]*STATUS=(pass|fail|skip)\b")
+SOURCE_SYNC_STATE_PATH = Path("/var/lib/agent-canon/source-sync.json")
+SOURCE_SYNC_SCHEMA = "agent-canon.source-sync.v1"
+SOURCE_SYNC_IDENTITY_RE = re.compile(r"^(?:unknown|[0-9a-f]{40})$")
+SOURCE_SYNC_CODE_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+def read_source_sync_state(
+    path: Path = SOURCE_SYNC_STATE_PATH,
+) -> dict[str, object] | None:
+    """Read the host-owned source-sync record mounted into the resident."""
+    if path.is_symlink() or not path.is_file():
+        return None
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(value, dict) or value.get("schema") != SOURCE_SYNC_SCHEMA:
+        return None
+    required = (
+        "status",
+        "code",
+        "source_root",
+        "source_head",
+        "source_tree",
+        "remote",
+        "branch",
+        "updated_at",
+    )
+    if any(not isinstance(value.get(field_name), str) for field_name in required):
+        return None
+    status = value["status"]
+    code = value["code"]
+    source_root = value["source_root"]
+    source_head = value["source_head"]
+    source_tree = value["source_tree"]
+    remote = value["remote"]
+    branch = value["branch"]
+    updated_at = value["updated_at"]
+    if (
+        status not in {"success", "failed"}
+        or not SOURCE_SYNC_CODE_RE.fullmatch(code)
+        or not isinstance(source_root, str)
+        or not source_root.startswith("/")
+        or not SOURCE_SYNC_IDENTITY_RE.fullmatch(source_head)
+        or not SOURCE_SYNC_IDENTITY_RE.fullmatch(source_tree)
+        or not re.fullmatch(r"[A-Za-z0-9_.-]+", remote)
+        or not re.fullmatch(r"[A-Za-z0-9._/-]+", branch)
+        or not ISO_TIMESTAMP_RE.fullmatch(updated_at)
+    ):
+        return None
+    remote_url = value.get("remote_url")
+    expected_keys = set(required) | {"schema", "remote_url"}
+    if status == "failed":
+        expected_keys.add("failure")
+    if set(value) != expected_keys or not isinstance(remote_url, str) or not remote_url:
+        return None
+    if (
+        '"' in remote_url
+        or "\\" in remote_url
+        or any(ord(character) < 0x20 for character in source_root)
+        or any(ord(character) < 0x20 for character in remote_url)
+    ):
+        return None
+    failure = value.get("failure")
+    if status == "failed" and (
+        not isinstance(failure, str) or not SOURCE_SYNC_CODE_RE.fullmatch(failure)
+    ):
+        return None
+    if status == "success" and "failure" in value:
+        return None
+    result = {field_name: value[field_name] for field_name in required}
+    result["remote_url"] = remote_url
+    if status == "failed":
+        result["failure"] = failure
+    return result
 
 
 TOKEN_COMPARISON_RE = re.compile(
@@ -428,6 +503,7 @@ class RuntimeDashboardSummary:
     selection_metrics_breakdown: SelectionMetricsBreakdown
     issue_worker_handoffs: tuple[IssueWorkerHandoff, ...] = ()
     issue_publication_receipts: tuple[IssuePublicationReceipt, ...] = ()
+    source_sync_state: dict[str, object] | None = None
 
 
 class ResultFamilyReader:
@@ -1633,6 +1709,7 @@ class AgentRuntimeDashboard:
         root: Path,
         recent_days: int | None = None,
         runtime_root: Path | str | None = None,
+        source_sync_path: Path | None = None,
     ) -> None:
         """Resolve the requested root to the AgentCanon evidence root."""
         self.runtime_root = runtime_artifact_boundary(root, runtime_root).root
@@ -1640,6 +1717,7 @@ class AgentRuntimeDashboard:
         self.root = self.guide.root
         self.recent_days = recent_days
         self.recent_cutoff_epoch = recent_cutoff_epoch(recent_days)
+        self.source_sync_path = source_sync_path or SOURCE_SYNC_STATE_PATH
 
     def collect(self) -> RuntimeDashboardSummary:
         """Collect dashboard evidence without mutating repository state."""
@@ -1723,6 +1801,7 @@ class AgentRuntimeDashboard:
                 self.recent_cutoff_epoch,
             ),
             issue_publication_receipts=issue_publication_receipts,
+            source_sync_state=read_source_sync_state(self.source_sync_path),
         )
 
     def collect_evidence(self) -> tuple[EvidenceSummary, tuple[Path, ...]]:
@@ -2264,6 +2343,7 @@ def render_dashboard_api(summary: RuntimeDashboardSummary) -> str:
         "hook_entries": summary.hook_entries,
         "github_issue_refs": list(summary.evidence.github_issue_refs),
         "issue_publication_action_counts": dict(sorted(publication_actions.items())),
+        "source_sync_state": summary.source_sync_state,
     }
     payload.update(hook_schema_breakdown(summary))
     payload.update(dashboard_repair_payload(summary))
@@ -2693,6 +2773,30 @@ def dashboard_location_lines(summary: RuntimeDashboardSummary) -> list[str]:
         "",
         *result_family_lines(summary),
         "",
+        "## Source Sync State",
+        "",
+        *source_sync_state_lines(summary),
+        "",
+    ]
+
+
+def source_sync_state_lines(summary: RuntimeDashboardSummary) -> list[str]:
+    """Render the current host-owned source-sync state from its mount."""
+    state = summary.source_sync_state
+    if state is None:
+        return ["| status | unavailable |", "| --- | --- |"]
+    fields = (
+        ("status", state.get("status")),
+        ("code", state.get("code")),
+        ("source_head", state.get("source_head")),
+        ("source_tree", state.get("source_tree")),
+        ("failure", state.get("failure", "none")),
+        ("updated_at", state.get("updated_at")),
+    )
+    return [
+        "| field | value |",
+        "| --- | --- |",
+        *[f"| `{name}` | {table_cell(str(value))} |" for name, value in fields],
     ]
 
 

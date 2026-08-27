@@ -96,6 +96,20 @@ runtime root; they are operational evidence, not source files. A failed
 operation returns a stable error code and preserves the previous state where
 the operation has a generation or ownership boundary.
 
+The host creates the canonical `.runtime/source-sync.json` record before any
+resident container is created and mounts that file read-only at
+`/var/lib/agent-canon/source-sync.json`. The host shell is the only source-sync
+state writer. Resident status and dashboard readers consume this mounted file;
+`container-state/source-sync.json` is not a state surface.
+
+The source-sync record uses schema `agent-canon.source-sync.v1` and contains
+`status`, `code`, `updated_at`, `source_root`, `remote`, `remote_url`, `branch`,
+`source_head`, and `source_tree`. A `failed` record additionally contains
+`failure`; a `success` record does not. Shell status and resident dashboard
+readers accept only this complete shape. Legacy, incomplete, or wrongly typed
+records are reported as unavailable and are replaced only by the next atomic
+host sync transition.
+
 ## What is installed and where
 
 `install` creates the runtime state directories and adopts the published GHCR

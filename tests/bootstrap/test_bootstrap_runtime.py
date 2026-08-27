@@ -19,7 +19,6 @@ from tools.agent_tools.bootstrap_runtime import (  # noqa: E402
     BootstrapRuntime,
     DockerAdapter,
     _container_source_identity,
-    TOOL_SOURCE_DESTINATION,
     _container_request_environment,
     build_parser,
     run,
@@ -1472,6 +1471,72 @@ def test_parser_has_typed_exec_tool_codex_and_eval_routes() -> None:
         .eval_operation
         == "collect"
     )
+
+
+def test_public_python_source_sync_route_is_removed() -> None:
+    """Only the host shell may mutate source-sync state."""
+    base = [
+        "--repository-root",
+        str(REPOSITORY_ROOT),
+        "--control-parent-root",
+        "/tmp",
+        "--runtime-root",
+        "/tmp/runtime",
+    ]
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(base + ["sync", "--install-root", str(REPOSITORY_ROOT)])
+
+
+def test_status_reads_host_owned_source_sync_record(tmp_path: Path) -> None:
+    """Status reads the canonical host record rather than container state."""
+    state_path = tmp_path / "runtime" / "source-sync.json"
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text(
+        json.dumps(
+            {
+                "schema": "agent-canon.source-sync.v1",
+                "status": "failed",
+                "code": "source_sync_candidate_failed",
+                "source_root": "/source",
+                "source_head": "1" * 40,
+                "source_tree": "2" * 40,
+                "remote": "origin",
+                "remote_url": "remote",
+                "branch": "main",
+                "updated_at": "2026-08-27T00:00:00Z",
+                "failure": "source_sync_candidate_failed",
+            }
+        ),
+        encoding="utf-8",
+    )
+    manager = BootstrapRuntime(
+        tmp_path,
+        state_path.parent,
+        repository_root=REPOSITORY_ROOT,
+        docker=DockerAdapter(str(REPOSITORY_ROOT / "tests/bootstrap/fake_docker.py")),
+    )
+    # Avoid a lifecycle install; status's state fallback is enough to exercise
+    # the source-sync reader and its owner path.
+    manager.paths.state.parent.mkdir(parents=True, exist_ok=True)
+    manager.paths.state.write_text(json.dumps(manager._new_state()), encoding="utf-8")
+    result = manager.status()
+    assert result["details"]["source_sync"]["failure"] == "source_sync_candidate_failed"
+    for invalid_state in (
+        {
+            "failure": "old",
+            "schema": "agent-canon.source-sync.v1",
+            "status": "failed",
+            "updated_at": "2026-08-26T00:00:00Z",
+        },
+        {"schema": "agent-canon.source-sync.v1", "status": 7},
+        {
+            "schema": "agent-canon.source-sync.v1",
+            "status": "success",
+            "code": "up_to_date",
+        },
+    ):
+        state_path.write_text(json.dumps(invalid_state), encoding="utf-8")
+        assert manager.status()["details"]["source_sync"] is None
 
 
 def test_eval_precondition_failure_creates_no_spool_or_exchange(

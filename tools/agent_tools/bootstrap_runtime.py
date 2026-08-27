@@ -69,6 +69,13 @@ CONTAINER_RUNTIME_DIR = "container-runtime"
 CONTAINER_RUNTIME_DESTINATION = "/var/lib/agent-canon/runtime"
 PRIVATE_LOG_DESTINATION = "/var/lib/agent-canon/private-log"
 REGISTRY_DESTINATION = "/var/lib/agent-canon/mount-registry.toml"
+SOURCE_SYNC_SCHEMA = "agent-canon.source-sync.v1"
+SOURCE_SYNC_DESTINATION = "/var/lib/agent-canon/source-sync.json"
+SOURCE_SYNC_CODE_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+SOURCE_SYNC_IDENTITY_RE = re.compile(r"^(?:unknown|[0-9a-f]{40})$")
+SOURCE_SYNC_TIMESTAMP_RE = re.compile(
+    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+)
 CODEX_SESSION_ROOT_ENV = "AGENT_CANON_CODEX_SESSION_ROOT"
 TOOL_SOURCE_DESTINATION = "/usr/local/share/agent-canon/runtime"
 TOOL_ENVIRONMENT_KEYS = frozenset(
@@ -1469,6 +1476,75 @@ class BootstrapRuntime:
     def personal_codex_config(self) -> Path:
         """Return AgentCanon's ignored, persistent personal-config source."""
         return self.repository_root / ".codex" / "personal" / "config.toml"
+
+    @property
+    def source_sync_read_path(self) -> Path:
+        """Return the host-owned source-sync path visible to this controller."""
+        if self._container_control():
+            return Path(SOURCE_SYNC_DESTINATION)
+        return self.paths.source_sync
+
+    def _read_source_sync_state(self) -> dict[str, Any] | None:
+        """Read the canonical host source-sync record without writing it."""
+        path = self.source_sync_read_path
+        if path.is_symlink() or not path.exists():
+            return None
+        if not path.is_file():
+            return None
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            return None
+        if not isinstance(value, dict) or value.get("schema") != SOURCE_SYNC_SCHEMA:
+            return None
+        required = {
+            "schema",
+            "status",
+            "code",
+            "source_root",
+            "source_head",
+            "source_tree",
+            "remote",
+            "remote_url",
+            "branch",
+            "updated_at",
+        }
+        status = value.get("status")
+        expected = required | ({"failure"} if status == "failed" else set())
+        if set(value) != expected:
+            return None
+        if (
+            status not in {"success", "failed"}
+            or not isinstance(value.get("code"), str)
+            or not SOURCE_SYNC_CODE_RE.fullmatch(value["code"])
+            or not isinstance(value.get("source_root"), str)
+            or not value["source_root"].startswith("/")
+            or '"' in value["source_root"]
+            or "\\" in value["source_root"]
+            or any(ord(character) < 0x20 for character in value["source_root"])
+            or not isinstance(value.get("source_head"), str)
+            or not SOURCE_SYNC_IDENTITY_RE.fullmatch(value["source_head"])
+            or not isinstance(value.get("source_tree"), str)
+            or not SOURCE_SYNC_IDENTITY_RE.fullmatch(value["source_tree"])
+            or not isinstance(value.get("remote"), str)
+            or re.fullmatch(r"[A-Za-z0-9_.-]+", value["remote"]) is None
+            or not isinstance(value.get("remote_url"), str)
+            or not value["remote_url"]
+            or '"' in value["remote_url"]
+            or "\\" in value["remote_url"]
+            or any(ord(character) < 0x20 for character in value["remote_url"])
+            or not isinstance(value.get("branch"), str)
+            or re.fullmatch(r"[A-Za-z0-9._/-]+", value["branch"]) is None
+            or not isinstance(value.get("updated_at"), str)
+            or SOURCE_SYNC_TIMESTAMP_RE.fullmatch(value["updated_at"]) is None
+        ):
+            return None
+        failure = value.get("failure")
+        if status == "failed" and (
+            not isinstance(failure, str) or not SOURCE_SYNC_CODE_RE.fullmatch(failure)
+        ):
+            return None
+        return value
 
     def _global_home_scope(self) -> bool:
         """Return whether global projection is explicitly bound to the real HOME."""
@@ -3066,6 +3142,7 @@ class BootstrapRuntime:
                         "managed_agents_link": self._agents_link_readback(state),
                         "managed_global_links": self._global_links_readback(state),
                         "managed_codex_config": state.get("managed_codex_config"),
+                        "source_sync": self._read_source_sync_state(),
                     },
                     state=state,
                 )
@@ -5885,10 +5962,6 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Reconcile an atomically installed source-sync candidate across its manifest boundary",
     )
-    sync_parser = sub.add_parser("sync")
-    sync_parser.add_argument("--install-root", required=True)
-    sync_parser.add_argument("--remote", default="origin")
-    sync_parser.add_argument("--branch", default="main")
     source_identity = sub.add_parser(
         "source-identity",
         help=argparse.SUPPRESS,
@@ -5972,18 +6045,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         return runtime.install(image_ref=args.image_ref)
     if operation == "update":
         return runtime.update(image_ref=args.image_ref, source_sync=args.source_sync)
-    if operation == "sync":
-        try:
-            from .source_sync import SourceSync  # type: ignore[import-not-found]
-        except ImportError:
-            from source_sync import SourceSync  # type: ignore[no-redef]
-
-        return SourceSync(
-            runtime,
-            Path(args.install_root),
-            remote=args.remote,
-            branch=args.branch,
-        ).sync()
     if operation == "scheduler":
         if args.scheduler_operation == "enable":
             return runtime.scheduler_enable()

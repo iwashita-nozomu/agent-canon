@@ -69,6 +69,375 @@ def test_sync_stages_source_before_live_fast_forward() -> None:
     assert text.index('bootstrap_host_entrypoint "$staging_root"') < text.index('git -C "$install_root" merge --ff-only "$remote/$branch"')
 
 
+def test_source_sync_state_is_mounted_read_only_into_the_resident() -> None:
+    """The resident reads the host-owned source-sync file through one mount."""
+    text = ADAPTER.read_text(encoding="utf-8")
+    assert "AGENT_CANON_SOURCE_SYNC_DESTINATION=/var/lib/agent-canon/source-sync.json" in text
+    assert 'src=$AGENT_CANON_RUNTIME_ROOT/source-sync.json' in text
+    assert 'dst=$AGENT_CANON_SOURCE_SYNC_DESTINATION,readonly' in text
+    assert '"$AGENT_CANON_RUNTIME_ROOT/source-sync.json" "$AGENT_CANON_SOURCE_SYNC_DESTINATION"' in text
+    assert "_agent_canon_ensure_source_sync_state" in text
+    assert "container-state/source-sync.json" not in text
+
+
+def test_source_sync_mount_migration_ignores_only_declared_destination(
+    tmp_path: Path,
+) -> None:
+    """Replacement accepts old/new source-sync mounts but rejects other drift."""
+    runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
+    private_log = tmp_path / "agent-canon-log"
+    control = tmp_path / "control"
+    source_sync = runtime / "source-sync.json"
+    mounts = state_root / "mounts.tsv"
+    for path in (state_root, private_log, control):
+        path.mkdir(parents=True)
+    source_sync.write_text("{}\n", encoding="utf-8")
+    mounts.write_text("", encoding="utf-8")
+    control_digest = hashlib.sha256(str(control).encode("utf-8")).hexdigest()
+    docker = tmp_path / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        "if [[ \"$1:$2\" == image:inspect ]]; then printf 'sha256:image\\n'; exit 0; fi\n"
+        "format=$4\n"
+        "case \"$format\" in\n"
+        "  *io.agent-canon.runtime*) printf 'shared-v1' ;;\n"
+        "  *io.agent-canon.control-root-digest*) printf '" + control_digest + "' ;;\n"
+        "  *Config.Image*) printf 'image' ;;\n"
+        "  *NetworkMode*) printf 'none' ;;\n"
+        "  *ReadonlyRootfs*) printf 'true' ;;\n"
+        "  *CapDrop*) printf 'ALL' ;;\n"
+        "  *SecurityOpt*) printf 'no-new-privileges' ;;\n"
+        "  *NanoCpus*) printf '2000000000' ;;\n"
+        "  *Memory*) printf '4294967296' ;;\n"
+        "  *PidsLimit*) printf '512' ;;\n"
+        "  *range[[:space:]].Mounts*) cat \"$FAKE_MOUNTS\" ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    common = (
+        f"source {str(ADAPTER)!r}\n"
+        "set -e\n"
+        f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}\n"
+        f"AGENT_CANON_STATE_ROOT={str(state_root)!r}\n"
+        f"AGENT_CANON_CONTROL_ROOT={str(control)!r}\n"
+        f"AGENT_CANON_PRIVATE_LOG_ROOT={str(private_log)!r}\n"
+        "AGENT_CANON_IMAGE_REF=image\n"
+        f"AGENT_CANON_DOCKER_CMD={str(docker)!r}\n"
+        "_agent_canon_validate_existing_container container "
+        f"{str(mounts)!r} 1 $REQUIRE_SYNC\n"
+    )
+
+    def validate(require_sync: int, mount_lines: str) -> int:
+        mount_file = tmp_path / f"mounts-{require_sync}-{len(mount_lines)}.txt"
+        mount_file.write_text(mount_lines, encoding="utf-8")
+        result = subprocess.run(
+            ["bash", "-c", common],
+            check=False,
+            capture_output=True,
+            text=True,
+            env={
+                **os.environ,
+                "FAKE_MOUNTS": str(mount_file),
+                "REQUIRE_SYNC": str(require_sync),
+            },
+        )
+        assert not result.stdout, result.stdout
+        return result.returncode
+
+    old_mounts = (
+        f"{state_root}\t/var/lib/agent-canon/runtime\ttrue\n"
+        f"{private_log}\t/var/lib/agent-canon/private-log\tfalse\n"
+        f"{state_root / 'mounts.toml'}\t/var/lib/agent-canon/mount-registry.toml\tfalse\n"
+    )
+    new_mounts = old_mounts + (
+        f"{source_sync}\t/var/lib/agent-canon/source-sync.json\tfalse\n"
+    )
+    assert validate(0, old_mounts) == 0
+    assert validate(0, new_mounts) == 0
+    assert validate(1, new_mounts) == 0
+    assert validate(1, old_mounts) == 2
+
+
+@pytest.mark.parametrize("install_option", ["separate", "equals"])
+def test_sync_resolves_install_root_before_runtime_initialization(
+    tmp_path: Path, install_option: str
+) -> None:
+    """A sync target owns the initial record even when it differs from the script root."""
+    bare = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    target = tmp_path / "target"
+    control = tmp_path / "control"
+    control.mkdir()
+    (tmp_path / "script-root").mkdir()
+    subprocess.run(["git", "init", "--bare", str(bare)], check=True, capture_output=True)
+    subprocess.run(["git", "init", str(seed)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(seed), "config", "user.email", "test@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(seed), "config", "user.name", "AgentCanon Test"], check=True)
+    (seed / "tracked.txt").write_text("one\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(seed), "add", "tracked.txt"], check=True)
+    subprocess.run(["git", "-C", str(seed), "commit", "-m", "one"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(seed), "branch", "-M", "main"], check=True)
+    subprocess.run(["git", "-C", str(seed), "remote", "add", "origin", str(bare)], check=True)
+    subprocess.run(["git", "-C", str(seed), "push", "origin", "main"], check=True, capture_output=True)
+    subprocess.run(["git", "clone", str(bare), str(target)], check=True, capture_output=True)
+    install_arg = (
+        f"--install-root={target}" if install_option == "equals" else "--install-root"
+    )
+    command = [str(BOOTSTRAP), "--repository-root", str(tmp_path / "script-root"),
+               "--control-parent-root", str(control), "sync", install_arg]
+    if install_option == "separate":
+        command.append(str(target))
+    command.extend(["--remote", "origin", "--branch", "main"])
+    completed = subprocess.run(
+        command,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "AGENT_CANON_DOCKER": "true"},
+    )
+    assert completed.returncode == 0, completed.stderr
+    state = json.loads((target / ".runtime/source-sync.json").read_text(encoding="utf-8"))
+    assert state["status"] == "success"
+    assert state["code"] == "up_to_date"
+    assert state["source_root"] == str(target.resolve())
+    assert state["remote"] == "origin"
+    assert state["branch"] == "main"
+    assert len(state["source_head"]) == 40
+    assert len(state["source_tree"]) == 40
+    failed = subprocess.run(
+        [*command[:-1], "missing"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "AGENT_CANON_DOCKER": "true"},
+    )
+    assert failed.returncode == 2
+    failed_state = json.loads((target / ".runtime/source-sync.json").read_text(encoding="utf-8"))
+    assert failed_state["status"] == "failed"
+    assert failed_state["source_root"] == str(target.resolve())
+    assert failed_state["remote"] == "origin"
+    assert failed_state["branch"] == "missing"
+    assert len(failed_state["source_head"]) == 40
+    assert len(failed_state["source_tree"]) == 40
+
+
+def test_sync_invalid_install_root_fails_before_state_creation(tmp_path: Path) -> None:
+    """An invalid target is rejected before a target runtime or misleading record exists."""
+    control = tmp_path / "control"
+    control.mkdir()
+    (tmp_path / "script-root").mkdir()
+    target = tmp_path / "missing-target"
+    completed = subprocess.run(
+        [
+            str(BOOTSTRAP),
+            "--repository-root",
+            str(tmp_path / "script-root"),
+            "--control-parent-root",
+            str(control),
+            "sync",
+            "--install-root",
+            str(target),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "AGENT_CANON_DOCKER": "true"},
+    )
+    assert completed.returncode == 2
+    assert json.loads(completed.stderr)["code"] == "install_root_invalid"
+    assert not target.exists()
+
+
+def test_source_sync_state_writer_reconciles_terminal_records_atomically(
+    tmp_path: Path,
+) -> None:
+    """Shell sync state clears stale failures and preserves them on interruption."""
+    runtime = tmp_path / "runtime"
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+_agent_canon_source_sync_write failed old_failure /source \\
+  0123456789012345678901234567890123456789 \\
+  abcdefabcdefabcdefabcdefabcdefabcdefabcd origin remote-url main \\
+  2026-08-27T00:00:00Z old_failure
+_agent_canon_source_sync_write success up_to_date /source \\
+  0123456789012345678901234567890123456789 \\
+  abcdefabcdefabcdefabcdefabcdefabcdefabcd origin remote-url main \\
+  2026-08-27T00:00:01Z
+cp -- {str(runtime / "source-sync.json")!r} {str(tmp_path / "up-to-date.json")!r}
+_agent_canon_source_sync_write success updated /source \\
+  1111111111111111111111111111111111111111 \\
+  2222222222222222222222222222222222222222 origin remote-url main \\
+  2026-08-27T00:00:02Z
+cp -- {str(runtime / "source-sync.json")!r} {str(tmp_path / "updated.json")!r}
+_agent_canon_source_sync_write failed candidate_failed /source \\
+  1111111111111111111111111111111111111111 \\
+  2222222222222222222222222222222222222222 origin remote-url main \\
+  2026-08-27T00:00:03Z candidate_failed
+cp -- {str(runtime / "source-sync.json")!r} {str(tmp_path / "failed.json")!r}
+before=$(< {str(runtime / "source-sync.json")!r})
+AGENT_CANON_TEST_INTERRUPT_STATE_WRITE=1 _agent_canon_source_sync_write success up_to_date /source \\
+  1111111111111111111111111111111111111111 \\
+  2222222222222222222222222222222222222222 origin remote-url main \\
+  2026-08-27T00:00:04Z
+interrupted_rc=$?
+test "$interrupted_rc" -eq 99
+test "$before" = "$(< {str(runtime / "source-sync.json")!r})"
+_agent_canon_source_sync_json
+"""
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == 0, completed.stderr
+    up_to_date = json.loads((tmp_path / "up-to-date.json").read_text(encoding="utf-8"))
+    updated = json.loads((tmp_path / "updated.json").read_text(encoding="utf-8"))
+    failed = json.loads((tmp_path / "failed.json").read_text(encoding="utf-8"))
+    final = json.loads(completed.stdout)
+    assert up_to_date["status"] == "success"
+    assert up_to_date["code"] == "up_to_date"
+    assert "failure" not in up_to_date
+    assert updated["status"] == "success"
+    assert updated["code"] == "updated"
+    assert updated["source_head"].startswith("1111")
+    assert failed["status"] == "failed"
+    assert failed["code"] == "candidate_failed"
+    assert failed["failure"] == "candidate_failed"
+    assert final == failed
+    assert (runtime / "source-sync.json").stat().st_mode & 0o777 == 0o600
+
+
+@pytest.mark.parametrize(
+    "invalid_state",
+    [
+        '{"failure":"old","schema":"agent-canon.source-sync.v1","status":"failed","updated_at":"2026-08-26T00:00:00Z"}',
+        '{"schema":"agent-canon.source-sync.v1","status":7}',
+        '{"schema":"agent-canon.source-sync.v1","status":"success","code":"up_to_date"}',
+    ],
+)
+def test_source_sync_reader_rejects_legacy_missing_and_wrong_type_state(
+    tmp_path: Path, invalid_state: str
+) -> None:
+    """Shell status treats every pre-contract state as unavailable."""
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    (runtime / "source-sync.json").write_text(invalid_state + "\n", encoding="utf-8")
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+if _agent_canon_source_sync_json >/dev/null; then
+  exit 7
+fi
+"""
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_shell_status_reports_invalid_source_sync_as_unavailable(tmp_path: Path) -> None:
+    """Shell status and dashboard share the unavailable result for legacy state."""
+    repository = tmp_path / "repository"
+    control = tmp_path / "control"
+    runtime = control / "runtime"
+    repository.mkdir()
+    control.mkdir()
+    runtime.mkdir(parents=True)
+    (runtime / "source-sync.json").write_text(
+        '{"failure":"old","schema":"agent-canon.source-sync.v1","status":"failed","updated_at":"2026-08-26T00:00:00Z"}\n',
+        encoding="utf-8",
+    )
+    docker = tmp_path / "docker"
+    docker.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    docker.chmod(0o755)
+    completed = subprocess.run(
+        [
+            str(BOOTSTRAP),
+            "--repository-root",
+            str(repository),
+            "--control-parent-root",
+            str(control),
+            "--runtime-root",
+            str(runtime),
+            "status",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "AGENT_CANON_DOCKER": str(docker)},
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout)["source_sync"] is None
+
+
+def test_shell_source_sync_publishes_up_to_date_updated_and_failure_state(
+    tmp_path: Path,
+) -> None:
+    """The active shell route records each source-sync terminal result."""
+    bare = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    install = tmp_path / "install"
+    publisher = tmp_path / "publisher"
+    subprocess.run(["git", "init", "--bare", str(bare)], check=True, capture_output=True)
+    subprocess.run(["git", "init", str(seed)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(seed), "config", "user.email", "test@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(seed), "config", "user.name", "AgentCanon Test"], check=True)
+    (seed / "tracked.txt").write_text("one\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(seed), "add", "tracked.txt"], check=True)
+    subprocess.run(["git", "-C", str(seed), "commit", "-m", "one"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(seed), "branch", "-M", "main"], check=True)
+    subprocess.run(["git", "-C", str(seed), "remote", "add", "origin", str(bare)], check=True)
+    subprocess.run(["git", "-C", str(seed), "push", "origin", "main"], check=True, capture_output=True)
+    subprocess.run(["git", "clone", str(bare), str(install)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(install), "branch", "-M", "main"], check=True)
+    subprocess.run(["git", "clone", str(bare), str(publisher)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(publisher), "config", "user.email", "test@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(publisher), "config", "user.name", "AgentCanon Test"], check=True)
+
+    def run_sync(candidate_rc: int = 0) -> subprocess.CompletedProcess[str]:
+        script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_REPOSITORY_ROOT={str(install)!r}
+AGENT_CANON_CONTROL_ROOT={str(tmp_path)!r}
+AGENT_CANON_RUNTIME_ROOT={str(tmp_path / "runtime")!r}
+command_args=(sync --install-root {str(install)!r} --remote origin --branch main)
+bootstrap_host_entrypoint() {{ return {candidate_rc}; }}
+_agent_canon_install_global_links() {{ return 0; }}
+_agent_canon_sync_operation
+"""
+        return subprocess.run(["bash", "-c", script], check=False, capture_output=True, text=True)
+
+    current = run_sync()
+    assert current.returncode == 0, current.stderr
+    up_to_date = json.loads((tmp_path / "runtime/source-sync.json").read_text(encoding="utf-8"))
+    assert up_to_date["status"] == "success"
+    assert up_to_date["code"] == "up_to_date"
+    (publisher / "tracked.txt").write_text("two\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(publisher), "commit", "-am", "two"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(publisher), "push", "origin", "main"], check=True, capture_output=True)
+    updated = run_sync()
+    assert updated.returncode == 0, updated.stderr
+    updated_state = json.loads((tmp_path / "runtime/source-sync.json").read_text(encoding="utf-8"))
+    assert updated_state["status"] == "success"
+    assert updated_state["code"] == "updated"
+    assert (install / "tracked.txt").read_text(encoding="utf-8") == "two\n"
+    (publisher / "tracked.txt").write_text("three\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(publisher), "commit", "-am", "three"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(publisher), "push", "origin", "main"], check=True, capture_output=True)
+    failed = run_sync(candidate_rc=7)
+    assert failed.returncode == 7
+    failed_state = json.loads((tmp_path / "runtime/source-sync.json").read_text(encoding="utf-8"))
+    assert failed_state["status"] == "failed"
+    assert failed_state["code"] == "source_sync_candidate_failed"
+    assert failed_state["failure"] == "source_sync_candidate_failed"
+    assert (install / "tracked.txt").read_text(encoding="utf-8") == "two\n"
+
+
 def test_target_mount_manifest_is_strict_and_reused_on_create() -> None:
     """Target mounts are emitted as allowlisted TSV and applied by host Docker."""
     text = ADAPTER.read_text(encoding="utf-8")
@@ -707,7 +1076,9 @@ def test_rollback_validates_current_mounts_before_previous_plan() -> None:
 def test_sync_never_projects_links_from_staging() -> None:
     """Only the live checkout may update the global link manifest."""
     text = ADAPTER.read_text(encoding="utf-8")
-    staging = text.split('    sync)\n', 1)[1]
+    staging = text.split('_agent_canon_sync_operation() (', 1)[1].split(
+        '_agent_canon_control_digest()', 1
+    )[0]
     assert 'AGENT_CANON_SUPPRESS_GLOBAL_LINKS=1 bootstrap_host_entrypoint "$staging_root"' in staging
     merge = 'git -C "$install_root" merge --ff-only "$remote/$branch"'
     assert staging.index('bootstrap_host_entrypoint "$staging_root"') < staging.index(merge)

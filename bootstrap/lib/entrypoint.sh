@@ -20,6 +20,7 @@ AGENT_CANON_CONTAINER_NETWORK=none
 AGENT_CANON_RUNTIME_DESTINATION=/var/lib/agent-canon/runtime
 AGENT_CANON_PRIVATE_LOG_DESTINATION=/var/lib/agent-canon/private-log
 AGENT_CANON_MOUNT_REGISTRY_DESTINATION=/var/lib/agent-canon/mount-registry.toml
+AGENT_CANON_SOURCE_SYNC_DESTINATION=/var/lib/agent-canon/source-sync.json
 AGENT_CANON_HEALTH_ATTEMPTS=120
 AGENT_CANON_PRIVATE_LOG_ROOT=
 
@@ -56,6 +57,439 @@ USAGE
 _agent_canon_sha256() {
   sha256sum "$1" | awk '{print $1}'
 }
+
+_agent_canon_json_escape() {
+  local value=$1
+  value=${value//\\/\\\\}
+  value=${value//\"/\\\"}
+  value=${value//$'\n'/\\n}
+  value=${value//$'\r'/\\r}
+  value=${value//$'\t'/\\t}
+  printf '%s' "$value"
+}
+
+_agent_canon_source_sync_write() {
+  local status=$1 code=$2 source_root=$3 source_head=$4 source_tree=$5
+  local remote=$6 remote_url=$7 branch=$8 updated_at=$9 failure=${10:-}
+  [[ "$status" == success || "$status" == failed ]] || return 64
+  [[ "$code" =~ ^[a-z][a-z0-9_]*$ ]] || return 64
+  if [[ "$status" == success ]]; then
+    [[ -z "$failure" ]] || return 64
+  else
+    [[ "$failure" =~ ^[a-z][a-z0-9_]*$ ]] || return 64
+  fi
+  [[ "$source_root" == /* && "$source_root" != *$'\n'* && "$source_root" != *$'\r'* &&
+     "$source_root" != *$'\t'* ]] || return 64
+  [[ "$source_root" != *'"'* && "$source_root" != *'\'* ]] || return 64
+  [[ "$source_head" == unknown || "$source_head" =~ ^[0-9a-f]{40}$ ]] || return 64
+  [[ "$source_tree" == unknown || "$source_tree" =~ ^[0-9a-f]{40}$ ]] || return 64
+  [[ "$remote" =~ ^[A-Za-z0-9_.-]+$ ]] || return 64
+  [[ "$branch" =~ ^[A-Za-z0-9._/-]+$ ]] || return 64
+  [[ "$remote_url" == unknown ||
+     ( -n "$remote_url" && "$remote_url" != *$'\n'* && "$remote_url" != *$'\r'* &&
+       "$remote_url" != *$'\t'* &&
+       "$remote_url" != *'"'* && "$remote_url" != *'\'* ) ]] || return 64
+  [[ "$updated_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || return 64
+
+  local state_root=$AGENT_CANON_RUNTIME_ROOT state_path tmp
+  [[ ! -L "$state_root" && ! -L "$state_root/source-sync.json" ]] || return 65
+  mkdir -p -- "$state_root" || return 66
+  tmp=$(mktemp "$state_root/.source-sync.json.XXXXXX") || return 66
+  local escaped_root escaped_remote_url escaped_failure
+  escaped_root=$(_agent_canon_json_escape "$source_root")
+  escaped_remote_url=$(_agent_canon_json_escape "$remote_url")
+  escaped_failure=$(_agent_canon_json_escape "$failure")
+  state_path="$state_root/source-sync.json"
+  if ! {
+    printf '{"schema":"agent-canon.source-sync.v1","status":"%s","code":"%s","source_root":"%s","source_head":"%s","source_tree":"%s","remote":"%s","remote_url":"%s","branch":"%s","updated_at":"%s"' \
+      "$status" "$code" "$escaped_root" "$source_head" "$source_tree" "$remote" \
+      "$escaped_remote_url" "$branch" "$updated_at"
+    if [[ "$status" == failed ]]; then
+      printf ',"failure":"%s"' "$escaped_failure"
+    fi
+    printf '}\n'
+  } > "$tmp"; then
+    rm -f -- "$tmp"
+    return 66
+  fi
+  if ! chmod 600 -- "$tmp"; then
+    rm -f -- "$tmp"
+    return 66
+  fi
+  # Test hooks may stop this transition after the complete temporary record is
+  # written.  The destination is deliberately untouched until the rename.
+  if [[ "${AGENT_CANON_TEST_INTERRUPT_STATE_WRITE:-0}" == 1 ||
+        "${AGENT_CANON_TEST_INTERRUPT_SOURCE_SYNC_WRITE:-0}" == 1 ]]; then
+    rm -f -- "$tmp"
+    return 99
+  fi
+  if ! mv -f -- "$tmp" "$state_path"; then
+    rm -f -- "$tmp"
+    return 66
+  fi
+  return 0
+}
+
+_agent_canon_source_sync_json() {
+  local state_path="$AGENT_CANON_RUNTIME_ROOT/source-sync.json" state
+  if [[ ! -f "$state_path" || -L "$state_path" ]]; then
+    printf 'null'
+    return 0
+  fi
+  state=$(<"$state_path") || return 1
+  [[ "$state" != *$'\n'* && "$state" != *$'\r'* ]] || return 1
+  local record_re='^\{"schema":"agent-canon.source-sync.v1","status":"(success|failed)","code":"([a-z][a-z0-9_]*)","source_root":"([^"]*)","source_head":"(unknown|[0-9a-f]{40})","source_tree":"(unknown|[0-9a-f]{40})","remote":"([A-Za-z0-9_.-]+)","remote_url":"([^"]+)","branch":"([A-Za-z0-9._/-]+)","updated_at":"([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)"(,"failure":"([a-z][a-z0-9_]*)")?\}$'
+  [[ "$state" =~ $record_re ]] || return 1
+  local status=${BASH_REMATCH[1]} source_root=${BASH_REMATCH[3]}
+  local source_head=${BASH_REMATCH[4]} source_tree=${BASH_REMATCH[5]}
+  local remote=${BASH_REMATCH[6]} remote_url=${BASH_REMATCH[7]}
+  local branch=${BASH_REMATCH[8]} updated_at=${BASH_REMATCH[9]}
+  local failure=${BASH_REMATCH[11]:-}
+  [[ "$source_root" == /* ]] || return 1
+  [[ "$source_root" != *'\'* && "$source_root" != *$'\t'* &&
+     "$remote_url" != *'\'* && "$remote_url" != *$'\t'* ]] || return 1
+  [[ "$status" == success && -z "$failure" ||
+     "$status" == failed && -n "$failure" ]] || return 1
+  printf '%s' "$state"
+}
+
+_agent_canon_ensure_source_sync_state() {
+  local state_path="$AGENT_CANON_RUNTIME_ROOT/source-sync.json"
+  if [[ -e "$state_path" || -L "$state_path" ]]; then
+    [[ -f "$state_path" && ! -L "$state_path" ]] ||
+      _agent_canon_json_error source_sync_state_invalid \
+        "source-sync state must be a regular file"
+    chmod 600 -- "$state_path" ||
+      _agent_canon_json_error source_sync_state_invalid \
+        "source-sync state permissions could not be restricted"
+    return 0
+  fi
+  local source_head=${AGENT_CANON_SYNC_INITIAL_HEAD:-unknown}
+  local source_tree=${AGENT_CANON_SYNC_INITIAL_TREE:-unknown}
+  local source_remote=${AGENT_CANON_SYNC_INITIAL_REMOTE:-origin}
+  local source_remote_url=${AGENT_CANON_SYNC_INITIAL_REMOTE_URL:-unknown}
+  source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD 2>/dev/null) || :
+  source_tree=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD^{tree} 2>/dev/null) || :
+  [[ "$source_head" =~ ^[0-9a-f]{40}$ ]] || source_head=unknown
+  [[ "$source_tree" =~ ^[0-9a-f]{40}$ ]] || source_tree=unknown
+  _agent_canon_source_sync_write success not_run "$AGENT_CANON_REPOSITORY_ROOT" \
+    "$source_head" "$source_tree" "$source_remote" "$source_remote_url" \
+    "${AGENT_CANON_SYNC_INITIAL_BRANCH:-main}" \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" ||
+    _agent_canon_json_error source_sync_state_write_failed \
+      "initial source-sync state could not be atomically published"
+}
+
+_agent_canon_sync_request_metadata() {
+  local install_request=${AGENT_CANON_REPOSITORY_ROOT:-} remote=origin branch=main
+  local sync_index=1 token install_root git_root remote_url source_head source_tree
+  while ((sync_index < ${#command_args[@]})); do
+    token=${command_args[sync_index]}
+    case "$token" in
+      sync) ;;
+      --install-root=*)
+        install_request=${token#--install-root=}
+        ;;
+      --install-root)
+        ((sync_index += 1))
+        if ((sync_index >= ${#command_args[@]})); then
+          _agent_canon_json_error argument_missing "--install-root requires a value"
+          return 2
+        fi
+        install_request=${command_args[sync_index]}
+        ;;
+      --remote=*) remote=${token#--remote=} ;;
+      --remote)
+        ((sync_index += 1))
+        if ((sync_index >= ${#command_args[@]})); then
+          _agent_canon_json_error argument_missing "--remote requires a value"
+          return 2
+        fi
+        remote=${command_args[sync_index]}
+        ;;
+      --branch=*) branch=${token#--branch=} ;;
+      --branch)
+        ((sync_index += 1))
+        if ((sync_index >= ${#command_args[@]})); then
+          _agent_canon_json_error argument_missing "--branch requires a value"
+          return 2
+        fi
+        branch=${command_args[sync_index]}
+        ;;
+      *)
+        _agent_canon_json_error argument_invalid "unsupported source-sync argument"
+        return 2
+        ;;
+    esac
+    ((sync_index += 1))
+  done
+  [[ "$remote" =~ ^[A-Za-z0-9_.-]+$ ]] || {
+    _agent_canon_json_error argument_invalid "source-sync remote is invalid"
+    return 2
+  }
+  [[ "$branch" =~ ^[A-Za-z0-9._/-]+$ ]] || {
+    _agent_canon_json_error argument_invalid "source-sync branch is invalid"
+    return 2
+  }
+  if ! install_root=$(realpath -e -- "$install_request" 2>/dev/null); then
+    _agent_canon_json_error install_root_invalid "source-sync install root is not a directory"
+    return 2
+  fi
+  [[ -d "$install_root" && ! -L "$install_root" ]] || {
+    _agent_canon_json_error install_root_invalid "source-sync install root must be a regular directory"
+    return 2
+  }
+  if ! git_root=$(git -C "$install_root" rev-parse --show-toplevel 2>/dev/null); then
+    _agent_canon_json_error install_root_not_git "source-sync install root is not a Git checkout"
+    return 2
+  fi
+  if ! git_root=$(realpath -e -- "$git_root" 2>/dev/null); then
+    _agent_canon_json_error install_root_not_git "source-sync Git root is unavailable"
+    return 2
+  fi
+  if ! remote_url=$(git -C "$git_root" remote get-url "$remote" 2>/dev/null); then
+    _agent_canon_json_error source_remote_unavailable "source-sync remote URL is unavailable"
+    return 2
+  fi
+  [[ -n "$remote_url" && "$remote_url" != *$'\n'* && "$remote_url" != *$'\r'* ]] || {
+    _agent_canon_json_error source_remote_unavailable "source-sync remote URL is invalid"
+    return 2
+  }
+  if ! source_head=$(git -C "$git_root" rev-parse --verify HEAD 2>/dev/null) ||
+     ! source_tree=$(git -C "$git_root" rev-parse --verify HEAD^{tree} 2>/dev/null) ||
+     [[ ! "$source_head" =~ ^[0-9a-f]{40}$ || ! "$source_tree" =~ ^[0-9a-f]{40}$ ]]; then
+    _agent_canon_json_error source_sync_git_failed "source-sync Git identity is incomplete"
+    return 2
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$git_root" "$remote" "$branch" "$remote_url" "$source_head" "$source_tree"
+}
+
+_agent_canon_source_sync_failure() {
+  local code=$1 detail=$2 write_rc=0
+  _agent_canon_source_sync_write failed "$code" \
+    "${AGENT_CANON_SYNC_SOURCE_ROOT:-$AGENT_CANON_REPOSITORY_ROOT}" \
+    "${AGENT_CANON_SYNC_SOURCE_HEAD:-unknown}" \
+    "${AGENT_CANON_SYNC_SOURCE_TREE:-unknown}" \
+    "${AGENT_CANON_SYNC_REMOTE:-origin}" \
+    "${AGENT_CANON_SYNC_REMOTE_URL:-unknown}" \
+    "${AGENT_CANON_SYNC_BRANCH:-main}" \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$code" || write_rc=$?
+  if ((write_rc != 0)); then
+    _agent_canon_json_error source_sync_state_write_failed \
+      "source-sync failure state could not be atomically published"
+    return 2
+  fi
+  _agent_canon_json_error "$code" "$detail"
+}
+
+_agent_canon_sync_operation() (
+  # The source-sync transaction is host-only, so keep its result-state
+  # transition here and never ask the resident Python controller to publish a
+  # second source-sync record.
+  set +e
+  local install_root=${AGENT_CANON_REPOSITORY_ROOT:-} remote=origin branch=main
+  local sync_index=0 sync_before sync_after candidate_commit staging_root sync_rc=0
+  local source_head=unknown source_tree=unknown remote_url=unknown
+  AGENT_CANON_SYNC_SOURCE_ROOT=${AGENT_CANON_REPOSITORY_ROOT:-/}
+  AGENT_CANON_SYNC_SOURCE_HEAD=unknown
+  AGENT_CANON_SYNC_SOURCE_TREE=unknown
+  AGENT_CANON_SYNC_REMOTE=$remote
+  AGENT_CANON_SYNC_REMOTE_URL=$remote_url
+  AGENT_CANON_SYNC_BRANCH=$branch
+
+  while ((sync_index < ${#command_args[@]})); do
+    case "${command_args[sync_index]}" in
+      sync) ;;
+      --install-root=*) install_root=${command_args[sync_index]#--install-root=} ;;
+      --install-root)
+        ((sync_index += 1))
+        if ((sync_index >= ${#command_args[@]})); then
+          _agent_canon_source_sync_failure argument_missing "--install-root requires a value"
+          exit 2
+        fi
+        install_root=${command_args[sync_index]}
+        ;;
+      --remote=*) remote=${command_args[sync_index]#--remote=} ;;
+      --remote)
+        ((sync_index += 1))
+        if ((sync_index >= ${#command_args[@]})); then
+          _agent_canon_source_sync_failure argument_missing "--remote requires a value"
+          exit 2
+        fi
+        remote=${command_args[sync_index]}
+        ;;
+      --branch=*) branch=${command_args[sync_index]#--branch=} ;;
+      --branch)
+        ((sync_index += 1))
+        if ((sync_index >= ${#command_args[@]})); then
+          _agent_canon_source_sync_failure argument_missing "--branch requires a value"
+          exit 2
+        fi
+        branch=${command_args[sync_index]}
+        ;;
+      *)
+        _agent_canon_source_sync_failure argument_invalid "unsupported source-sync argument"
+        exit 2
+        ;;
+    esac
+    ((sync_index += 1))
+  done
+  AGENT_CANON_SYNC_REMOTE=$remote
+  AGENT_CANON_SYNC_BRANCH=$branch
+  [[ "$remote" =~ ^[A-Za-z0-9_.-]+$ ]] || {
+    _agent_canon_source_sync_failure argument_invalid "source-sync remote is invalid"
+    exit 2
+  }
+  [[ "$branch" =~ ^[A-Za-z0-9._/-]+$ ]] || {
+    _agent_canon_source_sync_failure argument_invalid "source-sync branch is invalid"
+    exit 2
+  }
+  if ! install_root=$(CDPATH= cd -- "$install_root" && pwd -P); then
+    _agent_canon_source_sync_failure install_root_invalid "source-sync install root is not a directory"
+    exit 2
+  fi
+  AGENT_CANON_SYNC_SOURCE_ROOT=$install_root
+
+  if ! source_head=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null); then
+    _agent_canon_source_sync_failure source_sync_git_failed "source checkout HEAD is unavailable"
+    exit 2
+  fi
+  if ! source_tree=$(git -C "$install_root" rev-parse --verify HEAD^{tree} 2>/dev/null); then
+    AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
+    _agent_canon_source_sync_failure source_sync_git_failed "source checkout tree is unavailable"
+    exit 2
+  fi
+  AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
+  AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
+  sync_before=$source_head
+  if ! remote_url=$(git -C "$install_root" remote get-url "$remote" 2>/dev/null); then
+    _agent_canon_source_sync_failure source_remote_unavailable "source-sync remote URL is unavailable"
+    exit 2
+  fi
+  AGENT_CANON_SYNC_REMOTE_URL=$remote_url
+  if ! git -C "$install_root" fetch "$remote" "$branch"; then
+    _agent_canon_source_sync_failure source_remote_unavailable "source-sync fetch failed"
+    exit 2
+  fi
+  if ! sync_after=$(git -C "$install_root" rev-parse --verify "$remote/$branch" 2>/dev/null); then
+    _agent_canon_source_sync_failure source_remote_unavailable "fetched source branch is unavailable"
+    exit 2
+  fi
+  [[ "$sync_after" =~ ^[0-9a-f]{40}$ ]] || {
+    _agent_canon_source_sync_failure source_sync_git_failed "fetched source branch identity is invalid"
+    exit 2
+  }
+  if [[ "$sync_before" == "$sync_after" ]]; then
+    if ! _agent_canon_source_sync_write success up_to_date "$install_root" \
+      "$source_head" "$source_tree" "$remote" "$remote_url" "$branch" \
+      "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"; then
+      _agent_canon_json_error source_sync_state_write_failed \
+        "source-sync success state could not be atomically published"
+      exit 2
+    fi
+    printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"sync","code":"up_to_date","changed":false}\n'
+    exit 0
+  fi
+
+  candidate_commit=$sync_after
+  staging_root="$AGENT_CANON_RUNTIME_ROOT/source-staging/agent-canon"
+  if [[ -e "$staging_root" || -L "$staging_root" ]]; then
+    rm -rf -- "$staging_root"
+  fi
+  if ! mkdir -p "$(dirname "$staging_root")"; then
+    _agent_canon_source_sync_failure source_sync_staging_failed "source-sync staging directory could not be created"
+    exit 2
+  fi
+  if ! git clone --no-hardlinks "$install_root" "$staging_root"; then
+    rm -rf -- "$staging_root"
+    _agent_canon_source_sync_failure source_sync_clone_failed "source-sync candidate clone failed"
+    exit 2
+  fi
+  if ! git -C "$staging_root" checkout --detach "$candidate_commit" >/dev/null; then
+    rm -rf -- "$staging_root"
+    _agent_canon_source_sync_failure source_sync_git_failed "source-sync candidate checkout failed"
+    exit 2
+  fi
+  if AGENT_CANON_SUPPRESS_GLOBAL_LINKS=1 bootstrap_host_entrypoint "$staging_root" \
+    --control-parent-root "$AGENT_CANON_CONTROL_ROOT" \
+    --runtime-root "$AGENT_CANON_RUNTIME_ROOT" update; then
+    :
+  else
+    sync_rc=$?
+    rm -rf -- "$staging_root"
+    _agent_canon_source_sync_failure source_sync_candidate_failed \
+      "source-sync candidate runtime update failed"
+    exit "$sync_rc"
+  fi
+  if ! git -C "$install_root" merge --ff-only "$remote/$branch"; then
+    if ! bootstrap_host_entrypoint "$install_root" \
+      --control-parent-root "$AGENT_CANON_CONTROL_ROOT" \
+      --runtime-root "$AGENT_CANON_RUNTIME_ROOT" rollback; then
+      rm -rf -- "$staging_root"
+      _agent_canon_source_sync_failure sync_rollback_failed \
+        "source-sync live merge and resident rollback both failed"
+      exit 2
+    fi
+    rm -rf -- "$staging_root"
+    _agent_canon_source_sync_failure sync_live_merge_failed \
+      "source-sync live source fast-forward failed; resident was restored"
+    exit 2
+  fi
+  if ! source_head=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null); then
+    _agent_canon_source_sync_failure source_sync_git_failed "merged source checkout HEAD is unavailable"
+    exit 2
+  fi
+  if ! source_tree=$(git -C "$install_root" rev-parse --verify HEAD^{tree} 2>/dev/null); then
+    AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
+    _agent_canon_source_sync_failure source_sync_git_failed "merged source checkout tree is unavailable"
+    exit 2
+  fi
+  AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
+  AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
+  # Projection is a live-source operation. The candidate checkout may build
+  # and replace the resident, but it must never leave links pointing into the
+  # ignored staging tree.
+  AGENT_CANON_REPOSITORY_ROOT=$install_root
+  sync_rc=0
+  _agent_canon_install_global_links || sync_rc=$?
+  if ((sync_rc != 0)); then
+    if ! bootstrap_host_entrypoint "$install_root" \
+      --control-parent-root "$AGENT_CANON_CONTROL_ROOT" \
+      --runtime-root "$AGENT_CANON_RUNTIME_ROOT" rollback; then
+      rm -rf -- "$staging_root"
+      _agent_canon_source_sync_failure sync_rollback_failed \
+        "source-sync live link projection and resident rollback both failed"
+      exit 2
+    fi
+    rm -rf -- "$staging_root"
+    _agent_canon_source_sync_failure sync_global_links_failed \
+      "source-sync live link projection failed; resident was restored"
+    exit "$sync_rc"
+  fi
+  rm -rf -- "$staging_root"
+  if ! source_head=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null); then
+    _agent_canon_source_sync_failure source_sync_git_failed "updated source checkout HEAD is unavailable"
+    exit 2
+  fi
+  if ! source_tree=$(git -C "$install_root" rev-parse --verify HEAD^{tree} 2>/dev/null); then
+    AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
+    _agent_canon_source_sync_failure source_sync_git_failed "updated source checkout tree is unavailable"
+    exit 2
+  fi
+  AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
+  AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
+  if ! _agent_canon_source_sync_write success updated "$install_root" \
+    "$source_head" "$source_tree" "$remote" "$remote_url" "$branch" \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"; then
+    _agent_canon_json_error source_sync_state_write_failed \
+      "source-sync updated state could not be atomically published"
+    exit 2
+  fi
+  printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"sync","code":"updated","commit":"%s"}\n' \
+    "$candidate_commit"
+  exit 0
+)
 
 _agent_canon_control_digest() {
   printf '%s' "$AGENT_CANON_CONTROL_ROOT" | sha256sum | awk '{print $1}'
@@ -244,6 +678,7 @@ _agent_canon_prepare_host_runtime() {
   chmod 700 "$AGENT_CANON_RUNTIME_ROOT" "$AGENT_CANON_RUNTIME_ROOT/host-state" "$AGENT_CANON_STATE_ROOT"
   chmod 700 "$AGENT_CANON_PRIVATE_LOG_ROOT"
   chmod 1777 "$AGENT_CANON_STATE_ROOT/container-runtime"
+  _agent_canon_ensure_source_sync_state
   [[ -e "$AGENT_CANON_STATE_ROOT/mounts.toml" ]] || : > "$AGENT_CANON_STATE_ROOT/mounts.toml"
   [[ -e "$AGENT_CANON_STATE_ROOT/mounts.tsv" ]] || : > "$AGENT_CANON_STATE_ROOT/mounts.tsv"
 }
@@ -481,6 +916,7 @@ _agent_canon_write_rollback_plan() {
     printf 'image-id\t%s\n' "$image_id"
     printf 'image-ref\t%s\n' "$rollback_ref"
     printf 'mount\tmount\t%s\t%s\tfalse\n' "$AGENT_CANON_STATE_ROOT" "$AGENT_CANON_RUNTIME_DESTINATION"
+    printf 'mount\tmount\t%s\t%s\ttrue\n' "$AGENT_CANON_RUNTIME_ROOT/source-sync.json" "$AGENT_CANON_SOURCE_SYNC_DESTINATION"
     printf 'mount\tmount\t%s\t%s\ttrue\n' "$AGENT_CANON_PRIVATE_LOG_ROOT" "$AGENT_CANON_PRIVATE_LOG_DESTINATION"
     printf 'mount\tmount\t%s\t%s\ttrue\n' "$AGENT_CANON_STATE_ROOT/mounts.toml" "$AGENT_CANON_MOUNT_REGISTRY_DESTINATION"
     if [[ -f "$AGENT_CANON_STATE_ROOT/mounts.tsv" && ! -L "$AGENT_CANON_STATE_ROOT/mounts.tsv" ]]; then
@@ -520,7 +956,8 @@ _agent_canon_read_rollback_plan() {
           _agent_canon_json_error rollback_plan_invalid "rollback plan image reference is invalid"
         AGENT_CANON_ROLLBACK_IMAGE_REF=$value; ref_seen=$((ref_seen + 1)) ;;
       mount)
-        [[ "$value" == mount && -n "$source" && "$source" = /* && -d "$source" && ! -L "$source" &&
+        [[ "$value" == mount && -n "$source" && "$source" = /* && ! -L "$source" &&
+           ( -d "$source" || ("$destination" == "$AGENT_CANON_SOURCE_SYNC_DESTINATION" && -f "$source") ) &&
            -n "$destination" && ("$ro" == true || "$ro" == false) ]] ||
           _agent_canon_json_error rollback_plan_invalid "rollback plan mount is invalid"
         case "$destination" in
@@ -548,6 +985,7 @@ _agent_canon_validate_existing_container() {
   local observed_runtime observed_control observed_image observed_image_id observed_network
   local observed_rootfs observed_capdrop observed_security observed_cpus
   local observed_memory observed_pids observed_mounts expected_mounts mount_manifest
+  local require_source_sync=${4:-1}
   if ! observed_runtime=$("$AGENT_CANON_DOCKER_CMD" container inspect \
     --format '{{index .Config.Labels "io.agent-canon.runtime"}}' "$container"); then
     _agent_canon_json_error container_ownership_mismatch "resident container inspect failed"
@@ -588,6 +1026,9 @@ _agent_canon_validate_existing_container() {
   expected_mounts=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.expected-mounts.XXXXXX")
   observed_mounts=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.observed-mounts.XXXXXX")
   printf '%s\t%s\ttrue\n' "$AGENT_CANON_STATE_ROOT" "$AGENT_CANON_RUNTIME_DESTINATION" > "$expected_mounts"
+  if [[ "$require_source_sync" == 1 ]]; then
+    printf '%s\t%s\tfalse\n' "$AGENT_CANON_RUNTIME_ROOT/source-sync.json" "$AGENT_CANON_SOURCE_SYNC_DESTINATION" >> "$expected_mounts"
+  fi
   printf '%s\t%s\tfalse\n' "$AGENT_CANON_PRIVATE_LOG_ROOT" "$AGENT_CANON_PRIVATE_LOG_DESTINATION" >> "$expected_mounts"
   printf '%s\t%s\tfalse\n' "$AGENT_CANON_STATE_ROOT/mounts.toml" "$AGENT_CANON_MOUNT_REGISTRY_DESTINATION" >> "$expected_mounts"
   if [[ -f "$mount_manifest" && ! -L "$mount_manifest" ]]; then
@@ -606,6 +1047,16 @@ _agent_canon_validate_existing_container() {
   "$AGENT_CANON_DOCKER_CMD" container inspect \
     --format '{{range .Mounts}}{{printf "%s\t%s\t%t\n" .Source .Destination .RW}}{{end}}' \
     "$container" | sed '/^$/d' | sort > "$observed_mounts"
+  if [[ "$require_source_sync" == 0 ]]; then
+    local filtered_mounts
+    filtered_mounts=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.observed-mounts-filtered.XXXXXX")
+    if ! awk -F $'\t' -v destination="$AGENT_CANON_SOURCE_SYNC_DESTINATION" \
+      '$2 != destination' "$observed_mounts" > "$filtered_mounts"; then
+      rm -f -- "$expected_mounts" "$observed_mounts" "$filtered_mounts"
+      _agent_canon_json_error mount_readback_failed "resident mount readback filtering failed"
+    fi
+    mv -- "$filtered_mounts" "$observed_mounts"
+  fi
   sort -o "$expected_mounts" "$expected_mounts"
   if ! diff -u "$expected_mounts" "$observed_mounts" >/dev/null; then
     rm -f -- "$expected_mounts" "$observed_mounts"
@@ -658,6 +1109,7 @@ _agent_canon_ensure_container() {
       --label io.agent-canon.runtime=shared-v1 \
       --label "io.agent-canon.control-root-digest=$(_agent_canon_control_digest)" \
       --mount "type=bind,src=$AGENT_CANON_STATE_ROOT,dst=$AGENT_CANON_RUNTIME_DESTINATION" \
+      --mount "type=bind,src=$AGENT_CANON_RUNTIME_ROOT/source-sync.json,dst=$AGENT_CANON_SOURCE_SYNC_DESTINATION,readonly" \
       --mount "type=bind,src=$AGENT_CANON_PRIVATE_LOG_ROOT,dst=$AGENT_CANON_PRIVATE_LOG_DESTINATION,readonly" \
       --mount "type=bind,src=$AGENT_CANON_STATE_ROOT/mounts.toml,dst=$AGENT_CANON_MOUNT_REGISTRY_DESTINATION,readonly" \
       "${target_mount_args[@]}" \
@@ -803,7 +1255,7 @@ _agent_canon_replace_resident_locked() {
     AGENT_CANON_PREVIOUS_IMAGE_REF=$old_image_ref
     export AGENT_CANON_PREVIOUS_IMAGE_REF
     if "$AGENT_CANON_DOCKER_CMD" container inspect "$old_container" >/dev/null 2>&1; then
-      if ! _agent_canon_validate_existing_container "$old_container"; then
+      if ! _agent_canon_validate_existing_container "$old_container" "$AGENT_CANON_STATE_ROOT/mounts.tsv" 1 0; then
         _agent_canon_json_error replacement_readback_failed "old resident mount readback failed before replacement"
         return 2
       fi
@@ -1427,17 +1879,34 @@ bootstrap_host_entrypoint() {
     fi
   fi
   [[ -n "$AGENT_CANON_CONTROL_ROOT" ]] || _agent_canon_json_error control_root_required "--control-parent-root is required"
+  [[ ${#command_args[@]} -gt 0 ]] || { _agent_canon_usage >&2; return 64; }
+  local operation=${command_args[0]} image_ref=
+  if [[ "$operation" == sync ]]; then
+    local sync_request sync_request_rc
+    if sync_request=$(_agent_canon_sync_request_metadata); then
+      :
+    else
+      sync_request_rc=$?
+      return "$sync_request_rc"
+    fi
+    local sync_root sync_remote sync_branch sync_remote_url sync_head sync_tree
+    IFS=$'\t' read -r sync_root sync_remote sync_branch sync_remote_url sync_head sync_tree <<<"$sync_request"
+    AGENT_CANON_REPOSITORY_ROOT=$sync_root
+    AGENT_CANON_SYNC_INITIAL_REMOTE=$sync_remote
+    AGENT_CANON_SYNC_INITIAL_BRANCH=$sync_branch
+    AGENT_CANON_SYNC_INITIAL_REMOTE_URL=$sync_remote_url
+    AGENT_CANON_SYNC_INITIAL_HEAD=$sync_head
+    AGENT_CANON_SYNC_INITIAL_TREE=$sync_tree
+  fi
   [[ -n "$AGENT_CANON_RUNTIME_ROOT" ]] || AGENT_CANON_RUNTIME_ROOT="$AGENT_CANON_REPOSITORY_ROOT/.runtime"
   _agent_canon_validate_roots
   AGENT_CANON_DOCKER_CMD=${AGENT_CANON_DOCKER:-docker}
   export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
-  [[ ${#command_args[@]} -gt 0 ]] || { _agent_canon_usage >&2; return 64; }
   if ! command -v "$AGENT_CANON_DOCKER_CMD" >/dev/null 2>&1 &&
      [[ ! -x "$AGENT_CANON_DOCKER_CMD" ]]; then
     _agent_canon_json_error runtime_unavailable "Docker executable is unavailable"
   fi
   _agent_canon_prepare_host_runtime
-  local operation=${command_args[0]} image_ref=
   local index
   for index in "${!command_args[@]}"; do
     if [[ "${command_args[index]}" == --image-ref && $((index + 1)) -lt ${#command_args[@]} ]]; then
@@ -1459,8 +1928,12 @@ bootstrap_host_entrypoint() {
       health=$("$AGENT_CANON_DOCKER_CMD" container inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}' "$container" 2>/dev/null || printf absent)
       running=${running//$'\n'/}
       health=${health//$'\n'/}
-      printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"status","container":{"name":"%s","running":%s,"health":"%s"},"runtime_root":"%s"}\n' \
-        "$container" "$running" "$health" "$AGENT_CANON_RUNTIME_ROOT"
+      local source_sync_json
+      if ! source_sync_json=$(_agent_canon_source_sync_json); then
+        source_sync_json=null
+      fi
+      printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"status","container":{"name":"%s","running":%s,"health":"%s"},"runtime_root":"%s","source_sync":%s}\n' \
+        "$container" "$running" "$health" "$AGENT_CANON_RUNTIME_ROOT" "$source_sync_json"
       return 0
       ;;
     stop)
@@ -1859,70 +2332,8 @@ bootstrap_host_entrypoint() {
       return "$rc"
       ;;
     sync)
-      local install_root=$AGENT_CANON_REPOSITORY_ROOT remote=origin branch=main
-      local sync_index=0 sync_before sync_after candidate_commit staging_root sync_rc=0
-      while ((sync_index < ${#command_args[@]})); do
-        case "${command_args[sync_index]}" in
-          sync) ;;
-          --install-root) sync_index=$((sync_index + 1)); install_root=${command_args[sync_index]} ;;
-          --remote) sync_index=$((sync_index + 1)); remote=${command_args[sync_index]} ;;
-          --branch) sync_index=$((sync_index + 1)); branch=${command_args[sync_index]} ;;
-        esac
-        sync_index=$((sync_index + 1))
-      done
-      sync_before=$(git -C "$install_root" rev-parse --verify HEAD)
-      git -C "$install_root" fetch "$remote" "$branch"
-      sync_after=$(git -C "$install_root" rev-parse --verify "$remote/$branch")
-      if [[ "$sync_before" == "$sync_after" ]]; then
-        printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"sync","code":"up_to_date","changed":false}\n'
-        return 0
-      fi
-      candidate_commit=$sync_after
-      staging_root="$AGENT_CANON_RUNTIME_ROOT/source-staging/agent-canon"
-      if [[ -e "$staging_root" || -L "$staging_root" ]]; then
-        rm -rf -- "$staging_root"
-      fi
-      mkdir -p "$(dirname "$staging_root")"
-      git clone --no-hardlinks "$install_root" "$staging_root"
-      git -C "$staging_root" checkout --detach "$candidate_commit" >/dev/null
-      if AGENT_CANON_SUPPRESS_GLOBAL_LINKS=1 bootstrap_host_entrypoint "$staging_root" \
-        --control-parent-root "$AGENT_CANON_CONTROL_ROOT" \
-        --runtime-root "$AGENT_CANON_RUNTIME_ROOT" update; then
-        :
-      else
-        sync_rc=$?
-        rm -rf -- "$staging_root"
-        return "$sync_rc"
-      fi
-      if ! git -C "$install_root" merge --ff-only "$remote/$branch"; then
-        if ! bootstrap_host_entrypoint "$install_root" \
-          --control-parent-root "$AGENT_CANON_CONTROL_ROOT" \
-          --runtime-root "$AGENT_CANON_RUNTIME_ROOT" rollback; then
-          rm -rf -- "$staging_root"
-          _agent_canon_json_error sync_rollback_failed "live source merge and resident rollback both failed"
-        fi
-        rm -rf -- "$staging_root"
-        _agent_canon_json_error sync_live_merge_failed "live source fast-forward failed; resident was restored"
-      fi
-      # Projection is a live-source operation.  The candidate checkout may
-      # build and replace the resident, but it must never leave links pointing
-      # into the ignored staging tree.
-      AGENT_CANON_REPOSITORY_ROOT=$(CDPATH= cd -- "$install_root" && pwd -P)
-      sync_rc=0
-      _agent_canon_install_global_links || sync_rc=$?
-      if ((sync_rc != 0)); then
-        if ! bootstrap_host_entrypoint "$install_root" \
-          --control-parent-root "$AGENT_CANON_CONTROL_ROOT" \
-          --runtime-root "$AGENT_CANON_RUNTIME_ROOT" rollback; then
-          rm -rf -- "$staging_root"
-          _agent_canon_json_error sync_rollback_failed "live link projection and resident rollback both failed"
-        fi
-        rm -rf -- "$staging_root"
-        return "$sync_rc"
-      fi
-      rm -rf -- "$staging_root"
-      printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"sync","code":"updated","commit":"%s"}\n' "$candidate_commit"
-      return 0
+      _agent_canon_sync_operation
+      return $?
       ;;
     *)
       _agent_canon_json_error unsupported_operation "unsupported bootstrap operation: $operation"

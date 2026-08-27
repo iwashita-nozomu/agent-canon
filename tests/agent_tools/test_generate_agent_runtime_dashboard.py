@@ -24,12 +24,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "generate_agent_runtime_dashboard.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 from generate_agent_runtime_dashboard import (  # noqa: E402
+    AgentRuntimeDashboard,
     HookWorkflowBreakdownReader,
     TokenUsageBreakdownReader,
     durable_issue_next_action,
     issue_worker_candidate_records,
     read_issue_publication_receipts,
     read_issue_worker_handoffs,
+    render_dashboard,
     token_usage_lines,
     token_usage_next_action,
     tool_source_path_candidates,
@@ -343,6 +345,85 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assert_overview_sections(dashboard)
         self.assert_selection_and_prompt_sections(dashboard)
         self.assert_reference_and_log_sections(dashboard)
+
+    def test_dashboard_reads_current_mounted_source_sync_state(self) -> None:
+        """Dashboard uses the mounted source-sync record, not container state."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            source_sync = root / "source-sync.json"
+            source_sync.write_text(
+                json.dumps(
+                    {
+                        "schema": "agent-canon.source-sync.v1",
+                        "status": "failed",
+                        "code": "source_sync_candidate_failed",
+                        "source_root": "/home/niwashita/agent-canon",
+                        "source_head": "1" * 40,
+                        "source_tree": "2" * 40,
+                        "remote": "origin",
+                        "remote_url": "git@github.com:owner/repo.git",
+                        "branch": "main",
+                        "updated_at": "2026-08-27T00:00:00Z",
+                        "failure": "source_sync_candidate_failed",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            dashboard_reader = AgentRuntimeDashboard(
+                root,
+                runtime_root=self.runtime_root,
+                source_sync_path=source_sync,
+            )
+            summary = dashboard_reader.collect()
+            dashboard = render_dashboard(summary)
+            source_sync.write_text(
+                json.dumps(
+                    {
+                        "schema": "agent-canon.source-sync.v1",
+                        "status": "success",
+                        "code": "up_to_date",
+                        "source_root": "/home/niwashita/agent-canon",
+                        "source_head": "3" * 40,
+                        "source_tree": "4" * 40,
+                        "remote": "origin",
+                        "remote_url": "git@github.com:owner/repo.git",
+                        "branch": "main",
+                        "updated_at": "2026-08-27T00:00:01Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            replaced = dashboard_reader.collect()
+            replaced_dashboard = render_dashboard(replaced)
+            for invalid_state in (
+                {
+                    "failure": "old",
+                    "schema": "agent-canon.source-sync.v1",
+                    "status": "failed",
+                    "updated_at": "2026-08-26T00:00:00Z",
+                },
+                {"schema": "agent-canon.source-sync.v1", "status": 7},
+                {
+                    "schema": "agent-canon.source-sync.v1",
+                    "status": "success",
+                    "code": "up_to_date",
+                },
+            ):
+                source_sync.write_text(json.dumps(invalid_state) + "\n", encoding="utf-8")
+                rejected = dashboard_reader.collect()
+                self.assertIsNone(rejected.source_sync_state)
+
+        assert summary.source_sync_state is not None
+        self.assertEqual(summary.source_sync_state["status"], "failed")
+        self.assertIn("source_sync_candidate_failed", dashboard)
+        self.assertIn("2026-08-27T00:00:00Z", dashboard)
+        assert replaced.source_sync_state is not None
+        self.assertEqual(replaced.source_sync_state["status"], "success")
+        self.assertEqual(replaced.source_sync_state["code"], "up_to_date")
+        self.assertNotIn("source_sync_candidate_failed", replaced_dashboard)
 
     def test_live_like_api_and_compact_route_writes_only_external_runtime(self) -> None:
         """Container-style relative outputs stay outside the analyzed checkout."""
