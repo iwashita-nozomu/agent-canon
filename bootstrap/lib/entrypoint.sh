@@ -2548,6 +2548,18 @@ bootstrap_host_entrypoint() {
       AGENT_CANON_TARGET_DIGEST=$target_digest
       export AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT AGENT_CANON_TARGET_DIGEST
       _agent_canon_run_controller "$target_candidate" "${command_args[@]}" || target_rc=$?
+      if ((target_rc == 0)); then
+        # The resident has committed the host-source/container-target record.
+        # Read back the complete mount set once from the host Docker boundary;
+        # this confirms that the resident-side /targets/<digest> verification
+        # was backed by the bind mount that the host requested.
+        if _agent_canon_validate_existing_container "$target_candidate" \
+          "$AGENT_CANON_STATE_ROOT/mounts.tsv"; then
+          :
+        else
+          target_rc=$?
+        fi
+      fi
       if ((target_rc != 0)) && [[ -n "$target_current_image_id" ]]; then
         unset AGENT_CANON_TARGET_PENDING_SOURCE AGENT_CANON_TARGET_PENDING_DIGEST
         if ! _agent_canon_restore_candidate_failure "$target_candidate" "$target_current_image_id" "$target_current_image_id"; then

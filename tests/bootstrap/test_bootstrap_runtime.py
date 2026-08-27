@@ -14,6 +14,7 @@ import pytest
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPOSITORY_ROOT))
 
+import tools.agent_tools.bootstrap_runtime as bootstrap_runtime_module  # noqa: E402
 from tools.agent_tools.bootstrap_runtime import (  # noqa: E402
     BootstrapError,
     BootstrapRuntime,
@@ -1304,6 +1305,40 @@ def test_container_target_only_rollback_toggles_generations_without_image_change
     assert set(second_state["targets"]) == {"target-b"}
     assert second_state["resources"]["image"]["id"] == image_id
     assert second_state["current_generation"] != first_state["current_generation"]
+
+
+def test_container_target_record_keeps_host_validation_outside_resident(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A container target record checks only the mounted namespace."""
+    control = tmp_path / "control"
+    control.mkdir()
+    manager = BootstrapRuntime(
+        control, control / "runtime", repository_root=REPOSITORY_ROOT
+    )
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    host_root = tmp_path / "host-source"
+    calls: list[tuple[Path, str]] = []
+
+    def record_mount(path: Path, *, field: str) -> Path:
+        calls.append((path, field))
+        return path
+
+    monkeypatch.setattr(bootstrap_runtime_module, "_existing_no_symlink", record_mount)
+    target = manager._target_record(
+        Path("/targets/target-digest"),
+        "read-only",
+        host_root=str(host_root),
+        host_digest="target-digest",
+    )
+
+    assert target == {
+        "root": "/targets/target-digest",
+        "host_root": str(host_root),
+        "mode": "read-only",
+        "digest": "target-digest",
+    }
+    assert calls == [(Path("/targets/target-digest"), "mounted target root")]
 
 
 def test_symlink_state_write_fails_closed(
