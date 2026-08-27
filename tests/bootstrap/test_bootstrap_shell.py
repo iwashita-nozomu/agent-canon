@@ -60,6 +60,611 @@ def test_update_replacement_uses_one_host_owned_lock_without_bypass() -> None:
     assert "AGENT_CANON_LOCK_PID" not in text
 
 
+def _run_forced_update_probe(
+    tmp_path: Path,
+    *,
+    build_result: str,
+    tag_result: str = "0",
+    existing_plan: str = "",
+) -> tuple[subprocess.CompletedProcess[str], Path, Path, str, str]:
+    """Exercise the forced-update ordering with a Docker-only fake."""
+    runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
+    (runtime / "host-state").mkdir(parents=True)
+    state_root.mkdir()
+    control = tmp_path / "control"
+    control.mkdir()
+    private_log = tmp_path / "agent-canon-log"
+    private_log.mkdir()
+    (state_root / "mounts.tsv").write_text("", encoding="utf-8")
+    (state_root / "mounts.toml").write_text("", encoding="utf-8")
+    (runtime / "source-sync.json").write_text("{}\n", encoding="utf-8")
+    old_ref = "agent-canon-tools:active"
+    old_id = "sha256:" + "0" * 64
+    (runtime / "host-state" / "active-image.tsv").write_text(
+        f"schema\tagent-canon.active-image.v1\nimage-ref\t{old_ref}\nimage-id\t{old_id}\n",
+        encoding="utf-8",
+    )
+    if existing_plan:
+        (state_root / "rollback-plan.tsv").write_text(existing_plan, encoding="utf-8")
+    marker = tmp_path / "retained"
+    calls = tmp_path / "docker.calls"
+    replaced = tmp_path / "replaced"
+    candidate_id = "sha256:" + "1" * 64
+    docker = tmp_path / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        f"printf '%s\\n' \"$*\" >> {str(calls)!r}\n"
+        "if [[ \"$1:$2\" == image:inspect ]]; then\n"
+        "  ref=\"${@: -1}\"\n"
+        "  if [[ \"$ref\" == *rollback-* ]]; then\n"
+        f"    [[ -f {str(marker)!r} ]] || exit 1\n    printf '%s\\n' {old_id!r}\n"
+        "  else\n"
+        f"    printf '%s\\n' {candidate_id!r}\n"
+        "  fi\n"
+        "  exit 0\n"
+        "fi\n"
+        "if [[ \"$1\" == tag ]]; then\n"
+        f"  touch {str(marker)!r}\n  exit {tag_result}\n"
+        "fi\n"
+        "if [[ \"$1\" == build ]]; then\n"
+        f"  [[ -f {str(marker)!r} ]] || exit 91\n"
+        f"  exit {build_result}\n"
+        "fi\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    script = f'''
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(state_root)!r}
+AGENT_CANON_PRIVATE_LOG_ROOT={str(private_log)!r}
+AGENT_CANON_DOCKER_CMD={str(docker)!r}
+AGENT_CANON_ALLOW_BUILD=1
+AGENT_CANON_FORCE_BUILD=1
+export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
+export AGENT_CANON_STATE_ROOT AGENT_CANON_PRIVATE_LOG_ROOT
+export AGENT_CANON_DOCKER_CMD AGENT_CANON_ALLOW_BUILD AGENT_CANON_FORCE_BUILD
+_agent_canon_replace_resident_locked() {{
+  printf '%s\\n' replaced > {str(replaced)!r}
+  _agent_canon_commit_pending_rollback_plan
+}}
+_agent_canon_update_locked '' ignored
+rc=$?
+printf 'rc=%s\\n' "$rc"
+exit "$rc"
+'''
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    return completed, calls, marker, old_id, candidate_id
+
+
+def test_forced_update_retains_same_reference_before_build(tmp_path: Path) -> None:
+    """The active immutable ID is tagged before a same-reference build."""
+    completed, calls, marker, old_id, _candidate_id = _run_forced_update_probe(
+        tmp_path, build_result="0"
+    )
+    assert completed.returncode == 0, completed.stderr
+    operations = calls.read_text(encoding="utf-8").splitlines()
+    assert next(index for index, operation in enumerate(operations) if operation.startswith("tag " + old_id)) < operations.index(next(
+        operation for operation in operations if operation.startswith("build ")
+    ))
+    assert marker.is_file()
+    assert (tmp_path / "runtime" / "container-state" / "rollback-plan.tsv").is_file()
+    assert "rollback_plan_invalid" not in completed.stderr
+
+
+def test_forced_build_failure_preserves_previous_plan_and_active_image(
+    tmp_path: Path,
+) -> None:
+    """A candidate build failure leaves the old resident metadata untouched."""
+    previous_plan = "schema\tagent-canon.rollback-plan.v1\nimage-id\tsha256:previous\n"
+    completed, calls, _marker, old_id, _candidate_id = _run_forced_update_probe(
+        tmp_path, build_result="91", existing_plan=previous_plan
+    )
+    assert completed.returncode == 2
+    assert '"code":"candidate_image_build_failed"' in completed.stderr
+    assert not (tmp_path / "replaced").exists()
+    assert (tmp_path / "runtime" / "host-state" / "active-image.tsv").read_text(
+        encoding="utf-8"
+    ).endswith(f"image-id\t{old_id}\n")
+    assert (tmp_path / "runtime" / "container-state" / "rollback-plan.tsv").read_text(
+        encoding="utf-8"
+    ) == previous_plan
+    assert not (tmp_path / "runtime" / "container-state" / ".pending-rollback-plan.tsv").exists()
+    assert any(operation.startswith("build ") for operation in calls.read_text(encoding="utf-8").splitlines())
+
+
+def test_forced_retention_failure_stops_before_build(tmp_path: Path) -> None:
+    """A failed retention tag is terminal and cannot enter candidate build."""
+    completed, calls, _marker, _old_id, _candidate_id = _run_forced_update_probe(
+        tmp_path, build_result="0", tag_result="91"
+    )
+    assert completed.returncode == 2
+    assert '"code":"rollback_plan_invalid"' in completed.stderr
+    assert not any(
+        operation.startswith("build ")
+        for operation in calls.read_text(encoding="utf-8").splitlines()
+    )
+    assert not (tmp_path / "runtime" / "container-state" / ".pending-rollback-plan.tsv").exists()
+
+
+@pytest.mark.parametrize(
+    ("failure_hook", "failure_rc"),
+    [
+        ("classify", 17),
+        ("prune", 18),
+        ("validate", 19),
+        ("require", 20),
+    ],
+)
+def test_replacement_failure_hooks_abort_before_teardown_or_state_callbacks(
+    tmp_path: Path, failure_hook: str, failure_rc: int
+) -> None:
+    """Each post-lock ownership/mount gate stops the transaction immediately."""
+    runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
+    (runtime / "host-state").mkdir(parents=True)
+    state_root.mkdir()
+    control = tmp_path / "control"
+    control.mkdir()
+    calls = tmp_path / "docker.calls"
+    callbacks = tmp_path / "callbacks"
+    docker = tmp_path / "docker"
+    candidate_id = "sha256:" + "1" * 64
+    old_id = "sha256:" + "0" * 64
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        f"printf '%s\\n' \"$*\" >> {str(calls)!r}\n"
+        "if [[ \"$1:$2\" == image:inspect ]]; then\n"
+        f"  printf '%s\\n' {candidate_id!r}\n"
+        "  exit 0\n"
+        "fi\n"
+        "if [[ \"$1:$2\" == container:inspect ]]; then exit 0; fi\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    active = runtime / "host-state" / "active-image.tsv"
+    active.write_text(
+        f"schema\tagent-canon.active-image.v1\n"
+        f"image-ref\tactive\nimage-id\t{old_id}\n",
+        encoding="utf-8",
+    )
+    hooks = {
+        "classify": (
+            "_agent_canon_classify_existing_container() { "
+            f"printf '%s\\n' classify >> {str(callbacks)!r}; return {failure_rc}; }}"
+        ),
+        "prune": (
+            "_agent_canon_classify_existing_container() { "
+            "AGENT_CANON_OBSERVED_CONTAINER_ID=old; "
+            "AGENT_CANON_OBSERVED_CONTAINER_RUNTIME=shared-v1; "
+            "AGENT_CANON_OBSERVED_CONTAINER_CONTROL=$(_agent_canon_control_digest); }\n"
+            "_agent_canon_prune_stale_target_manifest() { "
+            f"printf '%s\\n' prune >> {str(callbacks)!r}; return {failure_rc}; }}"
+        ),
+        "validate": (
+            "_agent_canon_classify_existing_container() { "
+            "AGENT_CANON_OBSERVED_CONTAINER_ID=old; "
+            "AGENT_CANON_OBSERVED_CONTAINER_RUNTIME=shared-v1; "
+            "AGENT_CANON_OBSERVED_CONTAINER_CONTROL=$(_agent_canon_control_digest); }\n"
+            "_agent_canon_prune_stale_target_manifest() { :; }\n"
+            "_agent_canon_validate_target_manifest() { "
+            f"printf '%s\\n' validate >> {str(callbacks)!r}; return {failure_rc}; }}"
+        ),
+        "require": (
+            "_agent_canon_classify_existing_container() { "
+            "AGENT_CANON_OBSERVED_CONTAINER_ID=old; "
+            "AGENT_CANON_OBSERVED_CONTAINER_RUNTIME=shared-v1; "
+            "AGENT_CANON_OBSERVED_CONTAINER_CONTROL=$(_agent_canon_control_digest); }\n"
+            "_agent_canon_prune_stale_target_manifest() { :; }\n"
+            "_agent_canon_validate_target_manifest() { :; }\n"
+            "_agent_canon_write_rollback_plan() { :; }\n"
+            "_agent_canon_use_active_image() { "
+            f"AGENT_CANON_IMAGE_REF=active; AGENT_CANON_ACTIVE_IMAGE_ID={old_id}; "
+            f"AGENT_CANON_EXPECTED_IMAGE_ID={old_id}; export AGENT_CANON_IMAGE_REF "
+            "AGENT_CANON_ACTIVE_IMAGE_ID AGENT_CANON_EXPECTED_IMAGE_ID; }\n"
+            "_agent_canon_require_existing_container_identity() { "
+            f"printf '%s\\n' require >> {str(callbacks)!r}; return {failure_rc}; }}"
+        ),
+    }
+    script = f'''
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(state_root)!r}
+AGENT_CANON_DOCKER_CMD={str(docker)!r}
+AGENT_CANON_IMAGE_REF=candidate
+AGENT_CANON_EXPECTED_IMAGE_ID={candidate_id}
+export AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT
+export AGENT_CANON_DOCKER_CMD AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID
+{hooks[failure_hook]}
+_agent_canon_ensure_container() {{ printf '%s\\n' ensure >> {str(callbacks)!r}; return 0; }}
+_agent_canon_run_controller() {{ printf '%s\\n' controller >> {str(callbacks)!r}; return 0; }}
+_agent_canon_record_active_container() {{ printf '%s\\n' record >> {str(callbacks)!r}; return 0; }}
+_agent_canon_install_global_links() {{ printf '%s\\n' links >> {str(callbacks)!r}; return 0; }}
+_agent_canon_replace_resident candidate {candidate_id}
+rc=$?
+printf 'rc=%s\\n' "$rc"
+exit "$rc"
+'''
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == failure_rc
+    assert not any(
+        operation.split(" ", 1)[0] in {"build", "stop", "rm", "create", "start"}
+        for operation in calls.read_text(encoding="utf-8").splitlines()
+    )
+    assert not (state_root / "previous-image-id").exists()
+    assert active.read_text(encoding="utf-8").endswith(f"image-id\t{old_id}\n")
+    assert callbacks.read_text(encoding="utf-8").splitlines() == [failure_hook]
+
+
+@pytest.mark.parametrize("failure_hook", ["classify", "prune", "validate", "require"])
+def test_public_update_locked_propagates_gate_failure(
+    tmp_path: Path, failure_hook: str
+) -> None:
+    """The public update transaction returns injected gate failures unchanged."""
+    runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
+    (runtime / "host-state").mkdir(parents=True)
+    state_root.mkdir()
+    control = tmp_path / "control"
+    control.mkdir()
+    private_log = tmp_path / "agent-canon-log"
+    private_log.mkdir()
+    (state_root / "mounts.tsv").write_text("", encoding="utf-8")
+    (state_root / "mounts.toml").write_text("", encoding="utf-8")
+    (runtime / "source-sync.json").write_text("{}\n", encoding="utf-8")
+    old_id = "sha256:" + "0" * 64
+    candidate_id = "sha256:" + "1" * 64
+    active = runtime / "host-state" / "active-image.tsv"
+    if failure_hook != "classify":
+        active.write_text(
+            f"schema\tagent-canon.active-image.v1\n"
+            f"image-ref\tactive\nimage-id\t{old_id}\n",
+            encoding="utf-8",
+        )
+    calls = tmp_path / "docker.calls"
+    callbacks = tmp_path / "callbacks"
+    retained = tmp_path / "retained"
+    control_digest = hashlib.sha256(str(control).encode("utf-8")).hexdigest()
+    docker = tmp_path / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        f"printf '%s\\n' \"$*\" >> {str(calls)!r}\n"
+        "if [[ \"$1:$2\" == image:inspect ]]; then\n"
+        "  ref=\"${@: -1}\"\n"
+        f"  if [[ \"$ref\" == *rollback-* ]]; then [[ -f {str(retained)!r} ]] || exit 1; printf '%s\\n' {old_id!r}; "
+        f"  else printf '%s\\n' {candidate_id!r}; fi\n"
+        "  exit 0\n"
+        "fi\n"
+        "if [[ \"$1\" == tag ]]; then\n"
+        f"  touch {str(retained)!r}\n  exit 0\n"
+        "fi\n"
+        "if [[ \"$1:$2\" == container:inspect ]]; then\n"
+        "  format=\"${4:-}\"\n"
+        "  case \"$format\" in\n"
+        "    *Config.Image*) printf 'active\\n' ;;\n"
+        "    *'{{.Id}}'*) printf 'old-container\\n' ;;\n"
+        "    *io.agent-canon.runtime*) printf 'shared-v1\\n' ;;\n"
+        f"    *io.agent-canon.control-root-digest*) printf '%s\\n' {control_digest!r} ;;\n"
+        "  esac\n"
+        "  exit 0\n"
+        "fi\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    hooks = {
+        "classify": "_agent_canon_classify_existing_container() { return 17; }",
+        "prune": "_agent_canon_prune_stale_target_manifest() { return 18; }",
+        "validate": "_agent_canon_validate_target_manifest() { return 19; }",
+        "require": "_agent_canon_require_existing_container_identity() { return 20; }",
+    }
+    script = f'''
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(state_root)!r}
+AGENT_CANON_PRIVATE_LOG_ROOT={str(private_log)!r}
+AGENT_CANON_DOCKER_CMD={str(docker)!r}
+AGENT_CANON_ALLOW_BUILD=1
+AGENT_CANON_FORCE_BUILD=1
+export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
+export AGENT_CANON_STATE_ROOT AGENT_CANON_PRIVATE_LOG_ROOT AGENT_CANON_DOCKER_CMD
+export AGENT_CANON_ALLOW_BUILD AGENT_CANON_FORCE_BUILD
+_agent_canon_image() {{
+  printf '%s\\n' candidate >> {str(callbacks)!r}
+  AGENT_CANON_IMAGE_REF=candidate
+  export AGENT_CANON_IMAGE_REF
+}}
+_agent_canon_classify_existing_container() {{
+  AGENT_CANON_OBSERVED_CONTAINER_ID=old-container
+  AGENT_CANON_OBSERVED_CONTAINER_RUNTIME=shared-v1
+  AGENT_CANON_OBSERVED_CONTAINER_CONTROL=$(_agent_canon_control_digest)
+}}
+{hooks[failure_hook]}
+_agent_canon_ensure_container() {{ printf '%s\\n' ensure >> {str(callbacks)!r}; return 0; }}
+_agent_canon_run_controller() {{ printf '%s\\n' controller >> {str(callbacks)!r}; return 0; }}
+_agent_canon_record_active_container() {{ printf '%s\\n' record >> {str(callbacks)!r}; return 0; }}
+_agent_canon_install_global_links() {{ printf '%s\\n' links >> {str(callbacks)!r}; return 0; }}
+_agent_canon_update_locked '' candidate
+rc=$?
+printf 'rc=%s\\n' "$rc"
+exit "$rc"
+'''
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    expected_rc = {"classify": 17, "prune": 18, "validate": 19, "require": 20}[failure_hook]
+    assert completed.returncode == expected_rc
+    docker_calls = calls.read_text(encoding="utf-8").splitlines()
+    assert not any(
+        operation.split(" ", 1)[0] in {"build", "stop", "rm", "create", "start"}
+        for operation in docker_calls
+    )
+    assert not (state_root / "previous-image-id").exists()
+    if active.exists():
+        assert active.read_text(encoding="utf-8").endswith(f"image-id\t{old_id}\n")
+    assert not (state_root / ".pending-rollback-plan.tsv").exists()
+    callbacks_text = callbacks.read_text(encoding="utf-8") if callbacks.exists() else ""
+    assert "ensure" not in callbacks_text
+    assert "controller" not in callbacks_text
+    assert "record" not in callbacks_text
+
+
+def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
+    tmp_path: Path,
+) -> None:
+    """The real shell adapter preserves A, then B, across forced updates."""
+    home = tmp_path / "home"
+    control = tmp_path / "control"
+    repository = tmp_path / "agent-canon"
+    home.mkdir()
+    control.mkdir()
+    subprocess.run(
+        ["git", "clone", "--no-hardlinks", str(ROOT), str(repository)],
+        check=True,
+        capture_output=True,
+    )
+    fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
+    state_path = tmp_path / "docker-state.json"
+    environment = {
+        **os.environ,
+        "HOME": str(home),
+        "AGENT_CANON_DOCKER": str(fake_docker),
+        "FAKE_DOCKER_STATE": str(state_path),
+        "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
+    }
+    common = [
+        str(BOOTSTRAP),
+        "--repository-root",
+        str(repository),
+        "--control-parent-root",
+        str(control),
+    ]
+    runtime = repository / ".runtime"
+
+    def run(operation: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [*common, operation],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+            timeout=120,
+        )
+
+    def active_image() -> tuple[str, str]:
+        values = dict(
+            line.split("\t", 1)
+            for line in (runtime / "host-state" / "active-image.tsv")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        )
+        return values["image-ref"], values["image-id"]
+
+    def rollback_plan() -> tuple[str, str]:
+        values = dict(
+            line.split("\t", 1)
+            for line in (runtime / "container-state" / "rollback-plan.tsv")
+            .read_text(encoding="utf-8")
+            .splitlines()
+            if "\t" in line
+        )
+        return values["image-ref"], values["image-id"]
+
+    installed = run("install")
+    assert installed.returncode == 0, installed.stderr
+    target = tmp_path / "target"
+    target.mkdir()
+    added = subprocess.run(
+        [
+            *common,
+            "target",
+            "add",
+            "--root",
+            str(target),
+            "--mode",
+            "read-only",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=120,
+    )
+    assert added.returncode == 0, added.stderr
+    target_digest = hashlib.sha256(str(target.resolve()).encode("utf-8")).hexdigest()
+    active_ref, image_a = active_image()
+    first = run("update")
+    assert first.returncode == 0, first.stderr
+    assert not first.stderr
+    updated_ref, image_b = active_image()
+    assert updated_ref == active_ref
+    assert image_b != image_a
+    rollback_ref_a, rollback_id_a = rollback_plan()
+    docker_state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert rollback_id_a == image_a
+    assert docker_state["images"][rollback_ref_a]["Id"] == image_a
+
+    second = run("update")
+    assert second.returncode == 0, second.stderr
+    assert not second.stderr
+    updated_ref, image_c = active_image()
+    assert updated_ref == active_ref
+    assert image_c not in {image_a, image_b}
+    rollback_ref_b, rollback_id_b = rollback_plan()
+    docker_state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert rollback_id_b == image_b
+    assert docker_state["images"][rollback_ref_b]["Id"] == image_b
+
+    rolled_back = run("rollback")
+    assert rolled_back.returncode == 0, rolled_back.stderr
+    assert not rolled_back.stderr
+    rollback_active_ref, rollback_active_id = active_image()
+    assert rollback_active_id == image_b
+    assert rollback_active_ref == image_b
+    container_name = "agent-canon-tools-" + hashlib.sha256(
+        str(control.resolve()).encode("utf-8")
+    ).hexdigest()[:16]
+    docker_state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert docker_state["containers"][container_name]["Config"]["Image"] == image_b
+    assert any(
+        mount["Destination"] == f"/targets/{target_digest}"
+        for mount in docker_state["containers"][container_name]["Mounts"]
+    )
+    assert (runtime / "container-state" / "mounts.tsv").is_file()
+    rollback_again = run("rollback")
+    assert rollback_again.returncode == 0, rollback_again.stderr
+    assert active_image()[1] == image_c
+
+
+@pytest.mark.skipif(
+    shutil.which("docker") is None
+    or os.environ.get("AGENT_CANON_RUN_REAL_UPDATE_TESTS") != "1",
+    reason="opt-in real Docker forced-update acceptance",
+)
+def test_real_docker_forced_updates_retain_previous_images(tmp_path: Path) -> None:
+    """Run the same image/tag/rollback contract against the configured daemon."""
+    docker = shutil.which("docker")
+    assert docker is not None
+    daemon = subprocess.run(
+        [docker, "info"], check=False, capture_output=True, text=True, timeout=15
+    )
+    if daemon.returncode != 0:
+        pytest.skip("Docker daemon is unavailable")
+    home = tmp_path / "home"
+    control = tmp_path / "control"
+    repository = tmp_path / "agent-canon"
+    home.mkdir()
+    control.mkdir()
+    subprocess.run(
+        ["git", "clone", "--no-hardlinks", str(ROOT), str(repository)],
+        check=True,
+        capture_output=True,
+    )
+    environment = {**os.environ, "HOME": str(home), "AGENT_CANON_DOCKER": docker}
+    common = [
+        str(BOOTSTRAP),
+        "--repository-root",
+        str(repository),
+        "--control-parent-root",
+        str(control),
+    ]
+    runtime = repository / ".runtime"
+    retained_images: dict[str, str] = {}
+
+    def run(operation: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [*common, operation],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+            timeout=300,
+        )
+
+    def active_id() -> str:
+        return next(
+            line.split("\t", 1)[1]
+            for line in (runtime / "host-state" / "active-image.tsv")
+            .read_text(encoding="utf-8")
+            .splitlines()
+            if line.startswith("image-id\t")
+        )
+
+    def plan_value(key: str) -> str:
+        return next(
+            line.split("\t", 1)[1]
+            for line in (runtime / "container-state" / "rollback-plan.tsv")
+            .read_text(encoding="utf-8")
+            .splitlines()
+            if line.startswith(key + "\t")
+        )
+
+    try:
+        installed = run("install")
+        assert installed.returncode == 0, installed.stderr
+        image_a = active_id()
+        first = run("update")
+        assert first.returncode == 0, first.stderr
+        assert not first.stderr
+        image_b = active_id()
+        retained_images[plan_value("image-ref")] = plan_value("image-id")
+        assert image_b != image_a
+        assert image_a in retained_images.values()
+        second = run("update")
+        assert second.returncode == 0, second.stderr
+        assert not second.stderr
+        image_c = active_id()
+        retained_images[plan_value("image-ref")] = plan_value("image-id")
+        assert image_c not in {image_a, image_b}
+        assert image_b in retained_images.values()
+        for image_ref, image_id in retained_images.items():
+            inspected = subprocess.run(
+                [docker, "image", "inspect", "--format", "{{.Id}}", image_ref],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            assert inspected.returncode == 0, inspected.stderr
+            assert inspected.stdout.strip() == image_id
+        rolled_back = run("rollback")
+        assert rolled_back.returncode == 0, rolled_back.stderr
+        assert not rolled_back.stderr
+        assert active_id() == image_b
+        rollback_again = run("rollback")
+        assert rollback_again.returncode == 0, rollback_again.stderr
+        assert not rollback_again.stderr
+        assert active_id() == image_c
+    finally:
+        run("uninstall")
+        for image_ref in retained_images:
+            subprocess.run(
+                [docker, "image", "rm", image_ref], check=False, capture_output=True
+            )
+        for image_id in retained_images.values():
+            subprocess.run(
+                [docker, "image", "rm", image_id], check=False, capture_output=True
+            )
+
+
 def test_sync_stages_source_before_live_fast_forward() -> None:
     """Source sync builds the candidate checkout before touching live source."""
     text = ADAPTER.read_text(encoding="utf-8")
