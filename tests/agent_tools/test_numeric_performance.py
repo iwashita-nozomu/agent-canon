@@ -34,15 +34,39 @@ def _observation(
         "eval_seconds": 0.2,
         "linear_solve_seconds": 0.1,
         "communication_seconds": 0.05,
+        "transfer_seconds": 0.03,
+        "synchronization_seconds": 0.02,
         "other_seconds": 0.05,
         "residual_trajectory": [1.0, 0.2, 0.01],
         "objective_trajectory": [4.0, 1.0, 0.25],
+        "kkt_trajectory": [2.0, 0.4, 0.02],
         "step_acceptance": [True, True],
         "step_sizes": [0.5, 0.25],
         "termination": "converged",
         "conditioning": 10.0,
         "inner_solver": {"name": "cg", "iterations": 3, "work": 3.0},
         "inner_solver_work": 3.0,
+        "finite_nonfinite_events": ["all_finite"],
+        "work_counters": {
+            "objective_evaluations": 3,
+            "gradient_evaluations": 3,
+            "evaluation_count": 6,
+            "linear_solve_count": 2,
+            "linear_solve_iterations": 3,
+            "matvec_count": 4,
+            "inner_solver_iterations": 3,
+            "inner_solver_acceptance": [True, True],
+        },
+        "mathematical_problem": "quadratic-v1",
+        "initial_state": "x0=[1,1]",
+        "stopping_policy": "residual<=task-tolerance",
+        "dtype": "float64",
+        "workload": "case-1",
+        "run_mode": "warm",
+        "compile_cache_state": "cache-hit",
+        "backend": "jax",
+        "device": "gpu:0",
+        "compiler": "xla-2026.08",
     }
     before = deepcopy(base)
     after = deepcopy(base)
@@ -121,6 +145,46 @@ def test_same_trajectory_with_compile_and_per_iteration_delta_routes_systems() -
     assert result["owner_route"] == "jit-backend-performance"
     assert "mathematical algorithm" in result["forbidden_writes"]
     assert result["separate_handoff"]["route"] == "computational-optimization"
+
+
+def test_context_mismatch_is_unresolved_and_forbids_jit() -> None:
+    """Different problem context cannot establish isolated systems causality."""
+    result = _result(
+        _observation(after_changes={"mathematical_problem": "different-problem"})
+    )
+    assert result["category"] == "evidence_missing"
+    assert result["owner_route"] == "computational-optimization"
+    assert "mathematical_problem" in result["evidence"]["context_mismatches"]
+    assert "JIT" in result["forbidden_writes"]
+
+
+def test_kkt_or_finite_event_change_routes_to_math() -> None:
+    """KKT or finite/non-finite behavior is numerical evidence, not JIT evidence."""
+    for changes in (
+        {"kkt_trajectory": [2.0, 1.5, 1.0]},
+        {"finite_nonfinite_events": ["nonfinite_residual"]},
+    ):
+        with_changes = _result(_observation(after_changes=changes))
+        assert with_changes["category"] == "convergence_changed"
+        assert with_changes["owner_route"] == "computational-optimization"
+
+
+def test_work_counter_change_routes_to_math() -> None:
+    """Changed objective/linear/inner work is an algorithmic change."""
+    counters = deepcopy(_observation()["after"]["work_counters"])
+    counters["linear_solve_iterations"] = 8
+    result = _result(_observation(after_changes={"work_counters": counters}))
+    assert result["category"] == "convergence_changed"
+    assert "work_counters" in result["evidence"]["changed_numerical_fields"]
+
+
+def test_identical_times_are_no_action_not_systems() -> None:
+    """Equivalent work with no positive regression cannot create a systems handoff."""
+    result = _result(_observation())
+    assert result["category"] == "evidence_missing"
+    assert result["next_action"].startswith("take no action")
+    assert result["owner_route"] == "computational-optimization"
+    assert result["separate_handoff"]["status"] == "forbidden"
 
 
 def test_total_time_only_is_missing_evidence_and_forbids_jit() -> None:

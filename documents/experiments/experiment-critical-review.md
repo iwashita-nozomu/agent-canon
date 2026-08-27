@@ -185,7 +185,8 @@ T_{total} = T_{compile/JIT} + N_{iter} \times
 
 total time だけでなく、residual / objective / KKT trajectory、iteration count、
 step acceptance / size、termination status、conditioning、inner-solver work、
-per-iteration cost、cold compile/JIT と warm execution、transfer / synchronization
+objective / gradient / eval / linear-solve / matvec work counters、finite / non-finite
+events、per-iteration cost、cold compile/JIT と warm execution、transfer / synchronization
 を区別します。観測 JSON は `python3 tools/agent_tools/numeric_performance.py
 --input <post-run-observations.json> --format json` で分類し、prose だけで owner を
 選びません。iteration、trajectory、受理、conditioning、または inner solver が
@@ -194,7 +195,13 @@ per-iteration cost、cold compile/JIT と warm execution、transfer / synchroniz
 count、termination、conditioning、inner-solver work、per-iteration numerical work
 が保たれ、compile/JIT または systems cost だけが分離された場合に限って、その
 sibling owner へ handoff します。証拠が不足する場合は `evidence_missing` として
-metrics collection を残し、JIT 修正へ進みません。
+metrics collection を残し、JIT 修正へ進みません。比較 context
+（mathematical problem、initial state、stopping policy、dtype、workload、cold / warm、
+compile cache、backend、device、compiler）が before / after で一致しない場合も
+`evidence_missing` です。同じ数値 work でも、after 側に compile/JIT、per-iteration、
+eval / linear-solve、transfer / synchronization、または total の正の回帰が測定され
+ない限り `systems_cost_isolated` にしません。`trajectory_tolerance` は task-provided
+trajectory comparison にだけ使い、work counter や context の差を許容しません。
 
 この節は数値 performance に限定されます。非数値 C++ performance は既存の
 `cpp-review` の workload / algorithm / native implementation review を使い、

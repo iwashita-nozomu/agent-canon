@@ -26,6 +26,7 @@ from collections.abc import Mapping, Sequence
 INPUT_SCHEMA = "agent-canon.numeric-performance-observation.v1"
 OUTPUT_SCHEMA = "agent-canon.numeric-performance-classification.v1"
 SCOPES = frozenset({"numeric_solver", "non_numeric"})
+RUN_MODE_VALUES = frozenset({"cold", "warm"})
 
 TOP_LEVEL_FIELDS = frozenset(
     {"schema", "scope", "trajectory_tolerance", "math_oracle", "before", "after"}
@@ -39,15 +40,56 @@ OBSERVATION_FIELDS = frozenset(
         "eval_seconds",
         "linear_solve_seconds",
         "communication_seconds",
+        "transfer_seconds",
+        "synchronization_seconds",
         "other_seconds",
         "residual_trajectory",
         "objective_trajectory",
+        "kkt_trajectory",
         "step_acceptance",
         "step_sizes",
         "termination",
         "conditioning",
         "inner_solver",
         "inner_solver_work",
+        "finite_nonfinite_events",
+        "work_counters",
+        "mathematical_problem",
+        "initial_state",
+        "stopping_policy",
+        "dtype",
+        "workload",
+        "run_mode",
+        "compile_cache_state",
+        "backend",
+        "device",
+        "compiler",
+    }
+)
+CONTEXT_FIELDS = frozenset(
+    {
+        "mathematical_problem",
+        "initial_state",
+        "stopping_policy",
+        "dtype",
+        "workload",
+        "run_mode",
+        "compile_cache_state",
+        "backend",
+        "device",
+        "compiler",
+    }
+)
+WORK_COUNTER_FIELDS = frozenset(
+    {
+        "objective_evaluations",
+        "gradient_evaluations",
+        "evaluation_count",
+        "linear_solve_count",
+        "linear_solve_iterations",
+        "matvec_count",
+        "inner_solver_iterations",
+        "inner_solver_acceptance",
     }
 )
 REQUIRED_COMMON_FIELDS = frozenset({"total_seconds"})
@@ -59,16 +101,36 @@ REQUIRED_NUMERICAL_FIELDS = frozenset(
         "eval_seconds",
         "linear_solve_seconds",
         "communication_seconds",
+        "transfer_seconds",
+        "synchronization_seconds",
         "other_seconds",
         "residual_trajectory",
         "objective_trajectory",
+        "kkt_trajectory",
         "step_acceptance",
         "step_sizes",
         "termination",
         "conditioning",
         "inner_solver",
         "inner_solver_work",
+        "finite_nonfinite_events",
+        "work_counters",
     }
+)
+REQUIRED_CONTEXT_FIELDS = CONTEXT_FIELDS
+TIMING_FIELDS = (
+    "compile_jit_seconds",
+    "per_iteration_seconds",
+    "eval_seconds",
+    "linear_solve_seconds",
+    "communication_seconds",
+    "transfer_seconds",
+    "synchronization_seconds",
+    "other_seconds",
+    "total_seconds",
+)
+TRAJECTORY_FIELDS = frozenset(
+    {"residual_trajectory", "objective_trajectory", "kkt_trajectory"}
 )
 FORBIDDEN_NON_MATH_WRITES = (
     "architecture",
@@ -128,6 +190,63 @@ def _bool_list(value: object, field: str) -> list[bool]:
     return list(value)
 
 
+def _string_list(value: object, field: str) -> list[str]:
+    if not isinstance(value, list):
+        raise ObservationError(f"{field}:list_required")
+    result: list[str] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, str) or not item.strip():
+            raise ObservationError(f"{field}[{index}]:nonempty_string_required")
+        result.append(item)
+    return result
+
+
+def _context_value(value: object, field: str) -> object:
+    """Normalize one task-owned comparison identity without inventing semantics."""
+    if isinstance(value, str):
+        if not value.strip():
+            raise ObservationError(f"{field}:nonempty_string_required")
+        return value
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        if not math.isfinite(float(value)):
+            raise ObservationError(f"{field}:finite_number_required")
+        return value
+    if isinstance(value, list):
+        return [_context_value(item, f"{field}[{index}]") for index, item in enumerate(value)]
+    if isinstance(value, Mapping):
+        result: dict[str, object] = {}
+        for key, item in value.items():
+            if not isinstance(key, str) or not key.strip():
+                raise ObservationError(f"{field}:string_keys_required")
+            result[key] = _context_value(item, f"{field}.{key}")
+        return result
+    raise ObservationError(f"{field}:json_identity_required")
+
+
+def _work_counters(value: object, field: str) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        raise ObservationError(f"{field}:mapping_required")
+    unknown = sorted(set(value).difference(WORK_COUNTER_FIELDS))
+    missing = sorted(WORK_COUNTER_FIELDS.difference(value))
+    if unknown:
+        raise ObservationError(f"{field}:unknown_fields:{','.join(unknown)}")
+    if missing:
+        raise ObservationError(f"{field}:missing_fields:{','.join(missing)}")
+    result: dict[str, object] = {}
+    for name in sorted(WORK_COUNTER_FIELDS):
+        item = value[name]
+        item_field = f"{field}.{name}"
+        if name == "inner_solver_acceptance":
+            result[name] = _bool_list(item, item_field)
+            continue
+        if isinstance(item, bool) or not isinstance(item, int) or item < 0:
+            raise ObservationError(f"{item_field}:nonnegative_integer_required")
+        result[name] = item
+    return result
+
+
 def _inner_solver(value: object, field: str) -> dict[str, object]:
     if not isinstance(value, Mapping):
         raise ObservationError(f"{field}:mapping_required")
@@ -165,10 +284,17 @@ def _normalize_observation(raw: object, field: str) -> dict[str, object]:
             if isinstance(item, bool) or not isinstance(item, int) or item < 0:
                 raise ObservationError(f"{item_field}:nonnegative_integer_required")
             result[name] = item
-        elif name in {"residual_trajectory", "objective_trajectory", "step_sizes"}:
+        elif name in {
+            "residual_trajectory",
+            "objective_trajectory",
+            "kkt_trajectory",
+            "step_sizes",
+        }:
             result[name] = _number_list(item, item_field)
         elif name == "step_acceptance":
             result[name] = _bool_list(item, item_field)
+        elif name == "finite_nonfinite_events":
+            result[name] = _string_list(item, item_field)
         elif name == "termination":
             if not isinstance(item, str) or not item.strip():
                 raise ObservationError(f"{item_field}:nonempty_string_required")
@@ -179,6 +305,16 @@ def _normalize_observation(raw: object, field: str) -> dict[str, object]:
             result[name] = _inner_solver(item, item_field)
         elif name == "inner_solver_work":
             result[name] = _number(item, item_field)
+        elif name == "work_counters":
+            result[name] = _work_counters(item, item_field)
+        elif name in CONTEXT_FIELDS:
+            context_value = _context_value(item, item_field)
+            if name == "run_mode" and (
+                not isinstance(context_value, str)
+                or context_value not in RUN_MODE_VALUES
+            ):
+                raise ObservationError(f"{item_field}:cold_or_warm_required")
+            result[name] = context_value
         else:  # pragma: no cover - closed field set makes this unreachable.
             raise ObservationError(f"{item_field}:unsupported")
     return result
@@ -236,22 +372,15 @@ def _equivalent(left: object, right: object, tolerance: float) -> bool:
 
 
 def _complete_numerical_observation(observation: Mapping[str, object]) -> bool:
-    return REQUIRED_NUMERICAL_FIELDS.issubset(observation)
+    return REQUIRED_NUMERICAL_FIELDS.issubset(observation) and REQUIRED_CONTEXT_FIELDS.issubset(
+        observation
+    )
 
 
 def _cost_decomposition(
     before: Mapping[str, object], after: Mapping[str, object]
 ) -> dict[str, dict[str, object]]:
-    fields = (
-        "total_seconds",
-        "compile_jit_seconds",
-        "iterations",
-        "per_iteration_seconds",
-        "eval_seconds",
-        "linear_solve_seconds",
-        "communication_seconds",
-        "other_seconds",
-    )
+    fields = ("iterations", *TIMING_FIELDS)
     return {
         "before": {field: before.get(field) for field in fields},
         "after": {field: after.get(field) for field in fields},
@@ -304,6 +433,13 @@ def classify(raw: object) -> dict[str, object]:
             evidence,
         )
 
+    missing_before = sorted(
+        (REQUIRED_NUMERICAL_FIELDS | REQUIRED_CONTEXT_FIELDS).difference(before)
+    )
+    missing_after = sorted(
+        (REQUIRED_NUMERICAL_FIELDS | REQUIRED_CONTEXT_FIELDS).difference(after)
+    )
+    evidence["missing_fields"] = {"before": missing_before, "after": missing_after}
     if not _complete_numerical_observation(before) or not _complete_numerical_observation(after):
         return _result(
             "evidence_missing",
@@ -318,20 +454,37 @@ def classify(raw: object) -> dict[str, object]:
             evidence,
         )
 
+    context_mismatches = [
+        field
+        for field in sorted(REQUIRED_CONTEXT_FIELDS)
+        if before[field] != after[field]
+    ]
+    evidence["context_mismatches"] = context_mismatches
+    if context_mismatches:
+        return _result(
+            "evidence_missing",
+            "computational-optimization",
+            "rerun or align the same mathematical problem, initial state, stopping policy, dtype, workload, run mode, cache, backend, device, and compiler before attributing a cost to JIT",
+            FORBIDDEN_NON_MATH_WRITES,
+            {
+                "route": "jit-backend-performance",
+                "status": "forbidden",
+                "reason": "before/after comparison context is not identical",
+            },
+            evidence,
+        )
+
     tolerance = packet["trajectory_tolerance"]
     assert isinstance(tolerance, float)
-    semantic_fields = tuple(sorted(REQUIRED_NUMERICAL_FIELDS.difference({
-        "compile_jit_seconds",
-        "per_iteration_seconds",
-        "eval_seconds",
-        "linear_solve_seconds",
-        "communication_seconds",
-        "other_seconds",
-    })))
+    semantic_fields = tuple(sorted(REQUIRED_NUMERICAL_FIELDS.difference(TIMING_FIELDS)))
     changed_fields = [
         field
         for field in semantic_fields
-        if not _equivalent(before[field], after[field], tolerance)
+        if (
+            field in TRAJECTORY_FIELDS
+            and not _equivalent(before[field], after[field], tolerance)
+        )
+        or (field not in TRAJECTORY_FIELDS and before[field] != after[field])
     ]
     evidence["changed_numerical_fields"] = changed_fields
     if changed_fields:
@@ -344,6 +497,26 @@ def classify(raw: object) -> dict[str, object]:
                 "route": "jit-backend-performance",
                 "status": "deferred",
                 "reason": "numerical trajectory or iteration behavior changed",
+            },
+            evidence,
+        )
+
+    positive_cost_regressions = [
+        field
+        for field in TIMING_FIELDS
+        if float(after[field]) > float(before[field])
+    ]
+    evidence["positive_cost_regressions"] = positive_cost_regressions
+    if not positive_cost_regressions:
+        return _result(
+            "evidence_missing",
+            "computational-optimization",
+            "take no action: the numerical work is equivalent but no positive performance regression was measured",
+            FORBIDDEN_NON_MATH_WRITES,
+            {
+                "route": "jit-backend-performance",
+                "status": "forbidden",
+                "reason": "identical or non-regressed timing does not justify a systems edit",
             },
             evidence,
         )

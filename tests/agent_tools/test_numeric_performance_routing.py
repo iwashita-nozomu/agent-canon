@@ -101,6 +101,23 @@ def test_diagnosis_docs_bind_cost_decomposition_and_post_run_order() -> None:
     assert "pass / fail" in optimization
     assert "run 前の pass / fail" in experiment
     assert "non_numeric" in optimization
+    for field in (
+        "mathematical_problem",
+        "initial_state",
+        "stopping_policy",
+        "run_mode",
+        "compile_cache_state",
+        "backend",
+        "device",
+        "compiler",
+        "kkt_trajectory",
+        "finite_nonfinite_events",
+        "work_counters",
+        "transfer_seconds",
+        "synchronization_seconds",
+    ):
+        assert field in optimization
+    assert "正の回帰" in optimization
 
 
 def test_catalog_exposes_only_narrow_numeric_performance_route() -> None:

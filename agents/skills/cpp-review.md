@@ -124,12 +124,19 @@ performance diagnosis に委譲します。cpp review はその post-run record 
 record は `python3 tools/agent_tools/numeric_performance.py --input
 <post-run-observations.json> --format json` の分類結果を使います。
 
-- iteration count、residual / objective / KKT trajectory、step acceptance / size、
-  termination、conditioning、inner-solver work、または per-iteration numerical
-  work が変わった場合は、math / algorithm owner へ返します。JIT、backend、
+- iteration count、residual / objective / KKT trajectory、KKT / finite state、step
+  acceptance / size、termination、conditioning、inner-solver work、または objective /
+  gradient / eval / linear-solve / matvec work counter が変わった場合は、math /
+  algorithm owner へ返します。JIT、backend、
   compiler、architecture の編集を cpp review の第一手段にしません。
-- 数値 trajectory と iteration count が同じで、compile/JIT または systems cost
-  だけが分離計測された場合に限り、該当 systems / JIT sibling handoff を受けます。
+- 数値 trajectory、work counters、termination、conditioning、inner-solver work、
+  mathematical problem、initial state、stopping policy、dtype、workload、run mode、
+  cache、backend、device、compiler が同じで、compile/JIT、per-iteration、eval /
+  linear-solve、transfer / synchronization、または total cost の after 側に正の
+  回帰がある場合に限り、該当 systems / JIT sibling handoff を受けます。
+- 比較 context が違う、finite / non-finite event が欠ける、または work counter が
+  変わる場合は `evidence_missing` または math route とし、systems attribution を
+  行いません。
 - total time しかない場合は `evidence_missing` として追加 metrics を要求し、
   JIT 境界の変更を提案しません。
 - 数値 solver ではない C++ performance は、既存のこの文書の workload、data

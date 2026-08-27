@@ -257,9 +257,14 @@ cost を含めます。正規化と分類は
 `trajectory_tolerance` と task-provided `math_oracle` を必須にします。各
 `before` / `after` record は `total_seconds` を必須とし、完全な数値比較には
 `compile_jit_seconds`、`iterations`、`per_iteration_seconds`、`eval_seconds`、
-`linear_solve_seconds`、`communication_seconds`、`other_seconds`、
-`residual_trajectory`、`objective_trajectory`、`step_acceptance`、`step_sizes`、
-`termination`、`conditioning`、`inner_solver`、`inner_solver_work` を使用します。
+`linear_solve_seconds`、`communication_seconds`、`transfer_seconds`、
+`synchronization_seconds`、`other_seconds`、`residual_trajectory`、
+`objective_trajectory`、`kkt_trajectory`、`step_acceptance`、`step_sizes`、
+`termination`、`conditioning`、`inner_solver`、`inner_solver_work`、
+`finite_nonfinite_events`、および `work_counters` を使用します。さらに
+`mathematical_problem`、`initial_state`、`stopping_policy`、`dtype`、`workload`、
+`run_mode`（`cold` / `warm`）、`compile_cache_state`、`backend`、`device`、
+`compiler` は before / after の両方に必要な比較 context です。
 未知の field は受け付けず、欠落した完全比較項目は `evidence_missing` として扱います。
 結果 JSON の `category`、`owner_route`、`next_action`、`forbidden_writes`、
 `separate_handoff` をそのまま handoff に渡し、agent が prose から別の owner や
@@ -270,15 +275,18 @@ JIT 編集を推測しません。
 | classification | required evidence | first owner and write boundary |
 | --- | --- | --- |
 | `convergence_changed` | trajectory、iteration count、residual / objective / KKT、step acceptance / size、termination、conditioning、または inner-solver work のいずれかが変化 | `computational-optimization` の数学 / algorithm owner。JIT、architecture、backend、compiler、runtime writer はこの math route から起動しない |
-| `systems_cost_isolated` | 数値 trajectory、iteration count、termination、conditioning、inner-solver work、per-iteration numerical work が同値で、compile/JIT または systems cost の差だけが実測で分離されている | JIT / backend / systems performance の sibling handoff。math writer はその surface を編集しない |
-| `evidence_missing` | total time だけ、または上記の分解・trajectory の一部が欠落 | 未解決の metrics collection。JIT / architecture の修正へ進まず、必要な run evidence を集める |
+| `systems_cost_isolated` | 数値 trajectory、KKT / finite state、iteration / work counters、termination、conditioning、inner-solver work、比較 context が同値で、compile/JIT、per-iteration、eval / linear-solve、transfer / synchronization、または total cost の少なくとも一つに after 側の正の回帰がある | JIT / backend / systems performance の sibling handoff。math writer はその surface を編集しない |
+| `evidence_missing` | total time だけ、分解・trajectory・KKT / finite state・work counters・比較 context の一部が欠落、context が不一致、または数値 work が同じで正の回帰がない | 未解決または no-action。JIT / architecture の修正へ進まず、必要な run evidence を集める |
 | `non_numeric` | solver / iterative numerical semantics を含まない native performance | 既存の `cpp-review` performance route。数値 decomposition を追加要求しない |
 
 iteration count の増加、residual / objective trajectory の悪化、rejected step、
 conditioning の悪化、または inner solver work の増加は、JIT 境界の変更ではなく
 数学 / algorithm の原因候補です。逆に `systems_cost_isolated` は数値 trajectory
-が保たれた場合だけ成立し、compile/JIT の印象や total-time-only の観測では成立
-しません。どの classification でも tolerance、stopping rule、case mix、数値
+が保たれ、比較 context が一致し、かつ measured cost の正の回帰がある場合だけ成立
+します。compile/JIT の印象、total-time-only、context mismatch、同一時間の観測では
+成立しません。`trajectory_tolerance` は residual / objective / KKT trajectory に
+だけ適用し、work counters、termination、context、cost の差を許容する根拠にしません。
+どの classification でも tolerance、stopping rule、case mix、数値
 semantics を変えて速度差を作らないでください。
 
 ## Review Route
