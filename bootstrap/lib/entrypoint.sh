@@ -1730,7 +1730,7 @@ _agent_canon_prepare_forced_update_locked() {
     AGENT_CANON_ACTIVE_IMAGE_ID=$old_image_id
     AGENT_CANON_EXPECTED_IMAGE_ID=$old_image_id
     export AGENT_CANON_IMAGE_REF AGENT_CANON_ACTIVE_IMAGE_ID AGENT_CANON_EXPECTED_IMAGE_ID
-    _agent_canon_classify_existing_container "$container"
+    _agent_canon_classify_existing_container "$container" || return $?
   fi
   old_image_ref=${AGENT_CANON_IMAGE_REF:-$old_image_ref}
   old_image_id=${AGENT_CANON_ACTIVE_IMAGE_ID:-$old_image_id}
@@ -1776,11 +1776,20 @@ _agent_canon_update_locked() {
     return 2
   fi
   set +e
-  _agent_canon_replace_resident_locked "$candidate_image_ref" "$candidate_image_id" update
+  (
+    set -e
+    _agent_canon_replace_resident_locked "$candidate_image_ref" "$candidate_image_id" update
+  )
   rc=$?
   set -e
-  _agent_canon_discard_pending_rollback_plan || :
-  return "$rc"
+  set +e
+  _agent_canon_discard_pending_rollback_plan
+  local discard_rc=$?
+  set -e
+  if ((rc != 0)); then
+    return "$rc"
+  fi
+  return "$discard_rc"
 }
 
 _agent_canon_replace_resident_locked() {
