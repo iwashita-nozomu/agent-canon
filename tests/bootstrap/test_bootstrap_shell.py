@@ -746,6 +746,7 @@ def test_replacement_rollback_failure_is_reported_after_controller_failure(
     docker.write_text(
         "#!/usr/bin/env bash\n"
         "if [[ \"$1:$2\" == image:inspect ]]; then printf 'sha256:candidate\\n'; fi\n"
+        "if [[ \"$1:$2\" == container:inspect && \"$4\" == '{{.Id}}' ]]; then printf 'container-old\\n'; fi\n"
         "if [[ \"$1:$2\" == container:inspect && \"$4\" == *io.agent-canon.runtime* ]]; then printf 'shared-v1\\n'; fi\n"
         f"if [[ \"$1:$2\" == container:inspect && \"$4\" == *io.agent-canon.control-root-digest* ]]; then printf '{control_digest}\\n'; fi\n"
         "exit 0\n",
@@ -797,6 +798,13 @@ exit "$rc"
             "target_root_invalid",
             False,
         ),
+        (
+            "owned",
+            "target\tbroad-digest\t__CONTROL_ROOT__\t/targets/broad-digest\tread-only\n",
+            2,
+            "mount_manifest_invalid",
+            False,
+        ),
     ],
 )
 def test_owned_resident_replacement_classifies_before_drift_and_teardown(
@@ -812,6 +820,7 @@ def test_owned_resident_replacement_classifies_before_drift_and_teardown(
     state_root = runtime / "container-state"
     (runtime / "host-state").mkdir(parents=True)
     state_root.mkdir()
+    mounts = mounts.replace("__CONTROL_ROOT__", str(tmp_path))
     (state_root / "mounts.tsv").write_text(mounts, encoding="utf-8")
     marker = tmp_path / "docker.calls"
     control_digest = hashlib.sha256(str(tmp_path).encode("utf-8")).hexdigest()
@@ -823,6 +832,7 @@ def test_owned_resident_replacement_classifies_before_drift_and_teardown(
         f"printf '%s\\n' \"$*\" >> {str(marker)!r}\n"
         "if [[ \"$1:$2\" == image:inspect ]]; then printf 'sha256:candidate\\n'; exit 0; fi\n"
         "if [[ \"$1:$2\" == container:inspect ]]; then\n"
+        "  if [[ \"${4:-}\" == '{{.Id}}' ]]; then printf 'container-old\\n'; fi\n"
         "  if [[ \"${4:-}\" == *io.agent-canon.runtime* ]]; then printf 'shared-v1\\n'; fi\n"
         f"  if [[ \"${{4:-}}\" == *io.agent-canon.control-root-digest* ]]; then printf '{owner_label}\\n'; fi\n"
         "  exit 0\n"
@@ -866,6 +876,108 @@ exit "$rc"
         call.startswith("rm ") for call in calls
     )
     assert teardown is expect_teardown
+
+
+def test_replacement_preserves_resident_when_identity_changes_before_teardown(
+    tmp_path: Path,
+) -> None:
+    """Recheck the captured ID/labels under lock before any stop or rm."""
+    runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
+    (runtime / "host-state").mkdir(parents=True)
+    state_root.mkdir()
+    (state_root / "mounts.tsv").write_text("", encoding="utf-8")
+    calls = tmp_path / "docker.calls"
+    id_reads = tmp_path / "id-reads"
+    id_reads.write_text("0\n", encoding="utf-8")
+    control_digest = hashlib.sha256(str(tmp_path).encode("utf-8")).hexdigest()
+    docker = tmp_path / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        f"printf '%s\\n' \"$*\" >> {str(calls)!r}\n"
+        "if [[ \"$1:$2\" == image:inspect ]]; then printf 'sha256:candidate\\n'; exit 0; fi\n"
+        "if [[ \"$1:$2\" == container:inspect ]]; then\n"
+        f"  if [[ \"${{4:-}}\" == *Id* ]]; then n=$(< {str(id_reads)!r}); n=$((n + 1)); printf '%s\\n' \"$n\" > {str(id_reads)!r}; if ((n == 1)); then printf 'container-old\\n'; else printf 'container-new\\n'; fi; fi\n"
+        "  if [[ \"${4:-}\" == *io.agent-canon.runtime* ]]; then printf 'shared-v1\\n'; fi\n"
+        f"  if [[ \"${{4:-}}\" == *io.agent-canon.control-root-digest* ]]; then printf '{control_digest}\\n'; fi\n"
+        "  exit 0\n"
+        "fi\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    script = f'''
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_CONTROL_ROOT={str(tmp_path)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(state_root)!r}
+AGENT_CANON_DOCKER_CMD={str(docker)!r}
+_agent_canon_use_active_image() {{
+  AGENT_CANON_IMAGE_REF=old-ref
+  AGENT_CANON_ACTIVE_IMAGE_ID=sha256:old
+  AGENT_CANON_EXPECTED_IMAGE_ID=sha256:old
+  export AGENT_CANON_IMAGE_REF AGENT_CANON_ACTIVE_IMAGE_ID AGENT_CANON_EXPECTED_IMAGE_ID
+}}
+_agent_canon_write_rollback_plan() {{ :; }}
+_agent_canon_replace_resident candidate requested
+rc=$?
+printf 'rc=%s\\n' "$rc"
+exit "$rc"
+'''
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == 2
+    assert '"code":"replacement_readback_failed"' in completed.stderr
+    calls_text = calls.read_text(encoding="utf-8")
+    assert "stop " not in calls_text
+    assert "rm " not in calls_text
+
+
+def test_install_rejects_foreign_named_resident_before_build_or_state_mutation(
+    tmp_path: Path,
+) -> None:
+    """Install ownership preflight runs before candidate build/runtime setup."""
+    repository = tmp_path / "agent-canon"
+    control = tmp_path / "control"
+    repository.mkdir()
+    control.mkdir()
+    calls = tmp_path / "docker.calls"
+    docker = tmp_path / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        f"printf '%s\\n' \"$*\" >> {str(calls)!r}\n"
+        "if [[ \"$1:$2\" == container:inspect ]]; then\n"
+        "  if [[ \"${4:-}\" == *io.agent-canon.runtime* ]]; then printf 'shared-v1\\n'; fi\n"
+        "  if [[ \"${4:-}\" == *io.agent-canon.control-root-digest* ]]; then printf 'foreign-control-root\\n'; fi\n"
+        "  exit 0\n"
+        "fi\n"
+        "if [[ \"$1\" == build ]]; then exit 99; fi\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    completed = subprocess.run(
+        [
+            str(BOOTSTRAP),
+            "--repository-root",
+            str(repository),
+            "--control-parent-root",
+            str(control),
+            "install",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "AGENT_CANON_DOCKER": str(docker)},
+    )
+    assert completed.returncode == 2
+    assert '"code":"container_ownership_mismatch"' in completed.stderr
+    assert "build " not in calls.read_text(encoding="utf-8")
+    assert not (repository / ".runtime").exists()
 
 
 def test_missing_docker_is_typed_without_host_python(tmp_path: Path) -> None:
