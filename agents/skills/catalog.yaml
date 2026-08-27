@@ -1712,6 +1712,8 @@ skill_families:
       required: []
       conditional:
       - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
+      - python3 tools/agent_tools/numeric_performance.py --input <post-run-observations.json>
+        --format json
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check
@@ -1734,6 +1736,10 @@ skill_families:
         - ["residual", "convergence"]
         - ["residual", "numerical"]
         - ["residual", "収束"]
+        - ["solver", "performance"]
+        - ["solver", "速度"]
+        - ["iterative", "algorithm", "performance"]
+        - ["反復", "アルゴリズム", "性能"]
   - id: adaptive-improvement-loop
     purpose: Manage experiments, research, tuning, and iterative code changes as one backlog-driven outer loop.
     canonical_doc: agents/skills/adaptive-improvement-loop.md
