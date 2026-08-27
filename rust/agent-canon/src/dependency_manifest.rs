@@ -211,9 +211,18 @@ struct SurfaceManifestEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct GeneratedProjectionEntry {
+    path: String,
+    source: String,
+    projection_producer: String,
+    projection_kind: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct SurfaceManifestSnapshot {
     prefix: String,
     entries: Vec<SurfaceManifestEntry>,
+    generated_projections: Vec<GeneratedProjectionEntry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -508,7 +517,11 @@ fn load_surface_manifest_snapshot(
         ManifestError::SurfaceManifest(format!("surface_manifest_snapshot: invalid JSON: {error}"))
     })?;
     let object = required_json_object(&value, "snapshot")?;
-    require_exact_json_keys(object, &["entries", "prefix", "schema"], "snapshot")?;
+    require_exact_json_keys(
+        object,
+        &["entries", "generated_projections", "prefix", "schema"],
+        "snapshot",
+    )?;
     if object.get("schema").and_then(serde_json::Value::as_str)
         != Some(SURFACE_MANIFEST_SNAPSHOT_SCHEMA)
     {
@@ -576,7 +589,46 @@ fn load_surface_manifest_snapshot(
             optional: required_json_bool(entry, "optional", &owner)?,
         });
     }
-    Ok(SurfaceManifestSnapshot { prefix, entries })
+    let raw_projections = object
+        .get("generated_projections")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| {
+            ManifestError::SurfaceManifest(
+                "surface_manifest_snapshot: snapshot.generated_projections must be array"
+                    .to_string(),
+            )
+        })?;
+    let mut generated_projections = Vec::with_capacity(raw_projections.len());
+    let mut projection_paths = BTreeSet::new();
+    for (index, raw_projection) in raw_projections.iter().enumerate() {
+        let owner = format!("snapshot.generated_projections[{index}]");
+        let projection = required_json_object(raw_projection, &owner)?;
+        require_exact_json_keys(
+            projection,
+            &["path", "projection_kind", "projection_producer", "source"],
+            &owner,
+        )?;
+        let path = required_json_string(projection, "path", &owner)?;
+        if !projection_paths.insert(path.clone()) {
+            return Err(ManifestError::SurfaceManifest(format!(
+                "surface_manifest_snapshot: duplicate generated projection path {path}"
+            )));
+        }
+        let source = required_json_string(projection, "source", &owner)?;
+        let projection_producer = required_json_string(projection, "projection_producer", &owner)?;
+        let projection_kind = required_json_string(projection, "projection_kind", &owner)?;
+        generated_projections.push(GeneratedProjectionEntry {
+            path,
+            source,
+            projection_producer,
+            projection_kind,
+        });
+    }
+    Ok(SurfaceManifestSnapshot {
+        prefix,
+        entries,
+        generated_projections,
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1046,6 +1098,18 @@ fn canonicalize_surface_path(
     manifest: &SurfaceManifestSnapshot,
     relative: &str,
 ) -> Result<String, ManifestError> {
+    if let Some(projection) = manifest
+        .generated_projections
+        .iter()
+        .find(|projection| projection.path == relative)
+    {
+        return normalize_relative(Path::new(&projection.source)).map_err(|error| {
+            ManifestError::SurfaceManifest(format!(
+                "surface_manifest_snapshot: generated projection source is invalid: {}: {error:?}",
+                projection.source
+            ))
+        });
+    }
     let mut selected: Option<(&SurfaceManifestEntry, &str)> = None;
     for entry in &manifest.entries {
         if !matches!(entry.mode.as_str(), "symlink" | "copy") || entry.source.is_empty() {
@@ -1658,7 +1722,8 @@ pub(crate) fn write_snapshot_jsonl(
 mod tests {
     use super::{
         declaration_identity, diagnostic_identity_json, manifest_lines,
-        resolve_source_relative_target, source_diagnostic,
+        canonicalize_surface_path, resolve_source_relative_target, source_diagnostic,
+        GeneratedProjectionEntry, SurfaceManifestSnapshot,
         source_span, target_path_diagnostic_code,
         TargetPathError, SOURCE_DIAGNOSTIC_SCHEMA,
     };
@@ -1700,7 +1765,7 @@ mod tests {
         assert_eq!(
             resolve_source_relative_target(
                 ".codex/personal/skills/academic-writing/SKILL.md",
-                "../../../agents/canonical/skills.md"
+                "../../../../agents/canonical/skills.md"
             ),
             Ok("agents/canonical/skills.md".to_string())
         );
@@ -1731,6 +1796,36 @@ mod tests {
         assert_eq!(
             target_path_diagnostic_code(TargetPathError::EscapesRoot),
             "target-escapes-root"
+        );
+    }
+
+    #[test]
+    fn generated_skill_projection_uses_tracked_materializer_owner() {
+        let manifest = SurfaceManifestSnapshot {
+            prefix: ".".to_string(),
+            entries: Vec::new(),
+            generated_projections: vec![GeneratedProjectionEntry {
+                path: ".codex/personal/skills/example/SKILL.md".to_string(),
+                source: "agents/skills/example.md".to_string(),
+                projection_producer: "agent-canon-bootstrap".to_string(),
+                projection_kind: "skill_shim".to_string(),
+            }],
+        };
+        assert_eq!(
+            canonicalize_surface_path(
+                &manifest,
+                ".codex/personal/skills/example/SKILL.md"
+            )
+            .expect("generated projection owner"),
+            "agents/skills/example.md"
+        );
+        assert_eq!(
+            canonicalize_surface_path(
+                &manifest,
+                ".codex/personal/skills/removed/SKILL.md"
+            )
+            .expect("unknown generated path remains unresolved"),
+            ".codex/personal/skills/removed/SKILL.md"
         );
     }
 

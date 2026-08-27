@@ -37,6 +37,15 @@ class SurfaceManifestTest(unittest.TestCase):
         self.assertEqual(payload["prefix"], ".")
         self.assertTrue(payload["entries"])
         self.assertTrue(all(entry["mode"] in {"runtime", "tool", "eval"} for entry in payload["entries"]))
+        projections = {entry["path"]: entry for entry in payload["generated_projections"]}
+        self.assertEqual(
+            projections[".codex/personal/skills/agent-orchestration/SKILL.md"]["source"],
+            "agents/skills/agent-orchestration.md",
+        )
+        self.assertEqual(
+            projections[".codex/personal/skills/_chatgpt-codex-routing/SKILL.md"]["source"],
+            "agents/internal-routines/chatgpt-codex-routing.md",
+        )
 
     def test_sync_commands_are_not_exposed(self) -> None:
         result = subprocess.run(

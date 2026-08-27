@@ -4,6 +4,7 @@
 # responsibility Parses and validates AgentCanon-owned standalone runtime surface classification.
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md bootstrap runtime surface policy
 # upstream design ../../documents/runtime/shared-runtime-surfaces.toml machine-readable runtime inventory
+# upstream implementation ./skill_projection_registry.py resolves generated skill-view owner paths
 # downstream implementation ../../rust/agent-canon/src/dependency_manifest.rs consumes normalized source classification
 # downstream implementation ./check_convention_compliance.py validates runtime catalog wiring
 # @dependency-end
@@ -27,6 +28,17 @@ try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
+
+try:
+    from .skill_projection_registry import (
+        GeneratedProjection,
+        generated_skill_projections,
+    )
+except ImportError:  # pragma: no cover - direct script execution
+    from skill_projection_registry import (  # type: ignore[no-redef]
+        GeneratedProjection,
+        generated_skill_projections,
+    )
 
 DEFAULT_MANIFEST = Path("documents/runtime/shared-runtime-surfaces.toml")
 DEFAULT_DOC = Path("documents/runtime/SHARED_RUNTIME_SURFACES.md")
@@ -76,6 +88,7 @@ class SurfaceManifest:
     prefix: str
     surface_selection: SurfaceSelection
     entries: tuple[SurfaceEntry, ...]
+    generated_projections: tuple[GeneratedProjection, ...] = ()
     projection_forbidden_roots: tuple[str, ...] = ()
 
     @property
@@ -186,8 +199,15 @@ def load_manifest(root: Path, prefix: str, raw_manifest: str) -> SurfaceManifest
     paths = [entry.path for entry in entries]
     if len(paths) != len(set(paths)):
         raise ValueError("duplicate surface paths")
+    generated_projections = generated_skill_projections(root)
     forbidden = _list(data, "projection_forbidden_roots")
-    return SurfaceManifest(_string(data, "prefix", default=prefix), _selection(data), entries, forbidden)
+    return SurfaceManifest(
+        _string(data, "prefix", default=prefix),
+        _selection(data),
+        entries,
+        generated_projections,
+        forbidden,
+    )
 
 
 def normalized_snapshot(manifest: SurfaceManifest) -> Mapping[str, object]:
@@ -206,6 +226,15 @@ def normalized_snapshot(manifest: SurfaceManifest) -> Mapping[str, object]:
                 "optional": entry.optional,
             }
             for entry in manifest.entries
+        ],
+        "generated_projections": [
+            {
+                "path": projection.path,
+                "source": projection.source,
+                "projection_producer": projection.projection_producer,
+                "projection_kind": projection.projection_kind,
+            }
+            for projection in manifest.generated_projections
         ],
     }
 
