@@ -129,6 +129,9 @@ TIMING_FIELDS = (
     "other_seconds",
     "total_seconds",
 )
+DECOMPOSED_COST_FIELDS = tuple(
+    field for field in TIMING_FIELDS if field != "total_seconds"
+)
 TRAJECTORY_FIELDS = frozenset(
     {"residual_trajectory", "objective_trajectory", "kkt_trajectory"}
 )
@@ -389,6 +392,7 @@ def _cost_decomposition(
 
 def _result(
     category: str,
+    reason_code: str,
     owner_route: str,
     next_action: str,
     forbidden_writes: Sequence[str],
@@ -398,6 +402,7 @@ def _result(
     return {
         "schema": OUTPUT_SCHEMA,
         "category": category,
+        "reason_code": reason_code,
         "owner_route": owner_route,
         "next_action": next_action,
         "forbidden_writes": list(forbidden_writes),
@@ -422,6 +427,7 @@ def classify(raw: object) -> dict[str, object]:
     if packet["scope"] == "non_numeric":
         return _result(
             "non_numeric",
+            "non_numeric_scope",
             "cpp-review",
             "use the existing native performance review order",
             (),
@@ -443,6 +449,7 @@ def classify(raw: object) -> dict[str, object]:
     if not _complete_numerical_observation(before) or not _complete_numerical_observation(after):
         return _result(
             "evidence_missing",
+            "missing_post_run_evidence",
             "computational-optimization",
             "collect the missing trajectory and cost-decomposition metrics before proposing a JIT or architecture edit",
             FORBIDDEN_NON_MATH_WRITES,
@@ -463,6 +470,7 @@ def classify(raw: object) -> dict[str, object]:
     if context_mismatches:
         return _result(
             "evidence_missing",
+            "comparison_context_mismatch",
             "computational-optimization",
             "rerun or align the same mathematical problem, initial state, stopping policy, dtype, workload, run mode, cache, backend, device, and compiler before attributing a cost to JIT",
             FORBIDDEN_NON_MATH_WRITES,
@@ -490,6 +498,7 @@ def classify(raw: object) -> dict[str, object]:
     if changed_fields:
         return _result(
             "convergence_changed",
+            "convergence_or_work_changed",
             "computational-optimization",
             "repair the mathematical or algorithmic mechanism from the first changed iteration; keep JIT and architecture unchanged",
             FORBIDDEN_NON_MATH_WRITES,
@@ -503,15 +512,21 @@ def classify(raw: object) -> dict[str, object]:
 
     positive_cost_regressions = [
         field
-        for field in TIMING_FIELDS
+        for field in DECOMPOSED_COST_FIELDS
         if float(after[field]) > float(before[field])
     ]
     evidence["positive_cost_regressions"] = positive_cost_regressions
     if not positive_cost_regressions:
+        total_increased = float(after["total_seconds"]) > float(before["total_seconds"])
         return _result(
             "evidence_missing",
+            "unattributed_total" if total_increased else "no_positive_decomposed_regression",
             "computational-optimization",
-            "take no action: the numerical work is equivalent but no positive performance regression was measured",
+            (
+                "collect decomposed component timings: total_seconds is only a summary and cannot attribute a JIT or systems regression"
+                if total_increased
+                else "take no action: the numerical work is equivalent but no positive decomposed performance regression was measured"
+            ),
             FORBIDDEN_NON_MATH_WRITES,
             {
                 "route": "jit-backend-performance",
@@ -523,6 +538,7 @@ def classify(raw: object) -> dict[str, object]:
 
     return _result(
         "systems_cost_isolated",
+        "isolated_decomposed_cost_regression",
         "jit-backend-performance",
         "handoff the isolated compile/JIT or per-iteration systems cost with the numerical record attached; do not edit math sources",
         ("mathematical algorithm", "tolerance / stopping semantics"),
@@ -554,6 +570,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = {
             "schema": OUTPUT_SCHEMA,
             "status": "error",
+            "reason_code": "invalid_input",
             "error": str(exc),
         }
         print(json.dumps(result, ensure_ascii=False, sort_keys=True))

@@ -137,7 +137,8 @@ record は `python3 tools/agent_tools/numeric_performance.py --input
 - 比較 context が違う、finite / non-finite event が欠ける、または work counter が
   変わる場合は `evidence_missing` または math route とし、systems attribution を
   行いません。
-- total time しかない場合は `evidence_missing` として追加 metrics を要求し、
+- total time しかない場合、または total だけが増えて decomposed component が増えて
+  いない場合は `evidence_missing`（`unattributed_total`）として追加 metrics を要求し、
   JIT 境界の変更を提案しません。
 - 数値 solver ではない C++ performance は、既存のこの文書の workload、data
   movement、native benchmark の順序をそのまま使います。数値 solver 用の

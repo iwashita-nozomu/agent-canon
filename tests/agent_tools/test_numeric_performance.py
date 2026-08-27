@@ -187,6 +187,16 @@ def test_identical_times_are_no_action_not_systems() -> None:
     assert result["separate_handoff"]["status"] == "forbidden"
 
 
+def test_total_only_regression_is_unattributed_not_systems() -> None:
+    """A larger summary time cannot attribute a component or authorize JIT."""
+    result = _result(_observation(after_changes={"total_seconds": 2.0}))
+    assert result["category"] == "evidence_missing"
+    assert result["reason_code"] == "unattributed_total"
+    assert result["owner_route"] == "computational-optimization"
+    assert "JIT" in result["forbidden_writes"]
+    assert result["separate_handoff"]["status"] == "forbidden"
+
+
 def test_total_time_only_is_missing_evidence_and_forbids_jit() -> None:
     """Timing without numerical observations remains unresolved."""
     packet = _observation()

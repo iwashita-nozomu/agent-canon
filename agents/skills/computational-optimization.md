@@ -245,7 +245,8 @@ T_{total} = T_{compile/JIT} + N_{iter} \times
 
 `T_iter_eval`、`T_linear_solve`、`T_communication` を可能な範囲で分離し、cold
 compile/JIT、warm execution、transfer / synchronization、algorithmic iteration
-cost を合計時間だけで代用しません。数値側の evidence は residual / objective /
+cost を合計時間だけで代用しません。`total_seconds` は summary であり、帰属可能な
+component ではありません。数値側の evidence は residual / objective /
 KKT trajectory、iteration count、step acceptance / size、termination status、
 conditioning、inner-solver work、finite / non-finite event、および per-iteration
 cost を含めます。正規化と分類は
@@ -266,7 +267,7 @@ cost を含めます。正規化と分類は
 `run_mode`（`cold` / `warm`）、`compile_cache_state`、`backend`、`device`、
 `compiler` は before / after の両方に必要な比較 context です。
 未知の field は受け付けず、欠落した完全比較項目は `evidence_missing` として扱います。
-結果 JSON の `category`、`owner_route`、`next_action`、`forbidden_writes`、
+結果 JSON の `category`、`reason_code`、`owner_route`、`next_action`、`forbidden_writes`、
 `separate_handoff` をそのまま handoff に渡し、agent が prose から別の owner や
 JIT 編集を推測しません。
 
@@ -276,14 +277,15 @@ JIT 編集を推測しません。
 | --- | --- | --- |
 | `convergence_changed` | trajectory、iteration count、residual / objective / KKT、step acceptance / size、termination、conditioning、または inner-solver work のいずれかが変化 | `computational-optimization` の数学 / algorithm owner。JIT、architecture、backend、compiler、runtime writer はこの math route から起動しない |
 | `systems_cost_isolated` | 数値 trajectory、KKT / finite state、iteration / work counters、termination、conditioning、inner-solver work、比較 context が同値で、compile/JIT、per-iteration、eval / linear-solve、transfer / synchronization、または total cost の少なくとも一つに after 側の正の回帰がある | JIT / backend / systems performance の sibling handoff。math writer はその surface を編集しない |
-| `evidence_missing` | total time だけ、分解・trajectory・KKT / finite state・work counters・比較 context の一部が欠落、context が不一致、または数値 work が同じで正の回帰がない | 未解決または no-action。JIT / architecture の修正へ進まず、必要な run evidence を集める |
+| `evidence_missing` | total time だけ、分解・trajectory・KKT / finite state・work counters・比較 context の一部が欠落、context が不一致、数値 work が同じで正の component 回帰がない、または total だけが増加（`reason_code=unattributed_total`） | 未解決または no-action。JIT / architecture の修正へ進まず、必要な run evidence を集める |
 | `non_numeric` | solver / iterative numerical semantics を含まない native performance | 既存の `cpp-review` performance route。数値 decomposition を追加要求しない |
 
 iteration count の増加、residual / objective trajectory の悪化、rejected step、
 conditioning の悪化、または inner solver work の増加は、JIT 境界の変更ではなく
 数学 / algorithm の原因候補です。逆に `systems_cost_isolated` は数値 trajectory
 が保たれ、比較 context が一致し、かつ measured cost の正の回帰がある場合だけ成立
-します。compile/JIT の印象、total-time-only、context mismatch、同一時間の観測では
+します。compile/JIT の印象、total-time-only、context mismatch、同一時間、または
+component が変わらず `total_seconds` だけ増えた観測では
 成立しません。`trajectory_tolerance` は residual / objective / KKT trajectory に
 だけ適用し、work counters、termination、context、cost の差を許容する根拠にしません。
 どの classification でも tolerance、stopping rule、case mix、数値

@@ -183,6 +183,7 @@ T_{total} = T_{compile/JIT} + N_{iter} \times
 (T_{iter\_eval} + T_{linear\_solve} + T_{communication}) + T_{other}.
 \]
 
+`total_seconds` は summary であり、単独では component の帰属根拠になりません。
 total time だけでなく、residual / objective / KKT trajectory、iteration count、
 step acceptance / size、termination status、conditioning、inner-solver work、
 objective / gradient / eval / linear-solve / matvec work counters、finite / non-finite
@@ -194,7 +195,8 @@ events、per-iteration cost、cold compile/JIT と warm execution、transfer / s
 返し、JIT / backend / architecture を変更しません。同じ trajectory、iteration
 count、termination、conditioning、inner-solver work、per-iteration numerical work
 が保たれ、compile/JIT または systems cost だけが分離された場合に限って、その
-sibling owner へ handoff します。証拠が不足する場合は `evidence_missing` として
+sibling owner へ handoff します。total だけが増えて component が増えていない場合は
+`evidence_missing` / `unattributed_total` として扱います。証拠が不足する場合は `evidence_missing` として
 metrics collection を残し、JIT 修正へ進みません。比較 context
 （mathematical problem、initial state、stopping policy、dtype、workload、cold / warm、
 compile cache、backend、device、compiler）が before / after で一致しない場合も
