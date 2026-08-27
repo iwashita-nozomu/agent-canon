@@ -184,6 +184,12 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             (published / "43.json").write_text(
                 json.dumps(value) + "\n", encoding="utf-8"
             )
+            value["number"] = "44"
+            value["url"] = "https://github.com/owner/repo/issues/44"
+            value["state"] = "pending"
+            (published / "44.json").write_text(
+                json.dumps(value) + "\n", encoding="utf-8"
+            )
             receipts = read_issue_publication_receipts(root, self.runtime_root)
 
         self.assertEqual(receipts, ())

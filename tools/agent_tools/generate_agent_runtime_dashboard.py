@@ -52,6 +52,7 @@ from issue_sync import (  # noqa: E402
     IssueSyncError,
     IssueWorkerHandoff,
     normalize_repository,
+    normalize_issue_state,
     parse_issue_reference,
     qualify_issue_worker_finding,
 )
@@ -1341,6 +1342,7 @@ def read_issue_publication_receipts(
                 continue
             try:
                 reference = parse_issue_reference(url, repository)
+                state = normalize_issue_state(str(value.get("state") or ""))
             except IssueSyncError:
                 continue
             if reference.repo != repository or reference.number != number:
@@ -1357,7 +1359,7 @@ def read_issue_publication_receipts(
                 repository=repository,
                 number=number,
                 url=url,
-                state=str(value.get("state") or ""),
+                state=state,
                 action=action,
                 responsibility=_receipt_strings(value.get("responsibility")),
                 occurrence_locations=_receipt_strings(value.get("occurrence_locations")),

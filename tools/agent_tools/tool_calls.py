@@ -53,6 +53,92 @@ ROUTE_TOOL_CALL_ARGUMENT_SCHEMA = "agent-canon.route.args.v1"
 SUBAGENT_SPAWN_TOOL_CALL_ARGUMENT_SCHEMA = "agent-canon.spawn-agent.args.v1"
 
 
+def build_issue_receipt_stage_command(
+    *,
+    repository: str,
+    runtime_root: str = "<runtime-root>",
+    source_root: str = "<source-root>",
+    control_parent_root: str = "<control-parent-root>",
+    checkout_identity: Mapping[str, object] | None = None,
+    number: str = "<issue-number>",
+    url: str = "<issue-url>",
+    state: str = "<issue-state>",
+    action: str = "<issue-action>",
+    responsibility: Sequence[str] = (),
+    occurrence_locations: Sequence[str] = (),
+    source_finding_kind: str = "",
+    execution: str = "run",
+    bootstrap: str = "./bootstrap.sh",
+    preflight: bool = False,
+) -> tuple[str, ...]:
+    """Build the canonical container command for post-publication staging."""
+    if execution not in {"run", "exec"}:
+        raise ValueError("receipt staging execution must be run or exec")
+    if not repository.strip():
+        raise ValueError("receipt staging repository is required")
+    state_value = state.strip().casefold()
+    if (
+        state_value not in {"open", "closed"}
+        and not state_value.startswith("<")
+        and not preflight
+    ):
+        raise ValueError("receipt staging state must be open or closed")
+    if (
+        not preflight
+        and action not in {"create", "update", "reopen", "reorganize", "noop"}
+        and not action.startswith("<")
+    ):
+        raise ValueError("receipt staging action is invalid")
+    command: list[str] = [
+        bootstrap,
+        "--control-parent-root",
+        control_parent_root,
+        "--runtime-root",
+        runtime_root,
+        "tool",
+        execution,
+        "--root",
+        source_root,
+        "issue_sync",
+        "--",
+        "--receipt-preflight" if preflight else "--stage-publication-receipt",
+        "--runtime-root",
+        runtime_root,
+    ]
+    if not preflight:
+        command.extend(
+            (
+                "--repo",
+                repository,
+                "--receipt-number",
+                number,
+                "--receipt-url",
+                url,
+                "--receipt-state",
+                state_value,
+                "--receipt-action",
+                action,
+            )
+        )
+    identity = checkout_identity or {}
+    checkout_head = str(identity.get("head") or "").strip()
+    checkout_root = str(identity.get("git_root") or "").strip()
+    checkout_remote = str(identity.get("remote") or "").strip()
+    if checkout_head:
+        command.extend(("--checkout-head", checkout_head))
+    if checkout_root:
+        command.extend(("--checkout-root", checkout_root))
+    if checkout_remote:
+        command.extend(("--checkout-repository", checkout_remote))
+    for value in responsibility:
+        command.extend(("--receipt-responsibility", value))
+    for value in occurrence_locations:
+        command.extend(("--receipt-occurrence-location", value))
+    if source_finding_kind:
+        command.extend(("--receipt-source-finding-kind", source_finding_kind))
+    return tuple(command)
+
+
 def materialize_tool_call_token(
     *,
     tool_id: str,
@@ -183,6 +269,10 @@ def materialize_issue_worker_tool_call(
     handoff: Mapping[str, object],
     publisher_agent_id: str,
     checkout_repository: str,
+    checkout_identity: Mapping[str, object] | None = None,
+    runtime_root: str = "<runtime-root>",
+    source_root: str = "<source-root>",
+    control_parent_root: str = "<control-parent-root>",
 ) -> dict[str, object]:
     """Return a host-publisher ToolCall for one typed IssueWorker handoff."""
     if not publisher_agent_id.strip() or not checkout_repository.strip():
@@ -196,15 +286,30 @@ def materialize_issue_worker_tool_call(
             "publisher_agent_id": {"type": "string", "minLength": 1},
             "checkout_repository": {"type": "string", "minLength": 1},
             "handoff": {"type": "object"},
+            "receipt_stage_command": {
+                "type": "array",
+                "items": {"type": "string", "minLength": 1},
+                "minItems": 1,
+            },
         },
         arguments={
             "publisher_agent_id": publisher_agent_id,
             "checkout_repository": checkout_repository,
             "handoff": dict(handoff),
+            "receipt_stage_command": list(
+                build_issue_receipt_stage_command(
+                    repository=checkout_repository,
+                    runtime_root=runtime_root,
+                    source_root=source_root,
+                    control_parent_root=control_parent_root,
+                    checkout_identity=checkout_identity,
+                )
+            ),
         },
         intent=(
             "Run IssueWorker plan and publication through the host publisher; "
-            "read back URL, number, body, and state."
+            "read back URL, number, body, and state, then execute the resident "
+            "receipt staging command before pending packet consumption."
         ),
         typed_failure_semantics=(
             {

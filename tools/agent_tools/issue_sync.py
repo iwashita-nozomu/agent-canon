@@ -88,6 +88,14 @@ def normalize_repository(value: str) -> str:
     return text.casefold()
 
 
+def normalize_issue_state(value: str) -> str:
+    """Normalize GitHub Issue state to the exact ``open``/``closed`` set."""
+    state = value.strip().casefold()
+    if state not in {"open", "closed"}:
+        raise IssueSyncError("issue_state_invalid", "GitHub Issue state must be open or closed")
+    return state
+
+
 class IssueSyncError(RuntimeError):
     """Raised for a typed GitHub/packet boundary failure."""
 
@@ -149,37 +157,49 @@ class IssueSyncReport:
 
 
 @dataclass(frozen=True)
-class ResidentReceiptStager:
-    """Injected resident-container route for body-free receipt staging."""
+class ContainerReceiptStager:
+    """Injected executable container route for body-free receipt staging."""
 
-    runtime_root: Path
-    checkout_identity: object | None = None
-    source_root: Path | None = None
+    command_builder: object
+    preflight_command: Sequence[str]
+    command_runner: object
+
+    def _run(self, command: Sequence[str], failure_code: str) -> object:
+        runner = self.command_runner
+        if not callable(runner):
+            raise IssueSyncError("issue_receipt_route_unavailable", "container command runner is unavailable")
+        try:
+            result = runner(tuple(command))
+        except Exception as exc:
+            raise IssueSyncError(failure_code, "container receipt command could not execute") from exc
+        returncode = getattr(result, "returncode", result)
+        if returncode != 0:
+            raise IssueSyncError(failure_code, "container receipt command failed")
+        return result
 
     def preflight(self) -> None:
-        """Verify the external runtime/spool route before GitHub mutation."""
-        root = _runtime_root(self.runtime_root)
-        _ensure_private_feedback_sync_request(
-            root,
-            checkout_identity=self.checkout_identity,
-            source_root=self.source_root,
-        )
+        """Execute the resident route preflight before GitHub mutation."""
+        if not callable(self.command_builder) or not self.preflight_command:
+            raise IssueSyncError("issue_receipt_route_unavailable", "container receipt command is unavailable")
+        self._run(self.preflight_command, "issue_receipt_route_unavailable")
 
     def __call__(
         self,
         record: GitHubIssueRecord,
         action: str,
         handoff: IssueWorkerHandoff,
-    ) -> Path:
-        """Stage one receipt through the resident private-feedback route."""
-        return stage_issue_publication_receipt(
-            self.runtime_root,
-            record,
-            action=action,
-            handoff=handoff,
-            checkout_identity=self.checkout_identity,
-            source_root=self.source_root,
-        )
+    ) -> object:
+        """Execute the resident command after GitHub readback."""
+        builder = self.command_builder
+        if not callable(builder):
+            raise IssueSyncError("issue_receipt_route_unavailable", "container receipt command builder is unavailable")
+        try:
+            command = builder(record, action, handoff)
+        except Exception as exc:
+            raise IssueSyncError("issue_receipt_route_unavailable", "container receipt command could not be built") from exc
+        if not isinstance(command, (tuple, list)) or not command:
+            raise IssueSyncError("issue_receipt_route_unavailable", "container receipt command is empty")
+        return self._run(tuple(command), "issue_receipt_write_failed")
 
 
 def _issue_publication_repo_path(repository: str) -> tuple[str, str]:
@@ -254,14 +274,12 @@ def _issue_publication_receipt_payload(
     value = source_finding_kind
     if not value and handoff is not None:
         value = handoff.source_finding_kind
-    responsibility = list(handoff.responsibility) if handoff is not None else []
-    if handoff is not None and handoff.fix and handoff.fix not in responsibility:
-        responsibility.append(handoff.fix)
+    responsibility = list(_receipt_responsibility(handoff))
     return {
         "repository": repository,
         "number": str(record.number),
         "url": record.url,
-        "state": record.state,
+        "state": normalize_issue_state(record.state),
         "action": action,
         "responsibility": responsibility,
         "occurrence_locations": list(handoff.occurrence_locations) if handoff is not None else [],
@@ -269,6 +287,18 @@ def _issue_publication_receipt_payload(
         "timestamp": timestamp
         or datetime.now(UTC).isoformat().replace("+00:00", "Z"),
     }
+
+
+def _receipt_responsibility(
+    handoff: IssueWorkerHandoff | None,
+) -> tuple[str, ...]:
+    """Return the exact responsibility tuple persisted in a receipt."""
+    if handoff is None:
+        return ()
+    values = list(handoff.responsibility)
+    if handoff.fix and handoff.fix not in values:
+        values.append(handoff.fix)
+    return tuple(values)
 
 
 def write_issue_publication_receipt(
@@ -425,6 +455,8 @@ def read_issue_publication_receipt(
         raise IssueSyncError("issue_receipt_invalid", "publication receipt values are invalid")
     if payload["action"] not in {"create", "update", "reopen", "reorganize", "noop"}:
         raise IssueSyncError("issue_receipt_invalid", "publication receipt action is invalid")
+    if payload["state"] != normalize_issue_state(str(payload["state"])):
+        raise IssueSyncError("issue_receipt_invalid", "publication receipt state is not canonical")
     identity = parse_issue_reference(str(payload.get("url") or ""), repository)
     if identity.repo != normalize_repository(repository) or identity.number != str(number):
         raise IssueSyncError("issue_receipt_identity_mismatch", "publication receipt identity differs")
@@ -445,11 +477,7 @@ def find_issue_publication_receipt(
         receipt = read_issue_publication_receipt(log_root, repository, number)
         if receipt is None or handoff is None:
             return receipt
-        expected_responsibility = (
-            (*handoff.responsibility, handoff.fix)
-            if handoff.fix and handoff.fix not in handoff.responsibility
-            else handoff.responsibility
-        )
+        expected_responsibility = _receipt_responsibility(handoff)
         if (
             tuple(receipt.get("responsibility", ())) != expected_responsibility
             or tuple(receipt.get("occurrence_locations", ())) != handoff.occurrence_locations
@@ -461,11 +489,7 @@ def find_issue_publication_receipt(
     if not published.is_dir() or published.is_symlink():
         return None
     matches: list[dict[str, object]] = []
-    expected_responsibility = (
-        (*handoff.responsibility, handoff.fix)
-        if handoff is not None and handoff.fix and handoff.fix not in handoff.responsibility
-        else handoff.responsibility if handoff is not None else ()
-    )
+    expected_responsibility = _receipt_responsibility(handoff)
     for path in sorted(published.rglob("*.json")):
         if path.is_symlink() or not path.is_file():
             continue
@@ -656,6 +680,85 @@ def stage_issue_publication_receipt(
         source_finding_kind=source_finding_kind,
         timestamp=timestamp,
     )
+
+
+def build_container_receipt_stager(
+    *,
+    runtime_root: Path,
+    checkout_identity: object | None = None,
+    source_root: Path | None = None,
+    command_runner: object = subprocess.run,
+    bootstrap: str | None = None,
+    execution: str = "run",
+) -> ContainerReceiptStager:
+    """Build the executable resident-container receipt route."""
+    try:
+        from .tool_calls import build_issue_receipt_stage_command
+    except ImportError:  # pragma: no cover - direct script execution
+        from tool_calls import build_issue_receipt_stage_command
+
+    identity = (
+        checkout_identity.as_dict()
+        if hasattr(checkout_identity, "as_dict")
+        else dict(checkout_identity)
+        if isinstance(checkout_identity, Mapping)
+        else {}
+    )
+    root = _runtime_root(runtime_root)
+    bootstrap_path = bootstrap or os.environ.get("AGENT_CANON_BOOTSTRAP", "").strip()
+    if not bootstrap_path:
+        bootstrap_path = str(Path(__file__).resolve().parents[2] / "bootstrap.sh")
+    project_root = source_root or Path(str(identity.get("git_root") or Path.cwd()))
+    control_parent = os.environ.get(
+        "AGENT_CANON_CONTROL_PARENT_ROOT", "<control-parent-root>"
+    )
+
+    def command_builder(
+        record: GitHubIssueRecord,
+        action: str,
+        handoff: IssueWorkerHandoff,
+    ) -> tuple[str, ...]:
+        return build_issue_receipt_stage_command(
+            repository=record.repository,
+            runtime_root=str(root),
+            source_root=str(project_root),
+            control_parent_root=control_parent,
+            checkout_identity=identity,
+            number=record.number,
+            url=record.url,
+            state=record.state,
+            action=action,
+            responsibility=_receipt_responsibility(handoff),
+            occurrence_locations=handoff.occurrence_locations,
+            source_finding_kind=handoff.source_finding_kind,
+            execution=execution,
+            bootstrap=bootstrap_path,
+        )
+
+    preflight_command = build_issue_receipt_stage_command(
+        repository=str(identity.get("remote") or "<checkout-repository>"),
+        runtime_root=str(root),
+        source_root=str(project_root),
+        control_parent_root=control_parent,
+        checkout_identity=identity,
+        execution=execution,
+        bootstrap=bootstrap_path,
+        preflight=True,
+    )
+
+    def run(command: Sequence[str]) -> object:
+        if command_runner is subprocess.run:
+            return subprocess.run(
+                list(command),
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        if not callable(command_runner):
+            raise IssueSyncError("issue_receipt_route_unavailable", "container command runner is unavailable")
+        return command_runner(tuple(command))
+
+    return ContainerReceiptStager(command_builder, preflight_command, run)
 
 
 @dataclass(frozen=True)
@@ -1092,7 +1195,7 @@ class IssueWorker:
         body_digest: str = "",
         run: str = "",
         task: str = "",
-        receipt_stager: ResidentReceiptStager | object | None = None,
+        receipt_stager: ContainerReceiptStager | object | None = None,
         allow_create: bool = True,
     ) -> GitHubIssueRecord:
         """Publish and enqueue a metadata-only retry packet on failure."""
@@ -1354,12 +1457,19 @@ class GitHubIssueClient:
             value = json.loads(result.stdout)
         except json.JSONDecodeError as exc:
             raise IssueSyncError("github_readback_invalid", "gh returned invalid Issue JSON") from exc
+        try:
+            state = normalize_issue_state(str(value.get("state") or ""))
+        except IssueSyncError as exc:
+            raise IssueSyncError(
+                "github_readback_invalid",
+                "GitHub returned an unsupported Issue state",
+            ) from exc
         return GitHubIssueRecord(
             repository=self._repo(reference),
             number=str(value.get("number") or reference.number),
             title=str(value.get("title") or ""),
             body=str(value.get("body") or ""),
-            state=str(value.get("state") or ""),
+            state=state,
             url=str(value.get("url") or reference.url),
         )
 
@@ -1532,6 +1642,7 @@ def sync_pending_packet(
     *,
     checkout_identity: object | None = None,
     runtime_root: Path | None = None,
+    receipt_stager: ContainerReceiptStager | object | None = None,
 ) -> GitHubIssueRecord:
     """Publish one packet through the host adapter and remove it after readback."""
     try:
@@ -1565,11 +1676,19 @@ def sync_pending_packet(
     configured_runtime = _runtime_root(configured_runtime)
     receipt_root = configured_runtime / PRIVATE_FEEDBACK_SPOOL_RELATIVE
     identity_root = _checkout_identity_value(checkout_identity, "git_root")
-    receipt_stager = ResidentReceiptStager(
-        configured_runtime,
-        checkout_identity=checkout_identity,
-        source_root=Path(identity_root) if identity_root and identity_root != "unknown" else Path.cwd(),
-    )
+    if receipt_stager is None:
+        receipt_stager = build_container_receipt_stager(
+            runtime_root=configured_runtime,
+            checkout_identity=checkout_identity,
+            source_root=Path(identity_root)
+            if identity_root and identity_root != "unknown"
+            else Path.cwd(),
+        )
+    if not callable(receipt_stager) or not callable(getattr(receipt_stager, "preflight", None)):
+        raise IssueSyncError(
+            "issue_receipt_route_unavailable",
+            "injected container receipt stager is unavailable",
+        )
     receipt_stager.preflight()
     raw_handoff = payload.get("handoff")
     handoff = (
@@ -1741,6 +1860,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Stage a body-free publication receipt in the resident private-feedback spool.",
     )
+    parser.add_argument(
+        "--receipt-preflight",
+        action="store_true",
+        help="Verify the resident receipt route without publishing a receipt.",
+    )
     parser.add_argument("--receipt-number")
     parser.add_argument("--receipt-url")
     parser.add_argument("--receipt-state", default="")
@@ -1749,12 +1873,29 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--receipt-occurrence-location", action="append", default=[])
     parser.add_argument("--receipt-source-finding-kind", default="")
     parser.add_argument("--receipt-timestamp")
+    parser.add_argument("--checkout-head", default="")
+    parser.add_argument("--checkout-root", type=Path)
+    parser.add_argument("--checkout-repository", default="")
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if args.receipt_preflight:
+            root = _runtime_root(args.runtime_root)
+            checkout_identity = {
+                "head": args.checkout_head,
+                "git_root": str(args.checkout_root) if args.checkout_root else "",
+                "remote": args.checkout_repository,
+            }
+            _ensure_private_feedback_sync_request(
+                root,
+                checkout_identity=checkout_identity,
+                source_root=args.checkout_root,
+            )
+            print(json.dumps({"status": "preflight", "runtime_root": str(root)}, sort_keys=True))
+            return 0
         if args.stage_publication_receipt:
             required = (
                 args.repo,
@@ -1777,6 +1918,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 responsibility=tuple(args.receipt_responsibility),
                 source_finding_kind=args.receipt_source_finding_kind,
             )
+            checkout_identity = {
+                "head": args.checkout_head,
+                "git_root": str(args.checkout_root) if args.checkout_root else "",
+                "remote": args.checkout_repository,
+            }
+            if args.checkout_repository and normalize_repository(args.checkout_repository) != normalize_repository(args.repo):
+                raise IssueSyncError(
+                    "checkout-repository-mismatch",
+                    "receipt staging checkout repository differs from Issue repository",
+                )
             record = GitHubIssueRecord(
                 repository=normalize_repository(args.repo),
                 number=str(args.receipt_number),
@@ -1791,6 +1942,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 action=args.receipt_action,
                 handoff=handoff,
                 timestamp=args.receipt_timestamp,
+                checkout_identity=checkout_identity,
+                source_root=args.checkout_root,
             )
             print(json.dumps({"status": "staged", "receipt": str(path)}, sort_keys=True))
             return 0

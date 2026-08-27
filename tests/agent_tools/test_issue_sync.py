@@ -49,6 +49,13 @@ def test_github_record_and_clause_projection_preserve_repository_identity() -> N
     assert clauses[2]["state"] == "advisory"
 
 
+def test_issue_state_is_normalized_to_open_or_closed() -> None:
+    assert issue_sync.normalize_issue_state("OPEN") == "open"
+    assert issue_sync.normalize_issue_state("closed") == "closed"
+    with pytest.raises(issue_sync.IssueSyncError, match="issue_state_invalid"):
+        issue_sync.normalize_issue_state("pending")
+
+
 def test_offline_packet_contains_locator_and_digest_but_not_body(tmp_path: Path) -> None:
     body = tmp_path / "private-body.md"
     body.write_text("private body must stay private\n", encoding="utf-8")
@@ -92,6 +99,7 @@ def test_pending_packet_online_create_readback_removes_packet(tmp_path: Path) ->
             client,
             checkout_identity={"remote": "owner/repo"},
             runtime_root=tmp_path / "runtime",
+            receipt_stager=_spooling_stager(tmp_path / "runtime"),
         )
     assert result.url.endswith("/42")
     create.assert_called_once_with("owner/repo", "Online packet", "Issue body\n")
@@ -122,6 +130,9 @@ def test_pending_packet_success_writes_body_free_publication_receipt(tmp_path: P
             client,
             checkout_identity={"remote": "owner/repo"},
             runtime_root=tmp_path / "runtime",
+            receipt_stager=_spooling_stager(
+                tmp_path / "runtime", source_finding_kind="recurrent-failure"
+            ),
         )
     receipt_path = issue_sync.issue_publication_receipt_spool_path(
         tmp_path / "runtime", "owner/repo", "42"
@@ -205,6 +216,50 @@ def test_stage_publication_receipt_cli_is_body_free(tmp_path: Path, capsys: pyte
     output = capsys.readouterr().out
     assert '"status": "staged"' in output
     assert "body" not in output
+
+
+def test_container_receipt_stager_runs_resident_cli_argv(tmp_path: Path) -> None:
+    record = issue_sync.GitHubIssueRecord(
+        repository="owner/repo", number="49", title="Receipt", body="private",
+        state="OPEN", url="https://github.com/owner/repo/issues/49",
+    )
+    handoff = issue_sync.qualify_issue_worker_finding(
+        _qualified_finding(finding_kind="recurrent-failure"),
+        authenticated_repository="owner/repo",
+    )
+    commands: list[tuple[str, ...]] = []
+
+    def runner(command: tuple[str, ...]) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        inner = command[command.index("--") + 1 :]
+        return subprocess.CompletedProcess(
+            command,
+            issue_sync.main(inner),
+            "",
+            "",
+        )
+
+    stager = issue_sync.build_container_receipt_stager(
+        runtime_root=tmp_path / "runtime",
+        checkout_identity={
+            "git_root": str(PROJECT_ROOT),
+            "head": subprocess.check_output(
+                ["git", "-C", str(PROJECT_ROOT), "rev-parse", "HEAD"],
+                text=True,
+            ).strip(),
+            "remote": "owner/repo",
+        },
+        source_root=PROJECT_ROOT,
+        command_runner=runner,
+    )
+    stager.preflight()
+    stager(record, "create", handoff)
+    assert len(commands) == 2
+    assert "--receipt-preflight" in commands[0]
+    assert "--stage-publication-receipt" in commands[1]
+    assert issue_sync.issue_publication_receipt_spool_path(
+        tmp_path / "runtime", "owner/repo", "49"
+    ).is_file()
 
 
 def test_publication_receipt_replace_failure_preserves_prior_receipt(
@@ -323,6 +378,11 @@ def test_pending_packet_receipt_failure_retains_packet(tmp_path: Path) -> None:
         url="https://github.com/owner/repo/issues/43",
     )
     client = issue_sync.GitHubIssueClient("owner/repo")
+    stager = _FakeReceiptStager(
+        lambda record, action, handoff: issue_sync.stage_issue_publication_receipt(
+            tmp_path / "runtime", record, action=action, handoff=handoff
+        )
+    )
     with (
         patch.object(client, "create", return_value=record),
         patch.object(
@@ -339,6 +399,7 @@ def test_pending_packet_receipt_failure_retains_packet(tmp_path: Path) -> None:
             client,
             checkout_identity={"remote": "owner/repo"},
             runtime_root=tmp_path / "runtime",
+            receipt_stager=stager,
         )
     assert packet.exists()
     assert not (tmp_path / "runtime" / "spool" / "private-feedback" / "feedback" / "issue-packets" / "published").exists()
@@ -567,8 +628,9 @@ class _SearchingIssueWorkerClient(_SuccessfulIssueWorkerClient):
 
 
 class _FakeReceiptStager:
-    def __init__(self, *, fail_preflight: bool = False) -> None:
+    def __init__(self, callback: object = None, *, fail_preflight: bool = False) -> None:
         self.fail_preflight = fail_preflight
+        self.callback = callback
         self.preflight_calls = 0
         self.receipts: list[tuple[str, str]] = []
 
@@ -586,6 +648,25 @@ class _FakeReceiptStager:
         handoff: issue_sync.IssueWorkerHandoff,
     ) -> None:
         self.receipts.append((record.url, action))
+        if callable(self.callback):
+            self.callback(record, action, handoff)
+
+
+def _spooling_stager(runtime: Path, *, source_finding_kind: str = "") -> _FakeReceiptStager:
+    def callback(
+        record: issue_sync.GitHubIssueRecord,
+        action: str,
+        handoff: issue_sync.IssueWorkerHandoff,
+    ) -> None:
+        issue_sync.stage_issue_publication_receipt(
+            runtime,
+            record,
+            action=action,
+            handoff=handoff,
+            source_finding_kind=source_finding_kind,
+        )
+
+    return _FakeReceiptStager(callback)
 
 def test_issue_worker_reorganization_removes_transferred_clause_and_adds_backlinks(tmp_path: Path) -> None:
     handoff = issue_sync.qualify_issue_worker_finding(
@@ -608,7 +689,7 @@ def test_issue_worker_reorganization_removes_transferred_clause_and_adds_backlin
         title="route",
         body=destination.body,
         related_issues=(source, destination),
-        receipt_stager=issue_sync.ResidentReceiptStager(tmp_path / "runtime"),
+        receipt_stager=_FakeReceiptStager(),
     )
     assert result.state == "OPEN"
     assert issue_sync.parse_sections(client.records["1"].body).get("finding", "") == ""
@@ -618,7 +699,7 @@ def test_issue_worker_reorganization_removes_transferred_clause_and_adds_backlin
     assert client.calls.count(("edit", "1")) == 1
 
 
-def test_issue_worker_uses_injected_resident_receipt_stager(tmp_path: Path) -> None:
+def test_issue_worker_uses_injected_container_receipt_stager(tmp_path: Path) -> None:
     handoff = issue_sync.qualify_issue_worker_finding(
         _qualified_finding(), authenticated_repository="owner/repo"
     )
@@ -683,6 +764,7 @@ def test_retry_searches_existing_issue_before_create_and_records_noop(tmp_path: 
         client,
         checkout_identity={"remote": "owner/repo"},
         runtime_root=tmp_path / "runtime",
+        receipt_stager=_spooling_stager(tmp_path / "runtime"),
     )
     assert result.number == "42"
     assert client.search_calls == 1
@@ -718,6 +800,7 @@ def test_retry_without_exact_search_result_remains_pending_without_create(tmp_pa
             client,
             checkout_identity={"remote": "owner/repo"},
             runtime_root=tmp_path / "runtime",
+            receipt_stager=_FakeReceiptStager(),
         )
     assert packet.exists()
     assert client.calls == []
@@ -741,7 +824,7 @@ def test_issue_worker_foreign_related_issue_is_handoff_relation_without_mutation
         title="route",
         body=local.body,
         related_issues=(local, foreign),
-        receipt_stager=issue_sync.ResidentReceiptStager(tmp_path / "runtime"),
+        receipt_stager=_FakeReceiptStager(),
     )
     assert result.number == "2"
     assert client.calls == [("edit", "2")]
@@ -833,6 +916,7 @@ def test_issue_worker_retry_packet_returns_through_issue_worker_route(tmp_path: 
         _SearchingIssueWorkerClient((existing,)),
         checkout_identity={"remote": "owner/repo"},
         runtime_root=tmp_path / "runtime",
+        receipt_stager=_spooling_stager(tmp_path / "runtime"),
     )
     assert result.url.endswith("/42")
     assert not packet.exists()
