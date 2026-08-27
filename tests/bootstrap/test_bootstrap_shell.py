@@ -2147,6 +2147,147 @@ def test_public_clean_install_materializes_source_view_and_first_target(
     ) == 1
 
 
+def test_clean_install_failure_restores_resident_and_lifecycle_state(
+    tmp_path: Path,
+) -> None:
+    """A failed replacement restores the pre-install resident and lifecycle."""
+    home = tmp_path / "home"
+    home.mkdir()
+    origin = tmp_path / "origin.git"
+    publisher = tmp_path / "publisher"
+    subprocess.run(
+        ["git", "init", "--bare", str(origin)], check=True, capture_output=True
+    )
+    subprocess.run(
+        ["git", "clone", "--no-hardlinks", str(ROOT), str(publisher)],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(publisher), "push", str(origin), "HEAD:refs/heads/main"],
+        check=True,
+        capture_output=True,
+    )
+    repository = home / "agent-canon"
+    subprocess.run(
+        ["git", "clone", "--no-hardlinks", str(origin), str(repository)],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "branch", "-M", "main"],
+        check=True,
+        capture_output=True,
+    )
+
+    fake_state = tmp_path / "docker-state.json"
+    calls = tmp_path / "docker.calls"
+    fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
+    legacy_runtime = home / "workspace" / "agent-canon-runtime" / "host"
+    environment = {
+        **os.environ,
+        "HOME": str(home),
+        "AGENT_CANON_DOCKER": str(fake_docker),
+        "FAKE_DOCKER_STATE": str(fake_state),
+        "FAKE_DOCKER_CALLS": str(calls),
+        "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
+    }
+    common = [
+        str(BOOTSTRAP),
+        "--repository-root",
+        str(repository),
+        "--control-parent-root",
+        str(home),
+        "--runtime-root",
+        str(legacy_runtime),
+    ]
+
+    installed = subprocess.run(
+        [*common, "install"], check=False, capture_output=True, text=True, env=environment
+    )
+    assert installed.returncode == 0, installed.stderr
+
+    runtime = repository / ".runtime"
+    state_root = runtime / "container-state"
+    active_image = runtime / "host-state" / "active-image.tsv"
+    active_values = dict(
+        line.split("\t", 1)
+        for line in active_image.read_text(encoding="utf-8").splitlines()
+    )
+    container_name = "agent-canon-tools-" + hashlib.sha256(
+        str(home.resolve()).encode("utf-8")
+    ).hexdigest()[:16]
+    before = json.loads(fake_state.read_text(encoding="utf-8"))
+    old_resident = before["containers"][container_name]
+    old_image_ref = active_values["image-ref"]
+    old_image_id = active_values["image-id"]
+    assert old_resident["Config"]["Image"] == old_image_ref
+
+    foreign_ref = "foreign-tools:keep"
+    foreign_record = {
+        "Id": "sha256:" + "f" * 64,
+        "RepoTags": [foreign_ref],
+        "Config": {"Labels": {}},
+        "SourceRoot": str(ROOT),
+    }
+    before["images"][foreign_ref] = foreign_record
+    fake_state.write_text(json.dumps(before), encoding="utf-8")
+    lifecycle_paths = [
+        state_root / "state.json",
+        state_root / "owner.json",
+        state_root / "mounts.toml",
+        state_root / "mounts.tsv",
+        active_image,
+    ]
+    lifecycle_before = {
+        path.relative_to(runtime).as_posix(): path.read_bytes() if path.exists() else None
+        for path in lifecycle_paths
+    }
+
+    failed = subprocess.run(
+        [*common, "install"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **environment,
+            "FAKE_DOCKER_FAIL_CONTROLLER_OPERATION": "install",
+            "FAKE_DOCKER_FAIL_CONTROLLER_RC": "41",
+        },
+    )
+    assert failed.returncode != 0
+
+    after = json.loads(fake_state.read_text(encoding="utf-8"))
+    restored = after["containers"][container_name]
+    assert restored["Config"]["Image"] == old_image_ref
+    assert restored["Config"]["Labels"] == old_resident["Config"]["Labels"]
+    assert restored["Mounts"] == old_resident["Mounts"]
+    assert restored["HostConfig"] == old_resident["HostConfig"]
+    assert restored["State"]["Running"] is True
+    assert restored["State"]["Health"]["Status"] == "healthy"
+    for relative, content in lifecycle_before.items():
+        path = runtime / relative
+        if content is None:
+            assert not path.exists()
+        else:
+            assert path.read_bytes() == content
+    assert not (state_root / "rollback-plan.tsv").exists()
+    assert not (state_root / ".pending-rollback-plan.tsv").exists()
+
+    rollback_refs = [
+        fields[2]
+        for fields in (
+            line.split("\t")
+            for line in calls.read_text(encoding="utf-8").splitlines()
+        )
+        if len(fields) == 3 and fields[0] == "tag" and "-rollback-" in fields[2]
+    ]
+    assert rollback_refs
+    assert rollback_refs[-1] not in after["images"]
+    assert after["images"][old_image_ref]["Id"] == old_image_id
+    assert after["images"][foreign_ref] == foreign_record
+
+
 def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
     """Run the exact clean public install path against a real Docker daemon."""
     if os.environ.get("AGENT_CANON_RUN_REAL_CLEAN_E2E") != "1":

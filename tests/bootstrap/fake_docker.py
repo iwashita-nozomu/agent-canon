@@ -395,6 +395,9 @@ def main(argv: list[str]) -> int:
             "python3",
             "/usr/local/share/agent-canon/runtime/tools/agent_tools/bootstrap_runtime.py",
         ]:
+            failed_operation = os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_OPERATION", "")
+            if failed_operation and failed_operation in command[2:]:
+                return int(os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_RC", "41"))
             if "target" in command[2:] and "add" in command[2:]:
                 runtime_mount = next(
                     (
