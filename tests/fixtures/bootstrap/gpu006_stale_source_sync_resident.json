@@ -1,0 +1,34 @@
+{
+  "schema": "agent-canon.bootstrap-resident-fixture.v1",
+  "fixture": "GPU006 stale source-sync mount",
+  "resident": {
+    "id": "container-gpu006-old",
+    "image_ref": "agent-canon-tools:gpu006-old",
+    "image_id": "sha256:0000000000000000000000000000000000000000000000000000000000000001",
+    "labels": {
+      "io.agent-canon.runtime": "shared-v1",
+      "io.agent-canon.control-root-digest": "CONTROL_ROOT_DIGEST"
+    },
+    "mounts": [
+      "container-state",
+      "private-log",
+      "mount-registry"
+    ],
+    "missing_mounts": [
+      "/var/lib/agent-canon/source-sync.json"
+    ]
+  },
+  "expected": {
+    "source_sync_mount": "/var/lib/agent-canon/source-sync.json",
+    "health": "healthy",
+    "security": {
+      "readonly_rootfs": true,
+      "cap_drop": ["ALL"],
+      "security_opt": ["no-new-privileges"],
+      "network": "none",
+      "cpus": 2000000000,
+      "memory": 4294967296,
+      "pids": 512
+    }
+  }
+}
