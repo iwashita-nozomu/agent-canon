@@ -257,7 +257,7 @@ def test_container_receipt_stager_runs_resident_cli_argv(tmp_path: Path) -> None
             ).strip(),
             "remote": "owner/repo",
         },
-        source_root=PROJECT_ROOT,
+        agentcanon_source_root=PROJECT_ROOT,
         command_runner=runner,
     )
     stager.preflight()

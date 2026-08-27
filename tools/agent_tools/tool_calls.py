@@ -57,7 +57,8 @@ def build_issue_receipt_stage_command(
     *,
     repository: str,
     runtime_root: str = "<runtime-root>",
-    source_root: str = "<source-root>",
+    agentcanon_source_root: str = "<agentcanon-source-root>",
+    target_root: str = "<target-root>",
     control_parent_root: str = "<control-parent-root>",
     checkout_identity: Mapping[str, object] | None = None,
     number: str = "<issue-number>",
@@ -76,6 +77,20 @@ def build_issue_receipt_stage_command(
         raise ValueError("receipt staging execution must be run or exec")
     if not repository.strip():
         raise ValueError("receipt staging repository is required")
+    for value, field in (
+        (agentcanon_source_root, "AgentCanon source root"),
+        (target_root, "registered target root"),
+    ):
+        if value.startswith("<"):
+            continue
+        if not Path(value).expanduser().is_absolute():
+            raise ValueError(f"receipt staging {field} must be absolute")
+    if bootstrap == "./bootstrap.sh" and agentcanon_source_root != "<agentcanon-source-root>":
+        bootstrap = str(
+            Path(agentcanon_source_root).expanduser().resolve() / "bootstrap.sh"
+        )
+    if not Path(bootstrap).expanduser().is_absolute() and agentcanon_source_root != "<agentcanon-source-root>":
+        raise ValueError("receipt staging bootstrap must be absolute")
     state_value = state.strip().casefold()
     if (
         state_value not in {"open", "closed"}
@@ -98,7 +113,7 @@ def build_issue_receipt_stage_command(
         "tool",
         execution,
         "--root",
-        source_root,
+        target_root,
         "issue-sync",
         "--",
         "--receipt-preflight" if preflight else "--stage-publication-receipt",
@@ -271,7 +286,8 @@ def materialize_issue_worker_tool_call(
     checkout_repository: str,
     checkout_identity: Mapping[str, object] | None = None,
     runtime_root: str = "<runtime-root>",
-    source_root: str = "<source-root>",
+    agentcanon_source_root: str = "<agentcanon-source-root>",
+    target_root: str = "<target-root>",
     control_parent_root: str = "<control-parent-root>",
     publication_mode: str = "publish",
     publication_reason: str = "",
@@ -283,16 +299,46 @@ def materialize_issue_worker_tool_call(
         )
     if publication_mode not in {"publish", "investigate_only"}:
         raise RuntimeError("issue_worker_tool_call publication mode is invalid")
+    identity = checkout_identity or {}
+    identity_remote = str(identity.get("remote") or "").strip().casefold()
+    handoff_repository = str(handoff.get("repository") or "").strip().casefold()
+    checkout_repository_value = checkout_repository.strip().casefold()
+    if identity_remote and identity_remote != checkout_repository_value:
+        raise RuntimeError("issue_worker_tool_call:checkout_repository_mismatch")
+    if handoff_repository and handoff_repository != checkout_repository_value:
+        raise RuntimeError("issue_worker_tool_call:handoff_repository_mismatch")
+    identity_target_root = str(identity.get("git_root") or "").strip()
+    if identity_target_root in {"", "unknown"}:
+        if target_root != "<target-root>" and publication_mode == "publish":
+            raise RuntimeError("issue_worker_tool_call:target_root_unresolved")
+    elif not Path(identity_target_root).expanduser().is_absolute():
+        raise RuntimeError("issue_worker_tool_call:target_root_not_absolute")
+    else:
+        identity_target_root = str(Path(identity_target_root).expanduser().resolve())
+        if target_root == "<target-root>":
+            target_root = identity_target_root
+        elif str(Path(target_root).expanduser().resolve()) != identity_target_root:
+            raise RuntimeError("issue_worker_tool_call:target_root_mismatch")
+    if target_root != "<target-root>":
+        target_path = Path(target_root).expanduser().resolve(strict=False)
+        if not target_path.is_dir():
+            raise RuntimeError("issue_worker_tool_call:target_root_missing")
+        target_root = str(target_path)
     bootstrap = "./bootstrap.sh"
-    if source_root != "<source-root>":
-        bootstrap_path = Path(source_root).expanduser().resolve() / "bootstrap.sh"
+    if agentcanon_source_root != "<agentcanon-source-root>":
+        source_path = Path(agentcanon_source_root).expanduser().resolve()
+        if not source_path.is_absolute():
+            raise RuntimeError("issue_worker_tool_call:agentcanon_source_root_not_absolute")
+        agentcanon_source_root = str(source_path)
+        bootstrap_path = source_path / "bootstrap.sh"
         if not bootstrap_path.is_file():
             raise RuntimeError("issue_worker_tool_call:bootstrap_missing")
         bootstrap = str(bootstrap_path)
     preflight_command = build_issue_receipt_stage_command(
         repository=checkout_repository,
         runtime_root=runtime_root,
-        source_root=source_root,
+        agentcanon_source_root=agentcanon_source_root,
+        target_root=target_root,
         control_parent_root=control_parent_root,
         checkout_identity=checkout_identity,
         bootstrap=bootstrap,
@@ -301,7 +347,8 @@ def materialize_issue_worker_tool_call(
     stage_command = build_issue_receipt_stage_command(
         repository=checkout_repository,
         runtime_root=runtime_root,
-        source_root=source_root,
+        agentcanon_source_root=agentcanon_source_root,
+        target_root=target_root,
         control_parent_root=control_parent_root,
         checkout_identity=checkout_identity,
         bootstrap=bootstrap,
@@ -315,6 +362,8 @@ def materialize_issue_worker_tool_call(
         argument_properties={
             "publisher_agent_id": {"type": "string", "minLength": 1},
             "checkout_repository": {"type": "string", "minLength": 1},
+            "agentcanon_source_root": {"type": "string", "minLength": 1},
+            "target_root": {"type": "string", "minLength": 1},
             "handoff": {"type": "object"},
             "publication_mode": {
                 "type": "string",
@@ -333,6 +382,8 @@ def materialize_issue_worker_tool_call(
         arguments={
             "publisher_agent_id": publisher_agent_id,
             "checkout_repository": checkout_repository,
+            "agentcanon_source_root": agentcanon_source_root,
+            "target_root": target_root,
             "handoff": dict(handoff),
             "publication_mode": publication_mode,
             "publication_reason": publication_reason,

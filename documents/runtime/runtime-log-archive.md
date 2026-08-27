@@ -73,10 +73,16 @@ and reads back this receipt, and only then removes a pending packet. Failed or
 uncertain publication retains the pending packet. `runtime_log_archive_git.py
 sync` stages this published namespace with the existing private archive
 families so the host shell remains the Git publisher. The publisher injects a
-resident writer and invokes `bootstrap.sh ... tool run/exec issue_sync --
+resident writer and invokes `bootstrap.sh ... tool run/exec issue-sync --
 --stage-publication-receipt`; its runtime/spool route is a precondition for
 GitHub mutation and its sync request is consumed by the existing
 private-feedback host synchronization path.
+
+The receipt ToolCall keeps the AgentCanon source root (the owner of
+`bootstrap.sh` and the resident image) separate from the registered product
+target root taken from `checkout_identity.git_root`; the generated command uses
+`<agentcanon_source_root>/bootstrap.sh ... tool run --root <target_root>
+issue-sync ...`.
 
 The durable archive layout and its operational checkout are owned by
 `agent-canon-log`; consumers should use its current branch contract rather

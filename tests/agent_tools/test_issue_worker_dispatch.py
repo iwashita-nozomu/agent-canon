@@ -50,6 +50,42 @@ def _candidate(**overrides: object) -> dict[str, object]:
 def test_same_repository_candidate_materializes_publisher_tool_call(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    product_root = tmp_path / "product"
+    product_root.mkdir()
+    subprocess.run(
+        ["git", "init", "-q", "-b", "main"],
+        cwd=product_root,
+        check=True,
+    )
+    (product_root / "README.md").write_text("product checkout\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "add", "README.md"], cwd=product_root, check=True
+    )
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=AgentCanon test",
+            "-c",
+            "user.email=agent-canon-test@example.invalid",
+            "commit",
+            "-qm",
+            "product fixture",
+        ],
+        cwd=product_root,
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "remote",
+            "add",
+            "origin",
+            "https://github.com/iwashita-nozomu/agent-canon.git",
+        ],
+        cwd=product_root,
+        check=True,
+    )
     runtime_root = tmp_path / "runtime"
     control_parent = tmp_path / "control"
     runtime_root.mkdir()
@@ -66,8 +102,8 @@ def test_same_repository_candidate_materializes_publisher_tool_call(
         _candidate(),
         "publish explicit feedback",
         spawn,
-        workspace_root=PROJECT_ROOT,
-        source_root=PROJECT_ROOT,
+        workspace_root=product_root,
+        agentcanon_source_root=PROJECT_ROOT,
         request_clause_ids=("feedback-routing",),
     )
 
@@ -78,9 +114,14 @@ def test_same_repository_candidate_materializes_publisher_tool_call(
     assert result.tool_call["tool_id"] == "issue-worker"
     assert result.tool_call["arguments"]["publisher_agent_id"] == "publisher-1"
     assert result.tool_call["arguments"]["checkout_repository"] == "iwashita-nozomu/agent-canon"
+    assert result.tool_call["arguments"]["agentcanon_source_root"] == str(PROJECT_ROOT)
+    assert result.tool_call["arguments"]["target_root"] == str(product_root)
     stage_command = result.tool_call["arguments"]["receipt_stage_command"]
     assert stage_command[0] == str(PROJECT_ROOT / "bootstrap.sh")
-    assert str(PROJECT_ROOT) in stage_command
+    assert str(PROJECT_ROOT) != str(product_root)
+    assert stage_command[stage_command.index("--root") + 1] == str(product_root)
+    assert "--checkout-root" in stage_command
+    assert stage_command[stage_command.index("--checkout-root") + 1] == str(product_root)
     assert str(runtime_root) in stage_command
     assert str(control_parent) in stage_command
     preflight_command = result.tool_call["arguments"]["receipt_preflight_command"]
@@ -146,7 +187,7 @@ def test_issue_worker_dispatch_investigates_without_runtime_publication_route(
         "publish explicit feedback",
         lambda _agent_type, _prompt: "unexpected-publisher",
         workspace_root=PROJECT_ROOT,
-        source_root=PROJECT_ROOT,
+        agentcanon_source_root=PROJECT_ROOT,
     )
     assert result.status == "spawned"
     assert result.tool_call is not None
@@ -166,7 +207,7 @@ def test_issue_worker_dispatch_investigates_without_source_context(
         "publish explicit feedback",
         lambda _agent_type, _prompt: "publisher-investigate",
         workspace_root=PROJECT_ROOT,
-        source_root=tmp_path / "missing-source",
+        agentcanon_source_root=tmp_path / "missing-source",
     )
     assert result.status == "spawned"
     assert result.tool_call is not None
@@ -415,7 +456,7 @@ def test_other_repository_candidate_is_no_mutation_handoff() -> None:
         "publish explicit feedback",
         lambda agent_type, prompt: calls.append(agent_type) or "publisher-1",
         workspace_root=PROJECT_ROOT,
-        source_root=PROJECT_ROOT,
+        agentcanon_source_root=PROJECT_ROOT,
     )
 
     assert result.status == "deferred"
@@ -431,7 +472,7 @@ def test_same_repository_evidence_gap_still_reaches_publisher_investigation() ->
         "investigate explicit feedback",
         lambda agent_type, prompt: calls.append(agent_type) or "publisher-1",
         workspace_root=PROJECT_ROOT,
-        source_root=PROJECT_ROOT,
+        agentcanon_source_root=PROJECT_ROOT,
     )
 
     assert result.status == "spawned"
@@ -458,9 +499,40 @@ def test_missing_checkout_identity_is_deferred_without_spawn(monkeypatch) -> Non
         "publish explicit feedback",
         lambda agent_type, prompt: calls.append(agent_type) or "publisher-1",
         workspace_root=PROJECT_ROOT,
-        source_root=PROJECT_ROOT,
+        agentcanon_source_root=PROJECT_ROOT,
     )
 
     assert result.status == "deferred"
     assert result.handoff.reason == "checkout-identity-unresolved"
     assert calls == []
+
+
+def test_missing_target_root_routes_to_publisher_investigation(monkeypatch) -> None:
+    monkeypatch.setattr(
+        issue_worker_dispatch,
+        "resolve_checkout_identity",
+        lambda workspace: CheckoutIdentity(
+            cwd=str(workspace),
+            git_root="unknown",
+            branch="main",
+            head="a" * 40,
+            remote="iwashita-nozomu/agent-canon",
+        ),
+    )
+    calls: list[str] = []
+    result = issue_worker_dispatch.dispatch_issue_worker(
+        _candidate(),
+        "investigate explicit feedback",
+        lambda agent_type, prompt: calls.append(agent_type) or "publisher-1",
+        workspace_root=PROJECT_ROOT,
+        agentcanon_source_root=PROJECT_ROOT,
+    )
+
+    assert result.status == "spawned"
+    assert result.tool_call is not None
+    assert result.tool_call["arguments"]["publication_mode"] == "investigate_only"
+    assert result.tool_call["arguments"]["target_root"] == "<target-root>"
+    assert "target_root" in result.tool_call["arguments"]["publication_reason"]
+    assert result.tool_call["arguments"]["receipt_preflight_command"] == []
+    assert result.tool_call["arguments"]["receipt_stage_command"] == []
+    assert calls == ["publisher"]

@@ -427,6 +427,13 @@ the required GitHub mutation through the existing adapter and reads back the
 URL, number, body, and state. The dashboard, resident runtime, and parent
 Python remain read-only and do not receive GitHub credentials. Orchestration
 materializes a publisher ToolCall with the checkout identity and typed handoff;
+the ToolCall carries `agentcanon_source_root` (the standalone AgentCanon
+checkout owning `bootstrap.sh` and the tool image) separately from
+`target_root` (the registered candidate checkout from
+`checkout_identity.git_root`). The generated route is
+`<agentcanon_source_root>/bootstrap.sh ... tool run --root <target_root>
+issue-sync ...`; a missing or mismatched target remains investigation/defer
+state and cannot reach GitHub mutation.
 publication failure writes only the existing metadata-only pending packet
 (repository, reason, private locator, and digest) and retries through this
 same IssueWorker route.
@@ -662,7 +669,7 @@ Run the focused resident-container receipt route and skill wiring checks after c
 
 ```bash
 ./bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root> \
-  tool run --root <registered-source-root> issue-sync -- --receipt-preflight \
+  tool run --root <registered-target-root> issue-sync -- --receipt-preflight \
   --checkout-head <source-commit> --checkout-repository <owner/repository>
 python3 tools/agent_tools/check_skill_frontmatter.py --root .
 python3 tools/agent_tools/skill_tool_commands.py check
