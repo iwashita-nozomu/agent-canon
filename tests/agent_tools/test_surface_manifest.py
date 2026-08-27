@@ -18,6 +18,10 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "surface_manifest.py"
+from tools.agent_tools.skill_projection_registry import (  # noqa: E402
+    GeneratedProjectionRegistryError,
+    generated_skill_projections,
+)
 
 
 class SurfaceManifestTest(unittest.TestCase):
@@ -33,10 +37,19 @@ class SurfaceManifestTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
-        self.assertEqual(payload["schema"], "agent-canon.surface-manifest.v1")
+        self.assertEqual(payload["schema"], "agent-canon.surface-manifest.v2")
         self.assertEqual(payload["prefix"], ".")
         self.assertTrue(payload["entries"])
         self.assertTrue(all(entry["mode"] in {"runtime", "tool", "eval"} for entry in payload["entries"]))
+        projections = {entry["path"]: entry for entry in payload["generated_projections"]}
+        self.assertEqual(
+            projections[".codex/personal/skills/agent-orchestration/SKILL.md"]["source"],
+            "agents/skills/agent-orchestration.md",
+        )
+        self.assertEqual(
+            projections[".codex/personal/skills/_chatgpt-codex-routing/SKILL.md"]["source"],
+            "agents/internal-routines/chatgpt-codex-routing.md",
+        )
 
     def test_sync_commands_are_not_exposed(self) -> None:
         result = subprocess.run(
@@ -48,6 +61,29 @@ class SurfaceManifestTest(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("invalid choice", result.stderr)
+
+    def test_duplicate_private_projection_owner_is_typed_ambiguity(self) -> None:
+        """A private shim with two routine owners must not use first-wins resolution."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            for name in ("one.md", "two.md"):
+                path = root / "agents" / "internal-routines" / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    f"downstream implementation ../../.codex/personal/skills/_duplicate/SKILL.md {name}\n",
+                    encoding="utf-8",
+                )
+            with self.assertRaises(GeneratedProjectionRegistryError) as raised:
+                generated_skill_projections(root)
+            self.assertEqual(raised.exception.code, "generated_projection_ambiguous")
+            self.assertEqual(
+                raised.exception.path,
+                ".codex/personal/skills/_duplicate/SKILL.md",
+            )
+            self.assertEqual(
+                raised.exception.owners,
+                ("agents/internal-routines/one.md", "agents/internal-routines/two.md"),
+            )
 
     def test_invalid_runtime_producer_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

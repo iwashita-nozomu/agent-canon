@@ -2,6 +2,7 @@
 // contract implementation
 // responsibility Owns the one-build AgentCanon dependency graph and optional persisted runtime-evidence snapshot.
 // upstream implementation dependency_manifest.rs provides the complete-file source snapshot
+// upstream implementation ../../../tools/agent_tools/skill_projection_registry.py provides generated skill-view owner mapping
 // upstream implementation structured_analysis.rs provides the graph storage schema
 // downstream implementation main.rs dispatches the public graph command
 // downstream implementation ../../../tools/agent_tools/graph_client.py consumes typed graph responses
@@ -3507,6 +3508,10 @@ mod tests {
             (
                 "tools/agent_tools/surface_manifest.py",
                 include_bytes!("../../../tools/agent_tools/surface_manifest.py"),
+            ),
+            (
+                "tools/agent_tools/skill_projection_registry.py",
+                include_bytes!("../../../tools/agent_tools/skill_projection_registry.py"),
             ),
             (
                 "documents/runtime/shared-runtime-surfaces.toml",

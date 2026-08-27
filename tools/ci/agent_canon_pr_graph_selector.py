@@ -58,8 +58,8 @@ HEX_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 FULL_HISTORY_DEEPEN = "2147483647"
 GRAPH_PROFILE = "default"
 SOURCE_DIAGNOSTIC_SCHEMA = "agent-canon.source-diagnostic.v1"
-PRODUCER_IDENTITY_VERSION = "agent-canon.surface-manifest-producer.v1"
-PRODUCER_IDENTITY_CONTRACT = "agent-canon.surface-manifest.v1"
+PRODUCER_IDENTITY_VERSION = "agent-canon.surface-manifest-producer.v2"
+PRODUCER_IDENTITY_CONTRACT = "agent-canon.surface-manifest.v2"
 CHANGED_PATH_PACKET_SCHEMA = "agent-canon.pr-changed-paths.v1"
 GRAPH_STATUS_SCHEMA = "agent-canon.graph.status.v1"
 

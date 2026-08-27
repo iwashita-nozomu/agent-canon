@@ -4,6 +4,7 @@
 # responsibility Derives dependency graph query, review, and context projections directly from tracked source manifests.
 # upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL and path semantics
 # upstream design ../../documents/design/source-owned-dependency-validation.md tracked source authority boundary
+# upstream implementation ./skill_projection_registry.py resolves generated skill-view owner paths
 # downstream implementation ./graph_client.py exposes source-derived dependency query and context compatibility
 # downstream implementation ./check_dependency_graph.sh validates source-derived relations and writes review artifacts
 # downstream implementation ../../tests/agent_tools/test_graph_client_source_projection.py validates no-runtime projections
@@ -21,6 +22,23 @@ from collections import defaultdict, deque
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+
+try:
+    from .skill_projection_registry import (
+        GENERATED_SKILL_PREFIX,
+        GENERATED_SKILL_SUFFIX,
+        GeneratedProjection,
+        generated_skill_projections,
+        generated_skill_projection_target,
+    )
+except ImportError:  # pragma: no cover - direct script execution
+    from skill_projection_registry import (  # type: ignore[no-redef]
+        GENERATED_SKILL_PREFIX,
+        GENERATED_SKILL_SUFFIX,
+        GeneratedProjection,
+        generated_skill_projections,
+        generated_skill_projection_target,
+    )
 
 HEADER_SCAN_LINES = 80
 MANIFEST_FIELD_COUNT = 4
@@ -196,6 +214,13 @@ def resolve_source_path(
 ) -> tuple[str, Path]:
     """Return repository-relative and physical source paths."""
     normalized = relative.replace("\\", "/").removeprefix("./")
+    generated_target = generated_skill_projection_target(root, normalized)
+    if generated_target is not None:
+        normalized = generated_target
+    elif normalized.startswith(GENERATED_SKILL_PREFIX) and normalized.endswith(
+        GENERATED_SKILL_SUFFIX
+    ):
+        raise SourceDependencyError(f"unknown generated skill view: {normalized}")
     direct_path = root / normalized
     if direct_path.is_symlink():
         raise SourceDependencyError(f"source path is a symbolic link: {normalized}")
@@ -214,19 +239,48 @@ def _read_text(path: Path, relative: str) -> str:
         raise SourceDependencyError(f"source text is unreadable: {relative}: {error}") from error
 
 
-def _normalize_target(root: Path, source: Path, raw_target: str) -> str:
+def _normalize_target(
+    root: Path,
+    source: Path,
+    raw_target: str,
+    projections: Sequence[GeneratedProjection] | None = None,
+) -> str:
     """Resolve one relative dependency target and reject root escape."""
     if raw_target.startswith("/") or "://" in raw_target:
         raise SourceDependencyError(
             f"dependency path must be repository-relative: {raw_target}"
         )
     target = (source.parent / raw_target).resolve(strict=False)
-    return repo_relative(root, target)
+    normalized = repo_relative(root, target)
+    generated_target = (
+        next(
+            (
+                projection.source
+                for projection in projections
+                if projection.path == normalized
+            ),
+            None,
+        )
+        if projections is not None
+        else generated_skill_projection_target(root, normalized)
+    )
+    if generated_target is not None:
+        if not (root / generated_target).is_file():
+            raise SourceDependencyError(
+                f"generated skill canonical source is unavailable: {generated_target}"
+            )
+        return generated_target
+    if normalized.startswith(GENERATED_SKILL_PREFIX) and normalized.endswith(
+        GENERATED_SKILL_SUFFIX
+    ):
+        raise SourceDependencyError(f"unknown generated skill view: {normalized}")
+    return normalized
 
 
 def parse_manifest_document(
     root: Path,
     relative: str,
+    projections: Sequence[GeneratedProjection] | None = None,
 ) -> SourceDependencyDocument:
     """Parse one canonical source document with the strict dependency DSL."""
     canonical, source = resolve_source_path(root, relative)
@@ -283,7 +337,7 @@ def parse_manifest_document(
                 source=canonical,
                 direction=direction,
                 kind=kind,
-                target=_normalize_target(root, source, raw_target),
+                target=_normalize_target(root, source, raw_target, projections),
                 reason=reason,
                 line=line_number,
             )
@@ -304,6 +358,7 @@ def parse_manifest_edges(
 def dependency_documents(root: Path) -> tuple[SourceDependencyDocument, ...]:
     """Return every unique canonical text document and manifest projection."""
     root = root.resolve()
+    projections = generated_skill_projections(root)
     documents: list[SourceDependencyDocument] = []
     canonical_sources: set[str] = set()
     for relative in source_paths(root):
@@ -320,7 +375,7 @@ def dependency_documents(root: Path) -> tuple[SourceDependencyDocument, ...]:
         if canonical_relative in canonical_sources or source.is_symlink():
             continue
         canonical_sources.add(canonical_relative)
-        documents.append(parse_manifest_document(root, canonical_relative))
+        documents.append(parse_manifest_document(root, canonical_relative, projections))
     return tuple(sorted(documents))
 
 
