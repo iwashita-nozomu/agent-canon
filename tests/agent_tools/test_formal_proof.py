@@ -22,44 +22,19 @@ from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "formal_proof.py"
+PRODUCER_TEST = PROJECT_ROOT / "tests" / "agent_tools" / "test_jit_canonical_ir.py"
 
-PROOF_TOOL_HANDOFF_FIXTURE: dict[str, object] = {
-    "target_theorem": "finite_stop_for_public_solve",
-    "public_root": "solver.py::main -> out.answer",
-    "iteration_map": "Step_impl(problem, config, state)",
-    "stopping_scalar": "residual_norm(state)",
-    "mathematical_evidence": {
-        "status": "absent",
-        "paths": [],
-    },
-    "failure": {
-        "kind": "ir_extractor_or_lowering",
-        "producer_surface": "tools/agent_tools/jit_canonical_ir.py",
-        "consumer_surface": "generated Lean return projection",
-    },
-    "math_writer": {
-        "allowed_paths": [
-            "math/definitions",
-            "math/derivations",
-            "tests/numerical_oracle.py",
-        ],
-        "forbidden_paths": [
-            "tools/agent_tools/jit_canonical_ir.py",
-            "rust/agent-canon/src/jit_ir_to_lean.rs",
-            "lean/",
-            "JIT/backend/runtime architecture",
-        ],
-        "algorithm_change_authorized": False,
-    },
-    "proof_tool_worker": {
-        "allowed_paths": [
-            "tools/agent_tools/jit_canonical_ir.py",
-            "rust/agent-canon/src/jit_ir_to_lean.rs",
-            "lean/",
-        ],
-    },
-    "return_status": "route_infrastructure",
-}
+
+def _load_proof_tool_handoff() -> tuple[
+    dict[str, object], frozenset[str], frozenset[str]
+]:
+    """Load the producer fixture and its canonical field sets."""
+    namespace = runpy.run_path(str(PRODUCER_TEST))
+    return (
+        cast(dict[str, object], namespace["PROOF_TOOL_HANDOFF_FIXTURE"]),
+        cast(frozenset[str], namespace["PROOF_TOOL_HANDOFF_TOP_LEVEL_FIELDS"]),
+        cast(frozenset[str], namespace["PROOF_TOOL_HANDOFF_ROLE_FIELDS"]),
+    )
 
 
 class FormalProofToolTest(unittest.TestCase):
@@ -67,20 +42,43 @@ class FormalProofToolTest(unittest.TestCase):
 
     def test_ir_failure_fixture_does_not_authorize_math_or_jit_drift(self) -> None:
         """An IR failure routes tooling without authorizing unrelated math edits."""
-        handoff = PROOF_TOOL_HANDOFF_FIXTURE
+        handoff, expected_top_level, expected_role = _load_proof_tool_handoff()
         mathematical_evidence = cast(dict[str, object], handoff["mathematical_evidence"])
         failure = cast(dict[str, object], handoff["failure"])
         math_writer = cast(dict[str, object], handoff["math_writer"])
         proof_tool_worker = cast(dict[str, object], handoff["proof_tool_worker"])
+        self.assertEqual(set(handoff), expected_top_level)
+        self.assertEqual(set(math_writer), expected_role)
+        self.assertEqual(set(proof_tool_worker), expected_role)
         math_allowed = set(cast(list[str], math_writer["allowed_paths"]))
         math_forbidden = set(cast(list[str], math_writer["forbidden_paths"]))
         proof_allowed = set(cast(list[str], proof_tool_worker["allowed_paths"]))
+        proof_forbidden = set(cast(list[str], proof_tool_worker["forbidden_paths"]))
 
         self.assertEqual(failure["kind"], "ir_extractor_or_lowering")
         self.assertEqual(mathematical_evidence["status"], "absent")
         self.assertEqual(handoff["return_status"], "route_infrastructure")
-        self.assertFalse(math_writer["algorithm_change_authorized"])
+        self.assertEqual(math_writer["owner"], "algorithm-proof-exploration")
+        self.assertEqual(
+            math_writer["evidence"],
+            {"status": "absent", "paths": []},
+        )
+        self.assertEqual(
+            proof_tool_worker["owner"],
+            "IR extractor and generated-proof mechanism owner",
+        )
+        self.assertEqual(
+            proof_tool_worker["evidence"],
+            {
+                "status": "awaiting_native_receipt",
+                "paths": [
+                    "tools/agent_tools/jit_canonical_ir.py",
+                    "generated Lean return projection",
+                ],
+            },
+        )
         self.assertTrue({"tools/agent_tools/jit_canonical_ir.py", "lean/"} <= math_forbidden)
+        self.assertTrue({"production algorithm and public API"} <= proof_forbidden)
         self.assertTrue(proof_allowed.isdisjoint(math_allowed))
         self.assertEqual(
             failure["producer_surface"],

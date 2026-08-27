@@ -75,7 +75,13 @@ checked boundary を top-level 分岐として返してはいけません。個�
 この skill は、`$algorithm-proof-exploration` が定義する
 `proof_tool_handoff` を消費して証明・証明基盤の作業を行います。failure classifier
 をここで複製せず、packet の `failure.kind`、`mathematical_evidence`、
-`allowed_paths`、`forbidden_paths`、`return_status` をそのまま適用します。
+`math_writer` / `proof_tool_worker` の role fields、`return_status` をそのまま適用します。
+packet の role object は producer と consumer で同じ shape を使います。
+`math_writer` と `proof_tool_worker` はそれぞれ必ず
+`owner`、`allowed_paths`、`forbidden_paths`、`evidence`、`reason` を持ち、
+省略・継承・共有の write scope は無効です。`proof_tool_worker` の
+`allowed_paths` はこの handoff で選択された proof-tool mechanism の範囲だけを
+列挙し、math-writer の範囲を暗黙に拡大してはいけません。
 
 数理 task が formal proof を明示的に選択していない場合、証明 tool の実行や
 証明基盤の編集は必須ではありません。proof tool が選択された場合でも、failed
@@ -93,9 +99,10 @@ algorithm、JIT boundary、runtime/API、proof-only production field を変更�
 いけません。`return_to_math` の場合だけ algorithm owner が数学定義・導出・更新則を
 修正し、proof-tool worker はその数学的判断を代行しません。
 
-proof-tool worker の write scope は packet の `allowed_paths` に記載された
+proof-tool worker の write scope は packet の `proof_tool_worker.allowed_paths` に記載された
 extractor/lowering、generated evidence、theorem graph、Lean/Lake/checker、または
-JIT/backend surface に限定します。修正後は native proof-tool receipt を返しますが、
+JIT/backend tool surface に限定します。production `main`、algorithm、public API、
+または JIT boundary はその scope に入らず、修正後は native proof-tool receipt を返しますが、
 その receipt は数学的正しさの判定ではありません。数学 owner は別途 recurrence /
 convergence oracle を返し、二つを一つの成功判定に混ぜません。
 
@@ -186,8 +193,11 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
   `Answer` / `State` / `Info` などの field path、return leaf index の対応を
   生成しなければなりません。目的 theorem はこの high-level projection 関数だけを
   参照します。projection から低レベル evaluator への接続が欠けている場合は、
-  低レベル binding を目的定理へ持ち込まず、extractor、projection 生成、または
-  `main` の返却 schema を直します。
+ 低レベル binding を目的定理へ持ち込まず、`failure.kind=ir_extractor_or_lowering`
+  の `proof_tool_handoff` を作ります。packet の `proof_tool_worker` だけが
+  extractor、projection 生成、または `main` の返却 schema を直せます。math-writer
+  は `return_status=return_to_math` と checker-backed 数理 evidence が返るまで
+  production `main` を編集しません。
 - theorem-critical な値は、自由 witness ではなく、public root の入力と実装 path から
   生成された値として扱います。たとえば KKT 成分、残差成分、停止 tolerance、
   solver 返却値、backend decode 誤差を target theorem が消費するなら、生成 Lean には
@@ -196,7 +206,8 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
   閉じてはいけません。存在 witness を使う場合は、同じ public input と generated
   state から得られる二つの witness が一致する uniqueness theorem、または witness を
   生成関数へ置き換える theorem を先に通します。この gate が失敗したら、証明
-  blocker ではなく extractor / projection / generated Lean の修正対象です。
+  blocker ではなく、`proof_tool_worker` の extractor / projection / generated Lean
+  修正対象です。math-writer がこの gap を理由に数理実装を変更してはいけません。
 - 実装由来の claim は、実装正本に合う機械抽出 route を先に固定します。
   JIT 可能な Python public root は
   `jit_canonical_ir.py --python-symbol path.py::qualname --input-factory path.py::factory`
@@ -292,8 +303,11 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
   algorithm 自体を証明可能な反復写像へ置き換えます。
 - target-critical solver-chain の数式 section は、現在の JIT-canonical record
   と theorem graph overlay から生成します。必須の equation evidence が欠けて
-  projection が失敗した場合は、proof note を手書きで補わず、JIT 抽出または実装形状を
-  直してから再生成します。proof note 側に同じ runtime 数式を並行して手書きしません。
+  projection が失敗した場合は、proof note を手書きで補わず、
+  `failure.kind=ir_extractor_or_lowering` の `proof_tool_handoff` を作ります。
+  packet の `proof_tool_worker` が JIT 抽出または実装形状を直してから再生成します。
+  math-writer は packet が `return_to_math` になるまで実装形状を変更せず、proof note
+  側に同じ runtime 数式を並行して手書きしません。
 - 命題化は flat な fact 一覧ではなく、public root の戻り値 projection で述べた
   目的命題 `P` から始めます。まず Lemma Dependency Graph の
   target theorem/profile で探索 surface を bounded にし、次に `P` が参照する
@@ -590,6 +604,7 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
   `unverified_with_next_witness`、`connection_unconnected`、stale generated
   evidence、local repair 可能な proof target failure、generated Lean /
   extractor / theorem-graph mismatch に到達する場合は、user-facing へ返さず、
+  proof-tool handoff を作成し、`proof_tool_worker.allowed_paths` 内で
   repair、regenerate、recheck、または次の bounded Wave を実行します。
   open frontier を持つ proof note、theorem-graph report、generated Lean file、
   Wave summary は evidence であり、workflow の戻り値ではありません。
@@ -599,7 +614,8 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
   2. proof status table の target-chain reachable row に bare `unverified`、
      `unverified_with_next_witness`、`connection_unconnected`、
      `guarantee_unconnected`、stale generated evidence、または local repair 可能な
-     extractor / generated Lean / theorem graph mismatch が残っていない。
+     extractor / generated Lean / theorem graph mismatch が残っていない。残る場合は
+     proof-tool handoff の worker が所有する repair work item として扱う。
   3. theorem graph の leaf-origin check と forbidden-reachability check が、selected
      target から actionable frontier へ到達しないこと、または到達先が failed /
      diagnostic Goal checklist item として記録済みであることを示している。
@@ -682,14 +698,19 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
   algorithmic choice のどこで直接失敗したかを checker evidence 付きで返します。
 - frontier が、実装 code shape、JIT / StableHLO / LLVM 抽出器、IR-to-Lean 生成、
   theorem graph、proof-status overlay、または proof note の不整合・不足で止まった場合、
-  その finding は user-facing blocker ではなく修正対象です。詰まっている箇所を特定したら、
-  直接の責務 surface を修正し、JIT / backend / Lean / theorem graph / proof-search artifact を
-  再生成し、同じ public-root target theorem / theorem profile へ戻って checker を再実行します。
+  その finding は user-facing blocker ではなく、packet に記録する proof-tool worker の
+  修正対象です。詰まっている箇所を特定したら、`failure.kind` と exact
+  producer/consumer を付けた `proof_tool_handoff` を作り、packet の
+  `proof_tool_worker.allowed_paths` 内だけを修正し、JIT / backend / Lean / theorem
+  graph / proof-search artifact を再生成して、同じ public-root target theorem /
+  theorem profile へ戻って checker を再実行します。math-writer はこの修正を行いません。
   修正と再実行を少なくとも一度行ってからでなければ、`unverified_with_next_witness`、
   `unprovable_under_assumptions`、または algorithmic blocker として返してはいけません。
   ただし production code に proof-only field、diagnostic gate、runtime proof check を
-  追加してはいけません。修正対象は、実装アルゴリズムそのもの、抽出器、証明グラフ接続、
-  既存証明文、または theorem statement の責務境界に限ります。
+  追加してはいけません。proof-tool 修正対象は packet の
+  `proof_tool_worker.allowed_paths` に記載された抽出器、証明グラフ接続、既存証明文、
+  または theorem statement の責務境界に限ります。実装アルゴリズムそのものは、
+  `return_to_math` と checker-backed 数理 evidence がある場合だけ math owner が修正します。
 - 上の修正・再実行は一度だけの儀礼ではありません。repository code、抽出器、
   generated Lean、theorem graph、proof overlay、local proof library、または
   既存 checker output から次 frontier を進められる限り、Wave parent が結果を統合し、
@@ -905,8 +926,9 @@ proof_nonterminal_return=<path-or-section-anchor|none>
 ```
 
 `proof_user_return_status=not_allowed` is not user-facing output. It means the
-agent must keep working in the same Wave: repair, regenerate, recheck, or reduce
-the frontier to a checked boundary before responding. `proof_actionable_frontier`
+agent must keep working in the same Wave: route proof-tool repairs through the
+named `proof_tool_worker`, regenerate, recheck, or reduce the frontier to a
+checked boundary before responding. `proof_actionable_frontier`
 must be `none` for `complete`; for `boundary_reached` it must point only to the
 checked direct boundary, not to an unconnected helper theorem.
 
@@ -955,7 +977,8 @@ Rows whose remaining obligation is an unconnected theorem graph edge, missing
 generated Lean value, generated equation not consumed by the proof graph, or
 callee guarantee not expanded are never final rows. They must be expanded,
 repaired, regenerated, or reduced to a checked boundary before the skill can
-return.
+return; generated/extractor/graph repairs go through the named
+`proof_tool_worker` and its packet scope, not an incidental math-writer edit.
 For individual proof rows, `verified`, `refuted`, and
 `unprovable_under_assumptions` remain checker statuses. They are not top-level
 branches for an implementation-derived Goal. The Goal is closed only when all
@@ -993,8 +1016,10 @@ local recursion, IR / graph regeneration, proof search, and algorithm
 exploration cannot currently advance it. A selected route may be a useful
 sufficient condition without being necessary; mark that distinction explicitly.
 If a returned boundary cannot be shown frontier-reduced, do not return it.
-Decompose it once more, repair the graph/extractor when possible, or state the
-tool/checker limitation that prevents the boundary-completeness check.
+Decompose it once more, or create a proof-tool handoff so its named
+`proof_tool_worker` can repair the graph/extractor when possible. State the
+tool/checker limitation that prevents the boundary-completeness check; do not
+let a math-writer repair that tooling gap.
 
 Forbidden implementation-derived return:
 
@@ -1007,8 +1032,8 @@ Accepted boundary return:
   `python/solver.py::solve_direction` return vector unconstrained; the public
   root theorem consumes that vector in the residual-decrease edge; extractor
   coverage and forbidden-reachability checks show no lower-level code-derived
-  equation is available. Resume by repairing that extractor edge and rerunning
-  the same public-root theorem.
+  equation is available. Resume by handing that extractor edge to the named
+  `proof_tool_worker` and rerunning the same public-root theorem.
 
 ## JIT-canonical IR
 
@@ -1333,7 +1358,9 @@ The runtime discovery adapter delegates these required operating clauses to this
    function, or repairable extractor gap is not an outcome. Keep it in the
    same Wave as a failed or newly added check item until it is resolved or the
    checker proves that this item is not on any route required by the target
-   theorem.
+   theorem. Resolve such a gap through the named `proof_tool_worker`; it does
+   not authorize a math-writer to edit production code, algorithm shape, or JIT
+   boundaries.
    Before selecting a local witness, build a target-rooted frontier board for
    the whole theorem: list every active route from the public-root conclusion to
    its current leaves, classify each row as code-derived, Problem/config-derived,
@@ -1423,9 +1450,13 @@ The runtime discovery adapter delegates these required operating clauses to this
    Build C++ source evidence and Lean evidence with
    `python3 tools/agent_tools/cpp_template_to_lean.py --cpp-symbol <path.hpp::qualname> --namespace <Lean.Namespace> --out <Generated.lean> --record-out <record.json>`.
    The tool fully expands the selected C++ source route and rejects unresolved
-   calls and unassigned operations before Lean output; repair coverage gaps in
-   the extractor or selected C++ root before treating the generated evidence as
-   accepted proof input.
+   calls and unassigned operations before Lean output; record missing coverage as
+   `failure.kind=ir_extractor_or_lowering` and hand it to the packet's
+   `proof_tool_worker`. Only that worker may repair the extractor before treating
+   the generated evidence as accepted proof input; a math-writer must not change
+   the selected C++ source root for this failure. A source-root or production
+   implementation-shape change requires
+   `return_status=return_to_math` with checker-backed mathematical evidence.
 1. Generate checker-facing Lean evidence definitions from the current
    JIT-canonical IR with `tools/bin/agent-canon jit-ir-to-lean`, or from the
    C++ template source route with
@@ -1441,15 +1472,21 @@ The runtime discovery adapter delegates these required operating clauses to this
    Require the generated layer or theorem-graph projection layer to expose the
    public root argument tree, return tree, return leaf indexes, and high-level
    projection functions for theorem-visible return fields. If these projections
-   are absent, fix extraction or the `main` return shape before proving local
-   low-level facts.
+   are absent, create `failure.kind=ir_extractor_or_lowering` in the
+   `proof_tool_handoff`; only its `proof_tool_worker` may fix extraction or
+   generated projection code before proving local low-level facts. A production
+   `main` return-shape change requires `return_status=return_to_math` with
+   checker-backed mathematical evidence.
 1. Backend arithmetic is generated trace evidence, not an external backend
    axiom. If backend lowering stops before LLVM or executable code, record the
-   last successful backend phase as a coverage gap and decide whether to fix
-   the algorithm, the lowering path, or the backend configuration. If an
-   alternate compiler-owned route such as XLA CUDA dump can emit LLVM for the
-   same JIT root, collect that route in the backend trace and lower the
-   resulting instruction list into Lean before reporting a backend frontier.
+   last successful backend phase as a coverage gap and create
+   `failure.kind=jit_backend_trace` in the `proof_tool_handoff`. The packet's
+   `proof_tool_worker` decides whether its allowed lowering path or backend
+   configuration can be repaired. If an alternate compiler-owned route such as
+   XLA CUDA dump can emit LLVM for the same JIT root, that worker collects the
+   route in the backend trace and lowers the resulting instruction list into
+   Lean before reporting a backend frontier. A math-writer must not fix the
+   algorithm, JIT boundary, or backend configuration for this failure.
    Do not fix a backend, runtime target, compiler route, device, or dtype to
    make a theorem or validation claim pass. A backend-specific theorem is valid
    only when the user request, approved design, runtime profile, public API, or
@@ -1467,9 +1504,12 @@ The runtime discovery adapter delegates these required operating clauses to this
    to the implementation data flow.  Use axioms only for explicit architecture
    or backend semantics boundaries, or for problem-owned analytic functions
    that are top-level theorem assumptions.  If an IR extraction cannot yet emit
-   the needed function body, either improve the extractor or add a local
-   checker-facing function with a dependency edge to the IR fact; do not return
-   an arbitrary function axiom as a proof frontier.
+   the needed function body, create `failure.kind=ir_extractor_or_lowering` in
+   the `proof_tool_handoff`; its `proof_tool_worker` may improve the extractor
+   or add a local checker-facing function with a dependency edge to the IR fact.
+   Do not return an arbitrary function axiom as a proof frontier. A production
+   code-shape change requires `return_status=return_to_math` with checker-backed
+   mathematical evidence; a math-writer must not make it for this tooling failure.
    State implementation-derived theorems over the data types used by the
    implementation path, or over an explicit decoded view of those data types
    with a checked binding lemma.  Do not replace implementation residuals,
@@ -1491,8 +1531,10 @@ The runtime discovery adapter delegates these required operating clauses to this
    stopping soundness for that implemented map only after the target theorem has
    been projected from `main`'s static return schema. Do not add runtime proof
    checks, proof-only `Info` fields, diagnostic gates, or proof-only
-   config/state to make a theorem true. If the current map is checker-refuted or
-   insufficient, return to `$algorithm-proof-exploration` to replace the
+   config/state to make a theorem true. If an independent checker-backed
+   mathematical counterexample or theorem mismatch refutes the current map,
+   return with `return_status=return_to_math` to
+   `$algorithm-proof-exploration` to replace the
    initializer, update rule, line search, inner-solver policy, regularization,
    Phase I, or globalization route with a provable numerical mechanism, then
    regenerate IR and retry the theorem.
@@ -1501,8 +1543,11 @@ The runtime discovery adapter delegates these required operating clauses to this
    Lean evidence and StableHLO/backend trace records for JIT roots, or C++ source
    facts and thin operational IR evidence for C++ source roots. Do not
    hand-maintain parallel runtime equations in proof notes. If the theorem needs
-   a formula not present in the generated implementation layer, improve the
-   extractor or change the implementation shape before adopting the theorem.
+   a formula not present in the generated implementation layer, create a
+   proof-tool handoff and let its `proof_tool_worker` repair the extractor or
+   generated implementation shape before adopting the theorem. A production
+   implementation-shape change is allowed only after
+   `return_status=return_to_math` carries checker-backed mathematical evidence.
    After extraction, propositionize theorem-critical equations from the target
    proposition, not from a flat op list. First select the target theorem/profile
    in the theorem graph to bound the search surface. The proposition must be
@@ -1842,14 +1887,17 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. If the frontier exposes a repairable mismatch or gap in production code
    shape, JIT / StableHLO / LLVM extraction, IR-to-Lean generation, theorem graph
    wiring, proof-status overlays, or the proof note, treat the finding as a
-   repair-and-rerun work item rather than as a user-facing blocker. Make the
-   directly relevant responsibility-preserving repair, regenerate the affected JIT,
-   backend, Lean, theorem-graph, and proof-search artifacts, then re-run the same
-   public-root target theorem or theorem profile. You may return only after at least one repair and
+   repair-and-rerun work item rather than as a user-facing blocker. Create the
+   corresponding `proof_tool_handoff` and let its `proof_tool_worker` make the
+   directly relevant responsibility-preserving repair within `allowed_paths`,
+   regenerate the affected JIT, backend, Lean, theorem-graph, and proof-search
+   artifacts, then re-run the same public-root target theorem or theorem profile. You may return only after at least one repair and
    rerun attempt shows that the remaining frontier is terminal or belongs to a
    top-level input, backend/runtime boundary, or algorithmic choice. Do not add
    proof-only fields, diagnostic gates, or runtime proof checks to production
-   code to satisfy this rule.
+   code to satisfy this rule. A production `main` / algorithm shape is not a
+   proof-tool repair: change it only when the packet has
+   `return_status=return_to_math` and checker-backed mathematical evidence.
    Repeat this repair-and-rerun cycle, not just the analysis, while the next
    frontier is actionable from repository code, extraction, generated Lean,
    theorem graph, proof overlay, local proof libraries, or existing checker
@@ -1874,7 +1922,9 @@ The runtime discovery adapter delegates these required operating clauses to this
    `Nonempty ... values` witness, unconstrained record, or standalone theorem
    variable is not enough to close the route. If the generated layer cannot
    provide that binding, classify the issue as extractor/projection/generated
-   Lean/theorem-graph wiring work and repair it before returning.
+   Lean/theorem-graph wiring work, create the corresponding proof-tool handoff,
+   and let its `proof_tool_worker` repair it before returning. A math-writer
+   cannot edit production code or algorithm shape for this tooling gap.
 1. If the target claim is not closed and the user explicitly asks for interim
    status, return a checklist packet, not a thin "unproved" summary and not a
    list of missing helper lemmas. Include: exact target claim, checklist
@@ -1894,8 +1944,8 @@ The runtime discovery adapter delegates these required operating clauses to this
    return: "`Boundary class=generated_lean`; generated Lean leaves
    `<source>::<function>` return unconstrained; the public-root theorem consumes
    that value in `<target edge>`; graph checks show no lower-level code-derived
-   equation is available; resume by repairing that extractor edge and rerunning
-   the same theorem."
+   equation is available; resume by handing the extractor edge to the named
+   `proof_tool_worker` and rerunning the same theorem."
 1. Enforce the workflow return contract as a hard gate. A user-facing
    `status=complete` is legal only when the selected public-root Goal checklist
    passes and the selected theorem graph has no reachable actionable frontier
@@ -1907,8 +1957,9 @@ The runtime discovery adapter delegates these required operating clauses to this
    `unverified`, `unverified_with_next_witness`, `connection_unconnected`,
    stale generated evidence, a failing proof target that can be repaired
    locally, or any generated Lean / extractor / theorem-graph mismatch, do not
-   return to the user. Repair, regenerate, recheck, or launch the next bounded
-   Wave. A proof note, theorem-graph report, generated Lean file, or Wave
+   return to the user. Create the corresponding proof-tool handoff and let its
+   `proof_tool_worker` repair, regenerate, and recheck within `allowed_paths`, or
+   launch the next bounded Wave. A proof note, theorem-graph report, generated Lean file, or Wave
    summary with open frontier is evidence, not a workflow return value.
 1. Run an exit gate immediately before any user-facing return. It must verify
    all of the following:
@@ -1918,7 +1969,8 @@ The runtime discovery adapter delegates these required operating clauses to this
    (c) no reachable row remains as bare `unverified`,
    `unverified_with_next_witness`, `connection_unconnected`,
    `guarantee_unconnected`, stale generated evidence, or local-repairable
-   extractor / generated Lean / theorem-graph mismatch;
+   extractor / generated Lean / theorem-graph mismatch is covered by a named
+   proof-tool handoff whose worker owns the repair;
    (d) leaf-origin and forbidden-reachability checks agree that no actionable
    frontier remains outside the failed checklist items;
    (e) interim returns include boundary class when relevant, causal path,
@@ -1948,7 +2000,10 @@ The runtime discovery adapter delegates these required operating clauses to this
    A row whose remaining obligation is an unconnected graph edge, missing
    generated Lean value, generated equation not consumed by the proof graph, or
    callee guarantee not expanded is not a final row. Expand, repair,
-   regenerate, or reduce it to a checked boundary before returning.
+   regenerate, or reduce it to a checked boundary before returning. For a
+   generated/extractor/graph gap, perform that action through the named
+   `proof_tool_worker`; it does not authorize a math-writer to edit production
+   `main`, the algorithm, or the JIT boundary.
 1. When an algorithm module owns nested initialization through `initialize(config: InitializeConfig)`, use that initialize/config pair only to expand the required independent proof scopes. Do not make `initialize` itself a mathematical proof premise.
 1. Search local repo sources, `references/`, `documents/notes/`, and `documents/` before external web search.
 1. Search existing formal proofs in the target ecosystem before creating new lemmas. For Lean, read `documents/tools/lean_capability_matrix.md` and route each frontier by shape: direct equations through `rfl`/`rw`/`simp`/`simpa`; structural goals through `constructor`/`cases`/`use`/`aesop?`/`aesop`; Nat/Int arithmetic through `omega` and focused `grind`; ordered linear arithmetic through `linarith`; polynomial recurrence through `ring_nf` and `nlinarith`; positivity/monotonicity through `positivity` and `gcongr`; theorem discovery through `exact?`/`apply?`/`rw?`/`simp?`, Mathlib docs, LeanSearch, Loogle, LeanSearchClient, and Moogle-style tools; over-strong executable claims through Plausible counterexample probes. For active proof themes, pin Mathlib/Aesop/Plausible/LeanSearchClient once in the topic-local Lake package so ordinary retries use `lake build`; use `python3 tools/agent_tools/lean_proof_env.py all-smoke|smoke|agent-smoke|counterexample-smoke|check-file --env-dir reports/formal-proof/lean-proof-env` for exploratory or fallback environment checks. For Isabelle include AFP and Sledgehammer reconstruction evidence. For Coq/Rocq include library search and CoqHammer-related routes.
@@ -1985,8 +2040,11 @@ The runtime discovery adapter delegates these required operating clauses to this
    A function guarantee row whose status is `guarantee_unconnected` is not
    user-facing progress when it blocks a caller lemma or target theorem edge.
    Treat it as an in-turn proof work item: recursively expand callees, improve
-   IR/Lean function generation, try alternate bridge propositions, run
-   counterexample search, or invoke algorithm exploration for a code change.
+   IR/Lean function generation through a proof-tool handoff, try alternate
+   bridge propositions, run counterexample search, or invoke algorithm
+   exploration for a code change only after `return_to_math` carries
+   checker-backed mathematical evidence. The math-writer does not repair
+   IR/Lean generation for a tooling failure.
    Return to the user only after this function guarantee is terminal
    (`verified`, `refuted`, or `unprovable_under_assumptions`) or after a
    checked external-boundary witness proves the remaining work cannot be
@@ -2001,5 +2059,9 @@ The runtime discovery adapter delegates these required operating clauses to this
    expanded before returning. It may be reported only when a checker-backed
    reduced frontier shows that the remaining item is a code/algorithm change,
    a target input/config condition, or an generated backend coverage boundary.
-1. For implementation-derived proof traces, run `python3 tools/agent_tools/check_proof_trace_alignment.py --trace-module <trace.py>` before proof expansion or verified-status claims, and fix stale source paths, StableHLO anchors, retained theorem names, and required/forbidden source-token drift first.
-1. If the checker cannot be run, record `proof_status=not_run`, the exact command, and the missing environment or dependency.
+1. For implementation-derived proof traces, run `python3 tools/agent_tools/check_proof_trace_alignment.py --trace-module <trace.py>` before proof expansion or verified-status claims. If it reports stale source paths, StableHLO anchors, retained theorem names, or required/forbidden source-token drift, create a proof-tool handoff and let its `proof_tool_worker` repair those surfaces; the math-writer must not edit production code or JIT boundaries for that failure.
+1. If the checker cannot be run, record `proof_status=not_run`, the exact command,
+   and the missing environment or dependency in a `proof_tool_handoff` with
+   `failure.kind=lean_lake_checker_environment`. The named `proof_tool_worker`
+   owns that environment repair; it is not evidence for changing the math,
+   production algorithm, or JIT boundary.

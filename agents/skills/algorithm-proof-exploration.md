@@ -75,8 +75,20 @@ proof_tool_handoff = {
     producer_surface: <exact failing producer>,
     consumer_surface: <exact blocked consumer>
   },
-  allowed_paths: <paths for the receiving owner>,
-  forbidden_paths: <paths the current writer must not edit>,
+  math_writer: {
+    owner: <mathematical algorithm owner>,
+    allowed_paths: <math definitions/derivations/oracles and owning docs/tests>,
+    forbidden_paths: <proof-tool, JIT, backend, and runtime surfaces>,
+    evidence: <mathematical evidence status and paths>,
+    reason: <why math writing is or is not authorized>
+  },
+  proof_tool_worker: {
+    owner: <exact proof-tool mechanism owner>,
+    allowed_paths: <extractor/lowering/checker surfaces for this failure>,
+    forbidden_paths: <math algorithm, production main/API/JIT boundary, and unrelated runtime surfaces>,
+    evidence: <native tool receipt and source/consumer evidence>,
+    reason: <why this proof-tool route is selected>
+  },
   return_status: return_to_math | route_infrastructure | blocked_external
 }
 ```
@@ -91,13 +103,16 @@ theorem mismatch may return `return_status=return_to_math` and authorize an algo
 change. A proof-tool failure alone never authorizes changes to `Step_impl`, stopping
 criteria, public API, JIT boundaries, backend configuration, or runtime architecture.
 
-The default math-writer scope permits mathematical definitions/derivations, the
+The default `math_writer` scope permits mathematical definitions/derivations, the
 algorithm mechanism, numerical oracles, and their owning documents/tests. It forbids
 JIT/IR extractors and lowerers, generated Lean/evidence, theorem-graph or proof-status
 generation, Lean/Lake/checker environments, and JIT/backend/runtime configuration.
-Those proof-tool paths may be edited only by an explicitly routed proof-tool worker
-whose packet names the same paths in `allowed_paths`. The proof-tool worker returns a
-native receipt; that receipt is validation evidence and does not decide mathematical
+The `proof_tool_worker` may edit only the same packet's named `allowed_paths`; its
+`forbidden_paths` include the math algorithm unless `return_status=return_to_math`
+has been established by independent mathematical evidence. Both role objects must
+carry `owner`, `allowed_paths`, `forbidden_paths`, `evidence`, and `reason`; no
+unnamed or inherited write scope is valid. The proof-tool worker returns a native
+receipt; that receipt is validation evidence and does not decide mathematical
 correctness. The math owner separately supplies the recurrence/convergence oracle.
 
 ## Use When
@@ -149,8 +164,10 @@ proof-only config/state を追加してはいけません。実行時にすで�
 その値を対象にする場合だけ使い、証明用の値は IR、Lean 関数、lemma graph、または
 `lean/lib` の有限精度モデルで再構成します。
 
-現在の反復写像から target theorem が導けないことが checker-backed に分かった場合だけ、
-code change を検討します。その変更は proof check を production code に入れることではなく、
+現在の反復写像から target theorem が導けないことが、proof-tool failure とは独立した
+checker-backed 数理反例または theorem mismatch として示された場合だけ、
+`return_status=return_to_math` を付けて code change を検討します。その変更は
+proof check を production code に入れることではなく、
 initializer、update rule、line search、inner-solver policy、regularization、Phase I /
 globalization などの algorithm そのものを、証明可能な反復写像へ置き換えることです。
 変更後は IR、backend trace、Lean route、theorem graph、proof-status overlay を再生成し、同じ theorem に
@@ -199,8 +216,8 @@ production code / algorithm choice、`Problem` / config / solve-input、
 backend/runtime architecture boundary に対応するかを示します。
 未接続の theorem graph edge、未展開の generated equation、未接続の generated Lean
 関数、`next_witness`、または repairable extractor / graph / proof-status gap は
-completion でも formal-proof handoff の終端でもありません。これらは同じ
-algorithm-exploration Wave の work item として、修正、再生成、再検査、または
+completion でも formal-proof handoff の終端でもありません。これらは
+`proof_tool_handoff` の proof-tool worker work item として、修正、再生成、再検査、または
 formal-proof 側での checker-backed refutation / unprovability へ進めます。
 handoff できるのは、Target Binding Packet が揃い、かつ未接続 row が
 Goal checklist の required item として機械的に追跡されている場合だけです。
@@ -304,8 +321,12 @@ frontier を checked boundary と誤分類していないかを検査するこ�
    - require the lowering / projection layer to expose public-root argument
      schema, return schema, return leaf indexes, and high-level projection
      functions for theorem-visible return fields. If those projections are
-     missing, fix extraction or the `main` return shape before exploring
-     theorem-specific low-level facts
+     missing, create a `proof_tool_handoff` with
+     `failure.kind=ir_extractor_or_lowering`; only the named proof-tool worker may
+     fix extraction or generated projection code. A production `main` return
+     shape is an algorithm/code change, not a proof-tool repair; the math writer
+     may edit it only if the packet later returns `return_to_math` with
+     checker-backed mathematical evidence.
 1. Algorithm Flowchart:
    - use `$algorithm-flowchart` after IR and theorem-graph generation when a
      human or agent needs to see the implemented iteration path and proof-state
@@ -324,13 +345,16 @@ frontier を checked boundary と誤分類していないかを検査するこ�
    - check iteration slices by `source_symbol` and `equation_tags`, for example
      `step_update`, `reduced_kkt`, `minres_defaults`, and initialization tags
    - if an equation fact is absent from the graph or lacks a
-     `lemma_consumes_code_fact` edge, fix IR extraction or graph generation
-     before writing proof prose or Lean bridge lemmas
+     `lemma_consumes_code_fact` edge, create a `proof_tool_handoff` with
+     `failure.kind=ir_extractor_or_lowering`; the proof-tool worker owns IR
+     extraction or graph generation. The math writer does not repair that gap
+     before writing proof prose or Lean bridge lemmas.
    - for target-critical equation sections, use the relevant projection tool
      with the current JIT-canonical IR files and theorem graph overlay
    - if the generator fails because a required code fact is missing, classify
-     the gap as IR extraction weakness or code-shape opacity before writing
-     proof prose
+     the gap as `ir_extractor_or_lowering` in a `proof_tool_handoff`, assign the
+     exact generator producer/consumer, and let the proof-tool worker repair the
+     extraction or code-shape route before writing proof prose
    - displayed implementation formulas in that section are substituted from
      matched IR `code_facts[*].expression`; proof notes should link to the
      generated section instead of carrying parallel hand-written runtime
@@ -410,8 +434,10 @@ frontier を checked boundary と誤分類していないかを検査するこ�
   - target theorem が消費する値は、`Problem`、config、source path、backend profile
     から生成された implementation value として固定します。KKT 成分、residual 成分、
     stopping scalar、solver return、backend error bound、upper-bound budget などを
-    任意 witness にして proof route を閉じてはいけません。必要なら extractor /
-    generated Lean を直して、`valueOf(problem, config, ...)` 形式の生成関数、
+    任意 witness にして proof route を閉じてはいけません。必要なら
+    `failure.kind=ir_extractor_or_lowering` の `proof_tool_handoff` を作り、
+    proof-tool worker が extractor / generated Lean を直して、
+    `valueOf(problem, config, ...)` 形式の生成関数、
     public-return projection lemma、または same-public-input uniqueness theorem を
     生成します。これができない場合は algorithmic blocker ではなく、まず
     code-shape / extractor / generated-Lean / theorem-graph-wiring boundary として
@@ -458,9 +484,11 @@ frontier を checked boundary と誤分類していないかを検査するこ�
       is verified, refuted, proved unprovable under current top-level assumptions,
       or reduced to a direct code/input/backend boundary with checker evidence
     - if the recursion identifies a repairable extractor / IR / generated-Lean /
-      theorem-graph / proof-overlay gap, repair that surface, regenerate the
-      generated artifacts, and rerun `$formal-proof-workflow` on the same target
-      theorem / theorem profile before returning. Such gaps are not algorithmic blockers. They only become
+      theorem-graph / proof-overlay gap, create a `proof_tool_handoff` and have
+      the named proof-tool worker repair that surface, regenerate the generated
+      artifacts, and rerun `$formal-proof-workflow` on the same target theorem /
+      theorem profile before returning. The math writer must not perform this
+      repair. Such gaps are not algorithmic blockers. They only become
       user-facing if the repaired path still fails at a checked top-level
       input/config/backend boundary or at a genuine algorithmic choice.
       Continue this repair / regenerate / check cycle while the frontier is
@@ -570,9 +598,12 @@ frontier を checked boundary と誤分類していないかを検査するこ�
        algorithm frontier; do not stop at "this change should help" when the
        target theorem can still be tested by `$formal-proof-workflow`
      - when a blocker has an actionable repair path in code, generator, theorem
-       graph, proof status, or proof note, perform that repair and rerun the
-       target theorem once before classifying the blocker as insufficient
-       assumptions or algorithmic change guidance. The exploration loop ends
+       graph, proof status, or proof note, route generator/graph/proof-status
+       repairs through the named `proof_tool_worker` and rerun the target theorem
+       once before classifying the blocker as insufficient assumptions or
+       algorithmic change guidance. A production algorithm/code repair is
+       permitted only after `return_status=return_to_math` carries checker-backed
+       mathematical evidence. The exploration loop ends
        only with a checker-backed theorem, refutation, unprovability result, or
        a direct checked boundary that no repository/tool action can advance.
      - keep the implemented trace as the operational assumption. New bounds,
@@ -586,9 +617,12 @@ frontier を checked boundary と誤分類していないかを検査するこ�
      user が明示的に interim status を求めない限り、次の Wave work item です。
      proposed algorithm change、lower-level witness、
      missing bridge、unconnected function guarantee、one-shot Wave summary、
-     open frontier を持つ graph report は戻り値ではありません。justified な
-     algorithm change / repair を行い、JIT / backend / Lean / theorem-graph artifact を
-     再生成して `$formal-proof-workflow` へ戻す次の work item として扱います。
+     open frontier を持つ graph report は戻り値ではありません。証明 tool の
+     repair は `proof_tool_handoff` の `proof_tool_worker` に限定し、JIT /
+     backend / Lean / theorem-graph artifact を再生成して
+     `$formal-proof-workflow` へ戻す次の work item として扱います。algorithm
+     change は `return_to_math` と checker-backed 数理 evidence がある場合だけ
+     math owner に返します。
 1. Algorithm change guidance:
    - remove unsound gates
    - change an algorithmic choice only when the proof obligation shows that the
