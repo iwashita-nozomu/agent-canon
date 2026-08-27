@@ -28,6 +28,7 @@ from generate_agent_runtime_dashboard import (  # noqa: E402
     TokenUsageBreakdownReader,
     durable_issue_next_action,
     issue_worker_candidate_records,
+    read_issue_publication_receipts,
     read_issue_worker_handoffs,
     token_usage_lines,
     token_usage_next_action,
@@ -134,6 +135,64 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertEqual(len(actions), 1)
         self.assertEqual(actions[0].automation, "host-publisher")
         self.assertIn("read-only", actions[0].command)
+
+    def test_published_issue_receipt_feeds_refs_and_action_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            published = mounted_log_archive_root(root) / "feedback" / "issue-packets" / "published" / "owner" / "repo"
+            published.mkdir(parents=True)
+            (published / "42.json").write_text(
+                json.dumps(
+                    {
+                        "repository": "owner/repo",
+                        "number": "42",
+                        "url": "https://github.com/owner/repo/issues/42",
+                        "state": "OPEN",
+                        "action": "create",
+                        "responsibility": ["issue-owner"],
+                        "occurrence_locations": ["tools/route.py::route"],
+                        "source_finding_kind": "recurrent-failure",
+                        "timestamp": "2026-08-27T00:00:00Z",
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            receipts = read_issue_publication_receipts(root, self.runtime_root)
+
+        self.assertEqual(len(receipts), 1)
+        self.assertEqual(receipts[0].url, "https://github.com/owner/repo/issues/42")
+        self.assertEqual(receipts[0].action, "create")
+
+    def test_dashboard_ignores_noncanonical_receipt_path_or_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            published = mounted_log_archive_root(root) / "feedback" / "issue-packets" / "published" / "owner" / "repo"
+            published.mkdir(parents=True)
+            value = {
+                "repository": "owner/repo",
+                "number": "42",
+                "url": "https://github.com/owner/repo/issues/42",
+                "state": "OPEN",
+                "action": "create",
+                "responsibility": [],
+                "occurrence_locations": [],
+                "source_finding_kind": "",
+                "timestamp": "2026-08-27T00:00:00Z",
+            }
+            (published / "43.json").write_text(
+                json.dumps(value) + "\n", encoding="utf-8"
+            )
+            value["number"] = "44"
+            value["url"] = "https://github.com/owner/repo/issues/44"
+            value["state"] = "pending"
+            (published / "44.json").write_text(
+                json.dumps(value) + "\n", encoding="utf-8"
+            )
+            receipts = read_issue_publication_receipts(root, self.runtime_root)
+
+        self.assertEqual(receipts, ())
     """Verify dashboard output from accumulated runtime evidence."""
 
     def test_iter_entries_tolerates_disappeared_log_file(self) -> None:
@@ -738,6 +797,61 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         )
         self.assertIn("| `namespace_debt_by_hook_family` | `skill_usage=1` |", compact_dashboard)
         self.assertIn("oop_applicability", compact_dashboard)
+
+    def test_api_and_compact_include_published_issue_refs_separate_from_candidates(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            published = mounted_log_archive_root(root) / "feedback" / "issue-packets" / "published" / "owner" / "repo"
+            published.mkdir(parents=True)
+            (published / "42.json").write_text(
+                json.dumps(
+                    {
+                        "repository": "owner/repo",
+                        "number": "42",
+                        "url": "https://github.com/owner/repo/issues/42",
+                        "state": "OPEN",
+                        "action": "update",
+                        "responsibility": ["issue-owner"],
+                        "occurrence_locations": ["tools/route.py::route"],
+                        "source_finding_kind": "recurrent-failure",
+                        "timestamp": "2026-08-27T00:00:00Z",
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            api_output = self.runtime_root / "reports" / "dashboard-api.json"
+            compact_output = self.runtime_root / "reports" / "compact-dashboard.md"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--root",
+                    str(root),
+                    "--out",
+                    str(self.runtime_root / "reports" / "dashboard.md"),
+                    "--compact-out",
+                    str(compact_output),
+                    "--api-out",
+                    str(api_output),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            payload = json.loads(api_output.read_text(encoding="utf-8"))
+            compact = compact_output.read_text(encoding="utf-8")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("https://github.com/owner/repo/issues/42", payload["github_issue_refs"])
+        self.assertEqual(payload["issue_publication_action_counts"], {"update": 1})
+        self.assertEqual(payload["issue_worker"]["published_receipts"], 1)
+        self.assertEqual(payload["issue_worker"]["issue_publication_action_counts"], {"update": 1})
+        self.assertIn("AGENT_RUNTIME_DASHBOARD_ISSUE_PUBLICATION_RECEIPTS=1", compact)
+        self.assertIn("update=1", compact)
+        self.assertIn("published_receipts", compact)
 
     def test_selection_metrics_normalize_workflows_and_known_skills(self) -> None:
         """Selection metrics should compare canonical workflow names only."""

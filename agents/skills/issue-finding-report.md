@@ -431,6 +431,20 @@ publication failure writes only the existing metadata-only pending packet
 (repository, reason, private locator, and digest) and retries through this
 same IssueWorker route.
 
+After a successful GitHub readback, the publisher records and reads back one
+body-free metadata receipt in the private archive's
+`feedback/issue-packets/published/<owner>/<repository>/<number>.json` path
+before consuming a pending packet. The receipt carries only repository,
+number, URL, state, action, responsibility/occurrence locators, source finding
+kind, and timestamp. Receipt/archive failure retains the pending packet and
+must not be reported as successful publication; non-qualified and foreign
+handoffs do not create receipts. The publisher ToolCall invokes the resident
+AgentCanon `issue_sync.py --stage-publication-receipt` subcommand through the
+canonical `bootstrap.sh ... tool run/exec issue_sync -- ...` route after a
+receipt-route preflight, and the host shell archive sync owns the subsequent
+Git commit/push; the dashboard only reads the published namespace. If the
+external runtime/spool route is unavailable, defer before invoking GitHub.
+
 The publisher filters every related Issue against both the candidate repository
 and the current checkout identity before editing. Foreign Issues are retained
 as handoff relations only. `noop` requires the same responsibility tuple and a
@@ -551,7 +565,8 @@ Before writing a new Issue:
    private body locator and digest; it never stores the body or a pending
    marker in AgentCanon source.
 1. Online publication reads back the GitHub URL, repository, number, title,
-   body digest, and state before removing the pending packet.
+   body, and state, then records and reads back the body-free private
+   publication receipt before removing the pending packet.
 
 Issue body sections:
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -45,9 +46,14 @@ from report_artifact_checks import (  # noqa: E402
     markdown_table_dict_rows,
 )
 from runtime_log_paths import eval_result_search_dirs  # noqa: E402
+from runtime_log_paths import mounted_log_archive_root  # noqa: E402
 from runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary  # noqa: E402
 from issue_sync import (  # noqa: E402
+    IssueSyncError,
     IssueWorkerHandoff,
+    normalize_repository,
+    normalize_issue_state,
+    parse_issue_reference,
     qualify_issue_worker_finding,
 )
 
@@ -373,6 +379,35 @@ class ProblemComponent:
 
 
 @dataclass(frozen=True)
+class IssuePublicationReceipt:
+    """One body-free successful Issue publication read from the private log."""
+
+    repository: str
+    number: str
+    url: str
+    state: str
+    action: str
+    responsibility: tuple[str, ...]
+    occurrence_locations: tuple[str, ...]
+    source_finding_kind: str
+    timestamp: str
+
+    def as_dict(self) -> dict[str, object]:
+        """Return the safe dashboard projection without Issue/private bodies."""
+        return {
+            "repository": self.repository,
+            "number": self.number,
+            "url": self.url,
+            "state": self.state,
+            "action": self.action,
+            "responsibility": list(self.responsibility),
+            "occurrence_locations": list(self.occurrence_locations),
+            "source_finding_kind": self.source_finding_kind,
+            "timestamp": self.timestamp,
+        }
+
+
+@dataclass(frozen=True)
 class RuntimeDashboardSummary:
     """All evidence used by one runtime dashboard."""
 
@@ -392,6 +427,7 @@ class RuntimeDashboardSummary:
     reference_capture_breakdown: ReferenceCaptureBreakdown
     selection_metrics_breakdown: SelectionMetricsBreakdown
     issue_worker_handoffs: tuple[IssueWorkerHandoff, ...] = ()
+    issue_publication_receipts: tuple[IssuePublicationReceipt, ...] = ()
 
 
 class ResultFamilyReader:
@@ -1217,6 +1253,123 @@ def issue_worker_candidate_records(entry: Mapping[str, object]) -> tuple[Mapping
     )
 
 
+def issue_publication_receipt_roots(
+    root: Path,
+    runtime_root: Path | str | None = None,
+) -> tuple[Path, ...]:
+    """Return configured/private-log views that may contain Issue receipts."""
+    candidates: list[Path] = []
+    configured = os.environ.get("AGENT_CANON_LOG_ROOT", "").strip()
+    if configured:
+        candidates.append(Path(configured).expanduser().resolve())
+    try:
+        candidates.append(mounted_log_archive_root(root, runtime_root).resolve())
+    except (OSError, RuntimeError):
+        pass
+    return tuple(dict.fromkeys(candidates))
+
+
+def _receipt_strings(value: object) -> tuple[str, ...]:
+    """Return non-empty string values from one receipt list field."""
+    if not isinstance(value, list):
+        return ()
+    return tuple(item.strip() for item in value if isinstance(item, str) and item.strip())
+
+
+def read_issue_publication_receipts(
+    root: Path,
+    runtime_root: Path | str | None = None,
+) -> tuple[IssuePublicationReceipt, ...]:
+    """Read valid body-free Issue publication receipts from the private log."""
+    receipts: dict[tuple[str, str], IssuePublicationReceipt] = {}
+    required = {
+        "repository",
+        "number",
+        "url",
+        "state",
+        "action",
+        "responsibility",
+        "occurrence_locations",
+        "source_finding_kind",
+        "timestamp",
+    }
+    for archive_root in issue_publication_receipt_roots(root, runtime_root):
+        published = archive_root / "feedback" / "issue-packets" / "published"
+        if not published.is_dir() or published.is_symlink():
+            continue
+        try:
+            paths = sorted(published.rglob("*.json"))
+        except OSError:
+            continue
+        for path in paths:
+            if path.is_symlink() or not path.is_file():
+                continue
+            try:
+                relative = path.relative_to(published)
+                path.resolve(strict=False).relative_to(published.resolve(strict=False))
+            except ValueError:
+                continue
+            if any(
+                parent.is_symlink()
+                for parent in path.parents
+                if parent != published
+            ):
+                continue
+            if len(relative.parts) != 3:
+                continue
+            path_owner, path_repo, path_name = relative.parts
+            path_number = path_name.removesuffix(".json")
+            if (
+                path_owner in {"", ".", ".."}
+                or path_repo in {"", ".", ".."}
+                or path_number in {"", ".", ".."}
+                or not re.fullmatch(r"[a-z0-9_.-]+", path_owner)
+                or not re.fullmatch(r"[a-z0-9_.-]+", path_repo)
+                or not re.fullmatch(r"[1-9][0-9]*", path_number)
+            ):
+                continue
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(value, Mapping) or set(value) != required:
+                continue
+            repository = normalize_repository(str(value.get("repository") or ""))
+            number = str(value.get("number") or "")
+            url = str(value.get("url") or "")
+            action = str(value.get("action") or "")
+            if action not in {"create", "update", "reopen", "reorganize", "noop"}:
+                continue
+            try:
+                reference = parse_issue_reference(url, repository)
+                state = normalize_issue_state(str(value.get("state") or ""))
+            except IssueSyncError:
+                continue
+            if reference.repo != repository or reference.number != number:
+                continue
+            if repository != f"{path_owner}/{path_repo}" or number != path_number:
+                continue
+            if not re.fullmatch(r"[1-9][0-9]*", number):
+                continue
+            if not isinstance(value.get("responsibility"), list):
+                continue
+            if not isinstance(value.get("occurrence_locations"), list):
+                continue
+            receipt = IssuePublicationReceipt(
+                repository=repository,
+                number=number,
+                url=url,
+                state=state,
+                action=action,
+                responsibility=_receipt_strings(value.get("responsibility")),
+                occurrence_locations=_receipt_strings(value.get("occurrence_locations")),
+                source_finding_kind=str(value.get("source_finding_kind") or ""),
+                timestamp=str(value.get("timestamp") or ""),
+            )
+            receipts[(repository, number)] = receipt
+    return tuple(sorted(receipts.values(), key=lambda item: (item.repository, int(item.number))))
+
+
 def read_issue_worker_handoffs(
     hook_files: Sequence[Path],
     recent_cutoff_epoch: int | None = None,
@@ -1455,11 +1608,20 @@ class RuntimeDashboardVisuals:
     def issue_row(self) -> str:
         """Return the durable issue action-map row."""
         handoff_count = len(getattr(self.summary, "issue_worker_handoffs", ()))
+        published_urls = {
+            receipt.url
+            for receipt in getattr(self.summary, "issue_publication_receipts", ())
+        }
+        pending_refs = tuple(
+            ref
+            for ref in self.summary.evidence.github_issue_refs
+            if ref not in published_urls
+        )
         return action_map_row(
             "durable issues",
             "route explicit IssueWorker candidates through the host publisher",
             len(self.summary.evidence.github_issue_refs) + handoff_count,
-            bool(self.summary.evidence.github_issue_refs) or handoff_count > 0,
+            bool(pending_refs) or handoff_count > 0,
         )
 
 
@@ -1482,6 +1644,15 @@ class AgentRuntimeDashboard:
     def collect(self) -> RuntimeDashboardSummary:
         """Collect dashboard evidence without mutating repository state."""
         evidence, hook_files = self.collect_evidence()
+        issue_publication_receipts = read_issue_publication_receipts(
+            self.root, self.runtime_root
+        )
+        issue_refs = tuple(
+            sorted(
+                set(evidence.github_issue_refs)
+                | {receipt.url for receipt in issue_publication_receipts}
+            )
+        )
         reader = ResultFamilyReader(
             self.root, self.recent_cutoff_epoch, self.runtime_root
         )
@@ -1493,7 +1664,7 @@ class AgentRuntimeDashboard:
         )
         skill_eval_breakdown = SkillEvalBreakdownReader.read(result_families[0])
         evidence = EvidenceSummary(
-            github_issue_refs=evidence.github_issue_refs,
+            github_issue_refs=issue_refs,
             knowledge_entries=evidence.knowledge_entries,
             skill_eval_reports=result_families[0].reports,
             failed_skill_eval_reports=result_families[0].failed_reports,
@@ -1551,6 +1722,7 @@ class AgentRuntimeDashboard:
                 hook_files,
                 self.recent_cutoff_epoch,
             ),
+            issue_publication_receipts=issue_publication_receipts,
         )
 
     def collect_evidence(self) -> tuple[EvidenceSummary, tuple[Path, ...]]:
@@ -1797,12 +1969,21 @@ def compact_issue_worker_drilldown_lines(summary: RuntimeDashboardSummary) -> li
     """Return typed IssueWorker candidate outcomes without raw log excerpts."""
     handoffs = getattr(summary, "issue_worker_handoffs", ())
     counts = Counter(handoff.status for handoff in handoffs)
+    receipts = getattr(summary, "issue_publication_receipts", ())
+    action_counts = Counter(receipt.action for receipt in receipts)
+    refs = tuple(receipt.url for receipt in receipts)
     return [
         "| outcome | count |",
         "| --- | ---: |",
         f"| `qualified` | `{counts.get('qualified', 0)}` |",
         f"| `handoff` | `{counts.get('handoff', 0)}` |",
         f"| `no-action` | `{counts.get('no-action', 0)}` |",
+        "",
+        "| publication metric | value |",
+        "| --- | --- |",
+        f"| `published_receipts` | `{len(receipts)}` |",
+        f"| `github_issue_refs` | `{', '.join(refs) if refs else 'none'}` |",
+        f"| `issue_publication_action_counts` | `{compact_counter_summary(action_counts)}` |",
     ]
 
 
@@ -2073,12 +2254,16 @@ def compact_oop_applicability(payload: object) -> str:
 
 def render_dashboard_api(summary: RuntimeDashboardSummary) -> str:
     """Render the stable agent-facing dashboard API JSON."""
+    receipts = getattr(summary, "issue_publication_receipts", ())
+    publication_actions = Counter(receipt.action for receipt in receipts)
     payload: dict[str, object] = {
         "schema": "agent_runtime_dashboard.v1",
         "root": summary.root.as_posix(),
         "recent_days": summary.recent_days if summary.recent_days is not None else "all",
         "hook_files": len(summary.hook_files),
         "hook_entries": summary.hook_entries,
+        "github_issue_refs": list(summary.evidence.github_issue_refs),
+        "issue_publication_action_counts": dict(sorted(publication_actions.items())),
     }
     payload.update(hook_schema_breakdown(summary))
     payload.update(dashboard_repair_payload(summary))
@@ -2109,12 +2294,17 @@ def issue_worker_payload(summary: RuntimeDashboardSummary) -> dict[str, object]:
     handoffs = getattr(summary, "issue_worker_handoffs", ())
     counts = Counter(handoff.status for handoff in handoffs)
     reasons = Counter(handoff.reason for handoff in handoffs)
+    receipts = getattr(summary, "issue_publication_receipts", ())
+    action_counts = Counter(receipt.action for receipt in receipts)
     return {
         "qualified": counts.get("qualified", 0),
         "routeable": sum(handoff.can_route for handoff in handoffs),
         "handoff": counts.get("handoff", 0),
         "no_action": counts.get("no-action", 0),
         "reasons": dict(sorted(reasons.items())),
+        "github_issue_refs": [receipt.url for receipt in receipts],
+        "published_receipts": len(receipts),
+        "issue_publication_action_counts": dict(sorted(action_counts.items())),
     }
 
 
@@ -3584,13 +3774,19 @@ def durable_issue_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboa
             issue="`issue-worker`",
             automation="host-publisher",
         ),)
-    if not summary.evidence.github_issue_refs:
+    published_urls = {
+        receipt.url for receipt in getattr(summary, "issue_publication_receipts", ())
+    }
+    pending_refs = tuple(
+        ref for ref in summary.evidence.github_issue_refs if ref not in published_urls
+    )
+    if not pending_refs:
         return ()
-    issue = summary.evidence.github_issue_refs[0]
+    issue = pending_refs[0]
     return (DashboardNextAction(
         priority="P2",
         action="triage oldest open durable issue",
-        reason=f"{len(summary.evidence.github_issue_refs)} repository-qualified GitHub Issue references are pending",
+        reason=f"{len(pending_refs)} repository-qualified GitHub Issue references are pending",
         evidence=issue,
         owner_surface="GitHub Issue URL/number and private packet locator",
         command="python3 tools/agent_tools/issue_sync.py --sync-pending",
@@ -3663,6 +3859,8 @@ def relative_path_label(path: Path, root: Path) -> str:
 
 def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
     """Return the machine-readable summary block."""
+    receipts = getattr(summary, "issue_publication_receipts", ())
+    publication_actions = Counter(receipt.action for receipt in receipts)
     return [
         "AGENT_RUNTIME_DASHBOARD_STATUS=pass",
         f"AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT={summary.root.as_posix()}",
@@ -3711,6 +3909,8 @@ def machine_summary_lines(summary: RuntimeDashboardSummary) -> list[str]:
         f"AGENT_RUNTIME_DASHBOARD_NEXT_ACTIONS={len(dashboard_next_actions(summary))}",
         f"AGENT_RUNTIME_DASHBOARD_BLOCKING_NEXT_ACTIONS={blocking_next_action_count(summary)}",
         f"AGENT_RUNTIME_DASHBOARD_GITHUB_ISSUE_REFS={len(summary.evidence.github_issue_refs)}",
+        f"AGENT_RUNTIME_DASHBOARD_ISSUE_PUBLICATION_RECEIPTS={len(receipts)}",
+        f"AGENT_RUNTIME_DASHBOARD_ISSUE_PUBLICATION_ACTIONS={compact_counter_summary(publication_actions)}",
         f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_QUALIFIED={sum(handoff.qualifies for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",
         f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_ROUTEABLE={sum(handoff.can_route for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",
         f"AGENT_RUNTIME_DASHBOARD_ISSUE_WORKER_HANDOFFS={sum(handoff.status == 'handoff' for handoff in getattr(summary, 'issue_worker_handoffs', ())) }",

@@ -87,7 +87,10 @@ GIT_PORCELAIN_STATUS_MIN_LINE_LENGTH = GIT_PORCELAIN_STATUS_PATH_START
 REPORT_SNAPSHOT_DIGEST_CHARS = 64
 PUBLICATION_RETRY_LIMIT = 3
 REPO_KEYED_ARCHIVE_FAMILIES = frozenset({"agent-reports", "codex-runtime", "hook-runs"})
-MANAGED_GLOBAL_ARCHIVE_FAMILIES = frozenset({"eval-results", "legacy-import"})
+MANAGED_GLOBAL_ARCHIVE_FAMILIES = frozenset(
+    {"eval-results", "legacy-import", "feedback"}
+)
+ISSUE_PUBLICATION_ARCHIVE_ROOT = Path("feedback") / "issue-packets" / "published"
 BRANCH_SWITCH_COMMIT_MESSAGE = "Preserve managed runtime logs before branch switch"
 GIT_INDEX_LOCK_MESSAGE = "index.lock"
 GIT_INDEX_LOCK_RETRIES = 5
@@ -6144,6 +6147,7 @@ def stage_archive_paths(transaction: PreparedArchiveTransaction) -> None:
         DEFAULT_AGENT_REPORT_DESTINATION / context.repo_key,
         Path("eval-results"),
         Path("legacy-import"),
+        ISSUE_PUBLICATION_ARCHIVE_ROOT,
     ]
     existing = [path.as_posix() for path in log_paths if (context.archive_root / path).exists()]
     if existing:

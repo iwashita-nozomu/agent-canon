@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,6 +34,7 @@ if __package__:
         materialize_prompt_capsule,
     )
     from .tool_calls import (
+        build_issue_receipt_stage_command,
         materialize_issue_worker_tool_call,
         materialize_subagent_spawn_tool_call,
     )
@@ -51,6 +53,7 @@ else:
         materialize_prompt_capsule,
     )
     from tool_calls import (  # type: ignore[no-redef]
+        build_issue_receipt_stage_command,
         materialize_issue_worker_tool_call,
         materialize_subagent_spawn_tool_call,
     )
@@ -115,6 +118,59 @@ def dispatch_issue_worker(
     ):
         return IssueWorkerDispatch("deferred", handoff, identity)
     registry_root = Path(source_root).expanduser().resolve() if source_root else workspace
+    registry_available = (registry_root / "agents" / "agents_config.json").is_file()
+    runtime_value = os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
+    control_parent_value = os.environ.get("AGENT_CANON_CONTROL_PARENT_ROOT", "").strip()
+    canonical_source_root = registry_root
+    bootstrap = canonical_source_root / "bootstrap.sh"
+    missing_route: list[str] = []
+    if not runtime_value or not Path(runtime_value).expanduser().is_absolute():
+        missing_route.append("runtime_root")
+    if not control_parent_value or not Path(control_parent_value).expanduser().is_absolute():
+        missing_route.append("control_parent_root")
+    if not bootstrap.is_file():
+        missing_route.append("bootstrap")
+    if not registry_available:
+        missing_route.append("source_root")
+        registry_root = Path(__file__).resolve().parents[2]
+    publication_mode = "publish" if not missing_route else "investigate_only"
+    publication_reason = "" if not missing_route else "receipt_route_unavailable:" + ",".join(missing_route)
+    command_source_root = str(canonical_source_root) if bootstrap.is_file() else "<source-root>"
+    command_runtime_root = (
+        str(Path(runtime_value).expanduser().resolve())
+        if runtime_value and Path(runtime_value).expanduser().is_absolute()
+        else "<runtime-root>"
+    )
+    command_control_parent = (
+        str(Path(control_parent_value).expanduser().resolve())
+        if control_parent_value and Path(control_parent_value).expanduser().is_absolute()
+        else "<control-parent-root>"
+    )
+    receipt_preflight_command = (
+        build_issue_receipt_stage_command(
+            repository=normalize_repository(identity.remote),
+            runtime_root=command_runtime_root,
+            source_root=command_source_root,
+            control_parent_root=command_control_parent,
+            checkout_identity=identity.as_dict(),
+            bootstrap=str(bootstrap) if bootstrap.is_file() else "./bootstrap.sh",
+            preflight=True,
+        )
+        if publication_mode == "publish"
+        else ()
+    )
+    receipt_stage_command = (
+        build_issue_receipt_stage_command(
+            repository=normalize_repository(identity.remote),
+            runtime_root=command_runtime_root,
+            source_root=command_source_root,
+            control_parent_root=command_control_parent,
+            checkout_identity=identity.as_dict(),
+            bootstrap=str(bootstrap) if bootstrap.is_file() else "./bootstrap.sh",
+        )
+        if publication_mode == "publish"
+        else ()
+    )
     registry = load_model_profile_registry(workspace, source_root=registry_root)
     evidence: dict[str, Any] = {
         "issue_worker_handoff": handoff.as_dict(),
@@ -130,8 +186,16 @@ def dispatch_issue_worker(
                 ContextItem(
                     "context",
                     {
-                        "issue_worker": "plan then publish through the host adapter",
+                        "issue_worker": (
+                            "investigate owner/cause and return deferred"
+                            if publication_mode == "investigate_only"
+                            else "plan then publish through the host adapter"
+                        ),
                         "checkout_identity": identity.as_dict(),
+                        "publication_mode": publication_mode,
+                        "publication_reason": publication_reason,
+                        "receipt_preflight_command": list(receipt_preflight_command),
+                        "receipt_stage_command": list(receipt_stage_command),
                     },
                 ),
                 ContextItem("request_clause_ids", list(request_clause_ids)),
@@ -170,6 +234,12 @@ def dispatch_issue_worker(
         handoff=handoff.as_dict(),
         publisher_agent_id=publisher_agent_id,
         checkout_repository=normalize_repository(identity.remote),
+        checkout_identity=identity.as_dict(),
+        runtime_root=command_runtime_root,
+        source_root=command_source_root,
+        control_parent_root=command_control_parent,
+        publication_mode=publication_mode,
+        publication_reason=publication_reason,
     )
     return IssueWorkerDispatch(
         "spawned",
