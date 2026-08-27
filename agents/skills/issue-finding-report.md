@@ -439,7 +439,8 @@ number, URL, state, action, responsibility/occurrence locators, source finding
 kind, and timestamp. Receipt/archive failure retains the pending packet and
 must not be reported as successful publication; non-qualified and foreign
 handoffs do not create receipts. The publisher ToolCall invokes the resident
-AgentCanon `issue_sync.py --stage-publication-receipt` subcommand after a
+AgentCanon `issue_sync.py --stage-publication-receipt` subcommand through the
+canonical `bootstrap.sh ... tool run/exec issue_sync -- ...` route after a
 receipt-route preflight, and the host shell archive sync owns the subsequent
 Git commit/push; the dashboard only reads the published namespace. If the
 external runtime/spool route is unavailable, defer before invoking GitHub.

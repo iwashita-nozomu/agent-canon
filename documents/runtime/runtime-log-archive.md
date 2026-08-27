@@ -62,10 +62,11 @@ not enter the receipt. A publisher reads the GitHub result back first, writes
 and reads back this receipt, and only then removes a pending packet. Failed or
 uncertain publication retains the pending packet. `runtime_log_archive_git.py
 sync` stages this published namespace with the existing private archive
-families so the host shell remains the Git publisher. The resident writer is
-`issue_sync.py --stage-publication-receipt`; its runtime/spool route is a
-precondition for GitHub mutation and its sync request is consumed by the
-existing private-feedback host synchronization path.
+families so the host shell remains the Git publisher. The publisher injects a
+resident writer and invokes `bootstrap.sh ... tool run/exec issue_sync --
+--stage-publication-receipt`; its runtime/spool route is a precondition for
+GitHub mutation and its sync request is consumed by the existing
+private-feedback host synchronization path.
 
 The durable archive layout and its operational checkout are owned by
 `agent-canon-log`; consumers should use its current branch contract rather

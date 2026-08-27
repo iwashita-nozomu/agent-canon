@@ -148,6 +148,40 @@ class IssueSyncReport:
     github_unavailable: int = 0
 
 
+@dataclass(frozen=True)
+class ResidentReceiptStager:
+    """Injected resident-container route for body-free receipt staging."""
+
+    runtime_root: Path
+    checkout_identity: object | None = None
+    source_root: Path | None = None
+
+    def preflight(self) -> None:
+        """Verify the external runtime/spool route before GitHub mutation."""
+        root = _runtime_root(self.runtime_root)
+        _ensure_private_feedback_sync_request(
+            root,
+            checkout_identity=self.checkout_identity,
+            source_root=self.source_root,
+        )
+
+    def __call__(
+        self,
+        record: GitHubIssueRecord,
+        action: str,
+        handoff: IssueWorkerHandoff,
+    ) -> Path:
+        """Stage one receipt through the resident private-feedback route."""
+        return stage_issue_publication_receipt(
+            self.runtime_root,
+            record,
+            action=action,
+            handoff=handoff,
+            checkout_identity=self.checkout_identity,
+            source_root=self.source_root,
+        )
+
+
 def _issue_publication_repo_path(repository: str) -> tuple[str, str]:
     """Return safe owner/repository path components for one Issue receipt."""
     raw_parts = repository.strip().replace("\\", "/").split("/")
@@ -220,13 +254,16 @@ def _issue_publication_receipt_payload(
     value = source_finding_kind
     if not value and handoff is not None:
         value = handoff.source_finding_kind
+    responsibility = list(handoff.responsibility) if handoff is not None else []
+    if handoff is not None and handoff.fix and handoff.fix not in responsibility:
+        responsibility.append(handoff.fix)
     return {
         "repository": repository,
         "number": str(record.number),
         "url": record.url,
         "state": record.state,
         "action": action,
-        "responsibility": list(handoff.responsibility) if handoff is not None else [],
+        "responsibility": responsibility,
         "occurrence_locations": list(handoff.occurrence_locations) if handoff is not None else [],
         "source_finding_kind": value,
         "timestamp": timestamp
@@ -259,6 +296,37 @@ def write_issue_publication_receipt(
     path = issue_publication_receipt_path(log_root, record.repository, record.number)
     temporary: Path | None = None
     prior: bytes | None = None
+    prior_mode = 0o600
+    replaced = False
+
+    def restore_prior() -> None:
+        """Restore the previous bytes atomically, or remove a new file."""
+        if prior is None:
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
+            return
+        restore_handle = tempfile.NamedTemporaryFile(
+            mode="wb",
+            prefix=f".{path.name}.restore.",
+            suffix=".tmp",
+            dir=path.parent,
+            delete=False,
+        )
+        restore_path = Path(restore_handle.name)
+        try:
+            restore_handle.write(prior)
+            restore_handle.flush()
+            os.fsync(restore_handle.fileno())
+        finally:
+            restore_handle.close()
+        try:
+            restore_path.chmod(prior_mode)
+            os.replace(restore_path, path)
+        finally:
+            restore_path.unlink(missing_ok=True)
+
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.is_symlink() or (path.exists() and not path.is_file()):
@@ -274,6 +342,7 @@ def write_issue_publication_receipt(
                 )
         if path.exists():
             prior = path.read_bytes()
+            prior_mode = path.stat().st_mode & 0o777
             existing = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(existing, dict):
                 raise IssueSyncError("issue_receipt_conflict", "existing receipt is not an object")
@@ -301,18 +370,23 @@ def write_issue_publication_receipt(
             raise IssueSyncError("issue_receipt_readback_failed", "publication receipt temp readback differs")
         os.replace(temporary, path)
         temporary = None
+        replaced = True
         observed = json.loads(path.read_text(encoding="utf-8"))
     except IssueSyncError:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
+        if replaced:
+            restore_prior()
         raise
     except (OSError, json.JSONDecodeError, TypeError) as exc:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
-        if prior is not None and path.exists() and path.read_bytes() != prior:
-            path.write_bytes(prior)
+        if replaced:
+            restore_prior()
         raise IssueSyncError("issue_receipt_write_failed", "publication receipt could not be written") from exc
     if observed != payload or set(observed) != set(ISSUE_PUBLICATION_RECEIPT_FIELDS):
+        if replaced:
+            restore_prior()
         raise IssueSyncError("issue_receipt_readback_failed", "publication receipt readback differs")
     return path
 
@@ -335,6 +409,22 @@ def read_issue_publication_receipt(
     if not isinstance(value, dict) or set(value) != set(ISSUE_PUBLICATION_RECEIPT_FIELDS):
         raise IssueSyncError("issue_receipt_invalid", "publication receipt fields are invalid")
     payload = dict(value)
+    if (
+        not isinstance(payload.get("responsibility"), list)
+        or not isinstance(payload.get("occurrence_locations"), list)
+        or not all(isinstance(item, str) for item in payload["responsibility"])
+        or not all(isinstance(item, str) for item in payload["occurrence_locations"])
+        or not isinstance(payload.get("repository"), str)
+        or not isinstance(payload.get("number"), str)
+        or not isinstance(payload.get("url"), str)
+        or not isinstance(payload.get("state"), str)
+        or not isinstance(payload.get("action"), str)
+        or not isinstance(payload.get("source_finding_kind"), str)
+        or not isinstance(payload.get("timestamp"), str)
+    ):
+        raise IssueSyncError("issue_receipt_invalid", "publication receipt values are invalid")
+    if payload["action"] not in {"create", "update", "reopen", "reorganize", "noop"}:
+        raise IssueSyncError("issue_receipt_invalid", "publication receipt action is invalid")
     identity = parse_issue_reference(str(payload.get("url") or ""), repository)
     if identity.repo != normalize_repository(repository) or identity.number != str(number):
         raise IssueSyncError("issue_receipt_identity_mismatch", "publication receipt identity differs")
@@ -352,11 +442,30 @@ def find_issue_publication_receipt(
 ) -> dict[str, object] | None:
     """Find a prior stable receipt for retry idempotency without body matching."""
     if number:
-        return read_issue_publication_receipt(log_root, repository, number)
+        receipt = read_issue_publication_receipt(log_root, repository, number)
+        if receipt is None or handoff is None:
+            return receipt
+        expected_responsibility = (
+            (*handoff.responsibility, handoff.fix)
+            if handoff.fix and handoff.fix not in handoff.responsibility
+            else handoff.responsibility
+        )
+        if (
+            tuple(receipt.get("responsibility", ())) != expected_responsibility
+            or tuple(receipt.get("occurrence_locations", ())) != handoff.occurrence_locations
+            or receipt.get("source_finding_kind") != handoff.source_finding_kind
+        ):
+            return None
+        return receipt
     published = log_root.expanduser().resolve(strict=False) / "feedback" / "issue-packets" / "published"
     if not published.is_dir() or published.is_symlink():
         return None
     matches: list[dict[str, object]] = []
+    expected_responsibility = (
+        (*handoff.responsibility, handoff.fix)
+        if handoff is not None and handoff.fix and handoff.fix not in handoff.responsibility
+        else handoff.responsibility if handoff is not None else ()
+    )
     for path in sorted(published.rglob("*.json")):
         if path.is_symlink() or not path.is_file():
             continue
@@ -380,7 +489,7 @@ def find_issue_publication_receipt(
         if path.resolve(strict=False) != canonical.resolve(strict=False):
             continue
         if handoff is not None:
-            if tuple(value.get("responsibility", ())) != handoff.responsibility:
+            if tuple(value.get("responsibility", ())) != expected_responsibility:
                 continue
             if tuple(value.get("occurrence_locations", ())) != handoff.occurrence_locations:
                 continue
@@ -431,21 +540,89 @@ def issue_publication_receipt_spool_path(
     )
 
 
-def _ensure_private_feedback_sync_request(runtime_root: Path) -> Path:
+def _checkout_identity_value(identity: object | None, key: str) -> str:
+    """Read one non-empty field from a checkout identity mapping/object."""
+    if identity is None:
+        return ""
+    if isinstance(identity, Mapping):
+        value = identity.get(key)
+    else:
+        value = getattr(identity, key, "")
+    return str(value or "").strip()
+
+
+def _source_commit_for_sync(
+    checkout_identity: object | None = None,
+    source_root: Path | None = None,
+) -> str:
+    """Resolve the source HEAD carried by identity or the explicit checkout."""
+    identity_head = _checkout_identity_value(checkout_identity, "head")
+    if re.fullmatch(r"[0-9a-f]{40,64}", identity_head):
+        return identity_head
+    configured = os.environ.get("AGENT_CANON_SOURCE_COMMIT", "").strip()
+    if re.fullmatch(r"[0-9a-f]{40,64}", configured):
+        return configured
+    root = source_root or Path.cwd()
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--verify", "HEAD"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return ""
+    value = result.stdout.strip()
+    return value if result.returncode == 0 and re.fullmatch(r"[0-9a-f]{40,64}", value) else ""
+
+
+def _ensure_private_feedback_sync_request(
+    runtime_root: Path,
+    *,
+    checkout_identity: object | None = None,
+    source_root: Path | None = None,
+) -> Path:
     """Create the existing body-free private-feedback host sync request."""
     spool = _runtime_root(runtime_root) / PRIVATE_FEEDBACK_SPOOL_RELATIVE
     spool.mkdir(parents=True, exist_ok=True)
+    spool.chmod(0o700)
     request = spool / PRIVATE_FEEDBACK_SYNC_REQUEST_NAME
+    source_commit = _source_commit_for_sync(checkout_identity, source_root)
+    if not source_commit:
+        raise IssueSyncError(
+            "private-feedback-sync-request-invalid",
+            "checkout source commit is unavailable",
+        )
     payload = {
         "schema": PRIVATE_FEEDBACK_SYNC_REQUEST_SCHEMA,
         "operation": "sync",
         "execution_plane": "agentcanon_tool_container",
+        "requested_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "source_commit": source_commit,
     }
-    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
     if request.is_symlink() or (request.exists() and not request.is_file()):
         raise IssueSyncError("private-feedback-sync-request-invalid", "sync request is not a regular file")
-    if request.exists() and request.read_text(encoding="utf-8") != encoded:
-        raise IssueSyncError("private-feedback-sync-request-conflict", "sync request has different metadata")
+    if request.exists():
+        try:
+            existing = json.loads(request.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise IssueSyncError("private-feedback-sync-request-invalid", "sync request is invalid") from exc
+        required = {
+            "schema", "operation", "execution_plane", "requested_at", "source_commit"
+        }
+        if not isinstance(existing, Mapping) or set(existing) != required:
+            raise IssueSyncError("private-feedback-sync-request-invalid", "sync request fields are incomplete")
+        if (
+            existing.get("schema") != PRIVATE_FEEDBACK_SYNC_REQUEST_SCHEMA
+            or existing.get("operation") != "sync"
+            or existing.get("execution_plane") != "agentcanon_tool_container"
+            or not isinstance(existing.get("requested_at"), str)
+            or not isinstance(existing.get("source_commit"), str)
+            or not re.fullmatch(r"[0-9a-f]{40,64}", str(existing["source_commit"]))
+        ):
+            raise IssueSyncError("private-feedback-sync-request-invalid", "sync request values are invalid")
+        return request
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
     if not request.exists():
         request.write_text(encoded, encoding="utf-8")
         request.chmod(0o600)
@@ -460,11 +637,17 @@ def stage_issue_publication_receipt(
     handoff: IssueWorkerHandoff | None = None,
     source_finding_kind: str = "",
     timestamp: str | None = None,
+    checkout_identity: object | None = None,
+    source_root: Path | None = None,
 ) -> Path:
     """Stage a receipt in the resident private-feedback spool and read it back."""
     root = _runtime_root(runtime_root)
     path = issue_publication_receipt_spool_path(root, record.repository, record.number)
-    _ensure_private_feedback_sync_request(root)
+    _ensure_private_feedback_sync_request(
+        root,
+        checkout_identity=checkout_identity,
+        source_root=source_root,
+    )
     return write_issue_publication_receipt(
         root / PRIVATE_FEEDBACK_SPOOL_RELATIVE,
         record,
@@ -909,41 +1092,47 @@ class IssueWorker:
         body_digest: str = "",
         run: str = "",
         task: str = "",
-        publication_log_root: Path | None = None,
-        publication_runtime_root: Path | None = None,
+        receipt_stager: ResidentReceiptStager | object | None = None,
+        allow_create: bool = True,
     ) -> GitHubIssueRecord:
         """Publish and enqueue a metadata-only retry packet on failure."""
         try:
-            runtime_root = publication_runtime_root
-            if runtime_root is None:
-                configured_runtime = os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
-                runtime_root = Path(configured_runtime) if configured_runtime else None
-            if runtime_root is not None:
-                runtime_root = _runtime_root(runtime_root)
-                _ensure_private_feedback_sync_request(runtime_root)
-            else:
+            if receipt_stager is None or not callable(receipt_stager):
                 raise IssueSyncError(
                     "issue_receipt_route_unavailable",
-                    "resident runtime receipt route is required before GitHub mutation",
+                    "injected resident receipt stager is required before GitHub mutation",
                 )
+            preflight = getattr(receipt_stager, "preflight", None)
+            if not callable(preflight):
+                raise IssueSyncError(
+                    "issue_receipt_route_unavailable",
+                    "receipt stager preflight is unavailable before GitHub mutation",
+                )
+            try:
+                preflight()
+            except IssueSyncError:
+                raise
+            except Exception as exc:
+                raise IssueSyncError(
+                    "issue_receipt_route_unavailable",
+                    "receipt stager preflight failed before GitHub mutation",
+                ) from exc
             record, action = self._publish(
                 handoff,
                 title=title,
                 body=body,
                 related_issues=related_issues,
+                allow_create=allow_create,
             )
-            if runtime_root is not None:
-                stage_issue_publication_receipt(
-                    runtime_root,
-                    record,
-                    action=action,
-                    handoff=handoff,
-                )
-            else:
+            try:
+                receipt_stager(record, action, handoff)
+            except IssueSyncError:
+                raise
+            except Exception as exc:
                 raise IssueSyncError(
-                    "issue_receipt_route_unavailable",
-                    "resident runtime receipt route is required after GitHub readback",
-                )
+                    "issue_receipt_write_failed",
+                    "injected receipt stager failed after GitHub readback",
+                ) from exc
             return record
         except IssueSyncError as error:
             if (
@@ -974,6 +1163,7 @@ class IssueWorker:
         title: str,
         body: str,
         related_issues: Iterable[GitHubIssueRecord] = (),
+        allow_create: bool = True,
     ) -> tuple[GitHubIssueRecord, str]:
         """Apply one planned operation through the host GitHub adapter.
 
@@ -996,13 +1186,22 @@ class IssueWorker:
         all_records = tuple(related_issues)
         if not all_records and handoff.related_issue_refs:
             all_records = self.related_issue_set(handoff.related_issue_refs)
-        discovered = self.search_related_issue_set(handoff)
+        discovered = (
+            self.search_related_issue_set(handoff)
+            if not all_records
+            else ()
+        )
         by_url = {record.url: record for record in all_records}
         by_url.update({record.url: record for record in discovered})
         all_records = tuple(by_url.values())
         records, _foreign_refs = self._filter_related_issues(handoff, all_records)
         plan = self.plan_publication(handoff, all_records)
         if plan.action == "create":
+            if not allow_create:
+                raise IssueSyncError(
+                    "issue_worker_retry_unresolved",
+                    "retry search found no exact same-responsibility Issue",
+                )
             candidate_body = body
             for foreign_ref in plan.foreign_issue_refs:
                 candidate_body = self._append_relation(
@@ -1365,6 +1564,13 @@ def sync_pending_packet(
         )
     configured_runtime = _runtime_root(configured_runtime)
     receipt_root = configured_runtime / PRIVATE_FEEDBACK_SPOOL_RELATIVE
+    identity_root = _checkout_identity_value(checkout_identity, "git_root")
+    receipt_stager = ResidentReceiptStager(
+        configured_runtime,
+        checkout_identity=checkout_identity,
+        source_root=Path(identity_root) if identity_root and identity_root != "unknown" else Path.cwd(),
+    )
+    receipt_stager.preflight()
     raw_handoff = payload.get("handoff")
     handoff = (
         qualify_issue_worker_finding(
@@ -1395,19 +1601,35 @@ def sync_pending_packet(
         return record
     repository = current_repository
     if handoff is not None:
-        record = IssueWorker(client, repository).publish(
+        worker = IssueWorker(client, repository)
+        discovered = worker.search_related_issue_set(handoff)
+        if len(discovered) != 1:
+            raise IssueSyncError(
+                "issue_worker_retry_unresolved",
+                "retry requires exactly one same-responsibility Issue readback",
+            )
+        record = worker.publish(
             handoff,
             title=str(payload["title"]),
             body=body,
-            publication_runtime_root=configured_runtime,
+            related_issues=discovered,
+            receipt_stager=receipt_stager,
+            allow_create=False,
         )
     else:
         record = client.create(repository, str(payload["title"]), body)
-        stage_issue_publication_receipt(
-            configured_runtime,
+        receipt_stager(
             record,
-            action="create",
-            source_finding_kind=str(payload.get("source_finding_kind") or ""),
+            "create",
+            IssueWorkerHandoff(
+                status="qualified",
+                reason="published-readback",
+                repository=repository,
+                owner="",
+                fix="",
+                occurrence_locations=(),
+                source_finding_kind=str(payload.get("source_finding_kind") or ""),
+            ),
         )
     path.unlink()
     return record
@@ -1589,7 +1811,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             packets = sorted((root / "feedback/issue-packets/pending").glob("*.json"))
             identity = resolve_checkout_identity(Path.cwd())
             records = [
-                sync_pending_packet(path, client, checkout_identity=identity)
+                sync_pending_packet(
+                    path,
+                    client,
+                    checkout_identity=identity,
+                    runtime_root=args.runtime_root,
+                )
                 for path in packets
             ]
             print(json.dumps({"schema": PACKET_SCHEMA, "status": "synced", "issues": [record.url for record in records]}, sort_keys=True))
