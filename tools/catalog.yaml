@@ -1732,6 +1732,43 @@ entries:
     tests:
       - tests/agent_tools/test_skill_document_reader.py
 
+  - id: issue-sync
+    summary: Runs the body-free Issue publication receipt preflight and staging adapter in the resident AgentCanon tool container.
+    path: tools/agent_tools/issue_sync.py
+    family: agent_tools
+    role: sync
+    status: canonical
+    command: bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root> tool run --root <registered-source-root> issue-sync -- --receipt-preflight
+    writes: true
+    dispatch:
+      runtime: python
+      argv: [python3, tools/agent_tools/issue_sync.py]
+      execution_plane: tool-container
+      cwd: source-root
+      env: allowlisted
+      stdin: inherited
+      stdout: inherited
+      stderr: inherited
+      exit: propagate
+      signal: propagate
+      side_effect: external-artifact
+      output_root: external-runtime
+      written_paths: []
+      parity: verified
+      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/skills/issue-finding-report.md
+      - documents/runtime/runtime-log-archive.md
+    tests:
+      - tests/agent_tools/test_issue_sync.py
+      - tests/agent_tools/test_tool_calls.py
+      - tests/agent_tools/test_tool_dispatch.py
+
   - id: vendor-skill-adapters
     summary: Validates and materializes third-party skill adapters from AgentCanon internal vendor storage.
     path: tools/agent_tools/vendor_skill_adapters.py

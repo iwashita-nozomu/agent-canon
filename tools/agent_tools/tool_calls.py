@@ -99,7 +99,7 @@ def build_issue_receipt_stage_command(
         execution,
         "--root",
         source_root,
-        "issue_sync",
+        "issue-sync",
         "--",
         "--receipt-preflight" if preflight else "--stage-publication-receipt",
         "--runtime-root",

@@ -263,6 +263,7 @@ def test_container_receipt_stager_runs_resident_cli_argv(tmp_path: Path) -> None
     stager.preflight()
     stager(record, "create", handoff)
     assert len(commands) == 2
+    assert all("issue-sync" in command for command in commands)
     assert "--receipt-preflight" in commands[0]
     assert "--stage-publication-receipt" in commands[1]
     assert issue_sync.issue_publication_receipt_spool_path(

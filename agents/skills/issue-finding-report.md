@@ -440,7 +440,7 @@ kind, and timestamp. Receipt/archive failure retains the pending packet and
 must not be reported as successful publication; non-qualified and foreign
 handoffs do not create receipts. The publisher ToolCall invokes the resident
 AgentCanon `issue_sync.py --stage-publication-receipt` subcommand through the
-canonical `bootstrap.sh ... tool run/exec issue_sync -- ...` route after a
+canonical `bootstrap.sh ... tool run/exec issue-sync -- ...` route after a
 receipt-route preflight, and the host shell archive sync owns the subsequent
 Git commit/push; the dashboard only reads the published namespace. If the
 external runtime/spool route is unavailable, defer before invoking GitHub.
@@ -658,10 +658,12 @@ Issue and evidence classification rather than creating another registry entry.
 
 ## Validation
 
-Run focused GitHub adapter and skill wiring checks after changing this route:
+Run the focused resident-container receipt route and skill wiring checks after changing this route:
 
 ```bash
-python3 tools/agent_tools/issue_sync.py --issue-url https://github.com/iwashita-nozomu/agent-canon/issues/<number>
+./bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root> \
+  tool run --root <registered-source-root> issue-sync -- --receipt-preflight \
+  --checkout-head <source-commit> --checkout-repository <owner/repository>
 python3 tools/agent_tools/check_skill_frontmatter.py --root .
 python3 tools/agent_tools/skill_tool_commands.py check
 python3 tools/agent_tools/skill_shim_materializer.py check --root .

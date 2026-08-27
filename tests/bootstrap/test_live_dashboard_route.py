@@ -116,6 +116,65 @@ def test_resident_dashboard_route_uses_target_and_private_archive(tmp_path: Path
         assert installed.returncode == 0, installed.stdout + installed.stderr
         registered = run_bootstrap(source, control, "target", "add", "--root", str(target), "--mode", "read-only")
         assert registered.returncode == 0, registered.stdout + registered.stderr
+        runtime = control / "runtime" / "container-state"
+        target_head = subprocess.run(
+            ["git", "-C", str(target), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        receipt_preflight = run_bootstrap(
+            source,
+            control,
+            "tool",
+            "run",
+            "--root",
+            str(target),
+            "issue-sync",
+            "--",
+            "--receipt-preflight",
+            "--checkout-head",
+            target_head,
+            "--checkout-repository",
+            "example/live-target",
+        )
+        assert receipt_preflight.returncode == 0, (
+            receipt_preflight.stdout + receipt_preflight.stderr
+        )
+        receipt_stage = run_bootstrap(
+            source,
+            control,
+            "tool",
+            "run",
+            "--root",
+            str(target),
+            "issue-sync",
+            "--",
+            "--stage-publication-receipt",
+            "--repo",
+            "example/live-target",
+            "--receipt-number",
+            "1",
+            "--receipt-url",
+            "https://github.com/example/live-target/issues/1",
+            "--receipt-state",
+            "OPEN",
+            "--receipt-action",
+            "create",
+            "--checkout-head",
+            target_head,
+            "--checkout-repository",
+            "example/live-target",
+        )
+        assert receipt_stage.returncode == 0, receipt_stage.stdout + receipt_stage.stderr
+        receipt_path = (
+            runtime / "spool" / "private-feedback" / "feedback" / "issue-packets"
+            / "published" / "example" / "live-target" / "1.json"
+        )
+        assert receipt_path.is_file()
+        receipt_text = receipt_path.read_text(encoding="utf-8")
+        assert "body" not in receipt_text
+        assert "private" not in receipt_text
         dashboard = run_bootstrap(
             source,
             control,
@@ -135,7 +194,6 @@ def test_resident_dashboard_route_uses_target_and_private_archive(tmp_path: Path
             "reports/live-dashboard/api.json",
         )
         assert dashboard.returncode == 0, dashboard.stdout + dashboard.stderr
-        runtime = control / "runtime" / "container-state"
         api = json.loads((runtime / "reports/live-dashboard/api.json").read_text(encoding="utf-8"))
         assert api["root"].startswith("/targets/")
         assert api["hook_files"] == 1

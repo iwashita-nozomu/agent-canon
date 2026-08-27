@@ -43,7 +43,7 @@ def test_issue_worker_tool_call_contains_post_publication_container_command() ->
         "run",
         "--root",
     )
-    assert "issue_sync" in command
+    assert "issue-sync" in command
     assert "--stage-publication-receipt" in command
     assert "--checkout-head" in command
     assert "--checkout-repository" in command
@@ -79,7 +79,7 @@ def test_receipt_stage_command_contains_readback_metadata_without_body() -> None
         "exec",
         "--root",
         "/project",
-        "issue_sync",
+        "issue-sync",
     )
     assert "--receipt-number" in command
     assert "42" in command

@@ -55,6 +55,32 @@
       }
     },
     {
+      "id": "issue-sync",
+      "probe_args": ["--help"],
+      "observed": {
+        "argv": ["python3", "tools/agent_tools/issue_sync.py"],
+        "cwd": "source-root",
+        "stdin": "inherited",
+        "stdout": "inherited",
+        "stderr": "inherited",
+        "exit": "propagate",
+        "signal": "propagate",
+        "written_paths": []
+      },
+      "legacy_result": {
+        "exit_code": 0,
+        "stdout_sha256": "8bc55f806976e68a43b9e30a671fd2e57af6fdb1e543c9c870c7837420e5c78f",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_paths": []
+      },
+      "container_result": {
+        "exit_code": 0,
+        "stdout_sha256": "8bc55f806976e68a43b9e30a671fd2e57af6fdb1e543c9c870c7837420e5c78f",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_paths": []
+      }
+    },
+    {
       "id": "template-bundle",
       "probe_args": ["export", "--help"],
       "observed": {

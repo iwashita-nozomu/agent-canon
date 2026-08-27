@@ -70,11 +70,26 @@ class ToolDispatchTest(unittest.TestCase):
             {spec.tool_id for spec in specs.values() if spec.parity == "verified"},
             {
                 "generate-agent-runtime-dashboard",
+                "issue-sync",
                 "route",
                 "skill-document-reader",
                 "template-bundle",
             },
         )
+
+    def test_issue_sync_uses_resident_container_and_external_receipt_route(self) -> None:
+        """Issue publication receipts use the registered container tool route."""
+        specs, _schema = tool_dispatch.load_specs(PROJECT_ROOT)
+        issue_sync = specs["issue-sync"]
+        self.assertEqual(
+            issue_sync.argv,
+            ("python3", "tools/agent_tools/issue_sync.py"),
+        )
+        self.assertEqual(issue_sync.execution_plane, "tool-container")
+        self.assertEqual(issue_sync.cwd_policy, "source-root")
+        self.assertEqual(issue_sync.side_effect_policy, "external-artifact")
+        self.assertEqual(issue_sync.output_root, "external-runtime")
+        self.assertEqual(issue_sync.parity, "verified")
 
     def test_dashboard_uses_container_and_external_artifact_route(self) -> None:
         """The canonical dashboard route keeps source read-only and output external."""
