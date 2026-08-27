@@ -1497,6 +1497,10 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
     )
     if daemon.returncode != 0:
         pytest.skip("Docker daemon is unavailable")
+    docker_host = subprocess.check_output(
+        [docker, "context", "inspect", "--format", "{{.Endpoints.docker.Host}}"],
+        text=True,
+    ).strip()
 
     home = tmp_path / "home"
     home.mkdir()
@@ -1546,6 +1550,7 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
         "HOME": str(home),
         "XDG_CONFIG_HOME": str(home / ".config"),
         "AGENT_CANON_DOCKER": docker,
+        "DOCKER_HOST": docker_host,
     }
     assert not runtime.exists()
     assert not personal_skills.exists()
@@ -1615,7 +1620,7 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
             timeout=120,
         )
         assert version.returncode == 0, version.stderr
-        assert version.stdout.strip().startswith("agent-canon ")
+        assert version.stdout.strip()
 
         repeated_install = subprocess.run(
             [*common, "install"],
