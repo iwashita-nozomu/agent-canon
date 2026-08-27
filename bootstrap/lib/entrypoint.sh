@@ -828,6 +828,60 @@ _agent_canon_prepare_host_runtime() {
   [[ -e "$AGENT_CANON_STATE_ROOT/mounts.tsv" ]] || : > "$AGENT_CANON_STATE_ROOT/mounts.tsv"
 }
 
+_agent_canon_prepare_clean_install() {
+  # ``install`` is a reconstructive transition.  The source-sync record is
+  # already current at this point, while the remaining runtime files are
+  # derived from an earlier source/image generation and must not participate
+  # in candidate creation.  Keep receipts, spool, archive, and cache as
+  # operational evidence; reset only lifecycle state and projections that
+  # the new resident will recreate.
+  local path directory
+  for path in \
+    "$AGENT_CANON_STATE_ROOT/state.json" \
+    "$AGENT_CANON_STATE_ROOT/owner.json" \
+    "$AGENT_CANON_STATE_ROOT/mounts.toml" \
+    "$AGENT_CANON_STATE_ROOT/mounts.tsv" \
+    "$AGENT_CANON_STATE_ROOT/rollback-plan.tsv" \
+    "$AGENT_CANON_STATE_ROOT/.pending-rollback-plan.tsv" \
+    "$AGENT_CANON_STATE_ROOT/previous-image-id" \
+    "$AGENT_CANON_RUNTIME_ROOT/host-state/active-image.tsv"; do
+    [[ ! -L "$path" ]] ||
+      _agent_canon_json_error install_runtime_invalid \
+        "clean install state file is a symlink: $path"
+    rm -f -- "$path"
+  done
+  for directory in \
+    "$AGENT_CANON_STATE_ROOT/generations" \
+    "$AGENT_CANON_STATE_ROOT/tasks" \
+    "$AGENT_CANON_STATE_ROOT/container-runtime" \
+    "$AGENT_CANON_STATE_ROOT/codex-home"; do
+    [[ ! -L "$directory" ]] ||
+      _agent_canon_json_error install_runtime_invalid \
+        "clean install state directory is a symlink: $directory"
+    mkdir -p -- "$directory"
+    find "$directory" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+  done
+  : > "$AGENT_CANON_STATE_ROOT/mounts.toml"
+  : > "$AGENT_CANON_STATE_ROOT/mounts.tsv"
+}
+
+_agent_canon_finish_clean_install() {
+  # Replacement keeps a rollback image long enough to recover a failed
+  # candidate.  Once the fresh install has completed, that prior generation
+  # is no longer part of install state and must not leak into the next run.
+  local path
+  for path in \
+    "$AGENT_CANON_STATE_ROOT/rollback-plan.tsv" \
+    "$AGENT_CANON_STATE_ROOT/.pending-rollback-plan.tsv" \
+    "$AGENT_CANON_STATE_ROOT/previous-image-id"; do
+    [[ ! -L "$path" ]] ||
+      _agent_canon_json_error install_runtime_invalid \
+        "clean install result is a symlink: $path"
+    rm -f -- "$path"
+  done
+  unset AGENT_CANON_PENDING_ROLLBACK_PLAN AGENT_CANON_PREVIOUS_IMAGE_ID AGENT_CANON_PREVIOUS_IMAGE_REF
+}
+
 _agent_canon_container_exec() {
   local container=$1
   shift
@@ -2621,6 +2675,9 @@ bootstrap_host_entrypoint() {
         "aligned source-sync state could not be atomically published"
     fi
   fi
+  if [[ "$operation" == install ]]; then
+    _agent_canon_prepare_clean_install
+  fi
   if [[ "$operation" == install || "$operation" == update ]]; then
     # mounts.tsv is the host-owned projection consumed before the resident
     # controller runs.  Drop only syntactically valid target rows whose
@@ -2747,8 +2804,11 @@ bootstrap_host_entrypoint() {
       AGENT_CANON_EXPECTED_IMAGE_ID=$install_image_id
       export AGENT_CANON_EXPECTED_IMAGE_ID
       if "$AGENT_CANON_DOCKER_CMD" container inspect "$install_container" >/dev/null 2>&1; then
-        _agent_canon_replace_resident "$AGENT_CANON_IMAGE_REF" "$install_image_id" install
-        return $?
+        local replace_rc=0
+        _agent_canon_replace_resident "$AGENT_CANON_IMAGE_REF" "$install_image_id" install || replace_rc=$?
+        ((replace_rc == 0)) || return "$replace_rc"
+        _agent_canon_finish_clean_install
+        return 0
       fi
       container=$(_agent_canon_ensure_container)
       local install_rc=0
@@ -2760,8 +2820,10 @@ bootstrap_host_entrypoint() {
       _agent_canon_record_active_container "$container"
       if [[ "${AGENT_CANON_SUPPRESS_GLOBAL_LINKS:-0}" != 1 ]]; then
         _agent_canon_install_global_links
-        return $?
+        local link_rc=$?
+        ((link_rc == 0)) || return "$link_rc"
       fi
+      _agent_canon_finish_clean_install
       return 0
       ;;
     update)

@@ -1901,8 +1901,9 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         "/var/lib/agent-canon/source-sync.json",
         "/var/lib/agent-canon/private-log",
         "/var/lib/agent-canon/mount-registry.toml",
-        f"/targets/{valid_digest}",
     }
+    if operation == "update":
+        expected_mounts.add(f"/targets/{valid_digest}")
     assert {mount["Destination"] for mount in replacement["Mounts"]} == expected_mounts
     assert f"/targets/{stale_digest}" not in {
         mount["Destination"] for mount in replacement["Mounts"]
@@ -1944,7 +1945,7 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
 def test_public_clean_install_materializes_source_view_and_first_target(
     tmp_path: Path,
 ) -> None:
-    """Exercise the dotfiles install sequence from an empty HOME fixture."""
+    """Install from empty state, then reconstruct over stale runtime residue."""
     home = tmp_path / "home"
     home.mkdir()
     origin = tmp_path / "origin.git"
@@ -2062,10 +2063,39 @@ def test_public_clean_install_materializes_source_view_and_first_target(
     assert wrapper.returncode == 0, wrapper.stderr
     assert wrapper.stdout.strip() == "agent-canon 0.1.0"
 
+    state_root = repository / ".runtime" / "container-state"
+    stale_target = home / "removed-agent-canon"
+    stale_digest = hashlib.sha256(str(stale_target).encode("utf-8")).hexdigest()
+    stale_state = json.loads((state_root / "state.json").read_text(encoding="utf-8"))
+    stale_state["targets"] = {
+        stale_digest: {
+            "root": str(stale_target),
+            "host_root": str(stale_target),
+            "mode": "read-only",
+            "digest": stale_digest,
+        }
+    }
+    stale_state["rollback_generation"] = "generation-stale"
+    (state_root / "state.json").write_text(
+        json.dumps(stale_state), encoding="utf-8"
+    )
+    (state_root / "mounts.tsv").write_text(
+        f"target\t{stale_digest}\t{stale_target}\t/targets/{stale_digest}\tread-only\n",
+        encoding="utf-8",
+    )
+    (state_root / "rollback-plan.tsv").write_text(
+        "schema\tagent-canon.rollback-plan.v1\n", encoding="utf-8"
+    )
+    (state_root / "generations" / "stale-generation").mkdir()
+
     repeated_install = subprocess.run(
         [*common, "install"], check=False, capture_output=True, text=True, env=environment
     )
     assert repeated_install.returncode == 0, repeated_install.stderr
+    assert not (state_root / "rollback-plan.tsv").exists()
+    assert not (state_root / "generations" / "stale-generation").exists()
+    assert (state_root / "mounts.tsv").read_text(encoding="utf-8") == ""
+
     repeated_add = subprocess.run(
         [
             *common,
@@ -2082,7 +2112,7 @@ def test_public_clean_install_materializes_source_view_and_first_target(
         env=environment,
     )
     assert repeated_add.returncode == 0, repeated_add.stderr
-    assert '"code":"target_unchanged"' in repeated_add.stdout
+    assert '"code": "target_registered"' in repeated_add.stdout
     assert len(
         (repository / ".runtime" / "container-state" / "mounts.tsv").read_text(
             encoding="utf-8"
