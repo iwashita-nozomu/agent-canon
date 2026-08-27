@@ -2063,6 +2063,21 @@ def test_public_clean_install_materializes_source_view_and_first_target(
     assert wrapper.returncode == 0, wrapper.stderr
     assert wrapper.stdout.strip() == "agent-canon 0.1.0"
 
+    # Keep an unrelated image in the daemon while the second install replaces
+    # the resident.  Cleanup must remove only the generated rollback tag and
+    # must leave the active image (even when both tags resolve to one ID) and
+    # unrelated images untouched.
+    foreign_ref = "foreign-tools:keep"
+    foreign_id = "sha256:" + "f" * 64
+    docker_state = json.loads(fake_state.read_text(encoding="utf-8"))
+    docker_state["images"][foreign_ref] = {
+        "Id": foreign_id,
+        "RepoTags": [foreign_ref],
+        "Config": {"Labels": {}},
+        "SourceRoot": str(ROOT),
+    }
+    fake_state.write_text(json.dumps(docker_state), encoding="utf-8")
+
     state_root = repository / ".runtime" / "container-state"
     stale_target = home / "removed-agent-canon"
     stale_digest = hashlib.sha256(str(stale_target).encode("utf-8")).hexdigest()
@@ -2095,6 +2110,18 @@ def test_public_clean_install_materializes_source_view_and_first_target(
     assert not (state_root / "rollback-plan.tsv").exists()
     assert not (state_root / "generations" / "stale-generation").exists()
     assert (state_root / "mounts.tsv").read_text(encoding="utf-8") == ""
+    docker_state = json.loads(fake_state.read_text(encoding="utf-8"))
+    active_values = dict(
+        line.split("\t", 1)
+        for line in (repository / ".runtime" / "host-state" / "active-image.tsv")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    )
+    assert docker_state["images"][active_values["image-ref"]]["Id"] == active_values[
+        "image-id"
+    ]
+    assert docker_state["images"][foreign_ref]["Id"] == foreign_id
+    assert not any("-rollback-" in key for key in docker_state["images"])
 
     repeated_add = subprocess.run(
         [
