@@ -17,18 +17,16 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .bootstrap_runtime import BootstrapError, BootstrapRuntime, _atomic_json, _now
+    from .bootstrap_runtime import BootstrapError, BootstrapRuntime
 except ImportError:  # direct script/module compatibility
     from bootstrap_runtime import (  # type: ignore[no-redef]
         BootstrapError,
         BootstrapRuntime,
-        _atomic_json,
-        _now,
     )
 
 
 class SourceSync:
-    """Own the live full-checkout and immutable OCI update transaction."""
+    """Provide source/image primitives without publishing host sync state."""
 
     def __init__(
         self,
@@ -161,9 +159,6 @@ class SourceSync:
         else:
             path.unlink()
 
-    def _write_sync_state(self, payload: dict[str, Any]) -> None:
-        _atomic_json(self.runtime.paths.source_sync, {"schema": "agent-canon.source-sync.v1", **payload})
-
     def _source_owned_runtime(self) -> bool:
         """Return whether the runtime path is nested in the live checkout."""
         return self.runtime.paths.runtime_root == self.install_root / ".runtime"
@@ -233,11 +228,10 @@ class SourceSync:
                     "source_root": str(self.install_root),
                     "source_head": old_head,
                     "source_tree": old_tree,
-                    "status": "unchanged",
-                    "updated_at": _now(),
+                    "status": "success",
+                    "code": "up_to_date",
                 }
-                self._write_sync_state(payload)
-                return {"code": "unchanged", **payload}
+                return payload
             self.runtime._prepare_legacy_runtime_reset()
             state = self.runtime._read_state(allow_manifest_drift=True)
             staging = self.runtime.paths.source_staging
@@ -291,10 +285,9 @@ class SourceSync:
                     "image_repo_digest": digest,
                     "image_os": correspondence["image_os"],
                     "image_architecture": correspondence["image_architecture"],
-                    "status": "active",
-                    "updated_at": _now(),
+                    "status": "success",
+                    "code": "updated",
                 }
-                self._write_sync_state(payload)
                 self.runtime._finalize_legacy_runtime_reset()
                 self._remove_exact(backup)
                 self._remove_exact(staging)
@@ -302,6 +295,4 @@ class SourceSync:
             except Exception as exc:
                 if not isinstance(exc, BootstrapError):
                     raise BootstrapError("source_sync_failed", "source synchronization failed") from exc
-                failed = {"status": "failed", "updated_at": _now(), "failure": exc.code}
-                self._write_sync_state(failed)
                 raise

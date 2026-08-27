@@ -96,6 +96,12 @@ runtime root; they are operational evidence, not source files. A failed
 operation returns a stable error code and preserves the previous state where
 the operation has a generation or ownership boundary.
 
+The host creates the canonical `.runtime/source-sync.json` record before any
+resident container is created and mounts that file read-only at
+`/var/lib/agent-canon/source-sync.json`. The host shell is the only source-sync
+state writer. Resident status and dashboard readers consume this mounted file;
+`container-state/source-sync.json` is not a state surface.
+
 ## What is installed and where
 
 `install` creates the runtime state directories and adopts the published GHCR

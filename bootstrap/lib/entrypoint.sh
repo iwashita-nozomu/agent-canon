@@ -20,6 +20,7 @@ AGENT_CANON_CONTAINER_NETWORK=none
 AGENT_CANON_RUNTIME_DESTINATION=/var/lib/agent-canon/runtime
 AGENT_CANON_PRIVATE_LOG_DESTINATION=/var/lib/agent-canon/private-log
 AGENT_CANON_MOUNT_REGISTRY_DESTINATION=/var/lib/agent-canon/mount-registry.toml
+AGENT_CANON_SOURCE_SYNC_DESTINATION=/var/lib/agent-canon/source-sync.json
 AGENT_CANON_HEALTH_ATTEMPTS=120
 AGENT_CANON_PRIVATE_LOG_ROOT=
 
@@ -134,6 +135,32 @@ _agent_canon_source_sync_json() {
   state=$(<"$state_path") || return 1
   [[ "$state" == \{*\} ]] || return 1
   printf '%s' "$state"
+}
+
+_agent_canon_ensure_source_sync_state() {
+  local state_path="$AGENT_CANON_RUNTIME_ROOT/source-sync.json"
+  if [[ -e "$state_path" || -L "$state_path" ]]; then
+    [[ -f "$state_path" && ! -L "$state_path" ]] ||
+      _agent_canon_json_error source_sync_state_invalid \
+        "source-sync state must be a regular file"
+    _agent_canon_source_sync_json >/dev/null ||
+      _agent_canon_json_error source_sync_state_invalid \
+        "source-sync state is not a JSON object"
+    chmod 600 -- "$state_path" ||
+      _agent_canon_json_error source_sync_state_invalid \
+        "source-sync state permissions could not be restricted"
+    return 0
+  fi
+  local source_head=unknown source_tree=unknown
+  source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD 2>/dev/null) || :
+  source_tree=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD^{tree} 2>/dev/null) || :
+  [[ "$source_head" =~ ^[0-9a-f]{40}$ ]] || source_head=unknown
+  [[ "$source_tree" =~ ^[0-9a-f]{40}$ ]] || source_tree=unknown
+  _agent_canon_source_sync_write success not_run "$AGENT_CANON_REPOSITORY_ROOT" \
+    "$source_head" "$source_tree" origin unknown main \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" ||
+    _agent_canon_json_error source_sync_state_write_failed \
+      "initial source-sync state could not be atomically published"
 }
 
 _agent_canon_source_sync_failure() {
@@ -546,6 +573,7 @@ _agent_canon_prepare_host_runtime() {
   chmod 700 "$AGENT_CANON_RUNTIME_ROOT" "$AGENT_CANON_RUNTIME_ROOT/host-state" "$AGENT_CANON_STATE_ROOT"
   chmod 700 "$AGENT_CANON_PRIVATE_LOG_ROOT"
   chmod 1777 "$AGENT_CANON_STATE_ROOT/container-runtime"
+  _agent_canon_ensure_source_sync_state
   [[ -e "$AGENT_CANON_STATE_ROOT/mounts.toml" ]] || : > "$AGENT_CANON_STATE_ROOT/mounts.toml"
   [[ -e "$AGENT_CANON_STATE_ROOT/mounts.tsv" ]] || : > "$AGENT_CANON_STATE_ROOT/mounts.tsv"
 }
@@ -783,6 +811,7 @@ _agent_canon_write_rollback_plan() {
     printf 'image-id\t%s\n' "$image_id"
     printf 'image-ref\t%s\n' "$rollback_ref"
     printf 'mount\tmount\t%s\t%s\tfalse\n' "$AGENT_CANON_STATE_ROOT" "$AGENT_CANON_RUNTIME_DESTINATION"
+    printf 'mount\tmount\t%s\t%s\ttrue\n' "$AGENT_CANON_RUNTIME_ROOT/source-sync.json" "$AGENT_CANON_SOURCE_SYNC_DESTINATION"
     printf 'mount\tmount\t%s\t%s\ttrue\n' "$AGENT_CANON_PRIVATE_LOG_ROOT" "$AGENT_CANON_PRIVATE_LOG_DESTINATION"
     printf 'mount\tmount\t%s\t%s\ttrue\n' "$AGENT_CANON_STATE_ROOT/mounts.toml" "$AGENT_CANON_MOUNT_REGISTRY_DESTINATION"
     if [[ -f "$AGENT_CANON_STATE_ROOT/mounts.tsv" && ! -L "$AGENT_CANON_STATE_ROOT/mounts.tsv" ]]; then
@@ -822,7 +851,8 @@ _agent_canon_read_rollback_plan() {
           _agent_canon_json_error rollback_plan_invalid "rollback plan image reference is invalid"
         AGENT_CANON_ROLLBACK_IMAGE_REF=$value; ref_seen=$((ref_seen + 1)) ;;
       mount)
-        [[ "$value" == mount && -n "$source" && "$source" = /* && -d "$source" && ! -L "$source" &&
+        [[ "$value" == mount && -n "$source" && "$source" = /* && ! -L "$source" &&
+           ( -d "$source" || ("$destination" == "$AGENT_CANON_SOURCE_SYNC_DESTINATION" && -f "$source") ) &&
            -n "$destination" && ("$ro" == true || "$ro" == false) ]] ||
           _agent_canon_json_error rollback_plan_invalid "rollback plan mount is invalid"
         case "$destination" in
@@ -850,6 +880,7 @@ _agent_canon_validate_existing_container() {
   local observed_runtime observed_control observed_image observed_image_id observed_network
   local observed_rootfs observed_capdrop observed_security observed_cpus
   local observed_memory observed_pids observed_mounts expected_mounts mount_manifest
+  local require_source_sync=${4:-1}
   if ! observed_runtime=$("$AGENT_CANON_DOCKER_CMD" container inspect \
     --format '{{index .Config.Labels "io.agent-canon.runtime"}}' "$container"); then
     _agent_canon_json_error container_ownership_mismatch "resident container inspect failed"
@@ -890,6 +921,9 @@ _agent_canon_validate_existing_container() {
   expected_mounts=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.expected-mounts.XXXXXX")
   observed_mounts=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.observed-mounts.XXXXXX")
   printf '%s\t%s\ttrue\n' "$AGENT_CANON_STATE_ROOT" "$AGENT_CANON_RUNTIME_DESTINATION" > "$expected_mounts"
+  if [[ "$require_source_sync" == 1 ]]; then
+    printf '%s\t%s\tfalse\n' "$AGENT_CANON_RUNTIME_ROOT/source-sync.json" "$AGENT_CANON_SOURCE_SYNC_DESTINATION" >> "$expected_mounts"
+  fi
   printf '%s\t%s\tfalse\n' "$AGENT_CANON_PRIVATE_LOG_ROOT" "$AGENT_CANON_PRIVATE_LOG_DESTINATION" >> "$expected_mounts"
   printf '%s\t%s\tfalse\n' "$AGENT_CANON_STATE_ROOT/mounts.toml" "$AGENT_CANON_MOUNT_REGISTRY_DESTINATION" >> "$expected_mounts"
   if [[ -f "$mount_manifest" && ! -L "$mount_manifest" ]]; then
@@ -960,6 +994,7 @@ _agent_canon_ensure_container() {
       --label io.agent-canon.runtime=shared-v1 \
       --label "io.agent-canon.control-root-digest=$(_agent_canon_control_digest)" \
       --mount "type=bind,src=$AGENT_CANON_STATE_ROOT,dst=$AGENT_CANON_RUNTIME_DESTINATION" \
+      --mount "type=bind,src=$AGENT_CANON_RUNTIME_ROOT/source-sync.json,dst=$AGENT_CANON_SOURCE_SYNC_DESTINATION,readonly" \
       --mount "type=bind,src=$AGENT_CANON_PRIVATE_LOG_ROOT,dst=$AGENT_CANON_PRIVATE_LOG_DESTINATION,readonly" \
       --mount "type=bind,src=$AGENT_CANON_STATE_ROOT/mounts.toml,dst=$AGENT_CANON_MOUNT_REGISTRY_DESTINATION,readonly" \
       "${target_mount_args[@]}" \
@@ -1105,7 +1140,7 @@ _agent_canon_replace_resident_locked() {
     AGENT_CANON_PREVIOUS_IMAGE_REF=$old_image_ref
     export AGENT_CANON_PREVIOUS_IMAGE_REF
     if "$AGENT_CANON_DOCKER_CMD" container inspect "$old_container" >/dev/null 2>&1; then
-      if ! _agent_canon_validate_existing_container "$old_container"; then
+      if ! _agent_canon_validate_existing_container "$old_container" "$AGENT_CANON_STATE_ROOT/mounts.tsv" 1 0; then
         _agent_canon_json_error replacement_readback_failed "old resident mount readback failed before replacement"
         return 2
       fi

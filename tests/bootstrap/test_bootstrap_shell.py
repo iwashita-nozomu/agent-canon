@@ -69,6 +69,17 @@ def test_sync_stages_source_before_live_fast_forward() -> None:
     assert text.index('bootstrap_host_entrypoint "$staging_root"') < text.index('git -C "$install_root" merge --ff-only "$remote/$branch"')
 
 
+def test_source_sync_state_is_mounted_read_only_into_the_resident() -> None:
+    """The resident reads the host-owned source-sync file through one mount."""
+    text = ADAPTER.read_text(encoding="utf-8")
+    assert "AGENT_CANON_SOURCE_SYNC_DESTINATION=/var/lib/agent-canon/source-sync.json" in text
+    assert 'src=$AGENT_CANON_RUNTIME_ROOT/source-sync.json' in text
+    assert 'dst=$AGENT_CANON_SOURCE_SYNC_DESTINATION,readonly' in text
+    assert '"$AGENT_CANON_RUNTIME_ROOT/source-sync.json" "$AGENT_CANON_SOURCE_SYNC_DESTINATION"' in text
+    assert "_agent_canon_ensure_source_sync_state" in text
+    assert "container-state/source-sync.json" not in text
+
+
 def test_source_sync_state_writer_reconciles_terminal_records_atomically(
     tmp_path: Path,
 ) -> None:

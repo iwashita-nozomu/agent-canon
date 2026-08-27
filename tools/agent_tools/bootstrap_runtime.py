@@ -69,6 +69,8 @@ CONTAINER_RUNTIME_DIR = "container-runtime"
 CONTAINER_RUNTIME_DESTINATION = "/var/lib/agent-canon/runtime"
 PRIVATE_LOG_DESTINATION = "/var/lib/agent-canon/private-log"
 REGISTRY_DESTINATION = "/var/lib/agent-canon/mount-registry.toml"
+SOURCE_SYNC_SCHEMA = "agent-canon.source-sync.v1"
+SOURCE_SYNC_DESTINATION = "/var/lib/agent-canon/source-sync.json"
 CODEX_SESSION_ROOT_ENV = "AGENT_CANON_CODEX_SESSION_ROOT"
 TOOL_SOURCE_DESTINATION = "/usr/local/share/agent-canon/runtime"
 TOOL_ENVIRONMENT_KEYS = frozenset(
@@ -1469,6 +1471,37 @@ class BootstrapRuntime:
     def personal_codex_config(self) -> Path:
         """Return AgentCanon's ignored, persistent personal-config source."""
         return self.repository_root / ".codex" / "personal" / "config.toml"
+
+    @property
+    def source_sync_read_path(self) -> Path:
+        """Return the host-owned source-sync path visible to this controller."""
+        if self._container_control():
+            return Path(SOURCE_SYNC_DESTINATION)
+        return self.paths.source_sync
+
+    def _read_source_sync_state(self) -> dict[str, Any] | None:
+        """Read the canonical host source-sync record without writing it."""
+        path = self.source_sync_read_path
+        if not path.exists():
+            return None
+        if path.is_symlink() or not path.is_file():
+            raise BootstrapError(
+                "source_sync_state_invalid",
+                "source-sync state must be a regular file",
+            )
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise BootstrapError(
+                "source_sync_state_invalid",
+                "source-sync state is not valid JSON",
+            ) from exc
+        if not isinstance(value, dict) or value.get("schema") != SOURCE_SYNC_SCHEMA:
+            raise BootstrapError(
+                "source_sync_state_invalid",
+                "source-sync state schema is invalid",
+            )
+        return value
 
     def _global_home_scope(self) -> bool:
         """Return whether global projection is explicitly bound to the real HOME."""
@@ -3066,6 +3099,7 @@ class BootstrapRuntime:
                         "managed_agents_link": self._agents_link_readback(state),
                         "managed_global_links": self._global_links_readback(state),
                         "managed_codex_config": state.get("managed_codex_config"),
+                        "source_sync": self._read_source_sync_state(),
                     },
                     state=state,
                 )
@@ -5885,10 +5919,6 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Reconcile an atomically installed source-sync candidate across its manifest boundary",
     )
-    sync_parser = sub.add_parser("sync")
-    sync_parser.add_argument("--install-root", required=True)
-    sync_parser.add_argument("--remote", default="origin")
-    sync_parser.add_argument("--branch", default="main")
     source_identity = sub.add_parser(
         "source-identity",
         help=argparse.SUPPRESS,
@@ -5972,18 +6002,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         return runtime.install(image_ref=args.image_ref)
     if operation == "update":
         return runtime.update(image_ref=args.image_ref, source_sync=args.source_sync)
-    if operation == "sync":
-        try:
-            from .source_sync import SourceSync  # type: ignore[import-not-found]
-        except ImportError:
-            from source_sync import SourceSync  # type: ignore[no-redef]
-
-        return SourceSync(
-            runtime,
-            Path(args.install_root),
-            remote=args.remote,
-            branch=args.branch,
-        ).sync()
     if operation == "scheduler":
         if args.scheduler_operation == "enable":
             return runtime.scheduler_enable()
