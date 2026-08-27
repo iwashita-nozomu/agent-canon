@@ -2924,6 +2924,12 @@ class BootstrapRuntime:
             fresh_reset = self._legacy_runtime_pending_cleanup is not None
             if state.get("state") == "uninstalled" and not fresh_reset:
                 raise BootstrapError("not_installed", "install must complete before update")
+            if state.get("state") == "uninstalled":
+                stale = self._prune_stale_targets(state)
+                if stale:
+                    self._write_mounts(state)
+                    self._write_mount_manifest(state)
+                    self._write_state(state)
             if source_sync and not image_ref:
                 raise BootstrapError(
                     "source_sync_image_required",

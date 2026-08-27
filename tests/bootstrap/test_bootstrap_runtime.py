@@ -583,14 +583,22 @@ def test_fresh_install_and_update_prune_retained_stale_targets(
     assert str(stale.resolve()) not in registry
     manager.uninstall()
 
-    with manager.locked():
-        state = manager._read_state(allow_manifest_drift=True)
-        assert manager._update_locked(state, "update")["code"] == "updated"
-        state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
-        assert list(state["targets"]) == [valid_digest]
-        registry = manager.paths.mounts.read_text(encoding="utf-8")
-        assert f"[targets.{valid_digest}]" in registry
-        assert str(stale.resolve()) not in registry
+    state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    stale_digest = sha256_bytes(str(stale.resolve()).encode("utf-8"))
+    state["targets"][stale_digest] = {
+        "root": str(stale.resolve()),
+        "mode": "read-only",
+        "digest": stale_digest,
+    }
+    manager.paths.state.write_text(json.dumps(state), encoding="utf-8")
+    manager._legacy_runtime_pending_cleanup = tmp_path / "legacy-runtime"
+    manager._finalize_legacy_runtime_reset = lambda: None  # type: ignore[method-assign]
+    assert manager.update()["code"] == "updated"
+    state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    assert list(state["targets"]) == [valid_digest]
+    registry = manager.paths.mounts.read_text(encoding="utf-8")
+    assert f"[targets.{valid_digest}]" in registry
+    assert str(stale.resolve()) not in registry
 
 
 def test_candidate_registry_is_snapshotted_before_create_and_restored_on_failure(
