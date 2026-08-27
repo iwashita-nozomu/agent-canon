@@ -742,9 +742,12 @@ def test_replacement_rollback_failure_is_reported_after_controller_failure(
     (runtime / "host-state").mkdir(parents=True)
     (runtime / "container-state").mkdir()
     docker = tmp_path / "docker"
+    control_digest = hashlib.sha256(str(tmp_path).encode("utf-8")).hexdigest()
     docker.write_text(
         "#!/usr/bin/env bash\n"
         "if [[ \"$1:$2\" == image:inspect ]]; then printf 'sha256:candidate\\n'; fi\n"
+        "if [[ \"$1:$2\" == container:inspect && \"$4\" == *io.agent-canon.runtime* ]]; then printf 'shared-v1\\n'; fi\n"
+        f"if [[ \"$1:$2\" == container:inspect && \"$4\" == *io.agent-canon.control-root-digest* ]]; then printf '{control_digest}\\n'; fi\n"
         "exit 0\n",
         encoding="utf-8",
     )
@@ -756,6 +759,8 @@ AGENT_CANON_CONTROL_ROOT={str(tmp_path)!r}
 AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
 AGENT_CANON_STATE_ROOT={str(runtime / "container-state")!r}
 AGENT_CANON_DOCKER_CMD={str(docker)!r}
+mkdir -p "$AGENT_CANON_STATE_ROOT"
+: > "$AGENT_CANON_STATE_ROOT/mounts.tsv"
 _agent_canon_use_active_image() {{
   AGENT_CANON_IMAGE_REF=old-ref
   AGENT_CANON_ACTIVE_IMAGE_ID=sha256:old
@@ -778,6 +783,89 @@ exit "$rc"
     assert completed.returncode == 2
     assert '"code":"rollback_failed"' in completed.stderr
     assert "up_to_date" not in completed.stdout
+
+
+@pytest.mark.parametrize(
+    ("control_label", "mounts", "expected_rc", "expected_code", "expect_teardown"),
+    [
+        ("owned", "", 0, None, True),
+        ("foreign", "", 2, "container_ownership_mismatch", False),
+        (
+            "owned",
+            "target\tmissing-digest\t/tmp/does-not-exist\t/targets/missing-digest\tread-only\n",
+            2,
+            "target_root_invalid",
+            False,
+        ),
+    ],
+)
+def test_owned_resident_replacement_classifies_before_drift_and_teardown(
+    tmp_path: Path,
+    control_label: str,
+    mounts: str,
+    expected_rc: int,
+    expected_code: str | None,
+    expect_teardown: bool,
+) -> None:
+    """Repair owned drift, but preserve foreign or invalid-target residents."""
+    runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
+    (runtime / "host-state").mkdir(parents=True)
+    state_root.mkdir()
+    (state_root / "mounts.tsv").write_text(mounts, encoding="utf-8")
+    marker = tmp_path / "docker.calls"
+    control_digest = hashlib.sha256(str(tmp_path).encode("utf-8")).hexdigest()
+    owner_label = control_digest if control_label == "owned" else "foreign-control-root"
+    docker = tmp_path / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        f"printf '%s\\n' \"$*\" >> {str(marker)!r}\n"
+        "if [[ \"$1:$2\" == image:inspect ]]; then printf 'sha256:candidate\\n'; exit 0; fi\n"
+        "if [[ \"$1:$2\" == container:inspect ]]; then\n"
+        "  if [[ \"${4:-}\" == *io.agent-canon.runtime* ]]; then printf 'shared-v1\\n'; fi\n"
+        f"  if [[ \"${{4:-}}\" == *io.agent-canon.control-root-digest* ]]; then printf '{owner_label}\\n'; fi\n"
+        "  exit 0\n"
+        "fi\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    script = f'''
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_CONTROL_ROOT={str(tmp_path)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(state_root)!r}
+AGENT_CANON_DOCKER_CMD={str(docker)!r}
+_agent_canon_use_active_image() {{
+  AGENT_CANON_IMAGE_REF=candidate
+  AGENT_CANON_ACTIVE_IMAGE_ID=sha256:candidate
+  AGENT_CANON_EXPECTED_IMAGE_ID=sha256:candidate
+  export AGENT_CANON_IMAGE_REF AGENT_CANON_ACTIVE_IMAGE_ID AGENT_CANON_EXPECTED_IMAGE_ID
+}}
+_agent_canon_validate_existing_container() {{ return 9; }}
+_agent_canon_write_rollback_plan() {{ :; }}
+_agent_canon_ensure_container() {{ printf 'candidate\\n'; }}
+_agent_canon_run_controller() {{ :; }}
+_agent_canon_record_active_container() {{ :; }}
+_agent_canon_install_global_links() {{ :; }}
+_agent_canon_replace_resident candidate requested
+rc=$?
+printf 'rc=%s\\n' "$rc"
+exit "$rc"
+'''
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == expected_rc
+    if expected_code is not None:
+        assert f'"code":"{expected_code}"' in completed.stderr
+    calls = marker.read_text(encoding="utf-8").splitlines()
+    teardown = any(call.startswith("stop ") for call in calls) and any(
+        call.startswith("rm ") for call in calls
+    )
+    assert teardown is expect_teardown
 
 
 def test_missing_docker_is_typed_without_host_python(tmp_path: Path) -> None:
