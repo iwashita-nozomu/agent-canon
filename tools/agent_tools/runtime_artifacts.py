@@ -237,11 +237,12 @@ def _resolve_runtime_spool_root(
 ) -> tuple[Path, bool]:
     """Resolve a spool boundary, allowing only the bootstrap source runtime.
 
-    The ordinary runtime boundary remains source-external.  The resident
-    bootstrap has one narrowly different capability: its source checkout may
-    own the exact ``<source>/.runtime`` control directory.  That capability
-    is limited by :meth:`RuntimeArtifactBoundary.resolve` to the ``locks``
-    and ``spool`` subtrees; archive/report paths are never admitted here.
+    The ordinary runtime boundary remains source-external. The resident
+    bootstrap has one narrowly scoped spool/control capability: it accepts
+    only the ``locks`` and ``spool`` subtrees of an external runtime, or the
+    exact ``<source>/.runtime`` control directory. That capability is limited
+    by :meth:`RuntimeArtifactBoundary.resolve`; archive/report paths are never
+    admitted here.
     """
     configured = runtime_root
     if configured is None:
@@ -291,6 +292,7 @@ class RuntimeArtifactBoundary:
     source_root: Path
     root: Path
     source_runtime_spool: bool = False
+    spool_only: bool = False
 
     @classmethod
     def for_source(
@@ -314,9 +316,10 @@ class RuntimeArtifactBoundary:
     ) -> "RuntimeArtifactBoundary":
         """Create the narrowly scoped bootstrap spool/control boundary.
 
-        External runtime roots use the ordinary boundary.  Only the exact
-        source-local ``<source>/.runtime`` root receives the restricted source
-        runtime capability.
+        Both external runtime roots and the exact source-local
+        ``<source>/.runtime`` root receive the restricted spool/control
+        capability. The ordinary factory remains unrestricted only for
+        source-external roots.
         """
         source = _resolved_source(source_root)
         root, source_runtime = _resolve_runtime_spool_root(
@@ -326,6 +329,7 @@ class RuntimeArtifactBoundary:
             source_root=source,
             root=root,
             source_runtime_spool=source_runtime,
+            spool_only=True,
         )
 
     def resolve(self, path: Path | str, *, allow_absolute: bool = True) -> Path:
@@ -349,6 +353,11 @@ class RuntimeArtifactBoundary:
             raise RuntimePathEscape(f"path escapes runtime root: {joined}") from exc
         if relative == Path("."):
             raise RuntimePathEscape("runtime root itself is not an artifact")
+        if self.spool_only and relative.parts[0] not in SOURCE_RUNTIME_ALLOWED_TOP_LEVELS:
+            raise RuntimePathEscape(
+                "runtime spool path is outside bootstrap spool/control paths: "
+                f"{joined}"
+            )
         _reject_symlink_components(joined, self.root)
         try:
             resolved = joined.resolve(strict=False)

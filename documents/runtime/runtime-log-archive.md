@@ -23,9 +23,10 @@ source-local `.agent-canon` fallback.
 
 The general `RuntimeArtifactBoundary` remains source-local-output-safe. The
 archive transaction has one explicitly named `runtime_spool_boundary` for the
-bootstrap-owned exact `<source-root>/.runtime` path; it admits only `locks/`
-and `spool/` descendants for transaction control and pending inputs. Archive
-and report output always uses the explicit external `context.archive_root`.
+bootstrap-owned exact `<source-root>/.runtime` path or an external runtime
+root; it admits only `locks/` and `spool/` descendants for transaction control
+and pending inputs. Archive and report output always uses the explicit external
+`context.archive_root`.
 In particular, the transaction never creates `.runtime/archive/`, and another
 source child, runtime root, or symlink cannot use this exception.
 

@@ -60,9 +60,9 @@ class RuntimeArtifactBoundaryTest(unittest.TestCase):
             self.assertEqual(boundary.root, runtime)
             self.assertEqual(boundary.resolve("spool/events"), runtime / "spool" / "events")
             self.assertEqual(boundary.resolve("locks/archive.lock"), runtime / "locks" / "archive.lock")
-            with self.assertRaises(SourceLocalArtifact):
+            with self.assertRaises(RuntimePathEscape):
                 boundary.resolve("archive/report.json")
-            with self.assertRaises(SourceLocalArtifact):
+            with self.assertRaises(RuntimePathEscape):
                 boundary.resolve("tasks/request.json")
             with self.assertRaises(SourceLocalArtifact):
                 runtime_spool_boundary(source, source / "other-runtime", create=True)
@@ -81,6 +81,27 @@ class RuntimeArtifactBoundaryTest(unittest.TestCase):
 
             with self.assertRaises(RuntimeSymlinkEscape):
                 runtime_spool_boundary(source, source / ".runtime", create=True)
+
+    def test_external_runtime_spool_boundary_rejects_archive_and_report_paths(self) -> None:
+        """The restricted spool capability stays restricted for external roots."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source"
+            runtime = root / "runtime"
+            outside = root / "outside"
+            source.mkdir()
+            outside.mkdir()
+            boundary = runtime_spool_boundary(source, runtime, create=True)
+
+            self.assertEqual(boundary.resolve("spool/events"), runtime / "spool" / "events")
+            self.assertEqual(boundary.resolve("locks/archive.lock"), runtime / "locks" / "archive.lock")
+            for path in ("archive/report.json", "reports/agents/run/report.md", "tasks/request.json"):
+                with self.assertRaises(RuntimePathEscape):
+                    boundary.resolve(path)
+            (runtime / "spool" / "escape").parent.mkdir(parents=True)
+            (runtime / "spool" / "escape").symlink_to(outside, target_is_directory=True)
+            with self.assertRaises(RuntimeSymlinkEscape):
+                boundary.resolve("spool/escape/report.json")
 
     def test_atomic_write_is_external_and_preserves_source_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
