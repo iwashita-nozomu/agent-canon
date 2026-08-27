@@ -1304,6 +1304,30 @@ def read_issue_publication_receipts(
             if path.is_symlink() or not path.is_file():
                 continue
             try:
+                relative = path.relative_to(published)
+                path.resolve(strict=False).relative_to(published.resolve(strict=False))
+            except ValueError:
+                continue
+            if any(
+                parent.is_symlink()
+                for parent in path.parents
+                if parent != published
+            ):
+                continue
+            if len(relative.parts) != 3:
+                continue
+            path_owner, path_repo, path_name = relative.parts
+            path_number = path_name.removesuffix(".json")
+            if (
+                path_owner in {"", ".", ".."}
+                or path_repo in {"", ".", ".."}
+                or path_number in {"", ".", ".."}
+                or not re.fullmatch(r"[a-z0-9_.-]+", path_owner)
+                or not re.fullmatch(r"[a-z0-9_.-]+", path_repo)
+                or not re.fullmatch(r"[1-9][0-9]*", path_number)
+            ):
+                continue
+            try:
                 value = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 continue
@@ -1320,6 +1344,8 @@ def read_issue_publication_receipts(
             except IssueSyncError:
                 continue
             if reference.repo != repository or reference.number != number:
+                continue
+            if repository != f"{path_owner}/{path_repo}" or number != path_number:
                 continue
             if not re.fullmatch(r"[1-9][0-9]*", number):
                 continue

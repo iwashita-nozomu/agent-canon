@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -86,7 +87,10 @@ def test_pending_packet_online_create_readback_removes_packet(tmp_path: Path) ->
     client = issue_sync.GitHubIssueClient("owner/repo")
     with patch.object(client, "create", return_value=record) as create:
         result = issue_sync.sync_pending_packet(
-            packet, client, checkout_identity={"remote": "owner/repo"}
+            packet,
+            client,
+            checkout_identity={"remote": "owner/repo"},
+            runtime_root=tmp_path / "runtime",
         )
     assert result.url.endswith("/42")
     create.assert_called_once_with("owner/repo", "Online packet", "Issue body\n")
@@ -113,10 +117,13 @@ def test_pending_packet_success_writes_body_free_publication_receipt(tmp_path: P
     client = issue_sync.GitHubIssueClient("owner/repo")
     with patch.object(client, "create", return_value=record):
         issue_sync.sync_pending_packet(
-            packet, client, checkout_identity={"remote": "owner/repo"}
+            packet,
+            client,
+            checkout_identity={"remote": "owner/repo"},
+            runtime_root=tmp_path / "runtime",
         )
-    receipt_path = issue_sync.issue_publication_receipt_path(
-        tmp_path / "log", "owner/repo", "42"
+    receipt_path = issue_sync.issue_publication_receipt_spool_path(
+        tmp_path / "runtime", "owner/repo", "42"
     )
     payload = json.loads(receipt_path.read_text(encoding="utf-8"))
     assert set(payload) == set(issue_sync.ISSUE_PUBLICATION_RECEIPT_FIELDS)
@@ -148,6 +155,67 @@ def test_publication_receipt_noop_updates_stable_file(tmp_path: Path) -> None:
     )
     assert path == issue_sync.issue_publication_receipt_path(tmp_path / "log", "owner/repo", "42")
     assert json.loads(path.read_text(encoding="utf-8"))["action"] == "noop"
+
+
+def test_stage_publication_receipt_uses_external_private_feedback_spool(tmp_path: Path) -> None:
+    record = issue_sync.GitHubIssueRecord(
+        repository="owner/repo", number="44", title="Receipt", body="private",
+        state="OPEN", url="https://github.com/owner/repo/issues/44",
+    )
+    path = issue_sync.stage_issue_publication_receipt(
+        tmp_path / "runtime",
+        record,
+        action="create",
+        source_finding_kind="recurrent-failure",
+    )
+    assert path == (
+        tmp_path / "runtime" / "spool" / "private-feedback" / "feedback"
+        / "issue-packets" / "published" / "owner" / "repo" / "44.json"
+    )
+    assert path.is_file()
+    assert not (tmp_path / "agent-canon-log").exists()
+    assert "private" not in path.read_text(encoding="utf-8")
+
+
+def test_stage_publication_receipt_cli_is_body_free(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert issue_sync.main(
+        [
+            "--repo", "owner/repo",
+            "--runtime-root", str(tmp_path / "runtime"),
+            "--stage-publication-receipt",
+            "--receipt-number", "45",
+            "--receipt-url", "https://github.com/owner/repo/issues/45",
+            "--receipt-state", "OPEN",
+            "--receipt-action", "create",
+        ]
+    ) == 0
+    output = capsys.readouterr().out
+    assert '"status": "staged"' in output
+    assert "body" not in output
+
+
+def test_publication_receipt_replace_failure_preserves_prior_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    record = issue_sync.GitHubIssueRecord(
+        repository="owner/repo", number="46", title="Receipt", body="private",
+        state="OPEN", url="https://github.com/owner/repo/issues/46",
+    )
+    path = issue_sync.write_issue_publication_receipt(
+        tmp_path / "log", record, action="create", timestamp="2026-08-27T00:00:00Z"
+    )
+    before = path.read_bytes()
+
+    def fail_replace(_source: object, _target: object) -> None:
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(issue_sync.os, "replace", fail_replace)
+    with pytest.raises(issue_sync.IssueSyncError, match="issue_receipt_write_failed"):
+        issue_sync.write_issue_publication_receipt(
+            tmp_path / "log", record, action="update", timestamp="2026-08-27T01:00:00Z"
+        )
+    assert path.read_bytes() == before
+    assert not tuple(path.parent.glob(".*.tmp"))
 
 
 def test_foreign_or_nonqualified_issue_worker_has_no_publication_receipt(tmp_path: Path) -> None:
@@ -198,7 +266,7 @@ def test_pending_packet_receipt_failure_retains_packet(tmp_path: Path) -> None:
         patch.object(client, "create", return_value=record),
         patch.object(
             issue_sync,
-            "write_issue_publication_receipt",
+            "stage_issue_publication_receipt",
             side_effect=issue_sync.IssueSyncError(
                 "issue_receipt_write_failed", "archive unavailable"
             ),
@@ -206,10 +274,13 @@ def test_pending_packet_receipt_failure_retains_packet(tmp_path: Path) -> None:
         pytest.raises(issue_sync.IssueSyncError, match="issue_receipt_write_failed"),
     ):
         issue_sync.sync_pending_packet(
-            packet, client, checkout_identity={"remote": "owner/repo"}
+            packet,
+            client,
+            checkout_identity={"remote": "owner/repo"},
+            runtime_root=tmp_path / "runtime",
         )
     assert packet.exists()
-    assert not (tmp_path / "log" / "feedback" / "issue-packets" / "published").exists()
+    assert not (tmp_path / "runtime" / "spool" / "private-feedback" / "feedback" / "issue-packets" / "published").exists()
 
 
 def test_pending_packet_requires_current_checkout_identity(tmp_path: Path) -> None:
@@ -416,7 +487,24 @@ class _SuccessfulIssueWorkerClient(_IssueWorkerClient):
         self.records[record.number] = record
         return record
 
-def test_issue_worker_reorganization_removes_transferred_clause_and_adds_backlinks() -> None:
+
+class _SearchingIssueWorkerClient(_SuccessfulIssueWorkerClient):
+    def __init__(self, records: tuple[issue_sync.GitHubIssueRecord, ...]) -> None:
+        super().__init__(records)
+        self.search_calls = 0
+        self.create_calls = 0
+
+    def search(
+        self, repository: str, terms: tuple[str, ...]
+    ) -> tuple[issue_sync.GitHubIssueRecord, ...]:
+        self.search_calls += 1
+        return tuple(self.records.values())
+
+    def create(self, repository: str, title: str, body: str) -> issue_sync.GitHubIssueRecord:
+        self.create_calls += 1
+        return super().create(repository, title, body)
+
+def test_issue_worker_reorganization_removes_transferred_clause_and_adds_backlinks(tmp_path: Path) -> None:
     handoff = issue_sync.qualify_issue_worker_finding(
         _qualified_finding(
             responsibility={"owner": "issue-owner", "decision": "repair route"}
@@ -437,6 +525,7 @@ def test_issue_worker_reorganization_removes_transferred_clause_and_adds_backlin
         title="route",
         body=destination.body,
         related_issues=(source, destination),
+        publication_runtime_root=tmp_path / "runtime",
     )
     assert result.state == "OPEN"
     assert issue_sync.parse_sections(client.records["1"].body).get("finding", "") == ""
@@ -446,7 +535,50 @@ def test_issue_worker_reorganization_removes_transferred_clause_and_adds_backlin
     assert client.calls.count(("edit", "1")) == 1
 
 
-def test_issue_worker_foreign_related_issue_is_handoff_relation_without_mutation() -> None:
+def test_retry_searches_existing_issue_before_create_and_records_noop(tmp_path: Path) -> None:
+    handoff = issue_sync.qualify_issue_worker_finding(
+        _qualified_finding(), authenticated_repository="owner/repo"
+    )
+    existing = issue_sync.GitHubIssueRecord(
+        "owner/repo",
+        "42",
+        "route",
+        "## Responsibility Boundary\nowner: issue-owner\n"
+        "## Required Fix\nrepair the missing route\n"
+        "## Finding\nrepair the missing route",
+        "OPEN",
+        "https://github.com/owner/repo/issues/42",
+    )
+    client = _SearchingIssueWorkerClient((existing,))
+    body = tmp_path / "private-body.md"
+    body.write_text("private body\n", encoding="utf-8")
+    packet = issue_sync.write_pending_packet(
+        log_root=tmp_path / "log",
+        repository="owner/repo",
+        title="route",
+        body_locator=str(body),
+        body_digest="sha256:" + hashlib.sha256(body.read_bytes()).hexdigest(),
+        route="issue-worker",
+        handoff=handoff.as_dict(),
+    )
+    result = issue_sync.sync_pending_packet(
+        packet,
+        client,
+        checkout_identity={"remote": "owner/repo"},
+        runtime_root=tmp_path / "runtime",
+    )
+    assert result.number == "42"
+    assert client.search_calls == 1
+    assert client.create_calls == 0
+    receipt = issue_sync.read_issue_publication_receipt(
+        tmp_path / "runtime" / "spool" / "private-feedback", "owner/repo", "42"
+    )
+    assert receipt is not None
+    assert receipt["action"] == "noop"
+    assert not packet.exists()
+
+
+def test_issue_worker_foreign_related_issue_is_handoff_relation_without_mutation(tmp_path: Path) -> None:
     handoff = issue_sync.qualify_issue_worker_finding(
         _qualified_finding(), authenticated_repository="owner/repo"
     )
@@ -464,6 +596,7 @@ def test_issue_worker_foreign_related_issue_is_handoff_relation_without_mutation
         title="route",
         body=local.body,
         related_issues=(local, foreign),
+        publication_runtime_root=tmp_path / "runtime",
     )
     assert result.number == "2"
     assert client.calls == [("edit", "2")]
@@ -481,6 +614,20 @@ def test_issue_worker_changed_fix_clause_requires_update() -> None:
     )
     plan = issue_sync.IssueWorker(None, "owner/repo").plan_publication(handoff, (old,))  # type: ignore[arg-type]
     assert plan.action == "update"
+
+
+def test_issue_worker_requires_receipt_route_before_github_mutation() -> None:
+    handoff = issue_sync.qualify_issue_worker_finding(
+        _qualified_finding(), authenticated_repository="owner/repo"
+    )
+    client = _IssueWorkerClient(())
+    with patch.dict(os.environ, {"AGENT_CANON_RUNTIME_ROOT": "", "AGENT_CANON_LOG_ROOT": ""}, clear=False), pytest.raises(issue_sync.IssueSyncError, match="issue_receipt_route_unavailable"):
+        issue_sync.IssueWorker(client, "owner/repo").publish(
+            handoff,
+            title="route",
+            body="body",
+        )
+    assert client.calls == []
 
 
 def test_issue_worker_failure_writes_metadata_only_retry_packet(tmp_path: Path) -> None:
@@ -529,6 +676,7 @@ def test_issue_worker_retry_packet_returns_through_issue_worker_route(tmp_path: 
         packet,
         _SuccessfulIssueWorkerClient(()),
         checkout_identity={"remote": "owner/repo"},
+        runtime_root=tmp_path / "runtime",
     )
     assert result.url.endswith("/42")
     assert not packet.exists()

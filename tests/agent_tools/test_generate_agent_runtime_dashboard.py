@@ -164,6 +164,29 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertEqual(len(receipts), 1)
         self.assertEqual(receipts[0].url, "https://github.com/owner/repo/issues/42")
         self.assertEqual(receipts[0].action, "create")
+
+    def test_dashboard_ignores_noncanonical_receipt_path_or_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            published = mounted_log_archive_root(root) / "feedback" / "issue-packets" / "published" / "owner" / "repo"
+            published.mkdir(parents=True)
+            value = {
+                "repository": "owner/repo",
+                "number": "42",
+                "url": "https://github.com/owner/repo/issues/42",
+                "state": "OPEN",
+                "action": "create",
+                "responsibility": [],
+                "occurrence_locations": [],
+                "source_finding_kind": "",
+                "timestamp": "2026-08-27T00:00:00Z",
+            }
+            (published / "43.json").write_text(
+                json.dumps(value) + "\n", encoding="utf-8"
+            )
+            receipts = read_issue_publication_receipts(root, self.runtime_root)
+
+        self.assertEqual(receipts, ())
     """Verify dashboard output from accumulated runtime evidence."""
 
     def test_iter_entries_tolerates_disappeared_log_file(self) -> None:
