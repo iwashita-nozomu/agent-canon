@@ -20,6 +20,14 @@ repository. Outside that exact `.runtime/` directory, they are not written to
 the AgentCanon source checkout, a parent repository, a vendor directory, or a
 source-local `.agent-canon` fallback.
 
+The general `RuntimeArtifactBoundary` remains source-local-output-safe. The
+archive transaction has one explicitly named `runtime_spool_boundary` for the
+bootstrap-owned exact `<source-root>/.runtime` path; it admits only `locks/`
+and `spool/` descendants for transaction control and pending inputs. Archive
+and report output always uses the explicit external `context.archive_root`.
+In particular, the transaction never creates `.runtime/archive/`, and another
+source child, runtime root, or symlink cannot use this exception.
+
 The log repository owns its branch, append-only layout, retention, and legacy
 import policy. AgentCanon owns only the local spool, archive checkout lease,
 typed publication request, receipt, and readback needed by its runtime. This

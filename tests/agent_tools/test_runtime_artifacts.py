@@ -19,6 +19,7 @@ from tools.agent_tools.runtime_artifacts import (  # noqa: E402
     SourceLocalArtifact,
     resolve_runtime_root,
     root_capability_environment,
+    runtime_spool_boundary,
 )
 
 
@@ -47,8 +48,39 @@ class RuntimeArtifactBoundaryTest(unittest.TestCase):
                 RuntimeArtifactBoundary.for_source(source, source / ".runtime", create=True)
             with self.assertRaises(SourceLocalArtifact):
                 RuntimeArtifactBoundary.for_source(source, source, create=True)
+
+    def test_source_runtime_spool_boundary_is_exact_and_narrow(self) -> None:
+        """Only the canonical source runtime spool/control paths are admitted."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "source"
+            source.mkdir()
+            runtime = source / ".runtime"
+            boundary = runtime_spool_boundary(source, runtime, create=True)
+
+            self.assertEqual(boundary.root, runtime)
+            self.assertEqual(boundary.resolve("spool/events"), runtime / "spool" / "events")
+            self.assertEqual(boundary.resolve("locks/archive.lock"), runtime / "locks" / "archive.lock")
             with self.assertRaises(SourceLocalArtifact):
-                RuntimeArtifactBoundary.for_source(source, source, create=True)
+                boundary.resolve("archive/report.json")
+            with self.assertRaises(SourceLocalArtifact):
+                boundary.resolve("tasks/request.json")
+            with self.assertRaises(SourceLocalArtifact):
+                runtime_spool_boundary(source, source / "other-runtime", create=True)
+            with self.assertRaises(SourceLocalArtifact):
+                runtime_spool_boundary(source, source / "nested" / ".runtime", create=True)
+
+    def test_source_runtime_spool_boundary_rejects_symlink_root(self) -> None:
+        """A source runtime alias cannot redirect the spool capability."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source"
+            outside = root / "outside"
+            source.mkdir()
+            outside.mkdir()
+            (source / ".runtime").symlink_to(outside, target_is_directory=True)
+
+            with self.assertRaises(RuntimeSymlinkEscape):
+                runtime_spool_boundary(source, source / ".runtime", create=True)
 
     def test_atomic_write_is_external_and_preserves_source_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -30,6 +30,7 @@ try:
         RuntimeArtifactBoundary,
         RuntimePathEscape,
         runtime_artifact_boundary,
+        runtime_spool_boundary,
     )
 except ImportError:
     from runtime_artifacts import (  # type: ignore[no-redef]
@@ -37,6 +38,7 @@ except ImportError:
         RuntimeArtifactBoundary,
         RuntimePathEscape,
         runtime_artifact_boundary,
+        runtime_spool_boundary,
     )
 
 try:
@@ -111,9 +113,9 @@ def hook_event_spool_root(active_root: Path, runtime_root: Path | str | None = N
         candidate = Path(override) / repo_log_key(active_root)
         # Explicit legacy override remains accepted only when it is inside the
         # declared external runtime root.
-        boundary = runtime_boundary(active_root, runtime_root)
+        boundary = runtime_spool_boundary(active_root, runtime_root)
         return boundary.resolve(candidate)
-    boundary = runtime_boundary(active_root, runtime_root)
+    boundary = runtime_spool_boundary(active_root, runtime_root)
     return boundary.resolve(Path("spool") / "hook-events" / repo_log_key(active_root))
 
 
@@ -121,7 +123,7 @@ def runtime_event_publication_outcome_spool_root(
     active_root: Path, runtime_root: Path | str | None = None
 ) -> Path:
     """Return the repo-local publication-outcome observation spool root."""
-    boundary = runtime_boundary(active_root, runtime_root)
+    boundary = runtime_spool_boundary(active_root, runtime_root)
     return boundary.resolve(Path("spool") / "publication-outcome")
 
 

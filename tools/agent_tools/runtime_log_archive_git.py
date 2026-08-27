@@ -57,8 +57,8 @@ from runtime_log_paths import (  # noqa: E402
     log_environment_key,
     mounted_log_archive_root,
     repo_log_key,
-    runtime_boundary,
     runtime_event_publication_outcome_spool_root,
+    runtime_spool_boundary,
     source_git_head,
 )
 from runtime_artifacts import RUNTIME_ROOT_ENV  # noqa: E402
@@ -2586,10 +2586,11 @@ def acquire_publication_attempt_lock(
     body_error: BaseException | None = None
     try:
         source_root = source_root.resolve(strict=True)
-        # Publication observations are external runtime state.  Anchor
-        # validation at the declared runtime root instead of assuming the
-        # historical source-local ``.agent-canon`` layout.
-        spool_base = runtime_boundary(source_root, runtime_root).root
+        # Publication observations are runtime spool state. Anchor validation
+        # at the declared runtime root (including the canonical source
+        # ``.runtime`` exception) instead of assuming the retired source-local
+        # ``.agent-canon`` layout.
+        spool_base = runtime_spool_boundary(source_root, runtime_root).root
         relative_spool = spool_root.relative_to(spool_base)
         if relative_spool.parts != ("spool", "publication-outcome"):
             raise RuntimeEventMaterializationError(
@@ -4545,10 +4546,11 @@ def prepare_archive_transaction(
     allow_branch_switch: bool = False,
 ) -> PreparedArchiveTransaction:
     """Acquire the source lock, ensure once, and return one prepared boundary."""
-    # The transaction lock is runtime state, not a source-checkout artifact.
-    # Resolve it through the same explicit external boundary as hook spools so
-    # acquiring a lock cannot dirty or create ``source/.agent-canon``.
-    lock_path = runtime_boundary(
+    # The transaction lock is bootstrap runtime control state, not an archive
+    # artifact. Resolve it through the restricted spool/control capability so
+    # the canonical source ``.runtime`` may own the lock without admitting an
+    # archive or report path there.
+    lock_path = runtime_spool_boundary(
         context.source_root, context.runtime_root
     ).resolve(ARCHIVE_TRANSACTION_LOCK_RELATIVE)
     if lock_path in _ACTIVE_ARCHIVE_LOCKS:

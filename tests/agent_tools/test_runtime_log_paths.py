@@ -22,7 +22,7 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from tools.agent_tools.runtime_artifacts import RuntimePathEscape
+from tools.agent_tools.runtime_artifacts import RuntimePathEscape, SourceLocalArtifact
 from tools.agent_tools.runtime_log_paths import (
     agent_report_archive_dir,
     codex_runtime_index_path,
@@ -250,6 +250,27 @@ class RuntimeLogPathsTest(unittest.TestCase):
         self.assertEqual(spool_a, runtime / "spool" / "hook-events" / repo_log_key(caller_a))
         self.assertEqual(spool_b, runtime / "spool" / "hook-events" / repo_log_key(caller_b))
         self.assertEqual(outcome_a, outcome_b)
+
+    def test_bootstrap_source_runtime_is_spool_only(self) -> None:
+        """The canonical source runtime serves spool paths, never archive output."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source"
+            source.mkdir()
+            runtime = source / ".runtime"
+            runtime.mkdir()
+
+            self.assertEqual(
+                hook_event_spool_root(source, runtime),
+                runtime / "spool" / "hook-events" / repo_log_key(source),
+            )
+            self.assertEqual(
+                runtime_event_publication_outcome_spool_root(source, runtime),
+                runtime / "spool" / "publication-outcome",
+            )
+            with self.assertRaises(SourceLocalArtifact):
+                mounted_log_archive_root(source, runtime)
+            self.assertFalse((runtime / "archive").exists())
 
     def test_explicit_runtime_root_rejects_external_spool_override(self) -> None:
         """A spool override outside the declared runtime root fails closed."""

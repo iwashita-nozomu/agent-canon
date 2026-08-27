@@ -346,7 +346,11 @@ receipt を `tools/agent_tools/bootstrap_runtime.py` で必須にします。run
 
 `RuntimeArtifactBoundary` は implicit output が source root 内なら拒否し、external
 rootへ atomic writeします。`__pycache__`、Cargo target、SQLite、event spool、eval、
-dashboard、report、tmp、cache を対象にします。
+dashboard、report、tmp、cache を対象にします。archive transaction の spool/control
+だけは `runtime_spool_boundary` という別 capability で、bootstrap が所有する
+正確な `<source>/.runtime` の `locks/` と `spool/` に限定して許可します。source の
+他の子、別 runtime root、symlink、`.runtime/archive/` は引き続き拒否し、archive/report
+出力は明示的な external archive clone に限定します。
 
 ## Skill Installation
 
