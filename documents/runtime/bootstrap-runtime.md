@@ -102,6 +102,14 @@ resident container is created and mounts that file read-only at
 state writer. Resident status and dashboard readers consume this mounted file;
 `container-state/source-sync.json` is not a state surface.
 
+The source-sync record uses schema `agent-canon.source-sync.v1` and contains
+`status`, `code`, `updated_at`, `source_root`, `remote`, `remote_url`, `branch`,
+`source_head`, and `source_tree`. A `failed` record additionally contains
+`failure`; a `success` record does not. Shell status and resident dashboard
+readers accept only this complete shape. Legacy, incomplete, or wrongly typed
+records are reported as unavailable and are replaced only by the next atomic
+host sync transition.
+
 ## What is installed and where
 
 `install` creates the runtime state directories and adopts the published GHCR

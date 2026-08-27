@@ -108,6 +108,19 @@ def read_source_sync_state(
         or not ISO_TIMESTAMP_RE.fullmatch(updated_at)
     ):
         return None
+    remote_url = value.get("remote_url")
+    expected_keys = set(required) | {"schema", "remote_url"}
+    if status == "failed":
+        expected_keys.add("failure")
+    if set(value) != expected_keys or not isinstance(remote_url, str) or not remote_url:
+        return None
+    if (
+        '"' in remote_url
+        or "\\" in remote_url
+        or any(ord(character) < 0x20 for character in source_root)
+        or any(ord(character) < 0x20 for character in remote_url)
+    ):
+        return None
     failure = value.get("failure")
     if status == "failed" and (
         not isinstance(failure, str) or not SOURCE_SYNC_CODE_RE.fullmatch(failure)
@@ -116,8 +129,7 @@ def read_source_sync_state(
     if status == "success" and "failure" in value:
         return None
     result = {field_name: value[field_name] for field_name in required}
-    if isinstance(value.get("remote_url"), str):
-        result["remote_url"] = value["remote_url"]
+    result["remote_url"] = remote_url
     if status == "failed":
         result["failure"] = failure
     return result

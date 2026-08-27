@@ -71,6 +71,11 @@ PRIVATE_LOG_DESTINATION = "/var/lib/agent-canon/private-log"
 REGISTRY_DESTINATION = "/var/lib/agent-canon/mount-registry.toml"
 SOURCE_SYNC_SCHEMA = "agent-canon.source-sync.v1"
 SOURCE_SYNC_DESTINATION = "/var/lib/agent-canon/source-sync.json"
+SOURCE_SYNC_CODE_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+SOURCE_SYNC_IDENTITY_RE = re.compile(r"^(?:unknown|[0-9a-f]{40})$")
+SOURCE_SYNC_TIMESTAMP_RE = re.compile(
+    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+)
 CODEX_SESSION_ROOT_ENV = "AGENT_CANON_CODEX_SESSION_ROOT"
 TOOL_SOURCE_DESTINATION = "/usr/local/share/agent-canon/runtime"
 TOOL_ENVIRONMENT_KEYS = frozenset(
@@ -1482,25 +1487,63 @@ class BootstrapRuntime:
     def _read_source_sync_state(self) -> dict[str, Any] | None:
         """Read the canonical host source-sync record without writing it."""
         path = self.source_sync_read_path
-        if not path.exists():
+        if path.is_symlink() or not path.exists():
             return None
-        if path.is_symlink() or not path.is_file():
-            raise BootstrapError(
-                "source_sync_state_invalid",
-                "source-sync state must be a regular file",
-            )
+        if not path.is_file():
+            return None
         try:
             value = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise BootstrapError(
-                "source_sync_state_invalid",
-                "source-sync state is not valid JSON",
-            ) from exc
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            return None
         if not isinstance(value, dict) or value.get("schema") != SOURCE_SYNC_SCHEMA:
-            raise BootstrapError(
-                "source_sync_state_invalid",
-                "source-sync state schema is invalid",
-            )
+            return None
+        required = {
+            "schema",
+            "status",
+            "code",
+            "source_root",
+            "source_head",
+            "source_tree",
+            "remote",
+            "remote_url",
+            "branch",
+            "updated_at",
+        }
+        status = value.get("status")
+        expected = required | ({"failure"} if status == "failed" else set())
+        if set(value) != expected:
+            return None
+        if (
+            status not in {"success", "failed"}
+            or not isinstance(value.get("code"), str)
+            or not SOURCE_SYNC_CODE_RE.fullmatch(value["code"])
+            or not isinstance(value.get("source_root"), str)
+            or not value["source_root"].startswith("/")
+            or '"' in value["source_root"]
+            or "\\" in value["source_root"]
+            or any(ord(character) < 0x20 for character in value["source_root"])
+            or not isinstance(value.get("source_head"), str)
+            or not SOURCE_SYNC_IDENTITY_RE.fullmatch(value["source_head"])
+            or not isinstance(value.get("source_tree"), str)
+            or not SOURCE_SYNC_IDENTITY_RE.fullmatch(value["source_tree"])
+            or not isinstance(value.get("remote"), str)
+            or re.fullmatch(r"[A-Za-z0-9_.-]+", value["remote"]) is None
+            or not isinstance(value.get("remote_url"), str)
+            or not value["remote_url"]
+            or '"' in value["remote_url"]
+            or "\\" in value["remote_url"]
+            or any(ord(character) < 0x20 for character in value["remote_url"])
+            or not isinstance(value.get("branch"), str)
+            or re.fullmatch(r"[A-Za-z0-9._/-]+", value["branch"]) is None
+            or not isinstance(value.get("updated_at"), str)
+            or SOURCE_SYNC_TIMESTAMP_RE.fullmatch(value["updated_at"]) is None
+        ):
+            return None
+        failure = value.get("failure")
+        if status == "failed" and (
+            not isinstance(failure, str) or not SOURCE_SYNC_CODE_RE.fullmatch(failure)
+        ):
+            return None
         return value
 
     def _global_home_scope(self) -> bool:

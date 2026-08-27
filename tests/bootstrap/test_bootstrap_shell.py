@@ -310,6 +310,70 @@ _agent_canon_source_sync_json
     assert (runtime / "source-sync.json").stat().st_mode & 0o777 == 0o600
 
 
+@pytest.mark.parametrize(
+    "invalid_state",
+    [
+        '{"failure":"old","schema":"agent-canon.source-sync.v1","status":"failed","updated_at":"2026-08-26T00:00:00Z"}',
+        '{"schema":"agent-canon.source-sync.v1","status":7}',
+        '{"schema":"agent-canon.source-sync.v1","status":"success","code":"up_to_date"}',
+    ],
+)
+def test_source_sync_reader_rejects_legacy_missing_and_wrong_type_state(
+    tmp_path: Path, invalid_state: str
+) -> None:
+    """Shell status treats every pre-contract state as unavailable."""
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    (runtime / "source-sync.json").write_text(invalid_state + "\n", encoding="utf-8")
+    script = f"""
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+if _agent_canon_source_sync_json >/dev/null; then
+  exit 7
+fi
+"""
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_shell_status_reports_invalid_source_sync_as_unavailable(tmp_path: Path) -> None:
+    """Shell status and dashboard share the unavailable result for legacy state."""
+    repository = tmp_path / "repository"
+    control = tmp_path / "control"
+    runtime = control / "runtime"
+    repository.mkdir()
+    control.mkdir()
+    runtime.mkdir(parents=True)
+    (runtime / "source-sync.json").write_text(
+        '{"failure":"old","schema":"agent-canon.source-sync.v1","status":"failed","updated_at":"2026-08-26T00:00:00Z"}\n',
+        encoding="utf-8",
+    )
+    docker = tmp_path / "docker"
+    docker.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    docker.chmod(0o755)
+    completed = subprocess.run(
+        [
+            str(BOOTSTRAP),
+            "--repository-root",
+            str(repository),
+            "--control-parent-root",
+            str(control),
+            "--runtime-root",
+            str(runtime),
+            "status",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "AGENT_CANON_DOCKER": str(docker)},
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout)["source_sync"] is None
+
+
 def test_shell_source_sync_publishes_up_to_date_updated_and_failure_state(
     tmp_path: Path,
 ) -> None:

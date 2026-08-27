@@ -398,6 +398,23 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             )
             replaced = dashboard_reader.collect()
             replaced_dashboard = render_dashboard(replaced)
+            for invalid_state in (
+                {
+                    "failure": "old",
+                    "schema": "agent-canon.source-sync.v1",
+                    "status": "failed",
+                    "updated_at": "2026-08-26T00:00:00Z",
+                },
+                {"schema": "agent-canon.source-sync.v1", "status": 7},
+                {
+                    "schema": "agent-canon.source-sync.v1",
+                    "status": "success",
+                    "code": "up_to_date",
+                },
+            ):
+                source_sync.write_text(json.dumps(invalid_state) + "\n", encoding="utf-8")
+                rejected = dashboard_reader.collect()
+                self.assertIsNone(rejected.source_sync_state)
 
         assert summary.source_sync_state is not None
         self.assertEqual(summary.source_sync_state["status"], "failed")

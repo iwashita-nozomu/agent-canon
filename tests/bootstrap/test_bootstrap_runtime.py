@@ -1521,6 +1521,22 @@ def test_status_reads_host_owned_source_sync_record(tmp_path: Path) -> None:
     manager.paths.state.write_text(json.dumps(manager._new_state()), encoding="utf-8")
     result = manager.status()
     assert result["details"]["source_sync"]["failure"] == "source_sync_candidate_failed"
+    for invalid_state in (
+        {
+            "failure": "old",
+            "schema": "agent-canon.source-sync.v1",
+            "status": "failed",
+            "updated_at": "2026-08-26T00:00:00Z",
+        },
+        {"schema": "agent-canon.source-sync.v1", "status": 7},
+        {
+            "schema": "agent-canon.source-sync.v1",
+            "status": "success",
+            "code": "up_to_date",
+        },
+    ):
+        state_path.write_text(json.dumps(invalid_state), encoding="utf-8")
+        assert manager.status()["details"]["source_sync"] is None
 
 
 def test_eval_precondition_failure_creates_no_spool_or_exchange(

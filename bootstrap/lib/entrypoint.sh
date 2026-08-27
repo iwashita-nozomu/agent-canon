@@ -78,13 +78,17 @@ _agent_canon_source_sync_write() {
   else
     [[ "$failure" =~ ^[a-z][a-z0-9_]*$ ]] || return 64
   fi
-  [[ "$source_root" == /* && "$source_root" != *$'\n'* && "$source_root" != *$'\r'* ]] || return 64
+  [[ "$source_root" == /* && "$source_root" != *$'\n'* && "$source_root" != *$'\r'* &&
+     "$source_root" != *$'\t'* ]] || return 64
+  [[ "$source_root" != *'"'* && "$source_root" != *'\'* ]] || return 64
   [[ "$source_head" == unknown || "$source_head" =~ ^[0-9a-f]{40}$ ]] || return 64
   [[ "$source_tree" == unknown || "$source_tree" =~ ^[0-9a-f]{40}$ ]] || return 64
   [[ "$remote" =~ ^[A-Za-z0-9_.-]+$ ]] || return 64
   [[ "$branch" =~ ^[A-Za-z0-9._/-]+$ ]] || return 64
   [[ "$remote_url" == unknown ||
-     ( -n "$remote_url" && "$remote_url" != *$'\n'* && "$remote_url" != *$'\r'* ) ]] || return 64
+     ( -n "$remote_url" && "$remote_url" != *$'\n'* && "$remote_url" != *$'\r'* &&
+       "$remote_url" != *$'\t'* &&
+       "$remote_url" != *'"'* && "$remote_url" != *'\'* ) ]] || return 64
   [[ "$updated_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || return 64
 
   local state_root=$AGENT_CANON_RUNTIME_ROOT state_path tmp
@@ -133,7 +137,19 @@ _agent_canon_source_sync_json() {
     return 0
   fi
   state=$(<"$state_path") || return 1
-  [[ "$state" == \{*\} ]] || return 1
+  [[ "$state" != *$'\n'* && "$state" != *$'\r'* ]] || return 1
+  local record_re='^\{"schema":"agent-canon.source-sync.v1","status":"(success|failed)","code":"([a-z][a-z0-9_]*)","source_root":"([^"]*)","source_head":"(unknown|[0-9a-f]{40})","source_tree":"(unknown|[0-9a-f]{40})","remote":"([A-Za-z0-9_.-]+)","remote_url":"([^"]+)","branch":"([A-Za-z0-9._/-]+)","updated_at":"([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)"(,"failure":"([a-z][a-z0-9_]*)")?\}$'
+  [[ "$state" =~ $record_re ]] || return 1
+  local status=${BASH_REMATCH[1]} source_root=${BASH_REMATCH[3]}
+  local source_head=${BASH_REMATCH[4]} source_tree=${BASH_REMATCH[5]}
+  local remote=${BASH_REMATCH[6]} remote_url=${BASH_REMATCH[7]}
+  local branch=${BASH_REMATCH[8]} updated_at=${BASH_REMATCH[9]}
+  local failure=${BASH_REMATCH[11]:-}
+  [[ "$source_root" == /* ]] || return 1
+  [[ "$source_root" != *'\'* && "$source_root" != *$'\t'* &&
+     "$remote_url" != *'\'* && "$remote_url" != *$'\t'* ]] || return 1
+  [[ "$status" == success && -z "$failure" ||
+     "$status" == failed && -n "$failure" ]] || return 1
   printf '%s' "$state"
 }
 
@@ -143,9 +159,6 @@ _agent_canon_ensure_source_sync_state() {
     [[ -f "$state_path" && ! -L "$state_path" ]] ||
       _agent_canon_json_error source_sync_state_invalid \
         "source-sync state must be a regular file"
-    _agent_canon_source_sync_json >/dev/null ||
-      _agent_canon_json_error source_sync_state_invalid \
-        "source-sync state is not a JSON object"
     chmod 600 -- "$state_path" ||
       _agent_canon_json_error source_sync_state_invalid \
         "source-sync state permissions could not be restricted"
@@ -1917,8 +1930,7 @@ bootstrap_host_entrypoint() {
       health=${health//$'\n'/}
       local source_sync_json
       if ! source_sync_json=$(_agent_canon_source_sync_json); then
-        _agent_canon_json_error source_sync_state_invalid \
-          "source-sync state is not a JSON object"
+        source_sync_json=null
       fi
       printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"status","container":{"name":"%s","running":%s,"health":"%s"},"runtime_root":"%s","source_sync":%s}\n' \
         "$container" "$running" "$health" "$AGENT_CANON_RUNTIME_ROOT" "$source_sync_json"
