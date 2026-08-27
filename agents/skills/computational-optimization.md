@@ -261,6 +261,9 @@ cost を含めます。正規化と分類は
 `residual_trajectory`、`objective_trajectory`、`step_acceptance`、`step_sizes`、
 `termination`、`conditioning`、`inner_solver`、`inner_solver_work` を使用します。
 未知の field は受け付けず、欠落した完全比較項目は `evidence_missing` として扱います。
+結果 JSON の `category`、`owner_route`、`next_action`、`forbidden_writes`、
+`separate_handoff` をそのまま handoff に渡し、agent が prose から別の owner や
+JIT 編集を推測しません。
 
 ### Classification and handoff
 
