@@ -399,8 +399,8 @@ outputs, locators, and decisions as evidence.
 
 ## Grouping And Dispatch Boundary
 
-Use `tools/agent_tools/issue_sync.py` as the host-side GitHub adapter for tool
-and Issue findings. Its `(owner, root_cause, fix)` key produces
+Use the host publisher's configured GitHub adapter (`gh issue view` for online
+Issue lookup/read) for tool and Issue findings. Its `(owner, root_cause, fix)` key produces
 an initial candidate group. Before publication, apply Cause Investigation and
 Issue Responsibility Unit contracts:
 
@@ -411,6 +411,13 @@ Issue Responsibility Unit contracts:
 - never split solely to increase agent fan-out.
 
 Warnings add a closeout obligation only when actionable or blocking.
+
+Online GitHub Issue lookup/read stays on the host publisher's GitHub route
+(`gh issue view` or the configured GitHub connector). It must not be routed
+through the resident `issue-sync` tool or a host-side Python fallback.
+The verified resident `issue-sync` route is limited to body-free offline
+receipt preflight, staging, and readback inputs after the publisher has its
+GitHub result.
 
 Runtime dashboard evidence enters this route only through an explicit
 `issue_worker_candidate` or `issue_worker_candidates` field. Counts, status
@@ -670,7 +677,7 @@ Run the focused resident-container receipt route and skill wiring checks after c
 ```bash
 ./bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root> \
   tool run --root <registered-target-root> issue-sync -- --receipt-preflight \
-  --checkout-head <source-commit> --checkout-repository <owner/repository>
+  --checkout-head <target-commit> --checkout-repository <owner/repository>
 python3 tools/agent_tools/check_skill_frontmatter.py --root .
 python3 tools/agent_tools/skill_tool_commands.py check
 python3 tools/agent_tools/skill_shim_materializer.py check --root .

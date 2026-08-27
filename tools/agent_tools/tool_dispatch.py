@@ -53,6 +53,25 @@ ALLOWED_SIGNALS = frozenset({"propagate", "normalize-signal"})
 ALLOWED_EFFECTS = frozenset({"read-only", "external-artifact", "explicit-target-write"})
 ALLOWED_OUTPUT_ROOTS = frozenset({"none", "external-runtime", "explicit-target"})
 ALLOWED_PARITY = frozenset({"verified", "pending", "legacy"})
+ISSUE_SYNC_RECEIPT_OPTIONS = frozenset(
+    {
+        "--help",
+        "--receipt-preflight",
+        "--stage-publication-receipt",
+        "--record-publication-receipt",
+        "--repo",
+        "--receipt-number",
+        "--receipt-url",
+        "--receipt-state",
+        "--receipt-action",
+        "--receipt-responsibility",
+        "--receipt-occurrence-location",
+        "--receipt-source-finding-kind",
+        "--receipt-timestamp",
+        "--checkout-head",
+        "--checkout-repository",
+    }
+)
 ENV_ALLOWLIST = frozenset(
     {
         "PATH",
@@ -467,6 +486,31 @@ def _check_parity_fixture(root: Path, spec: ToolSpec) -> None:
         raise DispatchError("parity-result-mismatch", spec.tool_id)
 
 
+def _validate_child_route(spec: ToolSpec, args: Sequence[str]) -> None:
+    """Keep the verified IssueSync route on body-free receipt operations."""
+    if spec.tool_id != "issue-sync":
+        return
+    options = {token for token in args if token.startswith("--")}
+    unsupported = sorted(options - ISSUE_SYNC_RECEIPT_OPTIONS)
+    if unsupported:
+        raise DispatchError(
+            "container-route-restricted",
+            f"issue-sync accepts receipt-only inputs; rejected={','.join(unsupported)}",
+        )
+    operations = options & {
+        "--receipt-preflight",
+        "--stage-publication-receipt",
+        "--record-publication-receipt",
+    }
+    if "--help" in options:
+        operations.add("--help")
+    if len(operations) != 1:
+        raise DispatchError(
+            "container-route-restricted",
+            "issue-sync requires exactly one receipt preflight, stage, or help operation",
+        )
+
+
 def _under(path: Path, root: Path) -> bool:
     """Return whether a resolved path is equal to or below a root."""
     try:
@@ -810,6 +854,7 @@ def _run_spec(
     """Build a typed request or execute only inside an authenticated image."""
     if require_parity:
         _check_parity_fixture(root, spec)
+    _validate_child_route(spec, args)
     if container_exec:
         return _run_container_spec(root, spec, args)
     runtime_value = os.environ.get("AGENT_CANON_RUNTIME_ROOT")

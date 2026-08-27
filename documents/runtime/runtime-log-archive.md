@@ -83,6 +83,9 @@ The receipt ToolCall keeps the AgentCanon source root (the owner of
 target root taken from `checkout_identity.git_root`; the generated command uses
 `<agentcanon_source_root>/bootstrap.sh ... tool run --root <target_root>
 issue-sync ...`.
+Online Issue reads remain on the host publisher's GitHub route; the resident
+`issue-sync` entry accepts only body-free receipt preflight, stage, and
+readback inputs.
 
 The durable archive layout and its operational checkout are owned by
 `agent-canon-log`; consumers should use its current branch contract rather
