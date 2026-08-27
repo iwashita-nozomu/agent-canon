@@ -112,6 +112,11 @@ if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "run-all-checks-script" ]]; then
     --source-root "${AGENT_CANON_SOURCE_ROOT}" \
     --purpose run-all-checks-script \
     --consume >/dev/null
+elif [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "standalone-static-gate-unit" ]]; then
+  # The bootstrap target mount already authenticates this read-only execution
+  # plane.  Its control root is an external, non-Git runtime parent, so do not
+  # re-enter the parent-side-effect boundary from inside the tool container.
+  :
 else
   exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
     --root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
@@ -303,6 +308,13 @@ if [[ -n "${PR_GATE_RECEIPT}" ]]; then
 fi
 
 resolve_agent_canon_cli() {
+  if [[ -n "${AGENT_CANON_CLI_CMD:-}" ]]; then
+    if [[ ! -x "${AGENT_CANON_CLI_CMD}" ]]; then
+      return 1
+    fi
+    AGENT_CANON_CLI_MODE="binary"
+    return 0
+  fi
   local root_tool_binary="${CANON_TOOLS_ROOT}/bin/agent-canon"
   local source_tool_binary="${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon"
   local source_release_binary="${AGENT_CANON_CLI_TARGET_DIR}/release/agent-canon"
