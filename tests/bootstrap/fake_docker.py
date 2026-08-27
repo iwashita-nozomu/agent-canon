@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -94,6 +95,58 @@ def _formatted_container(record: dict, fmt: str) -> str | None:
     return None
 
 
+def _materialize_skill_exchange(state: dict, container: dict) -> None:
+    """Model resident materializer output in the writable runtime exchange."""
+    runtime_mount = next(
+        (
+            mount
+            for mount in container.get("Mounts", [])
+            if mount["Destination"] == "/var/lib/agent-canon/runtime"
+        ),
+        None,
+    )
+    if runtime_mount is None:
+        return
+    image_ref = container.get("Config", {}).get("Image", "")
+    image = find(state, image_ref)
+    if image is None or image[0] != "image":
+        return
+    source_root = Path(str(image[1].get("SourceRoot", "")))
+    # The fake daemon is itself the resident boundary.  Use the canonical
+    # owner shipped with this test checkout while reading all canonical inputs
+    # from the image's source snapshot, including older source snapshots used
+    # by stale-resident fixtures.
+    materializer = Path(__file__).resolve().parents[2] / "tools/agent_tools/skill_shim_materializer.py"
+    if not materializer.is_file():
+        return
+    staging_root = Path(runtime_mount["Source"]) / "container-runtime/skill-projection"
+    staged_skill = staging_root / ".codex/personal/skills/agent-orchestration/SKILL.md"
+    if staged_skill.is_file():
+        return
+    staging_root.mkdir(parents=True, exist_ok=True)
+    materialized = subprocess.run(
+        [
+            sys.executable,
+            str(materializer),
+            "materialize",
+            "--root",
+            str(source_root),
+            "--output-root",
+            str(staging_root),
+            "--image-build",
+            "--all",
+        ],
+        cwd=source_root,
+        env={**os.environ, "AGENT_CANON_IMAGE_BUILD": "1"},
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if materialized.returncode != 0:
+        return
+
+
 def _memory_bytes(value: str) -> int:
     """Parse the small Docker memory notation used by the shell adapter."""
     if value.endswith("g"):
@@ -151,6 +204,7 @@ def main(argv: list[str]) -> int:
             "Id": image_id,
             "RepoTags": [tag],
             "Config": {"Labels": labels(argv)},
+            "SourceRoot": argv[-1],
         }
         state["images"][tag] = record
         save(state)
@@ -321,7 +375,10 @@ def main(argv: list[str]) -> int:
         return 0
     if argv[:1] == ["exec"]:
         index = argv.index("--workdir") + 2
+        exec_environment = {}
         while index < len(argv) and argv[index] == "--env":
+            key, _, value = argv[index + 1].partition("=")
+            exec_environment[key] = value
             index += 2
         identifier = argv[index]
         command = argv[index + 1 :]
@@ -332,8 +389,66 @@ def main(argv: list[str]) -> int:
             "python3",
             "/usr/local/share/agent-canon/runtime/tools/agent_tools/bootstrap_runtime.py",
         ]:
+            if "target" in command[2:] and "add" in command[2:]:
+                runtime_mount = next(
+                    (
+                        mount
+                        for mount in found[1]["Mounts"]
+                        if mount["Destination"] == "/var/lib/agent-canon/runtime"
+                    ),
+                    None,
+                )
+                digest = exec_environment.get("AGENT_CANON_TARGET_DIGEST", "")
+                host_root = exec_environment.get("AGENT_CANON_TARGET_HOST_ROOT", "")
+                container_root = exec_environment.get(
+                    "AGENT_CANON_TARGET_CONTAINER_ROOT", f"/targets/{digest}"
+                )
+                if runtime_mount is None or not digest or not host_root:
+                    return 1
+                runtime_root = Path(runtime_mount["Source"])
+                state_path = runtime_root / "state.json"
+                if state_path.is_file():
+                    lifecycle = json.loads(state_path.read_text(encoding="utf-8"))
+                else:
+                    lifecycle = {"targets": {}, "state": "ready"}
+                target = {
+                    "root": container_root,
+                    "host_root": host_root,
+                    "mode": "read-only",
+                    "digest": digest,
+                }
+                lifecycle.setdefault("targets", {})[digest] = target
+                state_path.write_text(json.dumps(lifecycle), encoding="utf-8")
+                (runtime_root / "mounts.tsv").write_text(
+                    f"target\t{digest}\t{host_root}\t/targets/{digest}\tread-only\n",
+                    encoding="utf-8",
+                )
+                (runtime_root / "mounts.toml").write_text(
+                    "[targets.{}]\nroot = \"{}\"\nmode = \"read-only\"\ndigest = \"{}\"\n".format(
+                        digest, container_root, digest
+                    ),
+                    encoding="utf-8",
+                )
+                print(
+                    json.dumps(
+                        {
+                            "schema": "agent-canon.bootstrap-receipt.v2",
+                            "status": "ok",
+                            "operation": "target_add",
+                            "code": "target_registered",
+                        }
+                    )
+                )
+                return 0
+            if "agent-canon" in command and "--version" in command:
+                print("agent-canon 0.1.0")
+                return 0
             operations = {"install", "update", "start", "stop", "uninstall"}
             operation = next((item for item in command[2:] if item in operations), "")
+            if operation in {"install", "update"} or (
+                "codex" in command[2:] and "prepare" in command[2:]
+            ):
+                _materialize_skill_exchange(state, found[1])
             if operation:
                 print(
                     json.dumps(

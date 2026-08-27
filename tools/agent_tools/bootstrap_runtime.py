@@ -3272,17 +3272,70 @@ class BootstrapRuntime:
         root: Path,
         mode: str,
         mutation_capability: Mapping[str, Any] | None = None,
+        *,
+        host_root: str | None = None,
+        host_digest: str | None = None,
     ) -> dict[str, Any]:
-        canonical = _existing_no_symlink(root, field="target root")
         if mode not in {"read-only", "explicit-target-write"}:
             raise BootstrapError(
                 "invalid_target_mode", f"unsupported target mode: {mode}"
             )
-        record: dict[str, Any] = {
-            "root": str(canonical),
-            "mode": mode,
-            "digest": sha256_text(str(canonical)),
-        }
+
+        # The host adapter validates the real source checkout and derives its
+        # digest before it creates the target bind mount.  The resident cannot
+        # see that host path; it must validate only the mounted container path
+        # and carry the already validated host metadata into the state record.
+        # Keeping these two namespaces separate prevents a container-side
+        # Path.exists()/is_dir() check from producing a false failure for a
+        # perfectly valid host source such as /home/user/agent-canon.
+        if host_root is not None:
+            if not self._container_control():
+                raise BootstrapError(
+                    "target_host_root_unexpected",
+                    "host target metadata is only valid in container control",
+                )
+            if not isinstance(host_root, str) or not host_root.startswith("/"):
+                raise BootstrapError(
+                    "target_host_root_invalid",
+                    "host target root must be an absolute path",
+                )
+            if any(character in host_root for character in "\x00\n\r\t\\\""):
+                raise BootstrapError(
+                    "target_host_root_invalid",
+                    "host target root contains a forbidden character",
+                )
+            if not isinstance(host_digest, str) or not re.fullmatch(
+                r"[A-Za-z0-9_.-]{1,128}", host_digest
+            ):
+                raise BootstrapError(
+                    "target_digest_invalid",
+                    "host target digest is invalid",
+                )
+            container_root = _normalize_absolute_path(root)
+            expected_root = Path("/targets") / host_digest
+            if container_root != expected_root:
+                raise BootstrapError(
+                    "target_mount_invalid",
+                    "target request does not name its declared container mount",
+                )
+            # This is the resident-side verification point.  It checks the
+            # bind-mounted namespace, never the host_root value above.
+            canonical = _existing_no_symlink(
+                container_root, field="mounted target root"
+            )
+            record: dict[str, Any] = {
+                "root": str(canonical),
+                "host_root": host_root,
+                "mode": mode,
+                "digest": host_digest,
+            }
+        else:
+            canonical = _existing_no_symlink(root, field="target root")
+            record = {
+                "root": str(canonical),
+                "mode": mode,
+                "digest": sha256_text(str(canonical)),
+            }
         if mode == "explicit-target-write":
             if not isinstance(mutation_capability, Mapping):
                 raise BootstrapError(
@@ -3699,7 +3752,51 @@ class BootstrapRuntime:
         """Generate the ignored project-local skill view before image/link use."""
         if self._container_control():
             self._validate_source_adapters()
-            return {"mode": "image-owned", "materialized": False}
+            # The resident owns the materializer write.  Generate into the
+            # writable container-runtime exchange, then let the host adapter
+            # export that exact generated tree to the live checkout.  The
+            # source image remains read-only and the host never imports the
+            # materializer's Python dependencies.
+            staging = self.paths.container_runtime / "skill-projection"
+            if staging.is_symlink():
+                raise BootstrapError(
+                    "skill_projection_path_invalid",
+                    "skill projection staging path is a symlink",
+                )
+            if staging.exists():
+                if not staging.is_dir():
+                    raise BootstrapError(
+                        "skill_projection_path_invalid",
+                        "skill projection staging path is not a directory",
+                    )
+                shutil.rmtree(staging)
+            staging.mkdir(parents=True, exist_ok=True)
+            try:
+                from skill_shim_materializer import materialize
+
+                previous_image_build = os.environ.get("AGENT_CANON_IMAGE_BUILD")
+                os.environ["AGENT_CANON_IMAGE_BUILD"] = "1"
+                try:
+                    materializer = materialize(
+                        self.repository_root,
+                        all_skills=True,
+                        image_build=True,
+                        output_root=staging,
+                    )
+                finally:
+                    if previous_image_build is None:
+                        os.environ.pop("AGENT_CANON_IMAGE_BUILD", None)
+                    else:
+                        os.environ["AGENT_CANON_IMAGE_BUILD"] = previous_image_build
+            except Exception as exc:  # noqa: BLE001 - translate owner failure once
+                raise BootstrapError(
+                    "skill_view_materialization_failed", str(exc)
+                ) from exc
+            return {
+                "mode": "resident-exchange",
+                "materialized": True,
+                "readback_digest": materializer.get("readback_digest"),
+            }
         tools_root = self.repository_root / "tools" / "agent_tools"
         if str(tools_root) not in sys.path:
             sys.path.insert(0, str(tools_root))
@@ -5680,6 +5777,8 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
             before = str(state.get("state"))
             resources = state.setdefault("resources", _container_resource_state(runtime))
             resources.update(_container_resource_state(runtime))
+            if operation in {"install", "update"}:
+                runtime._materialize_skill_view()
             if operation == "install":
                 state["state"] = "ready"
                 state["managed_paths"] = [
@@ -5890,15 +5989,15 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
         with runtime.locked():
             state = runtime._read_state()
             stale = runtime._prune_stale_targets(state)
-            target = runtime._target_record(Path(args.root), args.mode)
             host_root = os.environ.get("AGENT_CANON_TARGET_HOST_ROOT")
             container_root = os.environ.get("AGENT_CANON_TARGET_CONTAINER_ROOT")
-            if host_root:
-                target["host_root"] = host_root
-            if container_root:
-                target["root"] = container_root
-            if host_digest := os.environ.get("AGENT_CANON_TARGET_DIGEST"):
-                target["digest"] = host_digest
+            host_digest = os.environ.get("AGENT_CANON_TARGET_DIGEST")
+            target = runtime._target_record(
+                Path(container_root or args.root),
+                args.mode,
+                host_root=host_root,
+                host_digest=host_digest,
+            )
             targets = dict(state.get("targets", {}))
             existing_target = targets.get(target["digest"])
             if (
@@ -5941,8 +6040,16 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
     if operation == "target" and args.target_operation == "remove":
         with runtime.locked():
             state = runtime._read_state()
-            target = runtime._target_record(Path(args.root), args.mode)
-            target_digest = os.environ.get("AGENT_CANON_TARGET_DIGEST", target["digest"])
+            host_root = os.environ.get("AGENT_CANON_TARGET_HOST_ROOT")
+            container_root = os.environ.get("AGENT_CANON_TARGET_CONTAINER_ROOT")
+            host_digest = os.environ.get("AGENT_CANON_TARGET_DIGEST")
+            target = runtime._target_record(
+                Path(container_root or args.root),
+                args.mode,
+                host_root=host_root,
+                host_digest=host_digest,
+            )
+            target_digest = host_digest or target["digest"]
             if target_digest not in state.get("targets", {}):
                 raise BootstrapError("target_not_registered", "target root is not registered")
             targets = dict(state.get("targets", {}))

@@ -1367,6 +1367,38 @@ _agent_canon_run_controller() {
   return "$rc"
 }
 
+_agent_canon_sync_personal_skill_view() {
+  local _container=$1
+  local source_root="$AGENT_CANON_REPOSITORY_ROOT/.codex/personal/skills"
+  local staging_root="$AGENT_CANON_STATE_ROOT/container-runtime/skill-projection"
+  local staging_skills="$staging_root/.codex/personal/skills"
+  [[ "$staging_root" == "$AGENT_CANON_STATE_ROOT/container-runtime/skill-projection" ]] ||
+    _agent_canon_json_error skill_projection_path_invalid "skill projection staging path is invalid"
+  [[ ! -L "$AGENT_CANON_STATE_ROOT/container-runtime" ]] ||
+    _agent_canon_json_error skill_projection_path_invalid "skill projection exchange is a symlink"
+  [[ ! -L "$source_root" ]] ||
+    _agent_canon_json_error skill_projection_path_invalid "personal skill source is a symlink"
+  [[ -d "$staging_skills" && ! -L "$staging_skills" ]] ||
+    _agent_canon_json_error skill_projection_copy_failed \
+      "resident personal skill view was not materialized"
+  if find "$staging_skills" -type l -print -quit | grep -q .; then
+    _agent_canon_json_error skill_projection_copy_failed \
+      "resident personal skill view contains a symlink"
+  fi
+  if ! find "$staging_skills" -type f -name SKILL.md -print -quit | grep -q .; then
+    _agent_canon_json_error skill_projection_copy_failed \
+      "resident personal skill view contains no generated skills"
+  fi
+  mkdir -p -- "$source_root"
+  if ! cp -a -- "$staging_skills/." "$source_root/"; then
+    _agent_canon_json_error skill_projection_copy_failed \
+      "host personal skill view could not be published"
+  fi
+  [[ -n "$(find "$source_root" -type f -name SKILL.md -print -quit)" ]] ||
+    _agent_canon_json_error skill_projection_copy_failed \
+      "host personal skill view readback is missing"
+}
+
 _agent_canon_restore_candidate_failure() {
   local container=$1 old_image_id=$2 candidate_image_id=$3
   local restore_output restore_error restore_rc=0
@@ -1567,6 +1599,13 @@ _agent_canon_replace_resident_locked() {
     :
   else
     rc=$?
+  fi
+  if ((rc == 0)); then
+    if _agent_canon_sync_personal_skill_view "$candidate"; then
+      :
+    else
+      rc=$?
+    fi
   fi
   if ((rc == 0)) && [[ "${AGENT_CANON_SUPPRESS_GLOBAL_LINKS:-0}" != 1 ]]; then
     if _agent_canon_install_global_links; then
@@ -2343,6 +2382,7 @@ bootstrap_host_entrypoint() {
       if ((install_rc != 0)); then
         return "$install_rc"
       fi
+      _agent_canon_sync_personal_skill_view "$container"
       _agent_canon_record_active_container "$container"
       if [[ "${AGENT_CANON_SUPPRESS_GLOBAL_LINKS:-0}" != 1 ]]; then
         _agent_canon_install_global_links
@@ -2548,8 +2588,23 @@ bootstrap_host_entrypoint() {
       AGENT_CANON_TARGET_DIGEST=$target_digest
       export AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT AGENT_CANON_TARGET_DIGEST
       _agent_canon_run_controller "$target_candidate" "${command_args[@]}" || target_rc=$?
+      # The pending bind exists only while the candidate is being created. The
+      # resident controller has now committed the target into mounts.tsv, so
+      # do not let the pre-create input participate in readback a second time.
+      unset AGENT_CANON_TARGET_PENDING_SOURCE AGENT_CANON_TARGET_PENDING_DIGEST
+      if ((target_rc == 0)); then
+        # The resident has committed the host-source/container-target record.
+        # Read back the complete mount set once from the host Docker boundary;
+        # this confirms that the resident-side /targets/<digest> verification
+        # was backed by the bind mount that the host requested.
+        if _agent_canon_validate_existing_container "$target_candidate" \
+          "$AGENT_CANON_STATE_ROOT/mounts.tsv"; then
+          :
+        else
+          target_rc=$?
+        fi
+      fi
       if ((target_rc != 0)) && [[ -n "$target_current_image_id" ]]; then
-        unset AGENT_CANON_TARGET_PENDING_SOURCE AGENT_CANON_TARGET_PENDING_DIGEST
         if ! _agent_canon_restore_candidate_failure "$target_candidate" "$target_current_image_id" "$target_current_image_id"; then
           _agent_canon_json_error rollback_failed "target mount replacement recovery was incomplete"
         fi
@@ -2597,6 +2652,7 @@ bootstrap_host_entrypoint() {
       codex_container=$(_agent_canon_ensure_container)
       _agent_canon_run_controller "$codex_container" codex prepare || codex_prepare_rc=$?
       ((codex_prepare_rc == 0)) || return "$codex_prepare_rc"
+      _agent_canon_sync_personal_skill_view "$codex_container"
       if [[ "$codex_action" == prepare ]]; then
         return 0
       fi
