@@ -17,10 +17,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub const SNAPSHOT_SCHEMA_VERSION: &str = "source_snapshot.v1";
-const SURFACE_MANIFEST_SNAPSHOT_SCHEMA: &str = "agent-canon.surface-manifest.v1";
+const SURFACE_MANIFEST_SNAPSHOT_SCHEMA: &str = "agent-canon.surface-manifest.v2";
 const DEFAULT_SURFACE_MANIFEST: &str = "documents/runtime/shared-runtime-surfaces.toml";
-pub(crate) const PRODUCER_IDENTITY_VERSION: &str = "agent-canon.surface-manifest-producer.v1";
-pub(crate) const PRODUCER_IDENTITY_CONTRACT: &str = "agent-canon.surface-manifest.v1";
+pub(crate) const PRODUCER_IDENTITY_VERSION: &str = "agent-canon.surface-manifest-producer.v2";
+pub(crate) const PRODUCER_IDENTITY_CONTRACT: &str = "agent-canon.surface-manifest.v2";
 pub(crate) const SOURCE_DIAGNOSTIC_SCHEMA: &str = "agent-canon.source-diagnostic.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

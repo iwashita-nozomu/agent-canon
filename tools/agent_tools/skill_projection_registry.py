@@ -43,11 +43,22 @@ class GeneratedProjection:
     projection_kind: str
 
 
+class GeneratedProjectionRegistryError(ValueError):
+    """A generated view has no unique canonical owner."""
+
+    def __init__(self, code: str, path: str, owners: tuple[str, ...]) -> None:
+        """Bind a stable code, target path, and competing owners."""
+        self.code = code
+        self.path = path
+        self.owners = owners
+        super().__init__(f"{code}:{path}:{','.join(owners)}")
+
+
 def generated_skill_projections(root: Path) -> tuple[GeneratedProjection, ...]:
     """Read catalog and internal-routine generated paths without requiring views."""
     catalog_path = root.resolve() / SKILL_CATALOG
     projections: list[GeneratedProjection] = []
-    seen: set[str] = set()
+    owners: dict[str, str] = {}
     if catalog_path.is_file():
         try:
             raw: object = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
@@ -72,9 +83,9 @@ def generated_skill_projections(root: Path) -> tuple[GeneratedProjection, ...]:
                 raise ValueError(
                     f"skill catalog entry {skill} has non-canonical materializer paths"
                 )
-            if shim in seen:
+            if shim in owners:
                 raise ValueError(f"duplicate generated skill projection: {shim}")
-            seen.add(shim)
+            owners[shim] = canonical
             projections.append(
                 GeneratedProjection(
                     path=shim,
@@ -98,9 +109,16 @@ def generated_skill_projections(root: Path) -> tuple[GeneratedProjection, ...]:
             for shim in sorted(set(GENERATED_SKILL_REF_RE.findall(text))):
                 if not shim.split(GENERATED_SKILL_PREFIX, 1)[1].startswith("_"):
                     continue
-                if shim in seen:
+                previous_owner = owners.get(shim)
+                if previous_owner is not None:
+                    if previous_owner != source:
+                        raise GeneratedProjectionRegistryError(
+                            "generated_projection_ambiguous",
+                            shim,
+                            (previous_owner, source),
+                        )
                     continue
-                seen.add(shim)
+                owners[shim] = source
                 projections.append(
                     GeneratedProjection(
                         path=shim,

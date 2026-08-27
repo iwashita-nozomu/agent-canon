@@ -7,6 +7,7 @@
 # upstream implementation ../../bootstrap/container/Dockerfile image definition
 # upstream implementation ../../bootstrap/container/entrypoint.sh health and dispatch entrypoint
 # upstream implementation ../../bootstrap/container/dependencies.toml typed image capabilities
+# upstream implementation ../../tools/agent_tools/devcontainer_dependencies.py canonical Cargo snapshot digest owner
 # @dependency-end
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ except ModuleNotFoundError:
     import tomli as tomllib  # type: ignore[no-redef]
 
 from tools.agent_tools import tool_dispatch
+from tools.agent_tools.devcontainer_dependencies import Installer
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -250,6 +252,9 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
     assert cli["locked"] is True
     assert len(cli["source_tree_sha256"]) == 64
     assert len(cli["cargo_lock_sha256"]) == 64
+    source_digest, lock_digest = Installer._cargo_snapshot(ROOT / "rust/agent-canon")
+    assert cli["source_tree_sha256"] == source_digest
+    assert cli["cargo_lock_sha256"] == lock_digest
     assert cli["source"] == "rust/agent-canon"
     assert all("project" not in str(record).lower() for record in records)
 

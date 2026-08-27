@@ -42,7 +42,7 @@ except ImportError:  # pragma: no cover - direct script execution
 
 DEFAULT_MANIFEST = Path("documents/runtime/shared-runtime-surfaces.toml")
 DEFAULT_DOC = Path("documents/runtime/SHARED_RUNTIME_SURFACES.md")
-NORMALIZED_SNAPSHOT_SCHEMA = "agent-canon.surface-manifest.v1"
+NORMALIZED_SNAPSHOT_SCHEMA = "agent-canon.surface-manifest.v2"
 MANIFEST_COMMANDS = frozenset({"normalized-snapshot", "check-doc", "projection-forbidden-roots"})
 ALLOWED_MODES = frozenset({"runtime", "tool", "eval"})
 ALLOWED_PROJECTION_PRODUCERS = frozenset({"agent-canon", "agent-canon-bootstrap", "agent-canon-log"})

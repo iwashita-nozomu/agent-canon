@@ -4,6 +4,7 @@ contract reference
 responsibility Explains the standalone AgentCanon runtime-surface inventory and archive boundary.
 upstream design ./bootstrap-runtime.md bootstrap lifecycle and resource policy
 upstream implementation ../../tools/agent_tools/surface_manifest.py validates source classifications
+upstream implementation ../../tools/agent_tools/skill_projection_registry.py resolves generated skill owners
 downstream implementation ../../rust/agent-canon/src/dependency_manifest.rs consumes normalized classifications
 @dependency-end
 -->
@@ -24,6 +25,16 @@ families:
 - `bootstrap/`: lifecycle manifest and container definition;
 - `tools/agent_tools/`: Python orchestration and tool adapters;
 - `evidence/agent-evals/`: evaluation producers and collection metadata.
+
+The `normalized-snapshot` command emits schema
+`agent-canon.surface-manifest.v2`. Its required `generated_projections` field
+is the catalog/materializer mapping for ignored
+`.codex/personal/skills/<skill>/SKILL.md` views; graph consumers resolve those
+paths to tracked owners without creating the ignored view.
+
+The producer identity is
+`agent-canon.surface-manifest-producer.v2`; consumers must reject older or
+incomplete snapshots instead of silently treating them as equivalent.
 
 Evaluation results are collected into the external `agent-canon-log` repository.
 Runtime state, caches, temporary files, and receipts stay below the explicit

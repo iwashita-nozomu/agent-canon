@@ -108,7 +108,7 @@ version = "0.1.0"
 source = "rust/agent-canon"
 repo = "https://github.com/iwashita-nozomu/agent-canon.git"
 source_identity = "canonical-snapshot"
-source_tree_sha256 = "5779792f48184cb752fbc8d3d26a345cfde82ab0e35a493169bcaff41a123d44"
+source_tree_sha256 = "6bfc0ccdcb57e545800ec691f2094ca1363210863ad48ee4bf1103ec64a0f786"
 cargo_lock_sha256 = "060b8825843b14b12bebb9da095503f4ec7f68a77934e595c082957cb1f72638"
 locked = true
 verification = { kind = "cargo-binary", path = "target/release/agent-canon", args = ["--version"], output_contains = "agent-canon 0.1.0" }
