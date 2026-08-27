@@ -248,7 +248,19 @@ compile/JIT、warm execution、transfer / synchronization、algorithmic iteratio
 cost を合計時間だけで代用しません。数値側の evidence は residual / objective /
 KKT trajectory、iteration count、step acceptance / size、termination status、
 conditioning、inner-solver work、finite / non-finite event、および per-iteration
-cost を含めます。
+cost を含めます。正規化と分類は
+`python3 tools/agent_tools/numeric_performance.py --input <post-run-observations.json> --format json`
+で行い、prose だけで JIT handoff を決めません。
+
+入力は `agent-canon.numeric-performance-observation.v1` の closed JSON です。
+`scope` は `numeric_solver` または `non_numeric`、数値 solver では
+`trajectory_tolerance` と task-provided `math_oracle` を必須にします。各
+`before` / `after` record は `total_seconds` を必須とし、完全な数値比較には
+`compile_jit_seconds`、`iterations`、`per_iteration_seconds`、`eval_seconds`、
+`linear_solve_seconds`、`communication_seconds`、`other_seconds`、
+`residual_trajectory`、`objective_trajectory`、`step_acceptance`、`step_sizes`、
+`termination`、`conditioning`、`inner_solver`、`inner_solver_work` を使用します。
+未知の field は受け付けず、欠落した完全比較項目は `evidence_missing` として扱います。
 
 ### Classification and handoff
 

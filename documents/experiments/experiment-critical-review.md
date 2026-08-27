@@ -186,7 +186,9 @@ T_{total} = T_{compile/JIT} + N_{iter} \times
 total time だけでなく、residual / objective / KKT trajectory、iteration count、
 step acceptance / size、termination status、conditioning、inner-solver work、
 per-iteration cost、cold compile/JIT と warm execution、transfer / synchronization
-を区別します。iteration、trajectory、受理、conditioning、または inner solver が
+を区別します。観測 JSON は `python3 tools/agent_tools/numeric_performance.py
+--input <post-run-observations.json> --format json` で分類し、prose だけで owner を
+選びません。iteration、trajectory、受理、conditioning、または inner solver が
 変わった場合は数学 / algorithm の原因として `computational-optimization` に
 返し、JIT / backend / architecture を変更しません。同じ trajectory、iteration
 count、termination、conditioning、inner-solver work、per-iteration numerical work

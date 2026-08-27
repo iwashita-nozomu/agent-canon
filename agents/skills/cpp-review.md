@@ -121,6 +121,8 @@ workload、compiler、thread / device 条件を明記して handoff します。
 最初の判定は `computational-optimization` の convergence-first numerical
 performance diagnosis に委譲します。cpp review はその post-run record を
 受け取り、数学 / algorithm の観測と native implementation evidence を混ぜません。
+record は `python3 tools/agent_tools/numeric_performance.py --input
+<post-run-observations.json> --format json` の分類結果を使います。
 
 - iteration count、residual / objective / KKT trajectory、step acceptance / size、
   termination、conditioning、inner-solver work、または per-iteration numerical

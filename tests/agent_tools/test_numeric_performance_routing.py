@@ -101,3 +101,30 @@ def test_diagnosis_docs_bind_cost_decomposition_and_post_run_order() -> None:
     assert "pass / fail" in optimization
     assert "run 前の pass / fail" in experiment
     assert "non_numeric" in optimization
+
+
+def test_catalog_exposes_only_narrow_numeric_performance_route() -> None:
+    """The classifier is a computational command, not a generic performance trigger."""
+    catalog = (PROJECT_ROOT / "agents/skills/catalog.yaml").read_text(encoding="utf-8")
+    start = catalog.index("  - id: computational-optimization")
+    end = catalog.index("  - id: adaptive-improvement-loop", start)
+    computational = catalog[start:end]
+    assert "numeric_performance.py --input <post-run-observations.json>" in computational
+    assert '["solver", "performance"]' in computational
+    assert '["iterative", "algorithm", "performance"]' in computational
+    assert '["performance"]' not in computational
+
+    optimization = (PROJECT_ROOT / "agents/skills/computational-optimization.md").read_text(
+        encoding="utf-8"
+    )
+    assert "numeric_performance.py" in optimization
+
+
+def test_numeric_solver_performance_trigger_is_not_generic() -> None:
+    """Only a solver/iterative-algorithm performance phrase selects math routing."""
+    assert "computational-optimization" in _active_skills(
+        "solver performance の post-run numerical diagnosis"
+    )
+    assert "computational-optimization" not in _active_skills(
+        "generic performance regression review"
+    )
