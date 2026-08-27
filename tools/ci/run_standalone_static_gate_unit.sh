@@ -3,20 +3,29 @@
 # contract tool
 # responsibility Runs one standalone AgentCanon static-gate execution unit without selecting whether that unit is required.
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
+# upstream implementation ./run_all_checks.sh owns the full-confidence check body executed from a read-only target
 # downstream implementation ./check_agent_canon_pr.sh aggregates all units for the manual full-confidence route
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml remote execution boundary
 # downstream implementation ../../tests/tools/test_standalone_static_gate_units.py unit partition regression
+# downstream implementation ../../tests/tools/test_read_only_full_check.py read-only full-check regression
 # downstream implementation ../../tests/tools/test_standalone_static_gate_source_runtime_contract.py source/runtime ownership regression
 # @dependency-end
 
 set -euo pipefail
 
-if [[ "$#" -ne 1 ]]; then
-  echo "usage: $0 {rust|contracts|eval|workflow-container}" >&2
+if [[ "$#" -lt 1 ]]; then
+  echo "usage: $0 {rust|contracts|eval|workflow-container|full} [full-check-options...]" >&2
   exit 2
 fi
 
 UNIT="$1"
+shift
+UNIT_ARGS=("$@")
+if [[ "${UNIT}" != "full" && "${#UNIT_ARGS[@]}" -ne 0 ]]; then
+  echo "standalone static-gate unit does not accept arguments: ${UNIT}" >&2
+  exit 2
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 if [[ ! -f /usr/local/share/agent-canon/.agent-canon-tool-container ]]; then
   echo "AGENT_CANON_STATIC_GATE=fail reason=shared_tool_runtime_required" >&2
@@ -24,6 +33,56 @@ if [[ ! -f /usr/local/share/agent-canon/.agent-canon-tool-container ]]; then
 fi
 ROOT="${AGENT_CANON_TARGET_ROOT:?AGENT_CANON_TARGET_ROOT is required}"
 TOOLS_ROOT=/usr/local/share/agent-canon/runtime/tools
+
+assert_read_only_target() {
+  python3 - "${ROOT}" <<'PY'
+from pathlib import Path
+import sys
+
+
+def decode_mount_path(value: str) -> str:
+    for encoded, decoded in (
+        ("\\040", " "),
+        ("\\011", "\t"),
+        ("\\012", "\n"),
+        ("\\134", "\\"),
+    ):
+        value = value.replace(encoded, decoded)
+    return value
+
+
+target = Path(sys.argv[1]).resolve(strict=True)
+mountinfo = Path("/proc/self/mountinfo")
+if not mountinfo.is_file():
+    raise SystemExit("AGENT_CANON_STATIC_GATE=fail reason=mountinfo_unavailable")
+
+best: tuple[int, Path, set[str]] | None = None
+for line in mountinfo.read_text(encoding="utf-8").splitlines():
+    left, separator, _right = line.partition(" - ")
+    fields = left.split()
+    if not separator or len(fields) < 6:
+        continue
+    mount_point = Path(decode_mount_path(fields[4])).resolve(strict=False)
+    try:
+        target.relative_to(mount_point)
+    except ValueError:
+        continue
+    candidate = (len(mount_point.parts), mount_point, set(fields[5].split(",")))
+    if best is None or candidate[0] > best[0]:
+        best = candidate
+
+if best is None:
+    raise SystemExit("AGENT_CANON_STATIC_GATE=fail reason=target_mount_missing")
+_depth, mount_point, options = best
+if "ro" not in options:
+    raise SystemExit(
+        f"AGENT_CANON_STATIC_GATE=fail reason=target_mount_not_read_only mount={mount_point}"
+    )
+print(f"AGENT_CANON_STATIC_GATE_TARGET_MOUNT=read-only mount={mount_point}")
+PY
+}
+
+assert_read_only_target
 cd "${ROOT}"
 
 # Runtime artifacts belong to the caller-selected external runtime root.  Keep
@@ -64,6 +123,14 @@ export AGENT_CANON_CACHE_ROOT="$(runtime_boundary_path "${AGENT_CANON_CACHE_ROOT
 export CARGO_TARGET_DIR="$(runtime_boundary_path "${CARGO_TARGET_DIR:-${AGENT_CANON_CACHE_ROOT}/cargo-target}")"
 export TMPDIR="$(runtime_boundary_path "${TMPDIR:-${AGENT_CANON_STATIC_RUNTIME_ROOT}/tmp}")"
 mkdir -p "${CARGO_TARGET_DIR}" "${TMPDIR}"
+
+run_full() {
+  local control_parent_root=""
+  control_parent_root="$(cd "${AGENT_CANON_STATIC_RUNTIME_ROOT}/.." && pwd -P)"
+  AGENT_CANON_CONTROL_PARENT_ROOT="${control_parent_root}" \
+  AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_STATIC_RUNTIME_ROOT}" \
+    bash "${ROOT}/tools/ci/run_all_checks.sh" "${UNIT_ARGS[@]}"
+}
 
 run_rust() {
   cargo build --manifest-path rust/agent-canon/Cargo.toml
@@ -172,7 +239,9 @@ run_eval() (
 )
 
 run_workflow_container() {
-  python3 -m pytest -p no:cacheprovider tests/tools/test_standalone_static_gate_units.py -q
+  python3 -m pytest -p no:cacheprovider -q \
+    tests/tools/test_standalone_static_gate_units.py \
+    tests/tools/test_read_only_full_check.py
   python3 "${ROOT}/tools/ci/check_github_workflows.py"
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_bootstrap_container_contract.py \
@@ -180,6 +249,7 @@ run_workflow_container() {
 }
 
 case "${UNIT}" in
+  full) run_full ;;
   rust) run_rust ;;
   contracts) run_contracts ;;
   eval) run_eval ;;
