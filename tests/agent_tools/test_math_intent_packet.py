@@ -26,6 +26,7 @@ sys.path.insert(0, str(TOOLS))
 from packets import (  # noqa: E402
     MATHEMATICAL_INTENT_PACKET_SCHEMA,
     mathematical_intent_packet_mapping,
+    math_intent_route_id_from_context,
     normalize_mathematical_intent_packet,
     validate_mathematical_intent_route,
 )
@@ -133,6 +134,32 @@ def test_math_route_accepts_only_canonical_route_id() -> None:
         validate_mathematical_intent_route("caller_supplied_route")
     with pytest.raises(RuntimeError, match="unknown_id"):
         validate_mathematical_intent_route({"owner_skill": "computational-optimization"})  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "skill",
+    ("algorithm-proof-exploration", "lean-algorithm-design", "formal-proof-workflow"),
+)
+def test_proof_skills_do_not_imply_math_route(skill: str) -> None:
+    """Proof and theorem infrastructure selection alone is not math intent."""
+    assert math_intent_route_id_from_context((skill,)) is None
+
+
+@pytest.mark.parametrize(
+    "skill",
+    ("algorithm-proof-exploration", "lean-algorithm-design", "formal-proof-workflow"),
+)
+def test_explicit_math_route_with_proof_skill_resolves_canonical_route(
+    skill: str,
+) -> None:
+    """An explicit canonical math route overrides proof-skill ambiguity."""
+    assert (
+        math_intent_route_id_from_context(
+            (skill,),
+            explicit_route_id=MATH_ROUTE,
+        )
+        == MATH_ROUTE
+    )
 
 
 def test_packet_missing_field_stops() -> None:
@@ -395,14 +422,16 @@ def test_t6_math_owner_skill_requires_packet() -> None:
 
 
 def test_proof_tool_task_without_math_route_does_not_require_packet() -> None:
-    """Proof-tool selection stays outside the math route unless explicitly paired."""
-    result, runtime = run_bootstrap(
-        "--task",
+    """IR/theorem/proof-tool selection stays outside math routing by itself."""
+    for task in (
+        "$algorithm-proof-exploration IR extractor repair",
+        "$lean-algorithm-design theorem graph repair",
         "$formal-proof-workflow Lean theorem graph repair",
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert "MATH_INTENT_ROUTE_STATUS=not_applicable" in result.stdout
-    shutil.rmtree(runtime.parents[2])
+    ):
+        result, runtime = run_bootstrap("--task", task)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "MATH_INTENT_ROUTE_STATUS=not_applicable" in result.stdout
+        shutil.rmtree(runtime.parents[2])
 
 
 def test_full_team_non_math_docker_task_does_not_require_packet() -> None:
@@ -423,7 +452,7 @@ def test_normal_math_bootstrap_materializes_packet_and_reviewer() -> None:
     """A complete T4 packet activates the math reviewer and manifest route."""
     result, report_dir = run_bootstrap(
         "--task",
-        "修正 solver residual の収束と実行速度。JIT 境界は症状だが変更しない",
+        "修正 solver residual の収束と実行速度。$algorithm-proof-exploration は補助で、JIT 境界は症状だが変更しない",
         "--task-id",
         "T4",
         "--math-intent-packet",

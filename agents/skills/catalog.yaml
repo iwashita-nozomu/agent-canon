@@ -1734,10 +1734,6 @@ skill_families:
         - ["residual", "convergence"]
         - ["residual", "numerical"]
         - ["residual", "収束"]
-        - ["アルゴリズム", "修正"]
-        - ["アルゴリズム", "テストから"]
-        - ["algorithm", "repair"]
-        - ["algorithm", "test", "first"]
   - id: adaptive-improvement-loop
     purpose: Manage experiments, research, tuning, and iterative code changes as one backlog-driven outer loop.
     canonical_doc: agents/skills/adaptive-improvement-loop.md

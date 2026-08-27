@@ -325,6 +325,19 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("subagent-bootstrap", decision["active_skills"])
         self.assertNotIn("environment-maintenance", decision["active_skills"])
 
+    def test_explicit_math_owner_survives_proof_tool_context(self) -> None:
+        """An explicit computational owner remains authoritative without keywords."""
+        result = self.run_route(
+            "--prompt",
+            "$computational-optimization $algorithm-proof-exploration IR repair",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("computational-optimization", decision["matched_skills"])
+
     def test_infrastructure_only_request_is_exempt_from_math_route(self) -> None:
         """An infrastructure-only repair does not acquire mathematical routing."""
         result = self.run_route(
@@ -1609,7 +1622,7 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotIn("agent-log-analysis", decision["matched_skills"])
 
     def test_prompt_routes_algorithm_test_first_feedback(self) -> None:
-        """Algorithm repair feedback should route to algorithm owners before test design."""
+        """Proof-oriented algorithm feedback stays with proof owners, not math inference."""
         result = self.run_route(
             "--prompt",
             "アルゴリズム修正時にテストから直し始めるのをやめてください",
@@ -1620,16 +1633,12 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
         for skill in (
-            "computational-optimization",
             "algorithm-proof-exploration",
             "agent-learning",
         ):
             self.assertIn(skill, decision["matched_skills"])
-        for skill in (
-            "computational-optimization",
-            "algorithm-proof-exploration",
-        ):
-            self.assertIn(skill, decision["active_skills"])
+        self.assertIn("algorithm-proof-exploration", decision["active_skills"])
+        self.assertNotIn("computational-optimization", decision["matched_skills"])
         self.assertNotIn("test-design", decision["matched_skills"])
         self.assertNotIn("test-design", decision["active_skills"])
         self.assertIn("agent-learning", decision["deferred_skills"])

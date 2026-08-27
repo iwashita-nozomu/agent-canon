@@ -688,10 +688,10 @@ task id が分かる場合は、task catalog 側の family を正本にします
 `mathematical_correction` を解決して `mathematical_intent_packet` を作る math-intent route
 に入れます。handoff が持つのは route ID だけで、owner / reviewer / ordering は catalog
 record（`requires_math_intent=true`）から解決します。数学 route を有効にするのは、
-orchestration が数学 owner として選択した `computational-optimization`、
-`algorithm-proof-exploration`、または `lean-algorithm-design`、または正規化済み packet が
-ある場合に限ります。`formal-proof-workflow` など proof-only skill、reviewer role、full-team
-materialization だけでは route を有効にしません。対象が数学的・数値的な修正であることは、
+orchestration が数学 owner として選択した `computational-optimization`、または正規化済み
+packet がある場合に限ります。`algorithm-proof-exploration`、`lean-algorithm-design`、
+`formal-proof-workflow` など proof / theorem skill、reviewer role、full-team materialization
+だけでは route を有効にしません。対象が数学的・数値的な修正であることは、
 依頼の対象に数式・定義・変数 / domain / unit、objective / residual、制約、仮定、導出、
 反復 / 更新則、停止量、failure semantics、収束、勾配 / Jacobian / Hessian、KKT、または
 数値 oracle / counterexample が含まれ、かつ修正・診断対象であることが読める場合です。

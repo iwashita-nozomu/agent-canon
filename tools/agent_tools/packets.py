@@ -211,8 +211,6 @@ MATHEMATICAL_INTENT_ROUTE_ID = "mathematical_correction"
 MATHEMATICAL_INTENT_OWNER_SKILLS = frozenset(
     {
         "computational-optimization",
-        "algorithm-proof-exploration",
-        "lean-algorithm-design",
     }
 )
 MATHEMATICAL_INTENT_PACKET_TEXT_FIELDS = (
