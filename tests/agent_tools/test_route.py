@@ -35,6 +35,7 @@ from team_config import (  # noqa: E402
     load_task_catalog,
     load_team_config,
 )
+from implementation_dispatch import declared_team_capacity_derivation  # noqa: E402
 
 
 class RouteToolTest(unittest.TestCase):
@@ -468,6 +469,15 @@ class RouteToolTest(unittest.TestCase):
         )
         self.assertEqual(reviewer_view["model"], "gpt-5.6-luna")
         self.assertEqual(reviewer_view["model_reasoning_effort"], "high")
+
+    def test_conditional_math_reviewer_enters_capacity_only_when_active(self) -> None:
+        """The dormant conditional stage stays out of baseline capacity."""
+        catalog = load_task_catalog(load_team_config())
+        baseline = declared_team_capacity_derivation(catalog)
+        active = declared_team_capacity_derivation(catalog, include_math_intent=True)
+        self.assertEqual(baseline.requested_max_threads(), 27)
+        self.assertEqual(active.requested_max_threads(), 28)
+        self.assertEqual(active.peak_family.direct_frontier_count, 22)
 
     def test_prompt_routes_subagent_first_implementation_active(self) -> None:
         """Implementation, patch, and doc-edit prompts should activate bootstrap."""

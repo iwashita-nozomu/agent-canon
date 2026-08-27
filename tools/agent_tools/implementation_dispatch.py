@@ -188,6 +188,8 @@ def default_quality_check_agent_types(roles: tuple[Role, ...]) -> tuple[str, ...
 
 def _capacity_family_record(
     family: dict[str, object],
+    *,
+    include_math_intent: bool = False,
 ) -> capacity_handshake.DeclaredFamilyCapacity:
     """Derive one family capacity record from its declared stage topology."""
     family_id = _as_required_string(family.get("id"), "workflow_family.id")
@@ -211,7 +213,10 @@ def _capacity_family_record(
     def stage_roles(stage_class: str) -> tuple[str, ...]:
         selected: list[str] = []
         for wave in waves:
-            if wave.get("activation") == "conditional_math_intent_packet":
+            if (
+                wave.get("activation") == "conditional_math_intent_packet"
+                and not include_math_intent
+            ):
                 continue
             if wave.get("stage_class") != stage_class:
                 continue
@@ -246,6 +251,8 @@ def _capacity_family_record(
 
 def declared_team_capacity_derivation(
     catalog: TaskCatalog,
+    *,
+    include_math_intent: bool = False,
 ) -> capacity_handshake.DeclaredTeamTopologyDerivation:
     """Materialize the canonical topology-derived capacity witness input."""
     return capacity_handshake.DeclaredTeamTopologyDerivation(
@@ -258,7 +265,11 @@ def declared_team_capacity_derivation(
         excluded_nested_role_ids=("skill_evaluator",),
         isolated_direct_role_ids=("skill_evaluator",),
         family_records=tuple(
-            _capacity_family_record(family) for family in catalog.workflow_families
+            _capacity_family_record(
+                family,
+                include_math_intent=include_math_intent,
+            )
+            for family in catalog.workflow_families
         ),
     )
 
@@ -349,7 +360,14 @@ def capacity_runtime_for_spec(spec: RunBundleSpec) -> _CapacityRuntime:
     """Create one provider-owned ledger and snapshot for a run bundle."""
     if spec.task_catalog is None:
         raise RuntimeError("task catalog is required for capacity handshake")
-    derivation = declared_team_capacity_derivation(spec.task_catalog)
+    if __package__:
+        from .packets import math_intent_route_id_for_spec
+    else:
+        from packets import math_intent_route_id_for_spec  # type: ignore[no-redef]
+    derivation = declared_team_capacity_derivation(
+        spec.task_catalog,
+        include_math_intent=math_intent_route_id_for_spec(spec) is not None,
+    )
     witness = _capacity_topology_witness(derivation)
     config_path = spec.workspace_root / ".codex" / "config.toml"
     contract = capacity_handshake.load_startup_contract(
@@ -887,9 +905,17 @@ def capacity_start_output_lines(
     )
 
 
-def workflow_spawn_budget(catalog: TaskCatalog, family_id: str) -> tuple[int, int]:
+def workflow_spawn_budget(
+    catalog: TaskCatalog,
+    family_id: str,
+    *,
+    include_math_intent: bool = False,
+) -> tuple[int, int]:
     """Return the active and write-capable spawn budget for one workflow family."""
-    derivation = declared_team_capacity_derivation(catalog)
+    derivation = declared_team_capacity_derivation(
+        catalog,
+        include_math_intent=include_math_intent,
+    )
     family = next(
         record
         for record in derivation.family_records
@@ -1155,12 +1181,10 @@ def _materialize_stage_wave_slots(
     """Return one default executable slot for each active role in the stage."""
     if __package__:
         from .packets import (
-            MATHEMATICAL_INTENT_ROUTE_ID,
             validate_mathematical_intent_route,
         )
     else:
         from packets import (  # type: ignore[no-redef]
-            MATHEMATICAL_INTENT_ROUTE_ID,
             validate_mathematical_intent_route,
         )
     validate_mathematical_intent_route(math_intent_route_id)
@@ -1194,11 +1218,7 @@ def _materialize_stage_wave_slots(
                 ),
                 writer_target=target,
                 math_intent_route_id=(
-                    (
-                        math_intent_route_id or MATHEMATICAL_INTENT_ROUTE_ID
-                        if role.id == "mathematical_correctness_reviewer"
-                        else math_intent_route_id
-                    )
+                    math_intent_route_id
                     if role.id in {"implementer", "mathematical_correctness_reviewer"}
                     else None
                 ),
@@ -1458,7 +1478,7 @@ def dispatch_subagent_wave(
         for slot in slots
         if slot.requires_math_intent
     }
-    if any(slot.role_id == "mathematical_correctness_reviewer" for slot in slots):
+    if math_intent_packet is not None and not route_ids:
         route_ids.add(MATHEMATICAL_INTENT_ROUTE_ID)
     if len(route_ids) > 1:
         raise RuntimeError("mathematical_intent_route:multiple_ids")

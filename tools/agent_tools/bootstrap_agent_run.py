@@ -560,6 +560,14 @@ def resolve_bootstrap_context(
         packet_present=bool(args.math_intent_packet),
         explicit_route_id=math_route,
     )
+    if math_route is not None and workflow_family_id is not None:
+        workflow_active_spawn_budget, workflow_max_write_subagents = (
+            workflow_spawn_budget(
+                catalog,
+                workflow_family_id,
+                include_math_intent=True,
+            )
+        )
     if math_route is not None and args.math_intent_packet:
         reviewer = str(
             (mathematical_intent_route_config(catalog, math_route) or {}).get(

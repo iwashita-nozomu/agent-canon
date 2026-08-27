@@ -189,16 +189,16 @@ def test_spawn_requires_packet_and_rejects_non_math_writer_path() -> None:
                 writer_target=writer,
                 math_intent_route=MATH_ROUTE,
             )
-        with pytest.raises(RuntimeError, match="math_packet_missing"):
-            materialize_subagent_spawn_tool_call(
-                role="mathematical_correctness_reviewer",
-                agent_type="reviewer",
-                input="math review",
-                checkout_identity=identity(root),
-                workspace_write_capable=False,
-            )
+        reviewer_call = materialize_subagent_spawn_tool_call(
+            role="mathematical_correctness_reviewer",
+            agent_type="reviewer",
+            input="non-math review",
+            checkout_identity=identity(root),
+            workspace_write_capable=False,
+        )
+        assert "mathematical_intent_packet" not in reviewer_call["arguments"]
 
-        with pytest.raises(ValueError, match="forbidden_surface"):
+        with pytest.raises(ValueError, match="path_not_in_packet"):
             materialize_subagent_spawn_tool_call(
                 role="implementer",
                 agent_type="worker",
@@ -208,6 +208,33 @@ def test_spawn_requires_packet_and_rejects_non_math_writer_path() -> None:
                 math_intent_route=MATH_ROUTE,
                 math_intent_packet=packet(),
             )
+
+        mapped_runtime = packet()
+        mapped_runtime["equation_to_code_map"] = [
+            {
+                "equation": "f(x)=0",
+                "code_path": "src/runtime_solver.py",
+                "symbol_or_call_path": "newton_step",
+            }
+        ]
+        mapped_runtime["mathematical_definition_paths"] = ["src/runtime_solver.py"]
+        mapped_runtime["allowed_write_paths"] = [
+            "src/runtime_solver.py",
+            "tests/math_oracle.py",
+            "documents/math.md",
+        ]
+        call = materialize_subagent_spawn_tool_call(
+            role="implementer",
+            agent_type="worker",
+            input="math task",
+            checkout_identity=identity(root),
+            writer_target=target(root, ("src/runtime_solver.py",)),
+            math_intent_route=MATH_ROUTE,
+            math_intent_packet=mapped_runtime,
+        )
+        assert call["arguments"]["writer_target"]["allowed_paths"] == [
+            "src/runtime_solver.py"
+        ]
 
 
 def test_spawn_carries_valid_packet_and_narrowed_target() -> None:
@@ -344,7 +371,7 @@ def test_normal_math_bootstrap_requires_packet_before_run() -> None:
 
 
 def test_math_owner_skill_requires_packet_without_task_id() -> None:
-    """A semantic math owner skill activates the route even without a task id."""
+    """A selected mathematical owner skill activates the packet requirement."""
     result, runtime = run_bootstrap(
         "--task",
         "修正 solver residual の収束と更新式",
@@ -355,7 +382,7 @@ def test_math_owner_skill_requires_packet_without_task_id() -> None:
 
 
 def test_t6_math_owner_skill_requires_packet() -> None:
-    """A T6 task carrying numerical ownership is not exempt from the packet."""
+    """T6 carrying a mathematical owner skill requires the packet."""
     result, runtime = run_bootstrap(
         "--task",
         "computational optimization solver convergence repair",
@@ -365,6 +392,31 @@ def test_t6_math_owner_skill_requires_packet() -> None:
     assert result.returncode == 2
     assert "math_packet_missing" in result.stdout
     shutil.rmtree(runtime.parents[2] if runtime.exists() else runtime.parents[1])
+
+
+def test_proof_tool_task_without_math_route_does_not_require_packet() -> None:
+    """Proof-tool selection stays outside the math route unless explicitly paired."""
+    result, runtime = run_bootstrap(
+        "--task",
+        "$formal-proof-workflow Lean theorem graph repair",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "MATH_INTENT_ROUTE_STATUS=not_applicable" in result.stdout
+    shutil.rmtree(runtime.parents[2])
+
+
+def test_full_team_non_math_docker_task_does_not_require_packet() -> None:
+    """Full-team materialization does not turn a dormant math reviewer into a gate."""
+    result, runtime = run_bootstrap(
+        "--task",
+        "Docker build and container environment cleanup",
+        "--task-id",
+        "T4",
+        "--full-team",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "MATH_INTENT_ROUTE_STATUS=not_applicable" in result.stdout
+    shutil.rmtree(runtime.parents[2])
 
 
 def test_normal_math_bootstrap_materializes_packet_and_reviewer() -> None:

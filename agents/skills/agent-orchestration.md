@@ -687,7 +687,11 @@ task id が分かる場合は、task catalog 側の family を正本にします
 数理・数値挙動の修正は、一般の実装候補を先に広げず、task catalog の canonical route ID
 `mathematical_correction` を解決して `mathematical_intent_packet` を作る math-intent route
 に入れます。handoff が持つのは route ID だけで、owner / reviewer / ordering は catalog
-record（`requires_math_intent=true`）から解決します。route を有効にするのは、
+record（`requires_math_intent=true`）から解決します。数学 route を有効にするのは、
+orchestration が数学 owner として選択した `computational-optimization`、
+`algorithm-proof-exploration`、または `lean-algorithm-design`、または正規化済み packet が
+ある場合に限ります。`formal-proof-workflow` など proof-only skill、reviewer role、full-team
+materialization だけでは route を有効にしません。対象が数学的・数値的な修正であることは、
 依頼の対象に数式・定義・変数 / domain / unit、objective / residual、制約、仮定、導出、
 反復 / 更新則、停止量、failure semantics、収束、勾配 / Jacobian / Hessian、KKT、または
 数値 oracle / counterexample が含まれ、かつ修正・診断対象であることが読める場合です。
@@ -712,12 +716,12 @@ architecture / framework / JIT / compiler / backend / runtime / container / Dock
 environment / common infrastructure / proof-tool / IR infrastructure は既定の forbidden
 surface です。そこが必要に見える原因は separate handoff にし、数学 writer の write scope
 へ混ぜません。通常の `bootstrap_agent_run.py` は `--math-intent-packet JSON` でこの packet
-を受け取り、該当する T4/T5 math-intent route の `run.mathematical_intent_packet` と
-selected task/workflow route（T4/T5 に限定しない）の `run.mathematical_intent_packet` と
+を受け取り、selected task/workflow route（T4/T5 に限定しない）の
+`run.mathematical_intent_packet` と
 spawn handoff へそのまま投影します。packet の必須欄、map、oracle が未接続なら
 `math_packet_missing` として run の write-capable dispatch を停止します。writer target は
-packet の `allowed_write_paths` の部分集合に狭め、forbidden surface の path を含む target
-を `math_writer_target:forbidden_surface` で拒否します。
+packet の `allowed_write_paths` の厳密な部分集合に狭め、`separate_handoff_targets` と
+重なる path または packet にない path を `math_writer_target` として拒否します。
 
 明示された非数理 clause はこの route の対象外であり、同じ依頼に math clause と併記された
 場合も sibling handoff へ分けます。非数理 route を止める根拠に math packet を使わず、math

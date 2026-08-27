@@ -513,16 +513,11 @@ def math_intent_route_id_from_context(
     packet_present: bool = False,
     explicit_route_id: str | None = None,
 ) -> str | None:
-    """Derive the canonical math route from selected semantic context."""
+    """Derive math routing from explicit route, selected math owner, or packet."""
     if explicit_route_id is not None:
         return validate_mathematical_intent_route(explicit_route_id)
     normalized_skills = {str(skill).removeprefix("$") for skill in selected_skills}
-    normalized_roles = {str(role) for role in role_ids}
-    if (
-        packet_present
-        or normalized_skills.intersection(MATHEMATICAL_INTENT_OWNER_SKILLS)
-        or "mathematical_correctness_reviewer" in normalized_roles
-    ):
+    if packet_present or normalized_skills.intersection(MATHEMATICAL_INTENT_OWNER_SKILLS):
         return MATHEMATICAL_INTENT_ROUTE_ID
     return None
 

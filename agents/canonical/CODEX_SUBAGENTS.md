@@ -778,8 +778,9 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
   `spawn_agent` ToolCall の両方へ同じ正規化済み packet を渡します。math writer の
   `writer_target.allowed_paths` は packet の `allowed_write_paths` の部分集合でなければならず、
   architecture / JIT / backend / runtime / routing / environment / proof / IR infrastructure
-  の path を含む target は spawn 前に拒否します。非数理 route では packet を要求せず、math
-  reviewer も起動しません
+  は `separate_handoff_targets` に残し、math packet の厳密な `allowed_write_paths` にない
+  path は spawn 前に拒否します。packet が明示的に数理実装として mapped した `src/runtime`
+  のような path は許可します。非数理 route では packet を要求せず、math reviewer も起動しません
 - workflow family ごとの prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です
 - 一般説明 prose adapter を使う文書では `document_flow_reviewer` に加えて別 reviewer で `docs-completeness-review` を通します
 - 学術文章では `document_flow_reviewer` に加えて `notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer の `docs-completeness-review` を通します

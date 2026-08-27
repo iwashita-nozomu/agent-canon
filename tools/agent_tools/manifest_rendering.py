@@ -1116,6 +1116,7 @@ def write_initial_wave_execution_gate(spec: RunBundleSpec) -> None:
     active_subagents, _max_write_subagents = workflow_spawn_budget(
         spec.task_catalog,
         spec.workflow_family_id,
+        include_math_intent=math_intent_route_id_for_spec(spec) is not None,
     )
     initial_wave = recommended_initial_subagent_wave(
         spec.roles,
@@ -1125,6 +1126,7 @@ def write_initial_wave_execution_gate(spec: RunBundleSpec) -> None:
         _required_spec_source_root(spec) / ".codex" / "agents",
         workflow_family_id=spec.workflow_family_id,
         issue_worker_candidate=spec.issue_worker_candidate,
+        math_intent_route_id=math_intent_route_id_for_spec(spec),
     )
     if not initial_wave:
         return
@@ -1156,6 +1158,7 @@ def initial_wave_execution_gate_lines(
     active_subagents, _max_write_subagents = workflow_spawn_budget(
         spec.task_catalog,
         spec.workflow_family_id,
+        include_math_intent=math_intent_route_id_for_spec(spec) is not None,
     )
     initial_wave = recommended_initial_subagent_wave(
         spec.roles,
@@ -1165,6 +1168,7 @@ def initial_wave_execution_gate_lines(
         _required_spec_source_root(spec) / ".codex" / "agents",
         workflow_family_id=spec.workflow_family_id,
         issue_worker_candidate=spec.issue_worker_candidate,
+        math_intent_route_id=math_intent_route_id_for_spec(spec),
     )
     if not initial_wave:
         return ()
@@ -1524,6 +1528,7 @@ def manifest_run_lines(
         active_subagents, max_write_subagents = workflow_spawn_budget(
             spec.task_catalog,
             spec.workflow_family_id,
+            include_math_intent=math_intent_route_id is not None,
         )
         lines.append("  spawn_budget:")
         lines.append(

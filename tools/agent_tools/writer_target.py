@@ -18,7 +18,6 @@ packet has no target and remains shareable.
 
 from __future__ import annotations
 
-import fnmatch
 import json
 import re
 from collections.abc import Mapping, Sequence
@@ -29,22 +28,6 @@ REMOTE_RE = re.compile(r"^[^/\s]+/[^/\s]+$")
 WRITER_TARGET_SCHEMA = "agent-canon.writer-target.v1"
 WRITER_TARGET_PACKET_SCHEMA = "agent-canon.writer-target-packet.v1"
 WRITER_TARGET_PACKET_RELATIVE = Path(".agent-canon") / "writer-target.json"
-MATH_WRITER_FORBIDDEN_PATH_MARKERS = (
-    "architecture",
-    "framework",
-    "jit",
-    "compiler",
-    "backend",
-    "runtime",
-    "container",
-    "docker",
-    "routing",
-    "environment",
-    "infra",
-    "proof",
-    "lean",
-    "ir",
-)
 
 
 class WriterTargetError(ValueError):
@@ -200,7 +183,7 @@ def validate_mathematical_writer_target(
     target: WriterTarget | Mapping[str, object],
     math_intent_packet: Mapping[str, object] | object,
 ) -> WriterTarget:
-    """Narrow a math writer target to mapped math paths and reject infra paths."""
+    """Narrow a math writer target to exact packet paths and handoff targets."""
     parsed = parse_writer_target(target)
     allowed = getattr(math_intent_packet, "allowed_write_paths", None)
     if allowed is None and isinstance(math_intent_packet, Mapping):
@@ -208,20 +191,18 @@ def validate_mathematical_writer_target(
     if not isinstance(allowed, (list, tuple)) or not allowed:
         raise WriterTargetError("math_packet_missing:allowed_write_paths")
     allowed_paths = tuple(str(path) for path in allowed)
+    separate_targets = getattr(math_intent_packet, "separate_handoff_targets", None)
+    if separate_targets is None and isinstance(math_intent_packet, Mapping):
+        separate_targets = math_intent_packet.get("separate_handoff_targets", ())
+    if not isinstance(separate_targets, (list, tuple)):
+        raise WriterTargetError("math_packet_missing:separate_handoff_targets")
+    separate_target_set = {str(path) for path in separate_targets}
     for path in parsed.allowed_paths:
-        normalized = path.casefold()
-        path_tokens = set(re.split(r"[^a-z0-9]+", normalized))
-        if any(
-            marker in path_tokens or (len(marker) >= 3 and marker in normalized)
-            for marker in MATH_WRITER_FORBIDDEN_PATH_MARKERS
-        ):
-            raise WriterTargetError(f"math_writer_target:forbidden_surface:{path}")
-        if not any(
-            path == allowed_path
-            or fnmatch.fnmatchcase(path, allowed_path)
-            or path.startswith(allowed_path.rstrip("/") + "/")
-            for allowed_path in allowed_paths
-        ):
+        if path in separate_target_set:
+            raise WriterTargetError(
+                f"math_writer_target:separate_handoff_target:{path}"
+            )
+        if path not in allowed_paths:
             raise WriterTargetError(f"math_writer_target:path_not_in_packet:{path}")
     return parsed
 

@@ -454,11 +454,7 @@ def materialize_subagent_spawn_tool_call(
         )
     selected_math_route = validate_mathematical_intent_route(
         math_intent_route
-        or (
-            MATHEMATICAL_INTENT_ROUTE_ID
-            if role == "mathematical_correctness_reviewer"
-            else None
-        )
+        or (MATHEMATICAL_INTENT_ROUTE_ID if math_intent_packet is not None else None)
     )
     if selected_math_route is not None:
         if math_intent_packet is None:
