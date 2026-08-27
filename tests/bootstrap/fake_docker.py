@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -111,14 +112,39 @@ def _materialize_skill_exchange(state: dict, container: dict) -> None:
     if image is None or image[0] != "image":
         return
     source_root = Path(str(image[1].get("SourceRoot", "")))
-    source = source_root / ".codex/personal/skills"
-    if not source.is_dir():
-        source = Path(__file__).resolve().parents[2] / ".codex/personal/skills"
-    if not source.is_dir():
+    # The fake daemon is itself the resident boundary.  Use the canonical
+    # owner shipped with this test checkout while reading all canonical inputs
+    # from the image's source snapshot, including older source snapshots used
+    # by stale-resident fixtures.
+    materializer = Path(__file__).resolve().parents[2] / "tools/agent_tools/skill_shim_materializer.py"
+    if not materializer.is_file():
         return
-    stage = Path(runtime_mount["Source"]) / "container-runtime/skill-projection/.codex/personal/skills"
-    stage.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(source, stage, dirs_exist_ok=True)
+    staging_root = Path(runtime_mount["Source"]) / "container-runtime/skill-projection"
+    staged_skill = staging_root / ".codex/personal/skills/agent-orchestration/SKILL.md"
+    if staged_skill.is_file():
+        return
+    staging_root.mkdir(parents=True, exist_ok=True)
+    materialized = subprocess.run(
+        [
+            sys.executable,
+            str(materializer),
+            "materialize",
+            "--root",
+            str(source_root),
+            "--output-root",
+            str(staging_root),
+            "--image-build",
+            "--all",
+        ],
+        cwd=source_root,
+        env={**os.environ, "AGENT_CANON_IMAGE_BUILD": "1"},
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if materialized.returncode != 0:
+        return
 
 
 def _memory_bytes(value: str) -> int:
