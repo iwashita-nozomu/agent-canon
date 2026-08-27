@@ -47,6 +47,63 @@ downstream implementation ../../.codex/personal/skills/computational-optimizatio
 - Python / C++ 差分 review は `$python-review` / `$cpp-review` を併用します。
 - この skill は数値最適化の数学契約と検証契約を固定する責務を持ち、汎用 research workflow や実験 runner の代替ではありません。
 
+## Mathematical Intent Packet
+
+数学または数値の挙動を修正する write-capable route は、実装者へ渡す
+`mathematical_intent_packet` を先に埋めます。この packet は説明用の設計案ではなく、
+数学担当者の書込範囲を決める source packet です。次のフィールドを省略せず、該当しない
+場合は `not_applicable` と理由を書きます。
+
+- `math_object`: 対象の数理オブジェクト、入力・出力、対象の主張
+- `problem`: 問題設定、適用範囲、求める性質
+- `variables`: 変数と固定 parameter、shape、dtype
+- `domains`: 変数・parameter の domain と dimension
+- `units`: 物理単位、scale、dimensionless 化
+- `objective`: objective、正規化、符号規約、評価点（該当時）
+- `residual`: residual、norm、符号規約、評価点（該当時）
+- `constraints`: equality、inequality、box、feasibility、projection、barrier / penalty
+- `equations`: 数式、境界条件、記号の対応
+- `definitions`: 定義と意味（該当時）
+- `assumptions`: 仮定、適用範囲、適用外条件
+- `approximations`: 近似、許容範囲、誤差の扱い（該当時）
+- `derivation`: 期待する導出、変形、gradient / Jacobian / Hessian の根拠
+- `iteration_map`: 実装対象の反復写像、状態、受理条件、`z_next` の対応
+- `update_map`: 反復ごとの更新則と実装状態の対応（反復写像と別の場合）
+- `invariants`: 不変量、保存量、有限性、対称性、単調性
+- `limits`: 期待する極限、漸近条件、極限の適用範囲
+- `stopping_scalar`: 停止量、停止条件、tolerance、max iteration
+- `failure_semantics`: infeasible、singular、non-finite、max-iter、not-converged の意味
+- `equation_to_code_map`: 各 equation / definition / update と、実装の file、symbol、call path
+- `math_oracle`: 最小の数学 oracle、期待値、検証可能な性質
+- `counterexample`: 反例、失敗ケース、または反例が無いことの根拠
+- `mathematical_definition_paths`: 数式・定義・更新則を実装する明示的な相対 path
+- `mathematical_oracle_paths`: math oracle / counterexample を実装する明示的な相対 path
+- `mathematical_documentation_paths`: 数理責務を説明する owner document の明示的な相対 path
+- `allowed_write_paths`: 上記 map から直接導ける定義、導出、algorithm implementation、
+  numerical oracle、およびそれらを所有する docs / tests の相対 path
+- `forbidden_surfaces`: math route では既定で書き込まない architecture、framework、JIT、
+  compiler、backend、runtime、container、routing、environment、Docker、common infra、
+  proof-tool / IR infrastructure の surface
+- `separate_handoff_targets`: 明示された非数理要求、または forbidden surface の原因候補を
+  別 owner へ渡す対象と理由
+
+`allowed_write_paths` は見えているファイル一覧やエラー発生箇所から推測せず、
+`mathematical_definition_paths`、`mathematical_oracle_paths`、
+`mathematical_documentation_paths`、および `equation_to_code_map` の code path の集合と
+完全一致させます。共通 infrastructure、JIT / backend、
+runtime、routing、environment、Docker、証明ツールを変更しないと math oracle が閉じない場合は、
+数学 writer を停止し、該当 surface の separate handoff を返します。数学 packet が無い、
+または map / oracle が未接続な状態では write-capable dispatch を開始しません。
+
+通常の run は `bootstrap_agent_run.py --math-intent-packet '<JSON>'` で packet を渡します。
+bootstrap は選択された math-intent route の run manifest と spawn handoff に同じ正規化済み
+packet を投影し、packet が無い場合は `math_packet_missing` で停止します。
+
+数学 packet は数学的な依頼にだけ要求します。Docker、JIT、backend、runtime、routing、
+environment、CI、container などを明示的に修正する非数理要求には適用せず、その owner route
+へ渡します。両方が一つの依頼に含まれる場合は clause ごとに sibling handoff を作り、数学
+writer の scope に非数理 path を混ぜません。
+
 ## Optimization Contract
 
 The active design packet also references the run-local semantic responsibility

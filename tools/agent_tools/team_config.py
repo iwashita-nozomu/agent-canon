@@ -27,10 +27,12 @@ from route import implementation_handoff_required, load_skill_route_rules
 if TYPE_CHECKING:
     if __package__:
         from .packets import ActiveDesignPacketConfig
+        from .packets import MathematicalIntentPacket
         from .workspace_scope import RepositoryRoots
         from .writer_target import WriterTarget
     else:
         from packets import ActiveDesignPacketConfig
+        from packets import MathematicalIntentPacket
         from workspace_scope import RepositoryRoots
         from writer_target import WriterTarget
 
@@ -86,6 +88,7 @@ class SubagentWaveSlot:
     agent_type: str
     write_capable: bool = False
     writer_target: WriterTarget | None = None
+    math_intent_route_id: str | None = None
 
     def __post_init__(self) -> None:
         """Default the role instance id from the selected executable agent."""
@@ -96,6 +99,11 @@ class SubagentWaveSlot:
     def executable_identity(self) -> str:
         """Return the authoritative executable role identity."""
         return f"{self.role_id}:{self.instance_id}:{self.agent_type}"
+
+    @property
+    def requires_math_intent(self) -> bool:
+        """Return whether task selection bound this slot to the math route."""
+        return self.math_intent_route_id is not None
 
 
 @dataclass(frozen=True)
@@ -167,11 +175,14 @@ class RunBundleSpec:
     default_review_pack_ids: tuple[str, ...] = ()
     selected_skills: tuple[str, ...] = ()
     task_catalog: TaskCatalog | None = None
+    task_id: str | None = None
     agent_type_selections: tuple[AgentTypeSelection, ...] = ()
     parent_lineage_id: str = ""
     decision_sufficiency_packet: dict[str, object] | None = None
     decision_sufficiency_packet_ref: str = ""
     active_design_packet: ActiveDesignPacketConfig | None = None
+    math_intent_route: str | None = None
+    math_intent_packet: "MathematicalIntentPacket | None" = None
     writer_targets: Mapping[str, object] = field(default_factory=dict)
 
 

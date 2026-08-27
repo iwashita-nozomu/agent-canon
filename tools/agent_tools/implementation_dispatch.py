@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import cast
@@ -30,6 +30,7 @@ if __package__:
         WriterTarget,
         WriterTargetError,
         parse_writer_target,
+        validate_mathematical_writer_target,
         validate_wave_writer_targets,
         validate_writer_target_identity,
     )
@@ -42,6 +43,7 @@ else:
         WriterTarget,
         WriterTargetError,
         parse_writer_target,
+        validate_mathematical_writer_target,
         validate_wave_writer_targets,
         validate_writer_target_identity,
     )
@@ -186,6 +188,8 @@ def default_quality_check_agent_types(roles: tuple[Role, ...]) -> tuple[str, ...
 
 def _capacity_family_record(
     family: dict[str, object],
+    *,
+    include_math_intent: bool = False,
 ) -> capacity_handshake.DeclaredFamilyCapacity:
     """Derive one family capacity record from its declared stage topology."""
     family_id = _as_required_string(family.get("id"), "workflow_family.id")
@@ -209,6 +213,11 @@ def _capacity_family_record(
     def stage_roles(stage_class: str) -> tuple[str, ...]:
         selected: list[str] = []
         for wave in waves:
+            if (
+                wave.get("activation") == "conditional_math_intent_packet"
+                and not include_math_intent
+            ):
+                continue
             if wave.get("stage_class") != stage_class:
                 continue
             for role_id in _as_string_tuple(
@@ -242,6 +251,8 @@ def _capacity_family_record(
 
 def declared_team_capacity_derivation(
     catalog: TaskCatalog,
+    *,
+    include_math_intent: bool = False,
 ) -> capacity_handshake.DeclaredTeamTopologyDerivation:
     """Materialize the canonical topology-derived capacity witness input."""
     return capacity_handshake.DeclaredTeamTopologyDerivation(
@@ -254,7 +265,11 @@ def declared_team_capacity_derivation(
         excluded_nested_role_ids=("skill_evaluator",),
         isolated_direct_role_ids=("skill_evaluator",),
         family_records=tuple(
-            _capacity_family_record(family) for family in catalog.workflow_families
+            _capacity_family_record(
+                family,
+                include_math_intent=include_math_intent,
+            )
+            for family in catalog.workflow_families
         ),
     )
 
@@ -345,7 +360,14 @@ def capacity_runtime_for_spec(spec: RunBundleSpec) -> _CapacityRuntime:
     """Create one provider-owned ledger and snapshot for a run bundle."""
     if spec.task_catalog is None:
         raise RuntimeError("task catalog is required for capacity handshake")
-    derivation = declared_team_capacity_derivation(spec.task_catalog)
+    if __package__:
+        from .packets import math_intent_route_id_for_spec
+    else:
+        from packets import math_intent_route_id_for_spec  # type: ignore[no-redef]
+    derivation = declared_team_capacity_derivation(
+        spec.task_catalog,
+        include_math_intent=math_intent_route_id_for_spec(spec) is not None,
+    )
     witness = _capacity_topology_witness(derivation)
     config_path = spec.workspace_root / ".codex" / "config.toml"
     contract = capacity_handshake.load_startup_contract(
@@ -549,6 +571,10 @@ def dispatch_fixed_implementation(
     capacity_runtime: _CapacityRuntime | None = None,
     writer_target: WriterTarget | Mapping[str, object] | None = None,
     checkout_identity: Mapping[str, object] | None = None,
+    math_intent_route: str | None = None,
+    math_intent_packet: Mapping[str, object] | object | None = None,
+    selected_skills: Sequence[str] = (),
+    role_id: str = "implementer",
 ) -> ImplementationDispatch:
     """Route, materialize, and launch exactly one fixed Spark implementation worker."""
     route_result = implementation_route.route_implementation(request)
@@ -566,6 +592,51 @@ def dispatch_fixed_implementation(
         or route_result.failure is not None
     ):
         raise RuntimeError("implementation_dispatch:fixed_route_violation")
+    if __package__:
+        from .packets import (
+            mathematical_intent_packet_mapping,
+            math_intent_route_id_from_context,
+            normalize_mathematical_intent_packet,
+        )
+    else:
+        from packets import (  # type: ignore[no-redef]
+            mathematical_intent_packet_mapping,
+            math_intent_route_id_from_context,
+            normalize_mathematical_intent_packet,
+        )
+    selected_math_route = math_intent_route_id_from_context(
+        selected_skills,
+        (role_id,),
+        packet_present=math_intent_packet is not None,
+        explicit_route_id=math_intent_route,
+    )
+    normalized_math_packet: Mapping[str, object] | None = None
+    if selected_math_route is not None and math_intent_packet is None:
+        return ImplementationDispatch(
+            route_result,
+            None,
+            None,
+            None,
+            "math_packet_missing",
+            1,
+            0,
+            "blocked",
+        )
+    if selected_math_route is None and math_intent_packet is not None:
+        return ImplementationDispatch(
+            route_result,
+            None,
+            None,
+            None,
+            "math_packet_not_applicable",
+            1,
+            0,
+            "blocked",
+        )
+    if selected_math_route is not None:
+        normalized_math_packet = mathematical_intent_packet_mapping(
+            normalize_mathematical_intent_packet(math_intent_packet)
+        )
     if writer_target is None:
         return ImplementationDispatch(
             route_result,
@@ -586,6 +657,20 @@ def dispatch_fixed_implementation(
         )
     except WriterTargetError as exc:
         raise RuntimeError(str(exc)) from exc
+    if selected_math_route is not None:
+        try:
+            validate_mathematical_writer_target(parsed_writer_target, normalized_math_packet)
+        except WriterTargetError as exc:
+            return ImplementationDispatch(
+                route_result,
+                None,
+                None,
+                None,
+                str(exc),
+                1,
+                0,
+                "blocked",
+            )
     if isinstance(request, implementation_route.ImplementationRouteRequest):
         packet_payload: object = request.fixed_implementation_packet
     else:
@@ -621,6 +706,16 @@ def dispatch_fixed_implementation(
                 model_profile_registry.ContextItem(
                     "checkout_identity",
                     dict(checkout_identity),
+                ),
+                *(
+                    (
+                        model_profile_registry.ContextItem(
+                            "mathematical_intent_packet",
+                            dict(normalized_math_packet),
+                        ),
+                    )
+                    if normalized_math_packet is not None
+                    else ()
                 ),
                 *(
                     (
@@ -810,9 +905,17 @@ def capacity_start_output_lines(
     )
 
 
-def workflow_spawn_budget(catalog: TaskCatalog, family_id: str) -> tuple[int, int]:
+def workflow_spawn_budget(
+    catalog: TaskCatalog,
+    family_id: str,
+    *,
+    include_math_intent: bool = False,
+) -> tuple[int, int]:
     """Return the active and write-capable spawn budget for one workflow family."""
-    derivation = declared_team_capacity_derivation(catalog)
+    derivation = declared_team_capacity_derivation(
+        catalog,
+        include_math_intent=include_math_intent,
+    )
     family = next(
         record
         for record in derivation.family_records
@@ -1073,8 +1176,18 @@ def _materialize_stage_wave_slots(
     used_role_ids: set[str],
     selections: dict[str, AgentTypeSelection],
     writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
+    math_intent_route_id: str | None = None,
 ) -> tuple[SubagentWaveSlot, ...]:
     """Return one default executable slot for each active role in the stage."""
+    if __package__:
+        from .packets import (
+            validate_mathematical_intent_route,
+        )
+    else:
+        from packets import (  # type: ignore[no-redef]
+            validate_mathematical_intent_route,
+        )
+    validate_mathematical_intent_route(math_intent_route_id)
     slots: list[SubagentWaveSlot] = []
     for role_id in role_ids:
         role = roles_by_id.get(role_id)
@@ -1104,6 +1217,11 @@ def _materialize_stage_wave_slots(
                     or role.write_policy.mode not in {"read_only", "artifacts_only"}
                 ),
                 writer_target=target,
+                math_intent_route_id=(
+                    math_intent_route_id
+                    if role.id in {"implementer", "mathematical_correctness_reviewer"}
+                    else None
+                ),
             )
         )
     return tuple(slots)
@@ -1119,6 +1237,7 @@ def _initial_stage_wave_slots(
     workflow_family_id: str | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
     writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
+    math_intent_route_id: str | None = None,
 ) -> tuple[SubagentWaveSlot, ...]:
     """Return intake-stage slots derived from active roles and catalog topology."""
     if active_subagents < 1:
@@ -1152,6 +1271,7 @@ def _initial_stage_wave_slots(
         set(),
         selections,
         writer_targets,
+        math_intent_route_id,
     )
     return tuple(slot for slot in slots if slot.role_id not in {"verifier", "auditor"})[
         :active_subagents
@@ -1182,6 +1302,7 @@ def recommended_initial_subagent_wave(
     workflow_family_id: str | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
     writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
+    math_intent_route_id: str | None = None,
 ) -> tuple[str, ...]:
     """Return executable agent_type values for active catalog intake roles."""
     return tuple(
@@ -1195,6 +1316,7 @@ def recommended_initial_subagent_wave(
             workflow_family_id=workflow_family_id,
             issue_worker_candidate=issue_worker_candidate,
             writer_targets=writer_targets,
+            math_intent_route_id=math_intent_route_id,
         )
     )
 
@@ -1209,6 +1331,7 @@ def recommended_initial_subagent_wave_slots(
     workflow_family_id: str | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
     writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
+    math_intent_route_id: str | None = None,
 ) -> tuple[SubagentWaveSlot, ...]:
     """Return role-aware initial-wave slots carrying writer targets."""
     return _initial_stage_wave_slots(
@@ -1220,6 +1343,7 @@ def recommended_initial_subagent_wave_slots(
         workflow_family_id=workflow_family_id,
         issue_worker_candidate=issue_worker_candidate,
         writer_targets=writer_targets,
+        math_intent_route_id=math_intent_route_id,
     )
 
 
@@ -1234,6 +1358,7 @@ def recommended_dynamic_expansion_waves(
     workflow_family_id: str | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
     writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
+    math_intent_route_id: str | None = None,
 ) -> tuple[tuple[str, ...], ...]:
     """Return executable follow-up stage waves inside the active budget."""
     return tuple(
@@ -1248,6 +1373,7 @@ def recommended_dynamic_expansion_waves(
             workflow_family_id=workflow_family_id,
             issue_worker_candidate=issue_worker_candidate,
             writer_targets=writer_targets,
+            math_intent_route_id=math_intent_route_id,
         )
     )
 
@@ -1263,6 +1389,7 @@ def recommended_dynamic_expansion_wave_slots(
     workflow_family_id: str | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
     writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None] | None = None,
+    math_intent_route_id: str | None = None,
 ) -> tuple[tuple[SubagentWaveSlot, ...], ...]:
     """Return executable follow-up role-instance waves inside the active budget."""
     initial_slots = _initial_stage_wave_slots(
@@ -1274,6 +1401,7 @@ def recommended_dynamic_expansion_wave_slots(
         workflow_family_id=workflow_family_id,
         issue_worker_candidate=issue_worker_candidate,
         writer_targets=writer_targets,
+        math_intent_route_id=math_intent_route_id,
     )
     expected_initial_wave = tuple(slot.agent_type for slot in initial_slots)
     if initial_wave != expected_initial_wave:
@@ -1298,6 +1426,7 @@ def recommended_dynamic_expansion_wave_slots(
             used_role_ids,
             selections,
             writer_targets,
+            math_intent_route_id,
         )
         stage_slots = tuple(
             slot
@@ -1324,8 +1453,61 @@ def dispatch_subagent_wave(
     prompts: Mapping[str, str],
     spawn: Callable[[str, str], str | None],
     writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None],
+    math_intent_packet: Mapping[str, object] | object | None = None,
+    nonmath_handoff: Callable[[Mapping[str, object]], None] | None = None,
 ) -> tuple[str, ...]:
     """Validate one complete wave before invoking any spawn callback."""
+    if __package__:
+        from .packets import (
+            MATHEMATICAL_INTENT_ROUTE_ID,
+            mathematical_intent_packet_mapping,
+            normalize_mathematical_intent_packet,
+            separate_nonmath_handoff_mapping,
+            validate_mathematical_intent_route,
+        )
+    else:
+        from packets import (  # type: ignore[no-redef]
+            MATHEMATICAL_INTENT_ROUTE_ID,
+            mathematical_intent_packet_mapping,
+            normalize_mathematical_intent_packet,
+            separate_nonmath_handoff_mapping,
+            validate_mathematical_intent_route,
+        )
+    route_ids = {
+        slot.math_intent_route_id
+        for slot in slots
+        if slot.requires_math_intent
+    }
+    if math_intent_packet is not None and not route_ids:
+        route_ids.add(MATHEMATICAL_INTENT_ROUTE_ID)
+    if len(route_ids) > 1:
+        raise RuntimeError("mathematical_intent_route:multiple_ids")
+    selected_math_route = validate_mathematical_intent_route(
+        next(iter(route_ids)) if route_ids else None
+    )
+    normalized_math_packet = None
+    if selected_math_route is not None:
+        if math_intent_packet is None:
+            raise RuntimeError("math_packet_missing")
+        normalized_math_packet = mathematical_intent_packet_mapping(
+            normalize_mathematical_intent_packet(math_intent_packet)
+        )
+    elif math_intent_packet is not None:
+        raise RuntimeError("math_packet_not_applicable")
+    if selected_math_route is not None:
+        for slot in slots:
+            if not slot.write_capable:
+                continue
+            target = writer_targets.get(
+                slot.executable_identity,
+                writer_targets.get(slot.role_id, slot.writer_target),
+            )
+            if target is None:
+                raise RuntimeError("writer_target:required_before_spawn")
+            try:
+                validate_mathematical_writer_target(target, normalized_math_packet)
+            except WriterTargetError as exc:
+                raise RuntimeError(str(exc)) from exc
     validate_writer_handoff_waves((slots,), writer_targets)
     missing_prompts = [
         slot.executable_identity
@@ -1337,6 +1519,9 @@ def dispatch_subagent_wave(
         raise RuntimeError(
             "subagent_wave_prompt_missing:" + ",".join(missing_prompts)
         )
+    if selected_math_route is not None and nonmath_handoff is not None:
+        for handoff in separate_nonmath_handoff_mapping(normalized_math_packet):
+            nonmath_handoff(handoff)
     spawned: list[str] = []
     for slot in slots:
         agent_id = spawn(slot.agent_type, prompts[slot.executable_identity])

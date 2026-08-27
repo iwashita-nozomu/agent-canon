@@ -13,7 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Literal, cast
@@ -28,6 +28,7 @@ if __package__:
     from .team_config import (
         Role,
         RunBundleSpec,
+        TaskCatalog,
         TeamConfig,
         _as_object_mapping,
         _as_required_string,
@@ -37,6 +38,7 @@ else:
     from team_config import (
         Role,
         RunBundleSpec,
+        TaskCatalog,
         TeamConfig,
         _as_object_mapping,
         _as_required_string,
@@ -130,6 +132,17 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
             "post-implementation test design was activated."
         ),
     },
+    "mathematical_correctness_reviewer": {
+        "artifact_keys": ["user_request_contract", "schedule", "change_review"],
+        "workspace_paths": [
+            "agents/skills/computational-optimization.md",
+            "agents/skills/agent-orchestration.md",
+        ],
+        "notes": (
+            "Math-intent review reads the normalized packet and its mapped scope; it does not "
+            "authorize non-mathematical infrastructure edits."
+        ),
+    },
     "final_reviewer": {
         "artifact_keys": [
             "user_request_contract",
@@ -191,6 +204,407 @@ COMMON_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = (
 )
 
 OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = ("docker/README.md",)
+
+
+MATHEMATICAL_INTENT_PACKET_SCHEMA = "agent-canon.mathematical-intent.v1"
+MATHEMATICAL_INTENT_ROUTE_ID = "mathematical_correction"
+MATHEMATICAL_INTENT_OWNER_SKILLS = frozenset(
+    {
+        "computational-optimization",
+    }
+)
+MATHEMATICAL_INTENT_PACKET_TEXT_FIELDS = (
+    "math_object",
+    "problem",
+    "variables",
+    "domains",
+    "units",
+    "objective",
+    "residual",
+    "constraints",
+    "equations",
+    "definitions",
+    "assumptions",
+    "approximations",
+    "derivation",
+    "iteration_map",
+    "update_map",
+    "invariants",
+    "limits",
+    "stopping_scalar",
+    "failure_semantics",
+    "math_oracle",
+    "counterexample",
+)
+MATHEMATICAL_INTENT_PACKET_FIELDS = frozenset(
+    {
+        "schema",
+        *MATHEMATICAL_INTENT_PACKET_TEXT_FIELDS,
+        "equation_to_code_map",
+        "mathematical_definition_paths",
+        "mathematical_oracle_paths",
+        "mathematical_documentation_paths",
+        "allowed_write_paths",
+        "forbidden_surfaces",
+        "separate_handoff_targets",
+    }
+)
+MATHEMATICAL_INTENT_MAP_FIELDS = frozenset(
+    {"equation", "code_path", "symbol_or_call_path"}
+)
+@dataclass(frozen=True)
+class MathematicalIntentPacket:
+    """Closed math-intent source packet for one mathematical route."""
+
+    schema: str
+    math_object: str
+    problem: str
+    variables: str
+    domains: str
+    units: str
+    objective: str
+    residual: str
+    constraints: str
+    equations: str
+    definitions: str
+    assumptions: str
+    approximations: str
+    derivation: str
+    iteration_map: str
+    update_map: str
+    invariants: str
+    limits: str
+    stopping_scalar: str
+    failure_semantics: str
+    equation_to_code_map: tuple[Mapping[str, str], ...]
+    mathematical_definition_paths: tuple[str, ...]
+    mathematical_oracle_paths: tuple[str, ...]
+    mathematical_documentation_paths: tuple[str, ...]
+    math_oracle: str
+    counterexample: str
+    allowed_write_paths: tuple[str, ...]
+    forbidden_surfaces: tuple[str, ...]
+    separate_handoff_targets: tuple[str, ...]
+
+
+def _math_packet_relative_paths(value: object, field: str, *, allow_empty: bool) -> tuple[str, ...]:
+    """Validate canonical relative paths carried by a math packet."""
+    if not isinstance(value, (list, tuple)) or (not allow_empty and not value):
+        raise RuntimeError(f"mathematical_intent_packet.{field}:list_required")
+    result: list[str] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, str) or not item.strip():
+            raise RuntimeError(f"mathematical_intent_packet.{field}[{index}]:required")
+        path = item.strip()
+        parsed = PurePosixPath(path)
+        if (
+            parsed.is_absolute()
+            or ".." in parsed.parts
+            or path.startswith("./")
+            or "\\" in path
+            or "//" in path
+        ):
+            raise RuntimeError(
+                f"mathematical_intent_packet.{field}[{index}]:path_not_relative"
+            )
+        result.append(path)
+    if len(result) != len(set(result)):
+        raise RuntimeError(f"mathematical_intent_packet.{field}:duplicate")
+    return tuple(result)
+
+
+def _math_packet_strings(value: object, field: str, *, allow_empty: bool) -> tuple[str, ...]:
+    """Validate a non-empty list of labels or handoff references."""
+    if not isinstance(value, (list, tuple)) or (not allow_empty and not value):
+        raise RuntimeError(f"mathematical_intent_packet.{field}:list_required")
+    result: list[str] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, str) or not item.strip():
+            raise RuntimeError(f"mathematical_intent_packet.{field}[{index}]:required")
+        result.append(item.strip())
+    if len(result) != len(set(result)):
+        raise RuntimeError(f"mathematical_intent_packet.{field}:duplicate")
+    return tuple(result)
+
+
+def _math_packet_map(value: object) -> tuple[Mapping[str, str], ...]:
+    """Validate the equation-to-code correspondence rows."""
+    if not isinstance(value, list) or not value:
+        raise RuntimeError("mathematical_intent_packet.equation_to_code_map:list_required")
+    rows: list[Mapping[str, str]] = []
+    for index, raw_row in enumerate(value):
+        if not isinstance(raw_row, Mapping):
+            raise RuntimeError(
+                f"mathematical_intent_packet.equation_to_code_map[{index}]:mapping_required"
+            )
+        unknown = sorted(set(raw_row).difference(MATHEMATICAL_INTENT_MAP_FIELDS))
+        missing = sorted(MATHEMATICAL_INTENT_MAP_FIELDS.difference(raw_row))
+        if unknown:
+            raise RuntimeError(
+                "mathematical_intent_packet.equation_to_code_map"
+                f"[{index}]:field_unknown:{','.join(unknown)}"
+            )
+        if missing:
+            raise RuntimeError(
+                "mathematical_intent_packet.equation_to_code_map"
+                f"[{index}]:field_missing:{','.join(missing)}"
+            )
+        normalized = {
+            field: _packet_text(raw_row, field, f"mathematical_intent_packet.equation_to_code_map[{index}]")
+            for field in MATHEMATICAL_INTENT_MAP_FIELDS
+        }
+        rows.append(normalized)
+    return tuple(rows)
+
+
+def normalize_mathematical_intent_packet(
+    raw_packet: object,
+    field_prefix: str = "mathematical_intent_packet",
+) -> MathematicalIntentPacket:
+    """Normalize one math packet and fail closed on incomplete correspondence."""
+    if not isinstance(raw_packet, Mapping):
+        raise RuntimeError(f"{field_prefix}:mapping_required")
+    unknown = sorted(set(raw_packet).difference(MATHEMATICAL_INTENT_PACKET_FIELDS))
+    missing = sorted(MATHEMATICAL_INTENT_PACKET_FIELDS.difference(raw_packet))
+    if unknown:
+        raise RuntimeError(f"{field_prefix}:field_unknown:{','.join(unknown)}")
+    if missing:
+        raise RuntimeError(f"{field_prefix}:field_missing:{','.join(missing)}")
+    if raw_packet["schema"] != MATHEMATICAL_INTENT_PACKET_SCHEMA:
+        raise RuntimeError(f"{field_prefix}.schema:mismatch")
+    texts = {
+        field: _packet_text(raw_packet, field, field_prefix)
+        for field in MATHEMATICAL_INTENT_PACKET_TEXT_FIELDS
+    }
+    equation_map = _math_packet_map(raw_packet["equation_to_code_map"])
+    definition_paths = _math_packet_relative_paths(
+        raw_packet["mathematical_definition_paths"],
+        "mathematical_definition_paths",
+        allow_empty=True,
+    )
+    oracle_paths = _math_packet_relative_paths(
+        raw_packet["mathematical_oracle_paths"],
+        "mathematical_oracle_paths",
+        allow_empty=True,
+    )
+    documentation_paths = _math_packet_relative_paths(
+        raw_packet["mathematical_documentation_paths"],
+        "mathematical_documentation_paths",
+        allow_empty=True,
+    )
+    allowed_paths = _math_packet_relative_paths(
+        raw_packet["allowed_write_paths"], "allowed_write_paths", allow_empty=False
+    )
+    forbidden_surfaces = _math_packet_strings(
+        raw_packet["forbidden_surfaces"], "forbidden_surfaces", allow_empty=False
+    )
+    separate_targets = _math_packet_strings(
+        raw_packet["separate_handoff_targets"],
+        "separate_handoff_targets",
+        allow_empty=True,
+    )
+    code_paths = tuple(row["code_path"] for row in equation_map)
+    expected_paths = set(
+        (*definition_paths, *oracle_paths, *documentation_paths, *code_paths)
+    )
+    if set(allowed_paths) != expected_paths:
+        extra = sorted(set(allowed_paths).difference(expected_paths))
+        missing_paths = sorted(expected_paths.difference(allowed_paths))
+        details = []
+        if extra:
+            details.append("extra=" + ",".join(extra))
+        if missing_paths:
+            details.append("missing=" + ",".join(missing_paths))
+        raise RuntimeError(
+            "mathematical_intent_packet.allowed_write_paths:union_mismatch:"
+            + ";".join(details)
+        )
+    return MathematicalIntentPacket(
+        schema=str(raw_packet["schema"]),
+        equation_to_code_map=equation_map,
+        mathematical_definition_paths=definition_paths,
+        mathematical_oracle_paths=oracle_paths,
+        mathematical_documentation_paths=documentation_paths,
+        allowed_write_paths=allowed_paths,
+        forbidden_surfaces=forbidden_surfaces,
+        separate_handoff_targets=separate_targets,
+        **texts,
+    )
+
+
+def mathematical_intent_packet_mapping(
+    packet: MathematicalIntentPacket,
+) -> dict[str, object]:
+    """Serialize a normalized math packet for run manifests and spawn prompts."""
+    return {
+        "schema": packet.schema,
+        **{field: getattr(packet, field) for field in MATHEMATICAL_INTENT_PACKET_TEXT_FIELDS},
+        "equation_to_code_map": [dict(row) for row in packet.equation_to_code_map],
+        "mathematical_definition_paths": list(packet.mathematical_definition_paths),
+        "mathematical_oracle_paths": list(packet.mathematical_oracle_paths),
+        "mathematical_documentation_paths": list(packet.mathematical_documentation_paths),
+        "allowed_write_paths": list(packet.allowed_write_paths),
+        "forbidden_surfaces": list(packet.forbidden_surfaces),
+        "separate_handoff_targets": list(packet.separate_handoff_targets),
+    }
+
+
+def separate_nonmath_handoff_mapping(
+    packet: MathematicalIntentPacket | Mapping[str, object],
+) -> tuple[Mapping[str, object], ...]:
+    """Materialize deferred parent-owned handoffs without creating writer paths."""
+    targets = (
+        packet.separate_handoff_targets
+        if isinstance(packet, MathematicalIntentPacket)
+        else tuple(str(item) for item in packet.get("separate_handoff_targets", ()))
+    )
+    return tuple(
+        {
+            "target": target,
+            "owner": "parent",
+            "status": "deferred",
+            "writer_tool_call": "none",
+            "math_writer_paths": [],
+        }
+        for target in targets
+    )
+
+
+def mathematical_intent_route_for_task(
+    catalog: TaskCatalog | None,
+    task_id: str | None,
+    selected_skills: Sequence[str] = (),
+) -> str | None:
+    """Return the task-declared math route only when its skill is selected."""
+    if catalog is None or not task_id:
+        return None
+    task = next((item for item in catalog.tasks if item.get("id") == task_id), None)
+    if task is None:
+        return None
+    normalized_skills = {str(skill).removeprefix("$") for skill in selected_skills}
+    route_id = task.get("math_intent_route")
+    if route_id is None and not normalized_skills.intersection(
+        MATHEMATICAL_INTENT_OWNER_SKILLS
+    ):
+        return None
+    if route_id is None:
+        route_id = MATHEMATICAL_INTENT_ROUTE_ID
+    if MATHEMATICAL_INTENT_ROUTE_ID not in {
+        str(item.get("id"))
+        for item in _math_intent_route_records(catalog)
+    }:
+        raise RuntimeError("mathematical_intent_route:canonical_id_missing")
+    if not isinstance(route_id, str) or route_id != MATHEMATICAL_INTENT_ROUTE_ID:
+        raise RuntimeError(f"mathematical_intent_route:unknown_id:{route_id}")
+    route = mathematical_intent_route_config(catalog, route_id)
+    if route is None:
+        raise RuntimeError("mathematical_intent_route:catalog_record_missing")
+    if str(route.get("owner_skill")) not in normalized_skills:
+        return None
+    return route_id
+
+
+def math_intent_route_id_from_context(
+    selected_skills: Sequence[str] = (),
+    role_ids: Sequence[str] = (),
+    *,
+    packet_present: bool = False,
+    explicit_route_id: str | None = None,
+) -> str | None:
+    """Derive math routing from explicit route, selected math owner, or packet."""
+    if explicit_route_id is not None:
+        return validate_mathematical_intent_route(explicit_route_id)
+    normalized_skills = {str(skill).removeprefix("$") for skill in selected_skills}
+    if packet_present or normalized_skills.intersection(MATHEMATICAL_INTENT_OWNER_SKILLS):
+        return MATHEMATICAL_INTENT_ROUTE_ID
+    return None
+
+
+def _math_intent_route_records(catalog: TaskCatalog) -> tuple[Mapping[str, object], ...]:
+    """Return the canonical task-catalog math route records."""
+    raw_routes = catalog.raw.get("math_intent_routes")
+    if not isinstance(raw_routes, Mapping):
+        raise RuntimeError("mathematical_intent_route:catalog_records_missing")
+    records: list[Mapping[str, object]] = []
+    for route_id, raw_record in raw_routes.items():
+        if not isinstance(raw_record, Mapping):
+            raise RuntimeError(f"mathematical_intent_route:record_invalid:{route_id}")
+        record = dict(raw_record)
+        record.setdefault("id", route_id)
+        records.append(record)
+    return tuple(records)
+
+
+def mathematical_intent_route_config(
+    catalog: TaskCatalog | None,
+    route_id: str | None,
+) -> Mapping[str, object] | None:
+    """Resolve one canonical math route ID from the task catalog."""
+    if route_id is None:
+        return None
+    validate_mathematical_intent_route(route_id)
+    if catalog is None:
+        raise RuntimeError("mathematical_intent_route:catalog_required")
+    records = _math_intent_route_records(catalog)
+    for record in records:
+        if record.get("id") == route_id:
+            expected = {
+                "id": MATHEMATICAL_INTENT_ROUTE_ID,
+                "requires_math_intent": True,
+                "activation": "mathematical_or_numerical_correction_evidence",
+                "owner_skill": "computational-optimization",
+                "reviewer": "mathematical_correctness_reviewer",
+                "required_packet": "mathematical_intent_packet",
+                "precedes": ["design", "benchmark_reviewer"],
+            }
+            if dict(record) != expected:
+                raise RuntimeError("mathematical_intent_route:canonical_record_mismatch")
+            return record
+    raise RuntimeError(f"mathematical_intent_route:unknown_id:{route_id}")
+
+
+def validate_mathematical_intent_route(
+    route_id: str | None,
+) -> str | None:
+    """Validate the selected task/workflow route that makes math mandatory."""
+    if route_id is None:
+        return None
+    if not isinstance(route_id, str) or route_id != MATHEMATICAL_INTENT_ROUTE_ID:
+        raise RuntimeError(f"mathematical_intent_route:unknown_id:{route_id}")
+    return route_id
+
+
+def resolve_math_intent_packet_for_spec(
+    spec: RunBundleSpec,
+) -> MathematicalIntentPacket | None:
+    """Validate the route/packet pair before manifest creation or spawn."""
+    raw_packet = spec.math_intent_packet
+    selected_route_id = math_intent_route_id_from_context(
+        spec.selected_skills,
+        tuple(role.id for role in spec.roles),
+        packet_present=raw_packet is not None,
+        explicit_route_id=spec.math_intent_route,
+    )
+    if selected_route_id is None:
+        if raw_packet is not None:
+            raise RuntimeError("math_packet_not_applicable")
+        return None
+    mathematical_intent_route_config(spec.task_catalog, selected_route_id)
+    if raw_packet is None:
+        raise RuntimeError("math_packet_missing")
+    if isinstance(raw_packet, MathematicalIntentPacket):
+        return raw_packet
+    return normalize_mathematical_intent_packet(raw_packet)
+
+
+def math_intent_route_id_for_spec(spec: RunBundleSpec) -> str | None:
+    """Return the same canonical route used by run and spawn admission."""
+    return math_intent_route_id_from_context(
+        spec.selected_skills,
+        tuple(role.id for role in spec.roles),
+        packet_present=spec.math_intent_packet is not None,
+        explicit_route_id=spec.math_intent_route,
+    )
 
 
 # These packet helpers deliberately remain stateless.  A receipt is addressed by

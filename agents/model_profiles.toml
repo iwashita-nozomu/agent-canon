@@ -48,6 +48,8 @@ report_reviewer = "luna_reasoning_high"
 reproducibility_reviewer = "luna_reasoning_high"
 requirements_organizer = "luna_reasoning_high"
 reviewer = "luna_reasoning_high"
+# The logical mathematical_correctness_reviewer role reuses this dedicated
+# Luna/high executable with a stricter math-intent handoff contract.
 scientific_computing_reviewer = "luna_reasoning_high"
 ship_reviewer = "luna_ship_xhigh"
 skill_evaluator = "mini_skill_evaluator_medium"

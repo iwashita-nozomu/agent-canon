@@ -605,6 +605,25 @@ class AgentTeamTemplateTest(unittest.TestCase):
             identity["remote"],
             ("tools/agent_tools",),
         )
+        math_blocked = dispatch_fixed_implementation(
+            request,
+            "materialize P3 math repair",
+            lambda role, prompt: "must-not-spawn",
+            workspace_root=PROJECT_ROOT,
+            writer_target=target,
+            selected_skills=("computational-optimization",),
+        )
+        self.assertEqual(math_blocked.status, "blocked")
+        self.assertEqual(math_blocked.owner_gate_id, "math_packet_missing")
+        nonmath_dispatch = dispatch_fixed_implementation(
+            request,
+            "materialize P3 math repair",
+            lambda role, prompt: "must-not-spawn",
+            workspace_root=PROJECT_ROOT,
+            writer_target=target,
+            selected_skills=(),
+        )
+        self.assertEqual(nonmath_dispatch.status, "spawned")
         with patch(
             "implementation_dispatch.resolve_checkout_identity",
             side_effect=AssertionError("checkout identity must be reused"),

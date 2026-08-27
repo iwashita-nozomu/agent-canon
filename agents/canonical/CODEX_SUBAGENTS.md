@@ -633,6 +633,7 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 | `research_reviewer` | `reviewer` |
 | `experimenter` | `experiment_runner` for runs; `worker` only for scoped runtime-output handling |
 | `experiment_reviewer` | `reviewer` |
+| `mathematical_correctness_reviewer` | existing Luna/high `reviewer` executable with a dedicated math-intent packet and scope contract |
 | `scheduler` | `execution_planner` |
 | `schedule_reviewer` | `plan_reviewer` |
 | `citation_evidence_reviewer` | `citation_evidence_reviewer` |
@@ -674,6 +675,8 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
   - 論文主張が citation、figure、table、derivation、appendix、result に辿れるかを確認する
 - `notation_definition_reviewer`
   - 記号、略語、technical term、unit、index、assumption の definition-before-use と一貫性を確認する
+- `mathematical_correctness_reviewer`
+  - 既存の Luna/high `reviewer` executable を使う専用 logical role として、math-intent packet の `math_object` / `problem`、`variables` / `domains` / `units`、`objective` / `residual`、`constraints`、`equations` / `definitions`、`assumptions` / `approximations`、`derivation`、`iteration_map` / `update_map`、`invariants` / `limits` / `stopping_scalar` / `failure_semantics`、`equation_to_code_map`、`math_oracle` / `counterexample`、および mapped changed-path scope を確認する。数学対応の finding だけを返し、architecture、framework、JIT、compiler、backend、runtime、container、routing、environment、common infrastructure、proof-tool / IR infrastructure の編集を承認しない
 - `logic_gap_reviewer`
   - claim-to-evidence のつながり、hidden assumption、result と interpretation の飛躍を確認する
 - `long_form_writer`
@@ -748,6 +751,7 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 | テストケース設計 | 実装後に owning mechanism と具体的な未解決 risk が記録された場合だけ、専用の `test_designer` instance を条件付きで起動する。まず activation decision を返し、checker-owned property は static validation へ戻し、具体的な behavior regression oracle だけを test plan に落とす |
 | 記号定義レビュー | 専用の `notation_definition_reviewer` instance。記号、略語、technical term、unit、index、assumption の定義順と一貫性を見る |
 | 論理接続レビュー | 専用の `logic_gap_reviewer` instance。主張の飛躍、隠れた仮定、result と interpretation の境界を見る |
+| 数理修正の intent / scope review | `computational-optimization` の math-intent packet を先に作り、専用の `mathematical_correctness_reviewer` instance が equations、変数 / 単位、仮定、導出、更新則、停止 / failure、equation-to-code map、math oracle、changed-path scope を確認する。generic designer、benchmark、scientific-computing reviewer より前に行い、非数理 surface は sibling handoff に分ける |
 | report / claim-heavy narrative review | 専用の `report_reviewer` instance。evidence traceability、overclaim、reader-facing report quality を見る |
 | OOP readability report documentation | 専用の `oop_readability_reviewer` instance。機械判定 report の status / count / path / line を保持し、tool fact と reviewer judgment を分けて OOP 原則別に文書化する |
 | 実装 | `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認し、既定は `worker`。`spark_worker` は `--select-agent-type implementer=spark_worker:<evidence>` の parent packet selection が stdout / manifest に記録された bounded slice だけに使う |
@@ -761,6 +765,22 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 - parent は stage を暗黙にまとめず、別 role を別 instance で起動します
 - subagent を起動するときは、`team_manifest.yaml` の `run.subagent_prompt_packet`、該当 role の `prompt_contract`、`document_packet.read_before_work`、または `bootstrap_agent_run.py` の packet 出力を local/tool context として参照します。prompt へは `agents/COMMUNICATION_PROTOCOL.md` が定義する `Fresh Subagent Context Capsule` を渡し、packet stdout や full artifact は貼りません
 - context が増えたら capsule artifact を更新して再配送します
+- math-intent route の write-capable handoff には、protocol の Target Binding Packet に加えて
+  `mathematical_intent_packet` を必ず添えます。packet は `math_object` / `problem`, `variables` /
+  `domains` / `units`, `objective` / `residual`, `constraints`, `equations` / `definitions`,
+  `assumptions` / `approximations`, `derivation`, `iteration_map` / `update_map`, `invariants` /
+  `limits` / `stopping_scalar` / `failure_semantics`, `equation_to_code_map`, `math_oracle` /
+  `counterexample`, `mathematical_definition_paths`, `mathematical_oracle_paths`,
+  `mathematical_documentation_paths`, mapped `allowed_paths`, default
+  `forbidden_surfaces`、`separate_handoff_targets` を含みます。必須欄、map、oracle が欠けた
+  handoff は `math_packet_missing` として停止し、worker は推測で scope を補いません
+- 通常 bootstrap は `--math-intent-packet '<JSON>'` を受け取り、run manifest と canonical
+  `spawn_agent` ToolCall の両方へ同じ正規化済み packet を渡します。math writer の
+  `writer_target.allowed_paths` は packet の `allowed_write_paths` の部分集合でなければならず、
+  architecture / JIT / backend / runtime / routing / environment / proof / IR infrastructure
+  は `separate_handoff_targets` に残し、math packet の厳密な `allowed_write_paths` にない
+  path は spawn 前に拒否します。packet が明示的に数理実装として mapped した `src/runtime`
+  のような path は許可します。非数理 route では packet を要求せず、math reviewer も起動しません
 - workflow family ごとの prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です
 - 一般説明 prose adapter を使う文書では `document_flow_reviewer` に加えて別 reviewer で `docs-completeness-review` を通します
 - 学術文章では `document_flow_reviewer` に加えて `notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer の `docs-completeness-review` を通します

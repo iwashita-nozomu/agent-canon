@@ -44,6 +44,12 @@ if __package__:
     from .packets import (
         ACTIVE_DESIGN_PACKET_SCHEMA,
         ActiveDesignPacketConfig,
+        MATHEMATICAL_INTENT_PACKET_SCHEMA,
+        MathematicalIntentPacket,
+        mathematical_intent_route_config,
+        mathematical_intent_route_for_task,
+        math_intent_route_id_from_context,
+        normalize_mathematical_intent_packet,
         parse_active_design_packet_input,
         resolve_cross_cutting_document_packet,
         resolve_role_document_packet,
@@ -52,6 +58,12 @@ else:
     from packets import (
         ACTIVE_DESIGN_PACKET_SCHEMA,
         ActiveDesignPacketConfig,
+        MATHEMATICAL_INTENT_PACKET_SCHEMA,
+        MathematicalIntentPacket,
+        mathematical_intent_route_config,
+        mathematical_intent_route_for_task,
+        math_intent_route_id_from_context,
+        normalize_mathematical_intent_packet,
         parse_active_design_packet_input,
         resolve_cross_cutting_document_packet,
         resolve_role_document_packet,
@@ -221,6 +233,7 @@ class BootstrapRunContext:
     workflow_family_name: str | None
     workflow_active_spawn_budget: int | None
     workflow_max_write_subagents: int | None
+    math_intent_route: str | None = None
     issue_worker_candidate: Mapping[str, object] | None = None
     repository_roots: object | None = None
 
@@ -234,6 +247,7 @@ class BootstrapRuntime:
     active_pointer: Path
     agent_type_selections: tuple[AgentTypeSelection, ...]
     active_design_packet: ActiveDesignPacketConfig
+    math_intent_packet: MathematicalIntentPacket | None = None
     issue_worker_dispatch: Mapping[str, object] | None = None
 
 
@@ -349,6 +363,14 @@ def build_parser(
         ),
     )
     parser.add_argument(
+        "--math-intent-packet",
+        metavar="JSON",
+        help=(
+            f"Atomic {MATHEMATICAL_INTENT_PACKET_SCHEMA} JSON object. Required when "
+            "the selected task declares a mathematical intent route."
+        ),
+    )
+    parser.add_argument(
         "--writer-targets",
         metavar="JSON",
         help=(
@@ -442,6 +464,19 @@ def parse_issue_worker_candidate(value: str | None) -> Mapping[str, object] | No
     return parsed
 
 
+def parse_math_intent_packet_input(value: str | None) -> Mapping[str, object] | None:
+    """Parse one explicit math packet without inferring mathematical content."""
+    if value is None:
+        return None
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("mathematical_intent_packet:invalid_json") from exc
+    if not isinstance(parsed, dict) or not parsed:
+        raise RuntimeError("mathematical_intent_packet:must_be_nonempty_object")
+    return parsed
+
+
 def resolve_bootstrap_context(
     args: argparse.Namespace,
     config: TeamConfig,
@@ -509,6 +544,38 @@ def resolve_bootstrap_context(
             )
         # Task-catalog specialists and default review packs remain candidates;
         # explicit enablement or an owner-critical route activates them.
+    selected_route_skills = suggested_skills(
+        args.task_id,
+        workflow_family_id,
+        args.task,
+        source_root=(repository_roots.agentcanon_source_root if repository_roots else None),
+    )
+    math_route = mathematical_intent_route_for_task(
+        catalog,
+        args.task_id,
+        selected_route_skills,
+    )
+    math_route = math_intent_route_id_from_context(
+        selected_route_skills,
+        packet_present=bool(args.math_intent_packet),
+        explicit_route_id=math_route,
+    )
+    if math_route is not None and workflow_family_id is not None:
+        workflow_active_spawn_budget, workflow_max_write_subagents = (
+            workflow_spawn_budget(
+                catalog,
+                workflow_family_id,
+                include_math_intent=True,
+            )
+        )
+    if math_route is not None and args.math_intent_packet:
+        reviewer = str(
+            (mathematical_intent_route_config(catalog, math_route) or {}).get(
+                "reviewer", ""
+            )
+        ).strip()
+        if reviewer and reviewer not in enabled_specialists:
+            enabled_specialists.append(reviewer)
     language_candidates: tuple[str, ...] = ()
     if not args.no_language_review_candidates:
         language_candidates = language_review_candidates(
@@ -529,6 +596,7 @@ def resolve_bootstrap_context(
         workflow_family_name=workflow_family_name,
         workflow_active_spawn_budget=workflow_active_spawn_budget,
         workflow_max_write_subagents=workflow_max_write_subagents,
+        math_intent_route=math_route,
         issue_worker_candidate=issue_worker_candidate,
         repository_roots=repository_roots,
     )
@@ -602,6 +670,18 @@ def emit_bootstrap_output(
     print(f"SUGGESTED_SKILLS={','.join(selected_skills)}")
     print(f"ACTIVE_SKILLS={','.join(active_skills)}")
     print(f"DEFERRED_SKILLS={','.join(deferred_skills) or '-'}")
+    if context.math_intent_route is None:
+        print("MATH_INTENT_ROUTE_STATUS=not_applicable")
+        print("MATH_INTENT_PACKET=absent")
+    else:
+        print("MATH_INTENT_ROUTE_STATUS=active")
+        print(f"MATH_INTENT_PACKET_SCHEMA={MATHEMATICAL_INTENT_PACKET_SCHEMA}")
+        math_route_config = mathematical_intent_route_config(
+            catalog, context.math_intent_route
+        )
+        print(f"MATH_INTENT_ROUTE_ID={context.math_intent_route}")
+        print(f"MATH_INTENT_REVIEWER={math_route_config.get('reviewer', 'unknown')}")
+        print("MATH_INTENT_PACKET=present")
     print(
         "START_DECLARATION="
         f"workflow={context.workflow_family_name or 'Unspecified'}, "
@@ -668,6 +748,7 @@ def emit_bootstrap_output(
             workflow_family_id=context.workflow_family_id,
             issue_worker_candidate=context.issue_worker_candidate,
             writer_targets=writer_targets,
+            math_intent_route_id=context.math_intent_route,
         )
         initial_wave_slots = initial_slots
         initial_wave = tuple(slot.agent_type for slot in initial_wave_slots)
@@ -691,6 +772,7 @@ def emit_bootstrap_output(
             workflow_family_id=context.workflow_family_id,
             issue_worker_candidate=context.issue_worker_candidate,
             writer_targets=writer_targets,
+            math_intent_route_id=context.math_intent_route,
         )
         expansion_wave_slots = recommended_dynamic_expansion_wave_slots(
             runtime.roles,
@@ -702,6 +784,7 @@ def emit_bootstrap_output(
             workflow_family_id=context.workflow_family_id,
             issue_worker_candidate=context.issue_worker_candidate,
             writer_targets=writer_targets,
+            math_intent_route_id=context.math_intent_route,
         )
         print(
             "SUBAGENT_AGENT_TYPE_SELECTIONS="
@@ -1102,6 +1185,20 @@ def main(
         repository_roots,
         issue_worker_candidate,
     )
+    try:
+        math_packet_input = parse_math_intent_packet_input(args.math_intent_packet)
+        if context.math_intent_route is not None and math_packet_input is None:
+            raise RuntimeError("math_packet_missing")
+        if context.math_intent_route is None and math_packet_input is not None:
+            raise RuntimeError("math_packet_not_applicable")
+        math_intent_packet = (
+            normalize_mathematical_intent_packet(math_packet_input)
+            if math_packet_input is not None
+            else None
+        )
+    except RuntimeError as exc:
+        print(str(exc), flush=True)
+        return 2
     roles = select_roles(
         config,
         list(context.enabled_specialists),
@@ -1168,6 +1265,9 @@ def main(
             default_review_pack_ids=context.default_review_pack_ids,
             selected_skills=selected_skills,
             task_catalog=catalog,
+            task_id=args.task_id,
+            math_intent_route=context.math_intent_route,
+            math_intent_packet=math_intent_packet,
             agent_type_selections=agent_type_selections,
             writer_targets=writer_targets,
         )
@@ -1185,6 +1285,7 @@ def main(
         active_pointer=active_pointer,
         agent_type_selections=agent_type_selections,
         active_design_packet=active_design_packet,
+        math_intent_packet=math_intent_packet,
         issue_worker_dispatch=issue_worker_dispatch,
     )
     try:

@@ -179,6 +179,34 @@ def validate_writer_target_identity(
     return parsed
 
 
+def validate_mathematical_writer_target(
+    target: WriterTarget | Mapping[str, object],
+    math_intent_packet: Mapping[str, object] | object,
+) -> WriterTarget:
+    """Narrow a math writer target to exact packet paths and handoff targets."""
+    parsed = parse_writer_target(target)
+    allowed = getattr(math_intent_packet, "allowed_write_paths", None)
+    if allowed is None and isinstance(math_intent_packet, Mapping):
+        allowed = math_intent_packet.get("allowed_write_paths")
+    if not isinstance(allowed, (list, tuple)) or not allowed:
+        raise WriterTargetError("math_packet_missing:allowed_write_paths")
+    allowed_paths = tuple(str(path) for path in allowed)
+    separate_targets = getattr(math_intent_packet, "separate_handoff_targets", None)
+    if separate_targets is None and isinstance(math_intent_packet, Mapping):
+        separate_targets = math_intent_packet.get("separate_handoff_targets", ())
+    if not isinstance(separate_targets, (list, tuple)):
+        raise WriterTargetError("math_packet_missing:separate_handoff_targets")
+    separate_target_set = {str(path) for path in separate_targets}
+    for path in parsed.allowed_paths:
+        if path in separate_target_set:
+            raise WriterTargetError(
+                f"math_writer_target:separate_handoff_target:{path}"
+            )
+        if path not in allowed_paths:
+            raise WriterTargetError(f"math_writer_target:path_not_in_packet:{path}")
+    return parsed
+
+
 def materialize_writer_target_packet(
     target: WriterTarget | Mapping[str, object],
     checkout_identity: Mapping[str, object],
@@ -349,4 +377,5 @@ __all__ = (
     "validate_writer_target_allocations",
     "validate_spawn_handoff",
     "validate_writer_target_identity",
+    "validate_mathematical_writer_target",
 )

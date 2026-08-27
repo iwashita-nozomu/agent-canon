@@ -21,11 +21,16 @@ if __package__:
     from .artifact_identity import canonical_json_bytes
     from .writer_target import (
         WriterTarget,
+        validate_mathematical_writer_target,
         validate_spawn_handoff,
     )
 else:
     from artifact_identity import canonical_json_bytes
-    from writer_target import WriterTarget, validate_spawn_handoff  # type: ignore[no-redef]
+    from writer_target import (  # type: ignore[no-redef]
+        WriterTarget,
+        validate_mathematical_writer_target,
+        validate_spawn_handoff,
+    )
 
 from update_lifecycle_contract import (
     materialize_close_agent_tool_call as materialize_lifecycle_close_agent_tool_call,
@@ -414,6 +419,8 @@ def materialize_subagent_spawn_tool_call(
     checkout_identity: Mapping[str, object],
     workspace_write_capable: bool | None = None,
     writer_target: WriterTarget | Mapping[str, object] | None = None,
+    math_intent_route: str | None = None,
+    math_intent_packet: Mapping[str, object] | object | None = None,
 ) -> dict[str, object]:
     """Return the parent-runtime ToolCall for one stage-owner spawn handoff."""
     if not role.strip() or not agent_type.strip() or not input.strip():
@@ -428,12 +435,43 @@ def materialize_subagent_spawn_tool_call(
         if workspace_write_capable is None
         else workspace_write_capable
     )
+    normalized_math_packet = None
+    if __package__:
+        from .packets import (
+            MATHEMATICAL_INTENT_ROUTE_ID,
+            mathematical_intent_packet_mapping,
+            normalize_mathematical_intent_packet,
+            separate_nonmath_handoff_mapping,
+            validate_mathematical_intent_route,
+        )
+    else:
+        from packets import (  # type: ignore[no-redef]
+            MATHEMATICAL_INTENT_ROUTE_ID,
+            mathematical_intent_packet_mapping,
+            normalize_mathematical_intent_packet,
+            separate_nonmath_handoff_mapping,
+            validate_mathematical_intent_route,
+        )
+    selected_math_route = validate_mathematical_intent_route(
+        math_intent_route
+        or (MATHEMATICAL_INTENT_ROUTE_ID if math_intent_packet is not None else None)
+    )
+    if selected_math_route is not None:
+        if math_intent_packet is None:
+            raise RuntimeError("math_packet_missing")
+        normalized_math_packet = mathematical_intent_packet_mapping(
+            normalize_mathematical_intent_packet(math_intent_packet)
+        )
+    elif math_intent_packet is not None:
+        raise RuntimeError("math_packet_not_applicable")
     targets = validate_spawn_handoff(
         role,
         workspace_write_capable=workspace_write_capable,
         writer_target=writer_target,
         checkout_identity=identity,
     )
+    if selected_math_route is not None and targets:
+        validate_mathematical_writer_target(targets[0], normalized_math_packet)
     argument_properties: dict[str, Mapping[str, object]] = {
         "role": {"type": "string", "minLength": 1},
         "agent_type": {"type": "string", "minLength": 1},
@@ -449,6 +487,22 @@ def materialize_subagent_spawn_tool_call(
     if targets:
         arguments["writer_target"] = targets[0].as_dict()
         argument_properties["writer_target"] = {"type": "object"}
+    if normalized_math_packet is not None:
+        arguments["mathematical_intent_route_id"] = selected_math_route
+        argument_properties["mathematical_intent_route_id"] = {
+            "type": "string",
+            "const": selected_math_route,
+        }
+        arguments["mathematical_intent_packet"] = normalized_math_packet
+        argument_properties["mathematical_intent_packet"] = {"type": "object"}
+        separate_handoffs = separate_nonmath_handoff_mapping(
+            normalized_math_packet
+        )
+        if separate_handoffs:
+            arguments["separate_nonmath_handoffs"] = [
+                dict(item) for item in separate_handoffs
+            ]
+            argument_properties["separate_nonmath_handoffs"] = {"type": "array"}
     return materialize_tool_call_token(
         tool_id="spawn_agent",
         argument_schema_id=SUBAGENT_SPAWN_TOOL_CALL_ARGUMENT_SCHEMA,
