@@ -1101,20 +1101,25 @@ _agent_canon_read_container_identity() {
     --format '{{.Id}}' "$container" 2>/dev/null); then
     _agent_canon_json_error "$error_code" \
       "named resident container identity could not be read"
+    return 2
   fi
   if ! observed_runtime=$("$AGENT_CANON_DOCKER_CMD" container inspect \
     --format '{{index .Config.Labels "io.agent-canon.runtime"}}' "$container" 2>/dev/null); then
     _agent_canon_json_error "$error_code" \
       "named resident ownership labels could not be read"
+    return 2
   fi
   if ! observed_control=$("$AGENT_CANON_DOCKER_CMD" container inspect \
     --format '{{index .Config.Labels "io.agent-canon.control-root-digest"}}' "$container" 2>/dev/null); then
     _agent_canon_json_error "$error_code" \
       "named resident control-root ownership could not be read"
+    return 2
   fi
-  [[ -n "$observed_id" ]] ||
+  if [[ -z "$observed_id" ]]; then
     _agent_canon_json_error "$error_code" \
       "named resident container identity is empty"
+    return 2
+  fi
   AGENT_CANON_OBSERVED_CONTAINER_ID=$observed_id
   AGENT_CANON_OBSERVED_CONTAINER_RUNTIME=$observed_runtime
   AGENT_CANON_OBSERVED_CONTAINER_CONTROL=$observed_control
@@ -1127,6 +1132,7 @@ _agent_canon_classify_existing_container() {
         "$AGENT_CANON_OBSERVED_CONTAINER_CONTROL" != "$(_agent_canon_control_digest)" ]]; then
     _agent_canon_json_error container_ownership_mismatch \
       "named resident is not owned by this AgentCanon control root"
+    return 2
   fi
 }
 
@@ -1138,29 +1144,38 @@ _agent_canon_require_existing_container_identity() {
         "$AGENT_CANON_OBSERVED_CONTAINER_CONTROL" != "$expected_control" ]]; then
     _agent_canon_json_error replacement_readback_failed \
       "named resident identity changed before teardown"
+    return 2
   fi
 }
 
 _agent_canon_validate_target_manifest() {
   local manifest=${1:-$AGENT_CANON_STATE_ROOT/mounts.tsv}
-  [[ -f "$manifest" && ! -L "$manifest" ]] ||
+  if [[ ! -f "$manifest" || -L "$manifest" ]]; then
     _agent_canon_json_error mount_manifest_invalid \
       "target mount manifest is unavailable before resident replacement"
+    return 2
+  fi
   local kind digest source destination mode
   while IFS=$'\t' read -r kind digest source destination mode; do
     [[ -z "$kind" ]] && continue
-    [[ "$kind" == target && "$digest" =~ ^[A-Za-z0-9_.-]{1,128}$ &&
-       "$source" = /* && "$destination" == "/targets/$digest" &&
-       "$mode" == read-only ]] ||
+    if [[ "$kind" != target || ! "$digest" =~ ^[A-Za-z0-9_.-]{1,128}$ ||
+          "$source" != /* || "$destination" != "/targets/$digest" ||
+          "$mode" != read-only ]]; then
       _agent_canon_json_error mount_manifest_invalid \
         "target mount manifest is invalid before resident replacement"
-    [[ "$source" != "$AGENT_CANON_CONTROL_ROOT" &&
-       "$source" != "$(realpath -e -- "$HOME")" ]] ||
+      return 2
+    fi
+    if [[ "$source" == "$AGENT_CANON_CONTROL_ROOT" ||
+          "$source" == "$(realpath -e -- "$HOME")" ]]; then
       _agent_canon_json_error mount_manifest_invalid \
         "broad control or home mount is forbidden"
-    [[ -d "$source" && ! -L "$source" ]] ||
+      return 2
+    fi
+    if [[ ! -d "$source" || -L "$source" ]]; then
       _agent_canon_json_error target_root_invalid \
         "target root does not exist: $source"
+      return 2
+    fi
   done < "$manifest"
 }
 
@@ -1276,7 +1291,9 @@ _agent_canon_read_rollback_plan() {
         AGENT_CANON_ROLLBACK_IMAGE_REF=$value; ref_seen=$((ref_seen + 1)) ;;
       mount)
         [[ "$value" == mount && -n "$source" && "$source" = /* && ! -L "$source" &&
-           ( -d "$source" || ("$destination" == "$AGENT_CANON_SOURCE_SYNC_DESTINATION" && -f "$source") ) &&
+           ( -d "$source" ||
+             ("$destination" == "$AGENT_CANON_SOURCE_SYNC_DESTINATION" && -f "$source") ||
+             ("$destination" == "$AGENT_CANON_MOUNT_REGISTRY_DESTINATION" && -f "$source") ) &&
            -n "$destination" && ("$ro" == true || "$ro" == false) ]] ||
           _agent_canon_json_error rollback_plan_invalid "rollback plan mount is invalid"
         case "$destination" in
@@ -1308,27 +1325,58 @@ _agent_canon_validate_existing_container() {
   if ! observed_runtime=$("$AGENT_CANON_DOCKER_CMD" container inspect \
     --format '{{index .Config.Labels "io.agent-canon.runtime"}}' "$container"); then
     _agent_canon_json_error container_ownership_mismatch "resident container inspect failed"
+    return 2
   fi
-  observed_control=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{index .Config.Labels "io.agent-canon.control-root-digest"}}' "$container")
-  observed_image=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{.Config.Image}}' "$container")
-  observed_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect \
-    --format '{{.Id}}' "$observed_image")
-  observed_network=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{.HostConfig.NetworkMode}}' "$container")
-  observed_rootfs=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{.HostConfig.ReadonlyRootfs}}' "$container")
-  observed_capdrop=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{join .HostConfig.CapDrop ","}}' "$container")
-  observed_security=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{join .HostConfig.SecurityOpt ","}}' "$container")
-  observed_cpus=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{.HostConfig.NanoCpus}}' "$container")
-  observed_memory=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{.HostConfig.Memory}}' "$container")
-  observed_pids=$("$AGENT_CANON_DOCKER_CMD" container inspect \
-    --format '{{.HostConfig.PidsLimit}}' "$container")
+  if ! observed_control=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{index .Config.Labels "io.agent-canon.control-root-digest"}}' "$container"); then
+    _agent_canon_json_error container_ownership_mismatch "resident ownership readback failed"
+    return 2
+  fi
+  if ! observed_image=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{.Config.Image}}' "$container"); then
+    _agent_canon_json_error container_ownership_mismatch "resident image readback failed"
+    return 2
+  fi
+  if ! observed_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect \
+    --format '{{.Id}}' "$observed_image"); then
+    _agent_canon_json_error container_ownership_mismatch "resident image ID readback failed"
+    return 2
+  fi
+  if ! observed_network=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{.HostConfig.NetworkMode}}' "$container"); then
+    _agent_canon_json_error container_ownership_mismatch "resident network readback failed"
+    return 2
+  fi
+  if ! observed_rootfs=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{.HostConfig.ReadonlyRootfs}}' "$container"); then
+    _agent_canon_json_error container_ownership_mismatch "resident rootfs readback failed"
+    return 2
+  fi
+  if ! observed_capdrop=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{join .HostConfig.CapDrop ","}}' "$container"); then
+    _agent_canon_json_error container_ownership_mismatch "resident capability readback failed"
+    return 2
+  fi
+  if ! observed_security=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{join .HostConfig.SecurityOpt ","}}' "$container"); then
+    _agent_canon_json_error container_ownership_mismatch "resident security readback failed"
+    return 2
+  fi
+  if ! observed_cpus=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{.HostConfig.NanoCpus}}' "$container"); then
+    _agent_canon_json_error container_ownership_mismatch "resident CPU readback failed"
+    return 2
+  fi
+  if ! observed_memory=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{.HostConfig.Memory}}' "$container"); then
+    _agent_canon_json_error container_ownership_mismatch "resident memory readback failed"
+    return 2
+  fi
+  if ! observed_pids=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+    --format '{{.HostConfig.PidsLimit}}' "$container"); then
+    _agent_canon_json_error container_ownership_mismatch "resident PID readback failed"
+    return 2
+  fi
   if [[ "$observed_runtime" != shared-v1 ||
         "$observed_control" != "$(_agent_canon_control_digest)" ||
         "$observed_image" != "$AGENT_CANON_IMAGE_REF" ||
@@ -1341,9 +1389,14 @@ _agent_canon_validate_existing_container() {
         "$observed_memory" != 4294967296 ||
         "$observed_pids" != 512 ]]; then
     _agent_canon_json_error container_ownership_mismatch "named resident has unexpected owner, image, mount, or security configuration"
+    return 2
   fi
-  expected_mounts=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.expected-mounts.XXXXXX")
-  observed_mounts=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.observed-mounts.XXXXXX")
+  if ! expected_mounts=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.expected-mounts.XXXXXX") ||
+     ! observed_mounts=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.observed-mounts.XXXXXX"); then
+    rm -f -- "${expected_mounts:-}" "${observed_mounts:-}"
+    _agent_canon_json_error mount_readback_failed "resident mount readback files could not be created"
+    return 2
+  fi
   printf '%s\t%s\ttrue\n' "$AGENT_CANON_STATE_ROOT" "$AGENT_CANON_RUNTIME_DESTINATION" > "$expected_mounts"
   if [[ "$require_source_sync" == 1 ]]; then
     printf '%s\t%s\tfalse\n' "$AGENT_CANON_RUNTIME_ROOT/source-sync.json" "$AGENT_CANON_SOURCE_SYNC_DESTINATION" >> "$expected_mounts"
@@ -1354,8 +1407,13 @@ _agent_canon_validate_existing_container() {
     local kind digest source destination mode
     while IFS=$'\t' read -r kind digest source destination mode; do
       [[ -z "$kind" ]] && continue
-      [[ "$kind" == target && "$digest" =~ ^[A-Za-z0-9_.-]{1,128}$ && "$source" = /* && -d "$source" && ! -L "$source" && "$destination" == "/targets/$digest" && "$mode" == read-only ]] ||
+      if [[ "$kind" != target || ! "$digest" =~ ^[A-Za-z0-9_.-]{1,128}$ ||
+            "$source" != /* || ! -d "$source" || -L "$source" ||
+            "$destination" != "/targets/$digest" || "$mode" != read-only ]]; then
+        rm -f -- "$expected_mounts" "$observed_mounts"
         _agent_canon_json_error mount_manifest_invalid "target mount manifest is invalid during readback"
+        return 2
+      fi
       printf '%s\t%s\tfalse\n' "$source" "$destination" >> "$expected_mounts"
     done < "$mount_manifest"
   fi
@@ -1373,6 +1431,7 @@ _agent_canon_validate_existing_container() {
       '$2 != destination' "$observed_mounts" > "$filtered_mounts"; then
       rm -f -- "$expected_mounts" "$observed_mounts" "$filtered_mounts"
       _agent_canon_json_error mount_readback_failed "resident mount readback filtering failed"
+      return 2
     fi
     mv -- "$filtered_mounts" "$observed_mounts"
   fi
@@ -1380,6 +1439,7 @@ _agent_canon_validate_existing_container() {
   if ! diff -u "$expected_mounts" "$observed_mounts" >/dev/null; then
     rm -f -- "$expected_mounts" "$observed_mounts"
     _agent_canon_json_error container_ownership_mismatch "resident bind mount set differs from the expected complete manifest"
+    return 2
   fi
   rm -f -- "$expected_mounts" "$observed_mounts"
 }
@@ -1397,14 +1457,25 @@ _agent_canon_ensure_container() {
   local target_manifest="${AGENT_CANON_ROLLBACK_MOUNTS_FILE:-$AGENT_CANON_STATE_ROOT/mounts.tsv}"
   while IFS=$'\t' read -r target_kind target_digest target_source target_destination target_mode; do
     [[ -n "$target_kind" ]] || continue
-    [[ "$target_kind" == target && "$target_digest" =~ ^[A-Za-z0-9_.-]{1,128}$ ]] ||
+    if [[ "$target_kind" != target ||
+          ! "$target_digest" =~ ^[A-Za-z0-9_.-]{1,128}$ ]]; then
       _agent_canon_json_error mount_manifest_invalid "invalid target mount record"
-    [[ "$target_source" = /* && -d "$target_source" && ! -L "$target_source" ]] ||
+      return 2
+    fi
+    if [[ "$target_source" != /* || ! -d "$target_source" || -L "$target_source" ]]; then
       _agent_canon_json_error mount_manifest_invalid "target mount source is not a regular directory"
-    [[ "$target_source" != "$AGENT_CANON_CONTROL_ROOT" && "$target_source" != "$(realpath -e -- "$HOME")" ]] ||
+      return 2
+    fi
+    if [[ "$target_source" == "$AGENT_CANON_CONTROL_ROOT" ||
+          "$target_source" == "$(realpath -e -- "$HOME")" ]]; then
       _agent_canon_json_error mount_manifest_invalid "broad control or home mount is forbidden"
-    [[ "$target_destination" == "/targets/$target_digest" && "$target_mode" == read-only ]] ||
+      return 2
+    fi
+    if [[ "$target_destination" != "/targets/$target_digest" ||
+          "$target_mode" != read-only ]]; then
       _agent_canon_json_error mount_manifest_invalid "target mount destination or mode is invalid"
+      return 2
+    fi
     target_mount_args+=(--mount "type=bind,src=$target_source,dst=$target_destination,readonly")
   done < "$target_manifest"
   if [[ -n "${AGENT_CANON_TARGET_PENDING_SOURCE:-}" ]]; then
@@ -1414,8 +1485,10 @@ _agent_canon_ensure_container() {
   fi
   if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
     _agent_canon_validate_existing_container "$container"
+    local validate_rc=$?
+    ((validate_rc == 0)) || return "$validate_rc"
   else
-    "$AGENT_CANON_DOCKER_CMD" create \
+    if ! "$AGENT_CANON_DOCKER_CMD" create \
       --name "$container" \
       --read-only \
       --cap-drop ALL \
@@ -1432,26 +1505,41 @@ _agent_canon_ensure_container() {
       --mount "type=bind,src=$AGENT_CANON_PRIVATE_LOG_ROOT,dst=$AGENT_CANON_PRIVATE_LOG_DESTINATION,readonly" \
       --mount "type=bind,src=$AGENT_CANON_STATE_ROOT/mounts.toml,dst=$AGENT_CANON_MOUNT_REGISTRY_DESTINATION,readonly" \
       "${target_mount_args[@]}" \
-      "$AGENT_CANON_IMAGE_REF" >/dev/null
+      "$AGENT_CANON_IMAGE_REF" >/dev/null; then
+      _agent_canon_json_error candidate_ensure_failed "resident container could not be created"
+      return 2
+    fi
     _agent_canon_validate_existing_container "$container"
+    local validate_rc=$?
+    ((validate_rc == 0)) || return "$validate_rc"
   fi
   local running
   running=$("$AGENT_CANON_DOCKER_CMD" container inspect \
     --format '{{.State.Running}}' "$container" 2>/dev/null || printf false)
   if [[ "$running" != true ]]; then
-    "$AGENT_CANON_DOCKER_CMD" start "$container" >/dev/null
+    if ! "$AGENT_CANON_DOCKER_CMD" start "$container" >/dev/null; then
+      _agent_canon_json_error candidate_ensure_failed "resident container could not be started"
+      return 2
+    fi
   fi
   local attempts=0 health
   while ((attempts < AGENT_CANON_HEALTH_ATTEMPTS)); do
     health=$("$AGENT_CANON_DOCKER_CMD" container inspect \
       --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}starting{{end}}' \
       "$container" 2>/dev/null || printf missing)
-    [[ "$health" == healthy ]] && { printf '%s\n' "$container"; return; }
-    [[ "$health" == missing ]] && _agent_canon_json_error runtime_unavailable "resident container disappeared"
+    if [[ "$health" == healthy ]]; then
+      printf '%s\n' "$container"
+      return 0
+    fi
+    if [[ "$health" == missing ]]; then
+      _agent_canon_json_error runtime_unavailable "resident container disappeared"
+      return 2
+    fi
     sleep 1
     attempts=$((attempts + 1))
   done
   _agent_canon_json_error container_unhealthy "resident container did not become healthy"
+  return 2
 }
 
 _agent_canon_run_controller() {
@@ -1636,17 +1724,19 @@ _agent_canon_prepare_forced_update_locked() {
 
 _agent_canon_update_locked() {
   local requested_ref=${1:-} candidate_image_ref=$2 candidate_image_id rc
-  if _agent_canon_prepare_forced_update_locked; then
-    :
-  else
-    rc=$?
+  set +e
+  _agent_canon_prepare_forced_update_locked
+  rc=$?
+  set -e
+  if ((rc != 0)); then
     _agent_canon_discard_pending_rollback_plan || :
     return "$rc"
   fi
-  if _agent_canon_image "$requested_ref"; then
-    :
-  else
-    rc=$?
+  set +e
+  _agent_canon_image "$requested_ref"
+  rc=$?
+  set -e
+  if ((rc != 0)); then
     _agent_canon_discard_pending_rollback_plan || :
     return "$rc"
   fi
@@ -1658,11 +1748,10 @@ _agent_canon_update_locked() {
     _agent_canon_json_error candidate_image_missing "candidate resident image could not be inspected"
     return 2
   fi
-  if _agent_canon_replace_resident_locked "$candidate_image_ref" "$candidate_image_id" update; then
-    return 0
-  else
-    rc=$?
-  fi
+  set +e
+  _agent_canon_replace_resident_locked "$candidate_image_ref" "$candidate_image_id" update
+  rc=$?
+  set -e
   _agent_canon_discard_pending_rollback_plan || :
   return "$rc"
 }

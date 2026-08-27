@@ -443,6 +443,52 @@ def main(argv: list[str]) -> int:
             if "agent-canon" in command and "--version" in command:
                 print("agent-canon 0.1.0")
                 return 0
+            if "rollback" in command[2:]:
+                runtime_mount = next(
+                    (
+                        mount
+                        for mount in found[1]["Mounts"]
+                        if mount["Destination"] == "/var/lib/agent-canon/runtime"
+                    ),
+                    None,
+                )
+                current_id = exec_environment.get("AGENT_CANON_CURRENT_IMAGE_ID", "")
+                current_ref = exec_environment.get("AGENT_CANON_CURRENT_IMAGE_REF", "")
+                if runtime_mount is None or not current_id or not current_ref:
+                    return 1
+                runtime_root = Path(runtime_mount["Source"])
+                host_runtime_root = runtime_root.parent
+                private_log = exec_environment.get("AGENT_CANON_PRIVATE_LOG_ROOT", "")
+                plan = runtime_root / "rollback-plan.tsv"
+                plan_lines = [
+                    "schema\tagent-canon.rollback-plan.v1",
+                    f"image-id\t{current_id}",
+                    f"image-ref\t{current_ref}",
+                    f"mount\tmount\t{runtime_root}\t/var/lib/agent-canon/runtime\tfalse",
+                    f"mount\tmount\t{host_runtime_root / 'source-sync.json'}\t/var/lib/agent-canon/source-sync.json\ttrue",
+                    f"mount\tmount\t{private_log}\t/var/lib/agent-canon/private-log\ttrue",
+                    f"mount\tmount\t{runtime_root / 'mounts.toml'}\t/var/lib/agent-canon/mount-registry.toml\ttrue",
+                ]
+                mounts_path = runtime_root / "mounts.tsv"
+                if mounts_path.is_file():
+                    for line in mounts_path.read_text(encoding="utf-8").splitlines():
+                        fields = line.split("\t")
+                        if len(fields) == 5 and fields[0] == "target":
+                            plan_lines.append(
+                                f"mount\tmount\t{fields[2]}\t{fields[3]}\ttrue"
+                            )
+                plan.write_text("\n".join(plan_lines) + "\n", encoding="utf-8")
+                print(
+                    json.dumps(
+                        {
+                            "schema": "agent-canon.bootstrap-receipt.v2",
+                            "status": "ok",
+                            "operation": "rollback",
+                            "code": "previous_generation_restored",
+                        }
+                    )
+                )
+                return 0
             operations = {"install", "update", "start", "stop", "uninstall"}
             operation = next((item for item in command[2:] if item in operations), "")
             if operation in {"install", "update"} or (

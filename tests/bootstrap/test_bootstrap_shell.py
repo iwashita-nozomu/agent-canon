@@ -195,6 +195,244 @@ def test_forced_retention_failure_stops_before_build(tmp_path: Path) -> None:
     assert not (tmp_path / "runtime" / "container-state" / ".pending-rollback-plan.tsv").exists()
 
 
+def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
+    tmp_path: Path,
+) -> None:
+    """The real shell adapter preserves A, then B, across forced updates."""
+    home = tmp_path / "home"
+    control = tmp_path / "control"
+    repository = tmp_path / "agent-canon"
+    home.mkdir()
+    control.mkdir()
+    subprocess.run(
+        ["git", "clone", "--no-hardlinks", str(ROOT), str(repository)],
+        check=True,
+        capture_output=True,
+    )
+    fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
+    state_path = tmp_path / "docker-state.json"
+    environment = {
+        **os.environ,
+        "HOME": str(home),
+        "AGENT_CANON_DOCKER": str(fake_docker),
+        "FAKE_DOCKER_STATE": str(state_path),
+        "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
+    }
+    common = [
+        str(BOOTSTRAP),
+        "--repository-root",
+        str(repository),
+        "--control-parent-root",
+        str(control),
+    ]
+    runtime = repository / ".runtime"
+
+    def run(operation: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [*common, operation],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+            timeout=120,
+        )
+
+    def active_image() -> tuple[str, str]:
+        values = dict(
+            line.split("\t", 1)
+            for line in (runtime / "host-state" / "active-image.tsv")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        )
+        return values["image-ref"], values["image-id"]
+
+    def rollback_plan() -> tuple[str, str]:
+        values = dict(
+            line.split("\t", 1)
+            for line in (runtime / "container-state" / "rollback-plan.tsv")
+            .read_text(encoding="utf-8")
+            .splitlines()
+            if "\t" in line
+        )
+        return values["image-ref"], values["image-id"]
+
+    installed = run("install")
+    assert installed.returncode == 0, installed.stderr
+    target = tmp_path / "target"
+    target.mkdir()
+    added = subprocess.run(
+        [
+            *common,
+            "target",
+            "add",
+            "--root",
+            str(target),
+            "--mode",
+            "read-only",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=120,
+    )
+    assert added.returncode == 0, added.stderr
+    target_digest = hashlib.sha256(str(target.resolve()).encode("utf-8")).hexdigest()
+    active_ref, image_a = active_image()
+    first = run("update")
+    assert first.returncode == 0, first.stderr
+    assert not first.stderr
+    updated_ref, image_b = active_image()
+    assert updated_ref == active_ref
+    assert image_b != image_a
+    rollback_ref_a, rollback_id_a = rollback_plan()
+    docker_state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert rollback_id_a == image_a
+    assert docker_state["images"][rollback_ref_a]["Id"] == image_a
+
+    second = run("update")
+    assert second.returncode == 0, second.stderr
+    assert not second.stderr
+    updated_ref, image_c = active_image()
+    assert updated_ref == active_ref
+    assert image_c not in {image_a, image_b}
+    rollback_ref_b, rollback_id_b = rollback_plan()
+    docker_state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert rollback_id_b == image_b
+    assert docker_state["images"][rollback_ref_b]["Id"] == image_b
+
+    rolled_back = run("rollback")
+    assert rolled_back.returncode == 0, rolled_back.stderr
+    assert not rolled_back.stderr
+    rollback_active_ref, rollback_active_id = active_image()
+    assert rollback_active_id == image_b
+    assert rollback_active_ref == image_b
+    container_name = "agent-canon-tools-" + hashlib.sha256(
+        str(control.resolve()).encode("utf-8")
+    ).hexdigest()[:16]
+    docker_state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert docker_state["containers"][container_name]["Config"]["Image"] == image_b
+    assert any(
+        mount["Destination"] == f"/targets/{target_digest}"
+        for mount in docker_state["containers"][container_name]["Mounts"]
+    )
+    assert (runtime / "container-state" / "mounts.tsv").is_file()
+    rollback_again = run("rollback")
+    assert rollback_again.returncode == 0, rollback_again.stderr
+    assert active_image()[1] == image_c
+
+
+@pytest.mark.skipif(
+    shutil.which("docker") is None
+    or os.environ.get("AGENT_CANON_RUN_REAL_UPDATE_TESTS") != "1",
+    reason="opt-in real Docker forced-update acceptance",
+)
+def test_real_docker_forced_updates_retain_previous_images(tmp_path: Path) -> None:
+    """Run the same image/tag/rollback contract against the configured daemon."""
+    docker = shutil.which("docker")
+    assert docker is not None
+    daemon = subprocess.run(
+        [docker, "info"], check=False, capture_output=True, text=True, timeout=15
+    )
+    if daemon.returncode != 0:
+        pytest.skip("Docker daemon is unavailable")
+    home = tmp_path / "home"
+    control = tmp_path / "control"
+    repository = tmp_path / "agent-canon"
+    home.mkdir()
+    control.mkdir()
+    subprocess.run(
+        ["git", "clone", "--no-hardlinks", str(ROOT), str(repository)],
+        check=True,
+        capture_output=True,
+    )
+    environment = {**os.environ, "HOME": str(home), "AGENT_CANON_DOCKER": docker}
+    common = [
+        str(BOOTSTRAP),
+        "--repository-root",
+        str(repository),
+        "--control-parent-root",
+        str(control),
+    ]
+    runtime = repository / ".runtime"
+    retained_images: dict[str, str] = {}
+
+    def run(operation: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [*common, operation],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+            timeout=300,
+        )
+
+    def active_id() -> str:
+        return next(
+            line.split("\t", 1)[1]
+            for line in (runtime / "host-state" / "active-image.tsv")
+            .read_text(encoding="utf-8")
+            .splitlines()
+            if line.startswith("image-id\t")
+        )
+
+    def plan_value(key: str) -> str:
+        return next(
+            line.split("\t", 1)[1]
+            for line in (runtime / "container-state" / "rollback-plan.tsv")
+            .read_text(encoding="utf-8")
+            .splitlines()
+            if line.startswith(key + "\t")
+        )
+
+    try:
+        installed = run("install")
+        assert installed.returncode == 0, installed.stderr
+        image_a = active_id()
+        first = run("update")
+        assert first.returncode == 0, first.stderr
+        assert not first.stderr
+        image_b = active_id()
+        retained_images[plan_value("image-ref")] = plan_value("image-id")
+        assert image_b != image_a
+        assert image_a in retained_images.values()
+        second = run("update")
+        assert second.returncode == 0, second.stderr
+        assert not second.stderr
+        image_c = active_id()
+        retained_images[plan_value("image-ref")] = plan_value("image-id")
+        assert image_c not in {image_a, image_b}
+        assert image_b in retained_images.values()
+        for image_ref, image_id in retained_images.items():
+            inspected = subprocess.run(
+                [docker, "image", "inspect", "--format", "{{.Id}}", image_ref],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            assert inspected.returncode == 0, inspected.stderr
+            assert inspected.stdout.strip() == image_id
+        rolled_back = run("rollback")
+        assert rolled_back.returncode == 0, rolled_back.stderr
+        assert not rolled_back.stderr
+        assert active_id() == image_b
+        rollback_again = run("rollback")
+        assert rollback_again.returncode == 0, rollback_again.stderr
+        assert not rollback_again.stderr
+        assert active_id() == image_c
+    finally:
+        run("uninstall")
+        for image_ref in retained_images:
+            subprocess.run(
+                [docker, "image", "rm", image_ref], check=False, capture_output=True
+            )
+        for image_id in retained_images.values():
+            subprocess.run(
+                [docker, "image", "rm", image_id], check=False, capture_output=True
+            )
+
+
 def test_sync_stages_source_before_live_fast_forward() -> None:
     """Source sync builds the candidate checkout before touching live source."""
     text = ADAPTER.read_text(encoding="utf-8")
