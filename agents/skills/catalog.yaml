@@ -555,7 +555,7 @@ skill_families:
         --compact-out reports/agent-runtime-dashboard/agent-log-analysis-compact.md
         --api-out reports/agent-runtime-dashboard/agent-log-analysis-api.json
       - git grep -n "<cause keywords>" -- documents/notes/knowledge documents/notes/failures documents agents
-      - python3 tools/agent_tools/issue_sync.py --issue-url <owner/repository#number>
+      - gh issue view <owner/repository#number> --json number,title,body,state,url
       - bash tools/agent_tools/run_repo_dependency_review.sh
       - python3 tools/agent_tools/check_dependency_headers.py --changed
       - bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing

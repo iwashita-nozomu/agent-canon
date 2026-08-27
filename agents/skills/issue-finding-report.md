@@ -399,8 +399,8 @@ outputs, locators, and decisions as evidence.
 
 ## Grouping And Dispatch Boundary
 
-Use `tools/agent_tools/issue_sync.py` as the host-side GitHub adapter for tool
-and Issue findings. Its `(owner, root_cause, fix)` key produces
+Use the host publisher's configured GitHub adapter (`gh issue view` for online
+Issue lookup/read) for tool and Issue findings. Its `(owner, root_cause, fix)` key produces
 an initial candidate group. Before publication, apply Cause Investigation and
 Issue Responsibility Unit contracts:
 
@@ -411,6 +411,13 @@ Issue Responsibility Unit contracts:
 - never split solely to increase agent fan-out.
 
 Warnings add a closeout obligation only when actionable or blocking.
+
+Online GitHub Issue lookup/read stays on the host publisher's GitHub route
+(`gh issue view` or the configured GitHub connector). It must not be routed
+through the resident `issue-sync` tool or a host-side Python fallback.
+The verified resident `issue-sync` route is limited to body-free offline
+receipt preflight, staging, and readback inputs after the publisher has its
+GitHub result.
 
 Runtime dashboard evidence enters this route only through an explicit
 `issue_worker_candidate` or `issue_worker_candidates` field. Counts, status
@@ -427,6 +434,13 @@ the required GitHub mutation through the existing adapter and reads back the
 URL, number, body, and state. The dashboard, resident runtime, and parent
 Python remain read-only and do not receive GitHub credentials. Orchestration
 materializes a publisher ToolCall with the checkout identity and typed handoff;
+the ToolCall carries `agentcanon_source_root` (the standalone AgentCanon
+checkout owning `bootstrap.sh` and the tool image) separately from
+`target_root` (the registered candidate checkout from
+`checkout_identity.git_root`). The generated route is
+`<agentcanon_source_root>/bootstrap.sh ... tool run --root <target_root>
+issue-sync ...`; a missing or mismatched target remains investigation/defer
+state and cannot reach GitHub mutation.
 publication failure writes only the existing metadata-only pending packet
 (repository, reason, private locator, and digest) and retries through this
 same IssueWorker route.
@@ -440,7 +454,7 @@ kind, and timestamp. Receipt/archive failure retains the pending packet and
 must not be reported as successful publication; non-qualified and foreign
 handoffs do not create receipts. The publisher ToolCall invokes the resident
 AgentCanon `issue_sync.py --stage-publication-receipt` subcommand through the
-canonical `bootstrap.sh ... tool run/exec issue_sync -- ...` route after a
+canonical `bootstrap.sh ... tool run/exec issue-sync -- ...` route after a
 receipt-route preflight, and the host shell archive sync owns the subsequent
 Git commit/push; the dashboard only reads the published namespace. If the
 external runtime/spool route is unavailable, defer before invoking GitHub.
@@ -658,10 +672,12 @@ Issue and evidence classification rather than creating another registry entry.
 
 ## Validation
 
-Run focused GitHub adapter and skill wiring checks after changing this route:
+Run the focused resident-container receipt route and skill wiring checks after changing this route:
 
 ```bash
-python3 tools/agent_tools/issue_sync.py --issue-url https://github.com/iwashita-nozomu/agent-canon/issues/<number>
+./bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root> \
+  tool run --root <registered-target-root> issue-sync -- --receipt-preflight \
+  --checkout-head <target-commit> --checkout-repository <owner/repository>
 python3 tools/agent_tools/check_skill_frontmatter.py --root .
 python3 tools/agent_tools/skill_tool_commands.py check
 python3 tools/agent_tools/skill_shim_materializer.py check --root .

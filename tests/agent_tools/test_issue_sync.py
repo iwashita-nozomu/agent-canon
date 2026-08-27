@@ -226,7 +226,9 @@ def test_stage_publication_receipt_cli_is_body_free(tmp_path: Path, capsys: pyte
     assert "body" not in output
 
 
-def test_container_receipt_stager_runs_resident_cli_argv(tmp_path: Path) -> None:
+def test_container_receipt_stager_runs_resident_cli_argv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     record = issue_sync.GitHubIssueRecord(
         repository="owner/repo", number="49", title="Receipt", body="private",
         state="OPEN", url="https://github.com/owner/repo/issues/49",
@@ -236,6 +238,7 @@ def test_container_receipt_stager_runs_resident_cli_argv(tmp_path: Path) -> None
         authenticated_repository="owner/repo",
     )
     commands: list[tuple[str, ...]] = []
+    monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(tmp_path / "runtime"))
 
     def runner(command: tuple[str, ...]) -> subprocess.CompletedProcess[str]:
         commands.append(command)
@@ -257,12 +260,13 @@ def test_container_receipt_stager_runs_resident_cli_argv(tmp_path: Path) -> None
             ).strip(),
             "remote": "owner/repo",
         },
-        source_root=PROJECT_ROOT,
+        agentcanon_source_root=PROJECT_ROOT,
         command_runner=runner,
     )
     stager.preflight()
     stager(record, "create", handoff)
     assert len(commands) == 2
+    assert all("issue-sync" in command for command in commands)
     assert "--receipt-preflight" in commands[0]
     assert "--stage-publication-receipt" in commands[1]
     assert issue_sync.issue_publication_receipt_spool_path(

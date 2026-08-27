@@ -1130,7 +1130,7 @@ def main(
                 args.task,
                 spawn,
                 workspace_root=workspace_root,
-                source_root=repository_roots.agentcanon_source_root,
+                agentcanon_source_root=repository_roots.agentcanon_source_root,
             )
             as_dict = getattr(dispatched, "as_dict", None)
             if not callable(as_dict):

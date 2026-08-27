@@ -693,7 +693,7 @@ def build_container_receipt_stager(
     *,
     runtime_root: Path,
     checkout_identity: object | None = None,
-    source_root: Path | None = None,
+    agentcanon_source_root: Path | None = None,
     command_runner: object = subprocess.run,
     bootstrap: str | None = None,
     execution: str = "run",
@@ -715,7 +715,42 @@ def build_container_receipt_stager(
     bootstrap_path = bootstrap or os.environ.get("AGENT_CANON_BOOTSTRAP", "").strip()
     if not bootstrap_path:
         bootstrap_path = str(Path(__file__).resolve().parents[2] / "bootstrap.sh")
-    project_root = source_root or Path(str(identity.get("git_root") or Path.cwd()))
+    target_root = str(identity.get("git_root") or "").strip()
+    if not target_root or target_root == "unknown":
+        raise IssueSyncError(
+            "checkout-identity-unresolved",
+            "receipt staging requires checkout_identity.git_root",
+        )
+    target_path = Path(target_root).expanduser().resolve(strict=False)
+    if not target_path.is_absolute() or not target_path.is_dir():
+        raise IssueSyncError(
+            "checkout-identity-unresolved",
+            "receipt staging target root is unavailable",
+        )
+    configured_source = agentcanon_source_root
+    if configured_source is None:
+        raw_source = os.environ.get("AGENT_CANON_SOURCE_ROOT", "").strip()
+        configured_source = Path(raw_source) if raw_source else None
+    agentcanon_root = (
+        configured_source.expanduser().resolve()
+        if configured_source is not None
+        else Path(__file__).resolve().parents[2]
+    )
+    if not agentcanon_root.is_absolute() or not agentcanon_root.is_dir():
+        raise IssueSyncError(
+            "issue_receipt_route_unavailable",
+            "AgentCanon source root is unavailable",
+        )
+    bootstrap_file = Path(bootstrap_path).expanduser()
+    if not bootstrap_file.is_absolute():
+        bootstrap_file = agentcanon_root / bootstrap_file
+    bootstrap_file = bootstrap_file.resolve(strict=False)
+    if not bootstrap_file.is_file():
+        raise IssueSyncError(
+            "issue_receipt_route_unavailable",
+            "AgentCanon bootstrap entrypoint is unavailable",
+        )
+    bootstrap_path = str(bootstrap_file)
     control_parent = os.environ.get(
         "AGENT_CANON_CONTROL_PARENT_ROOT", "<control-parent-root>"
     )
@@ -728,7 +763,8 @@ def build_container_receipt_stager(
         return build_issue_receipt_stage_command(
             repository=record.repository,
             runtime_root=str(root),
-            source_root=str(project_root),
+            agentcanon_source_root=str(agentcanon_root),
+            target_root=str(target_path),
             control_parent_root=control_parent,
             checkout_identity=identity,
             number=record.number,
@@ -745,7 +781,8 @@ def build_container_receipt_stager(
     preflight_command = build_issue_receipt_stage_command(
         repository=str(identity.get("remote") or "<checkout-repository>"),
         runtime_root=str(root),
-        source_root=str(project_root),
+        agentcanon_source_root=str(agentcanon_root),
+        target_root=str(target_path),
         control_parent_root=control_parent,
         checkout_identity=identity,
         execution=execution,
@@ -1706,14 +1743,14 @@ def sync_pending_packet(
         )
     configured_runtime = _runtime_root(configured_runtime)
     receipt_root = configured_runtime / PRIVATE_FEEDBACK_SPOOL_RELATIVE
-    identity_root = _checkout_identity_value(checkout_identity, "git_root")
     if receipt_stager is None:
         receipt_stager = build_container_receipt_stager(
             runtime_root=configured_runtime,
             checkout_identity=checkout_identity,
-            source_root=Path(identity_root)
-            if identity_root and identity_root != "unknown"
-            else Path.cwd(),
+            agentcanon_source_root=Path(
+                os.environ.get("AGENT_CANON_SOURCE_ROOT", "")
+                or Path(__file__).resolve().parents[2]
+            ),
         )
     if not callable(receipt_stager) or not callable(getattr(receipt_stager, "preflight", None)):
         raise IssueSyncError(

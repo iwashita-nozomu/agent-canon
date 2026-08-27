@@ -70,11 +70,54 @@ class ToolDispatchTest(unittest.TestCase):
             {spec.tool_id for spec in specs.values() if spec.parity == "verified"},
             {
                 "generate-agent-runtime-dashboard",
+                "issue-sync",
                 "route",
                 "skill-document-reader",
                 "template-bundle",
             },
         )
+
+    def test_issue_sync_uses_resident_container_and_external_receipt_route(self) -> None:
+        """Issue publication receipts use the registered container tool route."""
+        specs, _schema = tool_dispatch.load_specs(PROJECT_ROOT)
+        issue_sync = specs["issue-sync"]
+        self.assertEqual(
+            issue_sync.argv,
+            ("python3", "tools/agent_tools/issue_sync.py"),
+        )
+        self.assertEqual(issue_sync.execution_plane, "tool-container")
+        self.assertEqual(issue_sync.cwd_policy, "target-root")
+        self.assertEqual(issue_sync.side_effect_policy, "external-artifact")
+        self.assertEqual(issue_sync.output_root, "external-runtime")
+        self.assertEqual(issue_sync.parity, "verified")
+
+    def test_issue_sync_rejects_online_issue_lookup_on_container_route(self) -> None:
+        """Online GitHub reads cannot cross the body-free receipt boundary."""
+        specs, _schema = tool_dispatch.load_specs(PROJECT_ROOT)
+        with self.assertRaisesRegex(tool_dispatch.DispatchError, "container-route-restricted"):
+            tool_dispatch.run_tool(
+                PROJECT_ROOT,
+                specs["issue-sync"],
+                ("--issue-url", "https://github.com/owner/repo/issues/1"),
+            )
+
+    def test_issue_lookup_stays_on_host_github_route(self) -> None:
+        """Skill routing uses the host GitHub adapter for online Issue reads."""
+        catalog = yaml.safe_load(
+            (PROJECT_ROOT / "agents" / "skills" / "catalog.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
+        entry = next(
+            item
+            for item in catalog["skill_families"]
+            if item["id"] == "issue-finding-report"
+        )
+        commands = entry["tool_commands"]["conditional"]
+        lookup_commands = [command for command in commands if "gh issue view" in command]
+        self.assertEqual(len(lookup_commands), 1)
+        self.assertIn("gh issue view", lookup_commands[0])
+        self.assertNotIn("issue-sync", lookup_commands[0])
 
     def test_dashboard_uses_container_and_external_artifact_route(self) -> None:
         """The canonical dashboard route keeps source read-only and output external."""
