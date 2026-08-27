@@ -80,6 +80,177 @@ def test_source_sync_state_is_mounted_read_only_into_the_resident() -> None:
     assert "container-state/source-sync.json" not in text
 
 
+def test_source_sync_mount_migration_ignores_only_declared_destination(
+    tmp_path: Path,
+) -> None:
+    """Replacement accepts old/new source-sync mounts but rejects other drift."""
+    runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
+    private_log = tmp_path / "agent-canon-log"
+    control = tmp_path / "control"
+    source_sync = runtime / "source-sync.json"
+    mounts = state_root / "mounts.tsv"
+    for path in (state_root, private_log, control):
+        path.mkdir(parents=True)
+    source_sync.write_text("{}\n", encoding="utf-8")
+    mounts.write_text("", encoding="utf-8")
+    control_digest = hashlib.sha256(str(control).encode("utf-8")).hexdigest()
+    docker = tmp_path / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        "if [[ \"$1:$2\" == image:inspect ]]; then printf 'sha256:image\\n'; exit 0; fi\n"
+        "format=$4\n"
+        "case \"$format\" in\n"
+        "  *io.agent-canon.runtime*) printf 'shared-v1' ;;\n"
+        "  *io.agent-canon.control-root-digest*) printf '" + control_digest + "' ;;\n"
+        "  *Config.Image*) printf 'image' ;;\n"
+        "  *NetworkMode*) printf 'none' ;;\n"
+        "  *ReadonlyRootfs*) printf 'true' ;;\n"
+        "  *CapDrop*) printf 'ALL' ;;\n"
+        "  *SecurityOpt*) printf 'no-new-privileges' ;;\n"
+        "  *NanoCpus*) printf '2000000000' ;;\n"
+        "  *Memory*) printf '4294967296' ;;\n"
+        "  *PidsLimit*) printf '512' ;;\n"
+        "  *range[[:space:]].Mounts*) cat \"$FAKE_MOUNTS\" ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    common = (
+        f"source {str(ADAPTER)!r}\n"
+        "set -e\n"
+        f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}\n"
+        f"AGENT_CANON_STATE_ROOT={str(state_root)!r}\n"
+        f"AGENT_CANON_CONTROL_ROOT={str(control)!r}\n"
+        f"AGENT_CANON_PRIVATE_LOG_ROOT={str(private_log)!r}\n"
+        "AGENT_CANON_IMAGE_REF=image\n"
+        f"AGENT_CANON_DOCKER_CMD={str(docker)!r}\n"
+        "_agent_canon_validate_existing_container container "
+        f"{str(mounts)!r} 1 $REQUIRE_SYNC\n"
+    )
+
+    def validate(require_sync: int, mount_lines: str) -> int:
+        mount_file = tmp_path / f"mounts-{require_sync}-{len(mount_lines)}.txt"
+        mount_file.write_text(mount_lines, encoding="utf-8")
+        result = subprocess.run(
+            ["bash", "-c", common],
+            check=False,
+            capture_output=True,
+            text=True,
+            env={
+                **os.environ,
+                "FAKE_MOUNTS": str(mount_file),
+                "REQUIRE_SYNC": str(require_sync),
+            },
+        )
+        assert not result.stdout, result.stdout
+        return result.returncode
+
+    old_mounts = (
+        f"{state_root}\t/var/lib/agent-canon/runtime\ttrue\n"
+        f"{private_log}\t/var/lib/agent-canon/private-log\tfalse\n"
+        f"{state_root / 'mounts.toml'}\t/var/lib/agent-canon/mount-registry.toml\tfalse\n"
+    )
+    new_mounts = old_mounts + (
+        f"{source_sync}\t/var/lib/agent-canon/source-sync.json\tfalse\n"
+    )
+    assert validate(0, old_mounts) == 0
+    assert validate(0, new_mounts) == 0
+    assert validate(1, new_mounts) == 0
+    assert validate(1, old_mounts) == 2
+
+
+@pytest.mark.parametrize("install_option", ["separate", "equals"])
+def test_sync_resolves_install_root_before_runtime_initialization(
+    tmp_path: Path, install_option: str
+) -> None:
+    """A sync target owns the initial record even when it differs from the script root."""
+    bare = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    target = tmp_path / "target"
+    control = tmp_path / "control"
+    control.mkdir()
+    (tmp_path / "script-root").mkdir()
+    subprocess.run(["git", "init", "--bare", str(bare)], check=True, capture_output=True)
+    subprocess.run(["git", "init", str(seed)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(seed), "config", "user.email", "test@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(seed), "config", "user.name", "AgentCanon Test"], check=True)
+    (seed / "tracked.txt").write_text("one\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(seed), "add", "tracked.txt"], check=True)
+    subprocess.run(["git", "-C", str(seed), "commit", "-m", "one"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(seed), "branch", "-M", "main"], check=True)
+    subprocess.run(["git", "-C", str(seed), "remote", "add", "origin", str(bare)], check=True)
+    subprocess.run(["git", "-C", str(seed), "push", "origin", "main"], check=True, capture_output=True)
+    subprocess.run(["git", "clone", str(bare), str(target)], check=True, capture_output=True)
+    install_arg = (
+        f"--install-root={target}" if install_option == "equals" else "--install-root"
+    )
+    command = [str(BOOTSTRAP), "--repository-root", str(tmp_path / "script-root"),
+               "--control-parent-root", str(control), "sync", install_arg]
+    if install_option == "separate":
+        command.append(str(target))
+    command.extend(["--remote", "origin", "--branch", "main"])
+    completed = subprocess.run(
+        command,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "AGENT_CANON_DOCKER": "true"},
+    )
+    assert completed.returncode == 0, completed.stderr
+    state = json.loads((target / ".runtime/source-sync.json").read_text(encoding="utf-8"))
+    assert state["status"] == "success"
+    assert state["code"] == "up_to_date"
+    assert state["source_root"] == str(target.resolve())
+    assert state["remote"] == "origin"
+    assert state["branch"] == "main"
+    assert len(state["source_head"]) == 40
+    assert len(state["source_tree"]) == 40
+    failed = subprocess.run(
+        [*command[:-1], "missing"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "AGENT_CANON_DOCKER": "true"},
+    )
+    assert failed.returncode == 2
+    failed_state = json.loads((target / ".runtime/source-sync.json").read_text(encoding="utf-8"))
+    assert failed_state["status"] == "failed"
+    assert failed_state["source_root"] == str(target.resolve())
+    assert failed_state["remote"] == "origin"
+    assert failed_state["branch"] == "missing"
+    assert len(failed_state["source_head"]) == 40
+    assert len(failed_state["source_tree"]) == 40
+
+
+def test_sync_invalid_install_root_fails_before_state_creation(tmp_path: Path) -> None:
+    """An invalid target is rejected before a target runtime or misleading record exists."""
+    control = tmp_path / "control"
+    control.mkdir()
+    (tmp_path / "script-root").mkdir()
+    target = tmp_path / "missing-target"
+    completed = subprocess.run(
+        [
+            str(BOOTSTRAP),
+            "--repository-root",
+            str(tmp_path / "script-root"),
+            "--control-parent-root",
+            str(control),
+            "sync",
+            "--install-root",
+            str(target),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "AGENT_CANON_DOCKER": "true"},
+    )
+    assert completed.returncode == 2
+    assert json.loads(completed.stderr)["code"] == "install_root_invalid"
+    assert not target.exists()
+
+
 def test_source_sync_state_writer_reconciles_terminal_records_atomically(
     tmp_path: Path,
 ) -> None:

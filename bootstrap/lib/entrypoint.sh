@@ -151,16 +151,105 @@ _agent_canon_ensure_source_sync_state() {
         "source-sync state permissions could not be restricted"
     return 0
   fi
-  local source_head=unknown source_tree=unknown
+  local source_head=${AGENT_CANON_SYNC_INITIAL_HEAD:-unknown}
+  local source_tree=${AGENT_CANON_SYNC_INITIAL_TREE:-unknown}
+  local source_remote=${AGENT_CANON_SYNC_INITIAL_REMOTE:-origin}
+  local source_remote_url=${AGENT_CANON_SYNC_INITIAL_REMOTE_URL:-unknown}
   source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD 2>/dev/null) || :
   source_tree=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD^{tree} 2>/dev/null) || :
   [[ "$source_head" =~ ^[0-9a-f]{40}$ ]] || source_head=unknown
   [[ "$source_tree" =~ ^[0-9a-f]{40}$ ]] || source_tree=unknown
   _agent_canon_source_sync_write success not_run "$AGENT_CANON_REPOSITORY_ROOT" \
-    "$source_head" "$source_tree" origin unknown main \
+    "$source_head" "$source_tree" "$source_remote" "$source_remote_url" \
+    "${AGENT_CANON_SYNC_INITIAL_BRANCH:-main}" \
     "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" ||
     _agent_canon_json_error source_sync_state_write_failed \
       "initial source-sync state could not be atomically published"
+}
+
+_agent_canon_sync_request_metadata() {
+  local install_request=${AGENT_CANON_REPOSITORY_ROOT:-} remote=origin branch=main
+  local sync_index=1 token install_root git_root remote_url source_head source_tree
+  while ((sync_index < ${#command_args[@]})); do
+    token=${command_args[sync_index]}
+    case "$token" in
+      sync) ;;
+      --install-root=*)
+        install_request=${token#--install-root=}
+        ;;
+      --install-root)
+        ((sync_index += 1))
+        if ((sync_index >= ${#command_args[@]})); then
+          _agent_canon_json_error argument_missing "--install-root requires a value"
+          return 2
+        fi
+        install_request=${command_args[sync_index]}
+        ;;
+      --remote=*) remote=${token#--remote=} ;;
+      --remote)
+        ((sync_index += 1))
+        if ((sync_index >= ${#command_args[@]})); then
+          _agent_canon_json_error argument_missing "--remote requires a value"
+          return 2
+        fi
+        remote=${command_args[sync_index]}
+        ;;
+      --branch=*) branch=${token#--branch=} ;;
+      --branch)
+        ((sync_index += 1))
+        if ((sync_index >= ${#command_args[@]})); then
+          _agent_canon_json_error argument_missing "--branch requires a value"
+          return 2
+        fi
+        branch=${command_args[sync_index]}
+        ;;
+      *)
+        _agent_canon_json_error argument_invalid "unsupported source-sync argument"
+        return 2
+        ;;
+    esac
+    ((sync_index += 1))
+  done
+  [[ "$remote" =~ ^[A-Za-z0-9_.-]+$ ]] || {
+    _agent_canon_json_error argument_invalid "source-sync remote is invalid"
+    return 2
+  }
+  [[ "$branch" =~ ^[A-Za-z0-9._/-]+$ ]] || {
+    _agent_canon_json_error argument_invalid "source-sync branch is invalid"
+    return 2
+  }
+  if ! install_root=$(realpath -e -- "$install_request" 2>/dev/null); then
+    _agent_canon_json_error install_root_invalid "source-sync install root is not a directory"
+    return 2
+  fi
+  [[ -d "$install_root" && ! -L "$install_root" ]] || {
+    _agent_canon_json_error install_root_invalid "source-sync install root must be a regular directory"
+    return 2
+  }
+  if ! git_root=$(git -C "$install_root" rev-parse --show-toplevel 2>/dev/null); then
+    _agent_canon_json_error install_root_not_git "source-sync install root is not a Git checkout"
+    return 2
+  fi
+  if ! git_root=$(realpath -e -- "$git_root" 2>/dev/null); then
+    _agent_canon_json_error install_root_not_git "source-sync Git root is unavailable"
+    return 2
+  fi
+  if ! remote_url=$(git -C "$git_root" remote get-url "$remote" 2>/dev/null); then
+    _agent_canon_json_error source_remote_unavailable "source-sync remote URL is unavailable"
+    return 2
+  fi
+  [[ -n "$remote_url" && "$remote_url" != *$'\n'* && "$remote_url" != *$'\r'* ]] || {
+    _agent_canon_json_error source_remote_unavailable "source-sync remote URL is invalid"
+    return 2
+  }
+  if ! source_head=$(git -C "$git_root" rev-parse --verify HEAD 2>/dev/null) ||
+     ! source_tree=$(git -C "$git_root" rev-parse --verify HEAD^{tree} 2>/dev/null) ||
+     [[ ! "$source_head" =~ ^[0-9a-f]{40}$ || ! "$source_tree" =~ ^[0-9a-f]{40}$ ]]; then
+    _agent_canon_json_error source_sync_git_failed "source-sync Git identity is incomplete"
+    return 2
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$git_root" "$remote" "$branch" "$remote_url" "$source_head" "$source_tree"
 }
 
 _agent_canon_source_sync_failure() {
@@ -199,6 +288,7 @@ _agent_canon_sync_operation() (
   while ((sync_index < ${#command_args[@]})); do
     case "${command_args[sync_index]}" in
       sync) ;;
+      --install-root=*) install_root=${command_args[sync_index]#--install-root=} ;;
       --install-root)
         ((sync_index += 1))
         if ((sync_index >= ${#command_args[@]})); then
@@ -207,6 +297,7 @@ _agent_canon_sync_operation() (
         fi
         install_root=${command_args[sync_index]}
         ;;
+      --remote=*) remote=${command_args[sync_index]#--remote=} ;;
       --remote)
         ((sync_index += 1))
         if ((sync_index >= ${#command_args[@]})); then
@@ -215,6 +306,7 @@ _agent_canon_sync_operation() (
         fi
         remote=${command_args[sync_index]}
         ;;
+      --branch=*) branch=${command_args[sync_index]#--branch=} ;;
       --branch)
         ((sync_index += 1))
         if ((sync_index >= ${#command_args[@]})); then
@@ -942,6 +1034,16 @@ _agent_canon_validate_existing_container() {
   "$AGENT_CANON_DOCKER_CMD" container inspect \
     --format '{{range .Mounts}}{{printf "%s\t%s\t%t\n" .Source .Destination .RW}}{{end}}' \
     "$container" | sed '/^$/d' | sort > "$observed_mounts"
+  if [[ "$require_source_sync" == 0 ]]; then
+    local filtered_mounts
+    filtered_mounts=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.observed-mounts-filtered.XXXXXX")
+    if ! awk -F $'\t' -v destination="$AGENT_CANON_SOURCE_SYNC_DESTINATION" \
+      '$2 != destination' "$observed_mounts" > "$filtered_mounts"; then
+      rm -f -- "$expected_mounts" "$observed_mounts" "$filtered_mounts"
+      _agent_canon_json_error mount_readback_failed "resident mount readback filtering failed"
+    fi
+    mv -- "$filtered_mounts" "$observed_mounts"
+  fi
   sort -o "$expected_mounts" "$expected_mounts"
   if ! diff -u "$expected_mounts" "$observed_mounts" >/dev/null; then
     rm -f -- "$expected_mounts" "$observed_mounts"
@@ -1764,17 +1866,34 @@ bootstrap_host_entrypoint() {
     fi
   fi
   [[ -n "$AGENT_CANON_CONTROL_ROOT" ]] || _agent_canon_json_error control_root_required "--control-parent-root is required"
+  [[ ${#command_args[@]} -gt 0 ]] || { _agent_canon_usage >&2; return 64; }
+  local operation=${command_args[0]} image_ref=
+  if [[ "$operation" == sync ]]; then
+    local sync_request sync_request_rc
+    if sync_request=$(_agent_canon_sync_request_metadata); then
+      :
+    else
+      sync_request_rc=$?
+      return "$sync_request_rc"
+    fi
+    local sync_root sync_remote sync_branch sync_remote_url sync_head sync_tree
+    IFS=$'\t' read -r sync_root sync_remote sync_branch sync_remote_url sync_head sync_tree <<<"$sync_request"
+    AGENT_CANON_REPOSITORY_ROOT=$sync_root
+    AGENT_CANON_SYNC_INITIAL_REMOTE=$sync_remote
+    AGENT_CANON_SYNC_INITIAL_BRANCH=$sync_branch
+    AGENT_CANON_SYNC_INITIAL_REMOTE_URL=$sync_remote_url
+    AGENT_CANON_SYNC_INITIAL_HEAD=$sync_head
+    AGENT_CANON_SYNC_INITIAL_TREE=$sync_tree
+  fi
   [[ -n "$AGENT_CANON_RUNTIME_ROOT" ]] || AGENT_CANON_RUNTIME_ROOT="$AGENT_CANON_REPOSITORY_ROOT/.runtime"
   _agent_canon_validate_roots
   AGENT_CANON_DOCKER_CMD=${AGENT_CANON_DOCKER:-docker}
   export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
-  [[ ${#command_args[@]} -gt 0 ]] || { _agent_canon_usage >&2; return 64; }
   if ! command -v "$AGENT_CANON_DOCKER_CMD" >/dev/null 2>&1 &&
      [[ ! -x "$AGENT_CANON_DOCKER_CMD" ]]; then
     _agent_canon_json_error runtime_unavailable "Docker executable is unavailable"
   fi
   _agent_canon_prepare_host_runtime
-  local operation=${command_args[0]} image_ref=
   local index
   for index in "${!command_args[@]}"; do
     if [[ "${command_args[index]}" == --image-ref && $((index + 1)) -lt ${#command_args[@]} ]]; then
