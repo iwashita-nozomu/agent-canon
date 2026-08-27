@@ -43,6 +43,16 @@ tools execute in the resident network-disabled container.
 USAGE
 }
 
+_agent_canon_operation_usage() {
+  local operation=$1
+  cat <<USAGE
+usage: bootstrap.sh $operation [OPTIONS]
+
+AgentCanon $operation operation. Use bootstrap.sh --help for the complete
+host adapter command list.
+USAGE
+}
+
 _agent_canon_sha256() {
   sha256sum "$1" | awk '{print $1}'
 }
@@ -741,6 +751,138 @@ _agent_canon_restore_candidate_failure() {
   return 0
 }
 
+_agent_canon_replace_resident_locked() {
+  local candidate_image_ref=$1 candidate_image_id=$2
+  local old_image_id old_image_ref old_container candidate restored rc
+  if ! candidate_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Id}}' "$candidate_image_ref"); then
+    _agent_canon_json_error candidate_image_missing "candidate resident image disappeared before replacement"
+  fi
+  old_container=$(_agent_canon_container_name)
+  old_image_ref=
+  old_image_id=
+  AGENT_CANON_IMAGE_REF=$candidate_image_ref
+  AGENT_CANON_EXPECTED_IMAGE_ID=$candidate_image_id
+  export AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID
+
+  # This readback happens after the replacement lock is acquired.  A build
+  # may have completed while another update owned the resident, so the
+  # resident state—not the caller's pre-lock snapshot—is authoritative.
+  if [[ -f "$AGENT_CANON_RUNTIME_ROOT/host-state/active-image.tsv" ]] ||
+     "$AGENT_CANON_DOCKER_CMD" container inspect "$old_container" >/dev/null 2>&1; then
+    _agent_canon_use_active_image "$old_container"
+    old_image_ref=$AGENT_CANON_IMAGE_REF
+    old_image_id=$AGENT_CANON_ACTIVE_IMAGE_ID
+    if [[ -n "$old_image_id" && "$old_image_id" == "$candidate_image_id" &&
+          "$old_image_ref" == "$candidate_image_ref" &&
+          -n "$candidate_image_id" ]] &&
+       "$AGENT_CANON_DOCKER_CMD" container inspect "$old_container" >/dev/null 2>&1; then
+      # The first updater already completed the transaction.  Revalidate the
+      # exact resident and health path, then converge without stop/rm/create.
+      AGENT_CANON_IMAGE_REF=$candidate_image_ref
+      AGENT_CANON_EXPECTED_IMAGE_ID=$candidate_image_id
+      export AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID
+      candidate=$(_agent_canon_ensure_container)
+      _agent_canon_record_active_container "$candidate"
+      printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"update","code":"up_to_date","changed":false}\n'
+      return 0
+    fi
+    AGENT_CANON_IMAGE_REF=$old_image_ref
+    AGENT_CANON_EXPECTED_IMAGE_ID=$old_image_id
+    export AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID
+    printf '%s\n' "$old_image_id" > "$AGENT_CANON_STATE_ROOT/previous-image-id"
+    AGENT_CANON_PREVIOUS_IMAGE_REF=$old_image_ref
+    export AGENT_CANON_PREVIOUS_IMAGE_REF
+    if "$AGENT_CANON_DOCKER_CMD" container inspect "$old_container" >/dev/null 2>&1; then
+      _agent_canon_validate_existing_container "$old_container"
+      _agent_canon_write_rollback_plan "$old_image_id" "$old_image_ref"
+    fi
+  else
+    unset AGENT_CANON_EXPECTED_IMAGE_ID AGENT_CANON_ACTIVE_IMAGE_ID
+  fi
+
+  AGENT_CANON_IMAGE_REF=$candidate_image_ref
+  AGENT_CANON_EXPECTED_IMAGE_ID=$candidate_image_id
+  AGENT_CANON_PREVIOUS_IMAGE_ID=$old_image_id
+  export AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID AGENT_CANON_PREVIOUS_IMAGE_ID
+  if [[ -n "$old_image_id" ]] &&
+     "$AGENT_CANON_DOCKER_CMD" container inspect "$old_container" >/dev/null 2>&1; then
+    "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$old_container" >/dev/null
+    "$AGENT_CANON_DOCKER_CMD" rm "$old_container" >/dev/null
+  fi
+  if ! candidate=$(_agent_canon_ensure_container); then
+    if "$AGENT_CANON_DOCKER_CMD" container inspect "$(_agent_canon_container_name)" >/dev/null 2>&1; then
+      if ! "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$(_agent_canon_container_name)" >/dev/null 2>&1; then
+        _agent_canon_json_error rollback_failed "candidate container stop failed after health failure"
+      fi
+      if ! "$AGENT_CANON_DOCKER_CMD" rm "$(_agent_canon_container_name)" >/dev/null 2>&1; then
+        _agent_canon_json_error rollback_failed "candidate container removal failed after health failure"
+      fi
+    fi
+    if [[ -n "${candidate_image_id:-}" && "$candidate_image_id" != "$old_image_id" ]]; then
+      if ! "$AGENT_CANON_DOCKER_CMD" image rm "$candidate_image_id" >/dev/null 2>&1; then
+        _agent_canon_json_error rollback_failed "candidate image removal failed after health failure"
+      fi
+    fi
+    if [[ -n "$old_image_id" ]]; then
+      AGENT_CANON_IMAGE_REF=$old_image_id
+      export AGENT_CANON_IMAGE_REF
+      if ! restored=$(_agent_canon_ensure_container); then
+        _agent_canon_json_error rollback_failed "previous resident could not be restarted"
+      fi
+      if ! _agent_canon_run_controller "$restored" start >/dev/null; then
+        _agent_canon_json_error rollback_failed "previous state could not be restored"
+      fi
+    fi
+    _agent_canon_json_error candidate_unhealthy "candidate resident container failed health readback"
+  fi
+  rc=0
+  _agent_canon_run_controller "$candidate" update || rc=$?
+  if ((rc == 0)) && [[ "${AGENT_CANON_SUPPRESS_GLOBAL_LINKS:-0}" != 1 ]]; then
+    _agent_canon_install_global_links || rc=$?
+  fi
+  if ((rc == 0)); then
+    _agent_canon_record_active_container "$candidate" || rc=$?
+  fi
+  if ((rc != 0)) && [[ -n "$old_image_id" ]]; then
+    if ! _agent_canon_restore_candidate_failure "$candidate" "$old_image_id" "$candidate_image_id"; then
+      _agent_canon_json_error rollback_failed "candidate failure recovery was incomplete"
+    fi
+  fi
+  unset AGENT_CANON_PREVIOUS_IMAGE_ID AGENT_CANON_PREVIOUS_IMAGE_REF
+  return "$rc"
+}
+
+_agent_canon_replace_resident() {
+  local candidate_image_ref=$1 candidate_image_id=$2
+  local lock_path="$AGENT_CANON_RUNTIME_ROOT/host-state/replacement.lock"
+  local lock_fd rc unlock_rc
+  [[ -n "$candidate_image_ref" && -n "$candidate_image_id" ]] ||
+    _agent_canon_json_error replacement_identity_missing "candidate resident identity is incomplete"
+  [[ ! -L "$lock_path" ]] ||
+    _agent_canon_json_error replacement_lock_invalid "resident replacement lock is a symlink"
+  command -v flock >/dev/null 2>&1 ||
+    _agent_canon_json_error replacement_lock_unavailable "flock is required for resident replacement"
+  if ! exec {lock_fd}>"$lock_path"; then
+    _agent_canon_json_error replacement_lock_unavailable "resident replacement lock could not be opened"
+  fi
+  if ! flock -x "$lock_fd"; then
+    exec {lock_fd}>&-
+    _agent_canon_json_error replacement_lock_unavailable "resident replacement lock could not be acquired"
+  fi
+  if _agent_canon_replace_resident_locked "$candidate_image_ref" "$candidate_image_id"; then
+    rc=0
+  else
+    rc=$?
+  fi
+  unlock_rc=0
+  flock -u "$lock_fd" || unlock_rc=$?
+  exec {lock_fd}>&-
+  if ((rc == 0 && unlock_rc != 0)); then
+    _agent_canon_json_error replacement_lock_release_failed "resident replacement lock could not be released"
+  fi
+  return "$rc"
+}
+
 _agent_canon_private_feedback_identity() {
   local container=$1 remote=$2 mode=${3:-source} response normalized branch
   local -a identity_args=(source-identity --mode "$mode" --remote "$remote")
@@ -1172,8 +1314,10 @@ _agent_canon_install_global_links() {
 bootstrap_host_entrypoint() {
   local repository_root=$1
   shift
-  AGENT_CANON_REPOSITORY_ROOT=$(CDPATH= cd -- "$repository_root" && pwd -P)
+  local repository_request=$repository_root
+  AGENT_CANON_REPOSITORY_ROOT=
   AGENT_CANON_CONTROL_ROOT=
+  AGENT_CANON_CONTROL_ROOT_REQUEST=
   AGENT_CANON_RUNTIME_ROOT=
   AGENT_CANON_RUNTIME_REQUEST=
   AGENT_CANON_MANIFEST=
@@ -1181,16 +1325,22 @@ bootstrap_host_entrypoint() {
   AGENT_CANON_ACTIVE_IMAGE_ID=
   AGENT_CANON_EXPECTED_IMAGE_ID=
   local -a command_args=()
+  local help_scope=
   while (($#)); do
+    if [[ "$1" == -- ]]; then
+      command_args+=("$@")
+      break
+    fi
     case "$1" in
-      --repository-root) [[ $# -ge 2 ]] || _agent_canon_json_error argument_missing "$1"; AGENT_CANON_REPOSITORY_ROOT=$(CDPATH= cd -- "$2" && pwd -P); shift 2 ;;
-      --control-parent-root) [[ $# -ge 2 ]] || _agent_canon_json_error argument_missing "$1"; AGENT_CANON_CONTROL_ROOT=$(CDPATH= cd -- "$2" && pwd -P); shift 2 ;;
-      --runtime-root) [[ $# -ge 2 ]] || _agent_canon_json_error argument_missing "$1"; AGENT_CANON_RUNTIME_REQUEST=$2; if ! AGENT_CANON_RUNTIME_ROOT=$(CDPATH= cd -- "$2" 2>/dev/null); then AGENT_CANON_RUNTIME_ROOT=; fi; [[ -n "$AGENT_CANON_RUNTIME_ROOT" ]] || AGENT_CANON_RUNTIME_ROOT=$2; shift 2 ;;
+      --repository-root) [[ $# -ge 2 ]] || _agent_canon_json_error argument_missing "$1"; repository_request=$2; shift 2 ;;
+      --control-parent-root) [[ $# -ge 2 ]] || _agent_canon_json_error argument_missing "$1"; AGENT_CANON_CONTROL_ROOT_REQUEST=$2; shift 2 ;;
+      --runtime-root) [[ $# -ge 2 ]] || _agent_canon_json_error argument_missing "$1"; AGENT_CANON_RUNTIME_REQUEST=$2; AGENT_CANON_RUNTIME_ROOT=$2; shift 2 ;;
       --manifest) [[ $# -ge 2 ]] || _agent_canon_json_error argument_missing "$1"; AGENT_CANON_MANIFEST=$2; shift 2 ;;
       --help|-h)
         if ((${#command_args[@]} == 0)); then
-          _agent_canon_usage
-          return 0
+          help_scope=top
+        elif [[ -z "$help_scope" ]]; then
+          help_scope=operation
         fi
         command_args+=("$1")
         shift
@@ -1198,6 +1348,30 @@ bootstrap_host_entrypoint() {
       *) command_args+=("$1"); shift ;;
     esac
   done
+  if [[ -n "$help_scope" ]]; then
+    if [[ "$help_scope" == top || ${#command_args[@]} -eq 0 ]]; then
+      _agent_canon_usage
+      return 0
+    fi
+    case "${command_args[0]}" in
+      install|update|start|status|stop|rollback|uninstall|sync|scheduler|target|tool|template|codex|eval|task|gc|exec)
+        _agent_canon_operation_usage "${command_args[0]}"
+        return 0
+        ;;
+      *)
+        _agent_canon_usage
+        return 0
+        ;;
+    esac
+  fi
+  if ! AGENT_CANON_REPOSITORY_ROOT=$(CDPATH= cd -- "$repository_request" && pwd -P); then
+    _agent_canon_json_error repository_root_invalid "repository root is not an existing directory"
+  fi
+  if [[ -n "${AGENT_CANON_CONTROL_ROOT_REQUEST:-}" ]]; then
+    if ! AGENT_CANON_CONTROL_ROOT=$(CDPATH= cd -- "$AGENT_CANON_CONTROL_ROOT_REQUEST" && pwd -P); then
+      _agent_canon_json_error control_root_invalid "control parent root is not an existing directory"
+    fi
+  fi
   [[ -n "$AGENT_CANON_CONTROL_ROOT" ]] || _agent_canon_json_error control_root_required "--control-parent-root is required"
   [[ -n "$AGENT_CANON_RUNTIME_ROOT" ]] || AGENT_CANON_RUNTIME_ROOT="$AGENT_CANON_REPOSITORY_ROOT/.runtime"
   _agent_canon_validate_roots
@@ -1333,80 +1507,13 @@ bootstrap_host_entrypoint() {
       AGENT_CANON_ALLOW_BUILD=1
       AGENT_CANON_FORCE_BUILD=1
       export AGENT_CANON_ALLOW_BUILD AGENT_CANON_FORCE_BUILD
-      local old_image_id old_image_ref old_container candidate candidate_image_id restored rc
-      old_container=$(_agent_canon_container_name)
-      old_image_ref=
-      old_image_id=
-      if [[ -f "$AGENT_CANON_RUNTIME_ROOT/host-state/active-image.tsv" ]] ||
-         "$AGENT_CANON_DOCKER_CMD" container inspect "$old_container" >/dev/null 2>&1; then
-        _agent_canon_use_active_image "$old_container"
-        old_image_ref=$AGENT_CANON_IMAGE_REF
-        old_image_id=$AGENT_CANON_ACTIVE_IMAGE_ID
-        printf '%s\n' "$old_image_id" > "$AGENT_CANON_STATE_ROOT/previous-image-id"
-        AGENT_CANON_PREVIOUS_IMAGE_REF=$old_image_ref
-        export AGENT_CANON_PREVIOUS_IMAGE_REF
-        AGENT_CANON_IMAGE_REF=$old_image_ref
-        export AGENT_CANON_IMAGE_REF
-        if "$AGENT_CANON_DOCKER_CMD" container inspect "$old_container" >/dev/null 2>&1; then
-          _agent_canon_validate_existing_container "$old_container"
-          _agent_canon_write_rollback_plan "$old_image_id" "$old_image_ref"
-        fi
-      else
-        unset AGENT_CANON_EXPECTED_IMAGE_ID AGENT_CANON_ACTIVE_IMAGE_ID
-      fi
       _agent_canon_image "$image_ref"
+      local candidate_image_ref candidate_image_id
+      candidate_image_ref=$AGENT_CANON_IMAGE_REF
       candidate_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect \
         --format '{{.Id}}' "$AGENT_CANON_IMAGE_REF")
-      AGENT_CANON_EXPECTED_IMAGE_ID=$candidate_image_id
-      export AGENT_CANON_EXPECTED_IMAGE_ID
-      AGENT_CANON_PREVIOUS_IMAGE_ID=$old_image_id
-      export AGENT_CANON_PREVIOUS_IMAGE_ID
-      if [[ -n "$old_image_id" ]] &&
-         "$AGENT_CANON_DOCKER_CMD" container inspect "$old_container" >/dev/null 2>&1; then
-        "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$old_container" >/dev/null
-        "$AGENT_CANON_DOCKER_CMD" rm "$old_container" >/dev/null
-      fi
-      if ! candidate=$(_agent_canon_ensure_container); then
-        if "$AGENT_CANON_DOCKER_CMD" container inspect "$(_agent_canon_container_name)" >/dev/null 2>&1; then
-          if ! "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$(_agent_canon_container_name)" >/dev/null 2>&1; then
-            _agent_canon_json_error rollback_failed "candidate container stop failed after health failure"
-          fi
-          if ! "$AGENT_CANON_DOCKER_CMD" rm "$(_agent_canon_container_name)" >/dev/null 2>&1; then
-            _agent_canon_json_error rollback_failed "candidate container removal failed after health failure"
-          fi
-        fi
-        if [[ -n "${candidate_image_id:-}" && "$candidate_image_id" != "$old_image_id" ]]; then
-          if ! "$AGENT_CANON_DOCKER_CMD" image rm "$candidate_image_id" >/dev/null 2>&1; then
-            _agent_canon_json_error rollback_failed "candidate image removal failed after health failure"
-          fi
-        fi
-        if [[ -n "$old_image_id" ]]; then
-          AGENT_CANON_IMAGE_REF=$old_image_id
-          export AGENT_CANON_IMAGE_REF
-          if ! restored=$(_agent_canon_ensure_container); then
-            _agent_canon_json_error rollback_failed "previous resident could not be restarted"
-          fi
-          if ! _agent_canon_run_controller "$restored" start >/dev/null; then
-            _agent_canon_json_error rollback_failed "previous state could not be restored"
-          fi
-        fi
-        _agent_canon_json_error candidate_unhealthy "candidate resident container failed health readback"
-      fi
-      rc=0
-      _agent_canon_run_controller "$candidate" update || rc=$?
-      if ((rc == 0)) && [[ "${AGENT_CANON_SUPPRESS_GLOBAL_LINKS:-0}" != 1 ]]; then
-        _agent_canon_install_global_links || rc=$?
-      fi
-      if ((rc == 0)); then
-        _agent_canon_record_active_container "$candidate" || rc=$?
-      fi
-      if ((rc != 0)) && [[ -n "$old_image_id" ]]; then
-        if ! _agent_canon_restore_candidate_failure "$candidate" "$old_image_id" "$candidate_image_id"; then
-          _agent_canon_json_error rollback_failed "candidate failure recovery was incomplete"
-        fi
-      fi
-      unset AGENT_CANON_PREVIOUS_IMAGE_ID AGENT_CANON_PREVIOUS_IMAGE_REF
-      return "$rc"
+      _agent_canon_replace_resident "$candidate_image_ref" "$candidate_image_id"
+      return $?
       ;;
     rollback)
       local rollback_image_id rollback_image_ref current_image_ref current_image_id rollback_container rollback_candidate rollback_rc=0

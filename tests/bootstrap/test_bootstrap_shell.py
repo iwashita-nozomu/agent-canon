@@ -47,6 +47,18 @@ def test_update_transaction_has_candidate_restore_path() -> None:
     assert "container inspect" in text
 
 
+def test_update_replacement_uses_one_host_owned_lock_without_bypass() -> None:
+    """The host teardown-to-publication window has one non-bypassable lock."""
+    text = ADAPTER.read_text(encoding="utf-8")
+    assert "replacement.lock" in text
+    assert "_agent_canon_replace_resident" in text
+    assert 'flock -x "$lock_fd"' in text
+    assert 'flock -u "$lock_fd"' in text
+    assert "AGENT_CANON_LOCK_HELD" not in text
+    assert "AGENT_CANON_LOCK_TOKEN" not in text
+    assert "AGENT_CANON_LOCK_PID" not in text
+
+
 def test_sync_stages_source_before_live_fast_forward() -> None:
     """Source sync builds the candidate checkout before touching live source."""
     text = ADAPTER.read_text(encoding="utf-8")
@@ -190,6 +202,88 @@ def test_help_does_not_require_python_or_docker(tmp_path: Path) -> None:
     )
     assert completed.returncode == 0
     assert "AgentCanon Python and Rust" in completed.stdout
+
+
+@pytest.mark.parametrize("operation", ["install", "update", "status", "sync"])
+def test_operation_help_has_no_path_or_docker_side_effects(
+    tmp_path: Path, operation: str
+) -> None:
+    """Operation help exits before validating or preparing any host state."""
+    control = tmp_path / "missing-control"
+    runtime = tmp_path / "missing-runtime"
+    docker = tmp_path / "docker-counter"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        f"printf '%s\\n' called >> {tmp_path / 'docker.calls'}\n"
+        "exit 99\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    completed = subprocess.run(
+        [
+            str(BOOTSTRAP),
+            "--repository-root",
+            str(tmp_path / "missing-repository"),
+            "--control-parent-root",
+            str(control),
+            "--runtime-root",
+            str(runtime),
+            operation,
+            "--help",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "AGENT_CANON_DOCKER": str(docker)},
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert f"bootstrap.sh {operation}" in completed.stdout
+    assert not control.exists()
+    assert not runtime.exists()
+    assert not (tmp_path / "docker.calls").exists()
+
+
+def test_resident_replacement_lock_serializes_only_the_replacement(
+    tmp_path: Path,
+) -> None:
+    """Concurrent replacement callbacks cannot overlap on one runtime."""
+    runtime = tmp_path / "runtime"
+    (runtime / "host-state").mkdir(parents=True)
+    events = tmp_path / "events"
+    script = f'''
+set -eu
+source {str(ADAPTER)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+_agent_canon_replace_resident_locked() {{
+  printf '%s start\\n' "$AGENT_CANON_TEST_LABEL" >> {str(events)!r}
+  sleep 0.15
+  printf '%s end\\n' "$AGENT_CANON_TEST_LABEL" >> {str(events)!r}
+}}
+_agent_canon_replace_resident candidate sha256:candidate
+'''
+    environment = {**os.environ, "PATH": os.environ.get("PATH", "/usr/bin:/bin")}
+    first = subprocess.Popen(
+        ["bash", "-c", script],
+        env={**environment, "AGENT_CANON_TEST_LABEL": "first"},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    second = subprocess.Popen(
+        ["bash", "-c", script],
+        env={**environment, "AGENT_CANON_TEST_LABEL": "second"},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    first_output, first_error = first.communicate(timeout=5)
+    second_output, second_error = second.communicate(timeout=5)
+    assert first.returncode == 0, first_error or first_output
+    assert second.returncode == 0, second_error or second_output
+    assert events.read_text(encoding="utf-8").splitlines() in (
+        ["first start", "first end", "second start", "second end"],
+        ["second start", "second end", "first start", "first end"],
+    )
 
 
 def test_missing_docker_is_typed_without_host_python(tmp_path: Path) -> None:
