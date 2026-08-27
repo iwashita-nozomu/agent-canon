@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import fnmatch
 import hashlib
 import json
 import re
@@ -236,6 +235,9 @@ MATHEMATICAL_INTENT_PACKET_FIELDS = frozenset(
         "schema",
         *MATHEMATICAL_INTENT_PACKET_TEXT_FIELDS,
         "equation_to_code_map",
+        "mathematical_definition_paths",
+        "mathematical_oracle_paths",
+        "mathematical_documentation_paths",
         "allowed_write_paths",
         "forbidden_surfaces",
         "separate_handoff_targets",
@@ -269,6 +271,9 @@ class MathematicalIntentPacket:
     stopping_scalar: str
     failure_semantics: str
     equation_to_code_map: tuple[Mapping[str, str], ...]
+    mathematical_definition_paths: tuple[str, ...]
+    mathematical_oracle_paths: tuple[str, ...]
+    mathematical_documentation_paths: tuple[str, ...]
     math_oracle: str
     counterexample: str
     allowed_write_paths: tuple[str, ...]
@@ -366,6 +371,21 @@ def normalize_mathematical_intent_packet(
         for field in MATHEMATICAL_INTENT_PACKET_TEXT_FIELDS
     }
     equation_map = _math_packet_map(raw_packet["equation_to_code_map"])
+    definition_paths = _math_packet_relative_paths(
+        raw_packet["mathematical_definition_paths"],
+        "mathematical_definition_paths",
+        allow_empty=True,
+    )
+    oracle_paths = _math_packet_relative_paths(
+        raw_packet["mathematical_oracle_paths"],
+        "mathematical_oracle_paths",
+        allow_empty=True,
+    )
+    documentation_paths = _math_packet_relative_paths(
+        raw_packet["mathematical_documentation_paths"],
+        "mathematical_documentation_paths",
+        allow_empty=True,
+    )
     allowed_paths = _math_packet_relative_paths(
         raw_packet["allowed_write_paths"], "allowed_write_paths", allow_empty=False
     )
@@ -378,19 +398,27 @@ def normalize_mathematical_intent_packet(
         allow_empty=True,
     )
     code_paths = tuple(row["code_path"] for row in equation_map)
-    for path in code_paths:
-        if not any(
-            path == allowed
-            or fnmatch.fnmatchcase(path, allowed)
-            or path.startswith(allowed.rstrip("/") + "/")
-            for allowed in allowed_paths
-        ):
-            raise RuntimeError(
-                "mathematical_intent_packet.equation_to_code_map:code_path_outside_allowed_write_paths"
-            )
+    expected_paths = set(
+        (*definition_paths, *oracle_paths, *documentation_paths, *code_paths)
+    )
+    if set(allowed_paths) != expected_paths:
+        extra = sorted(set(allowed_paths).difference(expected_paths))
+        missing_paths = sorted(expected_paths.difference(allowed_paths))
+        details = []
+        if extra:
+            details.append("extra=" + ",".join(extra))
+        if missing_paths:
+            details.append("missing=" + ",".join(missing_paths))
+        raise RuntimeError(
+            "mathematical_intent_packet.allowed_write_paths:union_mismatch:"
+            + ";".join(details)
+        )
     return MathematicalIntentPacket(
         schema=str(raw_packet["schema"]),
         equation_to_code_map=equation_map,
+        mathematical_definition_paths=definition_paths,
+        mathematical_oracle_paths=oracle_paths,
+        mathematical_documentation_paths=documentation_paths,
         allowed_write_paths=allowed_paths,
         forbidden_surfaces=forbidden_surfaces,
         separate_handoff_targets=separate_targets,
@@ -406,6 +434,9 @@ def mathematical_intent_packet_mapping(
         "schema": packet.schema,
         **{field: getattr(packet, field) for field in MATHEMATICAL_INTENT_PACKET_TEXT_FIELDS},
         "equation_to_code_map": [dict(row) for row in packet.equation_to_code_map],
+        "mathematical_definition_paths": list(packet.mathematical_definition_paths),
+        "mathematical_oracle_paths": list(packet.mathematical_oracle_paths),
+        "mathematical_documentation_paths": list(packet.mathematical_documentation_paths),
         "allowed_write_paths": list(packet.allowed_write_paths),
         "forbidden_surfaces": list(packet.forbidden_surfaces),
         "separate_handoff_targets": list(packet.separate_handoff_targets),
@@ -432,12 +463,32 @@ def mathematical_intent_route_for_task(
     return route
 
 
+def validate_mathematical_intent_route(
+    route: Mapping[str, object] | None,
+) -> Mapping[str, object] | None:
+    """Validate the selected task/workflow route that makes math mandatory."""
+    if route is None:
+        return None
+    if not isinstance(route, Mapping):
+        raise RuntimeError("mathematical_intent_route:mapping_required")
+    required = {"activation", "owner_skill", "reviewer", "required_packet", "precedes"}
+    missing = sorted(required.difference(route))
+    if missing:
+        raise RuntimeError(
+            "mathematical_intent_route:field_missing:" + ",".join(missing)
+        )
+    if route["required_packet"] != "mathematical_intent_packet":
+        raise RuntimeError("mathematical_intent_route:packet_type_mismatch")
+    return route
+
+
 def resolve_math_intent_packet_for_spec(
     spec: RunBundleSpec,
 ) -> MathematicalIntentPacket | None:
     """Validate the route/packet pair before manifest creation or spawn."""
     raw_packet = spec.math_intent_packet
-    if spec.math_intent_route is None:
+    route = validate_mathematical_intent_route(spec.math_intent_route)
+    if route is None:
         if raw_packet is not None:
             raise RuntimeError("math_packet_not_applicable")
         return None

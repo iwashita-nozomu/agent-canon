@@ -698,11 +698,14 @@ math-intent route の実装 handoff は、次を一つの packet として渡し
   `constraints`, `equations`, `definitions`
 - `assumptions`, `approximations`, `derivation`, `iteration_map`, `update_map`,
   `invariants`, `limits`, `stopping_scalar`, `failure_semantics`
-- `equation_to_code_map`, `math_oracle`, `counterexample`
+- `equation_to_code_map`, `mathematical_definition_paths`, `mathematical_oracle_paths`,
+  `mathematical_documentation_paths`, `math_oracle`, `counterexample`
 - `allowed_write_paths`, `forbidden_surfaces`, `separate_handoff_targets`
 
-`allowed_write_paths` は equation-to-code map と math oracle から直接導ける数学定義、
-algorithm implementation、numerical oracle、その owner docs / tests に限定します。
+`allowed_write_paths` は `mathematical_definition_paths`、`mathematical_oracle_paths`、
+`mathematical_documentation_paths`、および `equation_to_code_map` の code path の union
+と完全一致させ、そこから直接導ける数学定義、algorithm implementation、numerical
+oracle、その owner docs / tests に限定します。
 architecture / framework / JIT / compiler / backend / runtime / container / Docker / routing /
 environment / common infrastructure / proof-tool / IR infrastructure は既定の forbidden
 surface です。そこが必要に見える原因は separate handoff にし、数学 writer の write scope

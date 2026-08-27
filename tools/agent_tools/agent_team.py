@@ -62,6 +62,7 @@ if __package__:
         mathematical_intent_route_for_task,
         normalize_mathematical_intent_packet,
         resolve_math_intent_packet_for_spec,
+        validate_mathematical_intent_route,
     )
 else:
     from packets import (  # type: ignore[no-redef]
@@ -72,6 +73,7 @@ else:
         mathematical_intent_route_for_task,
         normalize_mathematical_intent_packet,
         resolve_math_intent_packet_for_spec,
+        validate_mathematical_intent_route,
     )
 
 import json as _json
@@ -584,6 +586,7 @@ __all__ = (
     "normalize_mathematical_intent_packet",
     "mathematical_intent_packet_mapping",
     "mathematical_intent_route_for_task",
+    "validate_mathematical_intent_route",
     "resolve_math_intent_packet_for_spec",
     "run_active_design_packet",
     "run_workflow_family",

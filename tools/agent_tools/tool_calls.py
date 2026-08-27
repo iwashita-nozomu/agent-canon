@@ -419,8 +419,8 @@ def materialize_subagent_spawn_tool_call(
     checkout_identity: Mapping[str, object],
     workspace_write_capable: bool | None = None,
     writer_target: WriterTarget | Mapping[str, object] | None = None,
+    math_intent_route: Mapping[str, object] | None = None,
     math_intent_packet: Mapping[str, object] | object | None = None,
-    math_intent_required: bool = False,
 ) -> dict[str, object]:
     """Return the parent-runtime ToolCall for one stage-owner spawn handoff."""
     if not role.strip() or not agent_type.strip() or not input.strip():
@@ -435,32 +435,36 @@ def materialize_subagent_spawn_tool_call(
         if workspace_write_capable is None
         else workspace_write_capable
     )
-    math_intent_required = math_intent_required or role == "mathematical_correctness_reviewer"
+    normalized_math_packet = None
+    if __package__:
+        from .packets import (
+            mathematical_intent_packet_mapping,
+            normalize_mathematical_intent_packet,
+            validate_mathematical_intent_route,
+        )
+    else:
+        from packets import (  # type: ignore[no-redef]
+            mathematical_intent_packet_mapping,
+            normalize_mathematical_intent_packet,
+            validate_mathematical_intent_route,
+        )
+    selected_math_route = validate_mathematical_intent_route(math_intent_route)
+    if selected_math_route is not None:
+        if math_intent_packet is None:
+            raise RuntimeError("math_packet_missing")
+        normalized_math_packet = mathematical_intent_packet_mapping(
+            normalize_mathematical_intent_packet(math_intent_packet)
+        )
+    elif math_intent_packet is not None:
+        raise RuntimeError("math_packet_not_applicable")
     targets = validate_spawn_handoff(
         role,
         workspace_write_capable=workspace_write_capable,
         writer_target=writer_target,
         checkout_identity=identity,
     )
-    normalized_math_packet = None
-    if math_intent_required:
-        if math_intent_packet is None:
-            raise RuntimeError("math_packet_missing")
-        if __package__:
-            from .packets import (
-                mathematical_intent_packet_mapping,
-                normalize_mathematical_intent_packet,
-            )
-        else:
-            from packets import (  # type: ignore[no-redef]
-                mathematical_intent_packet_mapping,
-                normalize_mathematical_intent_packet,
-            )
-        normalized_math_packet = mathematical_intent_packet_mapping(
-            normalize_mathematical_intent_packet(math_intent_packet)
-        )
-        if targets:
-            validate_mathematical_writer_target(targets[0], normalized_math_packet)
+    if selected_math_route is not None and targets:
+        validate_mathematical_writer_target(targets[0], normalized_math_packet)
     argument_properties: dict[str, Mapping[str, object]] = {
         "role": {"type": "string", "minLength": 1},
         "agent_type": {"type": "string", "minLength": 1},

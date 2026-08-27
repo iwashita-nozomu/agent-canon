@@ -76,6 +76,9 @@ downstream implementation ../../.codex/personal/skills/computational-optimizatio
 - `equation_to_code_map`: 各 equation / definition / update と、実装の file、symbol、call path
 - `math_oracle`: 最小の数学 oracle、期待値、検証可能な性質
 - `counterexample`: 反例、失敗ケース、または反例が無いことの根拠
+- `mathematical_definition_paths`: 数式・定義・更新則を実装する明示的な相対 path
+- `mathematical_oracle_paths`: math oracle / counterexample を実装する明示的な相対 path
+- `mathematical_documentation_paths`: 数理責務を説明する owner document の明示的な相対 path
 - `allowed_write_paths`: 上記 map から直接導ける定義、導出、algorithm implementation、
   numerical oracle、およびそれらを所有する docs / tests の相対 path
 - `forbidden_surfaces`: math route では既定で書き込まない architecture、framework、JIT、
@@ -85,7 +88,9 @@ downstream implementation ../../.codex/personal/skills/computational-optimizatio
   別 owner へ渡す対象と理由
 
 `allowed_write_paths` は見えているファイル一覧やエラー発生箇所から推測せず、
-`equation_to_code_map` と `math_oracle` / `counterexample` から生成します。共通 infrastructure、JIT / backend、
+`mathematical_definition_paths`、`mathematical_oracle_paths`、
+`mathematical_documentation_paths`、および `equation_to_code_map` の code path の集合と
+完全一致させます。共通 infrastructure、JIT / backend、
 runtime、routing、environment、Docker、証明ツールを変更しないと math oracle が閉じない場合は、
 数学 writer を停止し、該当 surface の separate handoff を返します。数学 packet が無い、
 または map / oracle が未接続な状態では write-capable dispatch を開始しません。

@@ -48,9 +48,20 @@ FORBIDDEN = [
     "proof infrastructure",
     "ir infrastructure",
 ]
+MATH_ROUTE = {
+    "activation": "mathematical_or_numerical_correction_evidence",
+    "owner_skill": "computational-optimization",
+    "reviewer": "mathematical_correctness_reviewer",
+    "required_packet": "mathematical_intent_packet",
+    "precedes": ["design", "benchmark_reviewer"],
+}
 
 
-def packet(*, allowed: list[str] | None = None) -> dict[str, object]:
+def packet(
+    *,
+    allowed: list[str] | None = None,
+    separate_handoff_targets: list[str] | None = None,
+) -> dict[str, object]:
     """Return one complete typed math packet fixture."""
     return {
         "schema": MATHEMATICAL_INTENT_PACKET_SCHEMA,
@@ -82,9 +93,13 @@ def packet(*, allowed: list[str] | None = None) -> dict[str, object]:
         ],
         "math_oracle": "exact quadratic root and residual bound",
         "counterexample": "zero derivative initial point",
-        "allowed_write_paths": allowed or ["src/solver.py"],
+        "mathematical_definition_paths": ["src/solver.py"],
+        "mathematical_oracle_paths": ["tests/math_oracle.py"],
+        "mathematical_documentation_paths": ["documents/math.md"],
+        "allowed_write_paths": allowed
+        or ["src/solver.py", "tests/math_oracle.py", "documents/math.md"],
         "forbidden_surfaces": FORBIDDEN,
-        "separate_handoff_targets": [],
+        "separate_handoff_targets": separate_handoff_targets or [],
     }
 
 
@@ -108,7 +123,11 @@ def test_packet_normalization_is_closed_and_serializable() -> None:
     """A complete packet round-trips without adding an identity registry."""
     normalized = normalize_mathematical_intent_packet(packet())
     assert mathematical_intent_packet_mapping(normalized)["schema"] == MATHEMATICAL_INTENT_PACKET_SCHEMA
-    assert normalized.allowed_write_paths == ("src/solver.py",)
+    assert normalized.allowed_write_paths == (
+        "src/solver.py",
+        "tests/math_oracle.py",
+        "documents/math.md",
+    )
 
 
 def test_packet_missing_field_stops() -> None:
@@ -129,8 +148,26 @@ def test_packet_rejects_unmapped_equation_code_path() -> None:
             "symbol_or_call_path": "newton_step",
         }
     ]
-    with pytest.raises(RuntimeError, match="code_path_outside_allowed_write_paths"):
+    with pytest.raises(RuntimeError, match="union_mismatch"):
         normalize_mathematical_intent_packet(value)
+
+
+def test_packet_rejects_extra_or_missing_allowed_write_path() -> None:
+    """The writer whitelist is exactly the explicit mathematical path union."""
+    extra = packet()
+    extra["allowed_write_paths"] = [
+        "src/solver.py",
+        "tests/math_oracle.py",
+        "documents/math.md",
+        "src/extra.py",
+    ]
+    with pytest.raises(RuntimeError, match="union_mismatch:extra=src/extra.py"):
+        normalize_mathematical_intent_packet(extra)
+
+    missing = packet()
+    missing["allowed_write_paths"] = ["src/solver.py", "documents/math.md"]
+    with pytest.raises(RuntimeError, match="union_mismatch:missing=tests/math_oracle.py"):
+        normalize_mathematical_intent_packet(missing)
 
 
 def test_spawn_requires_packet_and_rejects_non_math_writer_path() -> None:
@@ -145,7 +182,7 @@ def test_spawn_requires_packet_and_rejects_non_math_writer_path() -> None:
                 input="math task",
                 checkout_identity=identity(root),
                 writer_target=writer,
-                math_intent_required=True,
+                math_intent_route=MATH_ROUTE,
             )
 
         with pytest.raises(ValueError, match="forbidden_surface"):
@@ -155,8 +192,8 @@ def test_spawn_requires_packet_and_rejects_non_math_writer_path() -> None:
                 input="math task",
                 checkout_identity=identity(root),
                 writer_target=target(root, ("src/runtime_solver.py",)),
+                math_intent_route=MATH_ROUTE,
                 math_intent_packet=packet(),
-                math_intent_required=True,
             )
 
 
@@ -170,8 +207,8 @@ def test_spawn_carries_valid_packet_and_narrowed_target() -> None:
             input="math task",
             checkout_identity=identity(root),
             writer_target=target(root),
+            math_intent_route=MATH_ROUTE,
             math_intent_packet=packet(),
-            math_intent_required=True,
         )
         assert call["arguments"]["mathematical_intent_packet"]["schema"] == MATHEMATICAL_INTENT_PACKET_SCHEMA
         assert call["arguments"]["writer_target"]["allowed_paths"] == ["src/solver.py"]
@@ -195,7 +232,7 @@ def test_wave_blocks_before_callback_without_math_packet() -> None:
                 {slot.executable_identity: "math task"},
                 lambda _agent, _prompt: spawned.append("unexpected") or "agent",
                 {slot.executable_identity: target(root)},
-                math_intent_required=True,
+                math_intent_route=MATH_ROUTE,
             )
         assert spawned == []
 
@@ -250,11 +287,13 @@ def test_normal_math_bootstrap_materializes_packet_and_reviewer() -> None:
     """A complete T4 packet activates the math reviewer and manifest route."""
     result, report_dir = run_bootstrap(
         "--task",
-        "修正 solver residual の収束と更新式",
+        "修正 solver residual の収束と実行速度。JIT 境界は症状だが変更しない",
         "--task-id",
         "T4",
         "--math-intent-packet",
-        json.dumps(packet()),
+        json.dumps(
+            packet(separate_handoff_targets=["architecture/JIT owner"])
+        ),
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "MATH_INTENT_ROUTE_STATUS=active" in result.stdout
@@ -262,6 +301,9 @@ def test_normal_math_bootstrap_materializes_packet_and_reviewer() -> None:
     manifest = (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
     assert "mathematical_intent_packet:" in manifest
     assert "mathematical_correctness_reviewer" in manifest
+    assert "architecture/JIT owner" in manifest
+    assert "math_intent_write_scope: mapped_allowed_paths_only" in manifest
+    assert "math_intent_forbidden_surfaces:" in manifest
     shutil.rmtree(report_dir.parents[2])
 
 

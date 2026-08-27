@@ -337,6 +337,32 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertNotIn("computational-optimization", decision["matched_skills"])
 
+    def test_residual_log_cleanup_is_not_mathematical_intent(self) -> None:
+        """A residual log/CI cleanup has no numerical correction evidence."""
+        result = self.run_route(
+            "--prompt",
+            "CI の residual ログを整理して cleanup する。",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertNotIn("computational-optimization", decision["matched_skills"])
+
+    def test_solver_residual_convergence_remains_mathematical_intent(self) -> None:
+        """Solver residual plus convergence still selects numerical ownership."""
+        result = self.run_route(
+            "--prompt",
+            "solver の residual convergence を修正する。",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("computational-optimization", decision["matched_skills"])
+
     def test_research_tasks_put_math_route_before_generic_specialists(self) -> None:
         """T4/T5 expose a conditional math route before generic specialists."""
         config = load_team_config()
@@ -405,6 +431,9 @@ class RouteToolTest(unittest.TestCase):
             "equation_to_code_map",
             "math_oracle",
             "counterexample",
+            "mathematical_definition_paths",
+            "mathematical_oracle_paths",
+            "mathematical_documentation_paths",
             "allowed_write_paths",
             "forbidden_surfaces",
             "separate_handoff_targets",

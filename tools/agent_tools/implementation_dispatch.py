@@ -211,6 +211,8 @@ def _capacity_family_record(
     def stage_roles(stage_class: str) -> tuple[str, ...]:
         selected: list[str] = []
         for wave in waves:
+            if wave.get("activation") == "conditional_math_intent_packet":
+                continue
             if wave.get("stage_class") != stage_class:
                 continue
             for role_id in _as_string_tuple(
@@ -551,8 +553,8 @@ def dispatch_fixed_implementation(
     capacity_runtime: _CapacityRuntime | None = None,
     writer_target: WriterTarget | Mapping[str, object] | None = None,
     checkout_identity: Mapping[str, object] | None = None,
+    math_intent_route: Mapping[str, object] | None = None,
     math_intent_packet: Mapping[str, object] | object | None = None,
-    math_intent_required: bool = False,
 ) -> ImplementationDispatch:
     """Route, materialize, and launch exactly one fixed Spark implementation worker."""
     route_result = implementation_route.route_implementation(request)
@@ -570,7 +572,21 @@ def dispatch_fixed_implementation(
         or route_result.failure is not None
     ):
         raise RuntimeError("implementation_dispatch:fixed_route_violation")
-    if math_intent_required and math_intent_packet is None:
+    if __package__:
+        from .packets import (
+            mathematical_intent_packet_mapping,
+            normalize_mathematical_intent_packet,
+            validate_mathematical_intent_route,
+        )
+    else:
+        from packets import (  # type: ignore[no-redef]
+            mathematical_intent_packet_mapping,
+            normalize_mathematical_intent_packet,
+            validate_mathematical_intent_route,
+        )
+    selected_math_route = validate_mathematical_intent_route(math_intent_route)
+    normalized_math_packet: Mapping[str, object] | None = None
+    if selected_math_route is not None and math_intent_packet is None:
         return ImplementationDispatch(
             route_result,
             None,
@@ -580,6 +596,21 @@ def dispatch_fixed_implementation(
             1,
             0,
             "blocked",
+        )
+    if selected_math_route is None and math_intent_packet is not None:
+        return ImplementationDispatch(
+            route_result,
+            None,
+            None,
+            None,
+            "math_packet_not_applicable",
+            1,
+            0,
+            "blocked",
+        )
+    if selected_math_route is not None:
+        normalized_math_packet = mathematical_intent_packet_mapping(
+            normalize_mathematical_intent_packet(math_intent_packet)
         )
     if writer_target is None:
         return ImplementationDispatch(
@@ -601,9 +632,9 @@ def dispatch_fixed_implementation(
         )
     except WriterTargetError as exc:
         raise RuntimeError(str(exc)) from exc
-    if math_intent_required:
+    if selected_math_route is not None:
         try:
-            validate_mathematical_writer_target(parsed_writer_target, math_intent_packet)
+            validate_mathematical_writer_target(parsed_writer_target, normalized_math_packet)
         except WriterTargetError as exc:
             return ImplementationDispatch(
                 route_result,
@@ -615,21 +646,6 @@ def dispatch_fixed_implementation(
                 0,
                 "blocked",
             )
-    normalized_math_packet: Mapping[str, object] | None = None
-    if math_intent_required:
-        if __package__:
-            from .packets import (
-                mathematical_intent_packet_mapping,
-                normalize_mathematical_intent_packet,
-            )
-        else:
-            from packets import (  # type: ignore[no-redef]
-                mathematical_intent_packet_mapping,
-                normalize_mathematical_intent_packet,
-            )
-        normalized_math_packet = mathematical_intent_packet_mapping(
-            normalize_mathematical_intent_packet(math_intent_packet)
-        )
     if isinstance(request, implementation_route.ImplementationRouteRequest):
         packet_payload: object = request.fixed_implementation_packet
     else:
@@ -1378,16 +1394,33 @@ def dispatch_subagent_wave(
     prompts: Mapping[str, str],
     spawn: Callable[[str, str], str | None],
     writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None],
+    math_intent_route: Mapping[str, object] | None = None,
     math_intent_packet: Mapping[str, object] | object | None = None,
-    math_intent_required: bool = False,
 ) -> tuple[str, ...]:
     """Validate one complete wave before invoking any spawn callback."""
-    math_intent_required = math_intent_required or any(
-        slot.role_id == "mathematical_correctness_reviewer" for slot in slots
-    )
-    if math_intent_required:
+    if __package__:
+        from .packets import (
+            mathematical_intent_packet_mapping,
+            normalize_mathematical_intent_packet,
+            validate_mathematical_intent_route,
+        )
+    else:
+        from packets import (  # type: ignore[no-redef]
+            mathematical_intent_packet_mapping,
+            normalize_mathematical_intent_packet,
+            validate_mathematical_intent_route,
+        )
+    selected_math_route = validate_mathematical_intent_route(math_intent_route)
+    normalized_math_packet = None
+    if selected_math_route is not None:
         if math_intent_packet is None:
             raise RuntimeError("math_packet_missing")
+        normalized_math_packet = mathematical_intent_packet_mapping(
+            normalize_mathematical_intent_packet(math_intent_packet)
+        )
+    elif math_intent_packet is not None:
+        raise RuntimeError("math_packet_not_applicable")
+    if selected_math_route is not None:
         for slot in slots:
             if not slot.write_capable:
                 continue
@@ -1396,9 +1429,9 @@ def dispatch_subagent_wave(
                 writer_targets.get(slot.role_id, slot.writer_target),
             )
             if target is None:
-                raise RuntimeError("math_packet_missing:writer_target")
+                raise RuntimeError("writer_target:required_before_spawn")
             try:
-                validate_mathematical_writer_target(target, math_intent_packet)
+                validate_mathematical_writer_target(target, normalized_math_packet)
             except WriterTargetError as exc:
                 raise RuntimeError(str(exc)) from exc
     validate_writer_handoff_waves((slots,), writer_targets)

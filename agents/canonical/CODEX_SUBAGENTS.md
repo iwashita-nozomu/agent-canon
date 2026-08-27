@@ -770,7 +770,8 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
   `domains` / `units`, `objective` / `residual`, `constraints`, `equations` / `definitions`,
   `assumptions` / `approximations`, `derivation`, `iteration_map` / `update_map`, `invariants` /
   `limits` / `stopping_scalar` / `failure_semantics`, `equation_to_code_map`, `math_oracle` /
-  `counterexample`, mapped `allowed_paths`, default
+  `counterexample`, `mathematical_definition_paths`, `mathematical_oracle_paths`,
+  `mathematical_documentation_paths`, mapped `allowed_paths`, default
   `forbidden_surfaces`、`separate_handoff_targets` を含みます。必須欄、map、oracle が欠けた
   handoff は `math_packet_missing` として停止し、worker は推測で scope を補いません
 - 通常 bootstrap は `--math-intent-packet '<JSON>'` を受け取り、run manifest と canonical
