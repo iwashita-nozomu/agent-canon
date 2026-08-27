@@ -268,21 +268,126 @@ _agent_canon_sync_request_metadata() {
 
 _agent_canon_source_sync_failure() {
   local code=$1 detail=$2 write_rc=0
-  _agent_canon_source_sync_write failed "$code" \
-    "${AGENT_CANON_SYNC_SOURCE_ROOT:-$AGENT_CANON_REPOSITORY_ROOT}" \
-    "${AGENT_CANON_SYNC_SOURCE_HEAD:-unknown}" \
-    "${AGENT_CANON_SYNC_SOURCE_TREE:-unknown}" \
-    "${AGENT_CANON_SYNC_REMOTE:-origin}" \
-    "${AGENT_CANON_SYNC_REMOTE_URL:-unknown}" \
-    "${AGENT_CANON_SYNC_BRANCH:-main}" \
-    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$code" || write_rc=$?
-  if ((write_rc != 0)); then
-    _agent_canon_json_error source_sync_state_write_failed \
-      "source-sync failure state could not be atomically published"
-    return 2
+  if [[ "${AGENT_CANON_SYNC_SKIP_STATE:-0}" != 1 ]]; then
+    _agent_canon_source_sync_write failed "$code" \
+      "${AGENT_CANON_SYNC_SOURCE_ROOT:-$AGENT_CANON_REPOSITORY_ROOT}" \
+      "${AGENT_CANON_SYNC_SOURCE_HEAD:-unknown}" \
+      "${AGENT_CANON_SYNC_SOURCE_TREE:-unknown}" \
+      "${AGENT_CANON_SYNC_REMOTE:-origin}" \
+      "${AGENT_CANON_SYNC_REMOTE_URL:-unknown}" \
+      "${AGENT_CANON_SYNC_BRANCH:-main}" \
+      "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$code" || write_rc=$?
+    if ((write_rc != 0)); then
+      _agent_canon_json_error source_sync_state_write_failed \
+        "source-sync failure state could not be atomically published"
+      return 2
+    fi
   fi
   _agent_canon_json_error "$code" "$detail"
 }
+
+_agent_canon_source_sync_is_managed_install() {
+  local home_root
+  home_root=$(realpath -e -- "$HOME" 2>/dev/null) || return 1
+  [[ "$AGENT_CANON_CONTROL_ROOT" == "$home_root" &&
+     "$AGENT_CANON_REPOSITORY_ROOT" == "$home_root/agent-canon" ]]
+}
+
+_agent_canon_source_sync_align() (
+  # Install is entered by the dotfiles route after it has fetched into
+  # FETCH_HEAD and detached the live checkout.  SourceSync owns the one
+  # normalization point: publish the fetched branch ref, then make the
+  # managed checkout a local main checkout before any Docker operation.
+  set +e
+  AGENT_CANON_SYNC_SKIP_STATE=1
+  local install_root=${1:-$AGENT_CANON_REPOSITORY_ROOT}
+  local remote=${2:-origin} branch=${3:-main}
+  local remote_url source_head source_tree source_before target_ref target_head
+  local current_branch sync_code
+  AGENT_CANON_SYNC_SOURCE_ROOT=$install_root
+  AGENT_CANON_SYNC_REMOTE=$remote
+  AGENT_CANON_SYNC_BRANCH=$branch
+  AGENT_CANON_SYNC_REMOTE_URL=unknown
+  AGENT_CANON_SYNC_SOURCE_HEAD=unknown
+  AGENT_CANON_SYNC_SOURCE_TREE=unknown
+
+  [[ "$remote" =~ ^[A-Za-z0-9_.-]+$ && "$branch" =~ ^[A-Za-z0-9._/-]+$ ]] || {
+    _agent_canon_source_sync_failure argument_invalid "source-sync remote or branch is invalid"
+    exit 2
+  }
+  if ! source_before=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null) ||
+     ! source_tree=$(git -C "$install_root" rev-parse --verify HEAD^{tree} 2>/dev/null); then
+    _agent_canon_source_sync_failure source_sync_git_failed "source checkout identity is unavailable"
+    exit 2
+  fi
+  AGENT_CANON_SYNC_SOURCE_HEAD=$source_before
+  AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
+  if ! remote_url=$(git -C "$install_root" remote get-url "$remote" 2>/dev/null); then
+    _agent_canon_source_sync_failure source_remote_unavailable "source-sync remote URL is unavailable"
+    exit 2
+  fi
+  AGENT_CANON_SYNC_REMOTE_URL=$remote_url
+  target_ref="refs/remotes/$remote/$branch"
+  # The explicit refspec is intentional. A FETCH_HEAD-only fetch leaves the
+  # local remote-tracking ref stale and makes the following branch transition
+  # depend on whichever checkout state the caller happened to leave behind.
+  if ! git -C "$install_root" fetch "$remote" "+refs/heads/$branch:$target_ref"; then
+    _agent_canon_source_sync_failure source_remote_unavailable "source-sync fetch failed"
+    exit 2
+  fi
+  if ! target_head=$(git -C "$install_root" rev-parse --verify "$target_ref" 2>/dev/null) ||
+     [[ ! "$target_head" =~ ^[0-9a-f]{40}$ ]]; then
+    _agent_canon_source_sync_failure source_remote_unavailable "fetched source branch is unavailable"
+    exit 2
+  fi
+
+  if _agent_canon_source_sync_is_managed_install; then
+    # The managed source root is disposable source state.  Discard tracked
+    # edits and converge its branch/worktree to the fetched remote commit;
+    # ignored .runtime and .codex/personal files remain untouched by switch.
+    if ! git -C "$install_root" switch --discard-changes -C "$branch" "$target_ref" >/dev/null; then
+      _agent_canon_source_sync_failure source_sync_checkout_failed "managed source checkout could not be aligned to main"
+      exit 2
+    fi
+    if ! git -C "$install_root" merge --ff-only "$target_ref" >/dev/null; then
+      _agent_canon_source_sync_failure source_sync_checkout_failed "managed source main could not be fast-forwarded"
+      exit 2
+    fi
+  else
+    # Development/topic/workspace checkouts retain their caller-owned branch
+    # and tracked changes.  They may only advance an already clean main via
+    # the normal fast-forward path.
+    if ! current_branch=$(git -C "$install_root" symbolic-ref --quiet --short HEAD 2>/dev/null); then
+      _agent_canon_source_sync_failure source_sync_checkout_detached "non-managed source checkout is detached"
+      exit 2
+    fi
+    [[ "$current_branch" == "$branch" ]] || {
+      _agent_canon_source_sync_failure source_sync_branch_mismatch "non-managed source checkout is not on $branch"
+      exit 2
+    }
+    if [[ -n "$(git -C "$install_root" status --porcelain --untracked-files=no)" ]]; then
+      _agent_canon_source_sync_failure source_sync_dirty "non-managed source checkout has tracked changes"
+      exit 2
+    fi
+    if ! git -C "$install_root" merge --ff-only "$target_ref" >/dev/null; then
+      _agent_canon_source_sync_failure source_sync_diverged "non-managed source main cannot be fast-forwarded"
+      exit 2
+    fi
+  fi
+
+  if ! source_head=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null) ||
+     ! source_tree=$(git -C "$install_root" rev-parse --verify HEAD^{tree} 2>/dev/null); then
+    AGENT_CANON_SYNC_SOURCE_HEAD=${source_head:-unknown}
+    _agent_canon_source_sync_failure source_sync_git_failed "aligned source checkout identity is unavailable"
+    exit 2
+  fi
+  AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
+  AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
+  sync_code=up_to_date
+  [[ "$source_before" == "$source_head" ]] || sync_code=updated
+  printf '%s\t%s\t%s\t%s\n' "$sync_code" "$source_head" "$source_tree" "$remote_url"
+  exit 0
+)
 
 _agent_canon_sync_operation() (
   # The source-sync transaction is host-only, so keep its result-state
@@ -369,7 +474,7 @@ _agent_canon_sync_operation() (
     exit 2
   fi
   AGENT_CANON_SYNC_REMOTE_URL=$remote_url
-  if ! git -C "$install_root" fetch "$remote" "$branch"; then
+  if ! git -C "$install_root" fetch "$remote" "+refs/heads/$branch:refs/remotes/$remote/$branch"; then
     _agent_canon_source_sync_failure source_remote_unavailable "source-sync fetch failed"
     exit 2
   fi
@@ -2065,6 +2170,17 @@ bootstrap_host_entrypoint() {
   fi
   [[ -n "$AGENT_CANON_RUNTIME_ROOT" ]] || AGENT_CANON_RUNTIME_ROOT="$AGENT_CANON_REPOSITORY_ROOT/.runtime"
   _agent_canon_validate_roots
+  local source_sync_alignment=
+  if [[ "$operation" == install ]] && _agent_canon_source_sync_is_managed_install; then
+    local source_sync_rc
+    if source_sync_alignment=$(_agent_canon_source_sync_align \
+      "$AGENT_CANON_REPOSITORY_ROOT" origin main); then
+      :
+    else
+      source_sync_rc=$?
+      return "$source_sync_rc"
+    fi
+  fi
   AGENT_CANON_DOCKER_CMD=${AGENT_CANON_DOCKER:-docker}
   export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
   if ! command -v "$AGENT_CANON_DOCKER_CMD" >/dev/null 2>&1 &&
@@ -2081,6 +2197,17 @@ bootstrap_host_entrypoint() {
     fi
   fi
   _agent_canon_prepare_host_runtime
+  if [[ -n "$source_sync_alignment" ]]; then
+    local source_sync_code source_sync_head source_sync_tree source_sync_remote_url
+    IFS=$'\t' read -r source_sync_code source_sync_head source_sync_tree source_sync_remote_url \
+      <<<"$source_sync_alignment"
+    if ! _agent_canon_source_sync_write success "$source_sync_code" \
+      "$AGENT_CANON_REPOSITORY_ROOT" "$source_sync_head" "$source_sync_tree" origin \
+      "$source_sync_remote_url" main "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"; then
+      _agent_canon_json_error source_sync_state_write_failed \
+        "aligned source-sync state could not be atomically published"
+    fi
+  fi
   if [[ "$operation" == install || "$operation" == update ]]; then
     # mounts.tsv is the host-owned projection consumed before the resident
     # controller runs.  Drop only syntactically valid target rows whose

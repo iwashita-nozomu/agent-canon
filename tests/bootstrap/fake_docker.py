@@ -109,6 +109,10 @@ def main(argv: list[str]) -> int:
     if call_log:
         with Path(call_log).open("a", encoding="utf-8") as handle:
             handle.write("\t".join(argv) + "\n")
+    event_log = os.environ.get("FAKE_DOCKER_EVENTS")
+    if event_log:
+        with Path(event_log).open("a", encoding="utf-8") as handle:
+            handle.write("docker\n")
     state = load()
     if argv[:2] == ["image", "inspect"]:
         identifier = argv[-1]
