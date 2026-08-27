@@ -14,6 +14,8 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 RUNNER = ROOT / "tools" / "ci" / "run_standalone_static_gate_unit.sh"
 
@@ -57,10 +59,12 @@ def test_full_unit_reuses_existing_body_and_forwards_options() -> None:
     assert 'cd "${AGENT_CANON_STATIC_RUNTIME_ROOT}/.."' not in body
 
 
-def test_full_unit_runs_fake_container_body_without_target_mutation(
+@pytest.mark.parametrize("body_status", (0, 17))
+def test_full_unit_preserves_body_status_without_target_mutation(
     tmp_path: Path,
+    body_status: int,
 ) -> None:
-    """The container adapter forwards its bootstrap capabilities verbatim."""
+    """The adapter forwards capabilities and preserves the body result."""
     target = tmp_path / "target"
     target.mkdir()
     subprocess.run(["git", "init", "-q", str(target)], check=True)
@@ -110,7 +114,8 @@ def test_full_unit_runs_fake_container_body_without_target_mutation(
         "printf 'cargo=%s\\n' \"${CARGO_HOME}\" >> \"${FAKE_CAPTURE}\"\n"
         "printf 'rustup=%s\\n' \"${RUSTUP_HOME}\" >> \"${FAKE_CAPTURE}\"\n"
         "printf 'args=%s\\n' \"$*\" >> \"${FAKE_CAPTURE}\"\n"
-        "printf 'RUN_ALL_CHECKS_BODY=completed\\n'\n",
+        "printf 'RUN_ALL_CHECKS_BODY=completed\\n'\n"
+        "exit \"${FAKE_BODY_STATUS}\"\n",
         encoding="utf-8",
     )
     fake_checks.chmod(0o755)
@@ -155,9 +160,10 @@ def test_full_unit_runs_fake_container_body_without_target_mutation(
             "AGENT_CANON_CHILD_HANDOFF": "authenticated-handoff",
             "AGENT_CANON_HANDOFF_AUDIENCE": "standalone-static-gate-unit",
             "FAKE_CAPTURE": str(capture),
+            "FAKE_BODY_STATUS": str(body_status),
         },
     )
-    assert result.returncode == 0, result.stderr
+    assert result.returncode == body_status, result.stderr
     assert "RUN_ALL_CHECKS_BODY=completed" in result.stdout
     observed = dict(
         line.split("=", 1)

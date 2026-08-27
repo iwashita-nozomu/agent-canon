@@ -86,7 +86,9 @@ COMMON=(
   full --quick
 ```
 
-`full` の後ろは `run_all_checks.sh` の optionです。unit runnerは `/proc/self/mountinfo` の最深一致 mountが `ro` であることを確認してから既存 bodyを呼びます。`.gitignore`、`git restore`、`git reset`、`git clean`、`git stash` による隠蔽・復元は行いません。
+`full` の後ろは `run_all_checks.sh` の optionです。unit runnerは `/proc/self/mountinfo` の最深一致 mountが `ro` であることを確認してから、既存の `run_all_checks.sh` bodyをそのまま呼びます。bodyの exit code と finding は変更せず、失敗を成功に変換しません。graph checkを抑制したり、失敗を別の合否判定へ置き換えたりもしません。`CARGO_HOME`、`RUSTUP_HOME`、Cargo targetは外部runtime配下に置き、CLIはimage-owned `/usr/local/bin/agent-canon`を使います。`.gitignore`、`git restore`、`git reset`、`git clean`、`git stash` による隠蔽・復元は行いません。
+
+この経路で保証するのは実行境界だけです。read-only targetのtracked treeとindexが実行前後で変わらないこと、引数とbodyの終了状態がcallerへ戻ることを確認します。既存bodyが返した失敗は、その失敗原因の調査対象として残ります。
 
 ## Boundary
 
