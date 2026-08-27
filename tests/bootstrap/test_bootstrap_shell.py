@@ -195,6 +195,121 @@ def test_forced_retention_failure_stops_before_build(tmp_path: Path) -> None:
     assert not (tmp_path / "runtime" / "container-state" / ".pending-rollback-plan.tsv").exists()
 
 
+@pytest.mark.parametrize(
+    ("failure_hook", "failure_rc"),
+    [
+        ("classify", 17),
+        ("prune", 18),
+        ("validate", 19),
+        ("require", 20),
+    ],
+)
+def test_replacement_failure_hooks_abort_before_teardown_or_state_callbacks(
+    tmp_path: Path, failure_hook: str, failure_rc: int
+) -> None:
+    """Each post-lock ownership/mount gate stops the transaction immediately."""
+    runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
+    (runtime / "host-state").mkdir(parents=True)
+    state_root.mkdir()
+    control = tmp_path / "control"
+    control.mkdir()
+    calls = tmp_path / "docker.calls"
+    callbacks = tmp_path / "callbacks"
+    docker = tmp_path / "docker"
+    candidate_id = "sha256:" + "1" * 64
+    old_id = "sha256:" + "0" * 64
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        f"printf '%s\\n' \"$*\" >> {str(calls)!r}\n"
+        "if [[ \"$1:$2\" == image:inspect ]]; then\n"
+        f"  printf '%s\\n' {candidate_id!r}\n"
+        "  exit 0\n"
+        "fi\n"
+        "if [[ \"$1:$2\" == container:inspect ]]; then exit 0; fi\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    active = runtime / "host-state" / "active-image.tsv"
+    active.write_text(
+        f"schema\tagent-canon.active-image.v1\n"
+        f"image-ref\tactive\nimage-id\t{old_id}\n",
+        encoding="utf-8",
+    )
+    hooks = {
+        "classify": (
+            "_agent_canon_classify_existing_container() { "
+            f"printf '%s\\n' classify >> {str(callbacks)!r}; return {failure_rc}; }}"
+        ),
+        "prune": (
+            "_agent_canon_classify_existing_container() { "
+            "AGENT_CANON_OBSERVED_CONTAINER_ID=old; "
+            "AGENT_CANON_OBSERVED_CONTAINER_RUNTIME=shared-v1; "
+            "AGENT_CANON_OBSERVED_CONTAINER_CONTROL=$(_agent_canon_control_digest); }\n"
+            "_agent_canon_prune_stale_target_manifest() { "
+            f"printf '%s\\n' prune >> {str(callbacks)!r}; return {failure_rc}; }}"
+        ),
+        "validate": (
+            "_agent_canon_classify_existing_container() { "
+            "AGENT_CANON_OBSERVED_CONTAINER_ID=old; "
+            "AGENT_CANON_OBSERVED_CONTAINER_RUNTIME=shared-v1; "
+            "AGENT_CANON_OBSERVED_CONTAINER_CONTROL=$(_agent_canon_control_digest); }\n"
+            "_agent_canon_prune_stale_target_manifest() { :; }\n"
+            "_agent_canon_validate_target_manifest() { "
+            f"printf '%s\\n' validate >> {str(callbacks)!r}; return {failure_rc}; }}"
+        ),
+        "require": (
+            "_agent_canon_classify_existing_container() { "
+            "AGENT_CANON_OBSERVED_CONTAINER_ID=old; "
+            "AGENT_CANON_OBSERVED_CONTAINER_RUNTIME=shared-v1; "
+            "AGENT_CANON_OBSERVED_CONTAINER_CONTROL=$(_agent_canon_control_digest); }\n"
+            "_agent_canon_prune_stale_target_manifest() { :; }\n"
+            "_agent_canon_validate_target_manifest() { :; }\n"
+            "_agent_canon_write_rollback_plan() { :; }\n"
+            "_agent_canon_use_active_image() { "
+            f"AGENT_CANON_IMAGE_REF=active; AGENT_CANON_ACTIVE_IMAGE_ID={old_id}; "
+            f"AGENT_CANON_EXPECTED_IMAGE_ID={old_id}; export AGENT_CANON_IMAGE_REF "
+            "AGENT_CANON_ACTIVE_IMAGE_ID AGENT_CANON_EXPECTED_IMAGE_ID; }\n"
+            "_agent_canon_require_existing_container_identity() { "
+            f"printf '%s\\n' require >> {str(callbacks)!r}; return {failure_rc}; }}"
+        ),
+    }
+    script = f'''
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(state_root)!r}
+AGENT_CANON_DOCKER_CMD={str(docker)!r}
+AGENT_CANON_IMAGE_REF=candidate
+AGENT_CANON_EXPECTED_IMAGE_ID={candidate_id}
+export AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT AGENT_CANON_STATE_ROOT
+export AGENT_CANON_DOCKER_CMD AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID
+{hooks[failure_hook]}
+_agent_canon_ensure_container() {{ printf '%s\\n' ensure >> {str(callbacks)!r}; return 0; }}
+_agent_canon_run_controller() {{ printf '%s\\n' controller >> {str(callbacks)!r}; return 0; }}
+_agent_canon_record_active_container() {{ printf '%s\\n' record >> {str(callbacks)!r}; return 0; }}
+_agent_canon_install_global_links() {{ printf '%s\\n' links >> {str(callbacks)!r}; return 0; }}
+_agent_canon_replace_resident candidate {candidate_id}
+rc=$?
+printf 'rc=%s\\n' "$rc"
+exit "$rc"
+'''
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == failure_rc
+    assert not any(
+        operation.split(" ", 1)[0] in {"build", "stop", "rm", "create", "start"}
+        for operation in calls.read_text(encoding="utf-8").splitlines()
+    )
+    assert not (state_root / "previous-image-id").exists()
+    assert active.read_text(encoding="utf-8").endswith(f"image-id\t{old_id}\n")
+    assert callbacks.read_text(encoding="utf-8").splitlines() == [failure_hook]
+
+
 def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
     tmp_path: Path,
 ) -> None:
