@@ -1721,10 +1721,9 @@ pub(crate) fn write_snapshot_jsonl(
 #[cfg(test)]
 mod tests {
     use super::{
-        declaration_identity, diagnostic_identity_json, manifest_lines,
-        canonicalize_surface_path, resolve_source_relative_target, source_diagnostic,
-        GeneratedProjectionEntry, SurfaceManifestSnapshot,
-        source_span, target_path_diagnostic_code,
+        canonicalize_surface_path, declaration_identity, diagnostic_identity_json, manifest_lines,
+        resolve_source_relative_target, source_diagnostic, source_span,
+        target_path_diagnostic_code, GeneratedProjectionEntry, SurfaceManifestSnapshot,
         TargetPathError, SOURCE_DIAGNOSTIC_SCHEMA,
     };
     use std::path::Path;
@@ -1812,19 +1811,13 @@ mod tests {
             }],
         };
         assert_eq!(
-            canonicalize_surface_path(
-                &manifest,
-                ".codex/personal/skills/example/SKILL.md"
-            )
-            .expect("generated projection owner"),
+            canonicalize_surface_path(&manifest, ".codex/personal/skills/example/SKILL.md")
+                .expect("generated projection owner"),
             "agents/skills/example.md"
         );
         assert_eq!(
-            canonicalize_surface_path(
-                &manifest,
-                ".codex/personal/skills/removed/SKILL.md"
-            )
-            .expect("unknown generated path remains unresolved"),
+            canonicalize_surface_path(&manifest, ".codex/personal/skills/removed/SKILL.md")
+                .expect("unknown generated path remains unresolved"),
             ".codex/personal/skills/removed/SKILL.md"
         );
     }

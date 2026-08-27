@@ -130,7 +130,7 @@ CANONICAL_RUST_SOURCE_FILES = (
     "src/test_design.rs", "src/private_feedback.rs",
     "tests/python_algorithm_contract_cli.rs",
 )
-CANONICAL_RUST_SOURCE_SHA256 = "6bfc0ccdcb57e545800ec691f2094ca1363210863ad48ee4bf1103ec64a0f786"
+CANONICAL_RUST_SOURCE_SHA256 = "83509b3d72938fc9f0fbe10d6dd344747614787377a847dc4581136cb48f5438"
 CANONICAL_CARGO_LOCK_SHA256 = "060b8825843b14b12bebb9da095503f4ec7f68a77934e595c082957cb1f72638"
 CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 APT_PACKAGE_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]*$")
