@@ -1772,6 +1772,11 @@ def sync_pending_packet(
                 "issue_worker_retry_unresolved",
                 "retry Issue search candidates do not exactly match packet content",
             )
+        if not discovered and payload.get("input_mode") != "issue-publication-initial":
+            raise IssueSyncError(
+                "issue_worker_retry_unresolved",
+                "non-initial retry cannot create after a zero Issue search",
+            )
         record = worker.publish(
             handoff,
             title=str(payload["title"]),

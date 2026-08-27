@@ -887,7 +887,7 @@ def test_retry_without_exact_search_result_remains_pending_without_create(tmp_pa
         route="issue-worker",
         handoff=handoff.as_dict(),
     )
-    client = _IssueWorkerClient(())
+    client = _SearchingIssueWorkerClient(())
     with pytest.raises(issue_sync.IssueSyncError, match="issue_worker_retry_unresolved"):
         issue_sync.sync_pending_packet(
             packet,
