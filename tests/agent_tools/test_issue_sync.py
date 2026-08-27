@@ -760,7 +760,7 @@ def test_retry_searches_existing_issue_before_create_and_records_noop(tmp_path: 
     )
     client = _SearchingIssueWorkerClient((existing,))
     body = tmp_path / "private-body.md"
-    body.write_text("private body\n", encoding="utf-8")
+    body.write_text(existing.body, encoding="utf-8")
     packet = issue_sync.write_pending_packet(
         log_root=tmp_path / "log",
         repository="owner/repo",
@@ -786,6 +786,89 @@ def test_retry_searches_existing_issue_before_create_and_records_noop(tmp_path: 
     assert receipt is not None
     assert receipt["action"] == "noop"
     assert not packet.exists()
+
+
+def test_retry_body_keyword_match_without_exact_content_stays_pending(tmp_path: Path) -> None:
+    handoff = issue_sync.qualify_issue_worker_finding(
+        _qualified_finding(), authenticated_repository="owner/repo"
+    )
+    existing = issue_sync.GitHubIssueRecord(
+        "owner/repo", "51", "route", "canonical body", "OPEN",
+        "https://github.com/owner/repo/issues/51",
+    )
+    body = tmp_path / "body.md"
+    body.write_text("canonical body plus unrelated packet text", encoding="utf-8")
+    packet = issue_sync.write_pending_packet(
+        log_root=tmp_path / "log", repository="owner/repo", title="route",
+        body_locator=str(body),
+        body_digest="sha256:" + hashlib.sha256(body.read_bytes()).hexdigest(),
+        route="issue-worker", handoff=handoff.as_dict(),
+    )
+    client = _SearchingIssueWorkerClient((existing,))
+    with pytest.raises(issue_sync.IssueSyncError, match="exactly match"):
+        issue_sync.sync_pending_packet(
+            packet, client, checkout_identity={"remote": "owner/repo"},
+            runtime_root=tmp_path / "runtime",
+            receipt_stager=_FakeReceiptStager(),
+        )
+    assert packet.exists()
+    assert client.create_calls == 0
+
+
+def test_retry_multiple_exact_content_matches_stays_pending(tmp_path: Path) -> None:
+    handoff = issue_sync.qualify_issue_worker_finding(
+        _qualified_finding(), authenticated_repository="owner/repo"
+    )
+    body = tmp_path / "body.md"
+    body.write_text("same body", encoding="utf-8")
+    packet = issue_sync.write_pending_packet(
+        log_root=tmp_path / "log", repository="owner/repo", title="same title",
+        body_locator=str(body),
+        body_digest="sha256:" + hashlib.sha256(body.read_bytes()).hexdigest(),
+        route="issue-worker", handoff=handoff.as_dict(),
+    )
+    records = tuple(
+        issue_sync.GitHubIssueRecord(
+            "owner/repo", str(number), "same title", "same body", "OPEN",
+            f"https://github.com/owner/repo/issues/{number}",
+        )
+        for number in (52, 53)
+    )
+    with pytest.raises(issue_sync.IssueSyncError, match="multiple exact"):
+        issue_sync.sync_pending_packet(
+            packet, _SearchingIssueWorkerClient(records),
+            checkout_identity={"remote": "owner/repo"},
+            runtime_root=tmp_path / "runtime",
+            receipt_stager=_FakeReceiptStager(),
+        )
+    assert packet.exists()
+
+
+def test_retry_search_error_stays_pending(tmp_path: Path) -> None:
+    handoff = issue_sync.qualify_issue_worker_finding(
+        _qualified_finding(), authenticated_repository="owner/repo"
+    )
+    body = tmp_path / "body.md"
+    body.write_text("body", encoding="utf-8")
+    packet = issue_sync.write_pending_packet(
+        log_root=tmp_path / "log", repository="owner/repo", title="search error",
+        body_locator=str(body),
+        body_digest="sha256:" + hashlib.sha256(body.read_bytes()).hexdigest(),
+        route="issue-worker", handoff=handoff.as_dict(),
+    )
+
+    class FailingSearchClient(_SearchingIssueWorkerClient):
+        def search(self, repository: str, terms: tuple[str, ...]) -> tuple[issue_sync.GitHubIssueRecord, ...]:
+            raise issue_sync.IssueSyncError("github_unavailable", "search unavailable")
+
+    with pytest.raises(issue_sync.IssueSyncError, match="github_unavailable"):
+        issue_sync.sync_pending_packet(
+            packet, FailingSearchClient(()),
+            checkout_identity={"remote": "owner/repo"},
+            runtime_root=tmp_path / "runtime",
+            receipt_stager=_FakeReceiptStager(),
+        )
+    assert packet.exists()
 
 
 def test_retry_without_exact_search_result_remains_pending_without_create(tmp_path: Path) -> None:
@@ -940,18 +1023,6 @@ def test_issue_worker_retry_packet_returns_through_issue_worker_route(tmp_path: 
     handoff = issue_sync.qualify_issue_worker_finding(
         _qualified_finding(), authenticated_repository="owner/repo"
     )
-    body = tmp_path / "private-body.md"
-    body.write_text("private Issue body\n", encoding="utf-8")
-    digest = "sha256:" + hashlib.sha256(body.read_bytes()).hexdigest()
-    packet = issue_sync.write_pending_packet(
-        log_root=tmp_path / "agent-canon-log",
-        repository="owner/repo",
-        title="retry route",
-        body_locator=str(body),
-        body_digest=digest,
-        route="issue-worker",
-        handoff=handoff.as_dict(),
-    )
     existing = issue_sync.GitHubIssueRecord(
         "owner/repo",
         "42",
@@ -961,6 +1032,18 @@ def test_issue_worker_retry_packet_returns_through_issue_worker_route(tmp_path: 
         "## Finding\nrepair the missing route",
         "OPEN",
         "https://github.com/owner/repo/issues/42",
+    )
+    body = tmp_path / "private-body.md"
+    body.write_text(existing.body, encoding="utf-8")
+    digest = "sha256:" + hashlib.sha256(body.read_bytes()).hexdigest()
+    packet = issue_sync.write_pending_packet(
+        log_root=tmp_path / "agent-canon-log",
+        repository="owner/repo",
+        title="retry route",
+        body_locator=str(body),
+        body_digest=digest,
+        route="issue-worker",
+        handoff=handoff.as_dict(),
     )
     result = issue_sync.sync_pending_packet(
         packet,

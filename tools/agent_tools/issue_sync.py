@@ -96,6 +96,11 @@ def normalize_issue_state(value: str) -> str:
     return state
 
 
+def normalize_issue_content(value: str) -> str:
+    """Normalize transport line endings and outer whitespace for exact match."""
+    return value.replace("\r\n", "\n").replace("\r", "\n").strip()
+
+
 class IssueSyncError(RuntimeError):
     """Raised for a typed GitHub/packet boundary failure."""
 
@@ -1036,6 +1041,24 @@ class IssueWorker:
             if normalize_repository(record.repository) == self.authenticated_repository
         )
 
+    def search_exact_issue_set(
+        self,
+        handoff: IssueWorkerHandoff,
+        *,
+        title: str,
+        body: str,
+    ) -> tuple[tuple[GitHubIssueRecord, ...], tuple[GitHubIssueRecord, ...]]:
+        """Fresh-search and read back candidates before retry acknowledgement."""
+        candidates = self.search_related_issue_set(handoff)
+        readbacks = tuple(self.client.read(record.reference) for record in candidates)
+        exact = tuple(
+            record
+            for record in readbacks
+            if normalize_issue_content(record.title) == normalize_issue_content(title)
+            and normalize_issue_content(record.body) == normalize_issue_content(body)
+        )
+        return readbacks, exact
+
     @staticmethod
     def _cohesive_issue(
         issue: GitHubIssueRecord,
@@ -1729,22 +1752,31 @@ def sync_pending_packet(
     repository = current_repository
     if handoff is not None:
         worker = IssueWorker(client, repository)
-        discovered = worker.search_related_issue_set(handoff)
-        if len(discovered) > 1:
+        if not callable(getattr(client, "search", None)):
             raise IssueSyncError(
                 "issue_worker_retry_unresolved",
-                "retry requires exactly one same-responsibility Issue readback",
+                "retry requires an authoritative Issue search",
             )
-        if not discovered and payload.get("input_mode") != "issue-publication-initial":
+        discovered, exact = worker.search_exact_issue_set(
+            handoff,
+            title=str(payload["title"]),
+            body=body,
+        )
+        if len(exact) > 1:
             raise IssueSyncError(
                 "issue_worker_retry_unresolved",
-                "retry requires one same-responsibility Issue or an initial publication packet",
+                "retry has multiple exact same-responsibility Issue readbacks",
+            )
+        if discovered and not exact:
+            raise IssueSyncError(
+                "issue_worker_retry_unresolved",
+                "retry Issue search candidates do not exactly match packet content",
             )
         record = worker.publish(
             handoff,
             title=str(payload["title"]),
             body=body,
-            related_issues=discovered,
+            related_issues=exact,
             receipt_stager=receipt_stager,
             allow_create=not bool(discovered),
         )
@@ -1769,18 +1801,33 @@ def sync_pending_packet(
             path.unlink()
             return record
         search = getattr(client, "search", None)
-        candidates = (
-            tuple(search(repository, (str(payload["title"]),)))
-            if callable(search)
-            else ()
-        )
-        if len(candidates) > 1:
+        if not callable(search):
             raise IssueSyncError(
                 "issue_worker_retry_unresolved",
-                "ordinary packet has multiple related Issues",
+                "ordinary packet requires an authoritative Issue search",
             )
-        if len(candidates) == 1:
-            record = client.read(candidates[0].reference)
+        candidates = (
+            tuple(search(repository, (str(payload["title"]),)))
+        )
+        readbacks = tuple(client.read(candidate.reference) for candidate in candidates)
+        exact = tuple(
+            record
+            for record in readbacks
+            if normalize_issue_content(record.title) == normalize_issue_content(str(payload["title"]))
+            and normalize_issue_content(record.body) == normalize_issue_content(body)
+        )
+        if len(exact) > 1:
+            raise IssueSyncError(
+                "issue_worker_retry_unresolved",
+                "ordinary packet has multiple exact related Issues",
+            )
+        if candidates and not exact:
+            raise IssueSyncError(
+                "issue_worker_retry_unresolved",
+                "ordinary packet Issue search candidates do not exactly match packet content",
+            )
+        if exact:
+            record = exact[0]
             receipt_stager(
                 record,
                 "noop",
