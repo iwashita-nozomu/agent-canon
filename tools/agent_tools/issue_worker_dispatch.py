@@ -20,7 +20,11 @@ from pathlib import Path
 from typing import Any
 
 if __package__:
-    from .checkout_identity import CheckoutIdentity, resolve_checkout_identity
+    from .checkout_identity import (
+        CheckoutIdentity,
+        resolve_checkout_identity,
+        resolve_checkout_identity as resolve_agentcanon_checkout_identity,
+    )
     from .issue_sync import (
         IssueWorkerHandoff,
         normalize_repository,
@@ -39,7 +43,11 @@ if __package__:
         materialize_subagent_spawn_tool_call,
     )
 else:
-    from checkout_identity import CheckoutIdentity, resolve_checkout_identity
+    from checkout_identity import (  # type: ignore[no-redef]
+        CheckoutIdentity,
+        resolve_checkout_identity,
+        resolve_checkout_identity as resolve_agentcanon_checkout_identity,
+    )
     from issue_sync import (  # type: ignore[no-redef]
         IssueWorkerHandoff,
         normalize_repository,
@@ -60,6 +68,79 @@ else:
 
 
 PublisherSpawn = Callable[[str, str], str | None]
+
+
+@dataclass(frozen=True)
+class AgentCanonRuntimeContext:
+    """Resolved AgentCanon source and its resident runtime/control roots."""
+
+    source_root: Path
+    runtime_root: Path
+    control_parent_root: Path
+
+
+class AgentCanonRuntimeContextError(RuntimeError):
+    """Raised when the IssueWorker route has no canonical runtime context."""
+
+
+def resolve_agentcanon_runtime_context(
+    agentcanon_source_root: Path | str | None = None,
+    *,
+    runtime_root: Path | str | None = None,
+    control_parent_root: Path | str | None = None,
+) -> AgentCanonRuntimeContext:
+    """Resolve the one source-owned resident runtime used by IssueWorker.
+
+    The installed AgentCanon checkout owns the default resident ``.runtime``
+    and its control parent.  An omitted value is derived from that source
+    checkout.  Explicit runtime/control paths remain supported as long as
+    they are absolute; bootstrap owns creation and validation of their
+    lifecycle.  The source checkout itself is never replaced by a
+    HOME/workspace fallback.
+    """
+    source_value = (
+        Path(agentcanon_source_root).expanduser()
+        if agentcanon_source_root is not None
+        else Path(__file__).resolve().parents[2]
+    )
+    if not source_value.is_absolute():
+        raise AgentCanonRuntimeContextError("agentcanon_source_root_not_absolute")
+    source = source_value.resolve(strict=False)
+    if not source.is_dir():
+        raise AgentCanonRuntimeContextError("agentcanon_source_root_missing")
+    source_identity = resolve_agentcanon_checkout_identity(source)
+    if source_identity.git_root in {"", "unknown"}:
+        raise AgentCanonRuntimeContextError("agentcanon_source_checkout_unresolved")
+    if Path(source_identity.git_root).resolve(strict=False) != source:
+        raise AgentCanonRuntimeContextError("agentcanon_source_checkout_mismatch")
+    if not (source / "bootstrap.sh").is_file():
+        raise AgentCanonRuntimeContextError("agentcanon_bootstrap_missing")
+    if not (source / "agents" / "agents_config.json").is_file():
+        raise AgentCanonRuntimeContextError("agentcanon_registry_missing")
+
+    canonical_runtime = source / ".runtime"
+    canonical_control = source.parent
+
+    def context_value(
+        value: Path | str | None,
+        expected: Path,
+        field: str,
+    ) -> Path:
+        if value is None or not str(value).strip():
+            return expected
+        candidate = Path(value).expanduser()
+        if not candidate.is_absolute():
+            raise AgentCanonRuntimeContextError(f"{field}_not_absolute")
+        resolved = candidate.resolve(strict=False)
+        return resolved
+
+    return AgentCanonRuntimeContext(
+        source_root=source,
+        runtime_root=context_value(runtime_root, canonical_runtime, "runtime_root"),
+        control_parent_root=context_value(
+            control_parent_root, canonical_control, "control_parent_root"
+        ),
+    )
 
 
 @dataclass(frozen=True)
@@ -117,24 +198,23 @@ def dispatch_issue_worker(
         or not handoff.can_route
     ):
         return IssueWorkerDispatch("deferred", handoff, identity)
-    registry_root = (
-        Path(agentcanon_source_root).expanduser().resolve()
-        if agentcanon_source_root
-        else workspace
-    )
-    registry_available = (registry_root / "agents" / "agents_config.json").is_file()
-    runtime_value = os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
-    control_parent_value = os.environ.get("AGENT_CANON_CONTROL_PARENT_ROOT", "").strip()
-    canonical_source_root = registry_root
+    try:
+        context = resolve_agentcanon_runtime_context(
+            agentcanon_source_root,
+            runtime_root=os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip() or None,
+            control_parent_root=(
+                os.environ.get("AGENT_CANON_CONTROL_PARENT_ROOT", "").strip() or None
+            ),
+        )
+    except AgentCanonRuntimeContextError:
+        return IssueWorkerDispatch("deferred", handoff, identity)
+    registry_root = context.source_root
+    canonical_source_root = context.source_root
     bootstrap = canonical_source_root / "bootstrap.sh"
+    runtime_value = context.runtime_root
+    control_parent_value = context.control_parent_root
     target_root = identity.git_root
     missing_route: list[str] = []
-    if not runtime_value or not Path(runtime_value).expanduser().is_absolute():
-        missing_route.append("runtime_root")
-    if not control_parent_value or not Path(control_parent_value).expanduser().is_absolute():
-        missing_route.append("control_parent_root")
-    if not bootstrap.is_file():
-        missing_route.append("bootstrap")
     if target_root in {"", "unknown"}:
         missing_route.append("target_root")
         target_root = "<target-root>"
@@ -146,24 +226,11 @@ def dispatch_issue_worker(
         target_root = "<target-root>"
     else:
         target_root = str(Path(target_root).expanduser().resolve())
-    if not registry_available:
-        missing_route.append("agentcanon_source_root")
-        registry_root = Path(__file__).resolve().parents[2]
     publication_mode = "publish" if not missing_route else "investigate_only"
     publication_reason = "" if not missing_route else "receipt_route_unavailable:" + ",".join(missing_route)
-    command_agentcanon_source_root = (
-        str(canonical_source_root) if bootstrap.is_file() else "<agentcanon-source-root>"
-    )
-    command_runtime_root = (
-        str(Path(runtime_value).expanduser().resolve())
-        if runtime_value and Path(runtime_value).expanduser().is_absolute()
-        else "<runtime-root>"
-    )
-    command_control_parent = (
-        str(Path(control_parent_value).expanduser().resolve())
-        if control_parent_value and Path(control_parent_value).expanduser().is_absolute()
-        else "<control-parent-root>"
-    )
+    command_agentcanon_source_root = str(canonical_source_root)
+    command_runtime_root = str(runtime_value)
+    command_control_parent = str(control_parent_value)
     receipt_preflight_command = (
         build_issue_receipt_stage_command(
             repository=normalize_repository(identity.remote),
@@ -273,4 +340,10 @@ def dispatch_issue_worker(
     )
 
 
-__all__ = ("IssueWorkerDispatch", "dispatch_issue_worker")
+__all__ = (
+    "AgentCanonRuntimeContext",
+    "AgentCanonRuntimeContextError",
+    "IssueWorkerDispatch",
+    "dispatch_issue_worker",
+    "resolve_agentcanon_runtime_context",
+)

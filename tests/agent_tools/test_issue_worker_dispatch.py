@@ -180,7 +180,20 @@ def test_t15_without_explicit_candidate_has_no_initial_publisher() -> None:
     ) == ()
 
 
-def test_issue_worker_dispatch_investigates_without_runtime_publication_route(
+def test_runtime_context_defaults_to_the_source_checkout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("AGENT_CANON_RUNTIME_ROOT", raising=False)
+    monkeypatch.delenv("AGENT_CANON_CONTROL_PARENT_ROOT", raising=False)
+
+    context = issue_worker_dispatch.resolve_agentcanon_runtime_context()
+
+    assert context.source_root == PROJECT_ROOT.resolve()
+    assert context.runtime_root == PROJECT_ROOT.resolve() / ".runtime"
+    assert context.control_parent_root == PROJECT_ROOT.resolve().parent
+
+
+def test_issue_worker_dispatch_defaults_to_source_runtime_without_explicit_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("AGENT_CANON_RUNTIME_ROOT", raising=False)
@@ -194,28 +207,33 @@ def test_issue_worker_dispatch_investigates_without_runtime_publication_route(
     )
     assert result.status == "spawned"
     assert result.tool_call is not None
-    assert result.tool_call["arguments"]["publication_mode"] == "investigate_only"
-    assert result.tool_call["arguments"]["publication_reason"] == "receipt_route_unavailable:runtime_root,control_parent_root"
-    assert result.tool_call["arguments"]["receipt_preflight_command"] == []
-    assert result.tool_call["arguments"]["receipt_stage_command"] == []
+    arguments = result.tool_call["arguments"]
+    assert arguments["publication_mode"] == "publish"
+    assert arguments["publication_reason"] == ""
+    preflight = arguments["receipt_preflight_command"]
+    stage = arguments["receipt_stage_command"]
+    assert str(PROJECT_ROOT / ".runtime") in preflight
+    assert str(PROJECT_ROOT.parent) in preflight
+    assert str(PROJECT_ROOT / ".runtime") in stage
+    assert str(PROJECT_ROOT.parent) in stage
 
 
-def test_issue_worker_dispatch_investigates_without_source_context(
+def test_issue_worker_dispatch_defers_without_source_context(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(tmp_path / "runtime"))
     monkeypatch.setenv("AGENT_CANON_CONTROL_PARENT_ROOT", str(tmp_path / "control"))
+    calls: list[str] = []
     result = issue_worker_dispatch.dispatch_issue_worker(
         _candidate(),
         "publish explicit feedback",
-        lambda _agent_type, _prompt: "publisher-investigate",
+        lambda agent_type, _prompt: calls.append(agent_type) or "publisher-investigate",
         workspace_root=PROJECT_ROOT,
         agentcanon_source_root=tmp_path / "missing-source",
     )
-    assert result.status == "spawned"
-    assert result.tool_call is not None
-    assert result.tool_call["arguments"]["publication_mode"] == "investigate_only"
-    assert result.tool_call["arguments"]["receipt_stage_command"] == []
+    assert result.status == "deferred"
+    assert result.tool_call is None
+    assert calls == []
 
 
 def test_explicit_issue_worker_candidate_does_not_change_generic_intake() -> None:
@@ -511,17 +529,20 @@ def test_missing_checkout_identity_is_deferred_without_spawn(monkeypatch) -> Non
 
 
 def test_missing_target_root_routes_to_publisher_investigation(monkeypatch) -> None:
-    monkeypatch.setattr(
-        issue_worker_dispatch,
-        "resolve_checkout_identity",
-        lambda workspace: CheckoutIdentity(
-            cwd=str(workspace),
-            git_root="unknown",
-            branch="main",
-            head="a" * 40,
-            remote="iwashita-nozomu/agent-canon",
-        ),
-    )
+    original_resolver = issue_worker_dispatch.resolve_checkout_identity
+
+    def resolve_target_identity(workspace: Path) -> CheckoutIdentity:
+        if workspace.resolve() == PROJECT_ROOT.resolve():
+            return CheckoutIdentity(
+                cwd=str(workspace),
+                git_root="unknown",
+                branch="main",
+                head="a" * 40,
+                remote="iwashita-nozomu/agent-canon",
+            )
+        return original_resolver(workspace)
+
+    monkeypatch.setattr(issue_worker_dispatch, "resolve_checkout_identity", resolve_target_identity)
     calls: list[str] = []
     result = issue_worker_dispatch.dispatch_issue_worker(
         _candidate(),
