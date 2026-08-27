@@ -56,9 +56,11 @@ else:
 if __package__:
     from .packets import (
         MATHEMATICAL_INTENT_PACKET_SCHEMA,
+        MATHEMATICAL_INTENT_ROUTE_ID,
         MathematicalIntentPacket,
         iter_artifacts as _iter_artifacts,
         mathematical_intent_packet_mapping,
+        mathematical_intent_route_config,
         mathematical_intent_route_for_task,
         normalize_mathematical_intent_packet,
         resolve_math_intent_packet_for_spec,
@@ -67,9 +69,11 @@ if __package__:
 else:
     from packets import (  # type: ignore[no-redef]
         MATHEMATICAL_INTENT_PACKET_SCHEMA,
+        MATHEMATICAL_INTENT_ROUTE_ID,
         MathematicalIntentPacket,
         iter_artifacts as _iter_artifacts,
         mathematical_intent_packet_mapping,
+        mathematical_intent_route_config,
         mathematical_intent_route_for_task,
         normalize_mathematical_intent_packet,
         resolve_math_intent_packet_for_spec,
@@ -583,9 +587,11 @@ __all__ = (
     "PreparedRunBundle",
     "MathematicalIntentPacket",
     "MATHEMATICAL_INTENT_PACKET_SCHEMA",
+    "MATHEMATICAL_INTENT_ROUTE_ID",
     "normalize_mathematical_intent_packet",
     "mathematical_intent_packet_mapping",
     "mathematical_intent_route_for_task",
+    "mathematical_intent_route_config",
     "validate_mathematical_intent_route",
     "resolve_math_intent_packet_for_spec",
     "run_active_design_packet",

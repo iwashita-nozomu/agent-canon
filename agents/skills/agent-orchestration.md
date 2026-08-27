@@ -684,8 +684,10 @@ task id が分かる場合は、task catalog 側の family を正本にします
 
 ### Mathematical intent route
 
-数理・数値挙動の修正は、一般の実装候補を先に広げず、
-`mathematical_intent_packet` を作る math-intent route に入れます。route を有効にするのは、
+数理・数値挙動の修正は、一般の実装候補を先に広げず、task catalog の canonical route ID
+`mathematical_correction` を解決して `mathematical_intent_packet` を作る math-intent route
+に入れます。handoff が持つのは route ID だけで、owner / reviewer / ordering は catalog
+record から解決します。route を有効にするのは、
 依頼の対象に数式・定義・変数 / domain / unit、objective / residual、制約、仮定、導出、
 反復 / 更新則、停止量、failure semantics、収束、勾配 / Jacobian / Hessian、KKT、または
 数値 oracle / counterexample が含まれ、かつ修正・診断対象であることが読める場合です。

@@ -88,6 +88,7 @@ class SubagentWaveSlot:
     agent_type: str
     write_capable: bool = False
     writer_target: WriterTarget | None = None
+    math_intent_route_id: str | None = None
 
     def __post_init__(self) -> None:
         """Default the role instance id from the selected executable agent."""
@@ -98,6 +99,11 @@ class SubagentWaveSlot:
     def executable_identity(self) -> str:
         """Return the authoritative executable role identity."""
         return f"{self.role_id}:{self.instance_id}:{self.agent_type}"
+
+    @property
+    def requires_math_intent(self) -> bool:
+        """Return whether task selection bound this slot to the math route."""
+        return self.math_intent_route_id is not None
 
 
 @dataclass(frozen=True)
@@ -175,7 +181,7 @@ class RunBundleSpec:
     decision_sufficiency_packet: dict[str, object] | None = None
     decision_sufficiency_packet_ref: str = ""
     active_design_packet: ActiveDesignPacketConfig | None = None
-    math_intent_route: Mapping[str, object] | None = None
+    math_intent_route: str | None = None
     math_intent_packet: "MathematicalIntentPacket | None" = None
     writer_targets: Mapping[str, object] = field(default_factory=dict)
 

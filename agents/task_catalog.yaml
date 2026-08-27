@@ -229,6 +229,15 @@ role_topology_defaults: &standard_role_topology
         - verifier
         - auditor
 
+math_intent_routes:
+  mathematical_correction:
+    id: mathematical_correction
+    activation: mathematical_or_numerical_correction_evidence
+    owner_skill: computational-optimization
+    reviewer: mathematical_correctness_reviewer
+    required_packet: mathematical_intent_packet
+    precedes: [design, benchmark_reviewer]
+
 workflow_families:
   - id: owner_bounded_change
     name: Owner-Bounded Change
@@ -329,7 +338,7 @@ workflow_families:
         - Emit the skill call sequence with literature-survey before research-workflow when primary sources, prior art, official docs, or source-backed implementation claims are used; carry the source packet and adoption/exclusion decisions into design, implementation, benchmark, and report handoffs.
         - Start from the structured handoff; use the run bundle, user_request_contract.md, schedule.md, research_notes.md, cited sources, and team_manifest.yaml only when the selected research or coordination route requires them.
         - Separate correctness evidence, performance evidence, and reporting claims in the handoff.
-        - When mathematical or numerical correction evidence is present, create the computational-optimization math-intent packet before generic design, benchmark, or scientific-computing review. The packet must bind math_object/problem, variables/domains/units, objective/residual, constraints, equations/definitions, assumptions/approximations, derivation, iteration_map/update_map, invariants/limits/stopping_scalar/failure_semantics, equation_to_code_map, mathematical_definition_paths, mathematical_oracle_paths, mathematical_documentation_paths, math_oracle/counterexample, mapped allowed write paths equal to that union, forbidden non-math surfaces, and separate handoff targets.
+        - When mathematical or numerical correction evidence is present, resolve the canonical math_intent_route ID `mathematical_correction` before generic design, benchmark, or scientific-computing review, then create the computational-optimization math-intent packet. The packet must bind math_object/problem, variables/domains/units, objective/residual, constraints, equations/definitions, assumptions/approximations, derivation, iteration_map/update_map, invariants/limits/stopping_scalar/failure_semantics, equation_to_code_map, mathematical_definition_paths, mathematical_oracle_paths, mathematical_documentation_paths, math_oracle/counterexample, mapped allowed write paths equal to that union, forbidden non-math surfaces, and separate handoff targets.
       workflow_focus:
         - Follow `.codex/agents/*.toml` model and reasoning settings. Use the one physical agent selected for each evidenced decision; keep mini roles on bounded exploration, execution, and skill evaluation, use `worker` by default, and select `spark_worker` only through `--select-agent-type implementer=spark_worker:<evidence>`. Review roles provide hypotheses; owner-local receipts establish correspondence, while the parent owns transport, integration, and remote readback without approval authority.
         - Treat a bounded implementation slice as Spark-eligible only when it is derived from the Abstract Design Frame and design trace, one file or one abstraction unit, public interface unchanged, no dependency change, no specification interpretation, and locally testable.
@@ -693,12 +702,7 @@ tasks:
   - id: T4
     name: research-backed implementation change
     family: research_driven_change
-    math_intent_route:
-      activation: mathematical_or_numerical_correction_evidence
-      owner_skill: computational-optimization
-      reviewer: mathematical_correctness_reviewer
-      required_packet: mathematical_intent_packet
-      precedes: [design, benchmark_reviewer]
+    math_intent_route: mathematical_correction
     specialists:
       - researcher
       - research_reviewer
@@ -711,12 +715,7 @@ tasks:
   - id: T5
     name: benchmark or experiment-driven optimization
     family: research_driven_change
-    math_intent_route:
-      activation: mathematical_or_numerical_correction_evidence
-      owner_skill: computational-optimization
-      reviewer: mathematical_correctness_reviewer
-      required_packet: mathematical_intent_packet
-      precedes: [design, benchmark_reviewer]
+    math_intent_route: mathematical_correction
     specialists:
       - researcher
       - research_reviewer

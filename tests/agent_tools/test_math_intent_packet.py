@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,7 @@ from packets import (  # noqa: E402
     MATHEMATICAL_INTENT_PACKET_SCHEMA,
     mathematical_intent_packet_mapping,
     normalize_mathematical_intent_packet,
+    validate_mathematical_intent_route,
 )
 from tool_calls import materialize_subagent_spawn_tool_call  # noqa: E402
 from implementation_dispatch import dispatch_subagent_wave  # noqa: E402
@@ -48,13 +50,7 @@ FORBIDDEN = [
     "proof infrastructure",
     "ir infrastructure",
 ]
-MATH_ROUTE = {
-    "activation": "mathematical_or_numerical_correction_evidence",
-    "owner_skill": "computational-optimization",
-    "reviewer": "mathematical_correctness_reviewer",
-    "required_packet": "mathematical_intent_packet",
-    "precedes": ["design", "benchmark_reviewer"],
-}
+MATH_ROUTE = "mathematical_correction"
 
 
 def packet(
@@ -130,6 +126,15 @@ def test_packet_normalization_is_closed_and_serializable() -> None:
     )
 
 
+def test_math_route_accepts_only_canonical_route_id() -> None:
+    """Spawn callers cannot replace the task-catalog math route with a mapping."""
+    assert validate_mathematical_intent_route(MATH_ROUTE) == MATH_ROUTE
+    with pytest.raises(RuntimeError, match="unknown_id"):
+        validate_mathematical_intent_route("caller_supplied_route")
+    with pytest.raises(RuntimeError, match="unknown_id"):
+        validate_mathematical_intent_route({"owner_skill": "computational-optimization"})  # type: ignore[arg-type]
+
+
 def test_packet_missing_field_stops() -> None:
     """Missing math evidence cannot be inferred at the packet boundary."""
     value = packet()
@@ -184,6 +189,14 @@ def test_spawn_requires_packet_and_rejects_non_math_writer_path() -> None:
                 writer_target=writer,
                 math_intent_route=MATH_ROUTE,
             )
+        with pytest.raises(RuntimeError, match="math_packet_missing"):
+            materialize_subagent_spawn_tool_call(
+                role="mathematical_correctness_reviewer",
+                agent_type="reviewer",
+                input="math review",
+                checkout_identity=identity(root),
+                workspace_write_capable=False,
+            )
 
         with pytest.raises(ValueError, match="forbidden_surface"):
             materialize_subagent_spawn_tool_call(
@@ -224,6 +237,7 @@ def test_wave_blocks_before_callback_without_math_packet() -> None:
             agent_type="worker",
             write_capable=True,
             writer_target=target(root),
+            math_intent_route_id=MATH_ROUTE,
         )
         spawned: list[str] = []
         with pytest.raises(RuntimeError, match="math_packet_missing"):
@@ -232,9 +246,55 @@ def test_wave_blocks_before_callback_without_math_packet() -> None:
                 {slot.executable_identity: "math task"},
                 lambda _agent, _prompt: spawned.append("unexpected") or "agent",
                 {slot.executable_identity: target(root)},
-                math_intent_route=MATH_ROUTE,
             )
         assert spawned == []
+
+
+def test_math_wave_emits_separate_nonmath_handoff_without_arch_writer() -> None:
+    """A JIT-looking symptom stays a deferred handoff beside math-only writers."""
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        worker = SubagentWaveSlot(
+            role_id="implementer",
+            instance_id="math-worker",
+            agent_type="worker",
+            write_capable=True,
+            writer_target=target(root),
+            math_intent_route_id=MATH_ROUTE,
+        )
+        reviewer = SubagentWaveSlot(
+            role_id="mathematical_correctness_reviewer",
+            instance_id="math-reviewer",
+            agent_type="reviewer",
+            write_capable=False,
+        )
+        prompts = {
+            worker.executable_identity: "convergence math worker",
+            reviewer.executable_identity: "convergence math review",
+        }
+        spawned: list[str] = []
+        handoffs: list[Mapping[str, object]] = []
+        result = dispatch_subagent_wave(
+            (worker, reviewer),
+            prompts,
+            lambda agent, _prompt: spawned.append(agent) or agent,
+            {worker.executable_identity: target(root)},
+            math_intent_packet=packet(
+                separate_handoff_targets=["architecture/JIT performance owner"]
+            ),
+            nonmath_handoff=handoffs.append,
+        )
+        assert result == ("worker", "reviewer")
+        assert spawned == ["worker", "reviewer"]
+        assert handoffs == [
+            {
+                "target": "architecture/JIT performance owner",
+                "owner": "parent",
+                "status": "deferred",
+                "writer_tool_call": "none",
+                "math_writer_paths": [],
+            }
+        ]
 
 
 def run_bootstrap(*args: str) -> tuple[subprocess.CompletedProcess[str], Path]:

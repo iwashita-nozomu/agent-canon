@@ -207,6 +207,7 @@ OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = ("docker/README.md",)
 
 
 MATHEMATICAL_INTENT_PACKET_SCHEMA = "agent-canon.mathematical-intent.v1"
+MATHEMATICAL_INTENT_ROUTE_ID = "mathematical_correction"
 MATHEMATICAL_INTENT_PACKET_TEXT_FIELDS = (
     "math_object",
     "problem",
@@ -443,43 +444,108 @@ def mathematical_intent_packet_mapping(
     }
 
 
+def separate_nonmath_handoff_mapping(
+    packet: MathematicalIntentPacket | Mapping[str, object],
+) -> tuple[Mapping[str, object], ...]:
+    """Materialize deferred parent-owned handoffs without creating writer paths."""
+    targets = (
+        packet.separate_handoff_targets
+        if isinstance(packet, MathematicalIntentPacket)
+        else tuple(str(item) for item in packet.get("separate_handoff_targets", ()))
+    )
+    return tuple(
+        {
+            "target": target,
+            "owner": "parent",
+            "status": "deferred",
+            "writer_tool_call": "none",
+            "math_writer_paths": [],
+        }
+        for target in targets
+    )
+
+
 def mathematical_intent_route_for_task(
     catalog: TaskCatalog | None,
     task_id: str | None,
     selected_skills: Sequence[str] = (),
-) -> Mapping[str, object] | None:
+) -> str | None:
     """Return the task-declared math route only when its skill is selected."""
     if catalog is None or not task_id:
         return None
     task = next((item for item in catalog.tasks if item.get("id") == task_id), None)
     if task is None:
         return None
-    route = task.get("math_intent_route")
-    if not isinstance(route, Mapping):
+    route_id = task.get("math_intent_route")
+    if route_id is None:
         return None
     normalized_skills = {str(skill).removeprefix("$") for skill in selected_skills}
+    if MATHEMATICAL_INTENT_ROUTE_ID not in {
+        str(item.get("id"))
+        for item in _math_intent_route_records(catalog)
+    }:
+        raise RuntimeError("mathematical_intent_route:canonical_id_missing")
+    if not isinstance(route_id, str) or route_id != MATHEMATICAL_INTENT_ROUTE_ID:
+        raise RuntimeError(f"mathematical_intent_route:unknown_id:{route_id}")
+    route = mathematical_intent_route_config(catalog, route_id)
+    if route is None:
+        raise RuntimeError("mathematical_intent_route:catalog_record_missing")
     if str(route.get("owner_skill")) not in normalized_skills:
         return None
-    return route
+    return route_id
+
+
+def _math_intent_route_records(catalog: TaskCatalog) -> tuple[Mapping[str, object], ...]:
+    """Return the canonical task-catalog math route records."""
+    raw_routes = catalog.raw.get("math_intent_routes")
+    if not isinstance(raw_routes, Mapping):
+        raise RuntimeError("mathematical_intent_route:catalog_records_missing")
+    records: list[Mapping[str, object]] = []
+    for route_id, raw_record in raw_routes.items():
+        if not isinstance(raw_record, Mapping):
+            raise RuntimeError(f"mathematical_intent_route:record_invalid:{route_id}")
+        record = dict(raw_record)
+        record.setdefault("id", route_id)
+        records.append(record)
+    return tuple(records)
+
+
+def mathematical_intent_route_config(
+    catalog: TaskCatalog | None,
+    route_id: str | None,
+) -> Mapping[str, object] | None:
+    """Resolve one canonical math route ID from the task catalog."""
+    if route_id is None:
+        return None
+    validate_mathematical_intent_route(route_id)
+    if catalog is None:
+        raise RuntimeError("mathematical_intent_route:catalog_required")
+    records = _math_intent_route_records(catalog)
+    for record in records:
+        if record.get("id") == route_id:
+            expected = {
+                "id": MATHEMATICAL_INTENT_ROUTE_ID,
+                "activation": "mathematical_or_numerical_correction_evidence",
+                "owner_skill": "computational-optimization",
+                "reviewer": "mathematical_correctness_reviewer",
+                "required_packet": "mathematical_intent_packet",
+                "precedes": ["design", "benchmark_reviewer"],
+            }
+            if dict(record) != expected:
+                raise RuntimeError("mathematical_intent_route:canonical_record_mismatch")
+            return record
+    raise RuntimeError(f"mathematical_intent_route:unknown_id:{route_id}")
 
 
 def validate_mathematical_intent_route(
-    route: Mapping[str, object] | None,
-) -> Mapping[str, object] | None:
+    route_id: str | None,
+) -> str | None:
     """Validate the selected task/workflow route that makes math mandatory."""
-    if route is None:
+    if route_id is None:
         return None
-    if not isinstance(route, Mapping):
-        raise RuntimeError("mathematical_intent_route:mapping_required")
-    required = {"activation", "owner_skill", "reviewer", "required_packet", "precedes"}
-    missing = sorted(required.difference(route))
-    if missing:
-        raise RuntimeError(
-            "mathematical_intent_route:field_missing:" + ",".join(missing)
-        )
-    if route["required_packet"] != "mathematical_intent_packet":
-        raise RuntimeError("mathematical_intent_route:packet_type_mismatch")
-    return route
+    if not isinstance(route_id, str) or route_id != MATHEMATICAL_INTENT_ROUTE_ID:
+        raise RuntimeError(f"mathematical_intent_route:unknown_id:{route_id}")
+    return route_id
 
 
 def resolve_math_intent_packet_for_spec(
@@ -487,11 +553,12 @@ def resolve_math_intent_packet_for_spec(
 ) -> MathematicalIntentPacket | None:
     """Validate the route/packet pair before manifest creation or spawn."""
     raw_packet = spec.math_intent_packet
-    route = validate_mathematical_intent_route(spec.math_intent_route)
-    if route is None:
+    selected_route_id = validate_mathematical_intent_route(spec.math_intent_route)
+    if selected_route_id is None:
         if raw_packet is not None:
             raise RuntimeError("math_packet_not_applicable")
         return None
+    mathematical_intent_route_config(spec.task_catalog, selected_route_id)
     if raw_packet is None:
         raise RuntimeError("math_packet_missing")
     if isinstance(raw_packet, MathematicalIntentPacket):

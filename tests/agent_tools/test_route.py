@@ -371,9 +371,11 @@ class RouteToolTest(unittest.TestCase):
             with self.subTest(task_id=task_id):
                 task = next(item for item in catalog.tasks if item["id"] == task_id)
                 route = task["math_intent_route"]
+                self.assertEqual(route, "mathematical_correction")
                 self.assertEqual(
-                    route,
+                    catalog.raw["math_intent_routes"][route],
                     {
+                        "id": "mathematical_correction",
                         "activation": "mathematical_or_numerical_correction_evidence",
                         "owner_skill": "computational-optimization",
                         "reviewer": "mathematical_correctness_reviewer",

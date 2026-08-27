@@ -46,6 +46,7 @@ if __package__:
         ActiveDesignPacketConfig,
         MATHEMATICAL_INTENT_PACKET_SCHEMA,
         MathematicalIntentPacket,
+        mathematical_intent_route_config,
         mathematical_intent_route_for_task,
         normalize_mathematical_intent_packet,
         parse_active_design_packet_input,
@@ -58,6 +59,7 @@ else:
         ActiveDesignPacketConfig,
         MATHEMATICAL_INTENT_PACKET_SCHEMA,
         MathematicalIntentPacket,
+        mathematical_intent_route_config,
         mathematical_intent_route_for_task,
         normalize_mathematical_intent_packet,
         parse_active_design_packet_input,
@@ -229,7 +231,7 @@ class BootstrapRunContext:
     workflow_family_name: str | None
     workflow_active_spawn_budget: int | None
     workflow_max_write_subagents: int | None
-    math_intent_route: Mapping[str, object] | None = None
+    math_intent_route: str | None = None
     issue_worker_candidate: Mapping[str, object] | None = None
     repository_roots: object | None = None
 
@@ -552,7 +554,11 @@ def resolve_bootstrap_context(
         selected_route_skills,
     )
     if math_route is not None and args.math_intent_packet:
-        reviewer = str(math_route.get("reviewer", "")).strip()
+        reviewer = str(
+            (mathematical_intent_route_config(catalog, math_route) or {}).get(
+                "reviewer", ""
+            )
+        ).strip()
         if reviewer and reviewer not in enabled_specialists:
             enabled_specialists.append(reviewer)
     language_candidates: tuple[str, ...] = ()
@@ -655,10 +661,11 @@ def emit_bootstrap_output(
     else:
         print("MATH_INTENT_ROUTE_STATUS=active")
         print(f"MATH_INTENT_PACKET_SCHEMA={MATHEMATICAL_INTENT_PACKET_SCHEMA}")
-        print(
-            "MATH_INTENT_REVIEWER="
-            f"{context.math_intent_route.get('reviewer', 'unknown')}"
+        math_route_config = mathematical_intent_route_config(
+            catalog, context.math_intent_route
         )
+        print(f"MATH_INTENT_ROUTE_ID={context.math_intent_route}")
+        print(f"MATH_INTENT_REVIEWER={math_route_config.get('reviewer', 'unknown')}")
         print("MATH_INTENT_PACKET=present")
     print(
         "START_DECLARATION="
@@ -726,6 +733,7 @@ def emit_bootstrap_output(
             workflow_family_id=context.workflow_family_id,
             issue_worker_candidate=context.issue_worker_candidate,
             writer_targets=writer_targets,
+            math_intent_route_id=context.math_intent_route,
         )
         initial_wave_slots = initial_slots
         initial_wave = tuple(slot.agent_type for slot in initial_wave_slots)
@@ -749,6 +757,7 @@ def emit_bootstrap_output(
             workflow_family_id=context.workflow_family_id,
             issue_worker_candidate=context.issue_worker_candidate,
             writer_targets=writer_targets,
+            math_intent_route_id=context.math_intent_route,
         )
         expansion_wave_slots = recommended_dynamic_expansion_wave_slots(
             runtime.roles,
@@ -760,6 +769,7 @@ def emit_bootstrap_output(
             workflow_family_id=context.workflow_family_id,
             issue_worker_candidate=context.issue_worker_candidate,
             writer_targets=writer_targets,
+            math_intent_route_id=context.math_intent_route,
         )
         print(
             "SUBAGENT_AGENT_TYPE_SELECTIONS="

@@ -69,6 +69,7 @@ if __package__:
         active_design_packet_reference_projection,
         iter_artifacts,
         mathematical_intent_packet_mapping,
+        mathematical_intent_route_config,
         resolve_math_intent_packet_for_spec,
         resolve_active_design_packet_config,
         resolve_cross_cutting_document_packet,
@@ -84,6 +85,7 @@ else:
         active_design_packet_reference_projection,
         iter_artifacts,
         mathematical_intent_packet_mapping,
+        mathematical_intent_route_config,
         resolve_math_intent_packet_for_spec,
         resolve_active_design_packet_config,
         resolve_cross_cutting_document_packet,
@@ -1354,9 +1356,15 @@ def manifest_run_lines(
     if spec.math_intent_route is not None:
         if math_intent_packet is None:
             raise RuntimeError("math_packet_missing")
+        lines.append(f"  math_intent_route_id: {spec.math_intent_route!r}")
         lines.append("  math_intent_route:")
         route_yaml = yaml.safe_dump(
-            dict(spec.math_intent_route),
+            dict(
+                mathematical_intent_route_config(
+                    spec.task_catalog, spec.math_intent_route
+                )
+                or {}
+            ),
             sort_keys=False,
             default_flow_style=False,
         ).splitlines()
@@ -1541,6 +1549,7 @@ def manifest_run_lines(
             workflow_family_id=spec.workflow_family_id,
             issue_worker_candidate=spec.issue_worker_candidate,
             writer_targets=writer_targets,
+            math_intent_route_id=spec.math_intent_route,
         )
         initial_wave_slots = initial_slots
         initial_wave = tuple(slot.agent_type for slot in initial_slots)
@@ -1554,6 +1563,7 @@ def manifest_run_lines(
             workflow_family_id=spec.workflow_family_id,
             issue_worker_candidate=spec.issue_worker_candidate,
             writer_targets=writer_targets,
+            math_intent_route_id=spec.math_intent_route,
         )
         lines.append("  spawn_wave_recommendation:")
         lines.append(
