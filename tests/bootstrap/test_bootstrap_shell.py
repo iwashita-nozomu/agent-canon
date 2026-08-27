@@ -936,10 +936,11 @@ exit "$rc"
     assert "rm " not in calls_text
 
 
-def test_install_rejects_foreign_named_resident_before_build_or_state_mutation(
-    tmp_path: Path,
+@pytest.mark.parametrize("operation", ["install", "update"])
+def test_install_update_reject_foreign_before_build_or_state_mutation(
+    tmp_path: Path, operation: str
 ) -> None:
-    """Install ownership preflight runs before candidate build/runtime setup."""
+    """Install/update ownership preflight precedes build and runtime setup."""
     repository = tmp_path / "agent-canon"
     control = tmp_path / "control"
     repository.mkdir()
@@ -967,7 +968,7 @@ def test_install_rejects_foreign_named_resident_before_build_or_state_mutation(
             str(repository),
             "--control-parent-root",
             str(control),
-            "install",
+            operation,
         ],
         check=False,
         capture_output=True,
