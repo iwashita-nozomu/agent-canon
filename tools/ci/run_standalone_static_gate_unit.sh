@@ -125,9 +125,11 @@ export TMPDIR="$(runtime_boundary_path "${TMPDIR:-${AGENT_CANON_STATIC_RUNTIME_R
 mkdir -p "${CARGO_TARGET_DIR}" "${TMPDIR}"
 
 run_full() {
-  local control_parent_root=""
-  control_parent_root="$(cd "${AGENT_CANON_STATIC_RUNTIME_ROOT}/.." && pwd -P)"
+  # Bootstrap authenticates and supplies this control capability.  The
+  # runtime root is an exchange location, not a parent-root authority.
+  local control_parent_root="${AGENT_CANON_CONTROL_PARENT_ROOT:?AGENT_CANON_CONTROL_PARENT_ROOT is required}"
   AGENT_CANON_CONTROL_PARENT_ROOT="${control_parent_root}" \
+  AGENT_CANON_CHILD_PURPOSE="standalone-static-gate-unit" \
   AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_STATIC_RUNTIME_ROOT}" \
     bash "${ROOT}/tools/ci/run_all_checks.sh" "${UNIT_ARGS[@]}"
 }

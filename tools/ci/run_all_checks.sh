@@ -112,6 +112,11 @@ if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "run-all-checks-script" ]]; then
     --source-root "${AGENT_CANON_SOURCE_ROOT}" \
     --purpose run-all-checks-script \
     --consume >/dev/null
+elif [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "standalone-static-gate-unit" ]]; then
+  # The bootstrap target mount already authenticates this read-only execution
+  # plane.  Its control root is an external, non-Git runtime parent, so do not
+  # re-enter the parent-side-effect boundary from inside the tool container.
+  :
 else
   exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
     --root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \

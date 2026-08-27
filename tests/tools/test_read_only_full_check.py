@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import os
 import subprocess
 from pathlib import Path
 
@@ -41,10 +43,138 @@ def test_full_unit_reuses_existing_body_and_forwards_options() -> None:
     body = text.split("run_full() {", 1)[1].split("\n}\n\nrun_rust()", 1)[0]
 
     assert 'bash "${ROOT}/tools/ci/run_all_checks.sh" "${UNIT_ARGS[@]}"' in body
-    assert 'AGENT_CANON_CONTROL_PARENT_ROOT="${control_parent_root}"' in body
+    assert (
+        'AGENT_CANON_CONTROL_PARENT_ROOT="${control_parent_root}"' in body
+    )
+    assert "AGENT_CANON_CONTROL_PARENT_ROOT:?AGENT_CANON_CONTROL_PARENT_ROOT is required" in body
+    assert 'AGENT_CANON_CHILD_PURPOSE="standalone-static-gate-unit"' in body
     assert 'AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_STATIC_RUNTIME_ROOT}"' in body
     assert "full) run_full" in text
     assert '"${UNIT}" != "full"' in text
+    assert 'cd "${AGENT_CANON_STATIC_RUNTIME_ROOT}/.."' not in body
+
+
+def test_full_unit_runs_fake_container_body_without_target_mutation(
+    tmp_path: Path,
+) -> None:
+    """The container adapter forwards its bootstrap capabilities verbatim."""
+    target = tmp_path / "target"
+    target.mkdir()
+    subprocess.run(["git", "init", "-q", str(target)], check=True)
+    tracked = target / "tracked.txt"
+    tracked.write_text("unchanged\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "-C", str(target), "add", "tracked.txt"], check=True
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(target),
+            "-c",
+            "user.email=agent-canon@example.invalid",
+            "-c",
+            "user.name=AgentCanon",
+            "commit",
+            "-q",
+            "-m",
+            "fixture",
+        ],
+        check=True,
+    )
+
+    (target / "tools" / "ci").mkdir(parents=True)
+    runner = target / "tools" / "ci" / RUNNER.name
+    runner_text = RUNNER.read_text(encoding="utf-8").replace(
+        "/usr/local/share/agent-canon/.agent-canon-tool-container",
+        str(tmp_path / "tool-container-marker"),
+    )
+    runner.write_text(runner_text, encoding="utf-8")
+    runner.chmod(0o755)
+    (tmp_path / "tool-container-marker").touch()
+
+    capture = tmp_path / "capture.txt"
+    fake_checks = target / "tools" / "ci" / "run_all_checks.sh"
+    fake_checks.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        ": > \"${FAKE_CAPTURE}\"\n"
+        "printf 'control=%s\\n' \"${AGENT_CANON_CONTROL_PARENT_ROOT}\" >> \"${FAKE_CAPTURE}\"\n"
+        "printf 'runtime=%s\\n' \"${AGENT_CANON_RUNTIME_ROOT}\" >> \"${FAKE_CAPTURE}\"\n"
+        "printf 'purpose=%s\\n' \"${AGENT_CANON_CHILD_PURPOSE}\" >> \"${FAKE_CAPTURE}\"\n"
+        "printf 'handoff=%s\\n' \"${AGENT_CANON_CHILD_HANDOFF}\" >> \"${FAKE_CAPTURE}\"\n"
+        "printf 'args=%s\\n' \"$*\" >> \"${FAKE_CAPTURE}\"\n"
+        "printf 'RUN_ALL_CHECKS_BODY=completed\\n'\n",
+        encoding="utf-8",
+    )
+    fake_checks.chmod(0o755)
+
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_python = fake_bin / "python3"
+    fake_python.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "payload=$(cat)\n"
+        "if [[ \"${payload}\" == *'runtime_artifact_boundary'* ]]; then\n"
+        "  printf '%s\\n' \"${3}\"\n"
+        "else\n"
+        "  exit 0\n"
+        "fi\n",
+        encoding="utf-8",
+    )
+    fake_python.chmod(0o755)
+
+    control = tmp_path / "home"
+    runtime = control / "workspace" / "full-check"
+    before_tree = subprocess.run(
+        ["git", "-C", str(target), "write-tree"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    before_index = (target / ".git" / "index").read_bytes()
+    result = subprocess.run(
+        ["bash", str(runner), "full", "--quick", "--skip-docs"],
+        cwd=target,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+            "AGENT_CANON_TARGET_ROOT": str(target),
+            "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
+            "AGENT_CANON_RUNTIME_ROOT": str(runtime),
+            "AGENT_CANON_CHILD_HANDOFF": "authenticated-handoff",
+            "AGENT_CANON_HANDOFF_AUDIENCE": "standalone-static-gate-unit",
+            "FAKE_CAPTURE": str(capture),
+        },
+    )
+    assert result.returncode == 0, result.stderr
+    assert "RUN_ALL_CHECKS_BODY=completed" in result.stdout
+    observed = dict(
+        line.split("=", 1)
+        for line in capture.read_text(encoding="utf-8").splitlines()
+    )
+    assert observed == {
+        "control": str(control),
+        "runtime": str(runtime),
+        "purpose": "standalone-static-gate-unit",
+        "handoff": "authenticated-handoff",
+        "args": "--quick --skip-docs",
+    }
+    after_tree = subprocess.run(
+        ["git", "-C", str(target), "write-tree"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert after_tree == before_tree
+    assert (target / ".git" / "index").read_bytes() == before_index
+    assert hashlib.sha256(tracked.read_bytes()).hexdigest() == hashlib.sha256(
+        b"unchanged\n"
+    ).hexdigest()
 
 
 def test_read_only_route_never_repairs_the_caller_checkout() -> None:
