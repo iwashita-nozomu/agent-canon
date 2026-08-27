@@ -18,6 +18,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -29,6 +30,11 @@ import agent_canon_source_root  # noqa: E402
 import capability_route as capability_module  # noqa: E402
 import route as route_module  # noqa: E402
 import skill_route_catalog as catalog_module  # noqa: E402
+from team_config import (  # noqa: E402
+    default_specialists_for_task,
+    load_task_catalog,
+    load_team_config,
+)
 
 
 class RouteToolTest(unittest.TestCase):
@@ -302,6 +308,128 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotIn("subagent-bootstrap", decision["deferred_skills"])
         self.assertIn("agent-orchestration", decision["matched_skills"])
         self.assertIn("result-artifact-writeout", decision["matched_skills"])
+
+    def test_math_correction_routes_math_owner_before_infrastructure_symptom(self) -> None:
+        """A mathematical correction keeps a JIT-looking symptom in the math route."""
+        result = self.run_route(
+            "--prompt",
+            "修正して。solver の residual が収束しない。更新式と停止条件を確認し、JIT は変更しない。",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("computational-optimization", decision["active_skills"])
+        self.assertIn("subagent-bootstrap", decision["active_skills"])
+        self.assertNotIn("environment-maintenance", decision["active_skills"])
+
+    def test_infrastructure_only_request_is_exempt_from_math_route(self) -> None:
+        """An infrastructure-only repair does not acquire mathematical routing."""
+        result = self.run_route(
+            "--prompt",
+            "修正して。Docker build の cache 設定を更新し、コンテナ起動を直す。",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertNotIn("computational-optimization", decision["matched_skills"])
+
+    def test_research_tasks_put_math_route_before_generic_specialists(self) -> None:
+        """T4/T5 expose a conditional math route before generic specialists."""
+        config = load_team_config()
+        catalog = load_task_catalog(config)
+        for task_id in ("T4", "T5"):
+            with self.subTest(task_id=task_id):
+                task = next(item for item in catalog.tasks if item["id"] == task_id)
+                route = task["math_intent_route"]
+                self.assertEqual(
+                    route,
+                    {
+                        "activation": "mathematical_or_numerical_correction_evidence",
+                        "owner_skill": "computational-optimization",
+                        "reviewer": "mathematical_correctness_reviewer",
+                        "required_packet": "mathematical_intent_packet",
+                        "precedes": ["design", "benchmark_reviewer"],
+                    },
+                )
+                self.assertIn(
+                    "mathematical_correctness_reviewer",
+                    next(
+                        family
+                        for family in catalog.workflow_families
+                        if family["id"] == "research_driven_change"
+                    )["roles"]["specialists"],
+                )
+                self.assertNotIn(
+                    "mathematical_correctness_reviewer",
+                    default_specialists_for_task(config, catalog, task_id),
+                )
+
+    def test_math_scope_contract_names_required_packet_and_forbidden_surfaces(self) -> None:
+        """The route contract carries the math packet and refuses non-math scope drift."""
+        orchestration = (
+            PROJECT_ROOT / "agents" / "skills" / "agent-orchestration.md"
+        ).read_text(encoding="utf-8")
+        optimization = (
+            PROJECT_ROOT / "agents" / "skills" / "computational-optimization.md"
+        ).read_text(encoding="utf-8")
+        for field in (
+            "math_object",
+            "problem",
+            "variables",
+            "domains",
+            "units",
+            "objective",
+            "residual",
+            "constraints",
+            "equations",
+            "definitions",
+            "assumptions",
+            "approximations",
+            "derivation",
+            "iteration_map",
+            "update_map",
+            "invariants",
+            "limits",
+            "stopping_scalar",
+            "failure_semantics",
+            "equation_to_code_map",
+            "math_oracle",
+            "counterexample",
+            "allowed_write_paths",
+            "forbidden_surfaces",
+            "separate_handoff_targets",
+        ):
+            with self.subTest(field=field):
+                self.assertIn(field, optimization)
+                self.assertIn(field, orchestration)
+        for surface in ("architecture", "JIT", "backend", "runtime", "routing", "environment"):
+            with self.subTest(surface=surface):
+                self.assertIn(surface, orchestration)
+                self.assertIn(surface, optimization)
+        self.assertIn("math_packet_missing", orchestration)
+        self.assertIn("writer_target", orchestration)
+
+        team_config = json.loads(
+            (PROJECT_ROOT / "agents" / "agents_config.json").read_text(encoding="utf-8")
+        )
+        math_role = next(
+            role
+            for role in team_config["specialist_roles"]
+            if role["id"] == "mathematical_correctness_reviewer"
+        )
+        self.assertEqual(math_role["codex_agents"], ["reviewer"])
+        self.assertEqual(math_role["write_policy"]["mode"], "artifacts_only")
+        reviewer_view = tomllib.loads(
+            (PROJECT_ROOT / ".codex" / "agents" / "reviewer.toml").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(reviewer_view["model"], "gpt-5.6-luna")
+        self.assertEqual(reviewer_view["model_reasoning_effort"], "high")
 
     def test_prompt_routes_subagent_first_implementation_active(self) -> None:
         """Implementation, patch, and doc-edit prompts should activate bootstrap."""

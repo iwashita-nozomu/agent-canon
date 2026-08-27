@@ -938,6 +938,36 @@
         ],
         "notes": "The skill evaluator returns only the fixed observed report grammar as an artifact; the parent stores it in agent_evaluation.md, scores it, owns iteration and convergence decisions, and finalizes feedback_actions_resolved and learning_capture_complete outside evaluator context."
       }
+    },
+    {
+      "id": "mathematical_correctness_reviewer",
+      "codex_agents": [
+        "reviewer"
+      ],
+      "activation": "conditional_math_intent_packet",
+      "owns": [
+        "equation_definition_review",
+        "variable_domain_unit_review",
+        "objective_residual_constraint_review",
+        "assumption_approximation_review",
+        "derivation_review",
+        "iteration_update_map_review",
+        "invariant_limit_stopping_failure_review",
+        "equation_to_code_correspondence_review",
+        "math_oracle_counterexample_review",
+        "mapped_math_write_scope_review",
+        "non_math_surface_handoff_review"
+      ],
+      "required_outputs": [
+        "change_review.md"
+      ],
+      "write_policy": {
+        "mode": "artifacts_only",
+        "allowed_artifacts": [
+          "change_review"
+        ],
+        "notes": "The mathematical correctness reviewer is a Luna-backed read-only logical role. It records its math-scope findings in the existing change review artifact, checks the mathematical intent packet and mapped changed paths, and cannot authorize architecture, framework, JIT, compiler, backend, runtime, container, routing, environment, common-infrastructure, or proof-tool edits."
+      }
     }
   ],
   "handoffs": [
@@ -1055,6 +1085,16 @@
       "from": "experiment_reviewer",
       "to": "experimenter",
       "gate": "experiment review feedback is resolved or escalated"
+    },
+    {
+      "from": "manager",
+      "to": "mathematical_correctness_reviewer",
+      "gate": "math-intent packet is complete and mapped write scope is ready for mathematical correctness review"
+    },
+    {
+      "from": "mathematical_correctness_reviewer",
+      "to": "manager",
+      "gate": "equation/code correspondence and math write scope are accepted or a separate non-math handoff is recorded"
     },
     {
       "from": "report_reviewer",
@@ -1665,6 +1705,10 @@
     {
       "role": "experiment_reviewer",
       "when": "experimenter is active"
+    },
+    {
+      "role": "mathematical_correctness_reviewer",
+      "when": "math-intent evidence is present and the mathematical intent packet is complete"
     },
     {
       "role": "scheduler",
@@ -2931,8 +2975,8 @@
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass. Review exact diffs findings-first against request clauses and owning evidence. Run one initial owning review per candidate epoch, separate stable blocking finding IDs from advisory notes, and use focused recheck only after repair. For SOLID-sensitive Python changes require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence; return revise when that evidence or changed-path coverage is incomplete. Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands.",
-      "logical_role_id": "change_reviewer+final_reviewer+research_reviewer+experiment_reviewer+infra_reviewer",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/always_on_roles/8+agents/agents_config.json#/specialist_roles/3+agents/agents_config.json#/specialist_roles/5+agents/agents_config.json#/specialist_roles/12",
+      "logical_role_id": "change_reviewer+final_reviewer+research_reviewer+experiment_reviewer+infra_reviewer+mathematical_correctness_reviewer",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/always_on_roles/8+agents/agents_config.json#/specialist_roles/3+agents/agents_config.json#/specialist_roles/5+agents/agents_config.json#/specialist_roles/12+agents/agents_config.json#/specialist_roles/27",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [

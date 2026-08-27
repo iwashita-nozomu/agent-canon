@@ -682,6 +682,37 @@ contract requires them. Do not materialize empty reviewer or template artifacts.
 
 task id が分かる場合は、task catalog 側の family を正本にします。
 
+### Mathematical intent route
+
+数理・数値挙動の修正は、一般の実装候補を先に広げず、
+`mathematical_intent_packet` を作る math-intent route に入れます。route を有効にするのは、
+依頼の対象に数式・定義・変数 / domain / unit、objective / residual、制約、仮定、導出、
+反復 / 更新則、停止量、failure semantics、収束、勾配 / Jacobian / Hessian、KKT、または
+数値 oracle / counterexample が含まれ、かつ修正・診断対象であることが読める場合です。
+単に Docker、JIT、backend、runtime、routing、environment、CI、container、build、
+architecture を扱う依頼は math-intent にはしません。
+
+math-intent route の実装 handoff は、次を一つの packet として渡します。
+
+- `math_object`, `problem`, `variables`, `domains`, `units`, `objective`, `residual`,
+  `constraints`, `equations`, `definitions`
+- `assumptions`, `approximations`, `derivation`, `iteration_map`, `update_map`,
+  `invariants`, `limits`, `stopping_scalar`, `failure_semantics`
+- `equation_to_code_map`, `math_oracle`, `counterexample`
+- `allowed_write_paths`, `forbidden_surfaces`, `separate_handoff_targets`
+
+`allowed_write_paths` は equation-to-code map と math oracle から直接導ける数学定義、
+algorithm implementation、numerical oracle、その owner docs / tests に限定します。
+architecture / framework / JIT / compiler / backend / runtime / container / Docker / routing /
+environment / common infrastructure / proof-tool / IR infrastructure は既定の forbidden
+surface です。そこが必要に見える原因は separate handoff にし、数学 writer の write scope
+へ混ぜません。packet の必須欄、map、oracle が未接続なら `math_packet_missing` として
+write-capable dispatch を停止します。
+
+明示された非数理 clause はこの route の対象外であり、同じ依頼に math clause と併記された
+場合も sibling handoff へ分けます。非数理 route を止める根拠に math packet を使わず、math
+route を止める根拠に非数理エラーだけを使いません。
+
 ## Public Skill Selection
 
 - user が明示した `$skill-name` は preserve します
@@ -709,6 +740,10 @@ task id が分かる場合は、task catalog 側の family を正本にします
 - directory layout、directory README responsibility、root view、path mapping、responsibility-scope map、source-tree ownership の refactor では `structure-refactor` と `refactor-loop` を併用します
 - task 開始前に standalone AgentCanon source、`bootstrap.sh`、外部 runtime root、または canonical path の欠落 / 移動 / stale state が疑われる場合は、通常 task の前に `structure-refactor` の pre-task structure repair route を使います。AgentCanon source/runtime drift なら `agent-canon-update` も併用します
 - optimizer、solver、preconditioner、gradient、Jacobian、Hessian、KKT、収束、tolerance、数値 benchmark、数値 test 診断が scope にある場合は `computational-optimization` を使います
+- 数理 / 数値の修正 evidence がある場合は `computational-optimization` を active owner とし、
+  `mathematical_correctness_reviewer` を generic designer、benchmark、scientific-computing
+  reviewer より前の math-intent stage で選びます。数学 evidence のない infrastructure-only
+  request はこの route を選びません
 - GPU / CUDA / JAX / XLA / IREE 実行、`CUDA_VISIBLE_DEVICES`、`nvidia-smi`、ExperimentRunner Python 実行、JAX preallocation 無効化、GPU validation blocker が scope にある場合は `gpu-execution` を使います
 - 原因考察、仮説、修正箇所選定、複数候補比較、change-impact packet 作成、repair-planning / subagent handoff context が task の中心にある場合は `dependency-analysis` を足します。原因仮説を扱う場合は `agents/workflows/hypothesis-validation-workflow.md` を overlay として明示します
 - Markdown file edit、docs lint / link / heading repair、Mermaid / math drift、formatter adjacent check、`agent-canon docs`、docs-check failure、Markdown style drift が scope にある場合は `md-style-check` を足します。substantive な文書変更は `prose-reasoning-graph` と `structure-planning` も併用します
@@ -727,6 +762,11 @@ task id が分かる場合は、task catalog 側の family を正本にします
 ## Review And Specialist Expectations
 
 - family に応じた reviewer / specialist stack まで出します
+- math-intent route では `mathematical_correctness_reviewer` が equations、variables、units、
+  assumptions、derivation、update / stopping map、equation-to-code correspondence、math
+  oracle、changed-path scope を検証します。この reviewer の finding は数学 correspondence
+  と scope の判定だけを行い、architecture / JIT / backend / runtime / routing / environment /
+  proof-tool の編集を承認しません。必要なら別 owner の sibling handoff を返します
 - `Research-Driven Change` では research / report / reproducibility / benchmark / artifact 系 reviewer を落としません
 - `Research-Driven Change` のどの分岐でも、文献・一次資料に基づく実装 claim は
   `literature-survey` の source packet から design、implementation、benchmark、
