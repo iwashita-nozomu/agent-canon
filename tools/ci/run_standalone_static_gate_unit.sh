@@ -120,9 +120,11 @@ AGENT_CANON_STATIC_RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT}"
 AGENT_CANON_STATIC_RUNTIME_ROOT="$(runtime_boundary_root "${AGENT_CANON_STATIC_RUNTIME_ROOT}")"
 export AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_STATIC_RUNTIME_ROOT}"
 export AGENT_CANON_CACHE_ROOT="$(runtime_boundary_path "${AGENT_CANON_CACHE_ROOT:-${AGENT_CANON_STATIC_RUNTIME_ROOT}/cache}")"
+export CARGO_HOME="$(runtime_boundary_path "${AGENT_CANON_STATIC_RUNTIME_ROOT}/cargo-home")"
+export RUSTUP_HOME="$(runtime_boundary_path "${AGENT_CANON_STATIC_RUNTIME_ROOT}/rustup-home")"
 export CARGO_TARGET_DIR="$(runtime_boundary_path "${CARGO_TARGET_DIR:-${AGENT_CANON_CACHE_ROOT}/cargo-target}")"
 export TMPDIR="$(runtime_boundary_path "${TMPDIR:-${AGENT_CANON_STATIC_RUNTIME_ROOT}/tmp}")"
-mkdir -p "${CARGO_TARGET_DIR}" "${TMPDIR}"
+mkdir -p "${CARGO_HOME}" "${RUSTUP_HOME}" "${CARGO_TARGET_DIR}" "${TMPDIR}"
 
 run_full() {
   # Bootstrap authenticates and supplies this control capability.  The
@@ -130,7 +132,10 @@ run_full() {
   local control_parent_root="${AGENT_CANON_CONTROL_PARENT_ROOT:?AGENT_CANON_CONTROL_PARENT_ROOT is required}"
   AGENT_CANON_CONTROL_PARENT_ROOT="${control_parent_root}" \
   AGENT_CANON_CHILD_PURPOSE="standalone-static-gate-unit" \
+  AGENT_CANON_CLI_CMD="/usr/local/bin/agent-canon" \
   AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_STATIC_RUNTIME_ROOT}" \
+  CARGO_HOME="${CARGO_HOME}" \
+  RUSTUP_HOME="${RUSTUP_HOME}" \
     bash "${ROOT}/tools/ci/run_all_checks.sh" "${UNIT_ARGS[@]}"
 }
 

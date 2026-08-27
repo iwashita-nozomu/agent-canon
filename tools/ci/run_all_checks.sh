@@ -308,6 +308,13 @@ if [[ -n "${PR_GATE_RECEIPT}" ]]; then
 fi
 
 resolve_agent_canon_cli() {
+  if [[ -n "${AGENT_CANON_CLI_CMD:-}" ]]; then
+    if [[ ! -x "${AGENT_CANON_CLI_CMD}" ]]; then
+      return 1
+    fi
+    AGENT_CANON_CLI_MODE="binary"
+    return 0
+  fi
   local root_tool_binary="${CANON_TOOLS_ROOT}/bin/agent-canon"
   local source_tool_binary="${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon"
   local source_release_binary="${AGENT_CANON_CLI_TARGET_DIR}/release/agent-canon"

@@ -48,6 +48,9 @@ def test_full_unit_reuses_existing_body_and_forwards_options() -> None:
     )
     assert "AGENT_CANON_CONTROL_PARENT_ROOT:?AGENT_CANON_CONTROL_PARENT_ROOT is required" in body
     assert 'AGENT_CANON_CHILD_PURPOSE="standalone-static-gate-unit"' in body
+    assert 'AGENT_CANON_CLI_CMD="/usr/local/bin/agent-canon"' in body
+    assert 'CARGO_HOME="${CARGO_HOME}"' in body
+    assert 'RUSTUP_HOME="${RUSTUP_HOME}"' in body
     assert 'AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_STATIC_RUNTIME_ROOT}"' in body
     assert "full) run_full" in text
     assert '"${UNIT}" != "full"' in text
@@ -103,6 +106,9 @@ def test_full_unit_runs_fake_container_body_without_target_mutation(
         "printf 'runtime=%s\\n' \"${AGENT_CANON_RUNTIME_ROOT}\" >> \"${FAKE_CAPTURE}\"\n"
         "printf 'purpose=%s\\n' \"${AGENT_CANON_CHILD_PURPOSE}\" >> \"${FAKE_CAPTURE}\"\n"
         "printf 'handoff=%s\\n' \"${AGENT_CANON_CHILD_HANDOFF}\" >> \"${FAKE_CAPTURE}\"\n"
+        "printf 'cli=%s\\n' \"${AGENT_CANON_CLI_CMD}\" >> \"${FAKE_CAPTURE}\"\n"
+        "printf 'cargo=%s\\n' \"${CARGO_HOME}\" >> \"${FAKE_CAPTURE}\"\n"
+        "printf 'rustup=%s\\n' \"${RUSTUP_HOME}\" >> \"${FAKE_CAPTURE}\"\n"
         "printf 'args=%s\\n' \"$*\" >> \"${FAKE_CAPTURE}\"\n"
         "printf 'RUN_ALL_CHECKS_BODY=completed\\n'\n",
         encoding="utf-8",
@@ -117,7 +123,7 @@ def test_full_unit_runs_fake_container_body_without_target_mutation(
         "set -euo pipefail\n"
         "payload=$(cat)\n"
         "if [[ \"${payload}\" == *'runtime_artifact_boundary'* ]]; then\n"
-        "  printf '%s\\n' \"${3}\"\n"
+        "  if [[ \"$#\" -ge 4 ]]; then printf '%s\\n' \"${4}\"; else printf '%s\\n' \"${3}\"; fi\n"
         "else\n"
         "  exit 0\n"
         "fi\n",
@@ -162,6 +168,9 @@ def test_full_unit_runs_fake_container_body_without_target_mutation(
         "runtime": str(runtime),
         "purpose": "standalone-static-gate-unit",
         "handoff": "authenticated-handoff",
+        "cli": "/usr/local/bin/agent-canon",
+        "cargo": str(runtime / "cargo-home"),
+        "rustup": str(runtime / "rustup-home"),
         "args": "--quick --skip-docs",
     }
     after_tree = subprocess.run(
