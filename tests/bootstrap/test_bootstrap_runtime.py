@@ -558,6 +558,41 @@ def test_target_add_prunes_missing_target_and_is_idempotent(
     assert repeated["details"]["changed"] is False
 
 
+def test_fresh_install_and_update_prune_retained_stale_targets(
+    tmp_path: Path, fake_docker: DockerAdapter
+) -> None:
+    """Reinstalling an uninstalled runtime keeps valid targets only."""
+    manager = runtime(tmp_path, fake_docker)
+    stale = tmp_path / "stale"
+    valid = tmp_path / "valid"
+    stale.mkdir()
+    valid.mkdir()
+    manager.install()
+    manager.start()
+    manager.target_add(stale)
+    manager.target_add(valid)
+    manager.uninstall()
+    stale.rmdir()
+
+    manager.install()
+    state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+    valid_digest = sha256_bytes(str(valid.resolve()).encode("utf-8"))
+    assert list(state["targets"]) == [valid_digest]
+    registry = manager.paths.mounts.read_text(encoding="utf-8")
+    assert f"[targets.{valid_digest}]" in registry
+    assert str(stale.resolve()) not in registry
+    manager.uninstall()
+
+    with manager.locked():
+        state = manager._read_state(allow_manifest_drift=True)
+        assert manager._update_locked(state, "update")["code"] == "updated"
+        state = json.loads(manager.paths.state.read_text(encoding="utf-8"))
+        assert list(state["targets"]) == [valid_digest]
+        registry = manager.paths.mounts.read_text(encoding="utf-8")
+        assert f"[targets.{valid_digest}]" in registry
+        assert str(stale.resolve()) not in registry
+
+
 def test_candidate_registry_is_snapshotted_before_create_and_restored_on_failure(
     tmp_path: Path, fake_docker: DockerAdapter
 ) -> None:
