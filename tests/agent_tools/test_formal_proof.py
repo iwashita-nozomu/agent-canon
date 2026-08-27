@@ -23,9 +23,69 @@ from typing import cast
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "formal_proof.py"
 
+PROOF_TOOL_HANDOFF_FIXTURE: dict[str, object] = {
+    "target_theorem": "finite_stop_for_public_solve",
+    "public_root": "solver.py::main -> out.answer",
+    "iteration_map": "Step_impl(problem, config, state)",
+    "stopping_scalar": "residual_norm(state)",
+    "mathematical_evidence": {
+        "status": "absent",
+        "paths": [],
+    },
+    "failure": {
+        "kind": "ir_extractor_or_lowering",
+        "producer_surface": "tools/agent_tools/jit_canonical_ir.py",
+        "consumer_surface": "generated Lean return projection",
+    },
+    "math_writer": {
+        "allowed_paths": [
+            "math/definitions",
+            "math/derivations",
+            "tests/numerical_oracle.py",
+        ],
+        "forbidden_paths": [
+            "tools/agent_tools/jit_canonical_ir.py",
+            "rust/agent-canon/src/jit_ir_to_lean.rs",
+            "lean/",
+            "JIT/backend/runtime architecture",
+        ],
+        "algorithm_change_authorized": False,
+    },
+    "proof_tool_worker": {
+        "allowed_paths": [
+            "tools/agent_tools/jit_canonical_ir.py",
+            "rust/agent-canon/src/jit_ir_to_lean.rs",
+            "lean/",
+        ],
+    },
+    "return_status": "route_infrastructure",
+}
+
 
 class FormalProofToolTest(unittest.TestCase):
     """Validate scaffold output and proof-status boundaries."""
+
+    def test_ir_failure_fixture_does_not_authorize_math_or_jit_drift(self) -> None:
+        """An IR failure routes tooling without authorizing unrelated math edits."""
+        handoff = PROOF_TOOL_HANDOFF_FIXTURE
+        mathematical_evidence = cast(dict[str, object], handoff["mathematical_evidence"])
+        failure = cast(dict[str, object], handoff["failure"])
+        math_writer = cast(dict[str, object], handoff["math_writer"])
+        proof_tool_worker = cast(dict[str, object], handoff["proof_tool_worker"])
+        math_allowed = set(cast(list[str], math_writer["allowed_paths"]))
+        math_forbidden = set(cast(list[str], math_writer["forbidden_paths"]))
+        proof_allowed = set(cast(list[str], proof_tool_worker["allowed_paths"]))
+
+        self.assertEqual(failure["kind"], "ir_extractor_or_lowering")
+        self.assertEqual(mathematical_evidence["status"], "absent")
+        self.assertEqual(handoff["return_status"], "route_infrastructure")
+        self.assertFalse(math_writer["algorithm_change_authorized"])
+        self.assertTrue({"tools/agent_tools/jit_canonical_ir.py", "lean/"} <= math_forbidden)
+        self.assertTrue(proof_allowed.isdisjoint(math_allowed))
+        self.assertEqual(
+            failure["producer_surface"],
+            "tools/agent_tools/jit_canonical_ir.py",
+        )
 
     def test_writes_lean_scaffold_and_search_queries(self) -> None:
         """Lean scaffold should be clearly unverified and query existing proofs."""

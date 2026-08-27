@@ -38,7 +38,7 @@ granularity policy.
 
 - Purpose: formalize mathematical, proof-sketch, and implementation-derived
   claims into checker-backed proof or refutation routes.
-- Section path: start with Purpose, Use When, Core References, and Mandatory
+- Section path: start with Purpose, Proof-tool Boundary, Use When, Core References, and Mandatory
   Checklist; then use Canonical Flow, Required Outputs, Proof Status Table,
   JIT-canonical IR, Lemma Dependency Graph, Frontier Exploration Loop, and the
   proof-expansion sections for operational detail.
@@ -69,6 +69,35 @@ checked boundary を top-level 分岐として返してはいけません。個�
 はその checklist 全体の `pass` / `fail` と、失敗した required item の一覧です。
 必要な check item は proof search 中に増やせますが、未接続 item を別 branch の
 完了扱いにしてはいけません。
+
+## Proof-tool Boundary
+
+この skill は、`$algorithm-proof-exploration` が定義する
+`proof_tool_handoff` を消費して証明・証明基盤の作業を行います。failure classifier
+をここで複製せず、packet の `failure.kind`、`mathematical_evidence`、
+`allowed_paths`、`forbidden_paths`、`return_status` をそのまま適用します。
+
+数理 task が formal proof を明示的に選択していない場合、証明 tool の実行や
+証明基盤の編集は必須ではありません。proof tool が選択された場合でも、failed
+IR extraction/lowering、Lean/Lake/checker environment、または JIT/backend trace
+は、数理の recurrence、assumption、theorem が誤っている証拠ではありません。
+それらは `route_infrastructure` として exact producer/consumer owner に返し、
+math-writer の `forbidden_paths`（algorithm mechanism、public API、JIT boundary、
+backend/runtime architecture）を越えません。
+
+証明失敗を `return_to_math` にするには、実装済みの `Step_impl` と停止スカラー、
+target theorem、top-level `Problem`/config assumptions を固定したうえで、抽出器や
+checker の故障とは独立した checker-backed counterexample または theorem mismatch
+を `mathematical_evidence` に含めます。これがない限り、証明を通すために
+algorithm、JIT boundary、runtime/API、proof-only production field を変更しては
+いけません。`return_to_math` の場合だけ algorithm owner が数学定義・導出・更新則を
+修正し、proof-tool worker はその数学的判断を代行しません。
+
+proof-tool worker の write scope は packet の `allowed_paths` に記載された
+extractor/lowering、generated evidence、theorem graph、Lean/Lake/checker、または
+JIT/backend surface に限定します。修正後は native proof-tool receipt を返しますが、
+その receipt は数学的正しさの判定ではありません。数学 owner は別途 recurrence /
+convergence oracle を返し、二つを一つの成功判定に混ぜません。
 
 ## Use When
 
@@ -114,6 +143,15 @@ checked boundary を top-level 分岐として返してはいけません。個�
   checker-backed validation command は、public entrypoint と program contract から
   射影した必要性を持つ場合に採用します。補助 lemma や局所判定は、target theorem の
   dependency graph 上で必要な場合に選びます。
+- proof-tool failure が入力に含まれる場合は、先に handoff の
+  `mathematical_evidence` を確認します。`absent` または tool failure だけなら
+  数理修正を開始せず、`route_infrastructure` と exact owner/path を返します。
+  `counterexample` / `theorem_mismatch` が checker-backed に存在する場合だけ、
+  `return_to_math` として algorithm owner に返します。
+- math-writer と proof-tool worker の `allowed_paths` / `forbidden_paths` を
+  handoff に明記します。証明 task のために必要な proof-tool path だけを編集し、
+  証明 checker を通す目的で production algorithm、JIT boundary、または runtime
+  architecture を変更しません。formal proof は全 math task の必須工程ではありません。
 - 目的定理は public entrypoint の静的な引数 schema と戻り値 schema から作ります。
   低レベルの op id、binding、region、frame、trace row、または
   `generatedMainFuel` の内部 state を目的定理の表面にしてはいけません。

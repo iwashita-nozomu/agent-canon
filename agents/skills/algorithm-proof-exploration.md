@@ -18,7 +18,7 @@ downstream implementation ../../.codex/personal/skills/algorithm-proof-explorati
 
 - Purpose: explore algorithm choices and implementation changes under proof
   obligations before handing terminal proof work to `$formal-proof-workflow`.
-- Section path: read Purpose, Use When, Relationship To
+- Section path: read Purpose, Proof-tool Boundary, Use When, Relationship To
   `$formal-proof-workflow`, Numerical Iteration Boundary, and Completion
   Condition before Canonical Flow, Artifact Contract, and Guardrails.
 - Use when: convergence, stopping, finite-precision, certificate, or solver
@@ -44,6 +44,61 @@ backend、runtime target、compiler route、device、dtype は、証明を通す
 または config が明示した場合だけ backend 固有 theorem を扱います。それ以外では
 backend を top-level profile input、generated backend witness、coverage evidence として
 保持し、証拠不足は `backend_evidence_blocker` として返します。
+
+## Proof-tool Boundary and Handoff
+
+数理アルゴリズムの task と、証明・抽出・実行基盤の task は別の write scope です。
+この skill は境界判定と handoff packet の正本を持ち、`$formal-proof-workflow` は
+その packet を消費します。数理 task が formal proof を要求していない限り、proof
+tooling は必須ではなく、JIT/IR、theorem graph、Lean/Lake、checker、backend の
+失敗を理由に数理実装や JIT 境界を編集してはいけません。
+
+tool gap が現れたら、まず対象 theorem、public root、実装済みの反復写像
+`Step_impl`、停止スカラーを固定し、tool failure から独立した数理 evidence
+（定義・導出、反例、または theorem mismatch）があるかを記録します。handoff は
+次の `proof_tool_handoff` packet を一つだけ作り、generic な別 classifier を追加
+しません。
+
+```text
+proof_tool_handoff = {
+  target_theorem: <public-root theorem and profile>,
+  public_root: <entrypoint and input/return projection>,
+  iteration_map: <implemented Step_impl or non-iterative mechanism>,
+  stopping_scalar: <implemented stopping quantity, or none>,
+  mathematical_evidence: {
+    status: absent | supports_current_map | counterexample | theorem_mismatch,
+    paths: <definitions/derivation/oracle/counterexample evidence>
+  },
+  failure: {
+    kind: math_mismatch | ir_extractor_or_lowering |
+          lean_lake_checker_environment | jit_backend_trace,
+    producer_surface: <exact failing producer>,
+    consumer_surface: <exact blocked consumer>
+  },
+  allowed_paths: <paths for the receiving owner>,
+  forbidden_paths: <paths the current writer must not edit>,
+  return_status: return_to_math | route_infrastructure | blocked_external
+}
+```
+
+Failure kind is selected in this order: `(a)` a checker-backed mathematical
+recurrence/assumption/theorem mismatch, then `(b)` IR extractor or lowering, `(c)`
+Lean/Lake/checker environment, and `(d)` JIT/backend trace. A failure in `(b)`--`(d)`
+is infrastructure evidence, not mathematical evidence. It routes to the exact
+producer/consumer owner with `return_status=route_infrastructure` and keeps the
+mathematical implementation unchanged. Only `(a)` with a checked counterexample or
+theorem mismatch may return `return_status=return_to_math` and authorize an algorithm
+change. A proof-tool failure alone never authorizes changes to `Step_impl`, stopping
+criteria, public API, JIT boundaries, backend configuration, or runtime architecture.
+
+The default math-writer scope permits mathematical definitions/derivations, the
+algorithm mechanism, numerical oracles, and their owning documents/tests. It forbids
+JIT/IR extractors and lowerers, generated Lean/evidence, theorem-graph or proof-status
+generation, Lean/Lake/checker environments, and JIT/backend/runtime configuration.
+Those proof-tool paths may be edited only by an explicitly routed proof-tool worker
+whose packet names the same paths in `allowed_paths`. The proof-tool worker returns a
+native receipt; that receipt is validation evidence and does not decide mathematical
+correctness. The math owner separately supplies the recurrence/convergence oracle.
 
 ## Use When
 
@@ -107,8 +162,9 @@ production entrypoint がその Lean design transition と certificate predicate
 
 ## Algorithm Repair Ordering
 
-Algorithm repair begins with the theorem target, public entrypoint, IR-backed
-implementation mechanism, frontier board, and selected algorithm-change row.
+Algorithm repair begins only after the proof-tool boundary packet establishes
+`return_status=return_to_math`. Then use the theorem target, public entrypoint,
+IR-backed implementation mechanism, frontier board, and selected algorithm-change row.
 Tests and expected values are validation-oracle evidence after that route is
 fixed. Existing failing tests help classify symptoms and regression placement,
 but the repair target is the algorithmic mechanism: initializer, recurrence,
