@@ -81,7 +81,10 @@ packet の role object は producer と consumer で同じ shape を使います
 `owner`、`allowed_paths`、`forbidden_paths`、`evidence`、`reason` を持ち、
 省略・継承・共有の write scope は無効です。`proof_tool_worker` の
 `allowed_paths` はこの handoff で選択された proof-tool mechanism の範囲だけを
-列挙し、math-writer の範囲を暗黙に拡大してはいけません。
+列挙し、math-writer の範囲を暗黙に拡大してはいけません。`forbidden_paths` は
+production `main`、public API、algorithm return schema、JIT boundary、および
+無関係な runtime を常に含みます。`return_to_math` はこの禁止範囲を緩めず、
+数学 owner 用の新しい handoff を開始するだけです。
 
 数理 task が formal proof を明示的に選択していない場合、証明 tool の実行や
 証明基盤の編集は必須ではありません。proof tool が選択された場合でも、failed
@@ -192,12 +195,13 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
 - IR-to-Lean / theorem-graph tooling は、public root の引数 tree、戻り値 tree、
   `Answer` / `State` / `Info` などの field path、return leaf index の対応を
   生成しなければなりません。目的 theorem はこの high-level projection 関数だけを
-  参照します。projection から低レベル evaluator への接続が欠けている場合は、
+ 参照します。projection から低レベル evaluator への接続が欠けている場合は、
  低レベル binding を目的定理へ持ち込まず、`failure.kind=ir_extractor_or_lowering`
   の `proof_tool_handoff` を作ります。packet の `proof_tool_worker` だけが
-  extractor、projection 生成、または `main` の返却 schema を直せます。math-writer
-  は `return_status=return_to_math` と checker-backed 数理 evidence が返るまで
-  production `main` を編集しません。
+  extractor または生成 projection/adapter/checker を直せます。production `main` の
+  返却 schema、public API、algorithm return schema は proof-tool worker の
+  `forbidden_paths` であり、`return_to_math` の新しい math-owner handoff と
+  checker-backed 数理 evidence が揃うまで変更しません。
 - theorem-critical な値は、自由 witness ではなく、public root の入力と実装 path から
   生成された値として扱います。たとえば KKT 成分、残差成分、停止 tolerance、
   solver 返却値、backend decode 誤差を target theorem が消費するなら、生成 Lean には
@@ -305,8 +309,10 @@ convergence oracle を返し、二つを一つの成功判定に混ぜません�
   と theorem graph overlay から生成します。必須の equation evidence が欠けて
   projection が失敗した場合は、proof note を手書きで補わず、
   `failure.kind=ir_extractor_or_lowering` の `proof_tool_handoff` を作ります。
-  packet の `proof_tool_worker` が JIT 抽出または実装形状を直してから再生成します。
-  math-writer は packet が `return_to_math` になるまで実装形状を変更せず、proof note
+  packet の `proof_tool_worker` が JIT extractor または生成 projection/adapter/checker
+  を直してから再生成します。production implementation shape、main return schema、
+  public API、algorithm return schema は worker の `forbidden_paths` に残し、
+  `return_to_math` の新しい math-owner handoff がない限り変更しません。proof note
   側に同じ runtime 数式を並行して手書きしません。
 - 命題化は flat な fact 一覧ではなく、public root の戻り値 projection で述べた
   目的命題 `P` から始めます。まず Lemma Dependency Graph の
@@ -1888,16 +1894,18 @@ The runtime discovery adapter delegates these required operating clauses to this
    shape, JIT / StableHLO / LLVM extraction, IR-to-Lean generation, theorem graph
    wiring, proof-status overlays, or the proof note, treat the finding as a
    repair-and-rerun work item rather than as a user-facing blocker. Create the
-   corresponding `proof_tool_handoff` and let its `proof_tool_worker` make the
-   directly relevant responsibility-preserving repair within `allowed_paths`,
-   regenerate the affected JIT, backend, Lean, theorem-graph, and proof-search
-   artifacts, then re-run the same public-root target theorem or theorem profile. You may return only after at least one repair and
+   corresponding `proof_tool_handoff`. For a generated projection, adapter,
+   checker, proof infrastructure, or extractor gap, let its `proof_tool_worker`
+   make the directly relevant responsibility-preserving repair within
+   `proof_tool_worker.allowed_paths`, regenerate the affected JIT, backend, Lean,
+   theorem-graph, and proof-search artifacts, then re-run the same public-root target theorem or theorem profile. You may return only after at least one repair and
    rerun attempt shows that the remaining frontier is terminal or belongs to a
-   top-level input, backend/runtime boundary, or algorithmic choice. Do not add
+   top-level input, backend/runtime boundary, or algorithmic choice. A production
+   `main`, public API, algorithm, or algorithm return schema is never a
+   proof-tool repair; route it through a new math-owner handoff only after
+   `return_status=return_to_math` has checker-backed mathematical evidence. Do not add
    proof-only fields, diagnostic gates, or runtime proof checks to production
-   code to satisfy this rule. A production `main` / algorithm shape is not a
-   proof-tool repair: change it only when the packet has
-   `return_status=return_to_math` and checker-backed mathematical evidence.
+   code to satisfy this rule.
    Repeat this repair-and-rerun cycle, not just the analysis, while the next
    frontier is actionable from repository code, extraction, generated Lean,
    theorem graph, proof overlay, local proof libraries, or existing checker
@@ -1958,7 +1966,8 @@ The runtime discovery adapter delegates these required operating clauses to this
    stale generated evidence, a failing proof target that can be repaired
    locally, or any generated Lean / extractor / theorem-graph mismatch, do not
    return to the user. Create the corresponding proof-tool handoff and let its
-   `proof_tool_worker` repair, regenerate, and recheck within `allowed_paths`, or
+   `proof_tool_worker` repair, regenerate, and recheck within
+   `proof_tool_worker.allowed_paths`, or
    launch the next bounded Wave. A proof note, theorem-graph report, generated Lean file, or Wave
    summary with open frontier is evidence, not a workflow return value.
 1. Run an exit gate immediately before any user-facing return. It must verify

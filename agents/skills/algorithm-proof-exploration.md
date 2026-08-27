@@ -78,14 +78,14 @@ proof_tool_handoff = {
   math_writer: {
     owner: <mathematical algorithm owner>,
     allowed_paths: <math definitions/derivations/oracles and owning docs/tests>,
-    forbidden_paths: <proof-tool, JIT, backend, and runtime surfaces>,
+    forbidden_paths: <proof-tool, production main, public API, algorithm return schema, JIT boundary, backend, and runtime surfaces>,
     evidence: <mathematical evidence status and paths>,
     reason: <why math writing is or is not authorized>
   },
   proof_tool_worker: {
     owner: <exact proof-tool mechanism owner>,
-    allowed_paths: <extractor/lowering/checker surfaces for this failure>,
-    forbidden_paths: <math algorithm, production main/API/JIT boundary, and unrelated runtime surfaces>,
+    allowed_paths: <extractor/lowering/checker/proof-infrastructure surfaces for this failure; never production JIT>,
+    forbidden_paths: <math algorithm, production main, public API, algorithm return schema, JIT boundary, and unrelated runtime surfaces>,
     evidence: <native tool receipt and source/consumer evidence>,
     reason: <why this proof-tool route is selected>
   },
@@ -108,12 +108,14 @@ algorithm mechanism, numerical oracles, and their owning documents/tests. It for
 JIT/IR extractors and lowerers, generated Lean/evidence, theorem-graph or proof-status
 generation, Lean/Lake/checker environments, and JIT/backend/runtime configuration.
 The `proof_tool_worker` may edit only the same packet's named `allowed_paths`; its
-`forbidden_paths` include the math algorithm unless `return_status=return_to_math`
-has been established by independent mathematical evidence. Both role objects must
-carry `owner`, `allowed_paths`, `forbidden_paths`, `evidence`, and `reason`; no
-unnamed or inherited write scope is valid. The proof-tool worker returns a native
-receipt; that receipt is validation evidence and does not decide mathematical
-correctness. The math owner separately supplies the recurrence/convergence oracle.
+`forbidden_paths` always include the production `main`, public API, algorithm
+return schema, and JIT boundary; `return_status=return_to_math` never relaxes
+those prohibitions. Instead, it routes a new handoff to the math owner. Both
+role objects must carry `owner`, `allowed_paths`, `forbidden_paths`, `evidence`,
+and `reason`; no unnamed or inherited write scope is valid. The proof-tool worker
+returns a native receipt; that receipt is validation evidence and does not decide
+mathematical correctness. The math owner separately supplies the
+recurrence/convergence oracle.
 
 ## Use When
 

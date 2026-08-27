@@ -63,6 +63,12 @@ PROOF_TOOL_HANDOFF_FIXTURE: dict[str, object] = {
             "rust/agent-canon/src/jit_ir_to_lean.rs",
             "lean/",
             "JIT/backend/runtime architecture",
+            "production main",
+            "public API",
+            "algorithm return schema",
+            "algorithm implementation",
+            "JIT boundary",
+            "backend runtime",
         ],
         "evidence": {
             "status": "absent",
@@ -80,8 +86,12 @@ PROOF_TOOL_HANDOFF_FIXTURE: dict[str, object] = {
         "forbidden_paths": [
             "math/definitions",
             "math/derivations",
-            "production algorithm and public API",
-            "JIT boundary changes unrelated to extraction",
+            "production main",
+            "public API",
+            "algorithm return schema",
+            "algorithm implementation",
+            "JIT boundary",
+            "backend runtime",
         ],
         "evidence": {
             "status": "awaiting_native_receipt",

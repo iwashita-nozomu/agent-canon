@@ -77,8 +77,18 @@ class FormalProofToolTest(unittest.TestCase):
                 ],
             },
         )
+        forbidden_production_surfaces = {
+            "production main",
+            "public API",
+            "algorithm return schema",
+            "algorithm implementation",
+            "JIT boundary",
+            "backend runtime",
+        }
         self.assertTrue({"tools/agent_tools/jit_canonical_ir.py", "lean/"} <= math_forbidden)
-        self.assertTrue({"production algorithm and public API"} <= proof_forbidden)
+        self.assertTrue(forbidden_production_surfaces <= math_forbidden)
+        self.assertTrue(forbidden_production_surfaces <= proof_forbidden)
+        self.assertTrue(forbidden_production_surfaces.isdisjoint(proof_allowed))
         self.assertTrue(proof_allowed.isdisjoint(math_allowed))
         self.assertEqual(
             failure["producer_surface"],
