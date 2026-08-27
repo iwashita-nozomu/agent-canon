@@ -54,9 +54,25 @@ else:
     from agent_canon_source_root import resolve_agent_canon_source_root as _resolve_source_root
 
 if __package__:
-    from .packets import iter_artifacts as _iter_artifacts
+    from .packets import (
+        MATHEMATICAL_INTENT_PACKET_SCHEMA,
+        MathematicalIntentPacket,
+        iter_artifacts as _iter_artifacts,
+        mathematical_intent_packet_mapping,
+        mathematical_intent_route_for_task,
+        normalize_mathematical_intent_packet,
+        resolve_math_intent_packet_for_spec,
+    )
 else:
-    from packets import iter_artifacts as _iter_artifacts
+    from packets import (  # type: ignore[no-redef]
+        MATHEMATICAL_INTENT_PACKET_SCHEMA,
+        MathematicalIntentPacket,
+        iter_artifacts as _iter_artifacts,
+        mathematical_intent_packet_mapping,
+        mathematical_intent_route_for_task,
+        normalize_mathematical_intent_packet,
+        resolve_math_intent_packet_for_spec,
+    )
 
 import json as _json
 from collections.abc import Mapping as _Mapping
@@ -112,6 +128,11 @@ else:
         specialist_role_ids,
         task_ids,
     )
+
+if __package__:
+    from .writer_target import validate_mathematical_writer_target
+else:
+    from writer_target import validate_mathematical_writer_target  # type: ignore[no-redef]
 
 if __package__:
     from .workspace_scope import (
@@ -378,6 +399,10 @@ def _validate_report_destination(spec: RunBundleSpec, report_root: _Path) -> Non
 
 def prepare_run_bundle(spec: RunBundleSpec) -> PreparedRunBundle:
     """Render and validate all initial run bytes without filesystem writes."""
+    math_packet = resolve_math_intent_packet_for_spec(spec)
+    if math_packet is not None:
+        for target in spec.writer_targets.values():
+            validate_mathematical_writer_target(target, math_packet)
     replacements = {
         "RUN_ID": spec.run_id,
         "TASK": spec.task,
@@ -554,6 +579,12 @@ __all__ = (
     "create_run_bundle",
     "prepare_run_bundle",
     "PreparedRunBundle",
+    "MathematicalIntentPacket",
+    "MATHEMATICAL_INTENT_PACKET_SCHEMA",
+    "normalize_mathematical_intent_packet",
+    "mathematical_intent_packet_mapping",
+    "mathematical_intent_route_for_task",
+    "resolve_math_intent_packet_for_spec",
     "run_active_design_packet",
     "run_workflow_family",
     "format_subagent_wave",

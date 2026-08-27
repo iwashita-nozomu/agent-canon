@@ -27,10 +27,12 @@ from route import implementation_handoff_required, load_skill_route_rules
 if TYPE_CHECKING:
     if __package__:
         from .packets import ActiveDesignPacketConfig
+        from .packets import MathematicalIntentPacket
         from .workspace_scope import RepositoryRoots
         from .writer_target import WriterTarget
     else:
         from packets import ActiveDesignPacketConfig
+        from packets import MathematicalIntentPacket
         from workspace_scope import RepositoryRoots
         from writer_target import WriterTarget
 
@@ -167,11 +169,14 @@ class RunBundleSpec:
     default_review_pack_ids: tuple[str, ...] = ()
     selected_skills: tuple[str, ...] = ()
     task_catalog: TaskCatalog | None = None
+    task_id: str | None = None
     agent_type_selections: tuple[AgentTypeSelection, ...] = ()
     parent_lineage_id: str = ""
     decision_sufficiency_packet: dict[str, object] | None = None
     decision_sufficiency_packet_ref: str = ""
     active_design_packet: ActiveDesignPacketConfig | None = None
+    math_intent_route: Mapping[str, object] | None = None
+    math_intent_packet: "MathematicalIntentPacket | None" = None
     writer_targets: Mapping[str, object] = field(default_factory=dict)
 
 

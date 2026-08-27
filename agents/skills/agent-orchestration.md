@@ -706,8 +706,12 @@ algorithm implementation、numerical oracle、その owner docs / tests に限�
 architecture / framework / JIT / compiler / backend / runtime / container / Docker / routing /
 environment / common infrastructure / proof-tool / IR infrastructure は既定の forbidden
 surface です。そこが必要に見える原因は separate handoff にし、数学 writer の write scope
-へ混ぜません。packet の必須欄、map、oracle が未接続なら `math_packet_missing` として
-write-capable dispatch を停止します。
+へ混ぜません。通常の `bootstrap_agent_run.py` は `--math-intent-packet JSON` でこの packet
+を受け取り、該当する T4/T5 math-intent route の `run.mathematical_intent_packet` と
+spawn handoff へそのまま投影します。packet の必須欄、map、oracle が未接続なら
+`math_packet_missing` として run の write-capable dispatch を停止します。writer target は
+packet の `allowed_write_paths` の部分集合に狭め、forbidden surface の path を含む target
+を `math_writer_target:forbidden_surface` で拒否します。
 
 明示された非数理 clause はこの route の対象外であり、同じ依頼に math clause と併記された
 場合も sibling handoff へ分けます。非数理 route を止める根拠に math packet を使わず、math

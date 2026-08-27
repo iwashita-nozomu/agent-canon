@@ -90,6 +90,10 @@ runtime、routing、environment、Docker、証明ツールを変更しないと 
 数学 writer を停止し、該当 surface の separate handoff を返します。数学 packet が無い、
 または map / oracle が未接続な状態では write-capable dispatch を開始しません。
 
+通常の run は `bootstrap_agent_run.py --math-intent-packet '<JSON>'` で packet を渡します。
+bootstrap は選択された math-intent route の run manifest と spawn handoff に同じ正規化済み
+packet を投影し、packet が無い場合は `math_packet_missing` で停止します。
+
 数学 packet は数学的な依頼にだけ要求します。Docker、JIT、backend、runtime、routing、
 environment、CI、container などを明示的に修正する非数理要求には適用せず、その owner route
 へ渡します。両方が一つの依頼に含まれる場合は clause ごとに sibling handoff を作り、数学

@@ -367,6 +367,12 @@ class RouteToolTest(unittest.TestCase):
                     "mathematical_correctness_reviewer",
                     default_specialists_for_task(config, catalog, task_id),
                 )
+        waves = {
+            wave["id"]: wave["role_ids"]
+            for wave in catalog.raw["role_topology_defaults"]["stage_waves"]
+        }
+        self.assertIn("benchmark_reviewer", waves["research_review"])
+        self.assertNotIn("benchmark_reviewer", waves["final_review"])
 
     def test_math_scope_contract_names_required_packet_and_forbidden_surfaces(self) -> None:
         """The route contract carries the math packet and refuses non-math scope drift."""

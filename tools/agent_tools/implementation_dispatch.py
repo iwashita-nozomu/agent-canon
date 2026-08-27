@@ -30,6 +30,7 @@ if __package__:
         WriterTarget,
         WriterTargetError,
         parse_writer_target,
+        validate_mathematical_writer_target,
         validate_wave_writer_targets,
         validate_writer_target_identity,
     )
@@ -42,6 +43,7 @@ else:
         WriterTarget,
         WriterTargetError,
         parse_writer_target,
+        validate_mathematical_writer_target,
         validate_wave_writer_targets,
         validate_writer_target_identity,
     )
@@ -549,6 +551,8 @@ def dispatch_fixed_implementation(
     capacity_runtime: _CapacityRuntime | None = None,
     writer_target: WriterTarget | Mapping[str, object] | None = None,
     checkout_identity: Mapping[str, object] | None = None,
+    math_intent_packet: Mapping[str, object] | object | None = None,
+    math_intent_required: bool = False,
 ) -> ImplementationDispatch:
     """Route, materialize, and launch exactly one fixed Spark implementation worker."""
     route_result = implementation_route.route_implementation(request)
@@ -566,6 +570,17 @@ def dispatch_fixed_implementation(
         or route_result.failure is not None
     ):
         raise RuntimeError("implementation_dispatch:fixed_route_violation")
+    if math_intent_required and math_intent_packet is None:
+        return ImplementationDispatch(
+            route_result,
+            None,
+            None,
+            None,
+            "math_packet_missing",
+            1,
+            0,
+            "blocked",
+        )
     if writer_target is None:
         return ImplementationDispatch(
             route_result,
@@ -586,6 +601,35 @@ def dispatch_fixed_implementation(
         )
     except WriterTargetError as exc:
         raise RuntimeError(str(exc)) from exc
+    if math_intent_required:
+        try:
+            validate_mathematical_writer_target(parsed_writer_target, math_intent_packet)
+        except WriterTargetError as exc:
+            return ImplementationDispatch(
+                route_result,
+                None,
+                None,
+                None,
+                str(exc),
+                1,
+                0,
+                "blocked",
+            )
+    normalized_math_packet: Mapping[str, object] | None = None
+    if math_intent_required:
+        if __package__:
+            from .packets import (
+                mathematical_intent_packet_mapping,
+                normalize_mathematical_intent_packet,
+            )
+        else:
+            from packets import (  # type: ignore[no-redef]
+                mathematical_intent_packet_mapping,
+                normalize_mathematical_intent_packet,
+            )
+        normalized_math_packet = mathematical_intent_packet_mapping(
+            normalize_mathematical_intent_packet(math_intent_packet)
+        )
     if isinstance(request, implementation_route.ImplementationRouteRequest):
         packet_payload: object = request.fixed_implementation_packet
     else:
@@ -621,6 +665,16 @@ def dispatch_fixed_implementation(
                 model_profile_registry.ContextItem(
                     "checkout_identity",
                     dict(checkout_identity),
+                ),
+                *(
+                    (
+                        model_profile_registry.ContextItem(
+                            "mathematical_intent_packet",
+                            dict(normalized_math_packet),
+                        ),
+                    )
+                    if normalized_math_packet is not None
+                    else ()
                 ),
                 *(
                     (
@@ -1324,8 +1378,29 @@ def dispatch_subagent_wave(
     prompts: Mapping[str, str],
     spawn: Callable[[str, str], str | None],
     writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None],
+    math_intent_packet: Mapping[str, object] | object | None = None,
+    math_intent_required: bool = False,
 ) -> tuple[str, ...]:
     """Validate one complete wave before invoking any spawn callback."""
+    math_intent_required = math_intent_required or any(
+        slot.role_id == "mathematical_correctness_reviewer" for slot in slots
+    )
+    if math_intent_required:
+        if math_intent_packet is None:
+            raise RuntimeError("math_packet_missing")
+        for slot in slots:
+            if not slot.write_capable:
+                continue
+            target = writer_targets.get(
+                slot.executable_identity,
+                writer_targets.get(slot.role_id, slot.writer_target),
+            )
+            if target is None:
+                raise RuntimeError("math_packet_missing:writer_target")
+            try:
+                validate_mathematical_writer_target(target, math_intent_packet)
+            except WriterTargetError as exc:
+                raise RuntimeError(str(exc)) from exc
     validate_writer_handoff_waves((slots,), writer_targets)
     missing_prompts = [
         slot.executable_identity

@@ -18,6 +18,7 @@ packet has no target and remains shareable.
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import re
 from collections.abc import Mapping, Sequence
@@ -28,6 +29,22 @@ REMOTE_RE = re.compile(r"^[^/\s]+/[^/\s]+$")
 WRITER_TARGET_SCHEMA = "agent-canon.writer-target.v1"
 WRITER_TARGET_PACKET_SCHEMA = "agent-canon.writer-target-packet.v1"
 WRITER_TARGET_PACKET_RELATIVE = Path(".agent-canon") / "writer-target.json"
+MATH_WRITER_FORBIDDEN_PATH_MARKERS = (
+    "architecture",
+    "framework",
+    "jit",
+    "compiler",
+    "backend",
+    "runtime",
+    "container",
+    "docker",
+    "routing",
+    "environment",
+    "infra",
+    "proof",
+    "lean",
+    "ir",
+)
 
 
 class WriterTargetError(ValueError):
@@ -176,6 +193,36 @@ def validate_writer_target_identity(
         raise WriterTargetError("writer_target:branch_identity_mismatch")
     if remote != parsed.normalized_remote:
         raise WriterTargetError("writer_target:remote_identity_mismatch")
+    return parsed
+
+
+def validate_mathematical_writer_target(
+    target: WriterTarget | Mapping[str, object],
+    math_intent_packet: Mapping[str, object] | object,
+) -> WriterTarget:
+    """Narrow a math writer target to mapped math paths and reject infra paths."""
+    parsed = parse_writer_target(target)
+    allowed = getattr(math_intent_packet, "allowed_write_paths", None)
+    if allowed is None and isinstance(math_intent_packet, Mapping):
+        allowed = math_intent_packet.get("allowed_write_paths")
+    if not isinstance(allowed, (list, tuple)) or not allowed:
+        raise WriterTargetError("math_packet_missing:allowed_write_paths")
+    allowed_paths = tuple(str(path) for path in allowed)
+    for path in parsed.allowed_paths:
+        normalized = path.casefold()
+        path_tokens = set(re.split(r"[^a-z0-9]+", normalized))
+        if any(
+            marker in path_tokens or (len(marker) >= 3 and marker in normalized)
+            for marker in MATH_WRITER_FORBIDDEN_PATH_MARKERS
+        ):
+            raise WriterTargetError(f"math_writer_target:forbidden_surface:{path}")
+        if not any(
+            path == allowed_path
+            or fnmatch.fnmatchcase(path, allowed_path)
+            or path.startswith(allowed_path.rstrip("/") + "/")
+            for allowed_path in allowed_paths
+        ):
+            raise WriterTargetError(f"math_writer_target:path_not_in_packet:{path}")
     return parsed
 
 
@@ -349,4 +396,5 @@ __all__ = (
     "validate_writer_target_allocations",
     "validate_spawn_handoff",
     "validate_writer_target_identity",
+    "validate_mathematical_writer_target",
 )

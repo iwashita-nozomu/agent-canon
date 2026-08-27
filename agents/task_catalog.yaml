@@ -124,6 +124,11 @@ role_topology_defaults: &standard_role_topology
       stage_class: reviewer
       role_ids:
         - manager_reviewer
+    - id: mathematical_intent_review
+      stage_class: reviewer
+      activation: conditional_math_intent_packet
+      role_ids:
+        - mathematical_correctness_reviewer
     - id: research
       stage_class: producer
       role_ids:
@@ -134,8 +139,7 @@ role_topology_defaults: &standard_role_topology
         - research_reviewer
         - reproducibility_reviewer
         - scientific_computing_reviewer
-        - mathematical_correctness_reviewer
-        - artifact_reviewer
+        - benchmark_reviewer
         - fair_data_reviewer
         - ml_science_reviewer
     - id: scheduling
@@ -217,7 +221,7 @@ role_topology_defaults: &standard_role_topology
       stage_class: final
       role_ids:
         - final_reviewer
-        - benchmark_reviewer
+        - artifact_reviewer
     - id: verification_closeout
       stage_class: final
       role_ids:
