@@ -48,6 +48,9 @@ def test_issue_worker_tool_call_contains_post_publication_container_command() ->
     assert "--checkout-head" in command
     assert "--checkout-repository" in command
     assert "repair route" not in command
+    preflight = token["arguments"]["receipt_preflight_command"]
+    assert "--receipt-preflight" in preflight
+    assert tuple(preflight[:8]) == tuple(command[:8])
 
 
 def test_receipt_stage_command_contains_readback_metadata_without_body() -> None:

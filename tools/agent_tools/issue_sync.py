@@ -935,7 +935,13 @@ def qualify_issue_worker_finding(
     owner = _record_text(record, "owner", "owner_id")
     fix = _record_text(record, "fix", "required_action", "action")
     status = _record_text(record, "status", "resolution").casefold().replace("_", "-")
-    kind = _record_text(record, "finding_kind", "kind", "category").casefold().replace("_", "-")
+    kind = _record_text(
+        record,
+        "finding_kind",
+        "source_finding_kind",
+        "kind",
+        "category",
+    ).casefold().replace("_", "-")
     occurrence = _occurrence_locations(record)
     related = record.get("related_issue_refs", record.get("issue_refs", ()))
     related_refs = tuple(
@@ -1724,10 +1730,15 @@ def sync_pending_packet(
     if handoff is not None:
         worker = IssueWorker(client, repository)
         discovered = worker.search_related_issue_set(handoff)
-        if len(discovered) != 1:
+        if len(discovered) > 1:
             raise IssueSyncError(
                 "issue_worker_retry_unresolved",
                 "retry requires exactly one same-responsibility Issue readback",
+            )
+        if not discovered and payload.get("input_mode") != "issue-publication-initial":
+            raise IssueSyncError(
+                "issue_worker_retry_unresolved",
+                "retry requires one same-responsibility Issue or an initial publication packet",
             )
         record = worker.publish(
             handoff,
@@ -1735,7 +1746,7 @@ def sync_pending_packet(
             body=body,
             related_issues=discovered,
             receipt_stager=receipt_stager,
-            allow_create=False,
+            allow_create=not bool(discovered),
         )
     else:
         packet_number = str(payload.get("number") or "")
@@ -1757,18 +1768,18 @@ def sync_pending_packet(
             )
             path.unlink()
             return record
-        if payload.get("input_mode") != "issue-publication-initial":
-            search = getattr(client, "search", None)
-            candidates = (
-                tuple(search(repository, (str(payload["title"]),)))
-                if callable(search)
-                else ()
+        search = getattr(client, "search", None)
+        candidates = (
+            tuple(search(repository, (str(payload["title"]),)))
+            if callable(search)
+            else ()
+        )
+        if len(candidates) > 1:
+            raise IssueSyncError(
+                "issue_worker_retry_unresolved",
+                "ordinary packet has multiple related Issues",
             )
-            if len(candidates) != 1:
-                raise IssueSyncError(
-                    "issue_worker_retry_unresolved",
-                    "ordinary packet requires one related Issue before acknowledgement",
-                )
+        if len(candidates) == 1:
             record = client.read(candidates[0].reference)
             receipt_stager(
                 record,
@@ -1784,6 +1795,11 @@ def sync_pending_packet(
             )
             path.unlink()
             return record
+        if payload.get("input_mode") != "issue-publication-initial":
+            raise IssueSyncError(
+                "issue_worker_retry_unresolved",
+                "ordinary packet requires one related Issue before acknowledgement",
+            )
         record = client.create(repository, str(payload["title"]), body)
         receipt_stager(
             record,

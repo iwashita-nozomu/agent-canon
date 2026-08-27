@@ -94,7 +94,10 @@ def test_pending_packet_online_create_readback_removes_packet(tmp_path: Path) ->
         url="https://github.com/owner/repo/issues/42",
     )
     client = issue_sync.GitHubIssueClient("owner/repo")
-    with patch.object(client, "create", return_value=record) as create:
+    with (
+        patch.object(client, "create", return_value=record) as create,
+        patch.object(client, "search", return_value=()),
+    ):
         result = issue_sync.sync_pending_packet(
             packet,
             client,
@@ -126,7 +129,10 @@ def test_pending_packet_success_writes_body_free_publication_receipt(tmp_path: P
         url="https://github.com/owner/repo/issues/42",
     )
     client = issue_sync.GitHubIssueClient("owner/repo")
-    with patch.object(client, "create", return_value=record):
+    with (
+        patch.object(client, "create", return_value=record),
+        patch.object(client, "search", return_value=()),
+    ):
         issue_sync.sync_pending_packet(
             packet,
             client,
@@ -389,6 +395,7 @@ def test_pending_packet_receipt_failure_retains_packet(tmp_path: Path) -> None:
     )
     with (
         patch.object(client, "create", return_value=record),
+        patch.object(client, "search", return_value=()),
         patch.object(
             issue_sync,
             "stage_issue_publication_receipt",
@@ -807,6 +814,46 @@ def test_retry_without_exact_search_result_remains_pending_without_create(tmp_pa
             receipt_stager=_FakeReceiptStager(),
         )
     assert packet.exists()
+    assert client.calls == []
+
+
+def test_initial_packet_retry_consumes_exact_receipt_without_duplicate_create(
+    tmp_path: Path,
+) -> None:
+    handoff = issue_sync.qualify_issue_worker_finding(
+        _qualified_finding(finding_kind="recurrent-failure"),
+        authenticated_repository="owner/repo",
+    )
+    body = tmp_path / "private-body.md"
+    body.write_text("private body\n", encoding="utf-8")
+    packet = issue_sync.write_pending_packet(
+        log_root=tmp_path / "log",
+        repository="owner/repo",
+        title="crashed initial",
+        body_locator=str(body),
+        body_digest="sha256:" + hashlib.sha256(body.read_bytes()).hexdigest(),
+        input_mode="issue-publication-initial",
+        route="issue-worker",
+        handoff=handoff.as_dict(),
+    )
+    record = issue_sync.GitHubIssueRecord(
+        "owner/repo", "50", "crashed initial", "private body", "OPEN",
+        "https://github.com/owner/repo/issues/50",
+    )
+    runtime_archive = tmp_path / "runtime" / "spool" / "private-feedback"
+    issue_sync.write_issue_publication_receipt(
+        runtime_archive, record, action="create", handoff=handoff
+    )
+    client = _IssueWorkerClient((record,))
+    result = issue_sync.sync_pending_packet(
+        packet,
+        client,
+        checkout_identity={"remote": "owner/repo"},
+        runtime_root=tmp_path / "runtime",
+        receipt_stager=_FakeReceiptStager(),
+    )
+    assert result.number == "50"
+    assert packet.exists() is False
     assert client.calls == []
 
 

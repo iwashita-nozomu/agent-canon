@@ -273,18 +273,42 @@ def materialize_issue_worker_tool_call(
     runtime_root: str = "<runtime-root>",
     source_root: str = "<source-root>",
     control_parent_root: str = "<control-parent-root>",
+    publication_mode: str = "publish",
+    publication_reason: str = "",
 ) -> dict[str, object]:
     """Return a host-publisher ToolCall for one typed IssueWorker handoff."""
     if not publisher_agent_id.strip() or not checkout_repository.strip():
         raise RuntimeError(
             "issue_worker_tool_call publisher agent and checkout repository are required"
         )
+    if publication_mode not in {"publish", "investigate_only"}:
+        raise RuntimeError("issue_worker_tool_call publication mode is invalid")
     bootstrap = "./bootstrap.sh"
     if source_root != "<source-root>":
         bootstrap_path = Path(source_root).expanduser().resolve() / "bootstrap.sh"
         if not bootstrap_path.is_file():
             raise RuntimeError("issue_worker_tool_call:bootstrap_missing")
         bootstrap = str(bootstrap_path)
+    preflight_command = build_issue_receipt_stage_command(
+        repository=checkout_repository,
+        runtime_root=runtime_root,
+        source_root=source_root,
+        control_parent_root=control_parent_root,
+        checkout_identity=checkout_identity,
+        bootstrap=bootstrap,
+        preflight=True,
+    )
+    stage_command = build_issue_receipt_stage_command(
+        repository=checkout_repository,
+        runtime_root=runtime_root,
+        source_root=source_root,
+        control_parent_root=control_parent_root,
+        checkout_identity=checkout_identity,
+        bootstrap=bootstrap,
+    )
+    if publication_mode == "investigate_only":
+        preflight_command = ()
+        stage_command = ()
     return materialize_tool_call_token(
         tool_id="issue-worker",
         argument_schema_id="agent-canon.issue-worker.args.v1",
@@ -292,31 +316,34 @@ def materialize_issue_worker_tool_call(
             "publisher_agent_id": {"type": "string", "minLength": 1},
             "checkout_repository": {"type": "string", "minLength": 1},
             "handoff": {"type": "object"},
+            "publication_mode": {
+                "type": "string",
+                "enum": ["publish", "investigate_only"],
+            },
+            "publication_reason": {"type": "string"},
+            "receipt_preflight_command": {
+                "type": "array",
+                "items": {"type": "string", "minLength": 1},
+            },
             "receipt_stage_command": {
                 "type": "array",
                 "items": {"type": "string", "minLength": 1},
-                "minItems": 1,
             },
         },
         arguments={
             "publisher_agent_id": publisher_agent_id,
             "checkout_repository": checkout_repository,
             "handoff": dict(handoff),
-            "receipt_stage_command": list(
-                build_issue_receipt_stage_command(
-                    repository=checkout_repository,
-                    runtime_root=runtime_root,
-                    source_root=source_root,
-                    control_parent_root=control_parent_root,
-                    checkout_identity=checkout_identity,
-                    bootstrap=bootstrap,
-                )
-            ),
+            "publication_mode": publication_mode,
+            "publication_reason": publication_reason,
+            "receipt_preflight_command": list(preflight_command),
+            "receipt_stage_command": list(stage_command),
         },
         intent=(
             "Run IssueWorker plan and publication through the host publisher; "
-            "read back URL, number, body, and state, then execute the resident "
-            "receipt staging command before pending packet consumption."
+            "execute receipt_preflight_command successfully before any GitHub "
+            "mutation, read back URL, number, body, and state, then execute "
+            "receipt_stage_command before pending packet consumption."
         ),
         typed_failure_semantics=(
             {

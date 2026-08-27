@@ -83,6 +83,11 @@ def test_same_repository_candidate_materializes_publisher_tool_call(
     assert str(PROJECT_ROOT) in stage_command
     assert str(runtime_root) in stage_command
     assert str(control_parent) in stage_command
+    preflight_command = result.tool_call["arguments"]["receipt_preflight_command"]
+    assert preflight_command[0] == str(PROJECT_ROOT / "bootstrap.sh")
+    assert "--receipt-preflight" in preflight_command
+    assert "receipt_preflight_command" in calls[0][1]
+    assert "receipt_stage_command" in calls[0][1]
     assert calls and calls[0][0] == "publisher"
     assert "checkout_identity" in calls[0][1]
     assert "remote" in calls[0][1]
@@ -131,7 +136,7 @@ def test_t15_without_explicit_candidate_has_no_initial_publisher() -> None:
     ) == ()
 
 
-def test_issue_worker_dispatch_defers_without_runtime_publication_route(
+def test_issue_worker_dispatch_investigates_without_runtime_publication_route(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("AGENT_CANON_RUNTIME_ROOT", raising=False)
@@ -143,8 +148,30 @@ def test_issue_worker_dispatch_defers_without_runtime_publication_route(
         workspace_root=PROJECT_ROOT,
         source_root=PROJECT_ROOT,
     )
-    assert result.status == "deferred"
-    assert result.tool_call is None
+    assert result.status == "spawned"
+    assert result.tool_call is not None
+    assert result.tool_call["arguments"]["publication_mode"] == "investigate_only"
+    assert result.tool_call["arguments"]["publication_reason"] == "receipt_route_unavailable:runtime_root,control_parent_root"
+    assert result.tool_call["arguments"]["receipt_preflight_command"] == []
+    assert result.tool_call["arguments"]["receipt_stage_command"] == []
+
+
+def test_issue_worker_dispatch_investigates_without_source_context(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(tmp_path / "runtime"))
+    monkeypatch.setenv("AGENT_CANON_CONTROL_PARENT_ROOT", str(tmp_path / "control"))
+    result = issue_worker_dispatch.dispatch_issue_worker(
+        _candidate(),
+        "publish explicit feedback",
+        lambda _agent_type, _prompt: "publisher-investigate",
+        workspace_root=PROJECT_ROOT,
+        source_root=tmp_path / "missing-source",
+    )
+    assert result.status == "spawned"
+    assert result.tool_call is not None
+    assert result.tool_call["arguments"]["publication_mode"] == "investigate_only"
+    assert result.tool_call["arguments"]["receipt_stage_command"] == []
 
 
 def test_explicit_issue_worker_candidate_does_not_change_generic_intake() -> None:
