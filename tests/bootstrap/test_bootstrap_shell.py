@@ -309,7 +309,11 @@ def test_managed_install_source_fetch_failure_preserves_checkout(tmp_path: Path)
     missing_remote = tmp_path / "missing-origin.git"
     home.mkdir()
     repository.mkdir()
-    subprocess.run(["git", "-C", str(repository), "init"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(repository), "init", "-b", "main"],
+        check=True,
+        capture_output=True,
+    )
     subprocess.run(
         ["git", "-C", str(repository), "config", "user.email", "test@example.invalid"],
         check=True,
@@ -330,27 +334,38 @@ def test_managed_install_source_fetch_failure_preserves_checkout(tmp_path: Path)
         check=True,
     )
     runtime = repository / ".runtime"
-    runtime.mkdir()
+    docker_calls = tmp_path / "docker.calls"
+    docker = tmp_path / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        f"printf '%s\\n' called >> {str(docker_calls)!r}\n"
+        "exit 99\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
     completed = subprocess.run(
         [
-            "bash",
-            "-c",
-            f"source {str(ADAPTER)!r}; "
-            f"AGENT_CANON_CONTROL_ROOT={str(home)!r}; "
-            f"AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}; "
-            f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}; "
-            f"AGENT_CANON_PRIVATE_LOG_ROOT={str(home / 'agent-canon-log')!r}; "
-            "_agent_canon_prepare_host_runtime; "
-            f"_agent_canon_source_sync_align {str(repository)!r} origin main",
+            str(BOOTSTRAP),
+            "--repository-root",
+            str(repository),
+            "--control-parent-root",
+            str(home),
+            "install",
         ],
         check=False,
         capture_output=True,
         text=True,
-        env={**os.environ, "HOME": str(home)},
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "AGENT_CANON_DOCKER": str(docker),
+        },
     )
     assert completed.returncode == 2
     assert json.loads(completed.stderr.splitlines()[-1])["code"] == "source_remote_unavailable"
     assert (repository / "tracked.txt").read_text(encoding="utf-8") == "old\n"
+    assert not runtime.exists()
+    assert not docker_calls.exists()
     assert subprocess.run(
         ["git", "-C", str(repository), "symbolic-ref", "--short", "HEAD"],
         check=True,
@@ -1199,6 +1214,22 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         encoding="utf-8",
     )
     fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
+    events = tmp_path / "events"
+    tool_bin = tmp_path / "tool-bin"
+    tool_bin.mkdir()
+    git_wrapper = tool_bin / "git"
+    git_wrapper.write_text(
+        "#!/usr/bin/env bash\n"
+        "for argument in \"$@\"; do\n"
+        "  if [[ \"$argument\" == fetch ]]; then\n"
+        f"    printf '%s\\n' git-fetch >> {str(events)!r}\n"
+        "    break\n"
+        "  fi\n"
+        "done\n"
+        "exec /usr/bin/git \"$@\"\n",
+        encoding="utf-8",
+    )
+    git_wrapper.chmod(0o755)
     completed = subprocess.run(
         [
             "timeout",
@@ -1216,9 +1247,11 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         env={
             **os.environ,
             "HOME": str(tmp_path),
+            "PATH": f"{tool_bin}{os.pathsep}{os.environ.get('PATH', '')}",
             "AGENT_CANON_DOCKER": str(fake_docker),
             "FAKE_DOCKER_STATE": str(state_path),
             "FAKE_DOCKER_CALLS": str(calls_path),
+            "FAKE_DOCKER_EVENTS": str(events),
             "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
         },
     )
@@ -1240,6 +1273,10 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     assert result["images"][replacement["Config"]["Image"]]["Id"] != old_image_id
     assert replacement["State"]["Health"]["Status"] == fixture["expected"]["health"]
     if operation == "install":
+        assert events.read_text(encoding="utf-8").splitlines()[:2] == [
+            "git-fetch",
+            "docker",
+        ]
         source_sync = json.loads(
             (runtime / "source-sync.json").read_text(encoding="utf-8")
         )

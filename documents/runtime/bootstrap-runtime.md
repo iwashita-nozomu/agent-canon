@@ -120,9 +120,10 @@ host sync transition.
 
 ### Install source transition
 
-The distribution install path has one SourceSync transition before image build
-or resident reconciliation. It fetches `refs/heads/main` explicitly into
-`refs/remotes/origin/main`; a `FETCH_HEAD`-only result is not an alignment
+The distribution install path has one SourceSync transition after argument and
+path parsing but before Docker command discovery, host runtime initialization,
+image build, or resident reconciliation. It fetches `refs/heads/main`
+explicitly into `refs/remotes/origin/main`; a `FETCH_HEAD`-only result is not an alignment
 state. Only the exact managed root `~/agent-canon` with `$HOME` as its control
 root is converged automatically. Its tracked source may be detached, behind,
 ahead, or dirty: install attaches local `main` to the fetched remote commit

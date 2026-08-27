@@ -268,18 +268,20 @@ _agent_canon_sync_request_metadata() {
 
 _agent_canon_source_sync_failure() {
   local code=$1 detail=$2 write_rc=0
-  _agent_canon_source_sync_write failed "$code" \
-    "${AGENT_CANON_SYNC_SOURCE_ROOT:-$AGENT_CANON_REPOSITORY_ROOT}" \
-    "${AGENT_CANON_SYNC_SOURCE_HEAD:-unknown}" \
-    "${AGENT_CANON_SYNC_SOURCE_TREE:-unknown}" \
-    "${AGENT_CANON_SYNC_REMOTE:-origin}" \
-    "${AGENT_CANON_SYNC_REMOTE_URL:-unknown}" \
-    "${AGENT_CANON_SYNC_BRANCH:-main}" \
-    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$code" || write_rc=$?
-  if ((write_rc != 0)); then
-    _agent_canon_json_error source_sync_state_write_failed \
-      "source-sync failure state could not be atomically published"
-    return 2
+  if [[ "${AGENT_CANON_SYNC_SKIP_STATE:-0}" != 1 ]]; then
+    _agent_canon_source_sync_write failed "$code" \
+      "${AGENT_CANON_SYNC_SOURCE_ROOT:-$AGENT_CANON_REPOSITORY_ROOT}" \
+      "${AGENT_CANON_SYNC_SOURCE_HEAD:-unknown}" \
+      "${AGENT_CANON_SYNC_SOURCE_TREE:-unknown}" \
+      "${AGENT_CANON_SYNC_REMOTE:-origin}" \
+      "${AGENT_CANON_SYNC_REMOTE_URL:-unknown}" \
+      "${AGENT_CANON_SYNC_BRANCH:-main}" \
+      "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$code" || write_rc=$?
+    if ((write_rc != 0)); then
+      _agent_canon_json_error source_sync_state_write_failed \
+        "source-sync failure state could not be atomically published"
+      return 2
+    fi
   fi
   _agent_canon_json_error "$code" "$detail"
 }
@@ -297,6 +299,7 @@ _agent_canon_source_sync_align() (
   # normalization point: publish the fetched branch ref, then make the
   # managed checkout a local main checkout before any Docker operation.
   set +e
+  AGENT_CANON_SYNC_SKIP_STATE=1
   local install_root=${1:-$AGENT_CANON_REPOSITORY_ROOT}
   local remote=${2:-origin} branch=${3:-main}
   local remote_url source_head source_tree source_before target_ref target_head
@@ -382,13 +385,7 @@ _agent_canon_source_sync_align() (
   AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
   sync_code=up_to_date
   [[ "$source_before" == "$source_head" ]] || sync_code=updated
-  if ! _agent_canon_source_sync_write success "$sync_code" "$install_root" \
-    "$source_head" "$source_tree" "$remote" "$remote_url" "$branch" \
-    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"; then
-    _agent_canon_json_error source_sync_state_write_failed \
-      "aligned source-sync state could not be atomically published"
-    exit 2
-  fi
+  printf '%s\t%s\t%s\t%s\n' "$sync_code" "$source_head" "$source_tree" "$remote_url"
   exit 0
 )
 
@@ -2173,6 +2170,17 @@ bootstrap_host_entrypoint() {
   fi
   [[ -n "$AGENT_CANON_RUNTIME_ROOT" ]] || AGENT_CANON_RUNTIME_ROOT="$AGENT_CANON_REPOSITORY_ROOT/.runtime"
   _agent_canon_validate_roots
+  local source_sync_alignment=
+  if [[ "$operation" == install ]] && _agent_canon_source_sync_is_managed_install; then
+    local source_sync_rc
+    if source_sync_alignment=$(_agent_canon_source_sync_align \
+      "$AGENT_CANON_REPOSITORY_ROOT" origin main); then
+      :
+    else
+      source_sync_rc=$?
+      return "$source_sync_rc"
+    fi
+  fi
   AGENT_CANON_DOCKER_CMD=${AGENT_CANON_DOCKER:-docker}
   export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
   if ! command -v "$AGENT_CANON_DOCKER_CMD" >/dev/null 2>&1 &&
@@ -2189,13 +2197,15 @@ bootstrap_host_entrypoint() {
     fi
   fi
   _agent_canon_prepare_host_runtime
-  if [[ "$operation" == install ]]; then
-    # The distribution installer may leave ~/agent-canon detached at
-    # FETCH_HEAD. Normalize that managed source before the image build or
-    # resident reconciliation. Development/topic/workspace checkouts are not
-    # distribution install roots and retain their caller-owned Git state.
-    if _agent_canon_source_sync_is_managed_install; then
-      _agent_canon_source_sync_align "$AGENT_CANON_REPOSITORY_ROOT" origin main
+  if [[ -n "$source_sync_alignment" ]]; then
+    local source_sync_code source_sync_head source_sync_tree source_sync_remote_url
+    IFS=$'\t' read -r source_sync_code source_sync_head source_sync_tree source_sync_remote_url \
+      <<<"$source_sync_alignment"
+    if ! _agent_canon_source_sync_write success "$source_sync_code" \
+      "$AGENT_CANON_REPOSITORY_ROOT" "$source_sync_head" "$source_sync_tree" origin \
+      "$source_sync_remote_url" main "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"; then
+      _agent_canon_json_error source_sync_state_write_failed \
+        "aligned source-sync state could not be atomically published"
     fi
   fi
   if [[ "$operation" == install || "$operation" == update ]]; then
