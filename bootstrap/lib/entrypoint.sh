@@ -822,7 +822,7 @@ _agent_canon_private_feedback_sync() {
   fi
   source_identity=$(_agent_canon_private_feedback_identity "$container" "$source_remote" source)
   if [[ -d "$log_root/.git" && ! -L "$log_root/.git" ]]; then
-    if ! configured=$(git -C "$log_root" remote get-url origin 2>/dev/null); then
+    if ! configured=$(git -C "$log_root" config --get remote.origin.url 2>/dev/null); then
       _agent_canon_json_error private_log_invalid "private log checkout has no origin remote"
     fi
   else

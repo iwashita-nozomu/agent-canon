@@ -202,20 +202,16 @@ def test_resident_dashboard_route_uses_target_and_private_archive(
             "example/live-target",
         )
         assert receipt_stage.returncode == 0, receipt_stage.stdout + receipt_stage.stderr
-        receipt_path = (
-            runtime / "spool" / "private-feedback" / "feedback" / "issue-packets"
-            / "published" / "example" / "live-target" / "1.json"
-        )
-        assert receipt_path.is_file()
-        receipt_text = receipt_path.read_text(encoding="utf-8")
-        assert "body" not in receipt_text
-        assert "private" not in receipt_text
+        assert '"status":"staged"' in receipt_stage.stdout
         assert not (runtime / "spool" / "private-feedback" / "sync-request.json").exists()
         archive_receipt = (
             private_log / "feedback" / "issue-packets" / "published"
             / "example" / "live-target" / "1.json"
         )
         assert archive_receipt.is_file()
+        receipt_text = archive_receipt.read_text(encoding="utf-8")
+        assert "body" not in receipt_text
+        assert "private" not in receipt_text
         assert subprocess.run(
             ["git", "status", "--porcelain"],
             cwd=private_log,
