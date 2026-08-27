@@ -47,6 +47,18 @@ def test_update_transaction_has_candidate_restore_path() -> None:
     assert "container inspect" in text
 
 
+def test_update_replacement_uses_one_host_owned_lock_without_bypass() -> None:
+    """The host teardown-to-publication window has one non-bypassable lock."""
+    text = ADAPTER.read_text(encoding="utf-8")
+    assert "replacement.lock" in text
+    assert "_agent_canon_replace_resident" in text
+    assert 'flock -x "$lock_fd"' in text
+    assert 'flock -u "$lock_fd"' in text
+    assert "AGENT_CANON_LOCK_HELD" not in text
+    assert "AGENT_CANON_LOCK_TOKEN" not in text
+    assert "AGENT_CANON_LOCK_PID" not in text
+
+
 def test_sync_stages_source_before_live_fast_forward() -> None:
     """Source sync builds the candidate checkout before touching live source."""
     text = ADAPTER.read_text(encoding="utf-8")
@@ -190,6 +202,213 @@ def test_help_does_not_require_python_or_docker(tmp_path: Path) -> None:
     )
     assert completed.returncode == 0
     assert "AgentCanon Python and Rust" in completed.stdout
+
+
+@pytest.mark.parametrize("operation", ["install", "update", "status", "sync"])
+def test_operation_help_has_no_path_or_docker_side_effects(
+    tmp_path: Path, operation: str
+) -> None:
+    """Operation help exits before validating or preparing any host state."""
+    control = tmp_path / "missing-control"
+    runtime = tmp_path / "missing-runtime"
+    docker = tmp_path / "docker-counter"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        f"printf '%s\\n' called >> {tmp_path / 'docker.calls'}\n"
+        "exit 99\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    completed = subprocess.run(
+        [
+            str(BOOTSTRAP),
+            "--repository-root",
+            str(tmp_path / "missing-repository"),
+            "--control-parent-root",
+            str(control),
+            "--runtime-root",
+            str(runtime),
+            operation,
+            "--help",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "AGENT_CANON_DOCKER": str(docker)},
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert f"bootstrap.sh {operation}" in completed.stdout
+    assert not control.exists()
+    assert not runtime.exists()
+    assert not (tmp_path / "docker.calls").exists()
+
+
+def test_resident_replacement_lock_serializes_only_the_replacement(
+    tmp_path: Path,
+) -> None:
+    """Concurrent replacement callbacks cannot overlap on one runtime."""
+    runtime = tmp_path / "runtime"
+    (runtime / "host-state").mkdir(parents=True)
+    events = tmp_path / "events"
+    script = f'''
+set -eu
+source {str(ADAPTER)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+_agent_canon_replace_resident_locked() {{
+  printf '%s start\\n' "$AGENT_CANON_TEST_LABEL" >> {str(events)!r}
+  sleep 0.15
+  printf '%s end\\n' "$AGENT_CANON_TEST_LABEL" >> {str(events)!r}
+}}
+_agent_canon_replace_resident candidate sha256:candidate
+'''
+    environment = {**os.environ, "PATH": os.environ.get("PATH", "/usr/bin:/bin")}
+    first = subprocess.Popen(
+        ["bash", "-c", script],
+        env={**environment, "AGENT_CANON_TEST_LABEL": "first"},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    second = subprocess.Popen(
+        ["bash", "-c", script],
+        env={**environment, "AGENT_CANON_TEST_LABEL": "second"},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    first_output, first_error = first.communicate(timeout=5)
+    second_output, second_error = second.communicate(timeout=5)
+    assert first.returncode == 0, first_error or first_output
+    assert second.returncode == 0, second_error or second_output
+    assert events.read_text(encoding="utf-8").splitlines() in (
+        ["first start", "first end", "second start", "second end"],
+        ["second start", "second end", "first start", "first end"],
+    )
+
+
+def test_replacement_candidate_inspect_failure_stops_before_transaction_callbacks(
+    tmp_path: Path,
+) -> None:
+    """A missing candidate is reported before ensure or state publication."""
+    runtime = tmp_path / "runtime"
+    (runtime / "host-state").mkdir(parents=True)
+    marker = tmp_path / "callbacks"
+    docker_calls = tmp_path / "docker.calls"
+    docker = tmp_path / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        f"printf '%s\\n' docker >> {str(docker_calls)!r}\n"
+        "exit 1\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    script = f'''
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(runtime / "container-state")!r}
+AGENT_CANON_DOCKER_CMD={str(docker)!r}
+_agent_canon_ensure_container() {{ printf '%s\\n' ensure >> {str(marker)!r}; return 9; }}
+_agent_canon_record_active_container() {{ printf '%s\\n' active >> {str(marker)!r}; return 0; }}
+_agent_canon_replace_resident candidate sha256:candidate
+rc=$?
+printf 'rc=%s\\n' "$rc"
+exit "$rc"
+'''
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == 2
+    assert '"code":"candidate_image_missing"' in completed.stderr
+    assert not marker.exists()
+    assert "up_to_date" not in completed.stdout
+
+
+def test_replacement_ensure_failure_does_not_publish_active_state(
+    tmp_path: Path,
+) -> None:
+    """A failed candidate ensure returns a typed error before active write."""
+    runtime = tmp_path / "runtime"
+    (runtime / "host-state").mkdir(parents=True)
+    marker = tmp_path / "callbacks"
+    docker = tmp_path / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [[ \"$1:$2\" == image:inspect ]]; then printf 'sha256:candidate\\n'; exit 0; fi\n"
+        "if [[ \"$1:$2\" == container:inspect ]]; then exit 1; fi\n"
+        "if [[ \"$1:$2\" == image:rm ]]; then exit 0; fi\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    script = f'''
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_CONTROL_ROOT={str(tmp_path)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(runtime / "container-state")!r}
+AGENT_CANON_DOCKER_CMD={str(docker)!r}
+_agent_canon_ensure_container() {{ printf '%s\\n' ensure >> {str(marker)!r}; return 9; }}
+_agent_canon_record_active_container() {{ printf '%s\\n' active >> {str(marker)!r}; return 0; }}
+_agent_canon_replace_resident candidate requested
+rc=$?
+printf 'rc=%s\\n' "$rc"
+exit "$rc"
+'''
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == 2
+    assert '"code":"candidate_unhealthy"' in completed.stderr
+    assert marker.read_text(encoding="utf-8").splitlines() == ["ensure"]
+    assert not (runtime / "host-state" / "active-image.tsv").exists()
+    assert "up_to_date" not in completed.stdout
+
+
+def test_replacement_rollback_failure_is_reported_after_controller_failure(
+    tmp_path: Path,
+) -> None:
+    """A failed recovery path remains a typed rollback failure."""
+    runtime = tmp_path / "runtime"
+    (runtime / "host-state").mkdir(parents=True)
+    (runtime / "container-state").mkdir()
+    docker = tmp_path / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [[ \"$1:$2\" == image:inspect ]]; then printf 'sha256:candidate\\n'; fi\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    script = f'''
+source {str(ADAPTER)!r}
+set +e
+AGENT_CANON_CONTROL_ROOT={str(tmp_path)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_STATE_ROOT={str(runtime / "container-state")!r}
+AGENT_CANON_DOCKER_CMD={str(docker)!r}
+_agent_canon_use_active_image() {{
+  AGENT_CANON_IMAGE_REF=old-ref
+  AGENT_CANON_ACTIVE_IMAGE_ID=sha256:old
+  AGENT_CANON_EXPECTED_IMAGE_ID=sha256:old
+  export AGENT_CANON_IMAGE_REF AGENT_CANON_ACTIVE_IMAGE_ID AGENT_CANON_EXPECTED_IMAGE_ID
+}}
+_agent_canon_validate_existing_container() {{ :; }}
+_agent_canon_write_rollback_plan() {{ :; }}
+_agent_canon_ensure_container() {{ printf 'candidate\\n'; }}
+_agent_canon_run_controller() {{ return 9; }}
+_agent_canon_restore_candidate_failure() {{ return 7; }}
+_agent_canon_replace_resident candidate requested
+rc=$?
+printf 'rc=%s\\n' "$rc"
+exit "$rc"
+'''
+    completed = subprocess.run(
+        ["bash", "-c", script], check=False, capture_output=True, text=True
+    )
+    assert completed.returncode == 2
+    assert '"code":"rollback_failed"' in completed.stderr
+    assert "up_to_date" not in completed.stdout
 
 
 def test_missing_docker_is_typed_without_host_python(tmp_path: Path) -> None:
