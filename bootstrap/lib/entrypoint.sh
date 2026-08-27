@@ -284,6 +284,114 @@ _agent_canon_source_sync_failure() {
   _agent_canon_json_error "$code" "$detail"
 }
 
+_agent_canon_source_sync_is_managed_install() {
+  local home_root
+  home_root=$(realpath -e -- "$HOME" 2>/dev/null) || return 1
+  [[ "$AGENT_CANON_CONTROL_ROOT" == "$home_root" &&
+     "$AGENT_CANON_REPOSITORY_ROOT" == "$home_root/agent-canon" ]]
+}
+
+_agent_canon_source_sync_align() (
+  # Install is entered by the dotfiles route after it has fetched into
+  # FETCH_HEAD and detached the live checkout.  SourceSync owns the one
+  # normalization point: publish the fetched branch ref, then make the
+  # managed checkout a local main checkout before any Docker operation.
+  set +e
+  local install_root=${1:-$AGENT_CANON_REPOSITORY_ROOT}
+  local remote=${2:-origin} branch=${3:-main}
+  local remote_url source_head source_tree source_before target_ref target_head
+  local current_branch sync_code
+  AGENT_CANON_SYNC_SOURCE_ROOT=$install_root
+  AGENT_CANON_SYNC_REMOTE=$remote
+  AGENT_CANON_SYNC_BRANCH=$branch
+  AGENT_CANON_SYNC_REMOTE_URL=unknown
+  AGENT_CANON_SYNC_SOURCE_HEAD=unknown
+  AGENT_CANON_SYNC_SOURCE_TREE=unknown
+
+  [[ "$remote" =~ ^[A-Za-z0-9_.-]+$ && "$branch" =~ ^[A-Za-z0-9._/-]+$ ]] || {
+    _agent_canon_source_sync_failure argument_invalid "source-sync remote or branch is invalid"
+    exit 2
+  }
+  if ! source_before=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null) ||
+     ! source_tree=$(git -C "$install_root" rev-parse --verify HEAD^{tree} 2>/dev/null); then
+    _agent_canon_source_sync_failure source_sync_git_failed "source checkout identity is unavailable"
+    exit 2
+  fi
+  AGENT_CANON_SYNC_SOURCE_HEAD=$source_before
+  AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
+  if ! remote_url=$(git -C "$install_root" remote get-url "$remote" 2>/dev/null); then
+    _agent_canon_source_sync_failure source_remote_unavailable "source-sync remote URL is unavailable"
+    exit 2
+  fi
+  AGENT_CANON_SYNC_REMOTE_URL=$remote_url
+  target_ref="refs/remotes/$remote/$branch"
+  # The explicit refspec is intentional. A FETCH_HEAD-only fetch leaves the
+  # local remote-tracking ref stale and makes the following branch transition
+  # depend on whichever checkout state the caller happened to leave behind.
+  if ! git -C "$install_root" fetch "$remote" "+refs/heads/$branch:$target_ref"; then
+    _agent_canon_source_sync_failure source_remote_unavailable "source-sync fetch failed"
+    exit 2
+  fi
+  if ! target_head=$(git -C "$install_root" rev-parse --verify "$target_ref" 2>/dev/null) ||
+     [[ ! "$target_head" =~ ^[0-9a-f]{40}$ ]]; then
+    _agent_canon_source_sync_failure source_remote_unavailable "fetched source branch is unavailable"
+    exit 2
+  fi
+
+  if _agent_canon_source_sync_is_managed_install; then
+    # The managed source root is disposable source state.  Discard tracked
+    # edits and converge its branch/worktree to the fetched remote commit;
+    # ignored .runtime and .codex/personal files remain untouched by switch.
+    if ! git -C "$install_root" switch --discard-changes -C "$branch" "$target_ref" >/dev/null; then
+      _agent_canon_source_sync_failure source_sync_checkout_failed "managed source checkout could not be aligned to main"
+      exit 2
+    fi
+    if ! git -C "$install_root" merge --ff-only "$target_ref" >/dev/null; then
+      _agent_canon_source_sync_failure source_sync_checkout_failed "managed source main could not be fast-forwarded"
+      exit 2
+    fi
+  else
+    # Development/topic/workspace checkouts retain their caller-owned branch
+    # and tracked changes.  They may only advance an already clean main via
+    # the normal fast-forward path.
+    if ! current_branch=$(git -C "$install_root" symbolic-ref --quiet --short HEAD 2>/dev/null); then
+      _agent_canon_source_sync_failure source_sync_checkout_detached "non-managed source checkout is detached"
+      exit 2
+    fi
+    [[ "$current_branch" == "$branch" ]] || {
+      _agent_canon_source_sync_failure source_sync_branch_mismatch "non-managed source checkout is not on $branch"
+      exit 2
+    }
+    if [[ -n "$(git -C "$install_root" status --porcelain --untracked-files=no)" ]]; then
+      _agent_canon_source_sync_failure source_sync_dirty "non-managed source checkout has tracked changes"
+      exit 2
+    fi
+    if ! git -C "$install_root" merge --ff-only "$target_ref" >/dev/null; then
+      _agent_canon_source_sync_failure source_sync_diverged "non-managed source main cannot be fast-forwarded"
+      exit 2
+    fi
+  fi
+
+  if ! source_head=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null) ||
+     ! source_tree=$(git -C "$install_root" rev-parse --verify HEAD^{tree} 2>/dev/null); then
+    AGENT_CANON_SYNC_SOURCE_HEAD=${source_head:-unknown}
+    _agent_canon_source_sync_failure source_sync_git_failed "aligned source checkout identity is unavailable"
+    exit 2
+  fi
+  AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
+  AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
+  sync_code=up_to_date
+  [[ "$source_before" == "$source_head" ]] || sync_code=updated
+  if ! _agent_canon_source_sync_write success "$sync_code" "$install_root" \
+    "$source_head" "$source_tree" "$remote" "$remote_url" "$branch" \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"; then
+    _agent_canon_json_error source_sync_state_write_failed \
+      "aligned source-sync state could not be atomically published"
+    exit 2
+  fi
+  exit 0
+)
+
 _agent_canon_sync_operation() (
   # The source-sync transaction is host-only, so keep its result-state
   # transition here and never ask the resident Python controller to publish a
@@ -369,7 +477,7 @@ _agent_canon_sync_operation() (
     exit 2
   fi
   AGENT_CANON_SYNC_REMOTE_URL=$remote_url
-  if ! git -C "$install_root" fetch "$remote" "$branch"; then
+  if ! git -C "$install_root" fetch "$remote" "+refs/heads/$branch:refs/remotes/$remote/$branch"; then
     _agent_canon_source_sync_failure source_remote_unavailable "source-sync fetch failed"
     exit 2
   fi
@@ -2081,6 +2189,15 @@ bootstrap_host_entrypoint() {
     fi
   fi
   _agent_canon_prepare_host_runtime
+  if [[ "$operation" == install ]]; then
+    # The distribution installer may leave ~/agent-canon detached at
+    # FETCH_HEAD. Normalize that managed source before the image build or
+    # resident reconciliation. Development/topic/workspace checkouts are not
+    # distribution install roots and retain their caller-owned Git state.
+    if _agent_canon_source_sync_is_managed_install; then
+      _agent_canon_source_sync_align "$AGENT_CANON_REPOSITORY_ROOT" origin main
+    fi
+  fi
   if [[ "$operation" == install || "$operation" == update ]]; then
     # mounts.tsv is the host-owned projection consumed before the resident
     # controller runs.  Drop only syntactically valid target rows whose

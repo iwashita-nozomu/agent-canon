@@ -302,6 +302,63 @@ def test_sync_invalid_install_root_fails_before_state_creation(tmp_path: Path) -
     assert not target.exists()
 
 
+def test_managed_install_source_fetch_failure_preserves_checkout(tmp_path: Path) -> None:
+    """A remote failure stops before source or Docker state advances."""
+    home = tmp_path / "home"
+    repository = home / "agent-canon"
+    missing_remote = tmp_path / "missing-origin.git"
+    home.mkdir()
+    repository.mkdir()
+    subprocess.run(["git", "-C", str(repository), "init"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(repository), "config", "user.email", "test@example.invalid"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "config", "user.name", "AgentCanon Test"],
+        check=True,
+    )
+    (repository / "tracked.txt").write_text("old\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repository), "add", "tracked.txt"], check=True)
+    subprocess.run(
+        ["git", "-C", str(repository), "commit", "-m", "old"],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "remote", "add", "origin", str(missing_remote)],
+        check=True,
+    )
+    runtime = repository / ".runtime"
+    runtime.mkdir()
+    completed = subprocess.run(
+        [
+            "bash",
+            "-c",
+            f"source {str(ADAPTER)!r}; "
+            f"AGENT_CANON_CONTROL_ROOT={str(home)!r}; "
+            f"AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}; "
+            f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}; "
+            f"AGENT_CANON_PRIVATE_LOG_ROOT={str(home / 'agent-canon-log')!r}; "
+            "_agent_canon_prepare_host_runtime; "
+            f"_agent_canon_source_sync_align {str(repository)!r} origin main",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "HOME": str(home)},
+    )
+    assert completed.returncode == 2
+    assert json.loads(completed.stderr.splitlines()[-1])["code"] == "source_remote_unavailable"
+    assert (repository / "tracked.txt").read_text(encoding="utf-8") == "old\n"
+    assert subprocess.run(
+        ["git", "-C", str(repository), "symbolic-ref", "--short", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip() == "main"
+
+
 def test_source_sync_state_writer_reconciles_terminal_records_atomically(
     tmp_path: Path,
 ) -> None:
@@ -1043,13 +1100,31 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         "/var/lib/agent-canon/source-sync.json"
     ]
     repository = tmp_path / "agent-canon"
-    control = tmp_path / "control"
+    # Model the distribution install identity for install: HOME owns the
+    # disposable ~/agent-canon source checkout.  The update half remains a
+    # normal candidate replacement test and does not invoke source alignment.
+    control = tmp_path
     subprocess.run(
         ["git", "clone", "--no-hardlinks", str(ROOT), str(repository)],
         check=True,
         capture_output=True,
     )
-    control.mkdir()
+    if operation == "install":
+        old_head = subprocess.run(
+            ["git", "-C", str(repository), "rev-parse", "HEAD^"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        subprocess.run(
+            ["git", "-C", str(repository), "switch", "--detach", old_head],
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(repository), "update-ref", "refs/remotes/origin/main", old_head],
+            check=True,
+        )
     runtime = repository / ".runtime"
     state_path = tmp_path / "docker-state.json"
     calls_path = tmp_path / "docker-calls"
@@ -1140,6 +1215,7 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         text=True,
         env={
             **os.environ,
+            "HOME": str(tmp_path),
             "AGENT_CANON_DOCKER": str(fake_docker),
             "FAKE_DOCKER_STATE": str(state_path),
             "FAKE_DOCKER_CALLS": str(calls_path),
@@ -1163,6 +1239,21 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     }
     assert result["images"][replacement["Config"]["Image"]]["Id"] != old_image_id
     assert replacement["State"]["Health"]["Status"] == fixture["expected"]["health"]
+    if operation == "install":
+        source_sync = json.loads(
+            (runtime / "source-sync.json").read_text(encoding="utf-8")
+        )
+        source_head = subprocess.run(
+            ["git", "-C", str(repository), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        assert source_sync["status"] == "success"
+        assert source_sync["source_head"] == source_head
+        assert result["images"][replacement["Config"]["Image"]]["Config"]["Labels"][
+            "io.agent-canon.source-revision"
+        ] == source_head
     expected_mounts = {
         "/var/lib/agent-canon/runtime",
         "/var/lib/agent-canon/source-sync.json",
@@ -1188,6 +1279,24 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     assert build_index < stop_index
     assert resident["id"] in calls[stop_index]
     assert any(old_image_id in call for call in calls if call.startswith("tag\t"))
+    if operation == "install":
+        assert subprocess.run(
+            ["git", "-C", str(repository), "branch", "--show-current"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip() == "main"
+        assert subprocess.run(
+            ["git", "-C", str(repository), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip() == subprocess.run(
+            ["git", "-C", str(repository), "rev-parse", "origin/main"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
 
 
 def test_missing_docker_is_typed_without_host_python(tmp_path: Path) -> None:

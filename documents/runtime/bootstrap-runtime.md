@@ -118,6 +118,37 @@ readers accept only this complete shape. Legacy, incomplete, or wrongly typed
 records are reported as unavailable and are replaced only by the next atomic
 host sync transition.
 
+### Install source transition
+
+The distribution install path has one SourceSync transition before image build
+or resident reconciliation. It fetches `refs/heads/main` explicitly into
+`refs/remotes/origin/main`; a `FETCH_HEAD`-only result is not an alignment
+state. Only the exact managed root `~/agent-canon` with `$HOME` as its control
+root is converged automatically. Its tracked source may be detached, behind,
+ahead, or dirty: install attaches local `main` to the fetched remote commit
+with the forced managed transition and then performs a no-op `merge --ff-only`.
+Ignored `.runtime/` and `.codex/personal/` remain local state. A fetch or
+alignment failure ends install before Docker build/create and leaves the prior
+resident untouched.
+
+Other checkouts retain their caller-owned branch and tracked files. The
+SourceSync primitive rejects a detached, non-`main`, dirty, or non-fast-forward
+checkout rather than changing it. The resulting install state is deliberately
+small:
+
+| Source state | SourceSync transition | Install consequence |
+| --- | --- | --- |
+| absent / not a Git checkout | distribution caller must clone first | no Docker operation |
+| managed detached, dirty, or diverged | fetch explicit remote ref; converge tracked source to `main` | continue from aligned `HEAD` |
+| managed `main` already at remote | record `up_to_date` | continue without source rewrite |
+| non-managed detached / other branch / dirty / diverged | preserve and return typed refusal | no source or resident change |
+| remote fetch or ref readback failure | record failure | no Docker build/create |
+
+Only after the source transition succeeds does install prune stale derived
+target rows, build/adopt the expected image, and reconcile the named resident.
+An install failure is terminal for that invocation; target registration is a
+separate caller action and must not be inferred from a failed receipt.
+
 ## What is installed and where
 
 `install` creates the runtime state directories and adopts the published GHCR
