@@ -266,6 +266,7 @@ class BuildContext:
     """All canonical inputs used by one materialization run."""
 
     root: Path
+    output_root: Path
     skill_ids: tuple[str, ...]
     catalog_entries: Mapping[str, Mapping[str, object]]
     routes: Mapping[str, SkillRoutingRule]
@@ -497,9 +498,10 @@ def _source_snapshot_digest(
     return domain_digest("agent-canon.skill-runtime-shim.source-snapshot.v1", files)
 
 
-def build_context(root: Path) -> BuildContext:
+def build_context(root: Path, *, output_root: Path | None = None) -> BuildContext:
     """Load and validate the complete canonical input universe."""
     root = root.resolve()
+    output = (output_root or root).resolve()
     skill_ids, entries = _catalog_entries(root)
     try:
         routes = {rule.skill: rule for rule in load_skill_route_rules(root)}
@@ -518,6 +520,7 @@ def build_context(root: Path) -> BuildContext:
         raise MaterializerError("command_packet_count_mismatch", str(len(packets)))
     return BuildContext(
         root,
+        output,
         skill_ids,
         entries,
         routes,
@@ -707,7 +710,7 @@ def render_shim(record: Mapping[str, object]) -> str:
 
 
 def _runtime_path(context: BuildContext, skill: str) -> Path:
-    return context.root / RUNTIME_ROOT / skill / "SKILL.md"
+    return context.output_root / RUNTIME_ROOT / skill / "SKILL.md"
 
 
 def _legacy_generated_schema_matches(candidate: str, expected: str) -> bool:
@@ -776,7 +779,7 @@ def classify_legacy(
             "resolution": "blocked",
             "unmatched_blocks": [
                 {
-                    "locator": path.relative_to(context.root).as_posix(),
+                    "locator": path.relative_to(context.output_root).as_posix(),
                     "digest": hashlib.sha256(current).hexdigest(),
                 }
             ],
@@ -800,14 +803,14 @@ def classify_legacy(
     for locator, section in legacy_sections.items():
         unmatched_blocks.append(
             {
-                "locator": f"{path.relative_to(context.root).as_posix()}#{locator}",
+                "locator": f"{path.relative_to(context.output_root).as_posix()}#{locator}",
                 "digest": hashlib.sha256(section.encode("utf-8")).hexdigest(),
             }
         )
     if not unmatched_blocks:
         unmatched_blocks.append(
             {
-                "locator": path.relative_to(context.root).as_posix(),
+                "locator": path.relative_to(context.output_root).as_posix(),
                 "digest": hashlib.sha256(body.encode("utf-8")).hexdigest(),
             }
         )
@@ -933,12 +936,16 @@ def _staged_readback(context: BuildContext, rendered: Mapping[str, str]) -> None
 
 
 def materialize(
-    root: Path, *, all_skills: bool = False, image_build: bool = False
+    root: Path,
+    *,
+    all_skills: bool = False,
+    image_build: bool = False,
+    output_root: Path | None = None,
 ) -> dict[str, object]:
     """Materialize changed runtime targets using per-file temp+replace."""
     if not all_skills:
         raise MaterializerError("all_required")
-    context = build_context(root)
+    context = build_context(root, output_root=output_root)
     records, rendered, projections = build_rows(context)
     legacy = [
         classify_legacy(context, skill, rendered[skill]) for skill in context.skill_ids
@@ -947,7 +954,7 @@ def materialize(
         raise LegacyMigrationError(legacy)
     _staged_readback(context, rendered)
     boundary, attestation = _parent_boundary(
-        root, "skill-shim-materializer", image_build=image_build
+        context.output_root, "skill-shim-materializer", image_build=image_build
     )
     delta_paths: list[str] = []
     replaced = 0
@@ -976,10 +983,10 @@ def materialize(
             # creating an avoidable per-file attestation window.
             boundary.atomic_publish(target, data, mode=0o644)
             replaced += 1
-            delta_paths.append(path.relative_to(context.root).as_posix())
+            delta_paths.append(path.relative_to(context.output_root).as_posix())
         except OSError as exc:
             raise PartialStopError(
-                path.relative_to(context.root).as_posix(), replaced
+                path.relative_to(context.output_root).as_posix(), replaced
             ) from exc
     readback = readback_digest(
         context, cast(Mapping[str, object], records), projections
@@ -1005,11 +1012,13 @@ def materialize(
     }
 
 
-def readback(root: Path, *, all_skills: bool = False) -> dict[str, object]:
+def readback(
+    root: Path, *, all_skills: bool = False, output_root: Path | None = None
+) -> dict[str, object]:
     """Read back every generated target without writing any file."""
     if not all_skills:
         raise MaterializerError("all_required")
-    context = build_context(root)
+    context = build_context(root, output_root=output_root)
     records, rendered, projections = build_rows(context)
     _staged_readback(context, rendered)
     digest = readback_digest(context, cast(Mapping[str, object], records), projections)
@@ -1030,18 +1039,20 @@ def readback(root: Path, *, all_skills: bool = False) -> dict[str, object]:
     }
 
 
-def check(root: Path, *, all_skills: bool = False) -> dict[str, object]:
+def check(
+    root: Path, *, all_skills: bool = False, output_root: Path | None = None
+) -> dict[str, object]:
     """Check staged bytes and actual readback, reporting drift without writing."""
     if not all_skills:
         raise MaterializerError("all_required")
-    context = build_context(root)
+    context = build_context(root, output_root=output_root)
     records, rendered, projections = build_rows(context)
     _staged_readback(context, rendered)
     drift: list[str] = []
     for skill in context.skill_ids:
         path = _runtime_path(context, skill)
         if not path.is_file() or path.read_bytes() != rendered[skill].encode("utf-8"):
-            drift.append(path.relative_to(context.root).as_posix())
+            drift.append(path.relative_to(context.output_root).as_posix())
     payload: dict[str, object] = {
         "schema": "agent_canon.skill_runtime_shim.check",
         "version": VERSION,
@@ -1112,6 +1123,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Materialize into an ephemeral Docker image layer.",
     )
+    parser.add_argument(
+        "--output-root",
+        type=Path,
+        help="Write the generated view below this staging root instead of the source root.",
+    )
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
@@ -1136,14 +1152,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == "materialize":
             payload = materialize(
-                args.root, all_skills=args.all, image_build=args.image_build
+                args.root,
+                all_skills=args.all,
+                image_build=args.image_build,
+                output_root=args.output_root,
             )
         elif args.image_build:
             raise MaterializerError("image_build_materialize_only")
         elif args.command == "readback":
-            payload = readback(args.root, all_skills=args.all)
+            payload = readback(
+                args.root, all_skills=args.all, output_root=args.output_root
+            )
         else:
-            payload = check(args.root, all_skills=args.all)
+            payload = check(
+                args.root, all_skills=args.all, output_root=args.output_root
+            )
     except LegacyMigrationError as exc:
         print(
             "SKILL_SHIM_MATERIALIZER_LEGACY_RECEIPT="

@@ -1336,6 +1336,140 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         ).stdout.strip()
 
 
+def test_public_clean_install_materializes_source_view_and_first_target(
+    tmp_path: Path,
+) -> None:
+    """Exercise the dotfiles install sequence from an empty HOME fixture."""
+    home = tmp_path / "home"
+    home.mkdir()
+    repository = home / "agent-canon"
+    subprocess.run(
+        ["git", "clone", "--no-hardlinks", str(ROOT), str(repository)],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "branch", "-M", "main"],
+        check=True,
+        capture_output=True,
+    )
+    legacy_runtime = home / "workspace" / "agent-canon-runtime" / "host"
+    fake_state = tmp_path / "docker-state.json"
+    fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
+    environment = {
+        **os.environ,
+        "HOME": str(home),
+        "AGENT_CANON_DOCKER": str(fake_docker),
+        "FAKE_DOCKER_STATE": str(fake_state),
+        "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
+    }
+    common = [
+        str(BOOTSTRAP),
+        "--repository-root",
+        str(repository),
+        "--control-parent-root",
+        str(home),
+        "--runtime-root",
+        str(legacy_runtime),
+    ]
+    personal_skills = repository / ".codex" / "personal" / "skills"
+    assert not (repository / ".runtime").exists()
+    assert not personal_skills.exists()
+
+    installed = subprocess.run(
+        [*common, "install"], check=False, capture_output=True, text=True, env=environment
+    )
+    assert installed.returncode == 0, installed.stderr
+    assert (repository / ".runtime").is_dir()
+    assert personal_skills.is_dir()
+    assert list(personal_skills.glob("*/SKILL.md"))
+    assert not legacy_runtime.exists()
+    assert subprocess.run(
+        ["git", "-C", str(repository), "branch", "--show-current"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip() == "main"
+    assert subprocess.run(
+        ["git", "-C", str(repository), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip() == subprocess.run(
+        ["git", "-C", str(repository), "rev-parse", "origin/main"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    started = subprocess.run(
+        [*common, "start"], check=False, capture_output=True, text=True, env=environment
+    )
+    assert started.returncode == 0, started.stderr
+    added = subprocess.run(
+        [
+            *common,
+            "target",
+            "add",
+            "--root",
+            str(repository),
+            "--mode",
+            "read-only",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    assert added.returncode == 0, added.stderr
+    mounts = (repository / ".runtime" / "container-state" / "mounts.tsv").read_text(
+        encoding="utf-8"
+    ).splitlines()
+    assert len(mounts) == 1
+    assert mounts[0].split("\t")[2] == str(repository.resolve())
+
+    wrapper = subprocess.run(
+        [str(repository / "tools" / "bin" / "agent-canon"), "--version"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **environment,
+            "AGENT_CANON_CONTROL_PARENT_ROOT": str(home),
+            "AGENT_CANON_RUNTIME_ROOT": str(legacy_runtime),
+        },
+    )
+    assert wrapper.returncode == 0, wrapper.stderr
+    assert wrapper.stdout.strip() == "agent-canon 0.1.0"
+
+    repeated_install = subprocess.run(
+        [*common, "install"], check=False, capture_output=True, text=True, env=environment
+    )
+    assert repeated_install.returncode == 0, repeated_install.stderr
+    repeated_add = subprocess.run(
+        [
+            *common,
+            "target",
+            "add",
+            "--root",
+            str(repository),
+            "--mode",
+            "read-only",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    assert repeated_add.returncode == 0, repeated_add.stderr
+    assert '"code":"target_unchanged"' in repeated_add.stdout
+    assert len(
+        (repository / ".runtime" / "container-state" / "mounts.tsv").read_text(
+            encoding="utf-8"
+        ).splitlines()
+    ) == 1
+
+
 def test_missing_docker_is_typed_without_host_python(tmp_path: Path) -> None:
     """A missing Docker executable remains a host-adapter diagnostic."""
     control = tmp_path / "control"
