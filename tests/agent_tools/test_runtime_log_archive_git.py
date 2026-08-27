@@ -1562,6 +1562,49 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(clean.returncode, 0, clean.stdout + clean.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_CLEAN=yes", clean.stdout)
 
+    def test_sync_with_canonical_source_runtime_uses_spool_only(self) -> None:
+        """The install-root runtime handles locks/spool while reports stay external."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "project"
+            canon = root / "agent-canon"
+            runtime = source / ".runtime"
+            archive = root / "agent-canon-log"
+            source.mkdir()
+            canon.mkdir()
+            remote = self.make_remote(root)
+            key = repo_log_key(source)
+            run_dir = source / "reports" / "agents" / "run-source-runtime"
+            run_dir.mkdir(parents=True)
+            (run_dir / "summary.md").write_text("# Summary\n", encoding="utf-8")
+
+            synced = self.run_tool(
+                "sync",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+                runtime_root=runtime,
+                archive_root=archive,
+            )
+
+            self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_SYNC=pass", synced.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", synced.stdout)
+            self.assertTrue((archive / "agent-reports" / key).is_dir())
+            self.assertFalse((runtime / "archive").exists())
+
+            rerun = self.run_tool(
+                "sync",
+                source_root=source,
+                canon_root=canon,
+                remote=remote,
+                runtime_root=runtime,
+                archive_root=archive,
+            )
+            self.assertEqual(rerun.returncode, 0, rerun.stdout + rerun.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_SYNC=pass", rerun.stdout)
+            self.assertFalse((runtime / "archive").exists())
+
     def test_external_runtime_bare_remote_readback_duplicate_noop_and_conflict(self) -> None:
         """The external runtime flow proves remote objects, replay no-op, and conflict retention."""
         with tempfile.TemporaryDirectory() as temp_dir:

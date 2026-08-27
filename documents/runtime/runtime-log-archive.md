@@ -12,13 +12,23 @@ downstream design runtime-log-archive-migration.md archive migration route
 
 # Runtime Log Archive
 
-AgentCanon runtime evidence is runtime state. Hook events, accumulated evals,
-Codex runtime summaries, and archived task bundles are collected under the
-bootstrap-owned ignored `<install-root>/.runtime/` and published to the separate
+AgentCanon runtime evidence is runtime state. Hook events and pending
+collection inputs use the bootstrap-owned ignored `<install-root>/.runtime/`
+spool/control paths; accumulated evals, Codex runtime summaries, and archived
+task bundles are published to the separate
 [`iwashita-nozomu/agent-canon-log`](https://github.com/iwashita-nozomu/agent-canon-log)
 repository. Outside that exact `.runtime/` directory, they are not written to
 the AgentCanon source checkout, a parent repository, a vendor directory, or a
 source-local `.agent-canon` fallback.
+
+The general `RuntimeArtifactBoundary` remains source-local-output-safe. The
+archive transaction has one explicitly named `runtime_spool_boundary` for the
+bootstrap-owned exact `<source-root>/.runtime` path or an external runtime
+root; it admits only `locks/` and `spool/` descendants for transaction control
+and pending inputs. Archive and report output always uses the explicit external
+`context.archive_root`.
+In particular, the transaction never creates `.runtime/archive/`, and another
+source child, runtime root, or symlink cannot use this exception.
 
 The log repository owns its branch, append-only layout, retention, and legacy
 import policy. AgentCanon owns only the local spool, archive checkout lease,
