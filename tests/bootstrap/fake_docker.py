@@ -335,15 +335,21 @@ def main(argv: list[str]) -> int:
         save(state)
         return 0
     if argv[:2] == ["image", "rm"] and len(argv) == 3:
+        # Docker removes the requested tag when a tag is supplied.  Resolving
+        # the tag to its image ID first would remove an earlier alias instead,
+        # which can silently delete the active image from this fake daemon.
+        if argv[2] in state["images"]:
+            del state["images"][argv[2]]
+            save(state)
+            return 0
         found = find(state, argv[2])
         if not found or found[0] != "image":
             return 1
-        key = next(
-            key
-            for key, record in state["images"].items()
-            if record["Id"] == found[1]["Id"] or key == argv[2]
-        )
-        del state["images"][key]
+        keys = [
+            key for key, record in state["images"].items() if record["Id"] == found[1]["Id"]
+        ]
+        for key in keys:
+            del state["images"][key]
         save(state)
         return 0
     if argv[:1] == ["cp"] and len(argv) == 3:
@@ -389,6 +395,9 @@ def main(argv: list[str]) -> int:
             "python3",
             "/usr/local/share/agent-canon/runtime/tools/agent_tools/bootstrap_runtime.py",
         ]:
+            failed_operation = os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_OPERATION", "")
+            if failed_operation and failed_operation in command[2:]:
+                return int(os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_RC", "41"))
             if "target" in command[2:] and "add" in command[2:]:
                 runtime_mount = next(
                     (

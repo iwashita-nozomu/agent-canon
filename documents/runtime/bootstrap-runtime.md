@@ -91,13 +91,18 @@ or mounts a whole home directory. `read-only` is the default and is required
 for analysis. `explicit-target-write` is available only for an operation whose
 documented mutation capability names its target and allowed paths.
 
-`install` and `update` may remove only syntactically valid, derived target
-registry entries whose host source is missing, not a directory, or a symlink;
-all live target entries remain unchanged. `target add` applies the same stale
-entry cleanup before adding the requested mapping and returns an unchanged
-receipt when that mapping and the resident are already current. `start`,
-`exec`, and `tool` never prune the registry: a missing registered target is a
-terminal error in those execution paths.
+`install` is a clean reconstruction transition. After SourceSync has selected
+the current source generation, it resets the reconstructible lifecycle state
+and target projection before creating the resident; the new install therefore
+starts with no prior target or rollback generation. Receipts, pending spool,
+archive, and cache evidence remain available. `update` and `target add` may
+remove only syntactically valid, derived target registry entries whose host
+source is missing, not a directory, or a symlink; all other live target
+entries remain unchanged. `target add` applies the same stale entry cleanup
+before adding the requested mapping and returns an unchanged receipt when
+that mapping and the resident are already current. `start`, `exec`, and
+`tool` never prune the registry: a missing registered target is a terminal
+error in those execution paths.
 
 The command emits a typed JSON receipt. Keep receipts under the selected
 runtime root; they are operational evidence, not source files. A failed
@@ -145,10 +150,13 @@ small:
 | non-managed detached / other branch / dirty / diverged | preserve and return typed refusal | no source or resident change |
 | remote fetch or ref readback failure | record failure | no Docker build/create |
 
-Only after the source transition succeeds does install prune stale derived
-target rows, build/adopt the expected image, and reconcile the named resident.
-An install failure is terminal for that invocation; target registration is a
-separate caller action and must not be inferred from a failed receipt.
+Only after the source transition succeeds does install reset the stale
+reconstructible runtime projection, build/adopt the expected image, and
+reconcile the named resident. The reset uses the existing resident replacement
+and rollback primitives; a foreign resident is still rejected and unrelated
+Docker resources are untouched. An install failure is terminal for that
+invocation; target registration is a separate caller action and must not be
+inferred from a failed receipt.
 
 ## What is installed and where
 

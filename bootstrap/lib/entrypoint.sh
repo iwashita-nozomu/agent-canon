@@ -828,6 +828,271 @@ _agent_canon_prepare_host_runtime() {
   [[ -e "$AGENT_CANON_STATE_ROOT/mounts.tsv" ]] || : > "$AGENT_CANON_STATE_ROOT/mounts.tsv"
 }
 
+_agent_canon_prepare_clean_install() {
+  # ``install`` is a reconstructive transition.  The source-sync record is
+  # already current at this point, while the remaining runtime files are
+  # derived from an earlier source/image generation and must not participate
+  # in candidate creation.  Keep receipts, spool, archive, and cache as
+  # operational evidence; reset only lifecycle state and projections that
+  # the new resident will recreate.
+  local path directory backup
+  AGENT_CANON_CLEAN_INSTALL_PRIOR_ROLLBACK_REF=
+  AGENT_CANON_CLEAN_INSTALL_PRIOR_ROLLBACK_ID=
+  if [[ -f "$AGENT_CANON_STATE_ROOT/rollback-plan.tsv" &&
+        ! -L "$AGENT_CANON_STATE_ROOT/rollback-plan.tsv" ]]; then
+    AGENT_CANON_CLEAN_INSTALL_PRIOR_ROLLBACK_REF=$(awk -F $'\t' \
+      '$1 == "image-ref" { print $2; exit }' \
+      "$AGENT_CANON_STATE_ROOT/rollback-plan.tsv")
+    AGENT_CANON_CLEAN_INSTALL_PRIOR_ROLLBACK_ID=$(awk -F $'\t' \
+      '$1 == "image-id" { print $2; exit }' \
+      "$AGENT_CANON_STATE_ROOT/rollback-plan.tsv")
+  fi
+  export AGENT_CANON_CLEAN_INSTALL_PRIOR_ROLLBACK_REF \
+    AGENT_CANON_CLEAN_INSTALL_PRIOR_ROLLBACK_ID
+  backup=$(mktemp -d "$AGENT_CANON_RUNTIME_ROOT/.install-reset.XXXXXX") ||
+    _agent_canon_json_error install_runtime_invalid \
+      "clean install state backup could not be created"
+  for path in \
+    "$AGENT_CANON_STATE_ROOT/state.json" \
+    "$AGENT_CANON_STATE_ROOT/owner.json" \
+    "$AGENT_CANON_STATE_ROOT/mounts.toml" \
+    "$AGENT_CANON_STATE_ROOT/mounts.tsv" \
+    "$AGENT_CANON_STATE_ROOT/rollback-plan.tsv" \
+    "$AGENT_CANON_STATE_ROOT/rollback-mounts.tsv" \
+    "$AGENT_CANON_STATE_ROOT/.pending-rollback-plan.tsv" \
+    "$AGENT_CANON_STATE_ROOT/previous-image-id" \
+    "$AGENT_CANON_RUNTIME_ROOT/host-state/active-image.tsv"; do
+    [[ ! -L "$path" ]] || {
+      rm -rf -- "$backup"
+      _agent_canon_json_error install_runtime_invalid \
+        "clean install state file is a symlink: $path"
+    }
+    [[ -e "$path" ]] || continue
+    if [[ "$path" == "$AGENT_CANON_STATE_ROOT"/* ]]; then
+      cp -a -- "$path" "$backup/$(basename -- "$path")" || {
+        rm -rf -- "$backup"
+        _agent_canon_json_error install_runtime_invalid \
+          "clean install state file could not be backed up: $path"
+      }
+    else
+      mkdir -p -- "$backup/host-state"
+      cp -a -- "$path" "$backup/host-state/active-image.tsv" || {
+        rm -rf -- "$backup"
+        _agent_canon_json_error install_runtime_invalid \
+          "clean install image state could not be backed up"
+      }
+    fi
+  done
+  for directory in \
+    "$AGENT_CANON_STATE_ROOT/generations" \
+    "$AGENT_CANON_STATE_ROOT/tasks" \
+    "$AGENT_CANON_STATE_ROOT/container-runtime" \
+    "$AGENT_CANON_STATE_ROOT/codex-home"; do
+    [[ ! -L "$directory" ]] || {
+      rm -rf -- "$backup"
+      _agent_canon_json_error install_runtime_invalid \
+        "clean install state directory is a symlink: $directory"
+    }
+    mkdir -p -- "$backup/$(basename -- "$directory")"
+    [[ -d "$directory" ]] || continue
+    cp -a -- "$directory/." "$backup/$(basename -- "$directory")/" || {
+      rm -rf -- "$backup"
+      _agent_canon_json_error install_runtime_invalid \
+        "clean install state directory could not be backed up: $directory"
+    }
+  done
+  AGENT_CANON_CLEAN_INSTALL_BACKUP=$backup
+  export AGENT_CANON_CLEAN_INSTALL_BACKUP
+  for path in \
+    "$AGENT_CANON_STATE_ROOT/state.json" \
+    "$AGENT_CANON_STATE_ROOT/owner.json" \
+    "$AGENT_CANON_STATE_ROOT/mounts.toml" \
+    "$AGENT_CANON_STATE_ROOT/mounts.tsv" \
+    "$AGENT_CANON_STATE_ROOT/rollback-plan.tsv" \
+    "$AGENT_CANON_STATE_ROOT/rollback-mounts.tsv" \
+    "$AGENT_CANON_STATE_ROOT/.pending-rollback-plan.tsv" \
+    "$AGENT_CANON_STATE_ROOT/previous-image-id" \
+    "$AGENT_CANON_RUNTIME_ROOT/host-state/active-image.tsv"; do
+    [[ ! -L "$path" ]] ||
+      _agent_canon_json_error install_runtime_invalid \
+        "clean install state file is a symlink: $path"
+    rm -f -- "$path"
+  done
+  for directory in \
+    "$AGENT_CANON_STATE_ROOT/generations" \
+    "$AGENT_CANON_STATE_ROOT/tasks" \
+    "$AGENT_CANON_STATE_ROOT/container-runtime" \
+    "$AGENT_CANON_STATE_ROOT/codex-home"; do
+    [[ ! -L "$directory" ]] ||
+      _agent_canon_json_error install_runtime_invalid \
+        "clean install state directory is a symlink: $directory"
+    mkdir -p -- "$directory"
+    find "$directory" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+  done
+  : > "$AGENT_CANON_STATE_ROOT/mounts.toml"
+  : > "$AGENT_CANON_STATE_ROOT/mounts.tsv"
+}
+
+_agent_canon_restore_clean_install() {
+  local backup=${AGENT_CANON_CLEAN_INSTALL_BACKUP:-} path directory name
+  [[ -n "$backup" && -d "$backup" && ! -L "$backup" ]] || return 0
+  for path in \
+    "$AGENT_CANON_STATE_ROOT/state.json" \
+    "$AGENT_CANON_STATE_ROOT/owner.json" \
+    "$AGENT_CANON_STATE_ROOT/mounts.toml" \
+    "$AGENT_CANON_STATE_ROOT/mounts.tsv" \
+    "$AGENT_CANON_STATE_ROOT/rollback-plan.tsv" \
+    "$AGENT_CANON_STATE_ROOT/rollback-mounts.tsv" \
+    "$AGENT_CANON_STATE_ROOT/.pending-rollback-plan.tsv" \
+    "$AGENT_CANON_STATE_ROOT/previous-image-id" \
+    "$AGENT_CANON_RUNTIME_ROOT/host-state/active-image.tsv"; do
+    [[ ! -L "$path" ]] || return 2
+    rm -f -- "$path"
+  done
+  for directory in \
+    "$AGENT_CANON_STATE_ROOT/generations" \
+    "$AGENT_CANON_STATE_ROOT/tasks" \
+    "$AGENT_CANON_STATE_ROOT/container-runtime" \
+    "$AGENT_CANON_STATE_ROOT/codex-home"; do
+    [[ ! -L "$directory" ]] || return 2
+    mkdir -p -- "$directory"
+    find "$directory" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+    name=$(basename -- "$directory")
+    cp -a -- "$backup/$name/." "$directory/" || return 2
+  done
+  for path in \
+    "$AGENT_CANON_STATE_ROOT/state.json" \
+    "$AGENT_CANON_STATE_ROOT/owner.json" \
+    "$AGENT_CANON_STATE_ROOT/mounts.toml" \
+    "$AGENT_CANON_STATE_ROOT/mounts.tsv" \
+    "$AGENT_CANON_STATE_ROOT/rollback-plan.tsv" \
+    "$AGENT_CANON_STATE_ROOT/rollback-mounts.tsv" \
+    "$AGENT_CANON_STATE_ROOT/.pending-rollback-plan.tsv" \
+    "$AGENT_CANON_STATE_ROOT/previous-image-id"; do
+    name=$(basename -- "$path")
+    [[ -e "$backup/$name" ]] || continue
+    cp -a -- "$backup/$name" "$path" || return 2
+  done
+  if [[ -e "$backup/host-state/active-image.tsv" ]]; then
+    mkdir -p -- "$AGENT_CANON_RUNTIME_ROOT/host-state"
+    cp -a -- "$backup/host-state/active-image.tsv" \
+      "$AGENT_CANON_RUNTIME_ROOT/host-state/active-image.tsv" || return 2
+  fi
+  rm -rf -- "$backup"
+  unset AGENT_CANON_CLEAN_INSTALL_BACKUP
+  return 0
+}
+
+_agent_canon_discard_clean_install_backup() {
+  local backup=${AGENT_CANON_CLEAN_INSTALL_BACKUP:-}
+  [[ -z "$backup" ]] || rm -rf -- "$backup"
+  unset AGENT_CANON_CLEAN_INSTALL_BACKUP
+}
+
+_agent_canon_discard_clean_install_rollback_tag() {
+  local attempt_ref=${AGENT_CANON_CLEAN_INSTALL_ROLLBACK_REF:-}
+  local prior_ref=${AGENT_CANON_CLEAN_INSTALL_PRIOR_ROLLBACK_REF:-}
+  local prior_id=${AGENT_CANON_CLEAN_INSTALL_PRIOR_ROLLBACK_ID:-}
+  local attempt_id=${AGENT_CANON_CLEAN_INSTALL_ROLLBACK_ID:-}
+  [[ -n "$attempt_ref" ]] || return 0
+  # If the attempt reused the prior tag for the same image, it did not change
+  # the prior rollback resource. Otherwise remove only the attempt's exact
+  # tag, then restore a prior alias that the attempt replaced.
+  if [[ "$attempt_ref" == "$prior_ref" && "$attempt_id" == "$prior_id" ]]; then
+    unset AGENT_CANON_CLEAN_INSTALL_ROLLBACK_REF AGENT_CANON_CLEAN_INSTALL_ROLLBACK_ID
+    return 0
+  fi
+  if "$AGENT_CANON_DOCKER_CMD" image inspect "$attempt_ref" >/dev/null 2>&1; then
+    "$AGENT_CANON_DOCKER_CMD" image rm "$attempt_ref" >/dev/null || return 2
+  fi
+  if [[ -n "$prior_ref" && -n "$prior_id" ]]; then
+    if ! "$AGENT_CANON_DOCKER_CMD" tag "$prior_id" "$prior_ref" >/dev/null 2>&1; then
+      return 2
+    fi
+  fi
+  unset AGENT_CANON_CLEAN_INSTALL_ROLLBACK_REF AGENT_CANON_CLEAN_INSTALL_ROLLBACK_ID
+  return 0
+}
+
+_agent_canon_restore_clean_install_resident() {
+  local old_container=${AGENT_CANON_CLEAN_INSTALL_OLD_CONTAINER:-}
+  local old_image_ref=${AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF:-}
+  local old_image_id=${AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_ID:-}
+  local restored
+  [[ "${AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED:-0}" == 1 ]] || return 0
+  [[ -n "$old_container" && -n "$old_image_ref" && -n "$old_image_id" ]] || return 2
+  AGENT_CANON_IMAGE_REF=$old_image_ref
+  AGENT_CANON_EXPECTED_IMAGE_ID=$old_image_id
+  export AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID
+  if ! restored=$(_agent_canon_ensure_container); then
+    return 2
+  fi
+  if ! _agent_canon_run_controller "$restored" start >/dev/null; then
+    return 2
+  fi
+  AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED=0
+  export AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED
+  return 0
+}
+
+_agent_canon_clean_install_exit() {
+  local rc=$?
+  if [[ "${AGENT_CANON_CLEAN_INSTALL_ACTIVE:-0}" == 1 ]]; then
+    if [[ "${AGENT_CANON_CLEAN_INSTALL_SUCCESS:-0}" == 1 ]]; then
+      _agent_canon_discard_clean_install_backup || rc=2
+    else
+      local restore_rc=0
+      _agent_canon_discard_clean_install_rollback_tag || restore_rc=2
+      _agent_canon_restore_clean_install || restore_rc=2
+      _agent_canon_restore_clean_install_resident || restore_rc=2
+      if ((restore_rc != 0)); then
+        _agent_canon_json_error rollback_failed \
+          "clean install state could not be restored after candidate failure"
+        rc=2
+      fi
+    fi
+  fi
+  exit "$rc"
+}
+
+_agent_canon_finish_clean_install() {
+  # Replacement keeps a rollback image long enough to recover a failed
+  # candidate.  Once the fresh install has completed, that prior generation
+  # is no longer part of install state and must not leak into the next run.
+  local path rollback_plan rollback_ref rollback_tag_prefix
+  rollback_plan="$AGENT_CANON_STATE_ROOT/rollback-plan.tsv"
+  if [[ -f "$rollback_plan" && ! -L "$rollback_plan" ]]; then
+    rollback_ref=$(awk -F $'\t' '$1 == "image-ref" { print $2 }' "$rollback_plan")
+    # The plan owns a generated tag, not the image identity.  Never pass an
+    # immutable image ID or an unrelated/foreign tag to ``image rm``: an image
+    # ID can be the active candidate when Docker reused the same layers, while
+    # a foreign tag is outside this install's lifecycle.
+    rollback_tag_prefix="agent-canon-tools:$(_agent_canon_control_digest | cut -c1-16)-rollback-"
+    if [[ -n "$rollback_ref" && "$rollback_ref" == "$rollback_tag_prefix"* ]]; then
+      if "$AGENT_CANON_DOCKER_CMD" image inspect "$rollback_ref" >/dev/null 2>&1; then
+        "$AGENT_CANON_DOCKER_CMD" image rm "$rollback_ref" >/dev/null ||
+          _agent_canon_json_error install_runtime_invalid \
+            "clean install rollback image could not be released"
+      fi
+    fi
+  fi
+  for path in \
+    "$AGENT_CANON_STATE_ROOT/rollback-plan.tsv" \
+    "$AGENT_CANON_STATE_ROOT/.pending-rollback-plan.tsv" \
+    "$AGENT_CANON_STATE_ROOT/previous-image-id" \
+    "$AGENT_CANON_STATE_ROOT/rollback-mounts.tsv"; do
+    [[ ! -L "$path" ]] ||
+      _agent_canon_json_error install_runtime_invalid \
+        "clean install result is a symlink: $path"
+    rm -f -- "$path"
+  done
+  unset AGENT_CANON_PENDING_ROLLBACK_PLAN AGENT_CANON_PREVIOUS_IMAGE_ID AGENT_CANON_PREVIOUS_IMAGE_REF \
+    AGENT_CANON_CLEAN_INSTALL_ROLLBACK_REF AGENT_CANON_CLEAN_INSTALL_ROLLBACK_ID \
+    AGENT_CANON_CLEAN_INSTALL_PRIOR_ROLLBACK_REF AGENT_CANON_CLEAN_INSTALL_PRIOR_ROLLBACK_ID \
+    AGENT_CANON_CLEAN_INSTALL_OLD_CONTAINER AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF \
+    AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_ID AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED
+}
+
 _agent_canon_container_exec() {
   local container=$1
   shift
@@ -1621,6 +1886,7 @@ _agent_canon_sync_personal_skill_view() {
 
 _agent_canon_restore_candidate_failure() {
   local container=$1 old_image_id=$2 candidate_image_id=$3
+  local old_image_ref=${AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF:-$old_image_id}
   local restore_output restore_error restore_rc=0
   local recovery_errors=()
   AGENT_CANON_RESTORE_IMAGE_ID=$old_image_id
@@ -1647,7 +1913,7 @@ _agent_canon_restore_candidate_failure() {
   if ! "$AGENT_CANON_DOCKER_CMD" rm "$container" >/dev/null 2>&1; then
     recovery_errors+=("candidate_remove_failed")
   fi
-  AGENT_CANON_IMAGE_REF=$old_image_id
+  AGENT_CANON_IMAGE_REF=$old_image_ref
   AGENT_CANON_EXPECTED_IMAGE_ID=$old_image_id
   export AGENT_CANON_IMAGE_REF
   export AGENT_CANON_EXPECTED_IMAGE_ID
@@ -1796,8 +2062,19 @@ _agent_canon_replace_resident_locked() {
   local candidate_image_ref=$1 candidate_image_id=$2
   local replacement_operation=${3:-update}
   local old_image_id old_image_ref old_container candidate restored rc
-  local old_container_present=0 current_resident_valid=0
+  local old_container_present=0 current_resident_valid=0 clean_install=0 old_quiesced=0
   local old_container_id old_container_runtime old_container_control stale_target_pruned=
+  AGENT_CANON_CLEAN_INSTALL_ACTIVE=0
+  AGENT_CANON_CLEAN_INSTALL_SUCCESS=0
+  AGENT_CANON_CLEAN_INSTALL_OLD_CONTAINER=
+  AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF=
+  AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_ID=
+  AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED=0
+  export AGENT_CANON_CLEAN_INSTALL_OLD_CONTAINER \
+    AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF \
+    AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_ID \
+    AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED
+  trap '_agent_canon_clean_install_exit' EXIT
   if ! candidate_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Id}}' "$candidate_image_ref"); then
     _agent_canon_json_error candidate_image_missing "candidate resident image disappeared before replacement"
     return 2
@@ -1813,7 +2090,55 @@ _agent_canon_replace_resident_locked() {
     old_container_control=$AGENT_CANON_OBSERVED_CONTAINER_CONTROL
     old_container_present=1
   fi
-  if ((old_container_present == 1)); then
+  old_image_ref=
+  old_image_id=
+  if [[ "$replacement_operation" == install ]]; then
+    # Install deliberately ignores the previous active-image and mount
+    # records. Capture the owned resident's exact image reference and validate
+    # its immutable identity;
+    # the existing resident replacement transaction will tear it down after
+    # the candidate is ready and restore it if candidate activation fails.
+    if ((old_container_present == 1)); then
+      if ! old_image_ref=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+        --format '{{.Config.Image}}' "$old_container"); then
+        _agent_canon_json_error active_image_readback_failed "resident image reference readback failed"
+        return 2
+      fi
+      if ! old_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect \
+        --format '{{.Id}}' "$old_image_ref"); then
+        _agent_canon_json_error active_image_readback_failed "resident image ID readback failed"
+        return 2
+      fi
+    fi
+    # Establish the EXIT-trap restore owner before stopping the resident or
+    # resetting any mounted runtime state.  A prepare failure must therefore
+    # restart the exact resident captured above.
+    AGENT_CANON_CLEAN_INSTALL_OLD_CONTAINER=$old_container
+    AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF=$old_image_ref
+    AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_ID=$old_image_id
+    AGENT_CANON_CLEAN_INSTALL_ACTIVE=1
+    export AGENT_CANON_CLEAN_INSTALL_OLD_CONTAINER \
+      AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF \
+      AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_ID \
+      AGENT_CANON_CLEAN_INSTALL_ACTIVE
+    if ((old_container_present == 1)); then
+      # The runtime files below are mounted by the old resident. Quiesce it
+      # while the replacement lock is held, before taking the clean-install
+      # snapshot or removing those files.
+      _agent_canon_require_existing_container_identity "$old_container" \
+        "$old_container_id" "$old_container_runtime" "$old_container_control" || return $?
+      if ! "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$old_container_id" >/dev/null; then
+        _agent_canon_json_error replacement_stop_failed "old resident could not be stopped"
+        return 2
+      fi
+      old_quiesced=1
+      AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED=1
+      export AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED
+    fi
+    _agent_canon_prepare_clean_install
+    clean_install=1
+    stale_target_pruned=clean_install
+  elif ((old_container_present == 1)); then
     # A missing target is stale derived registry state. Remove only those
     # entries before the complete manifest validation; malformed or otherwise
     # invalid records remain validation errors.
@@ -1824,8 +2149,6 @@ _agent_canon_replace_resident_locked() {
     _agent_canon_prune_stale_target_manifest || return $?
     stale_target_pruned=$AGENT_CANON_TARGET_PRUNE_DIGESTS
   fi
-  old_image_ref=
-  old_image_id=
   AGENT_CANON_IMAGE_REF=$candidate_image_ref
   AGENT_CANON_EXPECTED_IMAGE_ID=$candidate_image_id
   export AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID
@@ -1833,7 +2156,11 @@ _agent_canon_replace_resident_locked() {
   # This readback happens after the replacement lock is acquired.  A build
   # may have completed while another update owned the resident, so the
   # resident state—not the caller's pre-lock snapshot—is authoritative.
-  if [[ -f "$AGENT_CANON_RUNTIME_ROOT/host-state/active-image.tsv" ]] ||
+  if ((clean_install == 1)); then
+    AGENT_CANON_IMAGE_REF=$candidate_image_ref
+    AGENT_CANON_EXPECTED_IMAGE_ID=$candidate_image_id
+    export AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID
+  elif [[ -f "$AGENT_CANON_RUNTIME_ROOT/host-state/active-image.tsv" ]] ||
      "$AGENT_CANON_DOCKER_CMD" container inspect "$old_container" >/dev/null 2>&1; then
     _agent_canon_use_active_image "$old_container" || return $?
     old_image_ref=$AGENT_CANON_IMAGE_REF
@@ -1892,6 +2219,12 @@ _agent_canon_replace_resident_locked() {
   if ((old_container_present == 1)) &&
      [[ -z "${AGENT_CANON_PENDING_ROLLBACK_PLAN:-}" ]]; then
     _agent_canon_write_rollback_plan "$old_image_id" "$old_image_ref" || return $?
+    if ((clean_install == 1)); then
+      AGENT_CANON_CLEAN_INSTALL_ROLLBACK_REF=$(awk -F $'\t' \
+        '$1 == "image-ref" { print $2; exit }' "$AGENT_CANON_STATE_ROOT/rollback-plan.tsv")
+      AGENT_CANON_CLEAN_INSTALL_ROLLBACK_ID=$old_image_id
+      export AGENT_CANON_CLEAN_INSTALL_ROLLBACK_REF AGENT_CANON_CLEAN_INSTALL_ROLLBACK_ID
+    fi
   fi
   if [[ -n "$old_image_id" ]]; then
     if ! printf '%s\n' "$old_image_id" > "$AGENT_CANON_STATE_ROOT/previous-image-id"; then
@@ -1902,7 +2235,7 @@ _agent_canon_replace_resident_locked() {
     export AGENT_CANON_PREVIOUS_IMAGE_REF
   fi
   if [[ -n "$old_image_id" ]] && ((old_container_present == 1)); then
-    if ! "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$old_container_id" >/dev/null; then
+    if ((old_quiesced == 0)) && ! "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$old_container_id" >/dev/null; then
       _agent_canon_json_error replacement_stop_failed "old resident could not be stopped"
       return 2
     fi
@@ -1928,6 +2261,16 @@ _agent_canon_replace_resident_locked() {
     if [[ -n "${candidate_image_id:-}" && "$candidate_image_id" != "$old_image_id" ]]; then
       if ! "$AGENT_CANON_DOCKER_CMD" image rm "$candidate_image_id" >/dev/null 2>&1; then
         _agent_canon_json_error rollback_failed "candidate image removal failed after health failure"
+        return 2
+      fi
+    fi
+    if ((clean_install == 1)); then
+      if _agent_canon_discard_clean_install_rollback_tag &&
+         _agent_canon_restore_clean_install; then
+        AGENT_CANON_CLEAN_INSTALL_ACTIVE=0
+      else
+        _agent_canon_json_error rollback_failed \
+          "clean install state could not be restored after candidate failure"
         return 2
       fi
     fi
@@ -1983,6 +2326,16 @@ _agent_canon_replace_resident_locked() {
       rc=$?
     fi
   fi
+  if ((rc != 0)) && ((clean_install == 1)); then
+    if _agent_canon_discard_clean_install_rollback_tag &&
+       _agent_canon_restore_clean_install; then
+      AGENT_CANON_CLEAN_INSTALL_ACTIVE=0
+    else
+      _agent_canon_json_error rollback_failed \
+        "clean install state could not be restored after candidate failure"
+      return 2
+    fi
+  fi
   if ((rc != 0)) && [[ -n "$old_image_id" ]]; then
     if ! _agent_canon_restore_candidate_failure "$candidate" "$old_image_id" "$candidate_image_id"; then
       _agent_canon_json_error rollback_failed "candidate failure recovery was incomplete"
@@ -1990,6 +2343,9 @@ _agent_canon_replace_resident_locked() {
     fi
   fi
   unset AGENT_CANON_PREVIOUS_IMAGE_ID AGENT_CANON_PREVIOUS_IMAGE_REF
+  if ((clean_install == 1)) && ((rc == 0)); then
+    AGENT_CANON_CLEAN_INSTALL_SUCCESS=1
+  fi
   return "$rc"
 }
 
@@ -2736,8 +3092,6 @@ bootstrap_host_entrypoint() {
       return
       ;;
     install)
-      local install_container
-      install_container=$(_agent_canon_container_name)
       AGENT_CANON_ALLOW_BUILD=1
       export AGENT_CANON_ALLOW_BUILD
       _agent_canon_image "$image_ref"
@@ -2746,22 +3100,10 @@ bootstrap_host_entrypoint() {
         --format '{{.Id}}' "$AGENT_CANON_IMAGE_REF")
       AGENT_CANON_EXPECTED_IMAGE_ID=$install_image_id
       export AGENT_CANON_EXPECTED_IMAGE_ID
-      if "$AGENT_CANON_DOCKER_CMD" container inspect "$install_container" >/dev/null 2>&1; then
-        _agent_canon_replace_resident "$AGENT_CANON_IMAGE_REF" "$install_image_id" install
-        return $?
-      fi
-      container=$(_agent_canon_ensure_container)
-      local install_rc=0
-      _agent_canon_run_controller "$container" install || install_rc=$?
-      if ((install_rc != 0)); then
-        return "$install_rc"
-      fi
-      _agent_canon_sync_personal_skill_view "$container"
-      _agent_canon_record_active_container "$container"
-      if [[ "${AGENT_CANON_SUPPRESS_GLOBAL_LINKS:-0}" != 1 ]]; then
-        _agent_canon_install_global_links
-        return $?
-      fi
+      local replace_rc=0
+      _agent_canon_replace_resident "$AGENT_CANON_IMAGE_REF" "$install_image_id" install || replace_rc=$?
+      ((replace_rc == 0)) || return "$replace_rc"
+      _agent_canon_finish_clean_install
       return 0
       ;;
     update)
