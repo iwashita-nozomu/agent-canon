@@ -485,6 +485,8 @@ def find_issue_publication_receipt(
         ):
             return None
         return receipt
+    if handoff is None:
+        return None
     published = log_root.expanduser().resolve(strict=False) / "feedback" / "issue-packets" / "published"
     if not published.is_dir() or published.is_symlink():
         return None
@@ -1736,6 +1738,52 @@ def sync_pending_packet(
             allow_create=False,
         )
     else:
+        packet_number = str(payload.get("number") or "")
+        if packet_number:
+            record = client.read(
+                parse_issue_reference(packet_number, repository)
+            )
+            receipt_stager(
+                record,
+                "noop",
+                IssueWorkerHandoff(
+                    status="qualified",
+                    reason="published-readback",
+                    repository=repository,
+                    owner="",
+                    fix="",
+                    occurrence_locations=(),
+                ),
+            )
+            path.unlink()
+            return record
+        if payload.get("input_mode") != "issue-publication-initial":
+            search = getattr(client, "search", None)
+            candidates = (
+                tuple(search(repository, (str(payload["title"]),)))
+                if callable(search)
+                else ()
+            )
+            if len(candidates) != 1:
+                raise IssueSyncError(
+                    "issue_worker_retry_unresolved",
+                    "ordinary packet requires one related Issue before acknowledgement",
+                )
+            record = client.read(candidates[0].reference)
+            receipt_stager(
+                record,
+                "noop",
+                IssueWorkerHandoff(
+                    status="qualified",
+                    reason="published-readback",
+                    repository=repository,
+                    owner="",
+                    fix="",
+                    occurrence_locations=(),
+                ),
+            )
+            path.unlink()
+            return record
         record = client.create(repository, str(payload["title"]), body)
         receipt_stager(
             record,

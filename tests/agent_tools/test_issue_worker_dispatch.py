@@ -17,6 +17,7 @@ import tempfile
 from contextlib import redirect_stdout
 from pathlib import Path
 
+import pytest
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -46,7 +47,15 @@ def _candidate(**overrides: object) -> dict[str, object]:
     return value
 
 
-def test_same_repository_candidate_materializes_publisher_tool_call() -> None:
+def test_same_repository_candidate_materializes_publisher_tool_call(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime_root = tmp_path / "runtime"
+    control_parent = tmp_path / "control"
+    runtime_root.mkdir()
+    control_parent.mkdir()
+    monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime_root))
+    monkeypatch.setenv("AGENT_CANON_CONTROL_PARENT_ROOT", str(control_parent))
     calls: list[tuple[str, str]] = []
 
     def spawn(agent_type: str, prompt: str) -> str:
@@ -69,6 +78,11 @@ def test_same_repository_candidate_materializes_publisher_tool_call() -> None:
     assert result.tool_call["tool_id"] == "issue-worker"
     assert result.tool_call["arguments"]["publisher_agent_id"] == "publisher-1"
     assert result.tool_call["arguments"]["checkout_repository"] == "iwashita-nozomu/agent-canon"
+    stage_command = result.tool_call["arguments"]["receipt_stage_command"]
+    assert stage_command[0] == str(PROJECT_ROOT / "bootstrap.sh")
+    assert str(PROJECT_ROOT) in stage_command
+    assert str(runtime_root) in stage_command
+    assert str(control_parent) in stage_command
     assert calls and calls[0][0] == "publisher"
     assert "checkout_identity" in calls[0][1]
     assert "remote" in calls[0][1]
@@ -117,6 +131,22 @@ def test_t15_without_explicit_candidate_has_no_initial_publisher() -> None:
     ) == ()
 
 
+def test_issue_worker_dispatch_defers_without_runtime_publication_route(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("AGENT_CANON_RUNTIME_ROOT", raising=False)
+    monkeypatch.delenv("AGENT_CANON_CONTROL_PARENT_ROOT", raising=False)
+    result = issue_worker_dispatch.dispatch_issue_worker(
+        _candidate(),
+        "publish explicit feedback",
+        lambda _agent_type, _prompt: "unexpected-publisher",
+        workspace_root=PROJECT_ROOT,
+        source_root=PROJECT_ROOT,
+    )
+    assert result.status == "deferred"
+    assert result.tool_call is None
+
+
 def test_explicit_issue_worker_candidate_does_not_change_generic_intake() -> None:
     config = load_team_config(PROJECT_ROOT / "agents" / "agents_config.json")
     catalog = load_task_catalog(config, PROJECT_ROOT)
@@ -141,7 +171,9 @@ def test_explicit_issue_worker_candidate_does_not_change_generic_intake() -> Non
     ) == ("requirements_organizer",)
 
 
-def test_bootstrap_t15_dispatches_candidate_once_and_persists_tool_call() -> None:
+def test_bootstrap_t15_dispatches_candidate_once_and_persists_tool_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls: list[tuple[str, str]] = []
 
     def spawn(agent_type: str, prompt: str) -> str:
@@ -151,6 +183,7 @@ def test_bootstrap_t15_dispatches_candidate_once_and_persists_tool_call() -> Non
     candidate = _candidate(durable_follow_up=True)
     with tempfile.TemporaryDirectory(prefix="issue-worker-bootstrap-") as root:
         runtime_root = Path(root) / "runtime"
+        monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime_root))
         report_root = runtime_root / "reports"
         run_id = "t15-bootstrap-dispatch"
         output = io.StringIO()
@@ -200,11 +233,14 @@ def test_bootstrap_t15_dispatches_candidate_once_and_persists_tool_call() -> Non
         )
 
 
-def test_bootstrap_t15_without_candidate_does_not_dispatch_publisher() -> None:
+def test_bootstrap_t15_without_candidate_does_not_dispatch_publisher(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls: list[tuple[str, str]] = []
 
     with tempfile.TemporaryDirectory(prefix="issue-worker-bootstrap-empty-") as root:
         runtime_root = Path(root) / "runtime"
+        monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime_root))
         report_root = runtime_root / "reports"
         run_id = "t15-bootstrap-no-candidate"
         output = io.StringIO()
@@ -243,12 +279,15 @@ def test_bootstrap_t15_without_candidate_does_not_dispatch_publisher() -> None:
         assert "issue_worker_dispatch" not in run
 
 
-def test_bootstrap_t15_foreign_candidate_is_handoff_without_spawn() -> None:
+def test_bootstrap_t15_foreign_candidate_is_handoff_without_spawn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls: list[tuple[str, str]] = []
     candidate = _candidate(repository="other/repository")
 
     with tempfile.TemporaryDirectory(prefix="issue-worker-bootstrap-foreign-") as root:
         runtime_root = Path(root) / "runtime"
+        monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime_root))
         report_root = runtime_root / "reports"
         run_id = "t15-bootstrap-foreign"
         return_code = bootstrap_main(

@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -115,6 +116,18 @@ def dispatch_issue_worker(
     ):
         return IssueWorkerDispatch("deferred", handoff, identity)
     registry_root = Path(source_root).expanduser().resolve() if source_root else workspace
+    runtime_value = os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
+    control_parent_value = os.environ.get("AGENT_CANON_CONTROL_PARENT_ROOT", "").strip()
+    canonical_source_root = registry_root
+    bootstrap = canonical_source_root / "bootstrap.sh"
+    if (
+        not runtime_value
+        or not control_parent_value
+        or not Path(runtime_value).expanduser().is_absolute()
+        or not Path(control_parent_value).expanduser().is_absolute()
+        or not bootstrap.is_file()
+    ):
+        return IssueWorkerDispatch("deferred", handoff, identity)
     registry = load_model_profile_registry(workspace, source_root=registry_root)
     evidence: dict[str, Any] = {
         "issue_worker_handoff": handoff.as_dict(),
@@ -170,6 +183,10 @@ def dispatch_issue_worker(
         handoff=handoff.as_dict(),
         publisher_agent_id=publisher_agent_id,
         checkout_repository=normalize_repository(identity.remote),
+        checkout_identity=identity.as_dict(),
+        runtime_root=str(Path(runtime_value).expanduser().resolve()),
+        source_root=str(canonical_source_root),
+        control_parent_root=str(Path(control_parent_value).expanduser().resolve()),
     )
     return IssueWorkerDispatch(
         "spawned",

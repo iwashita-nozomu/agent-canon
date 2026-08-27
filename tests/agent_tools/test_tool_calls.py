@@ -22,19 +22,19 @@ def test_issue_worker_tool_call_contains_post_publication_container_command() ->
         publisher_agent_id="publisher-1",
         checkout_repository="owner/repo",
         checkout_identity={
-            "cwd": "/workspace/project",
-            "git_root": "/workspace/project",
+            "cwd": str(PROJECT_ROOT),
+            "git_root": str(PROJECT_ROOT),
             "branch": "main",
             "head": "a" * 40,
             "remote": "owner/repo",
         },
         control_parent_root="/var/lib/agent-canon",
         runtime_root="/var/lib/agent-canon/runtime",
-        source_root="/workspace/project",
+        source_root=str(PROJECT_ROOT),
     )
     command = token["arguments"]["receipt_stage_command"]
     assert tuple(command[:8]) == (
-        "./bootstrap.sh",
+        str(PROJECT_ROOT / "bootstrap.sh"),
         "--control-parent-root",
         "/var/lib/agent-canon",
         "--runtime-root",

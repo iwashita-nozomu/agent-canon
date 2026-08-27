@@ -86,6 +86,7 @@ def test_pending_packet_online_create_readback_removes_packet(tmp_path: Path) ->
         title="Online packet",
         body_locator=str(body),
         body_digest=digest,
+        input_mode="issue-publication-initial",
     )
     record = issue_sync.GitHubIssueRecord(
         repository="owner/repo", number="42", title="Online packet",
@@ -116,6 +117,7 @@ def test_pending_packet_success_writes_body_free_publication_receipt(tmp_path: P
         title="Receipt packet",
         body_locator=str(body),
         body_digest=digest,
+        input_mode="issue-publication-initial",
         source_finding_kind="recurrent-failure",
     )
     record = issue_sync.GitHubIssueRecord(
@@ -303,6 +305,7 @@ def test_retry_receipt_match_requires_full_responsibility_tuple(tmp_path: Path) 
     issue_sync.write_issue_publication_receipt(
         root, record, action="create", handoff=first,
     )
+    assert issue_sync.find_issue_publication_receipt(root, "owner/repo") is None
     assert issue_sync.find_issue_publication_receipt(
         root, "owner/repo", handoff=second, number="47"
     ) is None
@@ -371,6 +374,7 @@ def test_pending_packet_receipt_failure_retains_packet(tmp_path: Path) -> None:
         title="Receipt failure",
         body_locator=str(body),
         body_digest="sha256:" + hashlib.sha256(body.read_bytes()).hexdigest(),
+        input_mode="issue-publication-initial",
     )
     record = issue_sync.GitHubIssueRecord(
         repository="owner/repo", number="43", title="Receipt failure",

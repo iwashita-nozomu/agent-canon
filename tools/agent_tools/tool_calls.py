@@ -279,6 +279,12 @@ def materialize_issue_worker_tool_call(
         raise RuntimeError(
             "issue_worker_tool_call publisher agent and checkout repository are required"
         )
+    bootstrap = "./bootstrap.sh"
+    if source_root != "<source-root>":
+        bootstrap_path = Path(source_root).expanduser().resolve() / "bootstrap.sh"
+        if not bootstrap_path.is_file():
+            raise RuntimeError("issue_worker_tool_call:bootstrap_missing")
+        bootstrap = str(bootstrap_path)
     return materialize_tool_call_token(
         tool_id="issue-worker",
         argument_schema_id="agent-canon.issue-worker.args.v1",
@@ -303,6 +309,7 @@ def materialize_issue_worker_tool_call(
                     source_root=source_root,
                     control_parent_root=control_parent_root,
                     checkout_identity=checkout_identity,
+                    bootstrap=bootstrap,
                 )
             ),
         },
