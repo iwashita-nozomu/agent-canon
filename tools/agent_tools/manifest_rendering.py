@@ -70,6 +70,7 @@ if __package__:
         iter_artifacts,
         mathematical_intent_packet_mapping,
         mathematical_intent_route_config,
+        math_intent_route_id_for_spec,
         resolve_math_intent_packet_for_spec,
         resolve_active_design_packet_config,
         resolve_cross_cutting_document_packet,
@@ -86,6 +87,7 @@ else:
         iter_artifacts,
         mathematical_intent_packet_mapping,
         mathematical_intent_route_config,
+        math_intent_route_id_for_spec,
         resolve_math_intent_packet_for_spec,
         resolve_active_design_packet_config,
         resolve_cross_cutting_document_packet,
@@ -1353,15 +1355,16 @@ def manifest_run_lines(
     ).splitlines()
     lines.extend(f"    {line}" for line in packet_yaml)
     math_intent_packet = resolve_math_intent_packet_for_spec(spec)
-    if spec.math_intent_route is not None:
+    math_intent_route_id = math_intent_route_id_for_spec(spec)
+    if math_intent_route_id is not None:
         if math_intent_packet is None:
             raise RuntimeError("math_packet_missing")
-        lines.append(f"  math_intent_route_id: {spec.math_intent_route!r}")
+        lines.append(f"  math_intent_route_id: {math_intent_route_id!r}")
         lines.append("  math_intent_route:")
         route_yaml = yaml.safe_dump(
             dict(
                 mathematical_intent_route_config(
-                    spec.task_catalog, spec.math_intent_route
+                    spec.task_catalog, math_intent_route_id
                 )
                 or {}
             ),
@@ -1549,7 +1552,7 @@ def manifest_run_lines(
             workflow_family_id=spec.workflow_family_id,
             issue_worker_candidate=spec.issue_worker_candidate,
             writer_targets=writer_targets,
-            math_intent_route_id=spec.math_intent_route,
+            math_intent_route_id=math_intent_route_id,
         )
         initial_wave_slots = initial_slots
         initial_wave = tuple(slot.agent_type for slot in initial_slots)
@@ -1563,7 +1566,7 @@ def manifest_run_lines(
             workflow_family_id=spec.workflow_family_id,
             issue_worker_candidate=spec.issue_worker_candidate,
             writer_targets=writer_targets,
-            math_intent_route_id=spec.math_intent_route,
+            math_intent_route_id=math_intent_route_id,
         )
         lines.append("  spawn_wave_recommendation:")
         lines.append(
@@ -1697,7 +1700,7 @@ def manifest_run_lines(
         lines.append("      - remaining_spawn_budget")
         lines.append("      - checkout_identity")
         lines.append("      - writer_target")
-        if spec.math_intent_route is not None:
+        if math_intent_route_id_for_spec(spec) is not None:
             lines.append("      - mathematical_intent_packet")
             lines.append("      - math_intent_write_scope")
         lines.append("    handoff_optional_fields:")
@@ -2134,7 +2137,7 @@ def manifest_one_role_lines(
         lines.append("    codex_agents:")
         for codex_agent in role.codex_agents:
             lines.append(f"      - {codex_agent}")
-    if spec.math_intent_route is not None and role.id in {
+    if math_intent_route_id_for_spec(spec) is not None and role.id in {
         "implementer",
         "mathematical_correctness_reviewer",
     }:

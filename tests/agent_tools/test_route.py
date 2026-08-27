@@ -376,6 +376,7 @@ class RouteToolTest(unittest.TestCase):
                     catalog.raw["math_intent_routes"][route],
                     {
                         "id": "mathematical_correction",
+                        "requires_math_intent": True,
                         "activation": "mathematical_or_numerical_correction_evidence",
                         "owner_skill": "computational-optimization",
                         "reviewer": "mathematical_correctness_reviewer",

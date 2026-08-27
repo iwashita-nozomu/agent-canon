@@ -48,6 +48,7 @@ if __package__:
         MathematicalIntentPacket,
         mathematical_intent_route_config,
         mathematical_intent_route_for_task,
+        math_intent_route_id_from_context,
         normalize_mathematical_intent_packet,
         parse_active_design_packet_input,
         resolve_cross_cutting_document_packet,
@@ -61,6 +62,7 @@ else:
         MathematicalIntentPacket,
         mathematical_intent_route_config,
         mathematical_intent_route_for_task,
+        math_intent_route_id_from_context,
         normalize_mathematical_intent_packet,
         parse_active_design_packet_input,
         resolve_cross_cutting_document_packet,
@@ -552,6 +554,11 @@ def resolve_bootstrap_context(
         catalog,
         args.task_id,
         selected_route_skills,
+    )
+    math_route = math_intent_route_id_from_context(
+        selected_route_skills,
+        packet_present=bool(args.math_intent_packet),
+        explicit_route_id=math_route,
     )
     if math_route is not None and args.math_intent_packet:
         reviewer = str(

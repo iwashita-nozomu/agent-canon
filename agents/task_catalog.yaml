@@ -232,6 +232,7 @@ role_topology_defaults: &standard_role_topology
 math_intent_routes:
   mathematical_correction:
     id: mathematical_correction
+    requires_math_intent: true
     activation: mathematical_or_numerical_correction_evidence
     owner_skill: computational-optimization
     reviewer: mathematical_correctness_reviewer

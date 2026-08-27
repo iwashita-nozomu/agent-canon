@@ -208,6 +208,13 @@ OPTIONAL_CROSS_CUTTING_DOCUMENT_PATHS: tuple[str, ...] = ("docker/README.md",)
 
 MATHEMATICAL_INTENT_PACKET_SCHEMA = "agent-canon.mathematical-intent.v1"
 MATHEMATICAL_INTENT_ROUTE_ID = "mathematical_correction"
+MATHEMATICAL_INTENT_OWNER_SKILLS = frozenset(
+    {
+        "computational-optimization",
+        "algorithm-proof-exploration",
+        "lean-algorithm-design",
+    }
+)
 MATHEMATICAL_INTENT_PACKET_TEXT_FIELDS = (
     "math_object",
     "problem",
@@ -476,10 +483,14 @@ def mathematical_intent_route_for_task(
     task = next((item for item in catalog.tasks if item.get("id") == task_id), None)
     if task is None:
         return None
-    route_id = task.get("math_intent_route")
-    if route_id is None:
-        return None
     normalized_skills = {str(skill).removeprefix("$") for skill in selected_skills}
+    route_id = task.get("math_intent_route")
+    if route_id is None and not normalized_skills.intersection(
+        MATHEMATICAL_INTENT_OWNER_SKILLS
+    ):
+        return None
+    if route_id is None:
+        route_id = MATHEMATICAL_INTENT_ROUTE_ID
     if MATHEMATICAL_INTENT_ROUTE_ID not in {
         str(item.get("id"))
         for item in _math_intent_route_records(catalog)
@@ -493,6 +504,27 @@ def mathematical_intent_route_for_task(
     if str(route.get("owner_skill")) not in normalized_skills:
         return None
     return route_id
+
+
+def math_intent_route_id_from_context(
+    selected_skills: Sequence[str] = (),
+    role_ids: Sequence[str] = (),
+    *,
+    packet_present: bool = False,
+    explicit_route_id: str | None = None,
+) -> str | None:
+    """Derive the canonical math route from selected semantic context."""
+    if explicit_route_id is not None:
+        return validate_mathematical_intent_route(explicit_route_id)
+    normalized_skills = {str(skill).removeprefix("$") for skill in selected_skills}
+    normalized_roles = {str(role) for role in role_ids}
+    if (
+        packet_present
+        or normalized_skills.intersection(MATHEMATICAL_INTENT_OWNER_SKILLS)
+        or "mathematical_correctness_reviewer" in normalized_roles
+    ):
+        return MATHEMATICAL_INTENT_ROUTE_ID
+    return None
 
 
 def _math_intent_route_records(catalog: TaskCatalog) -> tuple[Mapping[str, object], ...]:
@@ -525,6 +557,7 @@ def mathematical_intent_route_config(
         if record.get("id") == route_id:
             expected = {
                 "id": MATHEMATICAL_INTENT_ROUTE_ID,
+                "requires_math_intent": True,
                 "activation": "mathematical_or_numerical_correction_evidence",
                 "owner_skill": "computational-optimization",
                 "reviewer": "mathematical_correctness_reviewer",
@@ -553,7 +586,12 @@ def resolve_math_intent_packet_for_spec(
 ) -> MathematicalIntentPacket | None:
     """Validate the route/packet pair before manifest creation or spawn."""
     raw_packet = spec.math_intent_packet
-    selected_route_id = validate_mathematical_intent_route(spec.math_intent_route)
+    selected_route_id = math_intent_route_id_from_context(
+        spec.selected_skills,
+        tuple(role.id for role in spec.roles),
+        packet_present=raw_packet is not None,
+        explicit_route_id=spec.math_intent_route,
+    )
     if selected_route_id is None:
         if raw_packet is not None:
             raise RuntimeError("math_packet_not_applicable")
@@ -564,6 +602,16 @@ def resolve_math_intent_packet_for_spec(
     if isinstance(raw_packet, MathematicalIntentPacket):
         return raw_packet
     return normalize_mathematical_intent_packet(raw_packet)
+
+
+def math_intent_route_id_for_spec(spec: RunBundleSpec) -> str | None:
+    """Return the same canonical route used by run and spawn admission."""
+    return math_intent_route_id_from_context(
+        spec.selected_skills,
+        tuple(role.id for role in spec.roles),
+        packet_present=spec.math_intent_packet is not None,
+        explicit_route_id=spec.math_intent_route,
+    )
 
 
 # These packet helpers deliberately remain stateless.  A receipt is addressed by

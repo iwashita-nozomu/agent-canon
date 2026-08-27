@@ -343,6 +343,30 @@ def test_normal_math_bootstrap_requires_packet_before_run() -> None:
     shutil.rmtree(runtime.parents[2] if runtime.exists() else runtime.parents[1])
 
 
+def test_math_owner_skill_requires_packet_without_task_id() -> None:
+    """A semantic math owner skill activates the route even without a task id."""
+    result, runtime = run_bootstrap(
+        "--task",
+        "修正 solver residual の収束と更新式",
+    )
+    assert result.returncode == 2
+    assert "math_packet_missing" in result.stdout
+    shutil.rmtree(runtime.parents[2] if runtime.exists() else runtime.parents[1])
+
+
+def test_t6_math_owner_skill_requires_packet() -> None:
+    """A T6 task carrying numerical ownership is not exempt from the packet."""
+    result, runtime = run_bootstrap(
+        "--task",
+        "computational optimization solver convergence repair",
+        "--task-id",
+        "T6",
+    )
+    assert result.returncode == 2
+    assert "math_packet_missing" in result.stdout
+    shutil.rmtree(runtime.parents[2] if runtime.exists() else runtime.parents[1])
+
+
 def test_normal_math_bootstrap_materializes_packet_and_reviewer() -> None:
     """A complete T4 packet activates the math reviewer and manifest route."""
     result, report_dir = run_bootstrap(

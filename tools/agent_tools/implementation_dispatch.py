@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import cast
@@ -555,6 +555,8 @@ def dispatch_fixed_implementation(
     checkout_identity: Mapping[str, object] | None = None,
     math_intent_route: str | None = None,
     math_intent_packet: Mapping[str, object] | object | None = None,
+    selected_skills: Sequence[str] = (),
+    role_id: str = "implementer",
 ) -> ImplementationDispatch:
     """Route, materialize, and launch exactly one fixed Spark implementation worker."""
     route_result = implementation_route.route_implementation(request)
@@ -575,16 +577,21 @@ def dispatch_fixed_implementation(
     if __package__:
         from .packets import (
             mathematical_intent_packet_mapping,
+            math_intent_route_id_from_context,
             normalize_mathematical_intent_packet,
-            validate_mathematical_intent_route,
         )
     else:
         from packets import (  # type: ignore[no-redef]
             mathematical_intent_packet_mapping,
+            math_intent_route_id_from_context,
             normalize_mathematical_intent_packet,
-            validate_mathematical_intent_route,
         )
-    selected_math_route = validate_mathematical_intent_route(math_intent_route)
+    selected_math_route = math_intent_route_id_from_context(
+        selected_skills,
+        (role_id,),
+        packet_present=math_intent_packet is not None,
+        explicit_route_id=math_intent_route,
+    )
     normalized_math_packet: Mapping[str, object] | None = None
     if selected_math_route is not None and math_intent_packet is None:
         return ImplementationDispatch(
@@ -1432,6 +1439,7 @@ def dispatch_subagent_wave(
     """Validate one complete wave before invoking any spawn callback."""
     if __package__:
         from .packets import (
+            MATHEMATICAL_INTENT_ROUTE_ID,
             mathematical_intent_packet_mapping,
             normalize_mathematical_intent_packet,
             separate_nonmath_handoff_mapping,
@@ -1439,6 +1447,7 @@ def dispatch_subagent_wave(
         )
     else:
         from packets import (  # type: ignore[no-redef]
+            MATHEMATICAL_INTENT_ROUTE_ID,
             mathematical_intent_packet_mapping,
             normalize_mathematical_intent_packet,
             separate_nonmath_handoff_mapping,
@@ -1450,7 +1459,7 @@ def dispatch_subagent_wave(
         if slot.requires_math_intent
     }
     if any(slot.role_id == "mathematical_correctness_reviewer" for slot in slots):
-        route_ids.add("mathematical_correction")
+        route_ids.add(MATHEMATICAL_INTENT_ROUTE_ID)
     if len(route_ids) > 1:
         raise RuntimeError("mathematical_intent_route:multiple_ids")
     selected_math_route = validate_mathematical_intent_route(
