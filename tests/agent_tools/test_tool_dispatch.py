@@ -86,7 +86,7 @@ class ToolDispatchTest(unittest.TestCase):
             ("python3", "tools/agent_tools/issue_sync.py"),
         )
         self.assertEqual(issue_sync.execution_plane, "tool-container")
-        self.assertEqual(issue_sync.cwd_policy, "source-root")
+        self.assertEqual(issue_sync.cwd_policy, "target-root")
         self.assertEqual(issue_sync.side_effect_policy, "external-artifact")
         self.assertEqual(issue_sync.output_root, "external-runtime")
         self.assertEqual(issue_sync.parity, "verified")

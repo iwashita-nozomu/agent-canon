@@ -33,7 +33,7 @@
       "probe_args": ["--list"],
       "observed": {
         "argv": ["python3", "tools/agent_tools/route.py"],
-        "cwd": "source-root",
+        "cwd": "target-root",
         "stdin": "inherited",
         "stdout": "inherited",
         "stderr": "inherited",
@@ -59,7 +59,7 @@
       "probe_args": ["--help"],
       "observed": {
         "argv": ["python3", "tools/agent_tools/issue_sync.py"],
-        "cwd": "source-root",
+        "cwd": "target-root",
         "stdin": "inherited",
         "stdout": "inherited",
         "stderr": "inherited",

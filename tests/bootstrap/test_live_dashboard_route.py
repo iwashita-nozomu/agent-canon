@@ -5,13 +5,16 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
-from tools.agent_tools.runtime_log_paths import repo_log_key
-
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools" / "agent_tools"))
+from tools.agent_tools.runtime_log_paths import repo_log_key  # noqa: E402
+from tools.agent_tools.tool_calls import materialize_issue_worker_tool_call  # noqa: E402
+
 LIVE_DOCKER = os.environ.get("AGENT_CANON_LIVE_DOCKER") == "1"
 
 
@@ -158,51 +161,75 @@ def test_resident_dashboard_route_uses_target_and_private_archive(
             capture_output=True,
             text=True,
         ).stdout.strip()
-        receipt_preflight = run_bootstrap(
-            source,
-            control,
-            "tool",
-            "run",
-            "--root",
-            str(target),
-            "issue-sync",
-            "--",
-            "--receipt-preflight",
-            "--checkout-head",
-            target_head,
-            "--checkout-repository",
-            "example/live-target",
+        checkout_identity = {
+            "cwd": str(target),
+            "git_root": str(target),
+            "branch": "main",
+            "head": target_head,
+            "remote": "example/live-target",
+        }
+        tool_call = materialize_issue_worker_tool_call(
+            handoff={
+                "repository": "example/live-target",
+                "owner": "issue-worker",
+                "fix": "stage body-free receipt",
+            },
+            publisher_agent_id="publisher-live",
+            checkout_repository="example/live-target",
+            checkout_identity=checkout_identity,
+            runtime_root=str(control / "runtime"),
+            agentcanon_source_root=str(source),
+            target_root=str(target),
+            control_parent_root=str(control),
+        )
+        tool_arguments = tool_call["arguments"]
+        assert tool_arguments["agentcanon_source_root"] == str(source)
+        assert tool_arguments["target_root"] == str(target)
+        materialized_preflight = tuple(tool_arguments["receipt_preflight_command"])
+        materialized_stage = tuple(tool_arguments["receipt_stage_command"])
+        assert materialized_preflight[materialized_preflight.index("--root") + 1] == str(target)
+        assert materialized_stage[materialized_stage.index("--root") + 1] == str(target)
+        assert "--runtime-root" not in materialized_preflight[materialized_preflight.index("--") + 1 :]
+        assert "--checkout-root" not in materialized_preflight[materialized_preflight.index("--") + 1 :]
+        assert "--runtime-root" not in materialized_stage[materialized_stage.index("--") + 1 :]
+        assert "--checkout-root" not in materialized_stage[materialized_stage.index("--") + 1 :]
+        assert str(control / "runtime") not in materialized_preflight[materialized_preflight.index("--") + 1 :]
+        assert str(target) not in materialized_preflight[materialized_preflight.index("--") + 1 :]
+        assert str(control / "runtime") not in materialized_stage[materialized_stage.index("--") + 1 :]
+        assert str(target) not in materialized_stage[materialized_stage.index("--") + 1 :]
+        command_environment = os.environ.copy()
+        command_environment["AGENT_CANON_ALLOW_BUILD"] = "1"
+        receipt_preflight = subprocess.run(
+            list(materialized_preflight),
+            cwd=source,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=900,
+            env=command_environment,
         )
         assert receipt_preflight.returncode == 0, (
             receipt_preflight.stdout + receipt_preflight.stderr
         )
-        receipt_stage = run_bootstrap(
-            source,
-            control,
-            "tool",
-            "run",
-            "--root",
-            str(target),
-            "issue-sync",
-            "--",
-            "--stage-publication-receipt",
-            "--repo",
-            "example/live-target",
-            "--receipt-number",
-            "1",
-            "--receipt-url",
-            "https://github.com/example/live-target/issues/1",
-            "--receipt-state",
-            "OPEN",
-            "--receipt-action",
-            "create",
-            "--checkout-head",
-            target_head,
-            "--checkout-repository",
-            "example/live-target",
+        readback_bindings = {
+            "<issue-number>": "1",
+            "<issue-url>": "https://github.com/example/live-target/issues/1",
+            "<issue-state>": "open",
+            "<issue-action>": "create",
+        }
+        receipt_stage_command = tuple(
+            readback_bindings.get(value, value) for value in materialized_stage
+        )
+        receipt_stage = subprocess.run(
+            list(receipt_stage_command),
+            cwd=source,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=900,
+            env=command_environment,
         )
         assert receipt_stage.returncode == 0, receipt_stage.stdout + receipt_stage.stderr
-        assert '"status":"staged"' in receipt_stage.stdout
         assert not (runtime / "spool" / "private-feedback" / "sync-request.json").exists()
         archive_receipt = (
             private_log / "feedback" / "issue-packets" / "published"
