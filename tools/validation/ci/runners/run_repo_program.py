@@ -15,6 +15,9 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+
 from tools.validation.ci.runners.container_runtime import (
     apply_pack_overrides,
     build_build_command,
