@@ -54,6 +54,19 @@ SAFE_CHILD_ENV_NAMES = frozenset(
         "PATHEXT",
     }
 )
+RUNTIME_PATH_ENV_NAMES = frozenset(
+    {
+        "TMPDIR",
+        "TEMP",
+        "TMP",
+        "XDG_CACHE_HOME",
+        "PYTHONPYCACHEPREFIX",
+        "AGENT_CANON_TOOLS_HOME",
+        "CARGO_HOME",
+        "CARGO_TARGET_DIR",
+        "AGENT_CANON_CLI_TARGET_DIR",
+    }
+)
 
 
 class RuntimeArtifactError(RuntimeError):
@@ -105,7 +118,9 @@ def root_capability_environment(
     env = {
         name: value
         for name, value in supplied.items()
-        if name in SAFE_CHILD_ENV_NAMES or name.startswith("LC_")
+        if name in SAFE_CHILD_ENV_NAMES
+        or name in RUNTIME_PATH_ENV_NAMES
+        or name.startswith("LC_")
     }
 
     def identity(path: Path) -> tuple[str, str]:

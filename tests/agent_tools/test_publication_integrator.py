@@ -101,7 +101,7 @@ class PublicationIntegratorTest(unittest.TestCase):
     def test_ineligible_review_never_produces_publication_authority(self) -> None:
         """A non-eligible review fails closed before authority derivation."""
         with patch(
-            "publication_integrator.resolve_review_eligibility",
+            "tools.repository.github.publication_integrator.resolve_review_eligibility",
             return_value={"outcome": "ineligible"},
         ):
             projection = resolve_publication_eligibility(PROJECT_ROOT)
@@ -117,11 +117,11 @@ class PublicationIntegratorTest(unittest.TestCase):
         """Template aliases must be canonicalized before this exact boundary."""
         with (
             patch(
-                "publication_integrator.resolve_review_eligibility",
+                "tools.repository.github.publication_integrator.resolve_review_eligibility",
                 return_value={"outcome": "eligible"},
             ),
             patch(
-                "publication_integrator.resolve_current_review_state",
+                "tools.repository.github.publication_integrator.resolve_current_review_state",
                 return_value={
                     "candidate": {"candidate_id": "candidate-1"},
                     "decision": {
@@ -188,13 +188,13 @@ class PublicationIntegratorTest(unittest.TestCase):
 
         with (
             patch(
-                "publication_integrator.resolve_publication_authority",
+                "tools.repository.github.publication_integrator.resolve_publication_authority",
                 side_effect=[authority, authority],
             ),
-            patch("publication_integrator._git_text", side_effect=read_git),
-            patch("publication_integrator._worktree_status", return_value=""),
+            patch("tools.repository.github.publication_integrator._git_text", side_effect=read_git),
+            patch("tools.repository.github.publication_integrator._worktree_status", return_value=""),
             patch(
-                "publication_integrator._construct_result_commit",
+                "tools.repository.github.publication_integrator._construct_result_commit",
                 return_value=candidate,
             ) as result_builder,
         ):
@@ -289,10 +289,10 @@ class PublicationIntegratorTest(unittest.TestCase):
             return expected_tree if command[-1].endswith("^{tree}") else expected_base
 
         with (
-            patch("publication_integrator.resolve_publication_authority", return_value=authority),
-            patch("publication_integrator._git_text", side_effect=read_git),
-            patch("publication_integrator._worktree_status", return_value=""),
-            patch("publication_integrator._construct_result_commit", return_value=candidate),
+            patch("tools.repository.github.publication_integrator.resolve_publication_authority", return_value=authority),
+            patch("tools.repository.github.publication_integrator._git_text", side_effect=read_git),
+            patch("tools.repository.github.publication_integrator._worktree_status", return_value=""),
+            patch("tools.repository.github.publication_integrator._construct_result_commit", return_value=candidate),
             self.assertRaises(PublicationError) as raised,
         ):
             integrate_publication(

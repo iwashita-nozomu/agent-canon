@@ -22,7 +22,7 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-import tools.repository.github.issue_worker_dispatch  # noqa: E402
+from tools.repository.github import issue_worker_dispatch  # noqa: E402
 from tools.runtime.lifecycle.bootstrap_agent_run import main as bootstrap_main  # noqa: E402
 from tools.runtime.authority.checkout_identity import CheckoutIdentity  # noqa: E402
 from tools.agent.orchestration.implementation_dispatch import (  # noqa: E402

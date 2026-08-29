@@ -14,10 +14,16 @@
 from __future__ import annotations
 
 import os
+import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+if __package__ in (None, ""):
+    # Direct execution must resolve the canonical repository package from the
+    # relocated source root before importing any owner module.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 if __package__:
     from tools.runtime.authority.checkout_identity import (

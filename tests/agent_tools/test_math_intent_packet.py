@@ -357,7 +357,7 @@ def run_bootstrap(*args: str) -> tuple[subprocess.CompletedProcess[str], Path]:
     result = subprocess.run(
         [
             sys.executable,
-            str(TOOLS / "bootstrap_agent_run.py"),
+            str(PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"),
             "--owner",
             "test",
             "--runtime-root",

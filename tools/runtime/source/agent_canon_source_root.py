@@ -240,6 +240,11 @@ def _find_current_repository_root(raw_root: Path) -> Path:
     """Find the Git root of the checkout that owns ``raw_root``."""
     start = raw_root if raw_root.is_absolute() else raw_root.resolve()
     for candidate in (start, *start.parents):
+        # A standalone source checkout may intentionally have no Git metadata
+        # in a synthetic or exported fixture.  Prefer its own catalog before
+        # accepting an unrelated ambient parent ``.git`` directory.
+        if _has_catalog(candidate):
+            return candidate.resolve()
         if (candidate / ".git").exists():
             return candidate.resolve()
     return start.resolve()

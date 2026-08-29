@@ -73,13 +73,21 @@ class LogSurfaceInventoryTest(unittest.TestCase):
             github_shell = root / ".github" / "scripts" / "sample.sh"
             github_shell.parent.mkdir(parents=True)
             github_shell.write_text("echo GITHUB_SCRIPT_STATUS=pass\n", encoding="utf-8")
-            rust_tool = root / "rust" / "agent-canon" / "src" / "sample.rs"
+            rust_tool = (
+                root
+                / "tools"
+                / "runtime"
+                / "dispatch"
+                / "agent-canon"
+                / "src"
+                / "sample.rs"
+            )
             rust_tool.parent.mkdir(parents=True)
             rust_tool.write_text(
                 'fn main() {\n    println!("RUST_TOOL_STATUS=pass");\n}\n',
                 encoding="utf-8",
             )
-            skill = root / ".agents" / "skills" / "sample" / "SKILL.md"
+            skill = root / "agents" / "skills" / "sample.md"
             skill.parent.mkdir(parents=True)
             skill.write_text("```text\nSKILL_RESULT=pass\n```\n", encoding="utf-8")
 
@@ -94,8 +102,8 @@ class LogSurfaceInventoryTest(unittest.TestCase):
                     ".codex",
                     "tools",
                     ".github",
-                    "rust",
-                    ".agents",
+                    "tools/runtime/dispatch",
+                    "agents",
                 ],
                 check=True,
                 capture_output=True,
