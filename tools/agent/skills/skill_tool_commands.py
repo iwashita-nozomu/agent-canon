@@ -293,7 +293,7 @@ ISSUE_CONTRACT_FORBIDDEN: dict[str, tuple[tuple[str, re.Pattern[str]], ...]] = {
     "result-artifact-writeout": (
         (
             "bare-runtime-log-archive-push",
-            re.compile(r"(?<!tools/agent_tools/)runtime_log_archive_git\.py push"),
+            re.compile(r"(?<!tools/runtime/archive/)runtime_log_archive_git\.py push"),
         ),
     ),
     "tool-finding-report": (

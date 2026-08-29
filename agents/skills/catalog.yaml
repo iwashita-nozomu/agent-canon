@@ -448,9 +448,11 @@ skill_families:
       conditional:
       - python3 -m tools.experiments.artifacts.save_experiment_result_annex --result-dir experiments/<topic>/result/<run_name>
         --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
-      - python3 tools/runtime/archive/runtime_log_archive_git.py archive-agent-report --report-dir
-        reports/agents/<run-id>
-      - python3 tools/runtime/archive/runtime_log_archive_git.py push
+      - ./bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root>
+        exec --root <registered-source-root> -- python3 tools/runtime/archive/runtime_log_archive_git.py
+        archive-agent-report --report-dir reports/agents/<run-id>
+      - ./bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root>
+        exec --root <registered-source-root> -- python3 tools/runtime/archive/runtime_log_archive_git.py push
       maintenance:
       - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
       - python3 tools/agent/skills/skill_tool_commands.py check
