@@ -16,7 +16,14 @@ from __future__ import annotations
 
 import argparse
 import shutil
+import sys
 from pathlib import Path
+
+# A direct filesystem invocation places ``tools/experiments/lifecycle`` on
+# ``sys.path``; add the repository root so the same public imports work as
+# ``python -m``.
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 if __package__:
     from tools.experiments.lifecycle.experiment_identity import validate_segment

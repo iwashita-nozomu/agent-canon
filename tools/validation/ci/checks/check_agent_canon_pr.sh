@@ -35,10 +35,11 @@ if [[ "$#" -ne 0 ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-source "${SCRIPT_DIR}/../lib/repo_paths.sh"
+source "${SCRIPT_DIR}/../../../repository/support/repo_paths.sh"
 WORKSPACE_ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "${WORKSPACE_ROOT}")"
-AGENT_CANON_BOUNDARY_SCRIPT="${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py"
+CANON_CI_ROOT="${WORKSPACE_ROOT}/tools/validation/ci"
+AGENT_CANON_BOUNDARY_SCRIPT="${WORKSPACE_ROOT}/tools/repository/workspace/parent_root_side_effects.py"
 AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}"
 cd "${WORKSPACE_ROOT}"
 # The source checkout is read-only input.  A caller must provide both the
@@ -93,12 +94,12 @@ unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_P
 # shared with producers and archive readers; no source-local fallback exists.
 runtime_boundary_root() {
   local candidate="$1"
-  PYTHONPATH="${CANON_TOOLS_ROOT}/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+  PYTHONPATH="${WORKSPACE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
     python3 - "${AGENT_CANON_SOURCE_ROOT}" "${candidate}" <<'PY'
 from pathlib import Path
 import sys
 
-from runtime_artifacts import runtime_artifact_boundary
+from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
 
 print(runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True).root)
 PY
@@ -106,12 +107,12 @@ PY
 
 runtime_boundary_path() {
   local candidate="$1"
-  PYTHONPATH="${CANON_TOOLS_ROOT}/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+  PYTHONPATH="${WORKSPACE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
     python3 - "${AGENT_CANON_SOURCE_ROOT}" "${AGENT_CANON_RUNTIME_ROOT}" "${candidate}" <<'PY'
 from pathlib import Path
 import sys
 
-from runtime_artifacts import runtime_artifact_boundary
+from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
 
 boundary = runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True)
 print(boundary.resolve(Path(sys.argv[3])))
@@ -159,12 +160,12 @@ if git remote get-url "${REMOTE_NAME}" >/dev/null 2>&1; then
 fi
 run_direct_agent_checks() {
   run_convention_compliance_gate
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/skill_tool_commands.py" check
+  python3 "${WORKSPACE_ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
+  python3 "${WORKSPACE_ROOT}/tools/agent/skills/skill_tool_commands.py" check
 }
 
 run_convention_compliance_gate() {
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json
+  python3 "${WORKSPACE_ROOT}/tools/validation/semantic/convention/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json
 }
 
 run_agent_canon() {
@@ -209,7 +210,7 @@ agentcanon_pr_dependency_graph_required() {
   PR_GATE_DEPENDENCY_SOURCE_REASON="standalone_source"
   PR_GATE_DEPENDENCY_SOURCE_EVIDENCE="source_root=${AGENT_CANON_SOURCE_ROOT}"
   if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
-    if base_fetch_output="$(python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py" \
+    if base_fetch_output="$(python3 "${CANON_CI_ROOT}/checks/agent_canon_pr_graph_selector.py" \
       --root "${WORKSPACE_ROOT}" \
       --source-root "${AGENT_CANON_SOURCE_ROOT}" \
       --prepare-ci-base)"; then
@@ -247,7 +248,7 @@ agentcanon_pr_dependency_graph_required() {
     fi
     selector_args+=(--trusted-base-sha "${trusted_base_sha}")
   fi
-  if selector_output="$(python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py" \
+  if selector_output="$(python3 "${CANON_CI_ROOT}/checks/agent_canon_pr_graph_selector.py" \
     "${selector_args[@]}")"; then
     selector_rc=0
   else
@@ -298,7 +299,7 @@ write_pr_gate_receipt() {
   local selector_reason="${2:-}"
   local selector_evidence="${3:-}"
   local published_path=""
-  if ! python3 "${CANON_TOOLS_ROOT}/ci/pr_gate_receipt.py" write \
+  if ! python3 "${CANON_CI_ROOT}/receipts/pr_gate_receipt.py" write \
     --root "${WORKSPACE_ROOT}" \
     --parent-pid "$$" \
     --status "${source_status}" \
@@ -316,7 +317,7 @@ write_pr_gate_receipt() {
 
 consume_pr_gate_receipt() {
   local consumer_command=(
-    bash "${SCRIPT_DIR}/run_all_checks.sh"
+    bash "${SCRIPT_DIR}/../runners/run_all_checks.sh"
     --quick
     --skip-docs
     --skip-github-workflows
@@ -340,12 +341,12 @@ consume_source_correctness_receipt() {
     echo "AGENT_CANON_G1_RECEIPT=not_materialized_nontransaction"
     return
   fi
-  PYTHONPATH="${PR_AGENT_CANON_SOURCE_ROOT}/tools/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+  PYTHONPATH="${PR_AGENT_CANON_SOURCE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
     python3 - "${bundle}" <<'PY'
 import json
 import sys
 from pathlib import Path
-from update_lifecycle_contract import validate_gate_chain
+from tools.runtime.lifecycle.update_lifecycle_contract import validate_gate_chain
 
 payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 values = payload.get("gate_verdicts") if isinstance(payload, dict) else None
@@ -432,7 +433,7 @@ consume_source_correctness_receipt
 echo ""
 
 echo "1️⃣  GitHub workflow and PR template checks"
-python3 "${CANON_TOOLS_ROOT}/ci/check_github_workflows.py"
+python3 "${CANON_CI_ROOT}/checks/check_github_workflows.py"
 echo ""
 
 echo "2️⃣  changed AgentCanon paths"
@@ -463,7 +464,7 @@ fi
 
 source_gate_output=""
 source_gate_rc=0
-if source_gate_output="$(bash "${CANON_TOOLS_ROOT}/ci/run_pr_dependency_source_gate.sh" \
+if source_gate_output="$(bash "${CANON_CI_ROOT}/checks/run_pr_dependency_source_gate.sh" \
   --root "${WORKSPACE_ROOT}" \
   --tools-root "${CANON_TOOLS_ROOT}" \
   --report-dir "${PR_DEPENDENCY_REVIEW_DIR}" \
@@ -509,7 +510,7 @@ run_pr_project_quality_boundary
 echo ""
 
 echo "7b️⃣  generated artifact guard"
-python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"
+python3 "${WORKSPACE_ROOT}/tools/runtime/artifacts/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"
 echo ""
 
 emit_generated_completeness_receipt

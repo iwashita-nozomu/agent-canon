@@ -47,6 +47,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, TypeAlias, cast
 
+# A direct filesystem invocation places ``tools/experiments/execution`` on
+# ``sys.path``; add the repository root so the same public imports work as
+# ``python -m``.
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
 if __package__:
     from tools.experiments.execution.execution_resource_plan import (
         CALLER_ALLOCATION_PROVENANCE,

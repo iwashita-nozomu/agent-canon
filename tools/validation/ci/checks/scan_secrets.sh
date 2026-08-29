@@ -21,10 +21,15 @@ detect_secrets_only_verified="${AGENT_CANON_DETECT_SECRETS_ONLY_VERIFIED:-1}"
 invocation_root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
 parent_root="${AGENT_CANON_CONTROL_PARENT_ROOT:-${AGENT_CANON_PARENT_ROOT:-}}"
 runtime_root="${AGENT_CANON_RUNTIME_ROOT:-}"
-script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd -P)"
 boundary_script="${script_root}/tools/repository/workspace/parent_root_side_effects.py"
 parent_temp_paths=()
 created_parent_temp_dir=""
+
+run_boundary() {
+  PYTHONPATH="${script_root}${PYTHONPATH:+:${PYTHONPATH}}" \
+    python3 "$boundary_script" "$@"
+}
 
 usage() {
   cat <<'EOF'
@@ -92,7 +97,7 @@ case "$runtime_root/" in
 esac
 cd "$root"
 if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "secret-scan-script" ]]; then
-  python3 "$boundary_script" verify-child \
+  run_boundary verify-child \
     --root "$parent_root" \
     --purpose secret-scan-script \
     --consume >/dev/null
@@ -101,7 +106,8 @@ else
   # artifacts to the scanned project while parent_root_side_effects still
   # authenticates the control repository.
   export AGENT_CANON_SOURCE_ROOT="$root"
-  exec python3 "$boundary_script" exec-parent-bound \
+  PYTHONPATH="${script_root}${PYTHONPATH:+:${PYTHONPATH}}" \
+    exec python3 "$boundary_script" exec-parent-bound \
     --root "$parent_root" \
     --purpose secret-scan-script \
     --issue-handoff \
@@ -130,7 +136,7 @@ require_git_repo() {
 create_parent_temp_dir() {
   local prefix="$1"
   created_parent_temp_dir="$(
-    python3 "$boundary_script" temp-dir \
+    run_boundary temp-dir \
       --root "$parent_root" \
       --candidate "$runtime_root/secret-scan/tmp" \
       --prefix "$prefix" \
@@ -145,7 +151,7 @@ cleanup_parent_temps() {
   local index
   trap - EXIT
   for ((index=${#parent_temp_paths[@]} - 1; index >= 0; index--)); do
-    python3 "$boundary_script" remove-tree \
+    run_boundary remove-tree \
       --root "$parent_root" \
       --candidate "${parent_temp_paths[$index]}" \
       --purpose secret-scan-cleanup >/dev/null || cleanup_status=$?
@@ -172,7 +178,7 @@ make_current_tree_snapshot() {
   local snapshot_root="$1"
 
   while IFS= read -r -d '' path; do
-    python3 "$boundary_script" copy-read-only \
+    run_boundary copy-read-only \
       --root "$parent_root" \
       --source "${root}/${path}" \
       --candidate "${snapshot_root}/${path}" \
@@ -234,7 +240,7 @@ run_detect_secrets() {
   create_parent_temp_dir detect-secrets-report.
   report_path="$created_parent_temp_dir/report.json"
   echo "SECRET_SCAN_TOOL=detect-secrets mode=current-tracked-tree only_verified=${detect_secrets_only_verified}"
-  python3 "$boundary_script" capture-subprocess \
+  run_boundary capture-subprocess \
     --root "$parent_root" \
     --candidate "$report_path" \
     --purpose secret-scan-detect-secrets-report \

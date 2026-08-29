@@ -24,12 +24,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
+SOURCE_ROOT = Path(__file__).resolve().parents[4]
+if __package__ in {None, ""}:
+    # A direct filesystem invocation places ``tools/validation/ci/checks`` on
+    # ``sys.path``; add the repository root so the same public imports work as
+    # ``python -m``.
+    sys.path.insert(0, str(SOURCE_ROOT))
+
 if __package__:
     from tools.experiments.lifecycle.experiment_identity import validate_segment
 else:
-    _IDENTITY_PATH = (
-        Path(__file__).resolve().parents[1] / "experiments" / "experiment_identity.py"
-    )
+    _IDENTITY_PATH = SOURCE_ROOT / "tools" / "experiments" / "lifecycle" / "experiment_identity.py"
     _IDENTITY_SPEC = importlib.util.spec_from_file_location(
         "agentcanon_experiment_identity", _IDENTITY_PATH
     )
@@ -90,7 +95,7 @@ def resolve_repo_root() -> Path:
     discovered_root = extract_git_root(run_git_root_lookup())
     if discovered_root is not None:
         return discovered_root
-    return Path(__file__).absolute().parents[2]
+    return SOURCE_ROOT
 
 
 def build_parser() -> argparse.ArgumentParser:

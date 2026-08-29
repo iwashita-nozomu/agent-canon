@@ -22,6 +22,12 @@ from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+# A direct filesystem invocation places ``tools/experiments/artifacts`` on
+# ``sys.path``; add the repository root so the same public imports work as
+# ``python -m``.
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
 if __package__:
     from tools.experiments.lifecycle.experiment_identity import (
         DuplicateJSONKeyError,

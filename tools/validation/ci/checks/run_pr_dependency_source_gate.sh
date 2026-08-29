@@ -105,8 +105,20 @@ if [[ ! -f "$CHANGED_PATH_PACKET" ]]; then
 fi
 
 cd "$ROOT"
+dependency_review="${ROOT}/tools/analysis/dependencies/run_repo_dependency_review.sh"
+if [[ ! -f "$dependency_review" ]]; then
+  dependency_review="${TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh"
+fi
+tool_drift="${ROOT}/tools/validation/semantic/tools/tool_drift.py"
+if [[ ! -f "$tool_drift" ]]; then
+  tool_drift="${TOOLS_ROOT}/agent_tools/tool_drift.py"
+fi
+dependency_graph_renderer="${ROOT}/tools/analysis/dependencies/render_dependency_manifest_graph.py"
+if [[ ! -f "$dependency_graph_renderer" ]]; then
+  dependency_graph_renderer="${TOOLS_ROOT}/agent_tools/render_dependency_manifest_graph.py"
+fi
 review=(
-  bash "${TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh"
+  bash "$dependency_review"
   --root "$ROOT"
   --fail-missing
   --changed-path-packet "$CHANGED_PATH_PACKET"
@@ -121,9 +133,9 @@ if [[ "$SOURCE_REVIEW_REQUIRED" -eq 0 ]]; then
   exit 0
 fi
 
-python3 "${TOOLS_ROOT}/agent_tools/tool_drift.py" --root "$ROOT"
+python3 "$tool_drift" --root "$ROOT"
 "${review[@]}" --cycle-report-only
-python3 "${TOOLS_ROOT}/agent_tools/render_dependency_manifest_graph.py" \
+python3 "$dependency_graph_renderer" \
   --root "$ROOT" \
   --scope full \
   --markdown-out "$REPORT_DIR/dependency_manifest_graph.md" \

@@ -120,6 +120,10 @@ class LiveReceiptFixture:
             "printf 'static_gate_unit=%s\\n' \"$1\" >> \"${CALL_LOG:?}\"\n",
         )
         self.write_executable(
+            "tools/validation/ci/checks/check_github_workflows.py",
+            "#!/usr/bin/env python3\n",
+        )
+        self.write_executable(
             "tools/runtime/artifacts/generated_artifact_guard.py",
             "#!/usr/bin/env python3\n"
             "from __future__ import annotations\n",

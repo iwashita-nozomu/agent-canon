@@ -10,7 +10,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-source "${SCRIPT_DIR}/../lib/repo_paths.sh"
+source "${SCRIPT_DIR}/../../../repository/support/repo_paths.sh"
 WORKSPACE_ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$WORKSPACE_ROOT")"
 cd "${WORKSPACE_ROOT}"
@@ -42,7 +42,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 PYTHON_IMPORT_PATHS=()
-for candidate_path in python "${CANON_TOOLS_ROOT}/agent_tools" "${CANON_TOOLS_ROOT}" .codex/hooks; do
+for candidate_path in python "${CANON_TOOLS_ROOT}" .codex/hooks; do
   if [ -d "${candidate_path}" ]; then
     PYTHON_IMPORT_PATHS+=("${candidate_path}")
   fi
@@ -76,13 +76,13 @@ if [ -d python ]; then
   fi
 else
   AGENT_CANON_W2_OWNER_PATHS=(
-    "${CANON_TOOLS_ROOT}/agent_tools/review_dispatch.py" \
-    "${CANON_TOOLS_ROOT}/agent_tools/artifact_identity.py" \
-    "${CANON_TOOLS_ROOT}/agent_tools/external_artifact_binding.py" \
-    "${CANON_TOOLS_ROOT}/agent_tools/publication_integrator.py" \
-    "${CANON_TOOLS_ROOT}/agent_tools/report_artifact_checks.py" \
-    "${CANON_TOOLS_ROOT}/agent_tools/review_dispatch.py" \
-    "${CANON_TOOLS_ROOT}/agent_tools/work_log.py" \
+    "${WORKSPACE_ROOT}/tools/agent/orchestration/review_dispatch.py" \
+    "${WORKSPACE_ROOT}/tools/runtime/artifacts/artifact_identity.py" \
+    "${WORKSPACE_ROOT}/tools/runtime/artifacts/external_artifact_binding.py" \
+    "${WORKSPACE_ROOT}/tools/repository/github/publication_integrator.py" \
+    "${WORKSPACE_ROOT}/tools/runtime/artifacts/report_artifact_checks.py" \
+    "${WORKSPACE_ROOT}/tools/agent/orchestration/review_dispatch.py" \
+    "${WORKSPACE_ROOT}/tools/runtime/archive/work_log.py" \
     tests/agent_tools/test_artifact_identity.py \
     tests/agent_tools/test_codex_hooks.py \
     tests/agent_tools/test_external_artifact_binding.py \

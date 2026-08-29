@@ -9,7 +9,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 cd "${WORKSPACE_ROOT}"
 
 # Reports and snapshots are runtime artifacts, not source files.  Resolve all
@@ -17,12 +17,12 @@ cd "${WORKSPACE_ROOT}"
 # namespace under the caller-owned external root.
 runtime_boundary_root() {
   local candidate="$1"
-  PYTHONPATH="${WORKSPACE_ROOT}/tools/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+  PYTHONPATH="${WORKSPACE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
     python3 - "${WORKSPACE_ROOT}" "${candidate}" <<'PY'
 from pathlib import Path
 import sys
 
-from runtime_artifacts import runtime_artifact_boundary
+from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
 
 print(runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True).root)
 PY
@@ -30,12 +30,12 @@ PY
 
 runtime_boundary_path() {
   local candidate="$1"
-  PYTHONPATH="${WORKSPACE_ROOT}/tools/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+  PYTHONPATH="${WORKSPACE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
     python3 - "${WORKSPACE_ROOT}" "${AGENT_CANON_RUNTIME_ROOT}" "${candidate}" <<'PY'
 from pathlib import Path
 import sys
 
-from runtime_artifacts import runtime_artifact_boundary
+from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
 
 boundary = runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True)
 print(boundary.resolve(Path(sys.argv[3])))

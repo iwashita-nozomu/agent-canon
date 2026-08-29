@@ -134,7 +134,7 @@ def test_canonical_selector_maps_representative_surfaces_to_units() -> None:
     assert selected_units("documents/design/example.md") == ("contracts",)
     assert selected_units("tools/agent_tools/example.py") == ("contracts",)
     assert selected_units("tools/runtime/dispatch/agent-canon/src/main.rs") == ("rust",)
-    assert selected_units("agents/evals/skill-workflow-prompt.yaml") == ("eval",)
+    assert selected_units("eval/definitions/skill-workflow-prompt.toml") == ("eval",)
     assert selected_units("agents/skills/catalog.yaml") == ("contracts",)
     assert selected_units(".github/PULL_REQUEST_TEMPLATE.md") == (
         "contracts",

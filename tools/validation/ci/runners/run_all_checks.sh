@@ -71,15 +71,15 @@ set -euo pipefail
 # ═══════════════════════════════════════════════════════════════════════════
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-source "${SCRIPT_DIR}/../lib/repo_paths.sh"
+source "${SCRIPT_DIR}/../../../repository/support/repo_paths.sh"
 WORKSPACE_ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$WORKSPACE_ROOT")"
-CANON_CI_ROOT="${CANON_TOOLS_ROOT}/ci"
+CANON_CI_ROOT="${WORKSPACE_ROOT}/tools/validation/ci"
 cd "$WORKSPACE_ROOT"
 
 AGENT_CANON_SOURCE_ROOT="$WORKSPACE_ROOT"
 AGENT_CANON_CARGO_MANIFEST="${AGENT_CANON_SOURCE_ROOT}/tools/runtime/dispatch/agent-canon/Cargo.toml"
-AGENT_CANON_BOUNDARY_SCRIPT="${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py"
+AGENT_CANON_BOUNDARY_SCRIPT="${WORKSPACE_ROOT}/tools/repository/workspace/parent_root_side_effects.py"
 # The checkout is a read-only source input.  Control and runtime roots are
 # explicit capabilities supplied by the caller; source/TMPDIR fallbacks would
 # make a CI check mutate whichever checkout happened to invoke this script.
@@ -131,12 +131,12 @@ unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_P
 # delegated to runtime_artifacts.py, the single runtime-root contract.
 runtime_boundary_root() {
   local candidate="$1"
-  PYTHONPATH="${CANON_TOOLS_ROOT}/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+  PYTHONPATH="${WORKSPACE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
     python3 - "${AGENT_CANON_SOURCE_ROOT}" "${candidate}" <<'PY'
 from pathlib import Path
 import sys
 
-from runtime_artifacts import runtime_artifact_boundary
+from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
 
 print(runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True).root)
 PY
@@ -144,12 +144,12 @@ PY
 
 runtime_boundary_path() {
   local candidate="$1"
-  PYTHONPATH="${CANON_TOOLS_ROOT}/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
+  PYTHONPATH="${WORKSPACE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
     python3 - "${AGENT_CANON_SOURCE_ROOT}" "${AGENT_CANON_CI_RUNTIME_ROOT}" "${candidate}" <<'PY'
 from pathlib import Path
 import sys
 
-from runtime_artifacts import runtime_artifact_boundary
+from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
 
 boundary = runtime_artifact_boundary(Path(sys.argv[1]), Path(sys.argv[2]), create=True)
 print(boundary.resolve(Path(sys.argv[3])))
@@ -281,7 +281,7 @@ validate_pr_gate_receipt() {
     return 1
   fi
   local validated_status=""
-  if ! validated_status="$(python3 "${CANON_CI_ROOT}/pr_gate_receipt.py" validate \
+  if ! validated_status="$(python3 "${CANON_CI_ROOT}/receipts/pr_gate_receipt.py" validate \
     --receipt "${PR_GATE_RECEIPT}" \
     --root "${WORKSPACE_ROOT}" \
     --parent-pid "${PR_GATE_PARENT_PID}")"; then
@@ -382,7 +382,6 @@ add_pythonpath() {
 RUN_ALL_CHECKS_PYTHONPATH=""
 add_pythonpath "${AGENT_CANON_SOURCE_ROOT}"
 add_pythonpath "${AGENT_CANON_SOURCE_ROOT}/tools"
-add_pythonpath "${AGENT_CANON_SOURCE_ROOT}/tools/agent_tools"
 add_pythonpath "${WORKSPACE_ROOT}/python"
 if [ -n "${PYTHONPATH:-}" ]; then
   IFS=':' read -r -a existing_pythonpath <<< "${PYTHONPATH}"
@@ -432,7 +431,7 @@ else
   echo "❌ canonical graph build 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/smoke_test_research_perspective_pack.py" 2>&1; then
+if "$PYTHON_BIN" "${WORKSPACE_ROOT}/eval/checkers/smoke_test_research_perspective_pack.py" 2>&1; then
   echo "✅ research perspective pack smoke test 成功"
 else
   echo "❌ research perspective pack smoke test 失敗"
@@ -441,7 +440,7 @@ fi
 if [ "$PR_GATE_RECEIPT_VALID" -eq 1 ]; then
   echo "DEPENDENCY_HEADER_CHECKS=skip reason=validated_source_receipt_consumed"
 elif [ "$CANON_GRAPH_READY" -eq 1 ]; then
-  if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_dependency_headers.py" --changed 2>&1; then
+  if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/dependencies/check_dependency_headers.py" --changed 2>&1; then
     echo "✅ dependency header checks 成功"
   else
     echo "❌ dependency header checks 失敗"
@@ -451,26 +450,26 @@ else
   echo "⏭️ dependency header checks skipped: canonical graph build failed"
 fi
 if [ "$PR_GATE_RECEIPT_VALID" -eq 0 ]; then
-  if bash "${CANON_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh" --changed 2>&1; then
+  if bash "${WORKSPACE_ROOT}/tools/validation/semantic/dependencies/check_dependency_header_format.sh" --changed 2>&1; then
     echo "✅ dependency manifest format checks 成功"
   else
     echo "❌ dependency manifest format checks 失敗"
     EXIT_CODE=1
   fi
 fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_static_any.py" 2>&1; then
+if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/code/check_static_any.py" 2>&1; then
   echo "✅ explicit Any static checks 成功"
 else
   echo "❌ explicit Any static checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_log_helper_names.py" --changed --exclude reports 2>&1; then
+if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/logging/check_log_helper_names.py" --changed --exclude reports 2>&1; then
   echo "✅ log helper naming checks 成功"
 else
   echo "❌ log helper naming checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/import_responsibility.py" --changed 2>&1; then
+if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/analysis/code/import_responsibility.py" --changed 2>&1; then
   echo "✅ import responsibility checks 成功"
 else
   echo "❌ import responsibility checks 失敗"
@@ -490,38 +489,38 @@ if [ -d python ]; then
     EXIT_CODE=1
   fi
 fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py" 2>&1; then
+if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/convention/check_convention_compliance.py" 2>&1; then
   echo "✅ convention compliance wiring checks 成功"
 else
   echo "❌ convention compliance wiring checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_skill_frontmatter.py" 2>&1; then
+if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/skills/check_skill_frontmatter.py" 2>&1; then
   echo "✅ runtime skill frontmatter checks 成功"
 else
   echo "❌ runtime skill frontmatter checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/skill_tool_commands.py" check 2>&1; then
+if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/agent/skills/skill_tool_commands.py" check 2>&1; then
   echo "✅ runtime skill tool command checks 成功"
 else
   echo "❌ runtime skill tool command checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/tool_catalog.py" 2>&1; then
+if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/runtime/manifest/tool_catalog.py" 2>&1; then
   echo "✅ tool catalog checks 成功"
 else
   echo "❌ tool catalog checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/tool_proof_coverage.py" 2>&1; then
+if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/analysis/proof/tool_proof_coverage.py" 2>&1; then
   echo "✅ tool proof coverage checks 成功"
 else
   echo "❌ tool proof coverage checks 失敗"
   EXIT_CODE=1
 fi
 if [ "$CANON_GRAPH_READY" -eq 1 ]; then
-  if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/tool_drift.py" 2>&1; then
+  if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/tools/tool_drift.py" 2>&1; then
     echo "✅ tool/convention drift checks 成功"
   else
     echo "❌ tool/convention drift checks 失敗"
@@ -532,7 +531,7 @@ elif [ "$PR_GATE_RECEIPT_VALID" -eq 1 ]; then
 else
   echo "⏭️ tool/convention drift checks skipped: canonical graph build failed"
 fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/responsibility_scope.py" 2>&1; then
+if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/responsibility/responsibility_scope.py" 2>&1; then
   echo "✅ responsibility scope checks 成功"
 else
   echo "❌ responsibility scope checks 失敗"
@@ -545,13 +544,13 @@ accumulated_eval_args=(
   --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}"
 )
 if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" \
-  "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}" 2>&1; then
+  "$PYTHON_BIN" "${WORKSPACE_ROOT}/eval/producers/run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}" 2>&1; then
   echo "✅ accumulated agent eval producers 成功"
 else
   echo "❌ accumulated agent eval producers 失敗"
   EXIT_CODE=1
 fi
-if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/eval_accumulation_check.py" \
+if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" "$PYTHON_BIN" "${WORKSPACE_ROOT}/eval/checkers/eval_accumulation_check.py" \
   --root "${WORKSPACE_ROOT}" --runtime-root "${AGENT_CANON_CI_RUNTIME_ROOT}" 2>&1; then
   echo "✅ eval accumulation checks 成功"
 else
@@ -561,7 +560,7 @@ fi
 echo "RUST_CHECKS=owned_by_bootstrap_container_static_gate"
 if [ "$SKIP_GITHUB_WORKFLOWS" -eq 1 ]; then
   echo "GITHUB_WORKFLOW_CHECKS=skip reason=already_checked_by_parent_gate"
-elif "$PYTHON_BIN" "${CANON_CI_ROOT}/check_github_workflows.py" 2>&1; then
+elif "$PYTHON_BIN" "${CANON_CI_ROOT}/checks/check_github_workflows.py" 2>&1; then
   echo "✅ GitHub workflow / PR template checks 成功"
 else
   echo "❌ GitHub workflow / PR template checks 失敗"
@@ -597,7 +596,7 @@ if [ "$SKIP_EXPERIMENTS" -eq 1 ]; then
 elif [ ! -e experiments/registry.toml ]; then
   echo "EXPERIMENT_REGISTRY=skip"
   echo "experiment registry absent in this checkout; skipping registry validation"
-elif "$PYTHON_BIN" "${CANON_CI_ROOT}/check_experiment_registry.py" 2>&1; then
+elif "$PYTHON_BIN" "${CANON_CI_ROOT}/checks/check_experiment_registry.py" 2>&1; then
   echo "✅ experiment registry checks 成功"
 else
   echo "❌ experiment registry checks 失敗"
@@ -610,7 +609,7 @@ python_quality_args=()
 if [ "$QUICK_MODE" -eq 1 ]; then
   python_quality_args+=(--quick)
 fi
-if bash "${CANON_CI_ROOT}/run_python_quality_checks.sh" "${python_quality_args[@]}"; then
+if bash "${CANON_CI_ROOT}/checks/run_python_quality_checks.sh" "${python_quality_args[@]}"; then
   echo "✅ Python quality checks 成功"
 else
   echo "❌ Python quality checks 失敗"
