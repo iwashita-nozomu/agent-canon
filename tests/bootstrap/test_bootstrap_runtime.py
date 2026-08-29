@@ -1392,6 +1392,35 @@ def test_gc_high_water_keeps_current_rollback_and_unpublished_spool(
     assert "task:task-a" in preview["candidates"]
 
 
+def test_container_control_gc_delegates_to_runtime_gc(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Container control returns the real runtime GC result."""
+    calls: list[bool] = []
+    expected = {"operation": "gc", "code": "runtime-gc-result"}
+
+    def fake_gc(self: BootstrapRuntime, *, dry_run: bool = False) -> dict[str, Any]:
+        calls.append(dry_run)
+        return expected
+
+    monkeypatch.setattr(BootstrapRuntime, "gc", fake_gc)
+    args = build_parser().parse_args(
+        [
+            "--container-control",
+            "--repository-root",
+            str(REPOSITORY_ROOT),
+            "--control-parent-root",
+            str(tmp_path),
+            "--runtime-root",
+            str(tmp_path / "runtime"),
+            "gc",
+            "--dry-run",
+        ]
+    )
+    assert run(args) is expected
+    assert calls == [True]
+
+
 def test_gc_enforces_archive_quota_only_without_unpublished_spool(
     tmp_path: Path, fake_docker: DockerAdapter
 ) -> None:

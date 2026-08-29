@@ -1399,6 +1399,243 @@ def test_operation_help_has_no_path_or_docker_side_effects(
     assert not (tmp_path / "docker.calls").exists()
 
 
+def _gc_fixture(
+    tmp_path: Path,
+    *,
+    runtime: bool = True,
+    active: tuple[str, str] | None = None,
+    rollback: tuple[str, str] | None = None,
+) -> tuple[dict, dict, Path, Path, Path, Path, str, dict[str, str]]:
+    """Build a small Docker/runtime fixture for host GC contract tests."""
+    control = tmp_path / "control"
+    control.mkdir()
+    # Use this Git checkout as a read-only source root; the explicit runtime
+    # remains entirely inside the test-owned control root.
+    repository = ROOT
+    runtime_root = control / "runtime"
+    if runtime:
+        (runtime_root / "host-state").mkdir(parents=True)
+        (runtime_root / "container-state").mkdir()
+        (runtime_root / "host-state" / "replacement.lock").touch()
+    digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    container_name = f"agent-canon-tools-{digest[:16]}"
+    owned = {
+        "io.agent-canon.runtime": "shared-v1",
+        "io.agent-canon.control-root-digest": digest,
+    }
+    foreign = {
+        "io.agent-canon.runtime": "shared-v1",
+        "io.agent-canon.control-root-digest": "foreign-control",
+    }
+
+    def image(image_id: str, labels: dict[str, str]) -> dict:
+        return {"Id": image_id, "Config": {"Labels": labels}}
+
+    def container(container_id: str, image_ref: str, labels: dict[str, str]) -> dict:
+        return {
+            "Id": container_id,
+            "Name": "/unused",
+            "Config": {"Image": image_ref, "Labels": labels},
+            "State": {"Running": False, "Health": {"Status": "healthy"}},
+            "Mounts": [],
+        }
+
+    live_ref = "agent-canon-tools:live"
+    stale_ref = "agent-canon-tools:stale"
+    foreign_ref = "foreign-tools:keep"
+    live_id = "sha256:" + "1" * 64
+    stale_id = "sha256:" + "2" * 64
+    foreign_id = "sha256:" + "3" * 64
+    images = {
+        live_ref: image(live_id, owned),
+        stale_ref: image(stale_id, owned),
+        foreign_ref: image(foreign_id, foreign),
+    }
+    containers = {
+        container_name: container("container-live", live_ref, owned),
+        "agent-canon-tools-stale": container("container-stale", stale_ref, owned),
+        "foreign-resident": container("container-foreign", foreign_ref, foreign),
+    }
+    containers[container_name]["Name"] = "/" + container_name
+    containers["agent-canon-tools-stale"]["Name"] = "/agent-canon-tools-stale"
+    containers["foreign-resident"]["Name"] = "/foreign-resident"
+    state = {"images": images, "containers": containers, "next": 1}
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+    if active is not None:
+        active_ref, active_id = active
+        (runtime_root / "host-state" / "active-image.tsv").write_text(
+            "schema\tagent-canon.active-image.v1\n"
+            f"image-ref\t{active_ref}\nimage-id\t{active_id}\n",
+            encoding="utf-8",
+        )
+    if rollback is not None:
+        rollback_ref, rollback_id = rollback
+        (runtime_root / "container-state" / "rollback-plan.tsv").write_text(
+            "schema\tagent-canon.rollback-plan.v1\n"
+            f"image-id\t{rollback_id}\nimage-ref\t{rollback_ref}\n",
+            encoding="utf-8",
+        )
+    calls_path = tmp_path / "docker.calls"
+    fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
+    environment = {
+        **os.environ,
+        "AGENT_CANON_DOCKER": str(fake_docker),
+        "FAKE_DOCKER_STATE": str(state_path),
+        "FAKE_DOCKER_CALLS": str(calls_path),
+    }
+    return (
+        state,
+        owned,
+        repository,
+        control,
+        runtime_root,
+        state_path,
+        container_name,
+        environment,
+    )
+
+
+def _run_gc(
+    repository: Path,
+    control: Path,
+    runtime: Path,
+    environment: dict[str, str],
+    *,
+    dry_run: bool = False,
+) -> subprocess.CompletedProcess[str]:
+    """Run the public GC route against the fixture Docker executable."""
+    command = [
+        str(BOOTSTRAP),
+        "--repository-root",
+        str(repository),
+        "--control-parent-root",
+        str(control),
+        "--runtime-root",
+        str(runtime),
+        "gc",
+    ]
+    if dry_run:
+        command.append("--dry-run")
+    return subprocess.run(
+        command, check=False, capture_output=True, text=True, env=environment
+    )
+
+
+def test_gc_dry_run_does_not_create_or_chmod_runtime_files(tmp_path: Path) -> None:
+    """A preview is immutable, including when the runtime is absent."""
+    _state, _owned, repository, control, runtime, state_path, _name, environment = (
+        _gc_fixture(tmp_path, runtime=False)
+    )
+    completed = _run_gc(repository, control, runtime, environment, dry_run=True)
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout)["code"] == "gc_plan"
+    assert not runtime.exists()
+    assert json.loads(state_path.read_text(encoding="utf-8"))["containers"]
+
+
+def test_gc_keeps_live_resident_over_stale_persisted_container_id(
+    tmp_path: Path,
+) -> None:
+    """The live named resident wins over a stale persisted container ID."""
+    state, _owned, repository, control, runtime, state_path, name, environment = (
+        _gc_fixture(tmp_path)
+    )
+    (runtime / "container-state" / "state.json").write_text(
+        json.dumps({"container_id": "container-stale"}), encoding="utf-8"
+    )
+    completed = _run_gc(repository, control, runtime, environment)
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(state_path.read_text(encoding="utf-8"))
+    assert result["containers"][name]["Id"] == state["containers"][name]["Id"]
+    assert "agent-canon-tools-stale" not in result["containers"]
+
+
+def test_gc_keeps_live_resident_untagged_image_by_immutable_id(
+    tmp_path: Path,
+) -> None:
+    """A live image without a tag remains protected by its immutable ID."""
+    state, _owned, repository, control, runtime, state_path, name, environment = (
+        _gc_fixture(tmp_path)
+    )
+    live_ref = state["containers"][name]["Config"]["Image"]
+    live_image = state["images"].pop(live_ref)
+    live_id = live_image["Id"]
+    state["images"][f"untagged:{live_id}"] = live_image
+    state["containers"][name]["Config"]["Image"] = live_id
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+    completed = _run_gc(repository, control, runtime, environment)
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(state_path.read_text(encoding="utf-8"))
+    assert f"untagged:{live_id}" in result["images"]
+
+
+def test_gc_keeps_shared_active_and_rollback_image_id(tmp_path: Path) -> None:
+    """Shared active/rollback identity is retained once by exact image ID."""
+    shared_id = "sha256:" + "4" * 64
+    active_ref = "agent-canon-tools:active"
+    rollback_ref = "agent-canon-tools:rollback"
+    state, owned, repository, control, runtime, state_path, _name, environment = (
+        _gc_fixture(
+            tmp_path,
+            active=(active_ref, shared_id),
+            rollback=(rollback_ref, shared_id),
+        )
+    )
+    state["images"][active_ref] = {
+        "Id": shared_id,
+        "Config": {"Labels": owned},
+    }
+    state["images"][rollback_ref] = {
+        "Id": shared_id,
+        "Config": {"Labels": owned},
+    }
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+    completed = _run_gc(repository, control, runtime, environment)
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(state_path.read_text(encoding="utf-8"))
+    assert result["images"][active_ref]["Id"] == shared_id
+    assert result["images"][rollback_ref]["Id"] == shared_id
+    assert "agent-canon-tools:stale" not in result["images"]
+
+
+def test_gc_removes_only_exact_stale_owned_resources(tmp_path: Path) -> None:
+    """Stale owned IDs and tag references are the only Docker removals."""
+    _state, _owned, repository, control, runtime, state_path, _name, environment = (
+        _gc_fixture(tmp_path)
+    )
+    completed = _run_gc(repository, control, runtime, environment)
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(state_path.read_text(encoding="utf-8"))
+    assert "agent-canon-tools:stale" not in result["images"]
+    assert "agent-canon-tools-stale" not in result["containers"]
+
+
+def test_gc_preserves_foreign_resources(tmp_path: Path) -> None:
+    """Foreign control-root labels are outside the cleanup set."""
+    _state, _owned, repository, control, runtime, state_path, _name, environment = (
+        _gc_fixture(tmp_path)
+    )
+    completed = _run_gc(repository, control, runtime, environment)
+    assert completed.returncode == 0, completed.stderr
+    result = json.loads(state_path.read_text(encoding="utf-8"))
+    assert "foreign-tools:keep" in result["images"]
+    assert "foreign-resident" in result["containers"]
+
+
+def test_gc_invokes_container_state_gc_and_combines_receipt(tmp_path: Path) -> None:
+    """Host Docker cleanup retains the resident controller state transition."""
+    _state, _owned, repository, control, runtime, _state_path, _name, environment = (
+        _gc_fixture(tmp_path)
+    )
+    completed = _run_gc(repository, control, runtime, environment)
+    assert completed.returncode == 0, completed.stderr
+    receipt = json.loads(completed.stdout)
+    assert receipt["details"]["state"]["code"] == "state_gc_complete"
+    calls = (tmp_path / "docker.calls").read_text(encoding="utf-8")
+    assert "exec" in calls and "gc" in calls
+
+
 def test_resident_replacement_lock_serializes_only_the_replacement(
     tmp_path: Path,
 ) -> None:

@@ -1494,7 +1494,7 @@ _agent_canon_read_rollback_plan() {
     _agent_canon_json_error rollback_unavailable "rollback plan is missing"
   local key value source destination ro
   local schema_seen=0 image_seen=0 ref_seen=0
-  local previous_mounts="$AGENT_CANON_STATE_ROOT/rollback-mounts.tsv"
+  local previous_mounts=${1:-"$AGENT_CANON_STATE_ROOT/rollback-mounts.tsv"}
   AGENT_CANON_ROLLBACK_IMAGE_ID=
   AGENT_CANON_ROLLBACK_IMAGE_REF=
   : > "$previous_mounts"
@@ -1769,8 +1769,9 @@ _agent_canon_run_controller() {
   local container=$1
   shift
   local output_file error_file rc=0
-  output_file=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.stdout.XXXXXX")
-  error_file=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.stderr.XXXXXX")
+  local temporary_root=${AGENT_CANON_CONTROLLER_TEMP_ROOT:-$AGENT_CANON_RUNTIME_ROOT}
+  output_file=$(mktemp "$temporary_root/.bootstrap.stdout.XXXXXX")
+  error_file=$(mktemp "$temporary_root/.bootstrap.stderr.XXXXXX")
   _agent_canon_container_exec "$container" \
     python3 /usr/local/share/agent-canon/runtime/tools/agent_tools/bootstrap_runtime.py \
     --container-control \
@@ -2331,7 +2332,27 @@ _agent_canon_with_replacement_lock() {
     _agent_canon_json_error replacement_lock_unavailable "flock is required for resident replacement"
     return 2
   fi
-  if ! exec {lock_fd}>"$lock_path"; then
+  if [[ "${AGENT_CANON_LOCK_READ_ONLY:-0}" == 1 ]]; then
+    # A preview must not create the runtime or its lock.  Prefer the existing
+    # replacement lock; a pre-existing runtime directory is a read-only lock
+    # fallback for first-run previews, and /dev/null covers a missing runtime.
+    if [[ -e "$lock_path" ]]; then
+      exec {lock_fd}<"$lock_path" || {
+        _agent_canon_json_error replacement_lock_unavailable "resident replacement lock could not be opened"
+        return 2
+      }
+    elif [[ -d "$AGENT_CANON_RUNTIME_ROOT" ]]; then
+      exec {lock_fd}<"$AGENT_CANON_RUNTIME_ROOT" || {
+        _agent_canon_json_error replacement_lock_unavailable "runtime directory could not be opened for preview"
+        return 2
+      }
+    else
+      exec {lock_fd}</dev/null || {
+        _agent_canon_json_error replacement_lock_unavailable "preview lock could not be opened"
+        return 2
+      }
+    fi
+  elif ! exec {lock_fd}>"$lock_path"; then
     _agent_canon_json_error replacement_lock_unavailable "resident replacement lock could not be opened"
     return 2
   fi
@@ -2357,6 +2378,198 @@ _agent_canon_with_replacement_lock() {
     return 2
   fi
   return "$rc"
+}
+
+_agent_canon_gc_array_contains() {
+  local needle=$1 item
+  shift
+  for item in "$@"; do
+    [[ "$item" == "$needle" ]] && return 0
+  done
+  return 1
+}
+
+_agent_canon_gc_locked() {
+  local dry_run=${1:-0}
+  local control_digest live_name live_id live_ref live_image_id listing
+  local container_id container_name image_id image_repository image_tag image_ref
+  local active_ref= active_id= rollback_ref= rollback_id= rollback_plan
+  local state_receipt= rollback_mounts=
+  local -a container_keep_json=() container_remove_json=()
+  local -a image_keep_json=() image_remove_json=()
+  local -a kept_container_ids=() kept_image_ids=() kept_image_refs=()
+  local -a removed_container_ids=() removed_image_refs=() removed_image_ids=()
+
+  [[ "$dry_run" == 0 || "$dry_run" == 1 ]] ||
+    _agent_canon_json_error argument_invalid "gc dry-run flag is invalid"
+  AGENT_CANON_STATE_ROOT=${AGENT_CANON_STATE_ROOT:-$AGENT_CANON_RUNTIME_ROOT/container-state}
+  export AGENT_CANON_STATE_ROOT
+  control_digest=$(_agent_canon_control_digest)
+  live_name=$(_agent_canon_container_name)
+
+  # The existing identity reader is authoritative.  Never use a persisted
+  # container ID: the daemon may have recreated the named resident.
+  if _agent_canon_read_container_identity "$live_name" >/dev/null 2>&1; then
+    live_id=$AGENT_CANON_OBSERVED_CONTAINER_ID
+    if ! live_ref=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+      --format '{{.Config.Image}}' "$live_name" 2>/dev/null); then
+      _agent_canon_json_error gc_resident_readback_failed "resident image reference could not be read"
+    fi
+    live_ref=${live_ref//$'\n'/}
+    container_keep_json+=("{\"id\":\"$(_agent_canon_json_escape "$live_id")\",\"name\":\"$(_agent_canon_json_escape "$live_name")\"}")
+    kept_container_ids+=("$live_id")
+    [[ -n "$live_ref" ]] ||
+      _agent_canon_json_error gc_resident_readback_failed "resident image reference is empty"
+    if ! live_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect \
+      --format '{{.Id}}' "$live_ref" 2>/dev/null); then
+      _agent_canon_json_error gc_resident_readback_failed "resident image ID could not be read"
+    fi
+    live_image_id=${live_image_id//$'\n'/}
+    [[ "$live_image_id" =~ ^sha256:[0-9a-f]{64}$ ]] ||
+      _agent_canon_json_error gc_resident_readback_failed "resident image ID is invalid"
+    kept_image_ids+=("$live_image_id")
+    kept_image_refs+=("$live_ref")
+  else
+    live_id=
+    live_ref=
+  fi
+
+  # Existing state readers validate their own schemas.  The rollback reader
+  # writes its derived mount projection, so preview directs that output to a
+  # temporary file outside the runtime and removes it immediately.
+  if [[ -f "$AGENT_CANON_RUNTIME_ROOT/host-state/active-image.tsv" ]]; then
+    _agent_canon_read_active_image
+    active_ref=$AGENT_CANON_IMAGE_REF
+    active_id=$AGENT_CANON_ACTIVE_IMAGE_ID
+  fi
+  rollback_plan="$AGENT_CANON_STATE_ROOT/rollback-plan.tsv"
+  if [[ -f "$rollback_plan" ]]; then
+    if [[ "$dry_run" == 1 ]]; then
+      rollback_mounts=$(mktemp "${TMPDIR:-/tmp}/agent-canon-gc-rollback.XXXXXX") ||
+        _agent_canon_json_error gc_state_invalid "rollback reader temporary file could not be created"
+      _agent_canon_read_rollback_plan "$rollback_mounts"
+    else
+      _agent_canon_read_rollback_plan
+    fi
+    rollback_ref=$AGENT_CANON_ROLLBACK_IMAGE_REF
+    rollback_id=$AGENT_CANON_ROLLBACK_IMAGE_ID
+    [[ -n "$rollback_mounts" ]] && rm -f -- "$rollback_mounts"
+  fi
+
+  for image_id in "$active_id" "$rollback_id"; do
+    [[ "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]] || continue
+    _agent_canon_gc_array_contains "$image_id" "${kept_image_ids[@]}" ||
+      kept_image_ids+=("$image_id")
+  done
+  for image_ref in "$active_ref" "$rollback_ref" "$live_ref"; do
+    [[ -n "$image_ref" ]] || continue
+    _agent_canon_gc_array_contains "$image_ref" "${kept_image_refs[@]}" ||
+      kept_image_refs+=("$image_ref")
+  done
+
+  if ! listing=$("$AGENT_CANON_DOCKER_CMD" container ls --all --no-trunc \
+    --filter "label=io.agent-canon.runtime=shared-v1" \
+    --filter "label=io.agent-canon.control-root-digest=$control_digest" \
+    --format '{{.ID}}\t{{.Names}}'); then
+    _agent_canon_json_error gc_enumeration_failed "owned containers could not be enumerated"
+  fi
+  while IFS=$'\t' read -r container_id container_name; do
+    [[ -n "$container_id" ]] || continue
+    [[ "$container_name" == "$live_name" && "$container_id" == "$live_id" ]] && continue
+    container_remove_json+=("{\"id\":\"$(_agent_canon_json_escape "$container_id")\",\"name\":\"$(_agent_canon_json_escape "$container_name")\"}")
+    _agent_canon_gc_array_contains "$container_id" "${removed_container_ids[@]}" ||
+      removed_container_ids+=("$container_id")
+  done <<<"$listing"
+
+  if ! listing=$("$AGENT_CANON_DOCKER_CMD" image ls --all --no-trunc \
+    --filter "label=io.agent-canon.runtime=shared-v1" \
+    --filter "label=io.agent-canon.control-root-digest=$control_digest" \
+    --format '{{.ID}}\t{{.Repository}}\t{{.Tag}}'); then
+    _agent_canon_json_error gc_enumeration_failed "owned images could not be enumerated"
+  fi
+  while IFS=$'\t' read -r image_id image_repository image_tag; do
+    [[ -n "$image_id" ]] || continue
+    image_ref=
+    if [[ "$image_repository" != '<none>' && "$image_tag" != '<none>' &&
+          -n "$image_repository" && -n "$image_tag" ]]; then
+      image_ref="$image_repository:$image_tag"
+    fi
+    if _agent_canon_gc_array_contains "$image_id" "${kept_image_ids[@]}" ||
+      { [[ -n "$image_ref" ]] && _agent_canon_gc_array_contains "$image_ref" "${kept_image_refs[@]}"; }; then
+      image_keep_json+=("{\"id\":\"$(_agent_canon_json_escape "$image_id")\",\"ref\":\"$(_agent_canon_json_escape "$image_ref")\"}")
+      _agent_canon_gc_array_contains "$image_id" "${kept_image_ids[@]}" || kept_image_ids+=("$image_id")
+    else
+      if [[ -n "$image_ref" ]]; then
+        if ! _agent_canon_gc_array_contains "$image_ref" "${removed_image_refs[@]}"; then
+          removed_image_refs+=("$image_ref")
+          image_remove_json+=("{\"id\":\"$(_agent_canon_json_escape "$image_id")\",\"ref\":\"$(_agent_canon_json_escape "$image_ref")\"}")
+        fi
+      elif ! _agent_canon_gc_array_contains "$image_id" "${removed_image_ids[@]}"; then
+        removed_image_ids+=("$image_id")
+        image_remove_json+=("{\"id\":\"$(_agent_canon_json_escape "$image_id")\",\"ref\":\"\"}")
+      fi
+    fi
+  done <<<"$listing"
+
+  if [[ "$dry_run" == 0 ]]; then
+    for container_id in "${removed_container_ids[@]}"; do
+      if ! "$AGENT_CANON_DOCKER_CMD" rm -f "$container_id" >/dev/null; then
+        _agent_canon_json_error gc_remove_failed "stale owned container could not be removed"
+      fi
+    done
+    for image_ref in "${removed_image_refs[@]}"; do
+      if ! "$AGENT_CANON_DOCKER_CMD" image rm "$image_ref" >/dev/null; then
+        _agent_canon_json_error gc_remove_failed "stale owned image tag could not be removed"
+      fi
+    done
+    for image_id in "${removed_image_ids[@]}"; do
+      if ! "$AGENT_CANON_DOCKER_CMD" image rm "$image_id" >/dev/null; then
+        _agent_canon_json_error gc_remove_failed "stale owned image could not be removed"
+      fi
+    done
+  fi
+
+  if [[ -n "$live_id" ]]; then
+    local state_output state_rc=0
+    AGENT_CANON_IMAGE_REF=$live_ref
+    export AGENT_CANON_IMAGE_REF
+    if [[ "$dry_run" == 1 ]]; then
+      state_output=$(AGENT_CANON_CONTROLLER_TEMP_ROOT=${TMPDIR:-/tmp} \
+        _agent_canon_run_controller "$live_name" gc --dry-run) || state_rc=$?
+    else
+      state_output=$(_agent_canon_run_controller "$live_name" gc) || state_rc=$?
+    fi
+    ((state_rc == 0)) ||
+      _agent_canon_json_error gc_state_failed "container runtime GC failed"
+    state_receipt=$(printf '%s\n' "$state_output" | tail -n 1)
+    [[ "$state_receipt" == \{*\} ]] ||
+      _agent_canon_json_error gc_state_failed "container runtime GC returned no receipt"
+  fi
+  printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"gc","code":"%s","details":{"dry_run":%s,"containers":{"keep":[%s],"remove":[%s]},"images":{"keep":[%s],"remove":[%s]},"state":%s}}\n' \
+    "$([[ "$dry_run" == 1 ]] && printf gc_plan || printf gc_complete)" \
+    "$([[ "$dry_run" == 1 ]] && printf true || printf false)" \
+    "$(IFS=,; printf '%s' "${container_keep_json[*]}")" \
+    "$(IFS=,; printf '%s' "${container_remove_json[*]}")" \
+    "$(IFS=,; printf '%s' "${image_keep_json[*]}")" \
+    "$(IFS=,; printf '%s' "${image_remove_json[*]}")" \
+    "${state_receipt:-null}"
+}
+
+_agent_canon_gc() {
+  local dry_run=0 argument
+  for argument in "${command_args[@]:1}"; do
+    case "$argument" in
+      --dry-run) dry_run=1 ;;
+      *) _agent_canon_json_error argument_invalid "unsupported gc argument: $argument"; return 2 ;;
+    esac
+  done
+  if [[ "$dry_run" == 1 ]]; then
+    AGENT_CANON_LOCK_READ_ONLY=1 \
+      AGENT_CANON_CONTROLLER_TEMP_ROOT=${TMPDIR:-/tmp} \
+      _agent_canon_with_replacement_lock _agent_canon_gc_locked "$dry_run"
+  else
+    _agent_canon_with_replacement_lock _agent_canon_gc_locked "$dry_run"
+  fi
 }
 
 _agent_canon_install_locked() {
@@ -3009,6 +3222,14 @@ bootstrap_host_entrypoint() {
       _agent_canon_classify_existing_container "$preflight_container"
     fi
   fi
+  if [[ "$operation" == gc && "${command_args[1]:-}" == --dry-run ]]; then
+    # A preview is read-only: dispatch before host-runtime preparation, which
+    # creates directories, files, modes, and the normal replacement lock.
+    AGENT_CANON_STATE_ROOT="$AGENT_CANON_RUNTIME_ROOT/container-state"
+    export AGENT_CANON_STATE_ROOT
+    _agent_canon_gc
+    return $?
+  fi
   _agent_canon_prepare_host_runtime
   if [[ -n "$source_sync_alignment" ]]; then
     local source_sync_code source_sync_head source_sync_tree source_sync_remote_url
@@ -3035,6 +3256,13 @@ bootstrap_host_entrypoint() {
     fi
   done
   case "$operation" in
+    gc)
+      # Docker resource reconciliation is host-owned and serialized with
+      # resident replacement.  Do not create/adopt a container or delegate a
+      # second cleanup implementation to the resident controller.
+      _agent_canon_gc
+      return $?
+      ;;
     status)
       local container=$(_agent_canon_container_name)
       local running health resident_drift=false

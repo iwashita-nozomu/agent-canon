@@ -36,6 +36,14 @@ subagent の canonical owner は `agents/`、設計と runtime contract の owne
 [`bootstrap.sh`](bootstrap.sh) から共有 tool runtime を起動します。control root は
 必須で、runtime は既定で install root の ignored `.runtime/` を使います。
 
+コマンドを実行する cwd は入力の一部ではなく、cwd に関する warning は出ません。
+`bootstrap.sh` が解決した install root、明示した control root、install root 配下の
+`.runtime/` の順に状態をたどります。`install` は image と resident を構築し、
+`update` は同じ resident を検証済み checkout で置き換え、`status` はその状態を
+読み取ります。`gc --dry-run` はこの経路を読み取り専用で確認し、`gc` は lock の下で
+host Docker の stale owned resource と resident の state/cache/lease GC を同じ receipt
+にまとめます。
+
 ```bash
 ROOT=<authorized-parent-root>
 BOOTSTRAP=./bootstrap.sh

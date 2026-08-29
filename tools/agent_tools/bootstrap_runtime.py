@@ -6069,19 +6069,7 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
     if operation == "task" and args.task_operation == "release":
         return runtime.release_task(args.task_id, outcome=args.outcome)
     if operation == "gc":
-        with runtime.locked():
-            state = runtime._read_state(allow_manifest_drift=True)
-            return runtime._result(
-                runtime._receipt(
-                    "gc",
-                    "ok",
-                    "state_gc_complete",
-                    before=state["state"],
-                    after=state["state"],
-                    details={"docker_resources": "host-owned"},
-                    state=state,
-                )
-            )
+        return runtime.gc(dry_run=args.dry_run)
     raise BootstrapError(
         "container_control_unsupported",
         f"{operation} requires host-owned Docker or a project execution plane",

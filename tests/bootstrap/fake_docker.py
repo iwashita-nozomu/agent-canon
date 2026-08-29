@@ -56,6 +56,25 @@ def _formatted_image(record: dict, fmt: str) -> str | None:
     return None
 
 
+def _label_filters(argv: list[str]) -> dict[str, str]:
+    """Extract exact label filters used by host resource reconciliation."""
+    result = {}
+    for index, item in enumerate(argv):
+        if item != "--filter" or index + 1 >= len(argv):
+            continue
+        value = argv[index + 1]
+        if value.startswith("label="):
+            key, _, label_value = value[6:].partition("=")
+            result[key] = label_value
+    return result
+
+
+def _matches_labels(record: dict, filters: dict[str, str]) -> bool:
+    """Match Docker's conjunction of exact label filters."""
+    record_labels = record.get("Config", {}).get("Labels", {})
+    return all(record_labels.get(key) == value for key, value in filters.items())
+
+
 def _formatted_container(record: dict, fmt: str) -> str | None:
     """Return the scalar/container-list fields used by bootstrap readback."""
     if fmt == "{{.Id}}":
@@ -183,7 +202,33 @@ def main(argv: list[str]) -> int:
     if argv[:2] == ["image", "ls"]:
         if os.environ.get("FAKE_DOCKER_FAIL_IMAGE_LS") == "1":
             return 1
-        print("\n".join(dict.fromkeys(record["Id"] for record in state["images"].values())))
+        filters = _label_filters(argv)
+        if "--format" not in argv:
+            print(
+                "\n".join(
+                    dict.fromkeys(
+                        record["Id"]
+                        for record in state["images"].values()
+                        if _matches_labels(record, filters)
+                    )
+                )
+            )
+            return 0
+        image_format = argv[argv.index("--format") + 1]
+        if image_format != r"{{.ID}}\t{{.Repository}}\t{{.Tag}}":
+            return 2
+        rows = []
+        for key, record in state["images"].items():
+            if not _matches_labels(record, filters):
+                continue
+            if key.startswith("untagged:"):
+                repository, tag = "<none>", "<none>"
+            elif ":" in key:
+                repository, tag = key.rsplit(":", 1)
+            else:
+                repository, tag = key, "<none>"
+            rows.append(f"{record['Id']}\t{repository}\t{tag}")
+        print("\n".join(rows))
         return 0
     if argv[:1] == ["build"]:
         tag = argv[argv.index("--tag") + 1]
@@ -242,7 +287,26 @@ def main(argv: list[str]) -> int:
         print(json.dumps([found[1]]))
         return 0
     if argv[:2] == ["container", "ls"]:
-        print("\n".join(record["Id"] for record in state["containers"].values()))
+        filters = _label_filters(argv)
+        if "--format" not in argv:
+            print(
+                "\n".join(
+                    record["Id"]
+                    for record in state["containers"].values()
+                    if _matches_labels(record, filters)
+                )
+            )
+            return 0
+        container_format = argv[argv.index("--format") + 1]
+        if container_format != r"{{.ID}}\t{{.Names}}":
+            return 2
+        print(
+            "\n".join(
+                f"{record['Id']}\t{name}"
+                for name, record in state["containers"].items()
+                if _matches_labels(record, filters)
+            )
+        )
         return 0
     if argv[:1] == ["create"]:
         name = argv[argv.index("--name") + 1]
@@ -323,7 +387,8 @@ def main(argv: list[str]) -> int:
         save(state)
         return 0
     if argv[:1] == ["rm"]:
-        found = find(state, argv[1])
+        identifier = argv[-1]
+        found = find(state, identifier)
         if not found:
             return 1
         name = next(
@@ -398,6 +463,20 @@ def main(argv: list[str]) -> int:
             failed_operation = os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_OPERATION", "")
             if failed_operation and failed_operation in command[2:]:
                 return int(os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_RC", "41"))
+            if command[-1:] == ["gc"] or command[-2:] == ["gc", "--dry-run"]:
+                print(
+                    json.dumps(
+                        {
+                            "schema": "agent-canon.bootstrap-receipt.v2",
+                            "status": "ok",
+                            "operation": "gc",
+                            "code": "state_gc_complete",
+                            "details": {"docker_resources": "host-owned"},
+                        },
+                        separators=(",", ":"),
+                    )
+                )
+                return 0
             if "target" in command[2:] and "add" in command[2:]:
                 runtime_mount = next(
                     (
