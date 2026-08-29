@@ -185,7 +185,6 @@ class = "tooling"
 description = "Shared tool implementations, tool catalog, compiled tooling, and helper policy."
 paths = [
   "tools/**",
-  "rust/**",
   "helper_inventory_guard_policy.json",
 ]
 exclude_paths = [

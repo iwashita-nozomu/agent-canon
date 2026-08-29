@@ -1,8 +1,7 @@
 <!--
 @dependency-start
-contract runtime
+contract agent-runtime
 responsibility Defines the private feedback/knowledge command boundary and its external agent-canon-log storage route.
-upstream external-schema git@github.com:iwashita-nozomu/agent-canon-log.git@db3722b817be8574c682949db733df0fb5c2674a docs/FEEDBACK_KNOWLEDGE_SCHEMA.md
 downstream implementation ../../tools/runtime/archive/private_feedback.py
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/private_feedback.rs
 downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py structured feedback capture

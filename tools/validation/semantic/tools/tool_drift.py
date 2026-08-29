@@ -682,12 +682,12 @@ def projected_runtime_snippet(root: Path, snippet: str) -> str:
     """Map standalone AgentCanon tool paths to a parent runtime projection."""
     if (
         not (root / "tools" / "agent-canon").exists()
-        or (root / "tools" / "ci").exists()
+        or (root / "tools" / "agent").exists()
     ):
         return snippet
     return (
-        snippet.replace("tools/agent_tools/", "tools/agent-canon/agent_tools/")
-        .replace("tools/ci/", "tools/agent-canon/ci/")
+        snippet.replace("tools/agent/", "tools/agent-canon/agent/")
+        .replace("tools/validation/", "tools/agent-canon/validation/")
     )
 
 

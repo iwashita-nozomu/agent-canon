@@ -11,7 +11,7 @@ downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py c
 <!-- Generated from the typed skill/tool invocation graph; do not edit by hand. -->
 # Public Skill/Tool Invocation Graph
 
-<!-- graph_digest=6ad22322c7ab50d8eae06835f0a7adf1a06ac15501079830b217cd31eb5173c9 coverage_digest=7ec4aee419b092222ef8bf0ae1a08e88dddf110ca225d3b741017d5da38e4d60 -->
+<!-- graph_digest=35d8edc76c0fbc24530185230a8768eed3d0c3897c0cf5080bbdcaafadafb4c5 coverage_digest=6a0d1e6e828b3990394328b6f49092db544965685e63f2987ad71f2fbf8d6929 -->
 ```mermaid
 graph LR
   subgraph responsibility_n_analysis["Responsibility: analysis"]
@@ -553,8 +553,8 @@ graph LR
     n_command_result_artifact_writeout_conditional_0002["python3 tools/runtime/archive/runtime_log_archive_git.py push (order=2; ref=81b0341b4f9f681ce56eaeca8e89025725d1d75d06111d8f74474aa953e236ef)"]
     %% node kind=command id=command:result-visualize:conditional:0000 digest=8587215939ab9326b287b4de43e5939501ecdfa129fa549f2bd74ad602c1bce0 order=0
     n_command_result_visualize_conditional_0000["python3 tools/agent/orchestration/route.py --prompt '<user request>' --format json (order=0; ref=8587215939ab9326b287b4de43e5939501ecdfa129fa549f2bd74ad602c1bce0)"]
-    %% node kind=command id=command:tool-finding-report:conditional:0000 digest=0897d5e04fa9aa9827d209bf2c2c1a11401e6c45d7619a6c3ef1a3ec554e242b order=0
-    n_command_tool_finding_report_conditional_0000["'tools/oop/<language>/readability.py' --format json (order=0; ref=0897d5e04fa9aa9827d209bf2c2c1a11401e6c45d7619a6c3ef1a3ec554e242b)"]
+    %% node kind=command id=command:tool-finding-report:conditional:0000 digest=c7e1cebaa47d1ebbea1285778d3ffedaf6a305bbcb800da81968bc9ac3b1bc55 order=0
+    n_command_tool_finding_report_conditional_0000["'tools/validation/code/oop/<language>/readability.py' --format json (order=0; ref=c7e1cebaa47d1ebbea1285778d3ffedaf6a305bbcb800da81968bc9ac3b1bc55)"]
     %% node kind=command id=command:tool-finding-report:conditional:0001 digest=ff1cd0105638e49d19c2fa86c78c7f6d9647e57c67212cd1f35fad0068c7e52a order=1
     n_command_tool_finding_report_conditional_0001["python3 tools/runtime/lifecycle/workflow_monitor.py (order=1; ref=ff1cd0105638e49d19c2fa86c78c7f6d9647e57c67212cd1f35fad0068c7e52a)"]
     %% node kind=command id=command:tool-finding-report:conditional:0002 digest=87cd00f1bccb362dbfcd9b023c3cb47826d5457a950d7b5b1750d28ee1292c98 order=2
@@ -1878,8 +1878,8 @@ graph LR
   %% source kind=field id=source:field:00001:d4cb9ce539aa3900 digest=e45e397339ce0c69b3dafdf8f96f4dc7825e8e1fc27c18db292a8eb8a1f87371 locator=tools/agent/skills/skill_tool_commands.py#result-visualize:maintenance:1 ordinal=1
   %% source kind=phase id=source:phase:00000:612457f0dd5994af digest=e6ef706d1ff673960768a5287137d91a36d73580f8ad3ced4cc9239af665fae6 locator=agents/skills/catalog.yaml#skill:tool-finding-report.tool_commands.required ordinal=0
   %% source kind=phase id=source:phase:00001:f5056c17caea90a6 digest=37f0854321b68274def016015b1c720c16660814c06240af3d4e1eb1f38292f2 locator=agents/skills/catalog.yaml#skill:tool-finding-report.tool_commands.conditional ordinal=1
-  %% source kind=identity id=source:identity:00000:94d35df167b04be4 digest=c765c21cad25004034ae8e6b5b11277b4ad2018ef4c4013388edf3fb78b63dd1 locator=agents/skills/catalog.yaml#skill:tool-finding-report.tool_commands.conditional[0] ordinal=0
-  %% source kind=field id=source:field:00000:31fda13f54d2d89e digest=379c1e4f8819cb141637f4d9be5ae03369f48959ed26006720a04539acecc247 locator=tools/agent/skills/skill_tool_commands.py#tool-finding-report:conditional:0 ordinal=0
+  %% source kind=identity id=source:identity:00000:e9205c0a5ff5cd7c digest=8af1970ef747acedd3074cf7287ba972c0434bb2b8e6525a824294dbce6e7e0e locator=agents/skills/catalog.yaml#skill:tool-finding-report.tool_commands.conditional[0] ordinal=0
+  %% source kind=field id=source:field:00000:f018393a703ef6f1 digest=07944cad98ec660f8bfa23a8d888a64cd48d9f4d1c7d2f1b35a77917a12cb012 locator=tools/agent/skills/skill_tool_commands.py#tool-finding-report:conditional:0 ordinal=0
   %% source kind=identity id=source:identity:00001:3238fdf75fa733af digest=7d7ee2ddd8983496bbebe72eac42bb9d650467ab418312e2a16d4ebdc3f82806 locator=agents/skills/catalog.yaml#skill:tool-finding-report.tool_commands.conditional[1] ordinal=1
   %% source kind=field id=source:field:00001:5858602fd9010525 digest=f1e7933985ed7302ff4750c6ab427de4c86b0801e0f0e3c67e04b4e58d7f20f3 locator=tools/agent/skills/skill_tool_commands.py#tool-finding-report:conditional:1 ordinal=1
   %% source kind=identity id=source:identity:00002:b732ac15dcc1174e digest=2d36f1a582e34e75173a85693a75521e4bb8a509c291bfc8b55203707bec500b locator=agents/skills/catalog.yaml#skill:tool-finding-report.tool_commands.conditional[2] ordinal=2
@@ -2733,11 +2733,11 @@ graph LR
   %% source kind=field id=source:field:00005:51e409aab688a000 digest=7440de0cda1589e16d42b43bc269c0c901973affa537d9329095acd66e088553 locator=tools/agent/skills/skill_tool_commands.py#skill-cleanup:conditional:5 ordinal=5
   %% source kind=phase id=source:phase:00002:61a912619cf9ec2e digest=5a15b0c459a6d82aa0fd513841b62ad9256c7ce85328f9a7231b57efaea9ed12 locator=agents/skills/catalog.yaml#skill:skill-cleanup.tool_commands.maintenance ordinal=2
   %% source kind=module id=source:module:00000:efcc8c1d91224b3c digest=929389bbc1c9cd97297a6137e33d39eafb83ad7ccb941f49da39bd7d31bbd642 locator=agents/skills/code-visualization.md ordinal=0
-  %% source kind=evidence id=source:evidence:01215:674029e8cfca29c6 digest=2b066674560408168fc2ecf262ae1bc3e02f6f40667c1b44900534392bce95c3 locator=agents/skills/catalog.yaml ordinal=1215
+  %% source kind=evidence id=source:evidence:01215:65eb1d558b8404ed digest=27da25209f79164095dadaa9b41cccc19b7341746e678a46ec3e91fbf8062af9 locator=agents/skills/catalog.yaml ordinal=1215
   %% source kind=evidence id=source:evidence:01216:0ffa91c6400d2486 digest=9c1e743844b95de2e2ea76849661564d3b70bec7b8d01e85df8526b095702c18 locator=agents/skills/skill-dependencies.yaml ordinal=1216
   %% source kind=evidence id=source:evidence:01217:524d278c2d16ff54 digest=273ac3fd9ae46eafa9be0cfe892f1e57e3a9b885ac58bf9af29a5447df9ee4f6 locator=agents/canonical/skills.md ordinal=1217
   %% source kind=evidence id=source:evidence:01218:6c867396db98ceee digest=52bc61c3a646f8b58fb22d0370783053d751f1a05a9e3115bc24af32a3697c78 locator=agents/skills/catalog.yaml#routing ordinal=1218
-  %% source kind=evidence id=source:evidence:01219:2d4cf73f8b188941 digest=6a093316a03a9126c6ca776fecc80d548cec3944779c3023dcc7f171c5cb8d26 locator=tools/agent/skills/skill_tool_commands.py#canonical-resolution ordinal=1219
+  %% source kind=evidence id=source:evidence:01219:ed30cecd51e55f89 digest=e0e773bd70746e5b38a3381095812f986466b798dbc23d576bff860bf733b46d locator=tools/agent/skills/skill_tool_commands.py#canonical-resolution ordinal=1219
   %% source kind=evidence id=source:evidence:01220:53d450626a231899 digest=fdecf984ae5dec8a75b0fa0afcc6e316dd7003ffd7ea75f6e821b0213ca7573b locator=agents/skills/catalog.yaml#typed-visualization-toolcalls ordinal=1220
   %% source kind=edge id=source:edge:00000:b2c067afbbdb662a digest=39373e9dda473870fcb389c89fff692c544460c26e0748e877e7462f77b76c50 locator=graph:edge:00000 ordinal=0
   %% source kind=edge id=source:edge:00001:6dd7915f715eb4e6 digest=bfd9f7e272b7f5e48809c22d4a602ab2a69d0361a3792fb0d9282fa9b24a444b locator=graph:edge:00001 ordinal=1
@@ -2865,7 +2865,7 @@ graph LR
   %% source kind=edge id=source:edge:00123:092b6794abf80e5f digest=86d353912f00b48224fc0ea2b3b9e1122f2f7463c43cca5b309e7e20adaea860 locator=graph:edge:00123 ordinal=123
   %% source kind=edge id=source:edge:00124:ddb096478aff48c9 digest=ab63e1e2b35359f6d207993b68736cdbd607749cb9bd7aea348fc3f7c5762a91 locator=graph:edge:00124 ordinal=124
   %% source kind=edge id=source:edge:00125:bb8d475e0d6f8d2e digest=f41df6f24673940f619463382897d8f14d3b9d527e8ca356aace5379fcac6051 locator=graph:edge:00125 ordinal=125
-  %% source kind=edge id=source:edge:00126:fe4e9dea64ecf8a7 digest=439614d96e96fb9f09493e3792b8ed2058b0c921aa82eddd5bf0df1c95201521 locator=graph:edge:00126 ordinal=126
+  %% source kind=edge id=source:edge:00126:04dda31428774e0e digest=dc869385d822aee6b2fdc7169c206dcce065521ad4d2f783484bfae7f2aa2889 locator=graph:edge:00126 ordinal=126
   %% source kind=edge id=source:edge:00127:55336945955117f6 digest=a83ea8e20dd8c626e6af26912fda6d28de00fa77fbf2599e65184bd18668aa63 locator=graph:edge:00127 ordinal=127
   %% source kind=edge id=source:edge:00128:5a126ace521199b6 digest=42ffd361c8d48fb0c64bfcf79944dcced9456e9275d10ecce36db1e0a1cd275c locator=graph:edge:00128 ordinal=128
   %% source kind=edge id=source:edge:00129:449501e5432d34ae digest=60ff59edb9ba8eb2a48449b0486a07ad2bf10519fa3e022a4649c6376ca85fc4 locator=graph:edge:00129 ordinal=129
@@ -4265,7 +4265,7 @@ graph LR
   n_skill_tool_finding_report -->|"invocation (order=124; ref=1536a3fe38890c2a7116f236987e47c48754d5f65659db3ea9e8486b4e9a4bb9)"| n_phase_tool_finding_report_required
   %% edge id=edge:00125 digest=4c22b000517f41ca6916e1babc76ede5103553d59cd5ada7c00a99a538a01024 type=invocation source=skill:tool-finding-report source_digest=31017e43b44882f6b793ae762d6062b5f2f702d4546cd5a461d9dc27fe096537 target=phase:tool-finding-report:conditional target_digest=6f70e6ad6a7ee33fb2537a42caeb43cc129455504941007bb3725bb28fab4e13 order=125
   n_skill_tool_finding_report -->|"invocation (order=125; ref=4c22b000517f41ca6916e1babc76ede5103553d59cd5ada7c00a99a538a01024)"| n_phase_tool_finding_report_conditional
-  %% edge id=edge:00126 digest=d4e345e219bb7f23ca5d5b4140e74abe0bb5c6a0f73ae45391834949e9e9eca4 type=invocation source=phase:tool-finding-report:conditional source_digest=6f70e6ad6a7ee33fb2537a42caeb43cc129455504941007bb3725bb28fab4e13 target=command:tool-finding-report:conditional:0000 target_digest=0897d5e04fa9aa9827d209bf2c2c1a11401e6c45d7619a6c3ef1a3ec554e242b order=126
+  %% edge id=edge:00126 digest=d4e345e219bb7f23ca5d5b4140e74abe0bb5c6a0f73ae45391834949e9e9eca4 type=invocation source=phase:tool-finding-report:conditional source_digest=6f70e6ad6a7ee33fb2537a42caeb43cc129455504941007bb3725bb28fab4e13 target=command:tool-finding-report:conditional:0000 target_digest=c7e1cebaa47d1ebbea1285778d3ffedaf6a305bbcb800da81968bc9ac3b1bc55 order=126
   n_phase_tool_finding_report_conditional -->|"invocation (order=126; ref=d4e345e219bb7f23ca5d5b4140e74abe0bb5c6a0f73ae45391834949e9e9eca4)"| n_command_tool_finding_report_conditional_0000
   %% edge id=edge:00127 digest=bafbca04a4ee97cb60afd27dfa9ca7b72de0fa2d5efb6096a40d7fb905990cb3 type=invocation source=phase:tool-finding-report:conditional source_digest=6f70e6ad6a7ee33fb2537a42caeb43cc129455504941007bb3725bb28fab4e13 target=command:tool-finding-report:conditional:0001 target_digest=ff1cd0105638e49d19c2fa86c78c7f6d9647e57c67212cd1f35fad0068c7e52a order=127
   n_phase_tool_finding_report_conditional -->|"invocation (order=127; ref=bafbca04a4ee97cb60afd27dfa9ca7b72de0fa2d5efb6096a40d7fb905990cb3)"| n_command_tool_finding_report_conditional_0001
@@ -6569,5 +6569,5 @@ graph LR
 - `prerequisite`, `successor`, `order`, `invocation`, and `tool-resolution`: solid directed edges.
 - `routing` and `parallel`: dashed directed edges.
 
-Coverage digest: `7ec4aee419b092222ef8bf0ae1a08e88dddf110ca225d3b741017d5da38e4d60`.
-Graph digest: `6ad22322c7ab50d8eae06835f0a7adf1a06ac15501079830b217cd31eb5173c9`.
+Coverage digest: `6a0d1e6e828b3990394328b6f49092db544965685e63f2987ad71f2fbf8d6929`.
+Graph digest: `35d8edc76c0fbc24530185230a8768eed3d0c3897c0cf5080bbdcaafadafb4c5`.

@@ -2673,7 +2673,7 @@ class BootstrapRuntime:
     def scheduler_enable(self) -> dict[str, Any]:
         """Install and enable the one-shot user timer when systemd is available."""
         self._systemctl("show-environment")
-        template_root = self.repository_root / "bootstrap" / "systemd" / "user"
+        template_root = self.repository_root / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
         service_template = template_root / "agent-canon-sync.service.in"
         timer_template = template_root / "agent-canon-sync.timer.in"
         if not service_template.is_file() or not timer_template.is_file():

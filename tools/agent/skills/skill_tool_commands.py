@@ -20,9 +20,13 @@ import argparse
 import json
 import re
 import shlex
+import sys
 from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from tools.runtime.source.agent_canon_source_root import (
     RootResolution,

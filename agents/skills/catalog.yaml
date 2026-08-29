@@ -513,7 +513,7 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - tools/oop/<language>/readability.py --format json
+      - tools/validation/code/oop/<language>/readability.py --format json
       - python3 tools/runtime/lifecycle/workflow_monitor.py
       - python3 eval/producers/evaluate_skill_workflow_prompts.py
       maintenance:

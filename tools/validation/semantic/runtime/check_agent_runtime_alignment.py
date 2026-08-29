@@ -25,27 +25,29 @@ import os
 import re
 import subprocess
 import tempfile
+import sys
 from contextlib import contextmanager
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
-import sys
 from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
 try:
     from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
 except ImportError:
     from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary  # type: ignore[no-redef]
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 from typing import cast
 
-import tools.agent.orchestration.model_profile_registry
+from tools.agent.orchestration import model_profile_registry
 import yaml
 
 if __package__:
@@ -559,9 +561,14 @@ def is_public_skill_id(skill_id: str) -> bool:
 
 def validate_retired_command_or_skill(value: str, child: str) -> None:
     """Validate a tombstone representation without executing or resolving it."""
-    import_grammar = re.compile(r"import-only:tools\.agent_tools\.[A-Za-z0-9_]+:[A-Za-z0-9_]+$")
+    import_grammar = re.compile(
+        r"import-only:tools\.(?:agent|analysis|runtime|validation)"
+        r"(?:\.[A-Za-z0-9_]+)+:[A-Za-z0-9_]+$"
+    )
     command_grammar = re.compile(
-        r"command-only:python3 (tools/(?:agent_tools|validation)/[A-Za-z0-9_]+\.py)(?: [^\n]*)?$"
+        r"command-only:python3 "
+        r"(tools/(?:agent|analysis|runtime|validation)/[A-Za-z0-9_./-]+\.py)"
+        r"(?: [^\n]*)?$"
     )
     if import_grammar.fullmatch(value):
         return

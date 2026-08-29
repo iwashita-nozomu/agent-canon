@@ -21,12 +21,16 @@ import os
 import posixpath
 import re
 import stat
+import sys
 import tempfile
 import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Protocol, cast
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 try:
     import yaml

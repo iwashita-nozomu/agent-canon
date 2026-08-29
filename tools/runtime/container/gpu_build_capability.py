@@ -4,8 +4,8 @@
 # responsibility Validates staged GPU build receipts without owning Dockerfiles, BuildKit mutation, or CUDA provider materialization.
 # upstream design ../../documents/design/environment-resolution-gpu-build-capability.md GPU build admission contract
 # downstream implementation ../../tests/agent_tools/test_gpu_build_capability.py focused receipt regression
-# downstream data ../../tests/fixtures/environment_resolution/wsl2_rootless_nvml_failed.json sanitized WSL2 failure receipt
-# downstream data ../../tests/fixtures/environment_resolution/wsl2_rootless_cuda_build_repaired.json sanitized WSL2 repaired receipt
+# downstream implementation ../../tests/fixtures/environment_resolution/wsl2_rootless_nvml_failed.json sanitized WSL2 failure receipt
+# downstream implementation ../../tests/fixtures/environment_resolution/wsl2_rootless_cuda_build_repaired.json sanitized WSL2 repaired receipt
 # @dependency-end
 """Typed, fail-closed classification for GPU capability inside image builds."""
 

@@ -34,6 +34,9 @@ from pathlib import Path
 from pathlib import PurePosixPath
 from typing import Any, cast
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
 try:
     import yaml
 except ModuleNotFoundError:  # clean host before the shared tool image exists

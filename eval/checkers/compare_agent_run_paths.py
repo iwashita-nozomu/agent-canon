@@ -106,7 +106,7 @@ def render_report(left: RunPath, right: RunPath) -> str:
         "<!--",
         "@dependency-start",
         "responsibility Records two-run execution path comparison evidence.",
-        "upstream implementation ../../tools/agent_tools/"
+        "upstream implementation ../../eval/checkers/"
         "compare_agent_run_paths.py generates this report",
         "@dependency-end",
         "-->",

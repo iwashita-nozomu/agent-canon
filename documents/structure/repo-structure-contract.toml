@@ -35,8 +35,8 @@ ignore_globs = [
   "experiments/*/result",
   "experiments/*/result/**",
   "*/__pycache__",
-  "rust/agent-canon/target",
-  "rust/agent-canon/target/**",
+  "tools/runtime/dispatch/agent-canon/target",
+  "tools/runtime/dispatch/agent-canon/target/**",
   "tools/**/__pycache__",
 ]
 
@@ -135,7 +135,7 @@ path = "tools/catalog.yaml"
 kind = "file"
 
 [[profile.required]]
-path = "tools/agent_tools"
+path = "tools/agent"
 kind = "dir"
 
 [[profile.required]]
@@ -147,15 +147,19 @@ path = "tools/user"
 kind = "dir"
 
 [[profile.required]]
-path = "tools/internal"
+path = "tools/analysis"
 kind = "dir"
 
 [[profile.required]]
-path = "tools/ci"
+path = "tools/repository"
 kind = "dir"
 
 [[profile.required]]
-path = "rust/agent-canon"
+path = "tools/runtime"
+kind = "dir"
+
+[[profile.required]]
+path = "tools/validation"
 kind = "dir"
 
 [[profile.required]]
@@ -168,10 +172,6 @@ kind = "dir"
 
 [[profile.required]]
 path = "documents/notes"
-kind = "dir"
-
-[[profile.required]]
-path = "issues"
 kind = "dir"
 
 [[profile.optional]]

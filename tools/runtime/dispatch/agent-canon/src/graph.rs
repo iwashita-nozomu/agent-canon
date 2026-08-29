@@ -3507,15 +3507,15 @@ mod tests {
         let files: &[(&str, &[u8])] = &[
             (
                 "tools/runtime/manifest/surface_manifest.py",
-                include_bytes!("../../../tools/runtime/manifest/surface_manifest.py"),
+                include_bytes!("../../../../../tools/runtime/manifest/surface_manifest.py"),
             ),
             (
                 "tools/agent/skills/skill_projection_registry.py",
-                include_bytes!("../../../tools/agent/skills/skill_projection_registry.py"),
+                include_bytes!("../../../../../tools/agent/skills/skill_projection_registry.py"),
             ),
             (
                 "documents/runtime/shared-runtime-surfaces.toml",
-                include_bytes!("../../../documents/runtime/shared-runtime-surfaces.toml"),
+                include_bytes!("../../../../../documents/runtime/shared-runtime-surfaces.toml"),
             ),
         ];
         let mut exclude = OpenOptions::new()

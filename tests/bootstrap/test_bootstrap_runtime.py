@@ -187,12 +187,12 @@ def test_default_source_runtime_rebuilds_without_copying_legacy_state(
 ) -> None:
     """Migrate the fixed legacy root and remove it only after new readback."""
     repository = tmp_path / "repo"
-    (repository / "bootstrap").mkdir(parents=True)
+    (repository / "bootstrap" / "host").mkdir(parents=True)
     (repository / "bootstrap" / "host" / "manifest.toml").write_bytes(
         (REPOSITORY_ROOT / "bootstrap" / "host" / "manifest.toml").read_bytes()
     )
-    scheduler_source = REPOSITORY_ROOT / "bootstrap" / "systemd" / "user"
-    scheduler_target = repository / "bootstrap" / "systemd" / "user"
+    scheduler_source = REPOSITORY_ROOT / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
+    scheduler_target = repository / "bootstrap" / "host" / "scheduler" / "systemd" / "user"
     scheduler_target.mkdir(parents=True)
     for template in scheduler_source.glob("*.in"):
         (scheduler_target / template.name).write_bytes(template.read_bytes())

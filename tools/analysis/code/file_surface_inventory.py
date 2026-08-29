@@ -305,8 +305,8 @@ def render_markdown(mode: str, root: Path, scopes: Sequence[ScopeInventory], lim
         "@dependency-start",
         "responsibility Records file surface inventory for review.",
         (
-            "upstream implementation ../../../../tools/agent_tools/"
-            "agent_tools/file_surface_inventory.py generates this report"
+            "upstream implementation ../../../../tools/analysis/code/"
+            "file_surface_inventory.py generates this report"
         ),
         "@dependency-end",
         "-->",
