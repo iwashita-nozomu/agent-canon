@@ -116,6 +116,16 @@ capability を受けた場合だけ source を変更します。
 ./bootstrap.sh --control-parent-root <path> uninstall
 ```
 
+コマンドを実行する cwd は runtime の選択に使わず、cwd に関する warning は出しません。
+経路は `cwd -> bootstrap.sh -> install root -> control root ->
+<install-root>/.runtime/ -> resident container` です。`install` は検証済み image と
+resident を作り、`update` は同じ resident を current checkout へ更新し、`status` は
+`.runtime/` の active image と resident health を読み返します。`gc --dry-run` は
+`.runtime/` の準備・作成・chmod をせずに同じ identity/ownership read を行い、`gc` は
+replacement lock の下で stale な owned Docker resource だけを exact ID/reference で
+削除します。resident controller の既存 `runtime.gc/state GC` も継続して呼び出し、host
+Docker の結果と一つの receipt に結合します。
+
 Bootstrap はホストの Python / Cargo install へ fallback しません。Host
 `bootstrap/lib/entrypoint.sh` は Docker/Git の argv adapter だけを実行し、image を
 build/pull して resident container を起動した後、`docker exec` 経由で
@@ -458,7 +468,7 @@ unhealthy、archive publish failure、rollback、session restart、cleanup readb
 | `eval sync` | archive commit published | branch/commit/ref/tree/blob readback |
 | `rollback` | previous verified generation active | current/rollback pointer readback |
 | `stop` | container absent, state retained | inspect absence |
-| `gc` | eligible owned state absent | exact IDs/paths/bytes, active retained |
+| `gc` | exact stale owned Docker state absent; resident state/cache/lease GC complete | exact IDs/refs, foreign resources and active/rollback identities retained |
 | `uninstall` | owned runtime/skills absent | absence readback; user roots unchanged |
 
 ## Side-Effect Map (`tools/agent_tools/bootstrap_runtime.py`)

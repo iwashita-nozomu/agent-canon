@@ -86,6 +86,16 @@ The command family is:
 "$BOOTSTRAP" "${COMMON[@]}" uninstall
 ```
 
+The invocation cwd is informational only; it is not used to select runtime
+state and no cwd warning is emitted. The flow is `cwd -> bootstrap.sh ->
+install root -> control root -> <install-root>/.runtime/ -> resident
+container`. `install` creates the verified image and resident, `update`
+reconciles the current checkout in that resident, and `status` reads back the
+active image and resident health from `.runtime/`. `gc --dry-run` follows the
+same identity and ownership reads without preparing or changing `.runtime/`;
+`gc` performs the exact owned Docker cleanup under the replacement lock and
+includes the resident controller's state/cache/lease GC receipt.
+
 `target add` is explicit because the shared runtime never scans a workspace
 or mounts a whole home directory. `read-only` is the default and is required
 for analysis. `explicit-target-write` is available only for an operation whose
@@ -236,10 +246,14 @@ verified generation. `status` is the first recovery command; inspect its
 generation, container, target, limits, and receipt fields before retrying.
 
 `stop` removes the owned container but retains runtime state and spool data.
-`gc` removes only completed, unpinned, manifest-owned task/cache/archive
-objects after readback. An archive cache is retained whenever an unpublished
-spool exists. It never uses `docker system prune` and never removes
-pre-existing resources. `uninstall` removes only this installation's image,
+`gc` removes only exact stale Docker container IDs and image tag references or
+IDs carrying both the AgentCanon runtime label and the current control-root
+label. It keeps the live resident, its `Config.Image`, active image state,
+rollback identity, and images of kept containers. It never uses `docker system
+prune`, prefix matching, or foreign/other-control resources. The resident
+controller's existing GC continues to enforce completed, unpinned,
+manifest-owned task/cache/archive semantics; an unpublished spool retains its
+archive cache. `uninstall` removes only this installation's image,
 container, and managed links after checking that no task is active. It retains
 the external state, owner record, and receipts for absence readback; after that
 readback the installation runtime directory may be removed as the final
