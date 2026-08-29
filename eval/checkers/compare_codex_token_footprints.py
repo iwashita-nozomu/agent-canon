@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from workflow_monitor import MonitoringEntries, append_monitoring
+from tools.runtime.lifecycle.workflow_monitor import MonitoringEntries, append_monitoring
 
 TARGET_RATIO = 0.5
 DEFAULT_MOVING_AVERAGE_WINDOW = 5
@@ -172,7 +172,7 @@ def render_report(baseline: TokenFootprint, candidate: TokenFootprint) -> str:
         "<!--",
         "@dependency-start",
         "responsibility Records Codex token footprint comparison evidence.",
-        "upstream implementation ../../tools/agent_tools/compare_codex_token_footprints.py generates this report",
+        "upstream implementation ../../eval/checkers/compare_codex_token_footprints.py generates this report",
         "@dependency-end",
         "-->",
         "",
@@ -297,7 +297,7 @@ def render_summary_report(
         "<!--",
         "@dependency-start",
         "responsibility Records Codex token usage moving-average evidence.",
-        "upstream implementation ../../tools/agent_tools/compare_codex_token_footprints.py generates this report",
+        "upstream implementation ../../eval/checkers/compare_codex_token_footprints.py generates this report",
         "@dependency-end",
         "-->",
         "",

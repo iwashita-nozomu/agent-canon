@@ -10,17 +10,17 @@
 set -euo pipefail
 
 cat >&2 <<'EOF'
-tools/push_origin.sh no longer performs GitHub publish work.
+tools/repository/publish/push_origin.sh no longer performs GitHub publish work.
 
 Use the gh-backed tool instead, and pass the current user task explicitly:
 
-  python3 tools/agent_tools/github_publish.py push \
+  python3 tools/repository/github/github_publish.py push \
     --user-task "<current user task>" \
     --repo <owner/name>
 
 For PR work:
 
-  python3 tools/agent_tools/github_publish.py publish-pr \
+  python3 tools/repository/github/github_publish.py publish-pr \
     --user-task "<current user task>" \
     --repo <owner/name> \
     --title "<title>" \

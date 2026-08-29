@@ -26,7 +26,7 @@ except ModuleNotFoundError:  # pragma: no cover - compatibility for older runner
     import tomli as tomllib  # type: ignore[no-redef]
 
 
-DEFAULT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_CONTRACT = Path("agents/skills/agent-orchestration.execution-contract.toml")
 OWNER_REF = (
     "agents/skills/agent-orchestration.md#"
@@ -258,12 +258,12 @@ def _check_exact_contract(
         )
 
     expected_command = (
-        "python3 tools/agent_tools/check_execution_time_aware_orchestration.py --root ."
+        "python3 tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py --root ."
     )
     checker = contract.get("checker")
     checker_command = contract.get("checker_command")
     required_command = contract.get("required_skill_command")
-    if checker != "tools/agent_tools/check_execution_time_aware_orchestration.py":
+    if checker != "tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py":
         add(findings, "contract_schema", contract_label, "checker-path-mismatch")
     if checker_command != expected_command or required_command != expected_command:
         add(

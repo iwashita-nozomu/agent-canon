@@ -19,7 +19,7 @@ import inspect
 import sys
 from pathlib import Path
 
-CANONICAL_EVAL_MANIFEST_ROOT = Path("evidence") / "agent-evals"
+CANONICAL_EVAL_MANIFEST_ROOT = Path("eval") / "definitions"
 LEGACY_EVAL_MANIFEST_ROOT = Path("agents") / "evals"
 LEGACY_EVAL_RESULT_ROOT = LEGACY_EVAL_MANIFEST_ROOT / "results"
 

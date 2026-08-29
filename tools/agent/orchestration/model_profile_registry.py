@@ -1222,12 +1222,12 @@ def _render_role_view(view: GeneratedRoleView, projection: str = "live") -> str:
             "# contract configuration",
             f"# responsibility Projects the canonical {view.role_id} model profile into executable Codex settings.",
             "# upstream implementation ../../agents/model_profiles.toml owns model/profile authority",
-            "# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view",
-            "# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity",
+            "# upstream implementation ../../tools/agent/orchestration/model_profile_registry.py materializes this view",
+            "# downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates projection parity",
             "# @dependency-end",
             "# generated role view: generated_role_view_v1",
             "# generated from agents/model_profiles.toml plus canonical team/runtime role metadata",
-            "# materializer: tools/agent_tools/model_profile_registry.py",
+            "# materializer: tools/agent/orchestration/model_profile_registry.py",
             f"# source canonical digest: {view.source_canonical_digest}",
         )
     return "\n".join(
@@ -1316,7 +1316,7 @@ def write_role_views(
     agent_views, roles = _projection_records(consumer_static_views)
     raw["generated_profile_projection"] = {
         "schema_id": "generated_role_profile_projection_v1",
-        "materializer": "tools/agent_tools/model_profile_registry.py",
+        "materializer": "tools/agent/orchestration/model_profile_registry.py",
         "registry_ref": "agents/model_profiles.toml",
         "role_count": len(consumer_static_views),
         "projection_digest": _stable_digest(

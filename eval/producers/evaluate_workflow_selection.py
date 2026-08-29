@@ -23,12 +23,12 @@ UTC = timezone.utc
 from pathlib import Path
 from typing import cast
 
-from prompt_classifier import (
+from tools.agent.orchestration.prompt_classifier import (
     PromptClassifierInputs,
     SkillLaneEvidence,
     prompt_intake_signals,
 )
-from skill_lane_detector import (
+from tools.agent.skills.skill_lane_detector import (
     structural_skill_lane_concept_matches,
     validation_failure_repair_concept_matches,
 )
@@ -38,9 +38,9 @@ try:
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
-from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
-from runtime_log_paths import agent_canon_root, eval_results_dir
-from runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary
+from eval.checkers.eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
+from tools.runtime.archive.runtime_log_paths import agent_canon_root, eval_results_dir
+from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary
 
 DEFAULT_MANIFEST = eval_manifest_path("workflow_selection_eval.toml")
 DEFAULT_RESULTS_FAMILY = "workflow-selection"
@@ -438,7 +438,7 @@ def render_report(bundle: WorkflowSelectionBundle) -> str:
         "<!--",
         "@dependency-start",
         "responsibility Records one workflow selection eval run.",
-        "upstream implementation ../../../../tools/agent_tools/evaluate_workflow_selection.py generates this report",
+        "upstream implementation ../../../../eval/producers/evaluate_workflow_selection.py generates this report",
         "@dependency-end",
         "-->",
         "",

@@ -61,8 +61,8 @@ from runtime_log_paths import (  # noqa: E402
     runtime_spool_boundary,
     source_git_head,
 )
-from runtime_artifacts import RUNTIME_ROOT_ENV  # noqa: E402
-from parent_root_side_effects import (  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import RUNTIME_ROOT_ENV  # noqa: E402
+from tools.repository.workspace.parent_root_side_effects import (  # noqa: E402
     ParentRootAttestationRequest,
     ParentRootAttestationReceipt,
     ParentRootReject,
@@ -604,7 +604,13 @@ def check_hook_hot_path(path: Path) -> tuple[str, ...]:
     runtime_imports = _runtime_path_imports(tree)
     findings: set[str] = set()
     if runtime_imports:
-        runtime_path = path.resolve().parents[2] / "tools" / "agent_tools" / "runtime_log_paths.py"
+        runtime_path = (
+            path.resolve().parents[3]
+            / "tools"
+            / "runtime"
+            / "archive"
+            / "runtime_log_paths.py"
+        )
         try:
             runtime_text = runtime_path.read_text(encoding="utf-8")
             runtime_tree = ast.parse(runtime_text, filename=str(runtime_path))
@@ -694,7 +700,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--canon-root",
         type=Path,
-        default=Path(__file__).resolve().parents[2],
+        default=Path(__file__).resolve().parents[3],
         help="AgentCanon root that owns .agent-canon/log-archive.",
     )
     parser.add_argument(

@@ -33,6 +33,6 @@ jobs:
         with:
           python-version: "3.11"
       - name: Verify entrypoint grammar
-        run: python3 tools/agent_tools/check_entrypoint_owner_map.py --root . --format json
+        run: python3 tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py --root . --format json
       - name: Run entrypoint regression tests
         run: python3 -m unittest tests.agent_tools.test_check_entrypoint_owner_map -v

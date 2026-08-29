@@ -30,12 +30,12 @@ UTC = timezone.utc
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from runtime_log_paths import (  # noqa: E402
+from tools.runtime.archive.runtime_log_paths import (  # noqa: E402
     eval_result_search_dirs,
     hook_result_search_dirs,
 )
-from runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary  # noqa: E402
-from historical_skill_usage_reader import read_skill_usage_history  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary  # noqa: E402
+from tools.runtime.archive.historical_skill_usage_reader import read_skill_usage_history  # noqa: E402
 
 COMMIT_TIME_FORMAT = "%ct"
 GIT_LOG_TIMEOUT_SECONDS = 5
@@ -611,7 +611,7 @@ class AgentImprovementGuide:
             "<!--",
             "@dependency-start",
             "responsibility Records generated AgentCanon improvement guidance.",
-            "upstream implementation tools/agent_tools/generate_agent_improvement_guide.py generates this report",
+            "upstream implementation eval/producers/generate_agent_improvement_guide.py generates this report",
             "@dependency-end",
             "-->",
             "",
@@ -946,7 +946,7 @@ def protocol_feedback_lines(summary: EvidenceSummary) -> list[str]:
         or summary.failed_skill_eval_reports
     ):
         lines.append(
-            "- next_repair_branch: record the parent/subagent protocol decision in `workflow_monitoring.md` with `tools/agent_tools/workflow_monitor.py`."
+            "- next_repair_branch: record the parent/subagent protocol decision in `workflow_monitoring.md` with `tools/runtime/lifecycle/workflow_monitor.py`."
         )
     else:
         lines.append("- current_evidence: no failing hook, hook-quality, or skill-eval signal requires protocol repair.")

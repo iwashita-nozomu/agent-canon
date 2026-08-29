@@ -35,15 +35,15 @@ from typing import cast
 import yaml
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
-from tools.agent_tools.graph_client import (
+from tools.analysis.dependencies.graph_client import (
     CANONICAL_GRAPH_EXECUTABLE,
     GraphClient,
     GraphClientError,
     GraphDependencyFact,
 )
-from tools.agent_tools.tool_path_policy import (
+from tools.runtime.authority.tool_path_policy import (
     is_retired_legacy_tool_path,
     iter_retired_legacy_tool_paths,
     retired_legacy_tool_detail,
@@ -109,7 +109,7 @@ class Finding:
 CONTRACTS = (
     ToolContract(
         name="github_pr_flow",
-        tool="tools/ci/check_github_workflows.py",
+        tool="tools/validation/ci/checks/check_github_workflows.py",
         links=(
             LinkCheck("agents/workflows/agent-canon-pr-workflow.md"),
             LinkCheck(".github/AGENTS.md"),
@@ -121,14 +121,14 @@ CONTRACTS = (
     ),
     ToolContract(
         name="tool_catalog",
-        tool="tools/agent_tools/tool_catalog.py",
+        tool="tools/runtime/manifest/tool_catalog.py",
         links=(
             LinkCheck("tools/catalog.yaml", reverse_required=True),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
             LinkCheck("documents/tools/tool-docs.toml"),
             LinkCheck("documents/tools/repo-local-tool-imports.md"),
-            LinkCheck("tools/ci/run_all_checks.sh"),
+            LinkCheck("tools/validation/ci/runners/run_all_checks.sh"),
             LinkCheck("tests/agent_tools/test_tool_catalog.py"),
         ),
         text_checks=(
@@ -156,7 +156,7 @@ CONTRACTS = (
     ),
     ToolContract(
         name="responsibility_scope",
-        tool="tools/agent_tools/responsibility_scope.py",
+        tool="tools/validation/semantic/responsibility/responsibility_scope.py",
         links=(
             LinkCheck("responsibility-scope.toml"),
             LinkCheck("templates/documents/responsibility-scope.template.toml"),
@@ -164,13 +164,13 @@ CONTRACTS = (
             LinkCheck("tools/catalog.yaml"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
-            LinkCheck("tools/ci/run_all_checks.sh"),
+            LinkCheck("tools/validation/ci/runners/run_all_checks.sh"),
             LinkCheck("tests/agent_tools/test_responsibility_scope.py"),
         ),
     ),
     ToolContract(
         name="import_responsibility",
-        tool="tools/agent_tools/import_responsibility.py",
+        tool="tools/analysis/code/import_responsibility.py",
         links=(
             LinkCheck("responsibility-scope.toml"),
             LinkCheck("documents/design/responsibility-scope-management.md"),
@@ -178,17 +178,17 @@ CONTRACTS = (
             LinkCheck("tools/catalog.yaml"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
-            LinkCheck("tools/ci/run_all_checks.sh"),
+            LinkCheck("tools/validation/ci/runners/run_all_checks.sh"),
             LinkCheck("tests/agent_tools/test_import_responsibility.py"),
         ),
     ),
     ToolContract(
         name="tool_rejection_preflight",
-        tool="tools/agent_tools/tool_rejection_preflight.py",
+        tool="tools/validation/semantic/tools/tool_rejection_preflight.py",
         links=(
             LinkCheck("agents/COMMUNICATION_PROTOCOL.md"),
             LinkCheck("agents/skills/codex-task-workflow.md"),
-            LinkCheck("tools/agent_tools/responsibility_scope.py"),
+            LinkCheck("tools/validation/semantic/responsibility/responsibility_scope.py"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
             LinkCheck("tests/agent_tools/test_tool_rejection_preflight.py"),
@@ -208,41 +208,41 @@ CONTRACTS = (
     ),
     ToolContract(
         name="eval_accumulation",
-        tool="tools/agent_tools/eval_accumulation_check.py",
+        tool="eval/checkers/eval_accumulation_check.py",
         links=(
-            LinkCheck("evidence/agent-evals/README.md"),
+            LinkCheck("eval/definitions/README.md"),
             LinkCheck("documents/runtime/runtime-log-archive.md"),
             LinkCheck("documents/runtime/runtime-log-archive-migration.md"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
-            LinkCheck("tools/ci/run_all_checks.sh"),
+            LinkCheck("tools/validation/ci/runners/run_all_checks.sh"),
             LinkCheck("tests/agent_tools/test_eval_accumulation_check.py"),
         ),
     ),
     ToolContract(
         name="run_accumulated_agent_evals",
-        tool="tools/agent_tools/run_accumulated_agent_evals.py",
+        tool="eval/producers/run_accumulated_agent_evals.py",
         links=(
-            LinkCheck("evidence/agent-evals/README.md"),
+            LinkCheck("eval/definitions/README.md"),
             LinkCheck("documents/runtime/runtime-log-archive.md"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
             LinkCheck("tools/catalog.yaml"),
-            LinkCheck("tools/ci/check_agent_canon_pr.sh"),
-            LinkCheck("tools/ci/run_all_checks.sh"),
+            LinkCheck("tools/validation/ci/checks/check_agent_canon_pr.sh"),
+            LinkCheck("tools/validation/ci/runners/run_all_checks.sh"),
             LinkCheck(".github/workflows/agent-canon-static-gates.yml"),
             LinkCheck("tests/agent_tools/test_run_accumulated_agent_evals.py"),
         ),
     ),
     ToolContract(
         name="generated_artifact_guard",
-        tool="tools/agent_tools/generated_artifact_guard.py",
+        tool="tools/runtime/artifacts/generated_artifact_guard.py",
         links=(
-            LinkCheck("tools/agent_tools/report_artifact_checks.py"),
+            LinkCheck("tools/runtime/artifacts/report_artifact_checks.py"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
             LinkCheck("tools/catalog.yaml"),
-            LinkCheck("tools/ci/check_agent_canon_pr.sh"),
+            LinkCheck("tools/validation/ci/checks/check_agent_canon_pr.sh"),
             LinkCheck("agents/canonical/ARTIFACT_PLACEMENT.md"),
             LinkCheck("templates/agents/closeout_gate.md"),
             LinkCheck("tests/agent_tools/test_generated_artifact_guard.py"),
@@ -250,7 +250,7 @@ CONTRACTS = (
         text_checks=(),
         command_checks=(
             CommandCheck(
-                "tools/ci/check_agent_canon_pr.sh",
+                "tools/validation/ci/checks/check_agent_canon_pr.sh",
                 r'^python3\s+"\$\{CANON_TOOLS_ROOT\}/agent_tools/generated_artifact_guard\.py"\s+--root\s+"\$\{WORKSPACE_ROOT\}"\s*$',
                 "missing-generated-artifact-pr-guard",
             ),
@@ -258,64 +258,64 @@ CONTRACTS = (
     ),
     ToolContract(
         name="agent_canon_pr_check",
-        tool="tools/ci/check_agent_canon_pr.sh",
+        tool="tools/validation/ci/checks/check_agent_canon_pr.sh",
         links=(
             LinkCheck("agents/workflows/agent-canon-pr-workflow.md"),
             LinkCheck(".github/PULL_REQUEST_TEMPLATE.md"),
             LinkCheck("templates/documents/github/pull-request/agent_canon.md"),
-            LinkCheck("tools/agent_tools/run_repo_dependency_review.sh"),
-            LinkCheck("tools/ci/pr_gate_receipt.py"),
-            LinkCheck("tools/agent_tools/run_accumulated_agent_evals.py"),
-            LinkCheck("tools/agent_tools/generated_artifact_guard.py"),
-            LinkCheck("tools/agent_tools/evaluate_skill_workflow_prompts.py"),
-            LinkCheck("tools/agent_tools/check_agent_runtime_alignment.py"),
-            LinkCheck("tools/agent_tools/check_convention_compliance.py"),
-            LinkCheck("tools/ci/agent_canon_pr_graph_selector.py"),
-            LinkCheck("tools/ci/check_github_workflows.py"),
+            LinkCheck("tools/analysis/dependencies/run_repo_dependency_review.sh"),
+            LinkCheck("tools/validation/ci/receipts/pr_gate_receipt.py"),
+            LinkCheck("eval/producers/run_accumulated_agent_evals.py"),
+            LinkCheck("tools/runtime/artifacts/generated_artifact_guard.py"),
+            LinkCheck("eval/producers/evaluate_skill_workflow_prompts.py"),
+            LinkCheck("tools/validation/semantic/runtime/check_agent_runtime_alignment.py"),
+            LinkCheck("tools/validation/semantic/convention/check_convention_compliance.py"),
+            LinkCheck("tools/validation/ci/checks/agent_canon_pr_graph_selector.py"),
+            LinkCheck("tools/validation/ci/checks/check_github_workflows.py"),
         ),
         text_checks=(
             TextCheck(
-                "tools/ci/check_agent_canon_pr.sh",
+                "tools/validation/ci/checks/check_agent_canon_pr.sh",
                 'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"',
                 "missing-agent-runtime-alignment-check",
             ),
             TextCheck(
-                "tools/ci/check_agent_canon_pr.sh",
+                "tools/validation/ci/checks/check_agent_canon_pr.sh",
                 'AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}"',
                 "missing-agent-canon-pr-hook-archive-env",
             ),
             TextCheck(
-                "tools/ci/check_agent_canon_pr.sh",
+                "tools/validation/ci/checks/check_agent_canon_pr.sh",
                 "not_applicable_standalone_source",
                 "missing-standalone-shared-surface-skip",
             ),
             TextCheck(
-                "tools/ci/check_agent_canon_pr.sh",
+                "tools/validation/ci/checks/check_agent_canon_pr.sh",
                 "agentcanon_pr_dependency_graph_required()",
                 "missing-dependency-graph-requirement-selector",
             ),
             TextCheck(
-                "tools/ci/check_agent_canon_pr.sh",
+                "tools/validation/ci/checks/check_agent_canon_pr.sh",
                 "if agentcanon_pr_dependency_graph_required; then",
                 "missing-conditional-dependency-graph-gate",
             ),
             TextCheck(
-                "tools/ci/check_agent_canon_pr.sh",
+                "tools/validation/ci/checks/check_agent_canon_pr.sh",
                 "PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped",
                 "missing-optional-dependency-source-receipt-status",
             ),
             TextCheck(
-                "tools/ci/check_agent_canon_pr.sh",
+                "tools/validation/ci/checks/check_agent_canon_pr.sh",
                 'python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py"',
                 "missing-canonical-dependency-graph-selector",
             ),
             TextCheck(
-                "tools/ci/check_agent_canon_pr.sh",
+                "tools/validation/ci/checks/check_agent_canon_pr.sh",
                 "--selector-reason",
                 "missing-dependency-graph-selector-reason-receipt",
             ),
             TextCheck(
-                "tools/ci/check_agent_canon_pr.sh",
+                "tools/validation/ci/checks/check_agent_canon_pr.sh",
                 "--selector-evidence",
                 "missing-dependency-graph-selector-evidence-receipt",
             ),
@@ -323,28 +323,28 @@ CONTRACTS = (
     ),
     ToolContract(
         name="convention_compliance",
-        tool="tools/agent_tools/check_convention_compliance.py",
+        tool="tools/validation/semantic/convention/check_convention_compliance.py",
         links=(
             LinkCheck("documents/conventions/README.md"),
             LinkCheck("agents/canonical/CODEX_WORKFLOW.md"),
             LinkCheck("agents/canonical/CODEX_SUBAGENTS.md"),
             LinkCheck("agents/TASK_WORKFLOWS.md"),
             LinkCheck("agents/skills/agent-orchestration.md"),
-            LinkCheck("evidence/agent-evals/skill_workflow_prompt_eval.toml"),
+            LinkCheck("eval/definitions/skill_workflow_prompt_eval.toml"),
             LinkCheck("templates/agents/closeout_gate.md"),
-            LinkCheck("tools/ci/run_all_checks.sh"),
-            LinkCheck("tools/agent_tools/tool_drift.py"),
+            LinkCheck("tools/validation/ci/runners/run_all_checks.sh"),
+            LinkCheck("tools/validation/semantic/tools/tool_drift.py"),
         ),
     ),
     ToolContract(
         name="subagent_wave_routing",
-        tool="tools/agent_tools/tool_drift.py",
+        tool="tools/validation/semantic/tools/tool_drift.py",
         links=(
             LinkCheck("agents/canonical/CODEX_SUBAGENTS.md"),
             LinkCheck("agents/TASK_WORKFLOWS.md"),
             LinkCheck("agents/skills/agent-orchestration.md"),
-            LinkCheck("evidence/agent-evals/skill_workflow_prompt_eval.toml"),
-            LinkCheck("tools/agent_tools/check_convention_compliance.py"),
+            LinkCheck("eval/definitions/skill_workflow_prompt_eval.toml"),
+            LinkCheck("tools/validation/semantic/convention/check_convention_compliance.py"),
             LinkCheck("tests/agent_tools/test_tool_drift.py"),
         ),
         text_checks=(
@@ -369,17 +369,17 @@ CONTRACTS = (
                 "missing-orchestration-write-capable-handoff-policy",
             ),
             TextCheck(
-                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                "eval/definitions/skill_workflow_prompt_eval.toml",
                 "VERTICAL-WAVE-POLICY",
                 "missing-vertical-wave-prompt-eval",
             ),
             TextCheck(
-                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                "eval/definitions/skill_workflow_prompt_eval.toml",
                 "ORCH-SHIM-POINTER-1",
                 "missing-orchestration-owner-pointer-eval",
             ),
             TextCheck(
-                "evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                "eval/definitions/skill_workflow_prompt_eval.toml",
                 "ORCH-SHIM-TOOLCALL-1",
                 "missing-orchestration-toolcall-eval",
             ),
@@ -387,24 +387,24 @@ CONTRACTS = (
     ),
     ToolContract(
         name="repo_dependency_review",
-        tool="tools/agent_tools/run_repo_dependency_review.sh",
+        tool="tools/analysis/dependencies/run_repo_dependency_review.sh",
         links=(
             LinkCheck("documents/design/dependency-manifest-design.md"),
             LinkCheck("agents/canonical/CODEX_WORKFLOW.md"),
             LinkCheck("templates/agents/closeout_gate.md"),
             LinkCheck(".github/PULL_REQUEST_TEMPLATE.md"),
             LinkCheck("templates/documents/github/pull-request/agent_canon.md"),
-            LinkCheck("tools/ci/check_agent_canon_pr.sh"),
+            LinkCheck("tools/validation/ci/checks/check_agent_canon_pr.sh"),
         ),
     ),
     ToolContract(
         name="bootstrap_container_runtime",
-        tool="tools/agent_tools/bootstrap_runtime.py",
+        tool="tools/runtime/container/bootstrap_runtime.py",
         links=(
-            LinkCheck("bootstrap/container/Dockerfile"),
+            LinkCheck("bootstrap/container/image/Dockerfile"),
             LinkCheck("tests/tools/test_bootstrap_container_contract.py"),
             LinkCheck("tests/bootstrap/test_bootstrap_runtime.py"),
-            LinkCheck("tools/ci/run_all_checks.sh"),
+            LinkCheck("tools/validation/ci/runners/run_all_checks.sh"),
             LinkCheck("agents/skills/environment-maintenance.md"),
         ),
     ),

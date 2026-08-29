@@ -31,7 +31,7 @@ except ModuleNotFoundError:  # clean host before the shared tool image exists
         from . import stdlib_yaml as yaml
     except ImportError:
         import stdlib_yaml as yaml  # type: ignore[no-redef]
-from visualization_contract import (
+from tools.validation.semantic.tools.visualization_contract import (
     TOOL_ARGUMENT_SCHEMAS,
     ArgumentSchemaID,
     ToolCall,
@@ -122,13 +122,13 @@ _VISUALIZATION_ADAPTER_LOCATORS: MappingProxyType = MappingProxyType(
     {
         "agent_canon.visualization.adapter.dependency_manifest": {
             "dependency_manifest_locator": (
-                "tools/agent_tools/render_dependency_manifest_graph.py"
+                "tools/analysis/dependencies/render_dependency_manifest_graph.py"
             )
         },
         "agent_canon.visualization.adapter.algorithm_flowchart": {
-            "jit_ir_locator": "tools/agent_tools/jit_canonical_ir.py",
-            "lean_evidence_locator": "tools/agent_tools/operational_ir_to_lean.py",
-            "theorem_graph_locator": "tools/agent_tools/theorem_graph_board.py",
+            "jit_ir_locator": "tools/analysis/proof/jit_canonical_ir.py",
+            "lean_evidence_locator": "tools/analysis/proof/operational_ir_to_lean.py",
+            "theorem_graph_locator": "tools/analysis/proof/theorem_graph_board.py",
         },
         "agent_canon.visualization.adapter.document_mermaid": {
             "document_locator": "documents/runtime/skill-dependency-graph.md"

@@ -1413,7 +1413,7 @@ class BootstrapRuntime:
     ) -> None:
         """Create a lifecycle manager bound to explicit control and runtime roots."""
         self.repository_root = (
-            repository_root or Path(__file__).resolve().parents[2]
+            repository_root or Path(__file__).resolve().parents[3]
         ).resolve()
         control, runtime = validate_roots(
             Path(control_parent_root),
@@ -3131,7 +3131,7 @@ class BootstrapRuntime:
             cwd=CONTAINER_RUNTIME_DESTINATION,
             argv=[
                 "python3",
-                "/usr/local/share/agent-canon/runtime/tools/agent_tools/"
+                "/usr/local/share/agent-canon/runtime/tools/runtime/archive/"
                 "runtime_exchange_cleanup.py",
             ],
         )
@@ -4550,9 +4550,9 @@ class BootstrapRuntime:
             # continue to receive no output capability at all.
             environment = {}
             try:
-                from .tool_dispatch import load_specs  # type: ignore[import-not-found]
+                from ..dispatch.tool_dispatch import load_specs  # type: ignore[import-not-found]
             except ImportError:
-                from tool_dispatch import load_specs  # type: ignore[no-redef]
+                from tools.runtime.dispatch.tool_dispatch import load_specs  # type: ignore[no-redef]
             try:
                 specs, _schema = load_specs(self.repository_root)
                 spec = specs.get(catalog_id)
@@ -4697,7 +4697,7 @@ class BootstrapRuntime:
                 )
                 command = [
                     "python3",
-                    "/usr/local/share/agent-canon/runtime/tools/agent_tools/run_accumulated_agent_evals.py",
+                    "/usr/local/share/agent-canon/runtime/eval/producers/run_accumulated_agent_evals.py",
                     "--root",
                     canon_root,
                     "--target-root",
@@ -4709,7 +4709,7 @@ class BootstrapRuntime:
                     "--log-dir",
                     f"{exchange_runtime}/tasks/{run_id}/logs",
                     "--prompt-eval-manifest",
-                    f"{canon_root}/evidence/agent-evals/skill_workflow_prompt_eval.toml",
+                    f"{canon_root}/eval/definitions/skill_workflow_prompt_eval.toml",
                 ]
                 result = self.docker.exec_container(
                     str(container["id"]),

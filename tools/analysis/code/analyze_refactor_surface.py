@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 try:
-    from tools.shared.path_filters import is_hidden
+    from tools.support.path_filters import is_hidden
 except ModuleNotFoundError:
     for parent in Path(__file__).resolve().parents:
         if parent.name == "tools":
@@ -25,7 +25,7 @@ except ModuleNotFoundError:
             if str(repo_root) not in sys.path:
                 sys.path.append(str(repo_root))
             break
-    from tools.shared.path_filters import is_hidden
+    from tools.support.path_filters import is_hidden
 
 DEFAULT_MAX_FUNCTION_LINES = 80
 DEFAULT_MAX_CLASS_LINES = 220

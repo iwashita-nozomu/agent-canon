@@ -16,11 +16,11 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[5]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools.oop.shared.rule_inventory_core import InventoryEntry, run_inventory_cli
+from tools.validation.code.oop.shared.rule_inventory_core import InventoryEntry, run_inventory_cli
 
 
 ENTRIES = (
@@ -36,12 +36,12 @@ ENTRIES = (
     ),
     InventoryEntry(
         "tool",
-        "tools/oop/python/readability.py",
+        "tools/validation/code/oop/python/readability.py",
         "Python-specific OOP readability analyzer entrypoint.",
     ),
     InventoryEntry(
         "tool",
-        "tools/oop/python/rule_inventory.py",
+        "tools/validation/code/oop/python/rule_inventory.py",
         "Python OOP policy/tool/doc/test inventory.",
     ),
     InventoryEntry(

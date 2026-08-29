@@ -834,7 +834,7 @@ def main() -> int:
             and args.run_id is None
             and not os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
         ):
-            source = Path(__file__).resolve().parents[2]
+            source = Path(__file__).resolve().parents[3]
             candidate = workspace_root / "reports" / "agents"
             if workspace_root != source and source not in workspace_root.parents:
                 report_root = candidate

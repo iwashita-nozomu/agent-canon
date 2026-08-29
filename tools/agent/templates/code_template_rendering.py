@@ -14,7 +14,7 @@ from pathlib import Path
 if __package__:
     from .agent_canon_source_root import resolve_agent_canon_source_root
 else:
-    from agent_canon_source_root import resolve_agent_canon_source_root
+    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 
 
 def render_code_template(template_name: str) -> str:

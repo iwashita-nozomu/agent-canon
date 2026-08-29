@@ -52,7 +52,7 @@ try:
         runtime_artifact_boundary,
     )
 except ImportError:  # pragma: no cover - direct script execution
-    from runtime_artifacts import (  # type: ignore[no-redef]
+    from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
         RuntimeArtifactBoundary,
         RuntimeArtifactError,
         RuntimePathEscape,

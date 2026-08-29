@@ -36,9 +36,9 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from tools.agent_tools import vector_search
-from tools.agent_tools.runtime_artifacts import (
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from tools.analysis.search import vector_search
+from tools.runtime.artifacts.runtime_artifacts import (
     RuntimeArtifactError,
     runtime_artifact_boundary,
 )
@@ -218,10 +218,10 @@ class LspServerSpec:
         if root is None:
             raise ServerUnavailable("manifest executable resolution requires an analysis root")
         try:
-            repo_root = Path(__file__).resolve().parents[2]
+            repo_root = Path(__file__).resolve().parents[3]
             if str(repo_root) not in sys.path:
                 sys.path.insert(0, str(repo_root))
-            from tools.agent_tools.dependency_plan import (
+            from tools.analysis.dependencies.dependency_plan import (
                 DependencyError,
                 resolve_verified_executable,
             )

@@ -266,7 +266,7 @@ def _head_source_binding(
 
 def _owner_tool_identity(workspace: Path) -> dict[str, object]:
     """Return the frozen owner-tool source tuple."""
-    owner_path = "tools/agent_tools/artifact_identity.py"
+    owner_path = "tools/runtime/artifacts/artifact_identity.py"
     committed = _head_source_binding(workspace, owner_path)
     if committed is not None:
         source, _ = committed

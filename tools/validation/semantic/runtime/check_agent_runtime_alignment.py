@@ -40,9 +40,9 @@ from pathlib import Path
 try:
     from .runtime_artifacts import runtime_artifact_boundary
 except ImportError:
-    from runtime_artifacts import runtime_artifact_boundary  # type: ignore[no-redef]
+    from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary  # type: ignore[no-redef]
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 from typing import cast
 
 import model_profile_registry
@@ -110,7 +110,7 @@ if __package__:
         resolve_agent_canon_source_root,
     )
 else:
-    from agent_canon_source_root import (  # type: ignore[no-redef]
+    from tools.runtime.source.agent_canon_source_root import (  # type: ignore[no-redef]
         RepositoryRoots,
         RootResolution,
         resolve_agent_canon_source_root,
@@ -143,7 +143,7 @@ else:
         resolve_cross_cutting_document_packet,
         resolve_role_document_packet,
     )
-from skill_route_catalog import load_skill_route_rules
+from tools.agent.skills.skill_route_catalog import load_skill_route_rules
 from vendor_skill_adapters import VendorSkillValidator
 
 UTC = timezone.utc
@@ -1591,7 +1591,7 @@ def validate_subagent_protocol_docs() -> None:
                 ".codex/agents/*.toml",
                 "bootstrap_agent_run.py",
                 "workflow_monitor.py",
-                "python3 tools/agent_tools/route.py --prompt",
+                "python3 tools/agent/orchestration/route.py --prompt",
                 "Implementation Flow Graph",
             ):
                 ensure(marker in text, f"{path} missing owner-map marker: {marker}")

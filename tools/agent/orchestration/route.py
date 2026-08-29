@@ -27,7 +27,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
 
-from agent_canon_source_root import SourceRootFailure, resolve_agent_canon_source_root
+from tools.runtime.source.agent_canon_source_root import SourceRootFailure, resolve_agent_canon_source_root
 from capability_route import (
     FORMAT_VALUES,
     MODE_VALUES,
@@ -37,11 +37,11 @@ from capability_route import (
     decide_capabilities,
     preflight_capability_argv,
 )
-from skill_lane_detector import (
+from tools.agent.skills.skill_lane_detector import (
     structural_skill_lane_concept_matches,
     validation_failure_repair_concept_matches,
 )
-from skill_route_catalog import (
+from tools.agent.skills.skill_route_catalog import (
     VISUALIZATION_OWNER_ARGUMENT_SCHEMA,
     VISUALIZATION_OWNER_SKILL,
     VISUALIZATION_OWNER_TOOL_ID,
@@ -60,16 +60,16 @@ from skill_route_catalog import (
     related_skill_candidates,
     visualization_rejection_from_error,
 )
-from skill_route_catalog import (
+from tools.agent.skills.skill_route_catalog import (
     load_skill_related_map as _load_skill_related_map,
 )
-from skill_route_catalog import (
+from tools.agent.skills.skill_route_catalog import (
     load_skill_required_tool_commands as _load_skill_required_tool_commands,
 )
-from skill_route_catalog import (
+from tools.agent.skills.skill_route_catalog import (
     load_skill_tool_commands as _load_skill_tool_commands,
 )
-from visualization_contract import (
+from tools.validation.semantic.tools.visualization_contract import (
     TOOL_ARGUMENT_SCHEMAS,
     TOOL_CALL_SCHEMA,
     CoverageArguments,
@@ -174,7 +174,7 @@ AREA_DATA: tuple[AreaData, ...] = (
         "runtime surfaces",
         "Decide which AgentCanon root views are active, optional, or hidden.",
         "classify_runtime_surface",
-        ("python3 tools/agent_tools/route.py --area surface",),
+        ("python3 tools/agent/orchestration/route.py --area surface",),
         (
             "profile_surface_resolver.py",
             "runtime-surface-minimize",
@@ -187,9 +187,9 @@ AREA_DATA: tuple[AreaData, ...] = (
         "Classify repo-root, shared-canon, project runtime view, and personal runtime surfaces before refactors.",
         "classify_structure_refactor_surface",
         (
-            "python3 tools/agent_tools/repo_structure_contract.py --root <root> --format json",
-            "python3 tools/agent_tools/responsibility_scope.py --root <root> --format json",
-            "python3 tools/agent_tools/import_responsibility.py --root <root> --format json",
+            "python3 tools/validation/semantic/structure/repo_structure_contract.py --root <root> --format json",
+            "python3 tools/validation/semantic/responsibility/responsibility_scope.py --root <root> --format json",
+            "python3 tools/analysis/code/import_responsibility.py --root <root> --format json",
         ),
         (
             "structure-refactor",
@@ -215,7 +215,7 @@ AREA_DATA: tuple[AreaData, ...] = (
         "optional profiles",
         "Select optional Docker, C++, experiment, GitHub, or memory profiles.",
         "select_active_profiles",
-        ("python3 tools/agent_tools/route.py --area profile",),
+        ("python3 tools/agent/orchestration/route.py --area profile",),
         (
             "optional_profile_matrix.py",
             "profile-selection",
@@ -264,7 +264,7 @@ AREA_DATA: tuple[AreaData, ...] = (
         "read order",
         "Return the shortest required document packet for the task.",
         "read_minimal_packet",
-        ("python3 tools/agent_tools/route.py --area read",),
+        ("python3 tools/agent/orchestration/route.py --area read",),
         ("read_order_compactor.py", "onboarding-lite"),
     ),
     (
@@ -305,7 +305,7 @@ AREA_DATA: tuple[AreaData, ...] = (
         "runtime capability",
         "Hide Codex or CLI examples when unavailable.",
         "probe_runtime_capability",
-        ("python3 tools/agent_tools/route.py --area runtime",),
+        ("python3 tools/agent/orchestration/route.py --area runtime",),
         ("runtime_capability_probe.py", "runtime-capability-routing"),
     ),
     (
@@ -313,7 +313,7 @@ AREA_DATA: tuple[AreaData, ...] = (
         "token budget",
         "Pick light or full workflow gates from token budget and task risk.",
         "select_token_budget_gates",
-        ("python3 tools/agent_tools/route.py --area tokens",),
+        ("python3 tools/agent/orchestration/route.py --area tokens",),
         ("token_budget_gate.py", "token-lite"),
     ),
     (
@@ -321,7 +321,7 @@ AREA_DATA: tuple[AreaData, ...] = (
         "skill map",
         "Collapse duplicate workflow and skill entrypoints into one selection.",
         "select_public_skills",
-        ("python3 tools/agent_tools/route.py --area skills",),
+        ("python3 tools/agent/orchestration/route.py --area skills",),
         (
             "skill_workflow_mapper.py",
             "routing-single-source",
@@ -334,7 +334,7 @@ AREA_DATA: tuple[AreaData, ...] = (
         "agent mode",
         "Choose write-capable child, read-only scout, or staged agents by risk.",
         "select_agent_mode",
-        ("python3 tools/agent_tools/route.py --area agents",),
+        ("python3 tools/agent/orchestration/route.py --area agents",),
         (
             "multi_agent_mode_selector.py",
             "agent-mode",
@@ -347,7 +347,7 @@ AREA_DATA: tuple[AreaData, ...] = (
         "closeout",
         "Choose lightweight or full closeout evidence by risk.",
         "select_closeout_gate",
-        ("python3 tools/agent_tools/task_close.py --run-id <run-id>",),
+        ("python3 tools/runtime/lifecycle/task_close.py --run-id <run-id>",),
         (
             "closeout_profile_gate.py",
             "closeout-lite",
@@ -361,8 +361,8 @@ AREA_DATA: tuple[AreaData, ...] = (
         "Select changed-file or full dependency manifest checks.",
         "select_dependency_review",
         (
-            "python3 tools/agent_tools/check_dependency_headers.py --changed",
-            "bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing",
+            "python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed",
+            "bash tools/analysis/dependencies/scan_dependency_headers.sh --changed --fail-missing",
         ),
         (
             "dependency_manifest_scope.py",
@@ -376,7 +376,7 @@ AREA_DATA: tuple[AreaData, ...] = (
         "conventions",
         "Route convention subchecks without making every rule a prompt clause.",
         "run_convention_subchecks",
-        ("python3 tools/agent_tools/check_convention_compliance.py",),
+        ("python3 tools/validation/semantic/convention/check_convention_compliance.py",),
         (
             "convention_subcheck_router.py",
             "convention-gate-lite",
@@ -398,8 +398,8 @@ AREA_DATA: tuple[AreaData, ...] = (
         "Find candidate tools, documents, code, and dependency context from a purpose string.",
         "run_coordinated_search",
         (
-            'python3 tools/agent_tools/search.py --purpose "<goal>"',
-            'python3 tools/agent_tools/search.py --purpose "<goal>" --refresh-index --surface tools --surface documents',
+            'python3 tools/analysis/search/search.py --purpose "<goal>"',
+            'python3 tools/analysis/search/search.py --purpose "<goal>" --refresh-index --surface tools --surface documents',
         ),
         (
             "vector_search.py",
@@ -415,7 +415,7 @@ AREA_DATA: tuple[AreaData, ...] = (
         "logs and evals",
         "Route hook, skill, eval, and result evidence without overwriting logs.",
         "route_result_evidence",
-        ("python3 tools/agent_tools/generate_agent_improvement_guide.py",),
+        ("python3 eval/producers/generate_agent_improvement_guide.py",),
         (
             "log_retention_decider.py",
             "log-retention-lite",
@@ -430,7 +430,7 @@ AREA_DATA: tuple[AreaData, ...] = (
         "tool catalog",
         "Keep tool lists short while preserving catalog and docs checks.",
         "check_tool_catalog",
-        ("python3 tools/agent_tools/tool_catalog.py",),
+        ("python3 tools/runtime/manifest/tool_catalog.py",),
         (
             "tool_catalog_summarizer.py",
             "tool-selection",

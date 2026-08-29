@@ -30,10 +30,7 @@ from typing import cast
 
 UTC = timezone.utc
 
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from generate_agent_improvement_guide import (  # noqa: E402
+from eval.producers.generate_agent_improvement_guide import (  # noqa: E402
     AgentImprovementGuide,
     EvidenceSummary,
     HookEvidenceCounter,
@@ -41,14 +38,14 @@ from generate_agent_improvement_guide import (  # noqa: E402
     counter_lines,
     known_skill_ids,
 )
-from report_artifact_checks import (  # noqa: E402
+from tools.runtime.artifacts.report_artifact_checks import (  # noqa: E402
     actual_wave_event_fields,
     markdown_table_dict_rows,
 )
-from runtime_log_paths import eval_result_search_dirs  # noqa: E402
-from runtime_log_paths import mounted_log_archive_root  # noqa: E402
-from runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary  # noqa: E402
-from issue_sync import (  # noqa: E402
+from tools.runtime.archive.runtime_log_paths import eval_result_search_dirs  # noqa: E402
+from tools.runtime.archive.runtime_log_paths import mounted_log_archive_root  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary  # noqa: E402
+from tools.repository.github.issue_sync import (  # noqa: E402
     IssueSyncError,
     IssueWorkerHandoff,
     normalize_repository,
@@ -2719,7 +2716,7 @@ def dashboard_header_lines() -> list[str]:
         "<!--",
         "@dependency-start",
         "responsibility Records generated read-only AgentCanon runtime evidence dashboard.",
-        "upstream implementation tools/agent_tools/generate_agent_runtime_dashboard.py generates this report",
+        "upstream implementation eval/producers/generate_agent_runtime_dashboard.py generates this report",
         "@dependency-end",
         "-->",
         "",
@@ -2938,7 +2935,7 @@ def evidence_location_lines(root: Path) -> list[str]:
         "- hook_jsonl_archive_mount: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`",
         "- hook_jsonl_archive_remote: `git@github.com:iwashita-nozomu/agent-canon-log.git`",
         "- agent_report_archive_index: `.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl`",
-        "- agent_report_archive_command: `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`",
+        "- agent_report_archive_command: `python3 tools/runtime/archive/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`",
         "- skill_prompt_eval_reports: `.agent-canon/log-archive/eval-results/skill-workflow-prompt/<eval-run-id>-<status>-<skill-slug>.md`",
         "- workflow_selection_eval_reports: `.agent-canon/log-archive/eval-results/workflow-selection/<eval-run-id>-<status>.md`",
         "- report_quality_eval_reports: `.agent-canon/log-archive/eval-results/report-quality/<eval-run-id>-<status>.md`",
@@ -3626,7 +3623,7 @@ def hook_failure_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboar
         reason=f"{failed} hook entries report status=fail",
         evidence=evidence,
         owner_surface=".codex/hooks/ and hook accumulation tooling",
-        command="python3 tools/agent_tools/eval_accumulation_check.py",
+        command="python3 eval/checkers/eval_accumulation_check.py",
         done_condition="hook status fail count is 0",
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
         automation="agent-fix",
@@ -3658,7 +3655,7 @@ def reference_capture_next_action(summary: RuntimeDashboardSummary) -> tuple[Das
             action="confirm reference capture hook is producing evidence",
             reason="no reference_capture_guard entries are present",
             evidence=REFERENCE_CAPTURE_EVIDENCE_TARGET,
-            owner_surface="tools/agent_tools/reference_materializer.py",
+            owner_surface="tools/analysis/documents/reference_materializer.py",
             command=DASHBOARD_TOOL_ROUTE,
             done_condition="AGENT_RUNTIME_DASHBOARD_REFERENCE_CAPTURE_ENTRIES>0",
             issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
@@ -3671,8 +3668,8 @@ def reference_capture_next_action(summary: RuntimeDashboardSummary) -> tuple[Das
         action="materialize missing consulted source URLs",
         reason=f"{breakdown.missing_url_observations} observed URLs are not registered",
         evidence=REFERENCE_CAPTURE_EVIDENCE_TARGET,
-        owner_surface="references/external/ and tools/agent_tools/reference_materializer.py",
-        command="python3 tools/agent_tools/reference_materializer.py --url <url> --input <pdf-or-html>",
+        owner_surface="references/external/ and tools/analysis/documents/reference_materializer.py",
+        command="python3 tools/analysis/documents/reference_materializer.py --url <url> --input <pdf-or-html>",
         done_condition="AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS=0",
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
         automation="agent-fix-with-source-file",
@@ -3689,7 +3686,7 @@ def workflow_attribution_next_action(summary: RuntimeDashboardSummary) -> tuple[
         action="repair workflow attribution logging",
         reason=f"{breakdown.entries_without_workflow} hook entries lack workflow attribution",
         evidence=WORKFLOW_ATTRIBUTION_EVIDENCE_TARGET,
-            owner_surface="tools/agent_tools/behavior_event_assembly.py and workflow_monitoring.md",
+            owner_surface="tools/runtime/archive/behavior_event_assembly.py and workflow_monitoring.md",
         command=DASHBOARD_TOOL_ROUTE,
         done_condition="AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING=0 or entries are explicitly exempt",
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
@@ -3707,7 +3704,7 @@ def wave_execution_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashbo
             reason=f"{breakdown.missing_actual_wave_count} planned waves lack actual events",
             evidence=WAVE_EXECUTION_EVIDENCE_TARGET,
             owner_surface="schedule.md and workflow_monitoring.md",
-            command="python3 tools/agent_tools/task_close.py --run-id <run-id>",
+            command="python3 tools/runtime/lifecycle/task_close.py --run-id <run-id>",
             done_condition="AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL=0",
             issue=issue_label_by_slug(summary, "wave-activation-launcher-gap"),
             automation="agent-fix",
@@ -3731,8 +3728,8 @@ def wave_execution_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashbo
         action="add wave execution evidence to run bundles",
         reason="no Actual Wave Events rows were found",
         evidence=WAVE_EXECUTION_EVIDENCE_TARGET,
-        owner_surface="tools/agent_tools/agent_team.py",
-        command="python3 tools/agent_tools/bootstrap_agent_run.py --task-id <id>",
+        owner_surface="tools/agent/orchestration/agent_team.py",
+        command="python3 tools/runtime/lifecycle/bootstrap_agent_run.py --task-id <id>",
         done_condition="AGENT_RUNTIME_DASHBOARD_WAVE_EVENTS>0",
         issue=issue_label_by_slug(summary, "wave-activation-launcher-gap"),
         automation="agent-fix",
@@ -3770,7 +3767,7 @@ def skill_eval_next_action(summary: RuntimeDashboardSummary) -> tuple[DashboardN
         reason=f"{failed[skill]} failed eval reports are attributed to {skill}",
         evidence=f"{SKILL_EVAL_EVIDENCE_TARGET} skill={skill}",
         owner_surface=selection_reset_path_for(summary.root, "skill", skill),
-        command="python3 tools/agent_tools/evaluate_skill_workflow_prompts.py",
+        command="python3 eval/producers/evaluate_skill_workflow_prompts.py",
         done_condition=f"{skill} failed eval reports are 0",
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
         automation="agent-fix",
@@ -3793,7 +3790,7 @@ def markdown_docs_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboa
         action="repair Markdown/docs checking signal",
         reason=reason,
         evidence=MARKDOWN_EVIDENCE_TARGET,
-        owner_surface=".codex/personal/skills/md-style-check/SKILL.md and rust/agent-canon/src/docs.rs",
+        owner_surface=".codex/personal/skills/md-style-check/SKILL.md and tools/runtime/dispatch/agent-canon/src/docs.rs",
         command="tools/bin/agent-canon docs check",
         done_condition="markdown eval failures are 0 and markdown hook signal is present",
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
@@ -3815,7 +3812,7 @@ def prompt_tool_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboard
         action="repair prompt and tool selection evidence",
         reason="prompt excerpts or tool selection entries are missing",
         evidence=PROMPT_TOOL_EVIDENCE_TARGET,
-            owner_surface="tools/agent_tools/behavior_event_assembly.py",
+            owner_surface="tools/runtime/archive/behavior_event_assembly.py",
         command=DASHBOARD_TOOL_ROUTE,
         done_condition="prompt_entries>0, tool_selection_entries>0, prompt_missing_excerpt_entries=0",
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
@@ -3838,7 +3835,7 @@ def token_usage_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboard
         reason="no token footprint comparison or moving-average evidence found",
         evidence=TOKEN_USAGE_EVIDENCE_TARGET,
         owner_surface="workflow_monitoring.md and token logging hooks",
-        command="python3 tools/agent_tools/compare_codex_token_footprints.py --session-glob '<sessions>' --report-dir <run>",
+        command="python3 eval/checkers/compare_codex_token_footprints.py --session-glob '<sessions>' --report-dir <run>",
         done_condition="AGENT_RUNTIME_DASHBOARD_TOKEN_COMPARISONS>0 or AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARIES>0",
         issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
         automation="human-review-then-agent-fix",
@@ -3893,7 +3890,7 @@ def durable_issue_next_action(summary: RuntimeDashboardSummary) -> tuple[Dashboa
         reason=f"{len(pending_refs)} repository-qualified GitHub Issue references are pending",
         evidence=issue,
         owner_surface="GitHub Issue URL/number and private packet locator",
-        command="python3 tools/agent_tools/issue_sync.py --sync-pending",
+        command="python3 tools/repository/github/issue_sync.py --sync-pending",
         done_condition="GitHub Issue URL/number is read back or lookup is explicitly deferred",
         issue=f"`{issue}`",
         automation="human-review",

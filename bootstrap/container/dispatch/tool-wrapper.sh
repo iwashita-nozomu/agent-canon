@@ -15,7 +15,7 @@ fi
 shift 2
 
 exec env AGENT_CANON_EXECUTION_PLANE=tool-container \
-    python3 /usr/local/share/agent-canon/runtime/tools/agent_tools/tool_dispatch.py \
+    python3 /usr/local/share/agent-canon/runtime/tools/runtime/dispatch/tool_dispatch.py \
     --container-exec \
     --root /usr/local/share/agent-canon/runtime \
     run "$@"

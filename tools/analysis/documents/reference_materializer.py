@@ -38,7 +38,7 @@ try:
         attest_parent_root,
     )
 except ImportError:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
+    from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]
         ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,

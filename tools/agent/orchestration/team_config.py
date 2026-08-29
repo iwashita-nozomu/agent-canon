@@ -22,7 +22,7 @@ try:
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
-from route import implementation_handoff_required, load_skill_route_rules
+from tools.agent.orchestration.route import implementation_handoff_required, load_skill_route_rules
 
 if TYPE_CHECKING:
     if __package__:
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
         from workspace_scope import RepositoryRoots
         from writer_target import WriterTarget
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 
 TEAM_CONFIG_PATH = ROOT / "agents" / "agents_config.json"
 

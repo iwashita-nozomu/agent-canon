@@ -32,10 +32,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
-if __package__:
-    from .checkout_identity import resolve_checkout_identity
-else:
-    from checkout_identity import resolve_checkout_identity  # type: ignore[no-redef]
+from tools.runtime.authority.checkout_identity import resolve_checkout_identity
 
 GITHUB_URL_RE = re.compile(r"^https://github\.com/(?P<repo>[^/]+/[^/]+)/issues/(?P<number>[1-9][0-9]*)$")
 UTC = timezone.utc
@@ -714,7 +711,7 @@ def build_container_receipt_stager(
     root = _runtime_root(runtime_root)
     bootstrap_path = bootstrap or os.environ.get("AGENT_CANON_BOOTSTRAP", "").strip()
     if not bootstrap_path:
-        bootstrap_path = str(Path(__file__).resolve().parents[2] / "bootstrap.sh")
+        bootstrap_path = str(Path(__file__).resolve().parents[3] / "bootstrap.sh")
     target_root = str(identity.get("git_root") or "").strip()
     if not target_root or target_root == "unknown":
         raise IssueSyncError(
@@ -734,7 +731,7 @@ def build_container_receipt_stager(
     agentcanon_root = (
         configured_source.expanduser().resolve()
         if configured_source is not None
-        else Path(__file__).resolve().parents[2]
+        else Path(__file__).resolve().parents[3]
     )
     if not agentcanon_root.is_absolute() or not agentcanon_root.is_dir():
         raise IssueSyncError(
@@ -1749,7 +1746,7 @@ def sync_pending_packet(
             checkout_identity=checkout_identity,
             agentcanon_source_root=Path(
                 os.environ.get("AGENT_CANON_SOURCE_ROOT", "")
-                or Path(__file__).resolve().parents[2]
+                or Path(__file__).resolve().parents[3]
             ),
         )
     if not callable(receipt_stager) or not callable(getattr(receipt_stager, "preflight", None)):

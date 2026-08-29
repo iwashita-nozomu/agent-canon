@@ -83,12 +83,12 @@ RUN set -eux; \
 # context. They are copied into a disposable installer workspace and removed
 # in the same layer.  The manifest is explicit: no synthetic developer
 # configuration path is needed by the standalone image installer.
-COPY bootstrap/container/dependencies.toml /opt/agent-canon/bootstrap/container/dependencies.toml
-COPY tools/agent_tools/devcontainer_dependencies.py /opt/agent-canon/tools/agent_tools/devcontainer_dependencies.py
-COPY tools/agent_tools/dependency_plan.py /opt/agent-canon/tools/agent_tools/dependency_plan.py
-COPY tools/agent_tools/parent_root_side_effects.py /opt/agent-canon/tools/agent_tools/parent_root_side_effects.py
-COPY tools/agent_tools/runtime_artifacts.py /opt/agent-canon/tools/agent_tools/runtime_artifacts.py
-COPY rust/agent-canon /opt/agent-canon/rust/agent-canon
+COPY bootstrap/container/image/dependencies.toml /opt/agent-canon/bootstrap/container/image/dependencies.toml
+COPY tools/runtime/container/devcontainer_dependencies.py /opt/agent-canon/tools/runtime/container/devcontainer_dependencies.py
+COPY tools/analysis/dependencies/dependency_plan.py /opt/agent-canon/tools/analysis/dependencies/dependency_plan.py
+COPY tools/repository/workspace/parent_root_side_effects.py /opt/agent-canon/tools/repository/workspace/parent_root_side_effects.py
+COPY tools/runtime/artifacts/runtime_artifacts.py /opt/agent-canon/tools/runtime/artifacts/runtime_artifacts.py
+COPY tools/runtime/dispatch/agent-canon /opt/agent-canon/tools/runtime/dispatch/agent-canon
 
 ENV CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo \
     RUSTUP_HOME=/usr/local/share/agent-canon/toolchains/rustup \
@@ -96,16 +96,16 @@ ENV CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo \
     AGENT_CANON_IMAGE_DEPENDENCIES_ROOT=/usr/local/share/agent-canon/image-dependencies \
     PATH=/usr/local/share/agent-canon/toolchains/cargo/bin:/usr/local/bin:/usr/bin:/bin
 
-RUN python3 /opt/agent-canon/tools/agent_tools/dependency_plan.py \
+RUN python3 /opt/agent-canon/tools/analysis/dependencies/dependency_plan.py \
       image-install --workspace /opt/agent-canon \
-      --manifest /opt/agent-canon/bootstrap/container/dependencies.toml \
+      --manifest /opt/agent-canon/bootstrap/container/image/dependencies.toml \
       --final-binary-dir /usr/local/bin --format text \
     && test -x /usr/local/bin/agent-canon \
     && test -d /usr/local/share/agent-canon/toolchains/cargo \
     && test -d /usr/local/share/agent-canon/toolchains/rustup \
     && test -f /usr/local/share/agent-canon/image-dependencies/plan.json \
     && install -d -m 0555 /usr/local/share/agent-canon/runtime \
-    && install -m 0444 /opt/agent-canon/bootstrap/container/dependencies.toml \
+    && install -m 0444 /opt/agent-canon/bootstrap/container/image/dependencies.toml \
       /usr/local/share/agent-canon/runtime/dependencies.toml \
     && printf 'agent-canon-runtime/v1\n' > /usr/local/share/agent-canon/runtime/.agent-canon-runtime \
     && chmod 0444 /usr/local/share/agent-canon/runtime/.agent-canon-runtime \
@@ -119,35 +119,41 @@ RUN python3 /opt/agent-canon/tools/agent_tools/dependency_plan.py \
 COPY tools /usr/local/share/agent-canon/runtime/tools
 COPY agents /usr/local/share/agent-canon/runtime/agents
 COPY documents /usr/local/share/agent-canon/runtime/documents
-COPY bootstrap/manifest.toml /usr/local/share/agent-canon/runtime/bootstrap/manifest.toml
+COPY bootstrap/host/manifest.toml /usr/local/share/agent-canon/runtime/bootstrap/host/manifest.toml
 # The generated host view is intentionally excluded from the build context.
 # Reuse the canonical materializer in the image layer so this path is derived
 # from the tracked catalog and canonical skill documents at build time.
 RUN install -d -m 0755 /usr/local/share/agent-canon/runtime/.codex/personal \
     && AGENT_CANON_IMAGE_BUILD=1 python3 \
-      /usr/local/share/agent-canon/runtime/tools/agent_tools/skill_shim_materializer.py \
+      /usr/local/share/agent-canon/runtime/tools/agent/skills/skill_shim_materializer.py \
       materialize --root /usr/local/share/agent-canon/runtime --all --image-build --format text
 COPY .codex/agents /usr/local/share/agent-canon/runtime/.codex/agents
 COPY .codex/config.toml /usr/local/share/agent-canon/runtime/.codex/config.toml
-COPY evidence/agent-evals /usr/local/share/agent-canon/runtime/evidence/agent-evals
+COPY eval/definitions /usr/local/share/agent-canon/runtime/eval/definitions
+COPY eval/producers /usr/local/share/agent-canon/runtime/eval/producers
+COPY eval/checkers /usr/local/share/agent-canon/runtime/eval/checkers
+COPY eval/fixtures /usr/local/share/agent-canon/runtime/eval/fixtures
 COPY references /usr/local/share/agent-canon/runtime/references
 COPY templates /usr/local/share/agent-canon/runtime/templates
 COPY AGENTS.md ROOT_AGENTS.md /usr/local/share/agent-canon/runtime/
 RUN test -f /usr/local/share/agent-canon/runtime/tools/catalog.yaml \
-    && test -f /usr/local/share/agent-canon/runtime/tools/agent_tools/tool_dispatch.py \
+    && test -f /usr/local/share/agent-canon/runtime/tools/runtime/dispatch/tool_dispatch.py \
     && test -f /usr/local/share/agent-canon/runtime/tools/bin/agent-canon \
     && test -f /usr/local/share/agent-canon/runtime/tools/fixtures/tool_dispatch/public-command-parity.json \
     && test -f /usr/local/share/agent-canon/runtime/agents/skills/catalog.yaml \
     && test -f /usr/local/share/agent-canon/runtime/.codex/config.toml \
     && test -f /usr/local/share/agent-canon/runtime/.codex/agents/worker.toml \
     && test -f /usr/local/share/agent-canon/runtime/.codex/personal/skills/agent-orchestration/SKILL.md \
-    && test -f /usr/local/share/agent-canon/runtime/evidence/agent-evals/skill_workflow_prompt_eval.toml \
+    && test -f /usr/local/share/agent-canon/runtime/eval/definitions/skill_workflow_prompt_eval.toml \
+    && test -f /usr/local/share/agent-canon/runtime/eval/producers/generate_agent_runtime_dashboard.py \
+    && test -f /usr/local/share/agent-canon/runtime/eval/checkers/eval_accumulation_check.py \
+    && test -f /usr/local/share/agent-canon/runtime/eval/fixtures/skill-runtime-shim/measurements/fixture-measurement.json \
     && test -f /usr/local/share/agent-canon/runtime/ROOT_AGENTS.md \
     && test -f /usr/local/share/agent-canon/runtime/documents/runtime/runtime-profiles-and-check-matrix.json \
     && chown -R root:root /usr/local/share/agent-canon/runtime/tools /usr/local/share/agent-canon/runtime/agents /usr/local/share/agent-canon/runtime/documents
 
-COPY bootstrap/container/entrypoint.sh /usr/local/bin/agent-canon-container-entrypoint
-COPY bootstrap/container/agent-canon-tool-wrapper.sh /usr/local/bin/agent-canon-tool
+COPY bootstrap/container/lifecycle/entrypoint.sh /usr/local/bin/agent-canon-container-entrypoint
+COPY bootstrap/container/dispatch/tool-wrapper.sh /usr/local/bin/agent-canon-tool
 RUN chmod 0555 /usr/local/bin/agent-canon-container-entrypoint /usr/local/bin/agent-canon-tool \
     && chown -R root:root /usr/local/bin/agent-canon-container-entrypoint \
     && chown -R root:root /usr/local/bin/agent-canon-tool \

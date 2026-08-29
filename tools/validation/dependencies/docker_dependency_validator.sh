@@ -15,8 +15,8 @@ if [ "$#" -gt 0 ]; then
   workspace_input="$1"
 fi
 workspace="$(cd "$workspace_input" && pwd -P)"
-engine="$workspace/tools/agent_tools/dependency_plan.py"
-manifest="$workspace/bootstrap/container/dependencies.toml"
+engine="$workspace/tools/analysis/dependencies/dependency_plan.py"
+manifest="$workspace/bootstrap/container/image/dependencies.toml"
 
 [ -f "$engine" ] || {
   echo "shared tool dependency engine is unavailable: $engine" >&2

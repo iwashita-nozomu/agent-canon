@@ -27,15 +27,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from tools.agent_tools.graph_client import (
+from tools.analysis.dependencies.graph_client import (
     CANONICAL_GRAPH_EXECUTABLE,
     GraphClient,
     GraphClientError,
     GraphDependencyFact,
 )
-from tools.agent_tools.tool_path_policy import is_retired_legacy_tool_path
+from tools.runtime.authority.tool_path_policy import is_retired_legacy_tool_path
 
 DEFAULT_SURFACES = (
     "tools",

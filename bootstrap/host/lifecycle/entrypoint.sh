@@ -1098,8 +1098,8 @@ _agent_canon_scheduler() {
     enable)
       mkdir -p "$service_dir"
       local service_text timer_text
-      service_text=$(<"$AGENT_CANON_REPOSITORY_ROOT/bootstrap/systemd/user/agent-canon-sync.service.in")
-      timer_text=$(<"$AGENT_CANON_REPOSITORY_ROOT/bootstrap/systemd/user/agent-canon-sync.timer.in")
+      service_text=$(<"$AGENT_CANON_REPOSITORY_ROOT/bootstrap/host/scheduler/systemd/user/agent-canon-sync.service.in")
+      timer_text=$(<"$AGENT_CANON_REPOSITORY_ROOT/bootstrap/host/scheduler/systemd/user/agent-canon-sync.timer.in")
       service_text=${service_text//@BOOTSTRAP@/$AGENT_CANON_REPOSITORY_ROOT/bootstrap.sh}
       service_text=${service_text//@CONTROL_ROOT@/$AGENT_CANON_CONTROL_ROOT}
       service_text=${service_text//@RUNTIME_ROOT@/$AGENT_CANON_RUNTIME_ROOT}
@@ -1149,7 +1149,7 @@ _agent_canon_image_reference() {
     _agent_canon_json_error source_snapshot_failed "AgentCanon source is not a Git checkout"
     return 2
   fi
-  manifest_digest=$(_agent_canon_sha256 "$AGENT_CANON_REPOSITORY_ROOT/bootstrap/manifest.toml")
+  manifest_digest=$(_agent_canon_sha256 "$AGENT_CANON_REPOSITORY_ROOT/bootstrap/host/manifest.toml")
   control_digest=$(_agent_canon_control_digest)
   AGENT_CANON_IMAGE_REF="agent-canon-tools:${control_digest:0:16}-${manifest_digest:0:16}-${source_head:0:16}"
   export AGENT_CANON_IMAGE_REF
@@ -1182,7 +1182,7 @@ _agent_canon_image() {
   if [[ "${AGENT_CANON_FORCE_BUILD:-0}" == 1 ]] || \
      ! "$AGENT_CANON_DOCKER_CMD" image inspect "$AGENT_CANON_IMAGE_REF" >/dev/null 2>&1; then
     if ! "$AGENT_CANON_DOCKER_CMD" build \
-      --file "$AGENT_CANON_REPOSITORY_ROOT/bootstrap/container/Dockerfile" \
+      --file "$AGENT_CANON_REPOSITORY_ROOT/bootstrap/container/image/Dockerfile" \
       --tag "$AGENT_CANON_IMAGE_REF" \
       --label io.agent-canon.runtime=shared-v1 \
       --label "io.agent-canon.control-root-digest=$control_digest" \
@@ -1773,7 +1773,7 @@ _agent_canon_run_controller() {
   output_file=$(mktemp "$temporary_root/.bootstrap.stdout.XXXXXX")
   error_file=$(mktemp "$temporary_root/.bootstrap.stderr.XXXXXX")
   _agent_canon_container_exec "$container" \
-    python3 /usr/local/share/agent-canon/runtime/tools/agent_tools/bootstrap_runtime.py \
+    python3 /usr/local/share/agent-canon/runtime/tools/runtime/container/bootstrap_runtime.py \
     --container-control \
     --repository-root /usr/local/share/agent-canon/runtime \
     --control-parent-root /var/lib/agent-canon \
@@ -1845,7 +1845,7 @@ _agent_canon_restore_candidate_failure() {
   restore_output=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.restore.stdout.XXXXXX")
   restore_error=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.restore.stderr.XXXXXX")
   if _agent_canon_container_exec "$container" \
-    python3 /usr/local/share/agent-canon/runtime/tools/agent_tools/bootstrap_runtime.py \
+    python3 /usr/local/share/agent-canon/runtime/tools/runtime/container/bootstrap_runtime.py \
     --container-control \
     --repository-root /usr/local/share/agent-canon/runtime \
     --control-parent-root /var/lib/agent-canon \
@@ -2981,7 +2981,7 @@ _agent_canon_archive_eval_sync() {
     return 0
   fi
   local adapter_rc=0
-  python3 "$AGENT_CANON_REPOSITORY_ROOT/tools/agent_tools/runtime_log_archive_git.py" \
+  python3 "$AGENT_CANON_REPOSITORY_ROOT/tools/runtime/archive/runtime_log_archive_git.py" \
     --source-root "$resolved_source" \
     --canon-root "$AGENT_CANON_REPOSITORY_ROOT" \
     --archive-root "$AGENT_CANON_PRIVATE_LOG_ROOT" \
@@ -3693,7 +3693,7 @@ bootstrap_host_entrypoint() {
       error_file=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.stderr.XXXXXX")
       rc=0
       _agent_canon_container_exec "$container" \
-        python3 /usr/local/share/agent-canon/runtime/tools/agent_tools/bootstrap_runtime.py \
+        python3 /usr/local/share/agent-canon/runtime/tools/runtime/container/bootstrap_runtime.py \
         --container-control \
         --repository-root /usr/local/share/agent-canon/runtime \
         --control-parent-root /var/lib/agent-canon \

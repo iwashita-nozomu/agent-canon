@@ -16,7 +16,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Mapping
 
-from artifact_identity import canonical_body_sha256, canonical_json_bytes
+from tools.runtime.artifacts.artifact_identity import canonical_body_sha256, canonical_json_bytes
 
 ACK_SCHEMA = "agent-canon.external-projection-acknowledgement.v1"
 LOCAL_EVENT_SCHEMA = "agent-canon.terminal-resume-event.v3"

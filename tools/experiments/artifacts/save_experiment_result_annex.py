@@ -30,9 +30,9 @@ from pathlib import Path
 # A direct filesystem invocation places ``tools/experiments`` on ``sys.path``;
 # add the repository root so the same public module imports as ``python -m``.
 if __package__ in {None, ""}:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from tools.experiments.experiment_identity import (
+from tools.experiments.lifecycle.experiment_identity import (
     ExperimentIdentity,
     ExperimentIdentityError,
     identity_from_raw_relative_path,

@@ -36,14 +36,14 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest  # noqa: E402
-from prompt_capture import redact_sensitive_text  # noqa: E402
-from runtime_log_paths import (  # noqa: E402
+from eval.checkers.eval_manifest_paths import eval_manifest_path, resolve_eval_manifest  # noqa: E402
+from tools.agent.orchestration.prompt_capture import redact_sensitive_text  # noqa: E402
+from tools.runtime.archive.runtime_log_paths import (  # noqa: E402
     eval_result_search_dirs,
     hook_result_search_dirs,
     mounted_log_archive_root,
 )
-from runtime_artifacts import (  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import (  # noqa: E402
     RuntimeArtifactError,
     runtime_artifact_boundary,
 )

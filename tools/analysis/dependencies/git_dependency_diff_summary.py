@@ -30,7 +30,7 @@ try:
         runtime_artifact_boundary,
     )
 except ImportError:
-    from runtime_artifacts import (  # type: ignore[no-redef]
+    from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
         RuntimeArtifactBoundary,
         root_capability_environment,
         runtime_artifact_boundary,

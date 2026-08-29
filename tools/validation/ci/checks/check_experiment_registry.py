@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import cast
 
 if __package__:
-    from tools.experiments.experiment_identity import validate_segment
+    from tools.experiments.lifecycle.experiment_identity import validate_segment
 else:
     _IDENTITY_PATH = (
         Path(__file__).resolve().parents[1] / "experiments" / "experiment_identity.py"

@@ -24,12 +24,12 @@ from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from agent_canon_source_root import (
+from tools.runtime.source.agent_canon_source_root import (
     RootResolution,
     SourceRootFailure,
     resolve_agent_canon_source_root,
 )
-from route import (
+from tools.agent.orchestration.route import (
     load_skill_related_map,
     load_skill_required_tool_commands,
     load_skill_tool_commands,
@@ -42,16 +42,16 @@ SECTION_HEADING = "## Tool Commands"
 SECTION_START = "<!-- skill-tool-commands:start -->"
 SECTION_END = "<!-- skill-tool-commands:end -->"
 COMMAND_TEMPLATE = (
-    "python3 tools/agent_tools/skill_tool_commands.py show "
+    "python3 tools/agent/skills/skill_tool_commands.py show "
     "--skill {skill} --format text"
 )
 PROMPT_PLACEHOLDER = "<user request>"
 FALLBACK_COMMAND = (
-    f'python3 tools/agent_tools/route.py --prompt "{PROMPT_PLACEHOLDER}" --format json'
+    f'python3 tools/agent/orchestration/route.py --prompt "{PROMPT_PLACEHOLDER}" --format json'
 )
 LEGACY_MAINTENANCE_COMMANDS = (
-    "python3 tools/agent_tools/check_skill_frontmatter.py --root .",
-    "python3 tools/agent_tools/skill_tool_commands.py check",
+    "python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .",
+    "python3 tools/agent/skills/skill_tool_commands.py check",
 )
 COMMON_RESOLUTION_WORDING = (
     "論理コマンドは、実行前に AgentCanon source root を基準として解決します。"

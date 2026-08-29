@@ -362,7 +362,7 @@ emit_generated_completeness_receipt() {
   local bundle="${AGENT_CANON_PR_GATE_BUNDLE:-}"
   local output="${AGENT_CANON_G2_OUTPUT:-}"
   local command=(
-    python3 "${PR_AGENT_CANON_SOURCE_ROOT}/tools/ci/check_agent_canon_pr.py"
+    python3 "${PR_AGENT_CANON_SOURCE_ROOT}/tools/validation/ci/checks/check_agent_canon_pr.py"
     --g1-bundle "${bundle}"
     --source-root "${PR_AGENT_CANON_SOURCE_ROOT}"
     --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}"

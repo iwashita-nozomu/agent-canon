@@ -21,7 +21,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Final, Literal
 
-from agent_canon_source_root import SourceRootFailure, resolve_agent_canon_source_root
+from tools.runtime.source.agent_canon_source_root import SourceRootFailure, resolve_agent_canon_source_root
 
 UNIT_ROOT: Final = Path("documents/parent-repository-audit/audit-unit")
 SCHEMA: Final = "agent_canon.parent_repository_audit.v1"

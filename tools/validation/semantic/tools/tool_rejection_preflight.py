@@ -25,15 +25,19 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from responsibility_scope import (
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+
+from tools.validation.semantic.responsibility.responsibility_scope import (
     Scope,
     ScopeReport,
     scope_covers,
 )
-from responsibility_scope import (
+from tools.validation.semantic.responsibility.responsibility_scope import (
     validate as validate_responsibility_scope,
 )
 
@@ -103,7 +107,7 @@ AGENT_PROTOCOL_PATHS = frozenset(
         "agents/COMMUNICATION_PROTOCOL.md",
         "agents/canonical/CODEX_WORKFLOW.md",
         "agents/canonical/CODEX_SUBAGENTS.md",
-        "evidence/agent-evals/README.md",
+        "eval/definitions/README.md",
         "templates/agents/workflow_monitoring.md",
         "agents/workflows/agent-learning-workflow.md",
     }
@@ -117,10 +121,10 @@ EXPERIMENT_EXECUTION_SURFACE_PATHS = frozenset(
         "documents/experiments/experiment-registry.md",
         "documents/design/experiment_runner.md",
         "experiments/registry.toml",
-        "tools/ci/check_experiment_registry.py",
-        "tools/experiments/save_experiment_result_annex.py",
-        "tools/experiments/registry_lib.py",
-        "tools/experiments/run_managed_experiment.py",
+        "tools/validation/ci/checks/check_experiment_registry.py",
+        "tools/experiments/artifacts/save_experiment_result_annex.py",
+        "tools/experiments/registry/registry_lib.py",
+        "tools/experiments/execution/run_managed_experiment.py",
     }
 )
 LIBRARY_SURFACE_PREFIXES = (
@@ -133,7 +137,7 @@ LIBRARY_SURFACE_PREFIXES = (
 )
 AGENT_CANON_TOOL_SOURCE_ROOT = "tools"
 RESPONSIBILITY_SCOPE_COMMAND = (
-    "python3 tools/agent_tools/responsibility_scope.py --root . --format json"
+    "python3 tools/validation/semantic/responsibility/responsibility_scope.py --root . --format json"
 )
 
 
@@ -175,7 +179,7 @@ CAUSE_INVESTIGATION_GATE_TEMPLATES = (
             "'{{\"hookEventName\":\"PreToolUse\",\"tool_name\":\"apply_patch\","
             "\"tool_input\":{{\"patch\":\"*** Begin Patch\\n*** Update File: {path}\\n"
             "*** End Patch\\n\"}}}}' "
-            "| python3 tools/agent_tools/tool_rejection_preflight.py --gate cause_investigation"
+            "| python3 tools/validation/semantic/tools/tool_rejection_preflight.py --gate cause_investigation"
         ),
         handoff=(
             "record Observation, Hypothesis or Root Cause, Expected Fix Surface "
@@ -192,7 +196,7 @@ PYTHON_GATE_TEMPLATES = (
     GateTemplate(
         gate="import_responsibility",
         command_template=(
-            "python3 tools/agent_tools/import_responsibility.py --root . {path}"
+            "python3 tools/analysis/code/import_responsibility.py --root . {path}"
         ),
         handoff=(
             "include unused-import and responsibility-scope import boundary risk "
@@ -204,7 +208,7 @@ PYTHON_GATE_TEMPLATES = (
         command_template=(
             "printf '%s' "
             "'{{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}}' "
-            "| python3 tools/agent_tools/import_responsibility.py"
+            "| python3 tools/analysis/code/import_responsibility.py"
         ),
         handoff=(
             "include module boundary evidence before changing Python module "
@@ -214,7 +218,7 @@ PYTHON_GATE_TEMPLATES = (
     GateTemplate(
         gate="oop_readability_guard",
         command_template=(
-            "python3 tools/oop/python/readability.py --root . {path}"
+            "python3 tools/validation/code/oop/python/readability.py --root . {path}"
         ),
         handoff=(
             "include OOP readability risk, repair plan, and the non-blocking "
@@ -225,7 +229,7 @@ PYTHON_GATE_TEMPLATES = (
     GateTemplate(
         gate="solid_evidence_gate",
         command_template=(
-            "python3 tools/agent_tools/check_solid_evidence.py --root . {path} "
+            "python3 tools/validation/semantic/code/check_solid_evidence.py --root . {path} "
             "--evidence <oop-readability-report>"
         ),
         handoff=(
@@ -240,7 +244,7 @@ LIBRARY_GATE_TEMPLATES = (
         command_template=(
             "printf '%s' "
             "'{{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}}' "
-            "| import-only:tools.agent_tools.task_authority:first_party_library_authorized"
+            "| import-only:tools.runtime.authority.task_authority:first_party_library_authorized"
         ),
         handoff=(
             "do not rewrite vendored or installed library internals; use wrapper, "
@@ -252,7 +256,7 @@ CPP_GATE_TEMPLATES = (
     GateTemplate(
         gate="oop_readability_guard",
         command_template=(
-            "python3 tools/oop/cpp/readability.py --root . {path}"
+            "python3 tools/validation/code/oop/cpp/readability.py --root . {path}"
         ),
         handoff="include C/C++ OOP readability risk before edits",
     ),
@@ -275,7 +279,7 @@ DEPENDENCY_GATE_TEMPLATES = (
     GateTemplate(
         gate="dependency_review",
         command_template=(
-            "bash tools/agent_tools/run_repo_dependency_review.sh "
+            "bash tools/analysis/dependencies/run_repo_dependency_review.sh "
             "--root . --fail-missing --list-changed-dependencies"
         ),
         handoff=(
@@ -288,7 +292,7 @@ STRICT_SCHEMA_DEPENDENCY_GATE_TEMPLATES = (
     GateTemplate(
         gate="dependency_review",
         command_template=(
-            "bash tools/agent_tools/run_repo_dependency_review.sh "
+            "bash tools/analysis/dependencies/run_repo_dependency_review.sh "
             "--root . --fail-missing --list-changed-dependencies"
         ),
         handoff=(
@@ -301,7 +305,7 @@ LOG_SURFACE_GATE_TEMPLATES = (
     GateTemplate(
         gate="log_surface_inventory_guard",
         command_template=(
-            "python3 tools/agent_tools/log_surface_inventory.py --root . "
+            "python3 tools/runtime/archive/log_surface_inventory.py --root . "
             "--check --baseline documents/runtime/log-surface-inventory.json"
         ),
         handoff=(
@@ -313,7 +317,7 @@ LOG_SURFACE_GATE_TEMPLATES = (
 GITHUB_GATE_TEMPLATES = (
     GateTemplate(
         gate="github_workflow_check",
-        command_template="python3 tools/ci/check_github_workflows.py",
+        command_template="python3 tools/validation/ci/checks/check_github_workflows.py",
         handoff="include workflow checkout, permissions, and artifact evidence",
     ),
 )
@@ -321,7 +325,7 @@ HOOK_RUNTIME_GATE_TEMPLATES = (
     GateTemplate(
         gate="codex_hook_runtime_alignment",
         command_template=(
-            "python3 tools/agent_tools/check_agent_runtime_alignment.py && "
+            "python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py && "
             "python3 -m pytest tests/agent_tools/test_codex_hooks.py -q"
         ),
         handoff=(
@@ -333,7 +337,7 @@ SKILL_MIRROR_GATE_TEMPLATES: tuple[GateTemplate, ...] = ()
 AGENT_PROTOCOL_GATE_TEMPLATES = (
     GateTemplate(
         gate="agent_protocol_convention",
-        command_template="python3 tools/agent_tools/check_convention_compliance.py",
+        command_template="python3 tools/validation/semantic/convention/check_convention_compliance.py",
         handoff=(
             "include whether workflow, skill-routing, and hook/tool feedback "
             "protocol checks still pass"
@@ -343,7 +347,7 @@ AGENT_PROTOCOL_GATE_TEMPLATES = (
 TOOL_CATALOG_GATE_TEMPLATES = (
     GateTemplate(
         gate="tool_catalog",
-        command_template="python3 tools/agent_tools/tool_catalog.py",
+        command_template="python3 tools/runtime/manifest/tool_catalog.py",
         handoff=(
             "include catalog/docs/tests wiring for changed canonical tool surfaces"
         ),
@@ -366,7 +370,7 @@ EXPERIMENT_EXECUTION_SURFACE_GATE_TEMPLATES = (
         gate="experiment_execution_surface_guard",
         command_template=(
             "if [ -e experiments/registry.toml ]; then "
-            "python3 -m tools.ci.check_experiment_registry; "
+            "python3 -m tools.validation.ci.checks.check_experiment_registry; "
             "else echo EXPERIMENT_REGISTRY_CHECK=skipped_no_project_registry; "
             "fi && "
             "python3 -m pytest tests/tools/test_run_managed_experiment.py -q"

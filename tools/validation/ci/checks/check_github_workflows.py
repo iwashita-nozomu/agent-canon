@@ -111,9 +111,9 @@ AGENT_CANON_STATIC_GATE_DIRECT_COMMANDS = (
     "check_skill_frontmatter.py",
     "smoke_test_research_perspective_pack.py",
     "check_convention_compliance.py",
-    "cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check",
-    "cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D warnings",
-    "cargo test --manifest-path rust/agent-canon/Cargo.toml",
+    "cargo fmt --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml -- --check",
+    "cargo clippy --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --all-targets -- -D warnings",
+    "cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml",
     "run_repo_dependency_review.sh --fail-missing --cycle-report-only",
     "check_github_workflows.py",
 )

@@ -25,6 +25,6 @@ The integrated repo entrypoint is:
 ```bash
 ./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> \
   exec --root <target> -- bash \
-  /usr/local/share/agent-canon/runtime/tools/agent_tools/review_backlog_scan.sh \
+  /usr/local/share/agent-canon/runtime/tools/repository/github/review_backlog_scan.sh \
   --report-dir /var/lib/agent-canon/runtime/reports/<run-id>/cross_repo_inspection
 ```

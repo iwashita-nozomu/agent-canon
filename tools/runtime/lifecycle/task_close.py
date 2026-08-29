@@ -30,12 +30,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import capacity_handshake
-from runtime_artifacts import (
+from tools.runtime.artifacts.runtime_artifacts import (
     RUNTIME_ROOT_ENV,
     RuntimeArtifactError,
     runtime_artifact_boundary,
 )
-from parent_root_side_effects import (
+from tools.repository.workspace.parent_root_side_effects import (
     ParentRootAttestationRequest,
     ParentRootReject,
     ParentRootSideEffectBoundary,
@@ -84,7 +84,7 @@ from report_artifact_checks import (
     token_fields,
     wave_reconciliation_blockers,
 )
-from update_lifecycle_contract import (
+from tools.runtime.lifecycle.update_lifecycle_contract import (
     GATE_IDS,
     binding_identity,
     validate_cleanup_proof,
@@ -323,7 +323,7 @@ def _runtime_validate(
             ParentRootReject.RUNTIME_ROOT_REQUIRED,
             f"{purpose}: explicit runtime root is required",
         )
-    source_root = Path(__file__).resolve().parents[2]
+    source_root = Path(__file__).resolve().parents[3]
     try:
         runtime_artifact_boundary(source_root, configured).resolve(path)
     except RuntimeArtifactError as exc:

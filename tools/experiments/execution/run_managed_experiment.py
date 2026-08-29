@@ -48,7 +48,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, TypeAlias, cast
 
 if __package__:
-    from tools.experiments.execution_resource_plan import (
+    from tools.experiments.execution.execution_resource_plan import (
         CALLER_ALLOCATION_PROVENANCE,
         COMPLETION_COVERAGE_FILENAME,
         HOST_RUNTIME_ROOT,
@@ -91,7 +91,7 @@ if __package__:
         read_shared_runtime_provision,
         read_shared_runtime_readback,
     )
-    from tools.experiments.experiment_identity import (
+    from tools.experiments.lifecycle.experiment_identity import (
         ExperimentIdentity,
         ExperimentIdentityError,
         contained_path,
@@ -214,10 +214,10 @@ REVIEWED_W1_LINEAGE_ARTIFACT = "W1-IMPLEMENTATION-RECHECK-EF2DE34A-20260716-READ
 REVIEWED_W1_LINEAGE_COMMIT = "b829286c6a1c9de15f260199a44556e4f90be459"
 REVIEWED_W1_LINEAGE_TREE = "551abfa0a6e89f4a9218fc4fc0706b3addd2a84e"
 REVIEWED_W1_SOURCE_BLOBS = {
-    "tools/experiments/execution_resource_plan.py": (
+    "tools/experiments/execution/execution_resource_plan.py": (
         "0a767491176530ecfe68a18e6b198de5d45f47fe"
     ),
-    "tools/experiments/run_managed_experiment.py": (
+    "tools/experiments/execution/run_managed_experiment.py": (
         "4de18aeb418423ac36152d6e8501b11c16e82e18"
     ),
 }
@@ -1172,7 +1172,7 @@ def _run_admitted_runner(
 
 def repo_root_from_script() -> Path:
     """Return the repository root from this script location."""
-    return Path(__file__).absolute().parents[2]
+    return Path(__file__).absolute().parents[3]
 
 
 def utc_now() -> str:

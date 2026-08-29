@@ -115,7 +115,7 @@ CONTRACTS = (
     ),
 )
 
-MARKER_MANIFEST_PATH = "tools/agent_tools/convention_compliance_contracts.toml"
+MARKER_MANIFEST_PATH = "tools/validation/semantic/convention/convention_compliance_contracts.toml"
 ROOT_ENTRYPOINT_PATHS = frozenset(contract.path for contract in CONTRACTS)
 
 H1_RE = re.compile(r"^#(?!#)\s+\S")

@@ -3,7 +3,7 @@
 contract data
 responsibility Defines the answer-free argparse failure normalization packet.
 upstream design ../../../../../documents/design/skill-runtime-shim-materialization.md packet contract
-downstream implementation ../../../../../tools/agent_tools/skill_shim_evaluation.py packet producer
+downstream implementation ../../../../../eval/producers/skill_shim_evaluation.py packet producer
 @dependency-end
 -->
 
@@ -22,8 +22,8 @@ Keep the evaluation read-only.
 
 ## Prompt Dependency Files
 
-- `tools/agent_tools/route.py`
-- `tools/agent_tools/skill_shim_evaluation.py`
+- `tools/agent/orchestration/route.py`
+- `eval/producers/skill_shim_evaluation.py`
 
 ## Requirements
 

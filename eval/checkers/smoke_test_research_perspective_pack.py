@@ -25,12 +25,12 @@ import yaml
 if __package__:
     from .agent_canon_source_root import resolve_agent_canon_source_root
 else:
-    from agent_canon_source_root import resolve_agent_canon_source_root
+    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 
 if __package__:
     from .packets import ActiveDesignPacketConfig
 else:
-    from packets import ActiveDesignPacketConfig
+    from tools.agent.orchestration.packets import ActiveDesignPacketConfig
 
 if __package__:
     from .team_config import (
@@ -40,7 +40,7 @@ if __package__:
         resolve_role,
     )
 else:
-    from team_config import (
+    from tools.agent.orchestration.team_config import (
         RunBundleSpec,
         load_task_catalog,
         load_team_config,
@@ -50,15 +50,15 @@ else:
 if __package__:
     from .agent_team import create_run_bundle, run_active_design_packet
 else:
-    from agent_team import create_run_bundle, run_active_design_packet
+    from tools.agent.orchestration.agent_team import create_run_bundle, run_active_design_packet
 
 if __package__:
     from .workspace_scope import resolve_repository_roots, resolve_role_write_scope
 else:
-    from workspace_scope import resolve_repository_roots, resolve_role_write_scope
+    from tools.repository.workspace.workspace_scope import resolve_repository_roots, resolve_role_write_scope
 
 ROOT = Path(__file__).resolve().parents[2]
-from parent_root_side_effects import (  # noqa: E402
+from tools.repository.workspace.parent_root_side_effects import (  # noqa: E402
     ParentRootAttestationReceipt,
     ParentRootAttestationRequest,
     ParentRootReject,
@@ -66,7 +66,7 @@ from parent_root_side_effects import (  # noqa: E402
     ParentRootSideEffectError,
     attest_parent_root,
 )
-from runtime_artifacts import runtime_artifact_boundary  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary  # noqa: E402
 
 BASE_RESEARCH_ROLE_IDS = (
     "researcher",

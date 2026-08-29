@@ -35,21 +35,21 @@ except ModuleNotFoundError:  # clean host before the shared tool image exists
         from . import stdlib_yaml as yaml
     except ImportError:
         import stdlib_yaml as yaml  # type: ignore[no-redef]
-from agent_canon_source_root import resolve_agent_canon_source_root
+from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 
 if __package__:
     from .tool_calls import materialize_skill_tool_call_token
 else:
     from tool_calls import materialize_skill_tool_call_token
 from skill_dependency_map import build_graph
-from skill_route_catalog import (
+from tools.agent.skills.skill_route_catalog import (
     SkillDependencyRule,
     SkillRoutingRule,
     load_skill_catalog,
     load_skill_dependency_map,
     load_skill_route_rules,
 )
-from skill_tool_commands import SkillCommandPacket, packet_for_skill
+from tools.agent.skills.skill_tool_commands import SkillCommandPacket, packet_for_skill
 
 try:
     from .parent_root_side_effects import (
@@ -60,7 +60,7 @@ try:
         attest_parent_root,
     )
 except ImportError:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
+    from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]
         ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
@@ -596,7 +596,7 @@ def build_record(context: BuildContext, skill: str) -> dict[str, object]:
             "dependency_ref": f"{DEPENDENCY_PATH.as_posix()}#invocation:{skill}",
             "route_ref": f"{CATALOG_PATH.as_posix()}#skill:{skill}.routing",
             "command_ref": f"{CATALOG_PATH.as_posix()}#skill:{skill}.tool_commands",
-            "tool_surface_ref": "tools/agent_tools/agent_team.py#materialize_skill_tool_call_token",
+            "tool_surface_ref": "tools/agent/orchestration/agent_team.py#materialize_skill_tool_call_token",
             "graph_ref": f"{GRAPH_PATH.as_posix()}#skill:{skill}",
         },
         "identity": {
@@ -689,7 +689,7 @@ def _render_shim_template(
         "## Tool Commands",
         "",
         "<!-- skill-tool-commands:start -->",
-        f"`python3 tools/agent_tools/skill_tool_commands.py show --skill {skill} --format text`",
+        f"`python3 tools/agent/skills/skill_tool_commands.py show --skill {skill} --format text`",
         "<!-- skill-tool-commands:end -->",
         "",
         "1. Read the canonical owner before applying this skill.",

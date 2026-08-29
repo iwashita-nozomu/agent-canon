@@ -27,8 +27,8 @@ forbidden_route = [
   "add helper-like function with only unrelated boundary evidence",
 ]
 linked_rules = [
-  "tools/agent_tools/responsibility_scope.py",
-  "tools/agent_tools/task_authority.py",
+  "tools/validation/semantic/responsibility/responsibility_scope.py",
+  "tools/runtime/authority/task_authority.py",
 ]
 
 [[eval]]
@@ -110,7 +110,7 @@ forbidden_route = [
   "git add from check_agent_canon_latest.sh default path",
 ]
 linked_rules = [
-  "tools/ci/check_agent_canon_latest.sh",
+  "tools/validation/ci/check_agent_canon_latest.sh",
 ]
 
 [[eval]]
@@ -172,8 +172,8 @@ forbidden_route = [
   "reviewer or artifact-only role edits repo files without a blocking finding",
 ]
 linked_rules = [
-  "tools/agent_tools/task_authority.py",
-  "tools/agent_tools/task_authority.py",
+  "tools/runtime/authority/task_authority.py",
+  "tools/runtime/authority/task_authority.py",
   "tests/agent_tools/test_codex_hooks.py",
 ]
 
@@ -194,8 +194,8 @@ forbidden_route = [
   "modify python/src/include/lib reusable code without request-local authority",
 ]
 linked_rules = [
-  "tools/agent_tools/task_authority.py",
-  "tools/agent_tools/task_authority.py",
+  "tools/runtime/authority/task_authority.py",
+  "tools/runtime/authority/task_authority.py",
   "tests/agent_tools/test_codex_hooks.py",
 ]
 
@@ -216,9 +216,9 @@ forbidden_route = [
   "infer allowed paths only from chat or unstated subagent role",
 ]
 linked_rules = [
-  "tools/agent_tools/task_authority.py",
-  "tools/agent_tools/task_authority.py",
-  "tools/agent_tools/agent_team.py",
+  "tools/runtime/authority/task_authority.py",
+  "tools/runtime/authority/task_authority.py",
+  "tools/agent/orchestration/agent_team.py",
 ]
 
 [[eval]]
@@ -279,7 +279,7 @@ forbidden_route = [
   "choose PR validation only from intuition after path changes",
 ]
 linked_rules = [
-  "tools/agent_tools/classify_path_risk.py",
+  "tools/validation/semantic/path/classify_path_risk.py",
   ".github/workflows/path-risk-check-matrix-smoke.yml",
   "tests/agent_tools/test_classify_path_risk.py",
 ]
@@ -301,8 +301,8 @@ forbidden_route = [
   "add tool catalog rows without machine validation",
 ]
 linked_rules = [
-  "tools/agent_tools/tool_catalog.py",
-  "tools/agent_tools/tool_drift.py",
+  "tools/runtime/manifest/tool_catalog.py",
+  "tools/validation/semantic/tools/tool_drift.py",
   "tests/agent_tools/test_tool_catalog.py",
 ]
 
@@ -343,8 +343,8 @@ forbidden_route = [
   "read raw full graph output as the only review artifact",
 ]
 linked_rules = [
-  "tools/agent_tools/render_dependency_manifest_graph.py",
-  "tools/agent_tools/run_repo_dependency_review.sh",
+  "tools/analysis/dependencies/render_dependency_manifest_graph.py",
+  "tools/analysis/dependencies/run_repo_dependency_review.sh",
   "tests/agent_tools/test_render_dependency_manifest_graph.py",
 ]
 
@@ -366,7 +366,7 @@ forbidden_route = [
 ]
 linked_rules = [
   "documents/codex/prompt-skill-evaluation-checklist.md",
-  "evidence/agent-evals/issue_eval_manifest.toml",
+  "eval/definitions/issue_eval_manifest.toml",
 ]
 
 [[eval]]

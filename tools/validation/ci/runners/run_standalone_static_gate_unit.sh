@@ -136,21 +136,21 @@ run_full() {
   AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_STATIC_RUNTIME_ROOT}" \
   CARGO_HOME="${CARGO_HOME}" \
   RUSTUP_HOME="${RUSTUP_HOME}" \
-    bash "${ROOT}/tools/ci/run_all_checks.sh" "${UNIT_ARGS[@]}"
+    bash "${ROOT}/tools/validation/ci/runners/run_all_checks.sh" "${UNIT_ARGS[@]}"
 }
 
 run_rust() {
-  cargo build --manifest-path rust/agent-canon/Cargo.toml
+  cargo build --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml
   local agent_cli="${CARGO_TARGET_DIR:?}/debug/agent-canon"
   if [[ ! -x "${agent_cli}" ]]; then
     echo "AGENT_CANON_CLI_BUILD=fail" >&2
     return 1
   fi
   "${agent_cli}" --version
-  cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check
-  cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D warnings
+  cargo fmt --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml -- --check
+  cargo clippy --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --all-targets -- -D warnings
   env -u AGENT_CANON_RUNTIME_ROOT \
-    cargo test --manifest-path rust/agent-canon/Cargo.toml
+    cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml
 }
 
 run_contracts() {
@@ -176,7 +176,7 @@ run_contracts() {
   python3 "${TOOLS_ROOT}/agent_tools/import_responsibility.py" \
     --changed --baseline-ref "origin/${base_ref}"
   PYTHONPATH="${ROOT}/tools/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 "${ROOT}/tools/agent_tools/check_agent_runtime_alignment.py"
+    python3 "${ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
   python3 "${TOOLS_ROOT}/agent_tools/check_convention_compliance.py" \
     --root "${ROOT}" --format json
   python3 "${TOOLS_ROOT}/agent_tools/skill_tool_commands.py" check
@@ -238,7 +238,7 @@ run_eval() (
   fi
   if [[ "${primary_status}" -eq 0 ]]; then
     PYTHONPATH="${ROOT}/tools/agent_tools${PYTHONPATH:+:${PYTHONPATH}}" \
-      python3 "${ROOT}/tools/agent_tools/smoke_test_research_perspective_pack.py"
+      python3 "${ROOT}/eval/checkers/smoke_test_research_perspective_pack.py"
     primary_status=$?
   fi
   set -e
@@ -249,7 +249,7 @@ run_workflow_container() {
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_standalone_static_gate_units.py \
     tests/tools/test_read_only_full_check.py
-  python3 "${ROOT}/tools/ci/check_github_workflows.py"
+  python3 "${ROOT}/tools/validation/ci/checks/check_github_workflows.py"
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_bootstrap_container_contract.py \
     tests/bootstrap/test_bootstrap_runtime.py

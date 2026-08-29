@@ -37,7 +37,7 @@ try:
         attest_parent_root,
     )
 except ImportError:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
+    from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]
         ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
@@ -578,15 +578,15 @@ def render_pending_json(plan: Plan) -> str:
         "operator_protocol": {
             "pending_next_action": "apply_or_defer_pending_tasks_before_unrelated_work",
             "complete_command": (
-                "python3 tools/agent_tools/agent_canon_update_todos.py complete "
+                "python3 tools/agent/orchestration/agent_canon_update_todos.py complete "
                 "<task-id> --note '<evidence>'"
             ),
             "not_applicable_command": (
-                "python3 tools/agent_tools/agent_canon_update_todos.py not-applicable "
+                "python3 tools/agent/orchestration/agent_canon_update_todos.py not-applicable "
                 "<task-id> --reason '<evidence>' --owner '<owner>'"
             ),
             "defer_command": (
-                "python3 tools/agent_tools/agent_canon_update_todos.py defer "
+                "python3 tools/agent/orchestration/agent_canon_update_todos.py defer "
                 "<task-id> --reason '<blocker>' --owner '<owner>'"
             ),
         },
@@ -620,7 +620,7 @@ def render_state(state: UpdateState) -> str:
         "# responsibility Tracks this parent repo's applied AgentCanon update TODO boundary.",
         "# upstream design AgentCanon source checkout documents/agent-canon/agent-canon-parent-repo-latest-checklist.md parent update workflow",
         "# upstream design AgentCanon source checkout documents/agent-canon/agent-canon-update-tasks.toml shared update TODO manifest",
-        "# downstream implementation ../tools/agent_tools/agent_canon_update_todos.py advances this state",
+        "# downstream implementation ../tools/agent/orchestration/agent_canon_update_todos.py advances this state",
         "# @dependency-end",
         "",
         f"[{STATE_TABLE}]",

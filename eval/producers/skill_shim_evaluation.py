@@ -31,8 +31,8 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - Python 3.11+ is the supported runtime.
     import tomli as tomllib  # type: ignore[no-redef]
 
-from evaluate_workflow_selection import load_manifest
-from skill_shim_materializer import (  # pyright: ignore[reportMissingTypeStubs]
+from eval.producers.evaluate_workflow_selection import load_manifest
+from tools.agent.skills.skill_shim_materializer import (  # pyright: ignore[reportMissingTypeStubs]
     BuildContext,
     build_context,
     build_record,
@@ -42,7 +42,7 @@ from skill_shim_materializer import (  # pyright: ignore[reportMissingTypeStubs]
 try:
     from .runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
 except ImportError:
-    from runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError  # type: ignore[no-redef]
+    from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError  # type: ignore[no-redef]
 
 SCHEMA_ROUTE = "agent_canon.route_golden_case.v1"
 SCHEMA_PACKETS = "agent_canon.skill_runtime_shim.fresh_packets"
@@ -310,7 +310,7 @@ def route_golden(
                     "case_id": case.case_id,
                     "prompt_sha256": sha256_bytes(case.prompt.encode("utf-8")),
                     "invocation": {
-                        "cli": "tools/agent_tools/route.py",
+                        "cli": "tools/agent/orchestration/route.py",
                         "mode": "repo-changing",
                         "format": "json",
                     },

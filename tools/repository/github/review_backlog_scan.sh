@@ -367,7 +367,7 @@ run_scope_checks() {
       record_command \
         "oop-python:${scope_name}" \
         "$REPORT_DIR/oop_python_readability_${scope_name}.md" \
-        python3 "$AGENT_CANON_SOURCE_ROOT/tools/oop/python/readability.py" \
+        python3 "$AGENT_CANON_SOURCE_ROOT/tools/validation/code/oop/python/readability.py" \
           --root "$scope_root" \
           --format markdown \
           --include-snippets \
@@ -377,7 +377,7 @@ run_scope_checks() {
       record_command \
         "oop-cpp:${scope_name}" \
         "$REPORT_DIR/oop_cpp_readability_${scope_name}.md" \
-        python3 "$AGENT_CANON_SOURCE_ROOT/tools/oop/cpp/readability.py" \
+        python3 "$AGENT_CANON_SOURCE_ROOT/tools/validation/code/oop/cpp/readability.py" \
           --root "$scope_root" \
           --format markdown \
           --include-snippets \
@@ -529,8 +529,8 @@ write_report() {
 <!--
 @dependency-start
 responsibility Records integrated review backlog scan output.
-upstream implementation ../../tools/agent_tools/review_backlog_scan.sh generates this report
-upstream implementation ../../tools/agent_tools/file_surface_inventory.py generates inventory artifacts
+upstream implementation ../../tools/repository/github/review_backlog_scan.sh generates this report
+upstream implementation ../../tools/analysis/code/file_surface_inventory.py generates inventory artifacts
 @dependency-end
 -->
 

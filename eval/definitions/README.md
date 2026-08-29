@@ -3,12 +3,12 @@
 contract data
 responsibility Documents skill and workflow prompt eval definitions.
 upstream design ../../agents/canonical/skills.md skill canon registry
-downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py runs these evals
-downstream implementation ../../tools/agent_tools/evaluate_agent_run.py runs behavior evals
-downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates accumulated result evidence
-downstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py runs workflow selection evals
-downstream implementation ../../tools/agent_tools/evaluate_report_quality.py runs report quality evals
-downstream implementation ../../tools/agent_tools/evaluate_codex_agent_roles.py runs Codex subagent role evals
+downstream implementation ../../eval/producers/evaluate_skill_workflow_prompts.py runs these evals
+downstream implementation ../../eval/producers/evaluate_agent_run.py runs behavior evals
+downstream implementation ../../eval/checkers/eval_accumulation_check.py validates accumulated result evidence
+downstream implementation ../../eval/producers/evaluate_workflow_selection.py runs workflow selection evals
+downstream implementation ../../eval/producers/evaluate_report_quality.py runs report quality evals
+downstream implementation ../../eval/producers/evaluate_codex_agent_roles.py runs Codex subagent role evals
 @dependency-end
 -->
 
@@ -62,16 +62,16 @@ order:
 Use these evals when changing a skill, workflow, or routing prompt:
 
 ```bash
-python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
-  --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml
+python3 eval/producers/evaluate_skill_workflow_prompts.py \
+  --manifest eval/definitions/skill_workflow_prompt_eval.toml
 ```
 
 Agent-facing eval runs should write bounded statistics before the agent reads
 details:
 
 ```bash
-python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
-  --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml \
+python3 eval/producers/evaluate_skill_workflow_prompts.py \
+  --manifest eval/definitions/skill_workflow_prompt_eval.toml \
   --compact-out reports/agents/<run-id>/skill-workflow-prompt-compact.json
 ```
 
@@ -82,8 +82,8 @@ the mounted runtime log archive under
 overwritten during normal agent work:
 
 ```bash
-python3 tools/agent_tools/evaluate_skill_workflow_prompts.py \
-  --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml \
+python3 eval/producers/evaluate_skill_workflow_prompts.py \
+  --manifest eval/definitions/skill_workflow_prompt_eval.toml \
   --accumulate \
   --run-id <run-id> \
   --skill-used agent-orchestration
@@ -120,9 +120,9 @@ The file name convention is:
 ## Behavior Eval Closeout Gate
 
 ```bash
-python3 tools/agent_tools/evaluate_agent_run.py \
+python3 eval/producers/evaluate_agent_run.py \
   --report-dir reports/agents/<run-id> \
-  --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml \
+  --behavior-manifest eval/definitions/agent_behavior_eval.toml \
   --write
 ```
 
@@ -160,10 +160,10 @@ The archive boundary is documented in `documents/runtime/runtime-log-archive.md`
 Run the mechanical producer before using accumulated evidence in a PR or guide:
 
 ```bash
-python3 tools/agent_tools/run_accumulated_agent_evals.py \
+python3 eval/producers/run_accumulated_agent_evals.py \
   --root . \
   --run-id <run-id>
-python3 tools/agent_tools/eval_accumulation_check.py --root .
+python3 eval/checkers/eval_accumulation_check.py --root .
 ```
 
 The producer runs the registered role, skill/workflow prompt,
@@ -184,9 +184,9 @@ alternate oracle.
 
 | Eval surface | Command | Accumulated evidence and privacy rule |
 | --- | --- | --- |
-| Workflow selection | `python3 tools/agent_tools/evaluate_workflow_selection.py --manifest evidence/agent-evals/workflow_selection_eval.toml` | reports list case IDs, expected workflow labels, and observed workflow labels; they do not store raw prompt text. |
-| Report quality | `python3 tools/agent_tools/evaluate_report_quality.py --manifest evidence/agent-evals/report_quality_eval.toml` | reports list checklist IDs and missing patterns; they do not store raw report drafts or prompts. |
-| Codex subagent roles | `python3 tools/agent_tools/evaluate_codex_agent_roles.py` | accumulated reports use `codex-agent-role-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>-<status>.md` and record `CODEX_AGENT_ROLE_EVAL_RUN_ID=<eval_run_id>`. |
+| Workflow selection | `python3 eval/producers/evaluate_workflow_selection.py --manifest eval/definitions/workflow_selection_eval.toml` | reports list case IDs, expected workflow labels, and observed workflow labels; they do not store raw prompt text. |
+| Report quality | `python3 eval/producers/evaluate_report_quality.py --manifest eval/definitions/report_quality_eval.toml` | reports list checklist IDs and missing patterns; they do not store raw report drafts or prompts. |
+| Codex subagent roles | `python3 eval/producers/evaluate_codex_agent_roles.py` | accumulated reports use `codex-agent-role-eval-<YYYYMMDDTHHMMSSffffffZ>-<10-char-sha256-prefix>-<status>.md` and record `CODEX_AGENT_ROLE_EVAL_RUN_ID=<eval_run_id>`. |
 
 `workflow_selection_eval.toml` may define reusable `[[case_groups]]`.
 Each group supplies prompt templates, subjects, expected workflow labels, and
@@ -223,6 +223,6 @@ Agent Improvement Guide on PRs and branch pushes.
 | Run evidence concern | Required action |
 | --- | --- |
 | Prompt privacy | store bounded, redacted prompt excerpts, fingerprints, and counts instead of transcript text. |
-| Alternative paths | compare runs with `tools/agent_tools/compare_agent_run_paths.py` and record `execution_path_comparison`, `route_efficiency`, `selected_inefficient_route`, and `static_analysis_feedback`. |
-| Token reduction | compare footprints with `tools/agent_tools/compare_codex_token_footprints.py` when token reduction is part of the objective. No global count, ratio, or improvement threshold is required. |
-| During-run recording | Record these events during the run with `tools/agent_tools/workflow_monitor.py --behavior-event "..."` instead of reconstructing them only at closeout. |
+| Alternative paths | compare runs with `eval/checkers/compare_agent_run_paths.py` and record `execution_path_comparison`, `route_efficiency`, `selected_inefficient_route`, and `static_analysis_feedback`. |
+| Token reduction | compare footprints with `eval/checkers/compare_codex_token_footprints.py` when token reduction is part of the objective. No global count, ratio, or improvement threshold is required. |
+| During-run recording | Record these events during the run with `tools/runtime/lifecycle/workflow_monitor.py --behavior-event "..."` instead of reconstructing them only at closeout. |

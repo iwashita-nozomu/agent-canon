@@ -33,7 +33,7 @@ if __package__:
         attest_parent_root,
     )
 else:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
+    from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]
         ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
@@ -49,15 +49,15 @@ else:
 if __package__:
     from .agent_canon_source_root import resolve_agent_canon_source_root
 else:
-    from agent_canon_source_root import resolve_agent_canon_source_root
+    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 
-from route import decide_skills, implementation_handoff_required, load_skill_route_rules
-from skill_tool_commands import (
+from tools.agent.orchestration.route import decide_skills, implementation_handoff_required, load_skill_route_rules
+from tools.agent.skills.skill_tool_commands import (
     SkillCommandPacket,
     packet_for_skill,
     project_public_command_for_layout,
 )
-from update_lifecycle_contract import (
+from tools.runtime.lifecycle.update_lifecycle_contract import (
     import_decision_sufficiency_verdict,
 )
 
@@ -308,7 +308,7 @@ CHECKOUT_IDENTITY_BOUNDARIES = (
 )
 
 CHECKOUT_IDENTITY_COMMAND = (
-    "python3 tools/agent_tools/checkout_identity.py --format lines"
+    "python3 tools/runtime/authority/checkout_identity.py --format lines"
 )
 
 DEFERRED_SPAWN_ROLE_IDS = {
@@ -396,7 +396,7 @@ PARENT_BLOCKED_ROUTE = "typed_blocked_retry_or_user_report"
 
 REPO_TOOL_ROUTING_POLICY_SOURCE = "agents/skills/task-routing.md#Standard Command"
 
-REPO_TOOL_ROUTING_OWNER = "tools/agent_tools/skill_tool_commands.py"
+REPO_TOOL_ROUTING_OWNER = "tools/agent/skills/skill_tool_commands.py"
 
 REPO_TOOL_ROUTING_STATUS = "selected_skill_tool_call_tokens"
 
@@ -489,10 +489,10 @@ DEFAULT_QUALITY_CHECK_STAGES = ("selected_stages_only",)
 
 DEFAULT_QUALITY_CHECK_STATIC_COMMANDS = (
     "tools/bin/agent-canon docs check <changed-markdown-paths>",
-    "python3 tools/agent_tools/check_convention_compliance.py",
-    "python3 tools/agent_tools/check_dependency_headers.py --changed",
-    "bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing",
-    "bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header",
+    "python3 tools/validation/semantic/convention/check_convention_compliance.py",
+    "python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed",
+    "bash tools/analysis/dependencies/scan_dependency_headers.sh --changed --fail-missing",
+    "bash tools/validation/semantic/dependencies/check_dependency_header_format.sh --changed --require-header",
 )
 
 CANONICAL_FORMAT_CHECK_ROUTE = (
@@ -598,7 +598,7 @@ COORDINATION_RECEIPT_CONTRACT_REF = (
 COORDINATION_OPERATION_OBSERVATION = COLLABORATION_OPERATIONS
 
 SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE = (
-    "python3 tools/agent_tools/workflow_monitor.py --report-dir {report_dir} "
+    "python3 tools/runtime/lifecycle/workflow_monitor.py --report-dir {report_dir} "
     '--subagent-wave "wave_id=<WAVE-N> parent_or_delegate=<parent-or-role> '
     "spawn_authority=<authority> trigger=<trigger> budget_before=<used/limit> "
     "budget_after=<used/limit> runtime_max_threads=<n> runtime_max_depth=<n> "
@@ -1401,11 +1401,11 @@ def manifest_run_lines(
             "  implementation_execution:",
             "    schema_id: 'implementation_execution_contract_v1'",
             "    route_owner: 'implementation_route'",
-            "    route_import: 'tools.agent_tools.implementation_route'",
-            "    profile_registry_import: 'tools.agent_tools.model_profile_registry'",
+            "    route_import: 'tools.agent.orchestration.implementation_route'",
+            "    profile_registry_import: 'tools.agent.orchestration.model_profile_registry'",
             "    dispatch: 'immediate_one_pass'",
             "    same_spark_gap_continuation: 'resume_same_spark_after_gap'",
-            f"    deterministic_search_route: {public_command_for_spec(spec, 'python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json')!r}",
+            f"    deterministic_search_route: {public_command_for_spec(spec, 'python3 tools/analysis/search/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json')!r}",
             "  capacity_request:",
         ]
     )
@@ -1451,10 +1451,10 @@ def manifest_run_lines(
             "    broad_cross_cutting_packet: available_not_default_read",
             "  implementation_gate_defaults:",
             "    implementation_surface_route_status: pending",
-            f"    implementation_surface_route_command: {public_command_for_spec(spec, 'python3 tools/agent_tools/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json')!r}",
+            f"    implementation_surface_route_command: {public_command_for_spec(spec, 'python3 tools/analysis/search/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json')!r}",
             "    tool_reuse_ledger_status: required_before_custom_implementation",
             "    pre_edit_rejection_prediction_status: pending",
-            f"    pre_edit_rejection_command: {public_command_for_spec(spec, 'python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>')!r}",
+            f"    pre_edit_rejection_command: {public_command_for_spec(spec, 'python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>')!r}",
             "  standard_wave_sequence:",
             "    activation: candidate_sequence_selected_per_wave",
             f"    source: {STANDARD_AGENT_WAVE_SEQUENCE_SOURCE!r}",
@@ -1473,9 +1473,9 @@ def manifest_run_lines(
             *manifest_repo_tool_routing_policy_lines(spec),
             *manifest_default_quality_check_policy_lines(spec),
             "  agent_report_collection:",
-            f"    status_command: {public_command_for_spec(spec, 'python3 tools/agent_tools/runtime_log_archive_git.py status')!r}",
-            f"    archive_current_run_command: {public_command_for_spec(spec, f'python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir {spec.report_dir}')!r}",
-            f"    sync_command: {public_command_for_spec(spec, 'python3 tools/agent_tools/runtime_log_archive_git.py sync')!r}",
+            f"    status_command: {public_command_for_spec(spec, 'python3 tools/runtime/archive/runtime_log_archive_git.py status')!r}",
+            f"    archive_current_run_command: {public_command_for_spec(spec, f'python3 tools/runtime/archive/runtime_log_archive_git.py archive-agent-report --report-dir {spec.report_dir}')!r}",
+            f"    sync_command: {public_command_for_spec(spec, 'python3 tools/runtime/archive/runtime_log_archive_git.py sync')!r}",
             "    archive_index: '.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl'",
         ]
     )
@@ -1891,7 +1891,7 @@ def manifest_pre_handoff_gate_status_lines(
 ) -> list[str]:
     """Render the pre-handoff gate status contract."""
     design_projection = project_public_command_for_layout(
-        "python3 tools/agent_tools/waterfall_gate_check.py --report-dir <report-dir> --gate design",
+        "python3 tools/validation/semantic/lifecycle/waterfall_gate_check.py --report-dir <report-dir> --gate design",
         layout=layout,
     )
     design_command = shlex.join(design_projection.public_argv)
@@ -2175,7 +2175,7 @@ def manifest_prompt_contract_lines(
         )
         lines.append(
             "      assignment_prompt_source: "
-            "'tools/agent_tools/agent_team.py#dispatch_fixed_implementation->model_profile_registry.materialize_prompt_capsule'"
+            "'tools/agent/orchestration/agent_team.py#dispatch_fixed_implementation->model_profile_registry.materialize_prompt_capsule'"
         )
     else:
         lines.append(
@@ -2184,7 +2184,7 @@ def manifest_prompt_contract_lines(
         )
         lines.append(
             "      assignment_prompt_source: "
-            "'tools/agent_tools/agent_team.py#role_prompt_contract'"
+            "'tools/agent/orchestration/agent_team.py#role_prompt_contract'"
         )
     if role.id == "skill_evaluator":
         lines.append("      common_prompt_must_include_ref: 'not_applicable'")

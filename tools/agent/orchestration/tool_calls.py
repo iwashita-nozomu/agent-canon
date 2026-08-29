@@ -25,17 +25,17 @@ if __package__:
         validate_spawn_handoff,
     )
 else:
-    from artifact_identity import canonical_json_bytes
+    from tools.runtime.artifacts.artifact_identity import canonical_json_bytes
     from writer_target import (  # type: ignore[no-redef]
         WriterTarget,
         validate_mathematical_writer_target,
         validate_spawn_handoff,
     )
 
-from update_lifecycle_contract import (
+from tools.runtime.lifecycle.update_lifecycle_contract import (
     materialize_close_agent_tool_call as materialize_lifecycle_close_agent_tool_call,
 )
-from update_lifecycle_contract import (
+from tools.runtime.lifecycle.update_lifecycle_contract import (
     materialize_gate_verdict,
     validate_cleanup_proof,
     validate_descendant_close_receipt,

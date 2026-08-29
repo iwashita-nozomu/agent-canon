@@ -38,7 +38,7 @@ try:
         runtime_artifact_boundary,
     )
 except ImportError:
-    from runtime_artifacts import (  # type: ignore[no-redef]
+    from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
         RuntimeArtifactBoundary,
         RuntimeArtifactError,
         runtime_artifact_boundary,
@@ -98,7 +98,7 @@ def graph_source_root() -> Path:
         configured = os.environ.get(name, "").strip()
         if configured:
             return Path(configured).expanduser().resolve()
-    return Path(__file__).resolve().parents[2]
+    return Path(__file__).resolve().parents[3]
 
 
 def runtime_boundary(*, create: bool = True) -> RuntimeArtifactBoundary:

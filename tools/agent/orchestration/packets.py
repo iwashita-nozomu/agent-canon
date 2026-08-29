@@ -21,7 +21,7 @@ from typing import Literal, cast
 if __package__:
     from .artifact_identity import canonical_json_bytes
 else:
-    from artifact_identity import canonical_json_bytes
+    from tools.runtime.artifacts.artifact_identity import canonical_json_bytes
 
 
 if __package__:

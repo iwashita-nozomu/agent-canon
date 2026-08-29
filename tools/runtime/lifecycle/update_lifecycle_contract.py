@@ -34,7 +34,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import cast
 
-from artifact_identity import canonical_body_sha256, canonical_json_bytes
+from tools.runtime.artifacts.artifact_identity import canonical_body_sha256, canonical_json_bytes
 
 
 @dataclass(frozen=True)
@@ -177,39 +177,39 @@ GATE_CONTRACTS: dict[str, dict[str, object]] = {
     "G1": {
         "invariant": "source_correctness",
         "owners": (
-            "tools/agent_tools/publication_integrator.py#resolve_publication_eligibility",
+            "tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
         ),
     },
     "G2": {
         "invariant": "generated_completeness",
         "owners": (
-            "tools/ci/check_agent_canon_pr.py#materialize_generated_completeness_receipt",
+            "tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt",
         ),
     },
     "G3": {
         "invariant": "pr_identity_cas",
         "owners": (
-            "tools/agent_tools/publication_integrator.py#resolve_publication_authority",
-            "tools/agent_tools/github_publish.py#materialize_pr_identity_gate",
+            "tools/repository/github/publication_integrator.py#resolve_publication_authority",
+            "tools/repository/github/github_publish.py#materialize_pr_identity_gate",
         ),
     },
     "G4": {
         "invariant": "standalone_source_branch_integrity",
         "owners": (
-            "tools/agent_tools/repository_topic_clone.py#_ensure_branch",
+            "tools/repository/workspace/repository_topic_clone.py#_ensure_branch",
             "agents/workflows/agent-canon-pr-workflow.md",
         ),
     },
     "G5": {
         "invariant": "remote_publication_readback",
         "owners": (
-            "tools/agent_tools/publication_integrator.py#integrate_publication",
+            "tools/repository/github/publication_integrator.py#integrate_publication",
         ),
     },
     "G6": {
         "invariant": "nested_lifecycle_cleanup",
         "owners": (
-            "tools/agent_tools/tool_calls.py#materialize_close_agent_tool_call",
+            "tools/agent/orchestration/tool_calls.py#materialize_close_agent_tool_call",
         ),
     },
 }
@@ -1902,7 +1902,7 @@ def materialize_fresh_clone_source_projection_packet(
         "pr_essence": {
             "problem": "exercise standalone source publication from a fresh clone",
             "intent": "queue the observed AgentCanon source branch update",
-            "canonical_owner": "tools/agent_tools/repository_topic_clone.py",
+            "canonical_owner": "tools/repository/workspace/repository_topic_clone.py",
             "contract_delta": "fresh-clone source PR",
             "evidence_refs": [evidence("fresh-clone-pr-essence", identity)],
         },

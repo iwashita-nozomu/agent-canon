@@ -139,7 +139,7 @@ def resolve_cuda_visible_devices(requested: str | None) -> str:
     del requested
     raise SystemExit(
         "gpu_route_blocked=canonical_managed_experiment_runner_required:"
-        "tools/experiments/run_managed_experiment.py"
+        "tools/experiments/execution/run_managed_experiment.py"
     )
 
 

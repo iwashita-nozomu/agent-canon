@@ -14,7 +14,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/agent-improvement-guide.yml"
-      - "tools/agent_tools/generate_agent_improvement_guide.py"
+      - "eval/producers/generate_agent_improvement_guide.py"
       - "tests/agent_tools/test_generate_agent_improvement_guide.py"
   workflow_dispatch:
 
@@ -59,7 +59,7 @@ jobs:
           container_guide="/var/lib/agent-canon/runtime/reports/agent-improvement-guide/agent-improvement-guide-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
           ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
             exec --root "${GITHUB_WORKSPACE}" -- python3 \
-            /usr/local/share/agent-canon/runtime/tools/agent_tools/generate_agent_improvement_guide.py \
+            /usr/local/share/agent-canon/runtime/eval/producers/generate_agent_improvement_guide.py \
             --root . --runtime-root /var/lib/agent-canon/runtime --out "${container_guide}" \
             --output-mode 644
           cat "${guide_path}" >> "${GITHUB_STEP_SUMMARY}"

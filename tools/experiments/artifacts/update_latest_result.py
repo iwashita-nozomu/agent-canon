@@ -23,7 +23,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 if __package__:
-    from tools.experiments.experiment_identity import (
+    from tools.experiments.lifecycle.experiment_identity import (
         DuplicateJSONKeyError,
         ExperimentIdentity,
         contained_path,

@@ -1119,7 +1119,7 @@ required_regex = ["schedule\\.md", "work_log\\.md", "validation evidence"]
 id = "AIL-SHIM-2"
 critical = true
 description = "Requires frozen eval definitions before prompt or workflow tuning."
-required_regex = ["evidence/agent-evals/skill_workflow_prompt_eval\\.toml", "evaluate_skill_workflow_prompts\\.py"]
+required_regex = ["eval/definitions/skill_workflow_prompt_eval\\.toml", "evaluate_skill_workflow_prompts\\.py"]
 
 [[evals.checklist]]
 id = "AIL-SHIM-3"
@@ -1209,7 +1209,7 @@ description = "The workflow must make eval definition, measurement, prompt repai
 id = "AIL-WF-1"
 critical = true
 description = "Defines evals before choosing or changing an iteration."
-required_regex = ["skill/workflow eval", "evidence/agent-evals/skill_workflow_prompt_eval\\.toml"]
+required_regex = ["skill/workflow eval", "eval/definitions/skill_workflow_prompt_eval\\.toml"]
 
 [[evals.checklist]]
 id = "AIL-WF-2"
@@ -1789,7 +1789,7 @@ required_regex = ["runtime_feedback=observed", "workflow_monitor\\.py --runtime-
 
 [[evals]]
 id = "agent-behavior-eval-manifest"
-target = "evidence/agent-evals/agent_behavior_eval.toml"
+target = "eval/definitions/agent_behavior_eval.toml"
 kind = "eval"
 description = "The behavior eval manifest must cover observable run behavior families."
 
@@ -1868,7 +1868,7 @@ required_regex = ["active skill set", "first repair candidate", "calibration ste
 
 [[evals]]
 id = "evals-readme-behavior-eval"
-target = "evidence/agent-evals/README.md"
+target = "eval/definitions/README.md"
 kind = "eval"
 description = "The eval directory README must document prompt and behavior eval management."
 
@@ -2148,7 +2148,7 @@ required_regex = ["source_free_boundary", "parent_product_validation", "neither 
 
 [[evals]]
 id = "p5-generated-runtime-profile-projection"
-target = "tools/agent_tools/check_agent_runtime_alignment.py"
+target = "tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
 kind = "workflow"
 description = "The runtime profile projection gate is generated, topology-derived, and preserves typed capacity-domain separation."
 
@@ -2166,7 +2166,7 @@ required_regex = ["declared_team_peak_plus_nested_reservations_v1", "requested_m
 
 [[evals]]
 id = "p5-role-profile-attribution"
-target = "tools/agent_tools/evaluate_codex_agent_roles.py"
+target = "eval/producers/evaluate_codex_agent_roles.py"
 kind = "workflow"
 description = "The role evaluator attributes profile and capacity evidence without becoming policy truth."
 
@@ -2470,7 +2470,7 @@ forbidden_regex = ["html-experiment-report", "save-experiment-results"]
 
 [[evals]]
 id = "experiment-wrapper-classifier-removal"
-target = "tools/agent_tools/prompt_classifier.py"
+target = "tools/agent/orchestration/prompt_classifier.py"
 kind = "skill"
 description = "Prompt classification composes direct owners instead of selecting a removed wrapper."
 

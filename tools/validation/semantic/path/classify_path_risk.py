@@ -32,8 +32,8 @@ DOC_SUFFIXES = {".md", ".rst", ".txt"}
 PYTHON_SUFFIXES = {".py", ".pyi"}
 CONTAINER_PREFIXES = ("docker/", "bootstrap/")
 GITHUB_PREFIXES = (".github/",)
-EVAL_PREFIXES = ("agents/evals/", "evidence/agent-evals/", "reports/agent-runtime-dashboard/")
-RUST_PREFIXES = ("rust/",)
+EVAL_PREFIXES = ("eval/", "reports/agent-runtime-dashboard/")
+RUST_PREFIXES = ("tools/runtime/dispatch/agent-canon/",)
 DEPENDENCY_PATHS = {
     "agents/skills/catalog.yaml",
     "agents/skills/skill-dependencies.yaml",
@@ -41,9 +41,9 @@ DEPENDENCY_PATHS = {
     "documents/tools/tool-docs.toml",
 }
 SELECTOR_BOUNDARY_PATHS = {
-    "tools/agent_tools/classify_path_risk.py",
-    "tools/ci/run_standalone_static_gate_unit.sh",
-    "tools/ci/check_agent_canon_pr.sh",
+    "tools/validation/semantic/path/classify_path_risk.py",
+    "tools/validation/ci/runners/run_standalone_static_gate_unit.sh",
+    "tools/validation/ci/checks/check_agent_canon_pr.sh",
     ".github/workflows/agent-canon-static-gates.yml",
 }
 STATIC_GATE_UNITS = ("rust", "contracts", "eval", "workflow-container")
@@ -78,12 +78,12 @@ def classify(paths: tuple[str, ...]) -> tuple[PathRisk, ...]:
     if any(Path(path).suffix in DOC_SUFFIXES for path in paths):
         active.append(PathRisk("docs-only-or-docs-impact", "markdown_or_text_changed", (
             "tools/bin/agent-canon docs check",
-            "bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header",
+            "bash tools/validation/semantic/dependencies/check_dependency_header_format.sh --changed --require-header",
         )))
     if any(Path(path).suffix in PYTHON_SUFFIXES for path in paths):
         active.append(PathRisk("python-tooling", "python_path_changed", (
             "python3 -m ruff check <changed-python-paths>",
-            "PYTHONPATH=tools/agent_tools python3 -m pyright <changed-python-paths>",
+            "PYTHONPATH=. python3 -m pyright <changed-python-paths>",
             "python3 -m pytest -q <targeted-tests>",
         )))
     if any(path.startswith(CONTAINER_PREFIXES) for path in paths):
@@ -93,19 +93,19 @@ def classify(paths: tuple[str, ...]) -> tuple[PathRisk, ...]:
         )))
     if any(path.startswith(GITHUB_PREFIXES) for path in paths):
         active.append(PathRisk("github-automation", "github_surface_changed", (
-            "python3 tools/ci/check_github_workflows.py",
+            "python3 tools/validation/ci/checks/check_github_workflows.py",
         )))
     if any(path.startswith(EVAL_PREFIXES) for path in paths):
         active.append(PathRisk("agent-eval", "eval_surface_changed", (
-            "python3 tools/agent_tools/run_accumulated_agent_evals.py",
+            "python3 eval/producers/run_accumulated_agent_evals.py",
         )))
     if any(path.startswith(RUST_PREFIXES) for path in paths):
         active.append(PathRisk("rust", "rust_surface_changed", (
-            "cargo test --manifest-path rust/agent-canon/Cargo.toml",
+            "cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml",
         )))
     if any(path in DEPENDENCY_PATHS for path in paths):
         active.append(PathRisk("dependency", "dependency_owner_changed", (
-            "bash tools/agent_tools/run_repo_dependency_review.sh",
+            "bash tools/analysis/dependencies/run_repo_dependency_review.sh",
         )))
     return tuple(dict.fromkeys(active))
 

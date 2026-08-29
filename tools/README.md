@@ -103,13 +103,13 @@ second README registry.
 
 | Need | Owner command |
 | --- | --- |
-| catalog shape and docs wiring | `python3 tools/agent_tools/tool_catalog.py` |
-| tool/workflow drift | `python3 tools/agent_tools/tool_drift.py` |
-| responsibility scope | `python3 tools/agent_tools/responsibility_scope.py --root .` |
-| runtime artifact boundary | `python3 tools/agent_tools/generated_artifact_guard.py` |
-| archive state | `python3 tools/agent_tools/runtime_log_archive_git.py status` |
-| eval archive structure | `python3 tools/agent_tools/eval_accumulation_check.py` |
-| path-risk/profile selection | `python3 tools/agent_tools/classify_path_risk.py` |
+| catalog shape and docs wiring | `python3 tools/runtime/manifest/tool_catalog.py` |
+| tool/workflow drift | `python3 tools/validation/semantic/tools/tool_drift.py` |
+| responsibility scope | `python3 tools/validation/semantic/responsibility/responsibility_scope.py --root .` |
+| runtime artifact boundary | `python3 tools/runtime/artifacts/generated_artifact_guard.py` |
+| archive state | `python3 tools/runtime/archive/runtime_log_archive_git.py status` |
+| eval archive structure | `python3 eval/checkers/eval_accumulation_check.py` |
+| path-risk/profile selection | `python3 tools/validation/semantic/path/classify_path_risk.py` |
 | Markdown/links/Mermaid | `tools/bin/agent-canon docs check` |
 | semantic repository search | `tools/bin/agent-canon semantic-index ...` |
 | bounded Skill read and EOF admission | `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...` (shared tool container) |

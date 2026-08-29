@@ -56,7 +56,7 @@ GRAPH_RELATIONS = frozenset(
     }
 )
 GRAPH_DIRECTIONS = frozenset({"outgoing", "incoming", "both"})
-CANONICAL_GRAPH_EXECUTABLE = Path(__file__).resolve().parents[1] / "bin" / "agent-canon"
+CANONICAL_GRAPH_EXECUTABLE = Path(__file__).resolve().parents[2] / "bin" / "agent-canon"
 
 
 class GraphClientError(RuntimeError):

@@ -41,8 +41,8 @@ except ModuleNotFoundError:  # clean host before the shared tool image exists
         from . import stdlib_yaml as yaml
     except ImportError:
         import stdlib_yaml as yaml  # type: ignore[no-redef]
-from agent_canon_source_root import resolve_agent_canon_source_root
-from skill_route_catalog import (
+from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
+from tools.agent.skills.skill_route_catalog import (
     SKILL_DEPENDENCY_MAP_PATH,
     VISUALIZATION_ADAPTER_TOOL_IDS,
     VISUALIZATION_DEPENDENCY_ADAPTER_ARGUMENT_SCHEMA,
@@ -57,21 +57,21 @@ from skill_route_catalog import (
     load_skill_dependency_map,
     load_skill_route_rules,
 )
-from skill_tool_commands import SkillCommandPacket, packet_for_skill
-from runtime_artifacts import (
+from tools.agent.skills.skill_tool_commands import SkillCommandPacket, packet_for_skill
+from tools.runtime.artifacts.runtime_artifacts import (
     RuntimeArtifactBoundary,
     RuntimeArtifactError,
     RuntimeRootRequired,
     runtime_artifact_boundary,
 )
-from visualization_contract import (
+from tools.validation.semantic.tools.visualization_contract import (
     TOOL_ARGUMENT_SCHEMAS,
     VisualizationSourceItem,
     build_source_universe,
     serialize_tool_call,
 )
 
-DEFAULT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_GRAPH_PATH = Path("documents/runtime/skill-dependency-graph.md")
 DEFAULT_JSON_PATH = Path("documents/runtime/skill-dependency-graph.json")
 # Graph generation is an artifact operation, not a source-tree operation.  A
@@ -107,11 +107,11 @@ IMPLEMENTATION_TRACE_PATHS = (
     "documents/runtime/skill-dependency-graph.md",
     "tests/agent_tools/test_route.py",
     "tests/agent_tools/test_skill_dependency_map.py",
-    "tools/agent_tools/check_skill_tool_invocation_graph.py",
-    "tools/agent_tools/capability_route.py",
-    "tools/agent_tools/route.py",
-    "tools/agent_tools/skill_dependency_map.py",
-    "tools/agent_tools/skill_route_catalog.py",
+    "tools/validation/semantic/skills/check_skill_tool_invocation_graph.py",
+    "tools/agent/orchestration/capability_route.py",
+    "tools/agent/orchestration/route.py",
+    "tools/agent/skills/skill_dependency_map.py",
+    "tools/agent/skills/skill_route_catalog.py",
 )
 SOURCE_KINDS = (
     "identity",
@@ -142,8 +142,8 @@ GRAPH_DEPENDENCY_HEADER = """<!--
 contract reference
 responsibility Publishes the generated public skill/tool invocation graph as the canonical Mermaid reader surface.
 upstream design ../../documents/design/skill-tool-invocation-graph.md owns the graph universe, serialization, and readback contract
-upstream implementation ../../tools/agent_tools/skill_dependency_map.py materializes the typed graph and renders the Mermaid projection
-downstream implementation ../../tools/agent_tools/check_skill_tool_invocation_graph.py validates source/artifact equality and actual Mermaid syntax readback
+upstream implementation ../../tools/agent/skills/skill_dependency_map.py materializes the typed graph and renders the Mermaid projection
+downstream implementation ../../tools/validation/semantic/skills/check_skill_tool_invocation_graph.py validates source/artifact equality and actual Mermaid syntax readback
 downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py covers completeness, determinism, and stale-artifact failures
 @dependency-end
 -->"""
@@ -689,7 +689,7 @@ def _source_snapshot(
         "dependencies_sha256": "agents/skills/skill-dependencies.yaml",
         "reader_index_sha256": "agents/canonical/skills.md",
         "route_packet_sha256": "agents/skills/catalog.yaml#routing",
-        "command_packet_sha256": "tools/agent_tools/skill_tool_commands.py#canonical-resolution",
+        "command_packet_sha256": "tools/agent/skills/skill_tool_commands.py#canonical-resolution",
         "toolcall_packet_sha256": "agents/skills/catalog.yaml#typed-visualization-toolcalls",
     }
     return {
@@ -902,7 +902,7 @@ def build_graph(root: Path) -> dict[str, object]:
                     identities,
                     source_inventory,
                     "field",
-                    f"tools/agent_tools/skill_tool_commands.py#{skill}:{phase}:{index}",
+                    f"tools/agent/skills/skill_tool_commands.py#{skill}:{phase}:{index}",
                     index,
                     command_refs[(skill, phase, index)],
                     logical_argv=list(shlex.split(logical)),
@@ -953,7 +953,7 @@ def build_graph(root: Path) -> dict[str, object]:
             "tool_id": VISUALIZATION_DEPENDENCY_ADAPTER_TOOL_ID,
             "argument_schema_id": VISUALIZATION_DEPENDENCY_ADAPTER_ARGUMENT_SCHEMA,
             "order": 1,
-            "locator_refs": ["tools/agent_tools/render_dependency_manifest_graph.py"],
+            "locator_refs": ["tools/analysis/dependencies/render_dependency_manifest_graph.py"],
         },
     )
     toolcall_refs: dict[str, dict[str, str]] = {}

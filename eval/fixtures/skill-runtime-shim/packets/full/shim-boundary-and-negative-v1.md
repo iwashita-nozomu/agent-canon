@@ -3,7 +3,7 @@
 contract data
 responsibility Defines the answer-free boundary-negative fresh packet.
 upstream design ../../../../../documents/design/skill-runtime-shim-materialization.md approved packet contract
-downstream implementation ../../../../../tools/agent_tools/skill_shim_evaluation.py packet producer
+downstream implementation ../../../../../eval/producers/skill_shim_evaluation.py packet producer
 @dependency-end
 -->
 

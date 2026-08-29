@@ -29,7 +29,7 @@ try:
         runtime_artifact_boundary,
     )
 except ImportError:  # direct script/module execution
-    from runtime_artifacts import (  # type: ignore[no-redef]
+    from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
         RUNTIME_ROOT_ENV,
         RuntimeRootRequired,
         SourceLocalArtifact,
@@ -47,7 +47,7 @@ try:
         resolve_parent_owned_path,
     )
 except ImportError:  # direct script/module execution
-    from parent_root_side_effects import (  # type: ignore[no-redef]
+    from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]
         ParentRootAttestationRequest,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
@@ -65,7 +65,7 @@ if __package__:
     )
     from .team_config import Role, TeamConfig, resolve_role
 else:
-    from agent_canon_source_root import (  # type: ignore[no-redef]
+    from tools.runtime.source.agent_canon_source_root import (  # type: ignore[no-redef]
         RepositoryRoots,
         RootResolution,
         resolve_agent_canon_source_root,

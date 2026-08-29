@@ -48,12 +48,12 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-MARKER_CONTRACTS_PATH = Path("tools/agent_tools/convention_compliance_contracts.toml")
+MARKER_CONTRACTS_PATH = Path("tools/validation/semantic/convention/convention_compliance_contracts.toml")
 
 
 def load_marker_contracts() -> dict[str, dict[str, tuple[str, ...]]]:
     """Load declarative marker contracts from the checked-in manifest."""
-    manifest = Path(__file__).resolve().parents[2] / MARKER_CONTRACTS_PATH
+    manifest = Path(__file__).resolve().parents[4] / MARKER_CONTRACTS_PATH
     payload = tomllib.loads(manifest.read_text(encoding="utf-8"))
     contracts: dict[str, dict[str, tuple[str, ...]]] = {}
     for contract in payload.get("contracts", []):
@@ -111,67 +111,67 @@ TOOL_CATALOG_PATH = "tools/catalog.yaml"
 # workflow, and runtime-profile checkers own those contracts independently.
 TOOL_GATES = {
     "dependency_review": (
-        "tools/agent_tools/run_repo_dependency_review.sh",
+        "tools/analysis/dependencies/run_repo_dependency_review.sh",
         (TOOL_CATALOG_PATH,),
     ),
     "code_dependency_scan": (
-        "tools/agent_tools/scan_code_dependencies.sh",
+        "tools/analysis/dependencies/scan_code_dependencies.sh",
         (TOOL_CATALOG_PATH,),
     ),
     "hardcoded_numbers": (
-        "tools/agent_tools/check_hardcoded_numbers.py",
+        "tools/validation/semantic/code/check_hardcoded_numbers.py",
         (TOOL_CATALOG_PATH,),
     ),
     "static_any": (
-        "tools/agent_tools/check_static_any.py",
+        "tools/validation/semantic/code/check_static_any.py",
         (TOOL_CATALOG_PATH,),
     ),
     "log_helper_names": (
-        "tools/agent_tools/check_log_helper_names.py",
+        "tools/validation/semantic/logging/check_log_helper_names.py",
         (TOOL_CATALOG_PATH,),
     ),
     "notebook_quality": (
-        "tools/validation/notebook_quality.py",
+        "tools/validation/notebooks/notebook_quality.py",
         (TOOL_CATALOG_PATH,),
     ),
     "oop_readability": (
-        "tools/oop/python/readability.py",
+        "tools/validation/code/oop/python/readability.py",
         (TOOL_CATALOG_PATH,),
     ),
     "oop_cpp_readability": (
-        "tools/oop/cpp/readability.py",
+        "tools/validation/code/oop/cpp/readability.py",
         (TOOL_CATALOG_PATH,),
     ),
     "prompt_eval": (
-        "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+        "eval/producers/evaluate_skill_workflow_prompts.py",
         (TOOL_CATALOG_PATH,),
     ),
     "behavior_eval": (
-        "tools/agent_tools/evaluate_agent_run.py",
+        "eval/producers/evaluate_agent_run.py",
         (TOOL_CATALOG_PATH,),
     ),
     "skill_frontmatter": (
-        "tools/agent_tools/check_skill_frontmatter.py",
+        "tools/validation/semantic/skills/check_skill_frontmatter.py",
         (TOOL_CATALOG_PATH,),
     ),
     "convention_compliance": (
-        "tools/agent_tools/check_convention_compliance.py",
+        "tools/validation/semantic/convention/check_convention_compliance.py",
         (TOOL_CATALOG_PATH,),
     ),
     "tool_catalog": (
-        "tools/agent_tools/tool_catalog.py",
+        "tools/runtime/manifest/tool_catalog.py",
         (TOOL_CATALOG_PATH,),
     ),
     "tool_convention_drift": (
-        "tools/agent_tools/tool_drift.py",
+        "tools/validation/semantic/tools/tool_drift.py",
         (TOOL_CATALOG_PATH,),
     ),
     "import_responsibility": (
-        "tools/agent_tools/import_responsibility.py",
+        "tools/analysis/code/import_responsibility.py",
         (TOOL_CATALOG_PATH,),
     ),
     "github_workflow_pr_flow": (
-        "tools/ci/check_github_workflows.py",
+        "tools/validation/ci/checks/check_github_workflows.py",
         (TOOL_CATALOG_PATH,),
     ),
     "bootstrap_container_runtime": (
@@ -290,7 +290,7 @@ DOCUMENT_STRUCTURE_ROUTING_MARKERS = {
         "md_style_check",
         "format_only_reason",
     ),
-    "tools/agent_tools/task_close.py": (
+    "tools/runtime/lifecycle/task_close.py": (
         "changed_markdown_paths",
         "Document Structure Evidence",
         "document_structure_evidence",
@@ -322,7 +322,7 @@ DOCUMENT_SPLIT_DECISION_MARKERS = {
         "split:<new-owner-boundary>",
         "not_applicable:format-only:<reason>",
     ),
-    "tools/agent_tools/task_close.py": (
+    "tools/runtime/lifecycle/task_close.py": (
         "document_split_decision",
         "DOCUMENT_SPLIT_DECISION_EVIDENCE",
         "document_split_decision_ready",
@@ -345,7 +345,7 @@ BRANCH_WORKTREE_CREATION_GUARD_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
 ]
 
 WORKFLOW_GATE_MARKER = "check_convention_compliance.py"
-WORKFLOW_GATE_CONSUMERS = ("tools/ci/check_agent_canon_pr.sh",)
+WORKFLOW_GATE_CONSUMERS = ("tools/validation/ci/checks/check_agent_canon_pr.sh",)
 WORKFLOW_GATE_COMMAND_RE = re.compile(
     r'(?m)^\s*python3\s+"\$\{CANON_TOOLS_ROOT\}/agent_tools/check_convention_compliance\.py"\s+'
     r'--root\s+"\$\{WORKSPACE_ROOT\}"\s+--format\s+json$'
@@ -567,7 +567,7 @@ HOOK_GUARDRAIL_POLICY_MARKERS = {
         "RETIRED_CHILD_TOMBSTONES",
         "MOVED_SOURCE_ABSENCES",
     ),
-    "tools/agent_tools/hook_safety.py": (
+    "tools/runtime/authority/hook_safety.py": (
         "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY",
         "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY",
         "branch_block_payload",
@@ -622,11 +622,11 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "skill routing and public skill surface",
                     "agents/skills/catalog.yaml",
-                    "tools/agent_tools/route.py --prompt",
+                    "tools/agent/orchestration/route.py --prompt",
                 ),
                 (
                     "report and closeout structure",
-                    "tools/agent_tools/task_close.py",
+                    "tools/runtime/lifecycle/task_close.py",
                     "closeout gate",
                 ),
                 (
@@ -641,12 +641,12 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 ),
                 (
                     "Python, Rust, and LSP tool dispatch",
-                    "tools/agent_tools/tool_dispatch.py",
+                    "tools/runtime/dispatch/tool_dispatch.py",
                     "tool dispatch tests",
                 ),
                 (
                     "skill and agent installation",
-                    "tools/agent_tools/skill_shim_materializer.py",
+                    "tools/agent/skills/skill_shim_materializer.py",
                     "skill materializer check",
                 ),
                 (
@@ -656,7 +656,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 ),
                 (
                     "eval archive",
-                    "tools/agent_tools/runtime_log_archive_git.py",
+                    "tools/runtime/archive/runtime_log_archive_git.py",
                     "archive readback",
                 ),
                 (
@@ -719,7 +719,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "skill selection",
                     "agents/skills/catalog.yaml",
-                    "python3 tools/agent_tools/route.py --prompt",
+                    "python3 tools/agent/orchestration/route.py --prompt",
                 ),
                 (
                     "implementation stage gate",
@@ -1255,7 +1255,7 @@ def check_review_issue_routing(root: Path) -> list[Finding]:
 
 def check_prompt_eval_wiring(root: Path) -> list[Finding]:
     """Verify prompt evals cover convention verifier and skill-call routing."""
-    path = "evidence/agent-evals/skill_workflow_prompt_eval.toml"
+    path = "eval/definitions/skill_workflow_prompt_eval.toml"
     findings = check_required_files(root, (path,), "prompt_eval")
     if findings:
         return findings

@@ -25,17 +25,17 @@ AGENT_TOOLS_ROOT = Path(__file__).resolve().parents[1] / "agent_tools"
 if str(AGENT_TOOLS_ROOT) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS_ROOT))
 
-from artifact_identity import canonical_json_bytes  # noqa: E402
-from parent_root_side_effects import (  # noqa: E402
+from tools.runtime.artifacts.artifact_identity import canonical_json_bytes  # noqa: E402
+from tools.repository.workspace.parent_root_side_effects import (  # noqa: E402
     ParentRootAttestationReceipt,
     ParentRootAttestationRequest,
     ParentRootSideEffectBoundary,
 )
-from runtime_artifacts import (  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import (  # noqa: E402
     RuntimeArtifactBoundary,
     runtime_artifact_boundary,
 )
-from update_lifecycle_contract import (  # noqa: E402
+from tools.runtime.lifecycle.update_lifecycle_contract import (  # noqa: E402
     materialize_gate_verdict,
     validate_gate_chain,
     validate_gate_verdict,

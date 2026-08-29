@@ -57,7 +57,7 @@ try:
     )
     from .runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
 except ImportError:  # direct script execution
-    from parent_root_side_effects import (  # type: ignore[no-redef]
+    from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]
         ParentRootAttestationReceipt,
         ParentRootAttestationRequest,
         ParentRootSideEffectBoundary,
@@ -67,7 +67,7 @@ except ImportError:  # direct script execution
         ensure_parent_owned_directory,
         resolve_parent_owned_path,
     )
-    from runtime_artifacts import (  # type: ignore[no-redef]
+    from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
         RuntimeArtifactBoundary,
         RuntimeArtifactError,
     )
@@ -2880,12 +2880,12 @@ class EnvironmentBoundaryModel:
         """Validate the bootstrap-owned image/runtime surface."""
         for relative, executable in (
             ("bootstrap.sh", True),
-            ("bootstrap/container/dependencies.toml", False),
-            ("bootstrap/container/Dockerfile", False),
-            ("bootstrap/container/entrypoint.sh", True),
-            ("tools/agent_tools/dependency_plan.py", False),
-            ("tools/agent_tools/bootstrap_runtime.py", False),
-            ("tools/agent_tools/runtime_artifacts.py", False),
+            ("bootstrap/container/image/dependencies.toml", False),
+            ("bootstrap/container/image/Dockerfile", False),
+            ("bootstrap/container/lifecycle/entrypoint.sh", True),
+            ("tools/analysis/dependencies/dependency_plan.py", False),
+            ("tools/runtime/container/bootstrap_runtime.py", False),
+            ("tools/runtime/artifacts/runtime_artifacts.py", False),
             ("CONTAINER_OPERATIONS.md", False),
         ):
             self._require(

@@ -17,7 +17,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from skill_route_catalog import (
+from tools.agent.skills.skill_route_catalog import (
     VISUALIZATION_OWNER_SKILL,
     CapabilityId,
     CapabilityIndex,
@@ -32,7 +32,7 @@ from skill_route_catalog import (
     visualization_adapter_for_capability,
     visualization_rejection_from_error,
 )
-from visualization_contract import ToolCall, serialize_tool_call
+from tools.validation.semantic.tools.visualization_contract import ToolCall, serialize_tool_call
 
 __all__ = (
     "FORMAT_VALUES",

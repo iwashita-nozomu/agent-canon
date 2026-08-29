@@ -31,13 +31,13 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
 try:
-    from tools.agent_tools.runtime_artifacts import (
+    from tools.runtime.artifacts.runtime_artifacts import (
         RuntimeArtifactBoundary,
         RuntimeArtifactError,
     )
 except ImportError:  # pragma: no cover - direct script loading.
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from agent_tools.runtime_artifacts import (  # type: ignore[no-redef]
+    sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+    from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
         RuntimeArtifactBoundary,
         RuntimeArtifactError,
     )

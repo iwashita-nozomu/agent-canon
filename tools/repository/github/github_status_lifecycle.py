@@ -37,7 +37,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
     import tomli as tomllib  # type: ignore[no-redef]
 
-from artifact_identity import canonical_json_bytes
+from tools.runtime.artifacts.artifact_identity import canonical_json_bytes
 from github_publish import CommandResult, Runner, run_command, subprocess_runner
 
 MODULE_OWNER = "github_status_lifecycle.py"
@@ -249,7 +249,7 @@ def mapping_from_data(data: Mapping[str, object]) -> LabelMapping:
 
 def load_label_mapping(root: str | Path | None = None) -> LabelMapping:
     """Load the sole repository taxonomy owner relative to AgentCanon root."""
-    source_root = Path(root or Path(__file__).resolve().parents[2])
+    source_root = Path(root or Path(__file__).resolve().parents[3])
     path = source_root / "documents" / "operations" / "issue-label-taxonomy.toml"
     try:
         with path.open("rb") as stream:

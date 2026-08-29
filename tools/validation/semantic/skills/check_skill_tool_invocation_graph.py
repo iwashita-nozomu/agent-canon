@@ -21,7 +21,7 @@ def main(argv: list[str] | None = None) -> int:
     """Validate artifacts and print the typed checker envelope."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--root", type=Path, default=Path(__file__).resolve().parents[2]
+        "--root", type=Path, default=Path(__file__).resolve().parents[4]
     )
     args = parser.parse_args(argv)
     try:

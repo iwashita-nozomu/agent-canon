@@ -31,7 +31,7 @@ try:
         ParentRootSideEffectError,
     )
 except ImportError:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
+    from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]
         ParentRootReject,
         ParentRootSideEffectError,
     )
@@ -39,7 +39,7 @@ except ImportError:
 try:
     from .runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
 except ImportError:  # pragma: no cover - direct script execution
-    from runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError  # type: ignore[no-redef]
+    from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError  # type: ignore[no-redef]
 
 MAX_ERROR_CHARS = 4000
 REMOTE_UNINITIALIZED = "REMOTE_UNINITIALIZED"

@@ -27,14 +27,14 @@ from pathlib import Path
 from typing import ParamSpec, TypeAlias, TypeVar, cast
 
 try:
-    from tools.agent_tools.runtime_artifacts import (
+    from tools.runtime.artifacts.runtime_artifacts import (
         RuntimeArtifactBoundary,
         RuntimeRootRequired,
         runtime_artifact_boundary,
     )
 except ImportError:  # pragma: no cover - direct script invocation.
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from tools.agent_tools.runtime_artifacts import (  # type: ignore[no-redef]
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
         RuntimeArtifactBoundary,
         RuntimeRootRequired,
         runtime_artifact_boundary,

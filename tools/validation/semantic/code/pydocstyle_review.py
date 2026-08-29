@@ -20,15 +20,15 @@ from pathlib import Path
 from typing import Any
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
-from tools.agent_tools.agent_canon_source_root import (
+from tools.runtime.source.agent_canon_source_root import (
     RootResolution,
     SourceRootFailure,
     resolve_agent_canon_source_root,
 )
 
-CANONICAL_CONFIG_RELATIVE_PATH = Path("tools/ci/pydocstyle.toml")
+CANONICAL_CONFIG_RELATIVE_PATH = Path("tools/validation/ci/config/pydocstyle.toml")
 
 
 def _is_within(path: Path, root: Path) -> bool:

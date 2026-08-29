@@ -48,10 +48,10 @@ if __package__:
     )
     from .agent_canon_source_root import resolve_agent_canon_source_root as _resolve_source_root
 else:
-    from skill_tool_commands import (  # type: ignore[no-redef]
+    from tools.agent.skills.skill_tool_commands import (  # type: ignore[no-redef]
         validate_command_plan_executables as _validate_command_plan_executables,
     )
-    from agent_canon_source_root import resolve_agent_canon_source_root as _resolve_source_root
+    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root as _resolve_source_root
 
 if __package__:
     from .packets import (

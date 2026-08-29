@@ -31,10 +31,10 @@ from typing import cast
 if __package__:
     from .workspace_scope import resolve_report_root
 else:
-    from workspace_scope import resolve_report_root
-from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
-from runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary
-from report_artifact_checks import (
+    from tools.repository.workspace.workspace_scope import resolve_report_root
+from eval.checkers.eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
+from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary
+from tools.runtime.artifacts.report_artifact_checks import (
     check_final_review_artifact,
     check_schedule_artifact,
     check_work_log_artifact,

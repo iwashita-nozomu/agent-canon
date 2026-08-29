@@ -17,10 +17,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-AGENT_CANON_ROOT = Path(__file__).resolve().parents[2]
+AGENT_CANON_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_INVENTORY = AGENT_CANON_ROOT / "documents/runtime/runtime-profiles-and-check-matrix.json"
 DEFAULT_DOC = AGENT_CANON_ROOT / "documents/runtime/runtime-profiles-and-check-matrix.md"
-RENDER_SCRIPT = AGENT_CANON_ROOT / "tools/docs/render_runtime_profile_inventory.py"
+RENDER_SCRIPT = AGENT_CANON_ROOT / "tools/validation/documentation/formatting/render_runtime_profile_inventory.py"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -83,7 +83,7 @@ def main() -> int:
     print("RUNTIME_PROFILE_INVENTORY_DRIFT=fail")
     print("".join(diff).rstrip())
     print(
-        f"Fix by running: python3 tools/docs/render_runtime_profile_inventory.py --write --doc {doc_path}"
+        f"Fix by running: python3 tools/validation/documentation/formatting/render_runtime_profile_inventory.py --write --doc {doc_path}"
     )
     return 1
 

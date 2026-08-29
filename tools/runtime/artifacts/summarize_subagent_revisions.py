@@ -468,7 +468,7 @@ def render_markdown(summary: dict[str, object], *, max_evidence: int) -> str:
         "<!--",
         "@dependency-start",
         "responsibility Records generated subagent revision and rework summary evidence.",
-        "upstream implementation ../../tools/agent_tools/summarize_subagent_revisions.py generates this report",
+        "upstream implementation ../../tools/runtime/artifacts/summarize_subagent_revisions.py generates this report",
         f"upstream report {summary['dashboard_compact']} compact runtime dashboard source",
         "@dependency-end",
         "-->",

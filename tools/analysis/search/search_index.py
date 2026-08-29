@@ -35,7 +35,7 @@ import vector_search  # noqa: E402
 try:
     from .runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
 except ImportError:
-    from runtime_artifacts import (  # type: ignore[no-redef]
+    from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
         RuntimeArtifactBoundary,
         RuntimeArtifactError,
     )

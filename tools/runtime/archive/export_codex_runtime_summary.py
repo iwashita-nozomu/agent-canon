@@ -32,7 +32,7 @@ from typing import cast
 try:
     from .runtime_artifacts import RuntimeArtifactBoundary  # type: ignore[no-redef]
 except ImportError:
-    from runtime_artifacts import RuntimeArtifactBoundary  # type: ignore[no-redef]
+    from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary  # type: ignore[no-redef]
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -568,7 +568,7 @@ def _append_parent_jsonl(path: Path, record: dict[str, object], purpose: str) ->
     """Append one record through the explicit external runtime boundary."""
     line = (json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
     source = Path(
-        os.environ.get("AGENT_CANON_SOURCE_ROOT", Path(__file__).resolve().parents[2])
+        os.environ.get("AGENT_CANON_SOURCE_ROOT", Path(__file__).resolve().parents[3])
     )
     runtime = os.environ.get("AGENT_CANON_RUNTIME_ROOT")
     boundary = RuntimeArtifactBoundary.for_source(source, runtime, create=True)

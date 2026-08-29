@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import cast
 
 try:
-    from tools.shared.path_filters import is_hidden, path_is_excluded
+    from tools.support.path_filters import is_hidden, path_is_excluded
 except ModuleNotFoundError:
     for parent in Path(__file__).resolve().parents:
         if parent.name == "tools":
@@ -43,7 +43,7 @@ except ModuleNotFoundError:
             if str(repo_root) not in sys.path:
                 sys.path.append(str(repo_root))
             break
-    from tools.shared.path_filters import is_hidden, path_is_excluded
+    from tools.support.path_filters import is_hidden, path_is_excluded
 
 BAD_CLASS_NAME_PARTS = ("Manager", "Helper", "Util", "Thing")
 BAD_SYMBOL_NAME_PARTS = ("helper", "util", "misc", "tmp")

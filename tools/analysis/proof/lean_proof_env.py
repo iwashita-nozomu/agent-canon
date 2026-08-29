@@ -129,7 +129,7 @@ def lakefile_text(package_name: str, module_name: str, mathlib_rev: str) -> str:
             "/-",
             "@dependency-start",
             "responsibility Defines the AgentCanon reusable Lean proof environment.",
-            "upstream implementation tools/agent_tools/lean_proof_env.py generates this file.",
+            "upstream implementation tools/analysis/proof/lean_proof_env.py generates this file.",
             "downstream implementation AgentCanonLeanProofEnv.lean imports Mathlib, Aesop, Plausible, and LeanSearchClient.",
             "@dependency-end",
             "-/",

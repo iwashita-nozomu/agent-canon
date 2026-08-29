@@ -85,7 +85,7 @@ jobs:
           container_dashboard="/var/lib/agent-canon/runtime/reports/agent-runtime-dashboard/agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
           ./bootstrap.sh --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" --runtime-root "${AGENT_CANON_RUNTIME_ROOT}" \
             exec --root "${GITHUB_WORKSPACE}" -- python3 \
-            /usr/local/share/agent-canon/runtime/tools/agent_tools/generate_agent_runtime_dashboard.py \
+            /usr/local/share/agent-canon/runtime/eval/producers/generate_agent_runtime_dashboard.py \
             --root . --runtime-root /var/lib/agent-canon/runtime --out "${container_dashboard}"
           cat "${dashboard_path}" >> "${GITHUB_STEP_SUMMARY}"
           echo "dashboard_path=${dashboard_path}" >> "$GITHUB_OUTPUT"

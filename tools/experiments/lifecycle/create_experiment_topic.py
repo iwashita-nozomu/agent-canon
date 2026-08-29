@@ -19,8 +19,8 @@ import shutil
 from pathlib import Path
 
 if __package__:
-    from tools.experiments.experiment_identity import validate_segment
-    from tools.experiments.registry_lib import find_topic, load_registry, write_registry
+    from tools.experiments.lifecycle.experiment_identity import validate_segment
+    from tools.experiments.registry.registry_lib import find_topic, load_registry, write_registry
 else:
     from experiment_identity import validate_segment  # type: ignore[no-redef]
     from registry_lib import (  # type: ignore[no-redef]
@@ -34,7 +34,7 @@ AGENT_CANON_TEMPLATE_DIR = "vendor/agent-canon/templates/experiments/_template"
 
 def repo_root_from_script() -> Path:
     """Return the repository root from this script location."""
-    return Path(__file__).absolute().parents[2]
+    return Path(__file__).absolute().parents[3]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -100,7 +100,7 @@ def update_copied_files(topic_dir: Path, topic_name: str) -> None:
 
 def resolve_canon_path(repo_root: Path, logical_path: str) -> Path:
     """Resolve a canonical AgentCanon path in parent, standalone, or source checkouts."""
-    source_root = Path(__file__).resolve().parents[2]
+    source_root = Path(__file__).resolve().parents[3]
     vendor_root = repo_root / "vendor" / "agent-canon"
     candidates = (
         [

@@ -35,7 +35,7 @@ try:
         attest_parent_root,
     )
 except ImportError:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
+    from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]
         ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
@@ -43,8 +43,8 @@ except ImportError:
         attest_parent_root,
     )
 
-from artifact_identity import canonical_json_bytes
-from update_lifecycle_contract import (
+from tools.runtime.artifacts.artifact_identity import canonical_json_bytes
+from tools.runtime.lifecycle.update_lifecycle_contract import (
     binding_identity,
     materialize_gate_verdict,
     materialize_publication_readback_receipt,

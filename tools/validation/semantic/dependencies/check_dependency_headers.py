@@ -237,7 +237,7 @@ def manifest_lines(path: Path) -> list[str]:
 
 def registry_candidates(root: Path) -> tuple[Path, ...]:
     """Return registry candidates owned by the selected source checkout."""
-    script_root = Path(__file__).resolve().parents[2]
+    script_root = Path(__file__).resolve().parents[4]
     return (
         root / CONTRACT_REGISTRY,
         root / "vendor" / "agent-canon" / CONTRACT_REGISTRY,

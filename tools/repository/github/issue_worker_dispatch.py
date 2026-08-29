@@ -53,7 +53,7 @@ else:
         normalize_repository,
         qualify_issue_worker_finding,
     )
-    from model_profile_registry import (
+    from tools.agent.orchestration.model_profile_registry import (
         ContextItem,
         MaterializedPromptCapsule,
         PromptMaterializationRequest,
@@ -101,7 +101,7 @@ def resolve_agentcanon_runtime_context(
     source_value = (
         Path(agentcanon_source_root).expanduser()
         if agentcanon_source_root is not None
-        else Path(__file__).resolve().parents[2]
+        else Path(__file__).resolve().parents[3]
     )
     if not source_value.is_absolute():
         raise AgentCanonRuntimeContextError("agentcanon_source_root_not_absolute")

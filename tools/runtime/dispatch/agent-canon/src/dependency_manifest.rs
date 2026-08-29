@@ -355,7 +355,7 @@ pub(crate) fn current_producer_identity(root: &Path) -> Result<ProducerIdentity,
     let root = fs::canonicalize(root).map_err(|error| ManifestError::Io(error.to_string()))?;
     let source_root = fs::canonicalize(&root)
         .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?;
-    let producer_path = fs::canonicalize(source_root.join("tools/agent_tools/surface_manifest.py"))
+    let producer_path = fs::canonicalize(source_root.join("tools/runtime/manifest/surface_manifest.py"))
         .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?;
     let manifest_path =
         fs::canonicalize(source_root.join("documents/runtime/shared-runtime-surfaces.toml"))
@@ -468,7 +468,7 @@ fn surface_manifest_script(root: &Path, producer: Option<&Path>) -> Result<PathB
         }
         return Ok(producer.to_path_buf());
     }
-    let standalone_script = root.join("tools/agent_tools/surface_manifest.py");
+    let standalone_script = root.join("tools/runtime/manifest/surface_manifest.py");
     if standalone_script.is_file() {
         return Ok(standalone_script);
     }

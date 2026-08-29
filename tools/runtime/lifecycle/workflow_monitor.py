@@ -49,7 +49,7 @@ from mid_task_user_input_policy import (
     has_reuse_marker,
     is_empty_policy_value,
 )
-from update_lifecycle_contract import TRANSACTION_STATES
+from tools.runtime.lifecycle.update_lifecycle_contract import TRANSACTION_STATES
 from work_log import MONITOR_PASSTHROUGH_FIELDS, append_ledger_event
 
 DECISION_KEYS = (
@@ -154,7 +154,7 @@ VALIDATION_FAILURE_REPAIR_REQUIRED_KEYS = (
     "evidence",
 )
 RUNTIME_PROFILE_INVENTORY_PATH = (
-    Path(__file__).resolve().parents[2]
+    Path(__file__).resolve().parents[3]
     / "documents"
     / "runtime"
     / "runtime-profiles-and-check-matrix.json"

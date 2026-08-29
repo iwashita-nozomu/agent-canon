@@ -4,7 +4,7 @@
 // upstream design ../../../../documents/design/semantic-index-module-boundaries.md approved semantic-index owner boundary
 // upstream implementation ../main.rs canonical Rust CLI dispatch caller
 // downstream implementation ../../../../tools/catalog.yaml command catalog and public command source
-// downstream implementation ../../../../tools/agent_tools/review_backlog_scan.sh process-level semantic-index behavior oracle
+// downstream implementation ../../../../tools/repository/github/review_backlog_scan.sh process-level semantic-index behavior oracle
 // @dependency-end
 
 use super::args::{
@@ -956,7 +956,7 @@ fn responsibility_scope_bucket_tracks_manifest_surfaces() {
         "eval-and-hook-evidence"
     );
     assert_eq!(
-        responsibility_scope_bucket("evidence/agent-evals/skill_workflow_prompt_eval.toml"),
+        responsibility_scope_bucket("eval/definitions/skill_workflow_prompt_eval.toml"),
         "eval-and-hook-evidence"
     );
     assert_eq!(

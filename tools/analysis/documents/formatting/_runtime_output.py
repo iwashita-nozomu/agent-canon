@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
-from tools.agent_tools.runtime_artifacts import (
+from tools.runtime.artifacts.runtime_artifacts import (
     RuntimeArtifactBoundary,
     RuntimeArtifactError,
     runtime_artifact_boundary,

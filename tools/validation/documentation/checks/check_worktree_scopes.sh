@@ -23,7 +23,7 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, os.environ["ROOT_DIR"])
-from tools.agent_tools.runtime_artifacts import (  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import (  # noqa: E402
     RuntimeArtifactError,
     runtime_artifact_boundary,
 )

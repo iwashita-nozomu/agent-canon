@@ -33,7 +33,7 @@ try:
         runtime_spool_boundary,
     )
 except ImportError:
-    from runtime_artifacts import (  # type: ignore[no-redef]
+    from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
         RUNTIME_ROOT_ENV,
         RuntimeArtifactBoundary,
         RuntimePathEscape,
@@ -68,9 +68,9 @@ GIT_COMMIT_KEY_LENGTH = 12
 CODEX_TRACE_ENV_NAMES = ("CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_CONVERSATION_ID")
 GIT_HEAD_TIMEOUT_SECONDS = 5
 AGENT_CANON_ROOT_MARKERS = (
-    (Path("tools") / "agent_tools" / "runtime_log_paths.py", 2),
-    (Path("tools") / "agent_tools" / "evaluate_skill_workflow_prompts.py", 2),
-    (Path("evidence") / "agent-evals" / "README.md", 2),
+    (Path("tools") / "runtime" / "archive" / "runtime_log_paths.py", 2),
+    (Path("eval") / "producers" / "evaluate_skill_workflow_prompts.py", 2),
+    (Path("eval") / "definitions" / "README.md", 2),
     (Path("documents") / "runtime-log-archive.md", 1),
 )
 

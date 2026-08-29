@@ -73,7 +73,7 @@ if [ -n "${REPORT_DIR}" ]; then
     mkdir -p "${TEMP_DIR}"
     REPORT_SNAPSHOT_FILE="${TEMP_DIR}/report.json"
     WORKSPACE_SNAPSHOT_FILE="${TEMP_DIR}/workspace.json"
-    python3 tools/agent_tools/validate_role_write_scope.py \
+    python3 tools/validation/semantic/authority/validate_role_write_scope.py \
       --report-dir "${REPORT_DIR}" \
       --workspace-root "${WORKSPACE_ROOT}" \
       --report-snapshot-out "${REPORT_SNAPSHOT_FILE}" \
@@ -92,7 +92,7 @@ write_report() {
 if [ -n "${REPORT_FILE}" ]; then
   write_report "pre_review_started_at_utc=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   write_report "workspace_root=${WORKSPACE_ROOT}"
-  write_report "python_quality_runner=tools/ci/run_python_quality_checks.sh"
+  write_report "python_quality_runner=tools/validation/ci/checks/run_python_quality_checks.sh"
 fi
 
 enforce_write_scope() {
@@ -101,7 +101,7 @@ enforce_write_scope() {
   fi
   local cmd=(
     python3
-    tools/agent_tools/validate_role_write_scope.py
+    tools/validation/semantic/authority/validate_role_write_scope.py
     --role "${AGENT_ROLE_NAME}"
     --report-dir "${REPORT_DIR}"
     --workspace-root "${WORKSPACE_ROOT}"
@@ -147,7 +147,7 @@ echo "=========================================="
 echo "PRE-REVIEW PYTHON QUALITY CHECKS"
 echo "=========================================="
 
-if bash tools/ci/run_python_quality_checks.sh "$@"; then
+if bash tools/validation/ci/checks/run_python_quality_checks.sh "$@"; then
   write_report "python_quality=pass"
 else
   RUN_STATUS="failed"

@@ -22,7 +22,7 @@ import json
 import subprocess
 import sys
 
-import model_profile_registry
+import tools.agent.orchestration.model_profile_registry
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -39,8 +39,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
 
-from runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary
-from runtime_log_paths import eval_results_dir
+from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary
+from tools.runtime.archive.runtime_log_paths import eval_results_dir
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -55,7 +55,7 @@ if __package__:
         select_roles,
     )
 else:
-    from team_config import (
+    from tools.agent.orchestration.team_config import (
         Role,
         default_specialists_for_task,
         load_task_catalog,
@@ -72,7 +72,7 @@ if __package__:
         workflow_topology_policy_violations,
     )
 else:
-    from implementation_dispatch import (
+    from tools.agent.orchestration.implementation_dispatch import (
         declared_team_capacity_derivation,
         recommended_dynamic_expansion_wave_slots,
         recommended_initial_subagent_wave,
@@ -1014,7 +1014,7 @@ def write_markdown_report(
         "<!--",
         "@dependency-start",
         "responsibility Records one Codex subagent role eval run.",
-        "upstream implementation ../../../../tools/agent_tools/evaluate_codex_agent_roles.py generates this report",
+        "upstream implementation ../../../../eval/producers/evaluate_codex_agent_roles.py generates this report",
         "@dependency-end",
         "-->",
         "",

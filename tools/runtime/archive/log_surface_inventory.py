@@ -31,7 +31,7 @@ try:
         attest_parent_root,
     )
 except ImportError:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
+    from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]
         ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
@@ -74,8 +74,8 @@ TOOL_PATTERNS = (
     "tools/**/*.bash",
 )
 RUST_TOOL_PATTERNS = (
-    "rust/agent-canon/src/*.rs",
-    "rust/agent-canon/src/**/*.rs",
+    "tools/runtime/dispatch/agent-canon/src/*.rs",
+    "tools/runtime/dispatch/agent-canon/src/**/*.rs",
 )
 RUST_PRINT_PATTERN = re.compile(r'^\s*(?:e?println)\s*!\s*\(\s*"(?P<value>[^"]*)')
 MAX_DIFF_RECORDS = 20

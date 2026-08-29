@@ -2,10 +2,10 @@
 // contract implementation
 // responsibility Owns the one-build AgentCanon dependency graph and optional persisted runtime-evidence snapshot.
 // upstream implementation dependency_manifest.rs provides the complete-file source snapshot
-// upstream implementation ../../../tools/agent_tools/skill_projection_registry.py provides generated skill-view owner mapping
+// upstream implementation ../../../tools/agent/skills/skill_projection_registry.py provides generated skill-view owner mapping
 // upstream implementation structured_analysis.rs provides the graph storage schema
 // downstream implementation main.rs dispatches the public graph command
-// downstream implementation ../../../tools/agent_tools/graph_client.py consumes typed graph responses
+// downstream implementation ../../../tools/analysis/dependencies/graph_client.py consumes typed graph responses
 // @dependency-end
 
 use crate::dependency_manifest::{
@@ -1845,7 +1845,7 @@ fn runtime_evidence_producer(snapshot: &RuntimeEvidenceSnapshot) -> ProducerArti
     ProducerArtifact {
         producer_id: "runtime-event-materializer".to_string(),
         version: "agent_canon.runtime_event.v1".to_string(),
-        command: "tools/agent_tools/runtime_log_archive_git.py materialize-runtime-event"
+        command: "tools/runtime/archive/runtime_log_archive_git.py materialize-runtime-event"
             .to_string(),
         root: snapshot.rollout_path.clone(),
         content_sha256: sha256(&snapshot.artifact_bytes),
@@ -3506,12 +3506,12 @@ mod tests {
     fn materialize_standalone_surface_manifest(root: &Path) {
         let files: &[(&str, &[u8])] = &[
             (
-                "tools/agent_tools/surface_manifest.py",
-                include_bytes!("../../../tools/agent_tools/surface_manifest.py"),
+                "tools/runtime/manifest/surface_manifest.py",
+                include_bytes!("../../../tools/runtime/manifest/surface_manifest.py"),
             ),
             (
-                "tools/agent_tools/skill_projection_registry.py",
-                include_bytes!("../../../tools/agent_tools/skill_projection_registry.py"),
+                "tools/agent/skills/skill_projection_registry.py",
+                include_bytes!("../../../tools/agent/skills/skill_projection_registry.py"),
             ),
             (
                 "documents/runtime/shared-runtime-surfaces.toml",
@@ -4140,7 +4140,7 @@ mod tests {
             build_graph_with_failure(&graph_args(&fixture.root)).expect("first graph build");
         OpenOptions::new()
             .append(true)
-            .open(fixture.root.join("tools/agent_tools/surface_manifest.py"))
+            .open(fixture.root.join("tools/runtime/manifest/surface_manifest.py"))
             .expect("producer for mutation")
             .write_all(b"\n# producer semantic mutation\n")
             .expect("mutate producer");
@@ -4167,7 +4167,7 @@ mod tests {
 
         OpenOptions::new()
             .append(true)
-            .open(fixture.root.join("tools/agent_tools/surface_manifest.py"))
+            .open(fixture.root.join("tools/runtime/manifest/surface_manifest.py"))
             .expect("producer for mutation")
             .write_all(b"\n# producer status mutation\n")
             .expect("mutate producer");
@@ -4257,7 +4257,7 @@ mod tests {
             .open(
                 producer_fixture
                     .root
-                    .join("tools/agent_tools/surface_manifest.py"),
+                    .join("tools/runtime/manifest/surface_manifest.py"),
             )
             .expect("external producer for mutation")
             .write_all(b"\n# concurrent producer replacement\n")

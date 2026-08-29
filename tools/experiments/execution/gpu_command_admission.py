@@ -35,7 +35,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Callable, Literal, Mapping, Protocol, Sequence, cast
 
-from tools.experiments.execution_resource_plan import (
+from tools.experiments.execution.execution_resource_plan import (
     ConcurrentRunEvidence,
     DescendantRetentionEvidence,
     EvidenceFd,

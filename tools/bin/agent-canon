@@ -33,7 +33,7 @@ if [ "${1:-}" = "tool" ] && [ "${2:-}" = "run" ]; then
 
   # Catalog tool paths retain the dispatcher contract: they require an
   # already-registered external runtime and are not source-tree fallbacks.
-  dispatcher="${canon_root}/tools/agent_tools/tool_dispatch.py"
+  dispatcher="${canon_root}/tools/runtime/dispatch/tool_dispatch.py"
   if [ ! -f "$dispatcher" ]; then
     echo "agent-canon dispatcher is unavailable" >&2
     exit 2

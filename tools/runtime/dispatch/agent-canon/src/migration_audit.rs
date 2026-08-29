@@ -12,32 +12,32 @@ use std::path::{Path, PathBuf};
 const REQUIRED_PATHS: &[&str] = &[
     "documents/design/rust-agent-tool-migration.md",
     "agent-canon-environment.toml",
-    "rust/agent-canon/Cargo.toml",
-    "rust/agent-canon/src/main.rs",
-    "rust/agent-canon/src/mcp_inventory.rs",
-    "rust/agent-canon/src/migration_audit.rs",
-    "rust/agent-canon/src/rust_migration_plan.rs",
+    "tools/runtime/dispatch/agent-canon/Cargo.toml",
+    "tools/runtime/dispatch/agent-canon/src/main.rs",
+    "tools/runtime/dispatch/agent-canon/src/mcp_inventory.rs",
+    "tools/runtime/dispatch/agent-canon/src/migration_audit.rs",
+    "tools/runtime/dispatch/agent-canon/src/rust_migration_plan.rs",
     "tools/bin/agent-canon",
 ];
 
 const REQUIRED_BOOTSTRAP_PATHS: &[&str] = &[
     "bootstrap.sh",
-    "bootstrap/manifest.toml",
-    "bootstrap/container/Dockerfile",
-    "bootstrap/container/dependencies.toml",
-    "bootstrap/container/entrypoint.sh",
-    "tools/agent_tools/bootstrap_runtime.py",
-    "tools/agent_tools/runtime_artifacts.py",
-    "tools/agent_tools/tool_dispatch.py",
+    "bootstrap/host/manifest.toml",
+    "bootstrap/container/image/Dockerfile",
+    "bootstrap/container/image/dependencies.toml",
+    "bootstrap/container/lifecycle/entrypoint.sh",
+    "tools/runtime/container/bootstrap_runtime.py",
+    "tools/runtime/artifacts/runtime_artifacts.py",
+    "tools/runtime/dispatch/tool_dispatch.py",
 ];
 
 const REQUIRED_BOOTSTRAP_SNIPPETS: &[(&str, &str)] = &[
     ("bootstrap.sh", "bootstrap_python_entrypoint"),
-    ("bootstrap/container/Dockerfile", "USER agentcanon"),
-    ("bootstrap/container/Dockerfile", "HEALTHCHECK"),
-    ("bootstrap/container/Dockerfile", "image-install"),
-    ("bootstrap/container/entrypoint.sh", "health"),
-    ("bootstrap/container/entrypoint.sh", "resident"),
+    ("bootstrap/container/image/Dockerfile", "USER agentcanon"),
+    ("bootstrap/container/image/Dockerfile", "HEALTHCHECK"),
+    ("bootstrap/container/image/Dockerfile", "image-install"),
+    ("bootstrap/container/lifecycle/entrypoint.sh", "health"),
+    ("bootstrap/container/lifecycle/entrypoint.sh", "resident"),
 ];
 
 const FORBIDDEN_DOCKERFILE_SNIPPETS: &[&str] = &[
@@ -211,12 +211,12 @@ mod tests {
         write(root, "bootstrap.sh", "bootstrap_python_entrypoint\n");
         write(
             root,
-            "bootstrap/container/Dockerfile",
+            "bootstrap/container/image/Dockerfile",
             "USER agentcanon\nHEALTHCHECK\nimage-install\n",
         );
         write(
             root,
-            "bootstrap/container/entrypoint.sh",
+            "bootstrap/container/lifecycle/entrypoint.sh",
             "health\nresident\n",
         );
         write(root, "docker/Dockerfile", "FROM ubuntu:22.04\n");

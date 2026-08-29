@@ -24,7 +24,7 @@ from pathlib import Path
 try:
     from .runtime_artifacts import runtime_artifact_boundary
 except ImportError:  # direct script/module execution
-    from runtime_artifacts import (  # type: ignore[no-redef]
+    from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
         runtime_artifact_boundary,
     )
 
@@ -36,9 +36,9 @@ else:
 if __package__:
     from .agent_canon_source_root import resolve_agent_canon_source_root
 else:
-    from agent_canon_source_root import resolve_agent_canon_source_root
+    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 
-from agent_canon_preflight import AgentCanonPreflightResult, run_agent_canon_preflight
+from tools.runtime.source.agent_canon_preflight import AgentCanonPreflightResult, run_agent_canon_preflight
 
 if __package__:
     from .packets import (
@@ -726,12 +726,12 @@ def emit_bootstrap_output(
                     )
             print(
                 "ISSUE_WORKER_DISPATCH_ROUTE="
-                "tools/agent_tools/agent_team.py#dispatch_issue_worker"
+                "tools/agent/orchestration/agent_team.py#dispatch_issue_worker"
             )
             print("ISSUE_WORKER_EXECUTION_ROLE=publisher")
             print(
                 "ISSUE_WORKER_TOOL_CALL_ROUTE="
-                "tools/agent_tools/tool_calls.py#materialize_issue_worker_tool_call"
+                "tools/agent/orchestration/tool_calls.py#materialize_issue_worker_tool_call"
             )
             print("ISSUE_WORKER_READBACK=URL,number,body,state")
         print(
@@ -862,7 +862,7 @@ def emit_bootstrap_output(
         "IMPLEMENTATION_SURFACE_ROUTE_COMMAND="
         +
         public_command_for_layout(
-            "python3 tools/agent_tools/search.py "
+            "python3 tools/analysis/search/search.py "
             "--query-file <request-or-design-question.txt> "
             "--providers text,semantic,vector,tool,header-deps,code-deps "
             "--format json",
@@ -875,7 +875,7 @@ def emit_bootstrap_output(
         "PRE_EDIT_REJECTION_COMMAND="
         +
         public_command_for_layout(
-            "python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>",
+            "python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>",
             public_layout,
         )
     )
@@ -883,7 +883,7 @@ def emit_bootstrap_output(
     print(
         "AGENT_REPORT_COLLECTION_STATUS_COMMAND="
         + public_command_for_layout(
-            "python3 tools/agent_tools/runtime_log_archive_git.py status",
+            "python3 tools/runtime/archive/runtime_log_archive_git.py status",
             public_layout,
         )
     )
@@ -891,14 +891,14 @@ def emit_bootstrap_output(
         "AGENT_REPORT_ARCHIVE_RUN_COMMAND="
         +
         public_command_for_layout(
-            f"python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir {context.report_dir}",
+            f"python3 tools/runtime/archive/runtime_log_archive_git.py archive-agent-report --report-dir {context.report_dir}",
             public_layout,
         )
     )
     print(
         "AGENT_REPORT_COLLECTION_SYNC_COMMAND="
         + public_command_for_layout(
-            "python3 tools/agent_tools/runtime_log_archive_git.py sync",
+            "python3 tools/runtime/archive/runtime_log_archive_git.py sync",
             public_layout,
         )
     )

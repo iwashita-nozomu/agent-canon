@@ -22,13 +22,13 @@ invocation_root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
 parent_root="${AGENT_CANON_CONTROL_PARENT_ROOT:-${AGENT_CANON_PARENT_ROOT:-}}"
 runtime_root="${AGENT_CANON_RUNTIME_ROOT:-}"
 script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-boundary_script="${script_root}/tools/agent_tools/parent_root_side_effects.py"
+boundary_script="${script_root}/tools/repository/workspace/parent_root_side_effects.py"
 parent_temp_paths=()
 created_parent_temp_dir=""
 
 usage() {
   cat <<'EOF'
-Usage: bash tools/ci/scan_secrets.sh [--root PATH] [--current-only|--history-only]
+Usage: bash tools/validation/ci/checks/scan_secrets.sh [--root PATH] [--current-only|--history-only]
 
 Runs gitleaks, trufflehog, and detect-secrets without writing repository state.
 

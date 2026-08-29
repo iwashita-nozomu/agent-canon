@@ -20,7 +20,7 @@ from registry_lib import write_registry
 
 def repo_root_from_script() -> Path:
     """Return the repository root from this script location."""
-    return Path(__file__).absolute().parents[2]
+    return Path(__file__).absolute().parents[3]
 
 
 def build_parser() -> argparse.ArgumentParser:

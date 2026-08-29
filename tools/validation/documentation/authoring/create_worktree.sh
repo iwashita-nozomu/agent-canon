@@ -10,5 +10,5 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-echo "[compat] tools/docs/create_worktree.sh is deprecated and delegates to the rejecting legacy wrapper" >&2
+echo "[compat] tools/validation/documentation/authoring/create_worktree.sh is deprecated and delegates to the rejecting legacy wrapper" >&2
 exec bash "${ROOT_DIR}/setup_worktree.sh" "$@"

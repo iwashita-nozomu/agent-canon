@@ -33,13 +33,13 @@ TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools" / "agent_tools"
 if TOOLS_DIR.is_dir():
     sys.path.insert(0, str(TOOLS_DIR))
 
-from parent_root_side_effects import (  # noqa: E402
+from tools.repository.workspace.parent_root_side_effects import (  # noqa: E402
     ParentRootAttestationRequest,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
     attest_parent_root,
 )
-from runtime_log_paths import (  # noqa: E402
+from tools.runtime.archive.runtime_log_paths import (  # noqa: E402
     codex_trace_key,
     hook_event_spool_root,
     repo_log_key,

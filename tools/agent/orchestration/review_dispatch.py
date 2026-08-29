@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
-from artifact_identity import (
+from tools.runtime.artifacts.artifact_identity import (
     canonical_body_sha256,
     canonical_json_bytes,
     materialize_artifact_identity,
@@ -358,7 +358,7 @@ def _review_route(report_dir: Path, role_id: str) -> dict[str, str]:
             "automatic_review:role_config_mismatch",
             role_id,
         )
-    config_path = Path(__file__).resolve().parents[2] / "agents" / "agents_config.json"
+    config_path = Path(__file__).resolve().parents[3] / "agents" / "agents_config.json"
     raw = json.loads(config_path.read_text(encoding="utf-8"))
     role_groups = (
         [raw.get("always_on_roles"), raw.get("specialist_roles")]
@@ -428,7 +428,7 @@ def _append_automatic_event(
             "semantic_kind": "publication_state",
             "owner": "component_manager",
             "state_owner": "component_manager",
-            "api_owner": "tools/agent_tools/review_dispatch.py",
+            "api_owner": "tools/agent/orchestration/review_dispatch.py",
             "dependency_owner": "agents/COMMUNICATION_PROTOCOL.md",
             "responsibility_unit": "completion_authority",
             "intent_id": "W2-completion-authority",

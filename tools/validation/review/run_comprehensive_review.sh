@@ -10,7 +10,7 @@
 # スキルファイル section 12 の自動化スクリプトを一括実行
 # 
 # 用法:
-#   ./tools/run_comprehensive_review.sh [--parallel] [--report]
+#   ./tools/validation/review/run_comprehensive_review.sh [--parallel] [--report]
 #
 # オプション:
 #   --parallel     ツールを並行実行（高速化）
@@ -62,7 +62,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --help)
             cat <<'EOF'
-Usage: ./tools/run_comprehensive_review.sh [--parallel] [--report] [--verbose]
+Usage: ./tools/validation/review/run_comprehensive_review.sh [--parallel] [--report] [--verbose]
        [--runtime-root PATH]
 
 Runs static checks, tests, and workflow validators used in the comprehensive
@@ -85,7 +85,7 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, os.environ["ROOT_DIR"])
-from tools.agent_tools.runtime_artifacts import (  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import (  # noqa: E402
     RuntimeArtifactError,
     runtime_artifact_boundary,
 )

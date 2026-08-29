@@ -44,11 +44,11 @@ set -euo pipefail
 #       この script は full confidence gate として使います。
 #
 # 使用方法:
-#   bash tools/ci/run_all_checks.sh           # full confidence checks
-#   bash tools/ci/run_all_checks.sh --quick   # broad checks with ruff skipped
-#   bash tools/ci/run_all_checks.sh --quick --skip-docs --skip-github-workflows
+#   bash tools/validation/ci/runners/run_all_checks.sh           # full confidence checks
+#   bash tools/validation/ci/runners/run_all_checks.sh --quick   # broad checks with ruff skipped
+#   bash tools/validation/ci/runners/run_all_checks.sh --quick --skip-docs --skip-github-workflows
 #                                               # PR gate reuse after those gates already ran
-#   bash tools/ci/run_all_checks.sh --skip-experiments
+#   bash tools/validation/ci/runners/run_all_checks.sh --skip-experiments
 #                                               # skip the optional experiment registry gate
 #
 # 前提条件:
@@ -78,7 +78,7 @@ CANON_CI_ROOT="${CANON_TOOLS_ROOT}/ci"
 cd "$WORKSPACE_ROOT"
 
 AGENT_CANON_SOURCE_ROOT="$WORKSPACE_ROOT"
-AGENT_CANON_CARGO_MANIFEST="${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml"
+AGENT_CANON_CARGO_MANIFEST="${AGENT_CANON_SOURCE_ROOT}/tools/runtime/dispatch/agent-canon/Cargo.toml"
 AGENT_CANON_BOUNDARY_SCRIPT="${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py"
 # The checkout is a read-only source input.  Control and runtime roots are
 # explicit capabilities supplied by the caller; source/TMPDIR fallbacks would

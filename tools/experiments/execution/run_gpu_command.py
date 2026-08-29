@@ -21,14 +21,14 @@ from pathlib import Path
 from typing import Sequence
 
 if __package__ in {None, ""}:  # Support the documented path invocation.
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from tools.experiments.execution_resource_plan import (  # noqa: E402
+from tools.experiments.execution.execution_resource_plan import (  # noqa: E402
     HOST_RUNTIME_ROOT,
     LOCK_ROOT,
     TypedPreflightFailure,
 )
-from tools.experiments.gpu_command_admission import (  # noqa: E402
+from tools.experiments.execution.gpu_command_admission import (  # noqa: E402
     DirectGpuCommandRequest,
     DirectGpuCommandRunner,
     forward_command_output,

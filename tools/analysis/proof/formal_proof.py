@@ -27,7 +27,7 @@ from typing import TypeAlias
 os.environ.setdefault("PYTHONDONTWRITEBYTECODE", "1")
 
 try:
-    from tools.agent_tools.runtime_artifacts import (
+    from tools.runtime.artifacts.runtime_artifacts import (
         RuntimeArtifactBoundary,
         RuntimeArtifactError,
         RuntimeRootRequired,
@@ -35,8 +35,8 @@ try:
         runtime_artifact_boundary,
     )
 except ImportError:  # pragma: no cover - direct script invocation.
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from tools.agent_tools.runtime_artifacts import (  # type: ignore[no-redef]
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
         RuntimeArtifactBoundary,
         RuntimeArtifactError,
         RuntimeRootRequired,
@@ -44,7 +44,7 @@ except ImportError:  # pragma: no cover - direct script invocation.
         runtime_artifact_boundary,
     )
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 TARGET_EXTENSIONS = {
     "lean": "lean",
@@ -471,7 +471,7 @@ def build_verification_commands(
         else:
             env_dir = "${AGENT_CANON_RUNTIME_ROOT}/tasks/formal-proof/lean-proof-env"
         return (
-            "python3 tools/agent_tools/lean_proof_env.py check-file "
+            "python3 tools/analysis/proof/lean_proof_env.py check-file "
             f"--env-dir {env_dir} "
             f"--lean-file {shlex.quote(stub_path)} --execute",
         )

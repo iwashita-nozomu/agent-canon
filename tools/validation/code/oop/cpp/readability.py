@@ -15,11 +15,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[5]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools.oop.shared.readability_core import main
+from tools.validation.code.oop.shared.readability_core import main
 
 
 if __name__ == "__main__":

@@ -36,7 +36,7 @@ try:
         attest_parent_root,
     )
 except ImportError:
-    from parent_root_side_effects import (  # type: ignore[no-redef]
+    from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]
         ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
@@ -44,8 +44,8 @@ except ImportError:
         attest_parent_root,
     )
 
-from artifact_identity import canonical_body_sha256, canonical_json_bytes, git_blob_oid
-from mid_task_user_input_policy import (
+from tools.runtime.artifacts.artifact_identity import canonical_body_sha256, canonical_json_bytes, git_blob_oid
+from tools.agent.orchestration.mid_task_user_input_policy import (
     MID_TASK_CLASSIFICATION_ACTIONS,
     MID_TASK_CLASSIFICATION_SCOPE_STATUS,
     MID_TASK_EVIDENCE_FIELDS,
@@ -133,13 +133,13 @@ COMPLETION_COVERAGE_SCHEMA = "agent-canon.completion-coverage.v1"
 VALIDATION_RESULT_SCHEMA = "agent-canon.validation-result-projection.v1"
 VALIDATION_ROUTE_ID = "python.ruff.full"
 VALIDATION_OWNER_PATHS = (
-    "tools/agent_tools/review_dispatch.py",
-    "tools/agent_tools/artifact_identity.py",
-    "tools/agent_tools/external_artifact_binding.py",
-    "tools/agent_tools/publication_integrator.py",
-    "tools/agent_tools/report_artifact_checks.py",
-    "tools/agent_tools/review_dispatch.py",
-    "tools/agent_tools/work_log.py",
+    "tools/agent/orchestration/review_dispatch.py",
+    "tools/runtime/artifacts/artifact_identity.py",
+    "tools/runtime/artifacts/external_artifact_binding.py",
+    "tools/repository/github/publication_integrator.py",
+    "tools/runtime/artifacts/report_artifact_checks.py",
+    "tools/agent/orchestration/review_dispatch.py",
+    "tools/runtime/archive/work_log.py",
     "tests/agent_tools/test_artifact_identity.py",
     "tests/agent_tools/test_codex_hooks.py",
     "tests/agent_tools/test_external_artifact_binding.py",
@@ -170,7 +170,7 @@ COMPLETION_COVERAGE_TAXONOMY_REFS = (
     "documents/runtime/runtime-profiles-and-check-matrix.md",
 )
 RUNTIME_PROFILE_TAXONOMY_PATH = (
-    Path(__file__).resolve().parents[2]
+    Path(__file__).resolve().parents[3]
     / "documents"
     / "runtime-profiles-and-check-matrix.json"
 )
@@ -870,13 +870,13 @@ def materialize_required_validation(workspace: Path) -> dict[str, object]:
             "event_kind": "validation",
             "subject_id": VALIDATION_ROUTE_ID,
             "owner": "completion_authority",
-            "state_owner": "tools/agent_tools/work_log.py",
-            "api_owner": "tools/agent_tools/report_artifact_checks.py",
+            "state_owner": "tools/runtime/archive/work_log.py",
+            "api_owner": "tools/runtime/artifacts/report_artifact_checks.py",
             "dependency_owner": "agents/COMMUNICATION_PROTOCOL.md",
             "responsibility_unit": "existing materializer-backed validation route",
             "intent_id": "W2-v16-runtime-recovery",
             "outcome": "pending",
-            "evidence_refs": ["tools/agent_tools/report_artifact_checks.py"],
+            "evidence_refs": ["tools/runtime/artifacts/report_artifact_checks.py"],
             "artifact_refs": ["work_log.md"],
             "source_binding": {
                 "run_id": report_dir.name,

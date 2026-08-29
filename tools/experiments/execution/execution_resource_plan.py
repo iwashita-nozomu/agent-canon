@@ -82,10 +82,10 @@ APPROVED_DESIGN_BRIEF_SHA256 = "c103be1a2c37a150465194e00770548680c624eed6e0ed0e
 APPROVED_DESIGN_PARTITION_SHA256 = "4719b6da8d96811fec132e9b5e166785ae272fc45d9af480d7c6869ab2da0cca"
 APPROVED_DESIGN_REVISION = "W1-DESIGN-20260716-R3-GPU-COMPLETIONCOVERAGE-REPAIR"
 ORGANIZER_CONTEXT_ID = "019f6480-0e7d-73a2-9838-e343adc44457"
-MANAGED_RUN_ADAPTER_PATH = "tools/experiments/run_managed_experiment.py"
+MANAGED_RUN_ADAPTER_PATH = "tools/experiments/execution/run_managed_experiment.py"
 PARENT_LINEAGE_ARTIFACT = "reports/agents/w1-tool-env-routing-20260716/control_topology_ledger.md"
 ALTERNATE_GPU_ROUTE_STATIC_CONTRACT = (
-    "tools/agent_tools/jit_canonical_ir.py",
+    "tools/analysis/proof/jit_canonical_ir.py",
     "templates/experiments/_template/run.py",
     MANAGED_RUN_ADAPTER_PATH,
 )
@@ -7681,7 +7681,7 @@ def handle_pre_execution_failure(
             "approved_design_partition_sha256": APPROVED_DESIGN_PARTITION_SHA256,
             "organizer_conclusion_prior_hash": "none",
             "organizer_conclusion_hash_assigned": False,
-            "implementation_artifact": "tools/experiments/execution_resource_plan.py",
+            "implementation_artifact": "tools/experiments/execution/execution_resource_plan.py",
             "implementation_review_artifact": (
                 "reports/agents/w1-tool-env-routing-20260716/implementation_review.md"
             ),
@@ -9939,7 +9939,7 @@ def dispose_resources(
             "organizer_conclusion_hash_assigned": False,
             "approved_design_revision": APPROVED_DESIGN_REVISION,
             "organizer_context_id": ORGANIZER_CONTEXT_ID,
-            "implementation_artifact": "tools/experiments/execution_resource_plan.py",
+            "implementation_artifact": "tools/experiments/execution/execution_resource_plan.py",
             "implementation_review_artifact": (
                 "reports/agents/w1-tool-env-routing-20260716/implementation_review.md"
             ),
@@ -9976,7 +9976,7 @@ def dispose_resources(
             "organizer_conclusion_hash_assigned": False,
             "approved_design_revision": APPROVED_DESIGN_REVISION,
             "organizer_context_id": ORGANIZER_CONTEXT_ID,
-            "implementation_artifact": "tools/experiments/execution_resource_plan.py",
+            "implementation_artifact": "tools/experiments/execution/execution_resource_plan.py",
             "implementation_review_artifact": (
                 "reports/agents/w1-tool-env-routing-20260716/implementation_review.md"
             ),

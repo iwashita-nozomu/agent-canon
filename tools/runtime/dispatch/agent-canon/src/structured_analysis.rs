@@ -1216,7 +1216,7 @@ fn direct_findings(
         findings.push(DocumentFinding {
             path: record.path.clone(),
             kind: "accumulated_eval_result".to_string(),
-            canonical_path: "evidence/agent-evals/README.md".to_string(),
+            canonical_path: "eval/definitions/README.md".to_string(),
             action: "retain as evidence; do not edit as policy".to_string(),
             reason: "accumulated eval reports are run evidence, not the prompt canon".to_string(),
         });

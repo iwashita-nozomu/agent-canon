@@ -14,8 +14,8 @@ BASE_REF="${AGENT_UPDATE_BASE_REF:-origin/main}"
 usage() {
   cat <<'EOF'
 Usage:
-  bash tools/agent_tools/agent_update_branch.sh validate <knowledge-eval|canon-pin|integration> [base-ref]
-  bash tools/agent_tools/agent_update_branch.sh push <knowledge-eval|canon-pin|integration> <branch> [base-ref]
+  bash tools/repository/git/agent_update_branch.sh validate <knowledge-eval|canon-pin|integration> [base-ref]
+  bash tools/repository/git/agent_update_branch.sh push <knowledge-eval|canon-pin|integration> <branch> [base-ref]
 
 The command validates that an agent update branch only changes the allowed lane
 surface, then pushes the current HEAD to the requested branch.

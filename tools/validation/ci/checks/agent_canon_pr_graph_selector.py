@@ -33,11 +33,11 @@ AGENT_TOOLS_ROOT = Path(__file__).resolve().parents[1] / "agent_tools"
 if str(AGENT_TOOLS_ROOT) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS_ROOT))
 
-from parent_root_side_effects import (  # noqa: E402
+from tools.repository.workspace.parent_root_side_effects import (  # noqa: E402
     ParentRootReject,
     ParentRootSideEffectError,
 )
-from runtime_artifacts import (  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import (  # noqa: E402
     RuntimeArtifactError,
     runtime_artifact_boundary,
 )

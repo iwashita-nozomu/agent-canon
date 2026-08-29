@@ -2,7 +2,7 @@
 // contract implementation
 // responsibility Exposes the private feedback/knowledge command family from the Rust CLI.
 // upstream design ../../../documents/runtime/private-feedback-knowledge.md
-// upstream implementation ../../../tools/agent_tools/private_feedback.py owns private storage and sync semantics
+// upstream implementation ../../../tools/runtime/archive/private_feedback.py owns private storage and sync semantics
 // downstream implementation ../../../tests/agent_tools/test_private_feedback.py validates metadata/redaction boundaries
 // @dependency-end
 
@@ -21,11 +21,11 @@ fn adapter_path() -> Option<PathBuf> {
     let candidates = [
         env::var_os("AGENT_CANON_RUNTIME_TOOLS_ROOT")
             .map(PathBuf::from)
-            .map(|root| root.join("tools/agent_tools/private_feedback.py")),
+            .map(|root| root.join("tools/runtime/archive/private_feedback.py")),
         env::var_os("AGENT_CANON_SOURCE_ROOT")
             .map(PathBuf::from)
-            .map(|root| root.join("tools/agent_tools/private_feedback.py")),
-        Some(PathBuf::from("tools/agent_tools/private_feedback.py")),
+            .map(|root| root.join("tools/runtime/archive/private_feedback.py")),
+        Some(PathBuf::from("tools/runtime/archive/private_feedback.py")),
     ];
     candidates.into_iter().flatten().find(|path| path.is_file())
 }

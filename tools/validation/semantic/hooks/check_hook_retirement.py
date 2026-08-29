@@ -29,16 +29,16 @@ from hook_retirement import (
 
 EXECUTABLE_SCAN_PATHS = (
     ".codex/hooks.json", ".codex/config.toml", ".codex/agents", "templates", "tools/catalog.yaml",
-    "tools/ci/run_python_quality_checks.sh", "tools/agent_tools/check_agent_runtime_alignment.py",
-    "tools/agent_tools/check_convention_compliance.py", "tools/agent_tools/convention_compliance_contracts.toml",
-    "tools/agent_tools/generate_agent_runtime_dashboard.py", "tools/agent_tools/skill_lane_detector.py",
-    "tools/agent_tools/report_artifact_checks.py", "tools/agent_tools/workflow_monitor.py",
+    "tools/validation/ci/checks/run_python_quality_checks.sh", "tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
+    "tools/validation/semantic/convention/check_convention_compliance.py", "tools/validation/semantic/convention/convention_compliance_contracts.toml",
+    "eval/producers/generate_agent_runtime_dashboard.py", "tools/agent/skills/skill_lane_detector.py",
+    "tools/runtime/artifacts/report_artifact_checks.py", "tools/runtime/lifecycle/workflow_monitor.py",
     "agents/skills/worktree-health.md", ".codex/personal/skills/worktree-health/SKILL.md",
     "documents/experiments/gpu-admission-r5-source-packet.md", "AGENTS.md", "ROOT_AGENTS.md", "README.md",
-    "documents/runtime/runtime-log-archive.md", "tools/README.md", "tools/experiments/execution_resource_plan.py",
-    "tools/validation/notebook_quality.py",
+    "documents/runtime/runtime-log-archive.md", "tools/README.md", "tools/experiments/execution/execution_resource_plan.py",
+    "tools/validation/notebooks/notebook_quality.py",
 )
-METADATA_ALLOWLIST = {"tools/agent_tools/hook_retirement.py", "documents/design/agentcanon-hook-simplification-wave3.md"}
+METADATA_ALLOWLIST = {"tools/runtime/authority/hook_retirement.py", "documents/design/agentcanon-hook-simplification-wave3.md"}
 _COMMAND_RE = re.compile(r"^(?:import-only:tools\.agent_tools\.[A-Za-z0-9_]+:[A-Za-z0-9_]+|command-only:python3 tools/(?:agent_tools|validation)/[A-Za-z0-9_]+\.py(?: [^\n]*)?|skill-only:\$[A-Za-z0-9][A-Za-z0-9_-]*|docs-only:tools/bin/agent-canon docs check)$")
 
 
@@ -133,9 +133,9 @@ def contract_payload(root: Path) -> dict[str, object]:
         except OSError:
             inventory_paths = ["inventory_unreadable"]
     artifacts = [
-        {"name": "skill_usage.jsonl", "mode": "historical_read_only", "producer": "none", "parser": "tools/agent_tools/historical_skill_usage_reader.py", "consumers": ["tools/agent_tools/historical_skill_usage_reader.py", "tools/agent_tools/generate_agent_improvement_guide.py", "tools/agent_tools/generate_agent_runtime_dashboard.py"]},
-        {"name": "behavior_events.jsonl", "mode": "active_canonical", "producer": "tools/agent_tools/behavior_event_assembly.py", "parser": "tools/agent_tools/behavior_event_assembly.py", "consumers": ["tools/agent_tools/generate_agent_runtime_dashboard.py"]},
-        {"name": "workflow_monitoring.md", "mode": "projection", "producer": "tools/agent_tools/workflow_monitor.py", "parser": "tools/agent_tools/workflow_monitor.py", "consumers": ["tools/agent_tools/generate_agent_runtime_dashboard.py", "tools/agent_tools/task_close.py"]},
+        {"name": "skill_usage.jsonl", "mode": "historical_read_only", "producer": "none", "parser": "tools/runtime/archive/historical_skill_usage_reader.py", "consumers": ["tools/runtime/archive/historical_skill_usage_reader.py", "eval/producers/generate_agent_improvement_guide.py", "eval/producers/generate_agent_runtime_dashboard.py"]},
+        {"name": "behavior_events.jsonl", "mode": "active_canonical", "producer": "tools/runtime/archive/behavior_event_assembly.py", "parser": "tools/runtime/archive/behavior_event_assembly.py", "consumers": ["eval/producers/generate_agent_runtime_dashboard.py"]},
+        {"name": "workflow_monitoring.md", "mode": "projection", "producer": "tools/runtime/lifecycle/workflow_monitor.py", "parser": "tools/runtime/lifecycle/workflow_monitor.py", "consumers": ["eval/producers/generate_agent_runtime_dashboard.py", "tools/runtime/lifecycle/task_close.py"]},
     ]
     active, inactive = _active_events(root)
     malformed = [match for match in matches if not isinstance(match.get("token"), str)]

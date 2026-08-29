@@ -28,7 +28,7 @@ try:
         runtime_artifact_boundary,
     )
 except ImportError:
-    from runtime_artifacts import (  # type: ignore[no-redef]
+    from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
         RUNTIME_ROOT_ENV,
         RuntimeRootRequired,
         runtime_artifact_boundary,
@@ -53,7 +53,7 @@ AuthorityEntry: TypeAlias = dict[str, object]
 
 def _runtime_path(path: Path, runtime_root: Path | str | None = None) -> Path:
     """Resolve authority state below the external runtime boundary."""
-    source = Path(__file__).resolve().parents[2]
+    source = Path(__file__).resolve().parents[3]
     configured = runtime_root or os.environ.get(RUNTIME_ROOT_ENV, "").strip() or None
     if configured is None:
         candidate = Path(path)
@@ -79,13 +79,13 @@ def _report_root(root: Path, runtime_root: Path | str | None = None) -> Path:
         # never receive this compatibility path; writes still require an
         # explicit runtime root or an absolute artifact capability.
         candidate = root.resolve()
-        source = Path(__file__).resolve().parents[2]
+        source = Path(__file__).resolve().parents[3]
         if candidate == source or source in candidate.parents:
             raise RuntimeRootRequired(
                 f"explicit external runtime root required; set {RUNTIME_ROOT_ENV}"
             )
         return candidate / "reports" / "agents"
-    source = Path(__file__).resolve().parents[2]
+    source = Path(__file__).resolve().parents[3]
     return runtime_artifact_boundary(source, configured).resolve(Path("reports") / "agents")
 
 

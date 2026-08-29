@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import cast
 
 import yaml
-from tool_path_policy import is_retired_legacy_tool_path
+from ..authority.tool_path_policy import is_retired_legacy_tool_path
 
 CATALOG_PATH = "tools/catalog.yaml"
 TOOL_DOCS_PATH = "documents/tools/tool-docs.toml"
@@ -40,12 +40,12 @@ TOOL_REFERENCE_RE = re.compile(
     r"(?<![A-Za-z0-9_./-])tools/[A-Za-z0-9_./-]+\.(?:py|sh)\b"
 )
 DEFAULT_COMMAND_SOURCES = (
-    "tools/ci/run_all_checks.sh",
-    "tools/ci/check_agent_canon_pr.sh",
+    "tools/validation/ci/runners/run_all_checks.sh",
+    "tools/validation/ci/checks/check_agent_canon_pr.sh",
 )
 ENTRY_WIRING_SOURCES = (
     *DEFAULT_COMMAND_SOURCES,
-    "tools/agent_tools/run_accumulated_agent_evals.py",
+    "eval/producers/run_accumulated_agent_evals.py",
     "agents/workflows/agent-canon-pr-workflow.md",
     ".github/PULL_REQUEST_TEMPLATE.md",
     ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
@@ -57,7 +57,7 @@ CATALOG_DOCS = (
     "documents/tools/repo-local-tool-imports.md",
 )
 VISUALIZATION_CONTRACT_ID = "visualization-contract"
-VISUALIZATION_CONTRACT_PATH = "tools/agent_tools/visualization_contract.py"
+VISUALIZATION_CONTRACT_PATH = "tools/validation/semantic/tools/visualization_contract.py"
 VISUALIZATION_CONTRACT_DOC = "documents/tools/visualization_contract.md"
 
 
@@ -793,8 +793,8 @@ def yaml_id_spans(path: str, text: str) -> dict[str, PublicSourceSpan]:
 def extract_public_surface(root: Path) -> PublicSurfaceReport:
     """Extract the fixed public CLI/tool/skill surfaces from canonical inputs."""
     root = root.resolve()
-    main_path = "rust/agent-canon/src/main.rs"
-    graph_path = "rust/agent-canon/src/graph.rs"
+    main_path = "tools/runtime/dispatch/agent-canon/src/main.rs"
+    graph_path = "tools/runtime/dispatch/agent-canon/src/graph.rs"
     cli_path = "agents/canonical/CLI_ENTRYPOINTS.md"
     tool_path = CATALOG_PATH
     skill_path = "agents/skills/catalog.yaml"

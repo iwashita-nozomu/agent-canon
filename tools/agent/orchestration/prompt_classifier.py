@@ -21,7 +21,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import FrozenSet, Mapping, TypeAlias
 
-from skill_lane_detector import SkillLaneEvidence
+from tools.agent.skills.skill_lane_detector import SkillLaneEvidence
 
 FrozenValue: TypeAlias = str | int | float | bool | None | tuple["FrozenValue", ...] | Mapping[str, "FrozenValue"]
 FrozenMapping = Mapping[str, FrozenValue]

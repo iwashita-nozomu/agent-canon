@@ -18,7 +18,7 @@ Default commands:
 ```bash
 ./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> \
   exec --root <target> -- python3 \
-  /usr/local/share/agent-canon/runtime/tools/agent_tools/check_static_any.py
+  /usr/local/share/agent-canon/runtime/tools/validation/semantic/code/check_static_any.py
 ```
 
 Select either the standalone AgentCanon source or one project target before

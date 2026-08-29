@@ -12,7 +12,7 @@ Detect similar markdown documents under `documents/` (excluding templates and le
 and produce a report plus simple merge-draft files for manual review.
 
 Usage:
-  python3 tools/docs/find_similar_documents.py \
+  python3 tools/analysis/documents/analysis/find_similar_documents.py \
     --runtime-root /abs/path/to/external/agent-canon-runtime/<run> [--min 0.5] \
     [--documents-root /path/to/documents]
 
@@ -33,11 +33,11 @@ from pathlib import Path
 # Direct invocation must not turn the source checkout into a Python cache.
 os.environ.setdefault('PYTHONDONTWRITEBYTECODE', '1')
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from tools.agent_tools.runtime_artifacts import (  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import (  # noqa: E402
     RuntimeArtifactBoundary,
     RuntimeArtifactError,
     runtime_artifact_boundary,

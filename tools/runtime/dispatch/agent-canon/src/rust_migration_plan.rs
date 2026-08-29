@@ -15,33 +15,33 @@ const DEFAULT_LIMIT: usize = 12;
 const PORT_NOW_TARGETS: &[ToolTarget] = &[
     ToolTarget {
         name: "vector_search.py",
-        path: "tools/agent_tools/vector_search.py",
+        path: "tools/analysis/search/vector_search.py",
         reason: "heavy repo-wide text search and ranking logic",
     },
     ToolTarget {
         name: "file_surface_inventory.py",
-        path: "tools/agent_tools/file_surface_inventory.py",
+        path: "tools/analysis/code/file_surface_inventory.py",
         reason: "repo-wide filesystem classification with stable output schema",
     },
     ToolTarget {
         name: "helper_function_inventory.py",
-        path: "tools/agent_tools/helper_function_inventory.py",
+        path: "tools/analysis/code/helper_function_inventory.py",
         reason: "AST inventory with deterministic checker behavior",
     },
     ToolTarget {
         name: "log_surface_inventory.py",
-        path: "tools/agent_tools/log_surface_inventory.py",
+        path: "tools/runtime/archive/log_surface_inventory.py",
         reason: "static log schema inventory across hooks, skills, and tools",
     },
     ToolTarget {
         name: "readability.py",
-        path: "tools/oop/python/readability.py",
+        path: "tools/validation/code/oop/python/readability.py",
         reason:
             "hot hook-facing OOP checker that should reject bad edits before agent tokens are spent",
     },
     ToolTarget {
         name: "check_dependency_graph.sh",
-        path: "tools/agent_tools/check_dependency_graph.sh",
+        path: "tools/analysis/dependencies/check_dependency_graph.sh",
         reason: "dependency graph traversal should become a single typed checker",
     },
 ];
@@ -49,22 +49,22 @@ const PORT_NOW_TARGETS: &[ToolTarget] = &[
 const KEEP_PYTHON_TARGETS: &[ToolTarget] = &[
     ToolTarget {
         name: "bootstrap_agent_run.py",
-        path: "tools/agent_tools/bootstrap_agent_run.py",
+        path: "tools/runtime/lifecycle/bootstrap_agent_run.py",
         reason: "workflow orchestration changes frequently and writes run bundles",
     },
     ToolTarget {
         name: "task_close.py",
-        path: "tools/agent_tools/task_close.py",
+        path: "tools/runtime/lifecycle/task_close.py",
         reason: "closeout policy is agent-facing and changes with workflow gates",
     },
     ToolTarget {
         name: "evaluate_agent_run.py",
-        path: "tools/agent_tools/evaluate_agent_run.py",
+        path: "eval/producers/evaluate_agent_run.py",
         reason: "evaluation rubric remains easier to tune in Python",
     },
     ToolTarget {
         name: "agent_canon_update_todos.py",
-        path: "tools/agent_tools/agent_canon_update_todos.py",
+        path: "tools/agent/orchestration/agent_canon_update_todos.py",
         reason: "parent-repo TODO protocol is still actively evolving",
     },
 ];
@@ -245,16 +245,16 @@ fn inspect_foundation(root: &Path) -> FoundationStatus {
     let mut missing = Vec::new();
     for relative in [
         "documents/design/rust-agent-tool-migration.md",
-        "rust/agent-canon/Cargo.toml",
+        "tools/runtime/dispatch/agent-canon/Cargo.toml",
         "tools/bin/agent-canon",
         "bootstrap.sh",
-        "bootstrap/manifest.toml",
-        "bootstrap/container/Dockerfile",
-        "bootstrap/container/dependencies.toml",
-        "bootstrap/container/entrypoint.sh",
-        "tools/agent_tools/bootstrap_runtime.py",
-        "tools/agent_tools/runtime_artifacts.py",
-        "tools/agent_tools/tool_dispatch.py",
+        "bootstrap/host/manifest.toml",
+        "bootstrap/container/image/Dockerfile",
+        "bootstrap/container/image/dependencies.toml",
+        "bootstrap/container/lifecycle/entrypoint.sh",
+        "tools/runtime/container/bootstrap_runtime.py",
+        "tools/runtime/artifacts/runtime_artifacts.py",
+        "tools/runtime/dispatch/tool_dispatch.py",
     ] {
         if !root.join(relative).exists() {
             missing.push(format!("missing-path:{relative}"));
@@ -263,11 +263,11 @@ fn inspect_foundation(root: &Path) -> FoundationStatus {
 
     for (relative, snippet) in [
         ("bootstrap.sh", "bootstrap_python_entrypoint"),
-        ("bootstrap/container/Dockerfile", "USER agentcanon"),
-        ("bootstrap/container/Dockerfile", "HEALTHCHECK"),
-        ("bootstrap/container/Dockerfile", "image-install"),
-        ("bootstrap/container/entrypoint.sh", "health"),
-        ("bootstrap/container/entrypoint.sh", "resident"),
+        ("bootstrap/container/image/Dockerfile", "USER agentcanon"),
+        ("bootstrap/container/image/Dockerfile", "HEALTHCHECK"),
+        ("bootstrap/container/image/Dockerfile", "image-install"),
+        ("bootstrap/container/lifecycle/entrypoint.sh", "health"),
+        ("bootstrap/container/lifecycle/entrypoint.sh", "resident"),
     ] {
         if let Ok(text) = fs::read_to_string(root.join(relative)) {
             if !text.contains(snippet) {
@@ -437,10 +437,10 @@ fn parse_json_string_at(text: &str, start: usize) -> Option<(String, usize)> {
 
 fn infer_tool_path(root: &Path, name: &str) -> String {
     for prefix in [
-        "tools/agent_tools",
-        "tools/ci",
-        "tools/docs",
-        "tools/oop/python",
+        "tools/agent",
+        "tools/validation/ci",
+        "tools/analysis/documents",
+        "tools/validation/code/oop/python",
     ] {
         let path = format!("{prefix}/{name}");
         if root.join(&path).exists() {
@@ -580,7 +580,7 @@ mod tests {
             "documents/design/rust-agent-tool-migration.md",
             "fixture\n",
         );
-        write(&root, "rust/agent-canon/Cargo.toml", "fixture\n");
+        write(&root, "tools/runtime/dispatch/agent-canon/Cargo.toml", "fixture\n");
         write(&root, "tools/bin/agent-canon", "fixture\n");
 
         let foundation = inspect_foundation(&root);
@@ -606,29 +606,29 @@ mod tests {
             "documents/design/rust-agent-tool-migration.md",
             "fixture\n",
         );
-        write(root, "rust/agent-canon/Cargo.toml", "fixture\n");
+        write(root, "tools/runtime/dispatch/agent-canon/Cargo.toml", "fixture\n");
         write(root, "tools/bin/agent-canon", "fixture\n");
         for relative in [
             "bootstrap.sh",
             "bootstrap/manifest.toml",
-            "bootstrap/container/Dockerfile",
-            "bootstrap/container/dependencies.toml",
-            "bootstrap/container/entrypoint.sh",
-            "tools/agent_tools/bootstrap_runtime.py",
-            "tools/agent_tools/runtime_artifacts.py",
-            "tools/agent_tools/tool_dispatch.py",
+            "bootstrap/container/image/Dockerfile",
+            "bootstrap/container/image/dependencies.toml",
+            "bootstrap/container/lifecycle/entrypoint.sh",
+            "tools/runtime/container/bootstrap_runtime.py",
+            "tools/runtime/artifacts/runtime_artifacts.py",
+            "tools/runtime/dispatch/tool_dispatch.py",
         ] {
             write(root, relative, "fixture\n");
         }
         write(root, "bootstrap.sh", "bootstrap_python_entrypoint\n");
         write(
             root,
-            "bootstrap/container/Dockerfile",
+            "bootstrap/container/image/Dockerfile",
             "USER agentcanon\nHEALTHCHECK\nimage-install\n",
         );
         write(
             root,
-            "bootstrap/container/entrypoint.sh",
+            "bootstrap/container/lifecycle/entrypoint.sh",
             "health\nresident\n",
         );
     }

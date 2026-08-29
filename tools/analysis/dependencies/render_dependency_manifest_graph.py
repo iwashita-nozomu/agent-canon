@@ -26,14 +26,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict, cast
 
-import visualization_contract as viz_contract
+import tools.validation.semantic.tools.visualization_contract as viz_contract
 
 GRAPH_TSV_FIELD_COUNT = 4
 GRAPH_IR_SCHEMA = "agent_canon.graph_ir.v2"
 BUNDLE_SCHEMA = "agent_canon.dependency_graph_bundle.v1"
 PROJECTION_SCHEMA = "agent_canon.dependency_graph_projection.v1"
-CHECKER_AUTHORITY = "tools/agent_tools/check_dependency_graph.sh"
-PRODUCER_PATH = "tools/agent_tools/render_dependency_manifest_graph.py"
+CHECKER_AUTHORITY = "tools/analysis/dependencies/check_dependency_graph.sh"
+PRODUCER_PATH = "tools/analysis/dependencies/render_dependency_manifest_graph.py"
 CHECKER_GRAPH_TSV_LOCATOR = f"{CHECKER_AUTHORITY}#graph-tsv"
 BUNDLE_GRAPH_TSV_LOCATOR = "dependency_graph.tsv"
 VISUALIZATION_OWNER_TOOL_ID = "agent_canon.visualization.coverage"
@@ -981,7 +981,7 @@ def graph_ir(report: GraphReport, *, source_locator: str | None = None) -> Graph
         "schema": GRAPH_IR_SCHEMA,
         "version": 2,
         "id": f"dependency-manifest:{graph_fingerprint(report.edges)[:16]}",
-        "producer": "tools/agent_tools/render_dependency_manifest_graph.py",
+        "producer": "tools/analysis/dependencies/render_dependency_manifest_graph.py",
         "source": {
             "kind": "dependency_manifest_graph_tsv",
             "path": source,
@@ -1003,7 +1003,7 @@ def graph_ir(report: GraphReport, *, source_locator: str | None = None) -> Graph
             },
             {
                 "name": "adapter",
-                "value": "tools/agent_tools/render_dependency_manifest_graph.py",
+                "value": "tools/analysis/dependencies/render_dependency_manifest_graph.py",
             },
             {
                 "name": "checker_authority",

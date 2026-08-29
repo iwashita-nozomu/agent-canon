@@ -4,6 +4,6 @@
 set -euo pipefail
 
 repository_root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
-# shellcheck source=bootstrap/lib/entrypoint.sh
-source "$repository_root/bootstrap/lib/entrypoint.sh"
+# shellcheck source=bootstrap/host/lifecycle/entrypoint.sh
+source "$repository_root/bootstrap/host/lifecycle/entrypoint.sh"
 bootstrap_host_entrypoint "$repository_root" "$@"
