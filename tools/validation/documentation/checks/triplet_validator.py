@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Provides triplet validator repository automation.
-# upstream design ../README.md shared automation index
+# upstream design ../../../README.md shared automation index
 # @dependency-end
 
 """

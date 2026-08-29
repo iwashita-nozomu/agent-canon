@@ -2,13 +2,13 @@
 # @dependency-start
 # contract tool
 # responsibility Provides shared OOP boundary observations for language-specific tools.
-# upstream design ../../../documents/conventions/object-oriented-design.md OOP boundary policy
-# upstream design ../../../documents/conventions/coding-conventions-house-style.md shared readability rules
-# upstream design ../../../agents/workflows/comprehensive-refactoring-workflow.md static boundary evidence
+# upstream design ../../../../../documents/conventions/object-oriented-design.md OOP boundary policy
+# upstream design ../../../../../documents/conventions/coding-conventions-house-style.md shared readability rules
+# upstream design ../../../../../agents/workflows/comprehensive-refactoring-workflow.md static boundary evidence
 # downstream implementation ../python/readability.py Python OOP readability entrypoint
 # downstream implementation ../cpp/readability.py C++ OOP readability entrypoint
-# downstream implementation ../../../.codex/agents/oop_readability_reviewer.toml report output
-# downstream implementation ../../../tests/agent_tools/test_analyze_oop_readability.py tests analyzer
+# downstream implementation ../../../../../.codex/agents/oop_readability_reviewer.toml report output
+# downstream implementation ../../../../../tests/agent_tools/test_analyze_oop_readability.py tests analyzer
 # @dependency-end
 """Evaluate OOP boundary observations for Python and C++ source files.
 

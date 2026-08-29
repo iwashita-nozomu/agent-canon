@@ -4,10 +4,10 @@
 contract tool
 responsibility Documents C and C++ static analysis entrypoints.
 upstream design ../README.md language-organized static analysis index
-upstream design ../../../documents/conventions/coding-conventions-cpp.md C++ coding conventions
+upstream design ../../../../../documents/conventions/coding-conventions-cpp.md C++ coding conventions
 upstream implementation ../../oop/cpp/readability.py scores C and C++ readability
 upstream implementation ./static_analysis.py owns compile-database selection and native checks
-downstream implementation ../../../tests/tools/test_cpp_static_analysis.py focused CLI and policy tests
+downstream implementation ../../../../../tests/tools/test_cpp_static_analysis.py focused CLI and policy tests
 @dependency-end
 -->
 

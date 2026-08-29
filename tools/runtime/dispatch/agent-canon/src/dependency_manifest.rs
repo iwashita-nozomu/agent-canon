@@ -1,7 +1,7 @@
 // @dependency-start
 // contract implementation
 // responsibility Owns the complete-file dependency manifest snapshot consumed by the graph transaction.
-// upstream design ../../../documents/design/dependency-manifest-design.md canonical dependency-header grammar
+// upstream design ../../../../../documents/design/dependency-manifest-design.md canonical dependency-header grammar
 // downstream implementation graph.rs builds one graph from this source snapshot
 // @dependency-end
 

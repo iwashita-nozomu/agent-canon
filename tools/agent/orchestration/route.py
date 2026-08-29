@@ -2,17 +2,17 @@
 # @dependency-start
 # contract tool
 # responsibility Provides short task routing helper for tool and skill selection.
-# upstream design ../../documents/design/tool-skill-routing-refactor.md short tool and skill naming policy
-# upstream design ../../agents/skills/task-routing.md task routing skill contract
-# upstream design ../../agents/skills/catalog.yaml public skill catalog and related skill metadata
-# upstream implementation ./skill_route_catalog.py catalog/rule/index owner
+# upstream design ../../../documents/design/tool-skill-routing-refactor.md short tool and skill naming policy
+# upstream design ../../../agents/skills/task-routing.md task routing skill contract
+# upstream design ../../../agents/skills/catalog.yaml public skill catalog and related skill metadata
+# upstream implementation ../skills/skill_route_catalog.py catalog/rule/index owner
 # upstream implementation ./capability_route.py capability preflight/decision owner
-# upstream implementation ./visualization_contract.py exact D2.3 visualization ToolCall schema and validator
-# upstream design ../../agents/skills/structure-refactor.md repository structure and personal runtime routing boundary
-# upstream design ../../agents/skills/prose-reasoning-graph.md prose graph skill routing
-# upstream design ../../agents/skills/pr-processing.md PR and Issue queue processing skill routing
-# downstream design ../../documents/tools/route.md reader-facing route tool documentation
-# downstream implementation ../../tests/agent_tools/test_route.py tests route output and aliases
+# upstream implementation ../../validation/semantic/tools/visualization_contract.py exact D2.3 visualization ToolCall schema and validator
+# upstream design ../../../agents/skills/structure-refactor.md repository structure and personal runtime routing boundary
+# upstream design ../../../agents/skills/prose-reasoning-graph.md prose graph skill routing
+# upstream design ../../../agents/skills/pr-processing.md PR and Issue queue processing skill routing
+# downstream design ../../../documents/tools/route.md reader-facing route tool documentation
+# downstream implementation ../../../tests/agent_tools/test_route.py tests route output and aliases
 # @dependency-end
 """Select short AgentCanon tool and skill routes."""
 

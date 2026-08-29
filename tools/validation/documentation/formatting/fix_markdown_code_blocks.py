@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Fixes markdown code blocks documentation formatting.
-# upstream design ../README.md shared automation index
+# upstream design ../../../README.md shared automation index
 # @dependency-end
 
 """Markdown code block language fixer.

@@ -2,10 +2,10 @@
 // contract implementation
 // responsibility Owns the one-build AgentCanon dependency graph and optional persisted runtime-evidence snapshot.
 // upstream implementation dependency_manifest.rs provides the complete-file source snapshot
-// upstream implementation ../../../tools/agent/skills/skill_projection_registry.py provides generated skill-view owner mapping
+// upstream implementation ../../../../agent/skills/skill_projection_registry.py provides generated skill-view owner mapping
 // upstream implementation structured_analysis.rs provides the graph storage schema
 // downstream implementation main.rs dispatches the public graph command
-// downstream implementation ../../../tools/analysis/dependencies/graph_client.py consumes typed graph responses
+// downstream implementation ../../../../analysis/dependencies/graph_client.py consumes typed graph responses
 // @dependency-end
 
 use crate::dependency_manifest::{

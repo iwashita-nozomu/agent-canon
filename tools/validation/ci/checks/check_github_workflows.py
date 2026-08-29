@@ -1,15 +1,15 @@
 # @dependency-start
 # contract tool
 # responsibility Checks GitHub workflow and PR template conventions.
-# upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR evidence rules
-# upstream design ../../README.md AgentCanon surface index
-# upstream design ../../.github/AGENTS.md GitHub agent entrypoint
-# upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR checklist
-# upstream design ../../.github/workflows/agent-improvement-guide.yml PR and push improvement guide workflow
-# upstream design ../../.github/workflows/agent-runtime-dashboard.yml standalone AgentCanon runtime dashboard workflow
-# upstream design ../../.github/workflows/agent-canon-static-gates.yml PR candidate gate workflow
-# upstream implementation ../agent_tools/check_skill_frontmatter.py validates runtime skill frontmatter in static gates
-# downstream implementation ../../tests/tools/test_check_github_workflows.py tests
+# upstream design ../../../../agents/workflows/agent-canon-pr-workflow.md PR evidence rules
+# upstream design ../../../../README.md AgentCanon surface index
+# upstream design ../../../../.github/AGENTS.md GitHub agent entrypoint
+# upstream design ../../../../.github/PULL_REQUEST_TEMPLATE.md standalone PR checklist
+# upstream design ../../../../.github/workflows/agent-improvement-guide.yml PR and push improvement guide workflow
+# upstream design ../../../../.github/workflows/agent-runtime-dashboard.yml standalone AgentCanon runtime dashboard workflow
+# upstream design ../../../../.github/workflows/agent-canon-static-gates.yml PR candidate gate workflow
+# upstream implementation ../../semantic/skills/check_skill_frontmatter.py validates runtime skill frontmatter in static gates
+# downstream implementation ../../../../tests/tools/test_check_github_workflows.py tests
 # @dependency-end
 
 """Check GitHub workflow and PR template conventions."""

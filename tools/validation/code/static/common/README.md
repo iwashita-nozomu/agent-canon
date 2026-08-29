@@ -4,10 +4,10 @@
 contract tool
 responsibility Documents cross-language static analysis entrypoints.
 upstream design ../README.md language-organized static analysis index
-upstream design ../../../documents/design/dependency-manifest-design.md dependency manifest policy
-upstream implementation ../../agent_tools/review_backlog_scan.sh runs integrated review scans
-upstream implementation ../../agent_tools/check_hardcoded_numbers.py checks numeric literals
-upstream implementation ../../agent_tools/run_repo_dependency_review.sh validates dependency headers
+upstream design ../../../../../documents/design/dependency-manifest-design.md dependency manifest policy
+upstream implementation ../../../../repository/github/review_backlog_scan.sh runs integrated review scans
+upstream implementation ../../../semantic/code/check_hardcoded_numbers.py checks numeric literals
+upstream implementation ../../../../analysis/dependencies/run_repo_dependency_review.sh validates dependency headers
 @dependency-end
 -->
 

@@ -10,11 +10,11 @@ instead of parsing receipt text themselves.
 # @dependency-start
 # contract tool
 # responsibility Owns the source/skipped PR dependency gate receipt schema and binding validation.
-# upstream design ../../documents/design/source-owned-dependency-validation.md source-owned PR receipt contract
-# downstream implementation ./check_agent_canon_pr.sh writes the validated receipt
-# downstream implementation ./run_all_checks.sh consumes the validated receipt
-# downstream implementation ../../tests/tools/test_pr_gate_receipt.py exercises schema and binding rejection
-# downstream implementation ../../tests/tools/test_pr_gate_receipt_round_trip.py exercises writer/parser/consumer round trips
+# upstream design ../../../../documents/design/source-owned-dependency-validation.md source-owned PR receipt contract
+# downstream implementation ../checks/check_agent_canon_pr.sh writes the validated receipt
+# downstream implementation ../runners/run_all_checks.sh consumes the validated receipt
+# downstream implementation ../../../../tests/tools/test_pr_gate_receipt.py exercises schema and binding rejection
+# downstream implementation ../../../../tests/tools/test_pr_gate_receipt_round_trip.py exercises writer/parser/consumer round trips
 # @dependency-end
 
 from __future__ import annotations

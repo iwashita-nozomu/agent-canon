@@ -3,10 +3,10 @@
 @dependency-start
 contract tool
 responsibility Documents the verifier pre-review entrypoint for this repository.
-upstream design ../README.md shared automation index
-upstream implementation ./pre_review.sh verifier entrypoint
-upstream implementation ./run_python_quality_checks.sh shared Python quality gate
-downstream implementation ../agent_tools/pydocstyle_review.py explicit AgentCanon Docstring review
+upstream design ../../../README.md shared automation index
+upstream implementation ../runners/pre_review.sh verifier entrypoint
+upstream implementation ../checks/run_python_quality_checks.sh shared Python quality gate
+downstream implementation ../../semantic/code/pydocstyle_review.py explicit AgentCanon Docstring review
 @dependency-end
 -->
 

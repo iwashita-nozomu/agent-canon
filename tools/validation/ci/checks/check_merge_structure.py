@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Checks merge structure CI readiness.
-# upstream design ../README.md shared automation index
+# upstream design ../../../README.md shared automation index
 # @dependency-end
 
 """Check that branch-side structural path changes survived integration."""

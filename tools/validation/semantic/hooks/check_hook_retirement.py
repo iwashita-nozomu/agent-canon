@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Fails closed on hook retirement manifest, absence, executable-reference, inventory, and caller-closure violations.
-# upstream design ../../documents/design/agentcanon-hook-simplification-wave3.md fixes scan roots and readback schema.
-# upstream implementation ./hook_retirement.py owns the typed tombstone manifest.
-# upstream implementation ../../.codex/hooks/hook_dispatcher.py owns active event readback.
-# downstream implementation ../../tests/agent_tools/test_hook_retirement.py validates clean and violation fixtures.
+# upstream design ../../../../documents/design/agentcanon-hook-simplification-wave3.md fixes scan roots and readback schema.
+# upstream implementation ../../../runtime/authority/hook_retirement.py owns the typed tombstone manifest.
+# upstream implementation ../../../../.codex/hooks/hook_dispatcher.py owns active event readback.
+# downstream implementation ../../../../tests/agent_tools/test_hook_retirement.py validates clean and violation fixtures.
 # @dependency-end
 """Check the Wave 3 hook-retirement target tree."""
 

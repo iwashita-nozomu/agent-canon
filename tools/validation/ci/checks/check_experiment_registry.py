@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Checks experiment registry CI readiness.
-# upstream design ../README.md shared automation index
-# upstream design ../../documents/experiments/experiment-registry.md defines registry schema
-# downstream implementation ../../tests/tools/test_run_managed_experiment.py tests
+# upstream design ../../../README.md shared automation index
+# upstream design ../../../../documents/experiments/experiment-registry.md defines registry schema
+# downstream implementation ../../../../tests/tools/test_run_managed_experiment.py tests
 # @dependency-end
 
 """Validate the canonical experiment registry."""

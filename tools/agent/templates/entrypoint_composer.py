@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Composes a consumer-root AGENTS.md from the AgentCanon ROOT_AGENTS.md base and consumer-owned instructions.
-# upstream design ../../documents/design/entrypoint-owner-map.md consumer root composition contract
-# downstream design ../../ROOT_AGENTS.md common consumer root instruction base
-# downstream implementation ../../tests/agent_tools/test_entrypoint_composer.py focused composition tests
+# upstream design ../../../documents/design/entrypoint-owner-map.md consumer root composition contract
+# downstream design ../../../ROOT_AGENTS.md common consumer root instruction base
+# downstream implementation ../../../tests/agent_tools/test_entrypoint_composer.py focused composition tests
 # @dependency-end
 """Compose a source-free consumer root AGENTS.md from two explicit files."""
 

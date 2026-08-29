@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Reads compact discovered Skills and task-relevant canonical Skill sections in bounded UTF-8 chunks.
-# upstream design ../../agents/skills/agent-orchestration.md owner-first Skill read and implementation admission
-# upstream design ../../agents/canonical/CODEX_WORKFLOW.md bounded Skill read admission
-# downstream implementation ../../tests/agent_tools/test_skill_document_reader.py validates heading indexing, chunk boundaries, and admission state
+# upstream design ../../../agents/skills/agent-orchestration.md owner-first Skill read and implementation admission
+# upstream design ../../../agents/canonical/CODEX_WORKFLOW.md bounded Skill read admission
+# downstream implementation ../../../tests/agent_tools/test_skill_document_reader.py validates heading indexing, chunk boundaries, and admission state
 # @dependency-end
 """Read Skill documents in bounded chunks without requiring full canonical files."""
 

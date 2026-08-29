@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Resolves ignored generated skill views to catalog-owned source documents.
-# upstream design ../../documents/design/skill-runtime-shim-materialization.md owns the materializer path contract
-# upstream implementation ../../agents/skills/catalog.yaml owns public skill identity and owner paths
-# downstream implementation ./surface_manifest.py publishes the Rust graph snapshot
-# downstream implementation ./source_dependency_graph.py resolves source-only graph targets
+# upstream design ../../../documents/design/skill-runtime-shim-materialization.md owns the materializer path contract
+# upstream implementation ../../../agents/skills/catalog.yaml owns public skill identity and owner paths
+# downstream implementation ../../runtime/manifest/surface_manifest.py publishes the Rust graph snapshot
+# downstream implementation ../../analysis/dependencies/source_dependency_graph.py resolves source-only graph targets
 # @dependency-end
 """Read the materializer-owned mapping for generated skill projections."""
 

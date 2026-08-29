@@ -2,11 +2,11 @@
 # @dependency-start
 # contract tool
 # responsibility Normalizes subagent invocation and attribution evidence without side effects.
-# upstream design ../../documents/design/agentcanon-hook-simplification-wave3.md owns subagent-selection parity.
-# upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns capability and receipt semantics.
+# upstream design ../../../documents/design/agentcanon-hook-simplification-wave3.md owns subagent-selection parity.
+# upstream design ../../../agents/COMMUNICATION_PROTOCOL.md owns capability and receipt semantics.
 # upstream implementation ./workflow_context.py supplies inherited workflow context.
-# downstream implementation ./behavior_event_assembly.py consumes SubagentSelection.
-# downstream implementation ./workflow_monitor.py projects the assembled event.
+# downstream implementation ../../runtime/archive/behavior_event_assembly.py consumes SubagentSelection.
+# downstream implementation ../../runtime/lifecycle/workflow_monitor.py projects the assembled event.
 # @dependency-end
 """Pure subagent selection and attribution owner."""
 

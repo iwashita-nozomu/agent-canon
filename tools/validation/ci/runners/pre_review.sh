@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Runs verifier pre-review checks through the shared Python quality runner.
-# upstream design ../README.md shared automation index
-# upstream implementation ./run_python_quality_checks.sh shared Python quality gate
-# upstream implementation ../agent_tools/runtime_artifacts.py owns external report paths and exact cleanup
+# upstream design ../../../README.md shared automation index
+# upstream implementation ../checks/run_python_quality_checks.sh shared Python quality gate
+# upstream implementation ../../../runtime/artifacts/runtime_artifacts.py owns external report paths and exact cleanup
 # @dependency-end
 set -euo pipefail
 

@@ -2,12 +2,12 @@
 # @dependency-start
 # contract tool
 # responsibility Classifies changed paths into runtime risk profiles and canonical static-gate execution units.
-# upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md defines profile-based validation routing.
-# upstream design ../../documents/design/responsibility-rationale.md defines evidence-triggered validation selection.
-# upstream design ../../agents/TASK_WORKFLOWS.md defines risk-scaled workflow families.
-# downstream design ../../documents/tools/classify_path_risk.md documents path-risk classification.
-# downstream implementation ../../tests/agent_tools/test_classify_path_risk.py tests representative profiles.
-# downstream implementation ../../.github/workflows/agent-canon-static-gates.yml consumes unit selection without a second classifier.
+# upstream design ../../../../documents/runtime/runtime-profiles-and-check-matrix.md defines profile-based validation routing.
+# upstream design ../../../../documents/design/responsibility-rationale.md defines evidence-triggered validation selection.
+# upstream design ../../../../agents/TASK_WORKFLOWS.md defines risk-scaled workflow families.
+# downstream design ../../../../documents/tools/classify_path_risk.md documents path-risk classification.
+# downstream implementation ../../../../tests/agent_tools/test_classify_path_risk.py tests representative profiles.
+# downstream implementation ../../../../.github/workflows/agent-canon-static-gates.yml consumes unit selection without a second classifier.
 # @dependency-end
 """Classify changed paths into AgentCanon risk profiles and static-gate units."""
 

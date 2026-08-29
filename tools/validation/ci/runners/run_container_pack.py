@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Runs container pack CI automation.
-# upstream design ../README.md shared automation index
+# upstream design ../../../README.md shared automation index
 # @dependency-end
 
 """Build and smoke-test a container runtime pack."""

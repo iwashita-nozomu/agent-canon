@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Provides container runtime CI automation.
-# upstream design ../README.md shared automation index
-# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md exact runtime receipt names
+# upstream design ../../../README.md shared automation index
+# upstream design ../../../../documents/experiments/gpu-admission-r5-source-packet.md exact runtime receipt names
 # @dependency-end
 
 """Shared helpers for repo-defined container runtime scripts."""

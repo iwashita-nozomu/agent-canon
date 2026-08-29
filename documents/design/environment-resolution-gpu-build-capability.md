@@ -9,8 +9,8 @@ upstream design ../../agents/skills/environment-maintenance.md canonical image r
 upstream design ../../agents/skills/dependency-design.md dependency provider and placement boundary
 downstream implementation ../../tools/runtime/container/gpu_build_capability.py typed GPU build receipt classifier
 downstream implementation ../../tests/agent_tools/test_gpu_build_capability.py focused staged-receipt regression
-downstream data ../../tests/fixtures/environment_resolution/wsl2_rootless_nvml_failed.json sanitized WSL2 failure evidence
-downstream data ../../tests/fixtures/environment_resolution/wsl2_rootless_cuda_build_repaired.json sanitized WSL2 repaired evidence
+downstream implementation ../../tests/fixtures/environment_resolution/wsl2_rootless_nvml_failed.json sanitized WSL2 failure evidence
+downstream implementation ../../tests/fixtures/environment_resolution/wsl2_rootless_cuda_build_repaired.json sanitized WSL2 repaired evidence
 @dependency-end
 -->
 

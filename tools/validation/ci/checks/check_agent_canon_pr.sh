@@ -2,29 +2,29 @@
 # @dependency-start
 # contract tool
 # responsibility Checks AgentCanon PR readiness including source-owned dependency completeness.
-# upstream design ../../tools/README.md shared automation index
-# upstream design ../../agents/workflows/agent-canon-pr-workflow.md shared canon PR workflow
-# upstream design ../../documents/design/source-owned-dependency-validation.md source-owned PR acceptance contract
-# upstream design ../../documents/design/dependency-manifest-design.md manifest DSL projection
-# upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone AgentCanon PR checklist
-# upstream implementation ../agent_tools/run_repo_dependency_review.sh strict source dependency review
+# upstream design ../../../README.md shared automation index
+# upstream design ../../../../agents/workflows/agent-canon-pr-workflow.md shared canon PR workflow
+# upstream design ../../../../documents/design/source-owned-dependency-validation.md source-owned PR acceptance contract
+# upstream design ../../../../documents/design/dependency-manifest-design.md manifest DSL projection
+# upstream design ../../../../.github/PULL_REQUEST_TEMPLATE.md standalone AgentCanon PR checklist
+# upstream implementation ../../../analysis/dependencies/run_repo_dependency_review.sh strict source dependency review
 # upstream implementation ./run_pr_dependency_source_gate.sh owns no-runtime PR dependency completeness
-# upstream implementation ./pr_gate_receipt.py owns source/skipped receipt schema and binding validation
-# downstream implementation ./run_all_checks.sh consumes the live receipt before producer cleanup
-# upstream implementation ../agent_tools/parent_root_side_effects.py owns explicit control authentication and child execution
-# upstream implementation ../agent_tools/runtime_artifacts.py owns PR scratch, archive, and receipt output boundaries
+# upstream implementation ../receipts/pr_gate_receipt.py owns source/skipped receipt schema and binding validation
+# downstream implementation ../runners/run_all_checks.sh consumes the live receipt before producer cleanup
+# upstream implementation ../../../repository/workspace/parent_root_side_effects.py owns explicit control authentication and child execution
+# upstream implementation ../../../runtime/artifacts/runtime_artifacts.py owns PR scratch, archive, and receipt output boundaries
 # upstream implementation ./agent_canon_pr_graph_selector.py selects trusted changed-path evidence for source review scope
-# upstream implementation ../agent_tools/evaluate_skill_workflow_prompts.py skill/workflow prompt parity eval
-# upstream implementation ../agent_tools/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
-# upstream implementation ../agent_tools/generated_artifact_guard.py rejects regenerated report leftovers before PR check pass
-# upstream implementation ../agent_tools/check_agent_runtime_alignment.py Codex runtime role alignment eval
-# upstream implementation ../agent_tools/check_convention_compliance.py convention gate wiring eval
-# upstream implementation ../agent_tools/skill_tool_commands.py runtime skill command packet gate
-# upstream implementation ../agent_tools/update_lifecycle_contract.py owns G1-G3 receipt identity.
-# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/main.rs owns the Rust CLI build gate.
+# upstream implementation ../../../../eval/producers/evaluate_skill_workflow_prompts.py skill/workflow prompt parity eval
+# upstream implementation ../../../../eval/producers/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
+# upstream implementation ../../../runtime/artifacts/generated_artifact_guard.py rejects regenerated report leftovers before PR check pass
+# upstream implementation ../../semantic/runtime/check_agent_runtime_alignment.py Codex runtime role alignment eval
+# upstream implementation ../../semantic/convention/check_convention_compliance.py convention gate wiring eval
+# upstream implementation ../../../agent/skills/skill_tool_commands.py runtime skill command packet gate
+# upstream implementation ../../../runtime/lifecycle/update_lifecycle_contract.py owns G1-G3 receipt identity.
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/main.rs owns the Rust CLI build gate.
 # upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
-# upstream implementation ../ci/run_python_quality_checks.sh owns shared Python static quality checks
-# downstream implementation ../../tests/tools/test_agent_canon_pr_dependency_source_gate.py verifies source-only dependency routing
+# upstream implementation run_python_quality_checks.sh owns shared Python static quality checks
+# downstream implementation ../../../../tests/tools/test_agent_canon_pr_dependency_source_gate.py verifies source-only dependency routing
 # @dependency-end
 
 set -euo pipefail

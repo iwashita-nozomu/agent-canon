@@ -2,11 +2,11 @@
 # @dependency-start
 # contract tool
 # responsibility Owns capability raw-argv preflight and immutable route decisions.
-# upstream design ../../agents/skills/oop-type-design.md approved OOP/type-design owner and module contract
-# upstream implementation ./skill_route_catalog.py immutable catalog/index and decision-support API
-# upstream implementation ./visualization_contract.py owns canonical schema-bearing visualization ToolCall construction
+# upstream design ../../../agents/skills/oop-type-design.md approved OOP/type-design owner and module contract
+# upstream implementation ../skills/skill_route_catalog.py immutable catalog/index and decision-support API
+# upstream implementation ../../validation/semantic/tools/visualization_contract.py owns canonical schema-bearing visualization ToolCall construction
 # downstream implementation ./route.py public route composition and rendering
-# downstream implementation ../../tests/agent_tools/test_route.py capability-owned route tests
+# downstream implementation ../../../tests/agent_tools/test_route.py capability-owned route tests
 # @dependency-end
 """Normalize explicit capability arguments and build stable decisions."""
 

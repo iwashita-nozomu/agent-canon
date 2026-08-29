@@ -2,11 +2,11 @@
 # @dependency-start
 # contract tool
 # responsibility Selects and evaluates parent PR graph gating from canonical owners, a validated diff base, and persisted graph reachability.
-# upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json canonical validation profile owner
-# upstream design ../../documents/design/dependency-manifest-design.md canonical dependency surface owner and parent gate contract
-# upstream implementation ../agent_tools/parent_root_side_effects.py owns selector publication, staging, and graph child execution
+# upstream design ../../../../documents/runtime/runtime-profiles-and-check-matrix.json canonical validation profile owner
+# upstream design ../../../../documents/design/dependency-manifest-design.md canonical dependency surface owner and parent gate contract
+# upstream implementation ../../../repository/workspace/parent_root_side_effects.py owns selector publication, staging, and graph child execution
 # downstream implementation ./check_agent_canon_pr.sh consumes the typed selector verdict
-# downstream implementation ../../tests/tools/test_agent_canon_pr_graph_selector.py verifies required, skipped, and fail-closed selections
+# downstream implementation ../../../../tests/tools/test_agent_canon_pr_graph_selector.py verifies required, skipped, and fail-closed selections
 # @dependency-end
 """Select and evaluate parent AgentCanon PR dependency graph acceptance."""
 

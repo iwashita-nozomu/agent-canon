@@ -2,15 +2,15 @@
 # @dependency-start
 # contract tool
 # responsibility Validates the total single-owner relation from tracked repository paths to responsibility scopes.
-# upstream design ../../responsibility-scope.toml machine-readable repo-local scope manifest
-# upstream design ../../templates/documents/responsibility-scope.template.toml starter manifest for template-derived repositories
-# upstream design ../../documents/design/responsibility-scope-management.md scope ownership policy
-# upstream design ../../documents/structure/repo-structure-contract.toml separate path existence and kind contract
-# upstream design ../../tools/catalog.yaml structured tool ownership
-# upstream design ../../tools/README.md tool entrypoint index
-# upstream design ../../documents/tools/README.md user-facing tool index
-# downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs responsibility scope checks
-# downstream implementation ../../tests/agent_tools/test_responsibility_scope.py tests scope validation
+# upstream design ../../../../responsibility-scope.toml machine-readable repo-local scope manifest
+# upstream design ../../../../templates/documents/responsibility-scope.template.toml starter manifest for template-derived repositories
+# upstream design ../../../../documents/design/responsibility-scope-management.md scope ownership policy
+# upstream design ../../../../documents/structure/repo-structure-contract.toml separate path existence and kind contract
+# upstream design ../../../catalog.yaml structured tool ownership
+# upstream design ../../../README.md tool entrypoint index
+# upstream design ../../../../documents/tools/README.md user-facing tool index
+# downstream implementation ../../ci/runners/run_all_checks.sh runs responsibility scope checks
+# downstream implementation ../../../../tests/agent_tools/test_responsibility_scope.py tests scope validation
 # @dependency-end
 """Validate AgentCanon responsibility scopes."""
 

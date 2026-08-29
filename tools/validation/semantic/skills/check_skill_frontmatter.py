@@ -2,11 +2,11 @@
 # @dependency-start
 # contract tool
 # responsibility Validates runtime skill frontmatter for Codex skill loading.
-# upstream design ../../agents/canonical/skills.md skill runtime registry contract
-# upstream design ../../agents/skills/README.md human-facing skill index
-# downstream implementation ../../.github/workflows/agent-canon-static-gates.yml runs this check in GitHub Actions
-# downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs this check in repository CI
-# downstream implementation ../../tests/agent_tools/test_check_skill_frontmatter.py verifies this check
+# upstream design ../../../../agents/canonical/skills.md skill runtime registry contract
+# upstream design ../../../../agents/skills/README.md human-facing skill index
+# downstream implementation ../../../../.github/workflows/agent-canon-static-gates.yml runs this check in GitHub Actions
+# downstream implementation ../../ci/runners/run_all_checks.sh runs this check in repository CI
+# downstream implementation ../../../../tests/agent_tools/test_check_skill_frontmatter.py verifies this check
 # @dependency-end
 """Validate YAML frontmatter for runtime Codex skill shims."""
 

@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Defines mid-task user input policy tokens for workflow monitoring and closeout checks.
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md defines mid-task subagent reuse and fresh-run policy
-# downstream implementation ./workflow_monitor.py emits mid-task checkpoint and evidence rows
-# downstream implementation ./report_artifact_checks.py validates mid-task checkpoint and evidence rows
+# upstream design ../../../agents/canonical/CODEX_SUBAGENTS.md defines mid-task subagent reuse and fresh-run policy
+# downstream implementation ../../runtime/lifecycle/workflow_monitor.py emits mid-task checkpoint and evidence rows
+# downstream implementation ../../runtime/artifacts/report_artifact_checks.py validates mid-task checkpoint and evidence rows
 # @dependency-end
 """Shared policy for mid-task user input routing evidence."""
 

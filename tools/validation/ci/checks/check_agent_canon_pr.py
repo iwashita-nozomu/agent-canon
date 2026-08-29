@@ -2,11 +2,11 @@
 # @dependency-start
 # contract tool
 # responsibility Materializes the canonical G2 receipt after AgentCanon generated-completeness checks pass.
-# upstream implementation ../agent_tools/update_lifecycle_contract.py owns gate identity and immutable replay.
-# upstream implementation ../agent_tools/parent_root_side_effects.py owns atomic G2 publication.
+# upstream implementation ../../../runtime/lifecycle/update_lifecycle_contract.py owns gate identity and immutable replay.
+# upstream implementation ../../../repository/workspace/parent_root_side_effects.py owns atomic G2 publication.
 # upstream implementation ./check_agent_canon_pr.sh owns the ordered generated-completeness check execution.
-# downstream implementation ../../tests/agent_tools/test_github_publish.py consumes owner-produced G2 fixtures.
-# downstream implementation ../../tests/agent_tools/test_github_publish.py consumes owner-produced G2 fixtures.
+# downstream implementation ../../../../tests/agent_tools/test_github_publish.py consumes owner-produced G2 fixtures.
+# downstream implementation ../../../../tests/agent_tools/test_github_publish.py consumes owner-produced G2 fixtures.
 # @dependency-end
 """Own the G2 boundary emitted by the AgentCanon PR gate."""
 

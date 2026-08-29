@@ -2,15 +2,15 @@
 # @dependency-start
 # contract tool
 # responsibility Produces read-only catalog-backed tool-command packets and checks their runtime projections.
-# upstream design ../../agents/canonical/skills.md skill canon registry
-# upstream design ../../agents/skills/task-routing.md deterministic skill routing contract
-# upstream design ../../agents/skills/agent-orchestration.md tool-first skill execution contract
-# upstream design ../../agents/skills/catalog.yaml public skill related-skill metadata
-# upstream implementation ../../tools/agent/orchestration/route.py parses and validates the public skill catalog
-# upstream implementation ../../tools/runtime/source/agent_canon_source_root.py resolves the selected source checkout
-# downstream implementation ../../.codex/personal/skills/agent-orchestration/SKILL.md materialized runtime skill command entry example
-# downstream implementation ../../tools/validation/semantic/convention/check_convention_compliance.py verifies command section wiring
-# downstream implementation ../../tests/agent_tools/test_skill_tool_commands.py tests command extraction and read-only checks
+# upstream design ../../../agents/canonical/skills.md skill canon registry
+# upstream design ../../../agents/skills/task-routing.md deterministic skill routing contract
+# upstream design ../../../agents/skills/agent-orchestration.md tool-first skill execution contract
+# upstream design ../../../agents/skills/catalog.yaml public skill related-skill metadata
+# upstream implementation ../orchestration/route.py parses and validates the public skill catalog
+# upstream implementation ../../runtime/source/agent_canon_source_root.py resolves the selected source checkout
+# downstream implementation ../../../.codex/personal/skills/agent-orchestration/SKILL.md materialized runtime skill command entry example
+# downstream implementation ../../validation/semantic/convention/check_convention_compliance.py verifies command section wiring
+# downstream implementation ../../../tests/agent_tools/test_skill_tool_commands.py tests command extraction and read-only checks
 # @dependency-end
 """Produce read-only tool-command packets for AgentCanon runtime skills."""
 

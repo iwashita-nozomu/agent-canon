@@ -2,18 +2,18 @@
 # @dependency-start
 # contract tool
 # responsibility Materializes and validates the complete typed public skill/tool invocation graph.
-# upstream design ../../agents/skills/catalog.yaml owns public skill identity and command phases
-# upstream design ../../agents/skills/skill-dependencies.yaml owns skill relations and invocation order
-# upstream design ../../tools/catalog.yaml owns canonical ToolIDs
-# upstream design ../../documents/design/skill-tool-invocation-graph.md owns the v2 schema and digest rules
-# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md owns the external runtime and explicit mutation boundary
+# upstream design ../../../agents/skills/catalog.yaml owns public skill identity and command phases
+# upstream design ../../../agents/skills/skill-dependencies.yaml owns skill relations and invocation order
+# upstream design ../../catalog.yaml owns canonical ToolIDs
+# upstream design ../../../documents/design/skill-tool-invocation-graph.md owns the v2 schema and digest rules
+# upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md owns the external runtime and explicit mutation boundary
 # upstream implementation ./skill_tool_commands.py resolves command packets and execution argv
 # upstream implementation ./skill_route_catalog.py owns typed visualization owner/adapter routing
-# upstream implementation ./runtime_artifacts.py owns external artifact publication and source exclusion
-# downstream implementation ../../documents/runtime/skill-dependency-graph.md is generated Mermaid
-# downstream implementation ../../documents/runtime/skill-dependency-graph.json is generated machine graph
-# downstream implementation ./check_skill_tool_invocation_graph.py is the public checker entrypoint
-# downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py checks graph completeness
+# upstream implementation ../../runtime/artifacts/runtime_artifacts.py owns external artifact publication and source exclusion
+# downstream implementation ../../../documents/runtime/skill-dependency-graph.md is generated Mermaid
+# downstream implementation ../../../documents/runtime/skill-dependency-graph.json is generated machine graph
+# downstream implementation ../../validation/semantic/skills/check_skill_tool_invocation_graph.py is the public checker entrypoint
+# downstream implementation ../../../tests/agent_tools/test_skill_dependency_map.py checks graph completeness
 # @dependency-end
 """Materialize and validate the deterministic public skill/tool graph."""
 

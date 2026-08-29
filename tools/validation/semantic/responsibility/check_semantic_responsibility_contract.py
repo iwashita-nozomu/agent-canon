@@ -4,10 +4,10 @@
 # @dependency-start
 # contract tool
 # responsibility Validates semantic responsibility contract instance shape, identity, and references.
-# upstream design ../../documents/design/semantic-responsibility-contract.md canonical contract
-# upstream design ../../templates/documents/semantic-responsibility-contract.template.toml reusable instance shape
-# downstream implementation ../../tests/agent_tools/test_check_semantic_responsibility_contract.py focused validator tests
-# downstream design ../../documents/tools/check_semantic_responsibility_contract.md reader-facing tool documentation
+# upstream design ../../../../documents/design/semantic-responsibility-contract.md canonical contract
+# upstream design ../../../../templates/documents/semantic-responsibility-contract.template.toml reusable instance shape
+# downstream implementation ../../../../tests/agent_tools/test_check_semantic_responsibility_contract.py focused validator tests
+# downstream design ../../../../documents/tools/check_semantic_responsibility_contract.md reader-facing tool documentation
 # @dependency-end
 
 from __future__ import annotations

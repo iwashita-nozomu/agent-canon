@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Renders the runtime profile and check matrix doc from a machine-readable inventory.
-# upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json runtime profile inventory machine mirror
-# downstream implementation ../../tools/validation/semantic/runtime/check_runtime_profile_inventory.py drift checker compares rendered doc
-# downstream implementation ../../documents/runtime/runtime-profiles-and-check-matrix.md rendered documentation
+# upstream design ../../../../documents/runtime/runtime-profiles-and-check-matrix.json runtime profile inventory machine mirror
+# downstream implementation ../../semantic/runtime/check_runtime_profile_inventory.py drift checker compares rendered doc
+# downstream implementation ../../../../documents/runtime/runtime-profiles-and-check-matrix.md rendered documentation
 # @dependency-end
 """Render `documents/runtime/runtime-profiles-and-check-matrix.md` from JSON inventory."""
 

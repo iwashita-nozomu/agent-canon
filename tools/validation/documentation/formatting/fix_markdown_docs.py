@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Fixes markdown docs documentation formatting.
-# upstream design ../README.md shared automation index
+# upstream design ../../../README.md shared automation index
 # @dependency-end
 
 """

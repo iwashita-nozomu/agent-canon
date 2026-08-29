@@ -2,11 +2,11 @@
 # @dependency-start
 # contract tool
 # responsibility Validates dependency manifest syntax, contract kind metadata, and responsibility metadata.
-# upstream design ../../documents/design/source-owned-dependency-validation.md source parser authority
-# upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL design
-# upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
-# upstream implementation ./scan_dependency_headers.sh finds files with manifests
-# downstream implementation ./check_dependency_graph.sh consumes validated manifest lines
+# upstream design ../../../../documents/design/source-owned-dependency-validation.md source parser authority
+# upstream design ../../../../documents/design/dependency-manifest-design.md dependency manifest DSL design
+# upstream design ../../../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
+# upstream implementation ../../../analysis/dependencies/scan_dependency_headers.sh finds files with manifests
+# downstream implementation ../../../analysis/dependencies/check_dependency_graph.sh consumes validated manifest lines
 # @dependency-end
 set -euo pipefail
 
@@ -156,6 +156,14 @@ is_checkable_suffix() {
       return 1
       ;;
   esac
+}
+
+is_non_owning_package_marker() {
+  local path="$1"
+  [[ "${path##*/}" == "__init__.py" ]] || return 1
+  local content
+  content="$(sed '/^[[:space:]]*$/d' "$path")"
+  [[ -z "$content" || "$content" == '"""Repository-local package namespace."""' ]]
 }
 
 is_skip_path() {
@@ -434,6 +442,7 @@ while IFS= read -r raw_path; do
     path="$(realpath -m --relative-to="$ROOT_DIR" "$path")"
   fi
   is_skip_path "$path" && continue
+  is_non_owning_package_marker "$path" && continue
   if ! check_file "$path"; then
     failures=$((failures + 1))
   fi

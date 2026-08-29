@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract agent-runtime
-# responsibility Owns the host-only Docker/Git adapter for the shared AgentCanon
-# container. AgentCanon Python is invoked only through docker exec.
-# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md
-# downstream implementation ../../tools/runtime/container/bootstrap_runtime.py
+# responsibility Owns the host-only Docker/Git adapter for the shared AgentCanon container. AgentCanon Python is invoked only through docker exec.
+# upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md shared host/container bootstrap contract
+# downstream implementation ../../../tools/runtime/container/bootstrap_runtime.py container-side runtime implementation
 # @dependency-end
 
 set -euo pipefail

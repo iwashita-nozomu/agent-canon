@@ -2,35 +2,35 @@
 # @dependency-start
 # contract tool
 # responsibility Runs all checks CI automation.
-# upstream design ../../documents/design/source-owned-dependency-validation.md source-owned PR receipt contract
-# upstream design ../../documents/design/dependency-manifest-design.md manifest DSL and explicit graph analysis projection
-# upstream implementation ./check_agent_canon_pr.sh writes owner/root/PID/status-bound source receipts
-# upstream implementation ./pr_gate_receipt.py owns receipt parsing and binding validation
-# upstream implementation ../agent_tools/parent_root_side_effects.py owns explicit control authentication and child execution
-# upstream implementation ../agent_tools/runtime_artifacts.py owns external CI state and exact cleanup
-# upstream implementation ../agent_tools/check_dependency_headers.py validates changed-file dependency manifests
-# upstream implementation ../agent_tools/check_dependency_header_format.sh validates changed-file manifest syntax
-# upstream implementation ../agent_tools/check_static_any.py rejects explicit Python Any usage
-# upstream implementation ../agent_tools/check_log_helper_names.py validates log helper naming
-# upstream implementation ../agent_tools/import_responsibility.py validates import ownership boundaries
-# upstream implementation ../validation/notebook_quality.py validates notebooks as readable runnable demos
-# upstream implementation ../bin/agent-canon invokes the canonical Rust algorithm contract checker
-# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/python_algorithm_contract.rs owns the algorithm contract checker
-# upstream implementation ../agent_tools/check_convention_compliance.py validates convention/workflow gate wiring
-# upstream implementation ../agent_tools/tool_catalog.py validates structured tool catalog
-# upstream implementation ../agent_tools/tool_drift.py validates tool/convention trace contracts
-# upstream implementation ../agent_tools/skill_tool_commands.py validates runtime skill command packets
-# upstream implementation ../agent_tools/responsibility_scope.py validates responsibility-scope coverage
-# upstream implementation ../agent_tools/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
-# upstream implementation ../agent_tools/eval_accumulation_check.py validates eval result accumulation
-# upstream implementation ../agent_tools/runtime_log_archive_git.py manages mounted hook/eval log archive branches
-# upstream implementation ../agent_tools/check_skill_frontmatter.py validates runtime skill YAML frontmatter
-# upstream implementation ../agent_tools/evaluate_workflow_selection.py validates workflow selection routing cases
-# upstream implementation ../agent_tools/evaluate_report_quality.py validates report writing quality checklist cases
-# upstream implementation ./check_github_workflows.py validates GitHub workflow and PR checklist contracts
-# upstream implementation ../../bootstrap/container/image/Dockerfile defines the shared tool image
-# upstream implementation ../../tools/runtime/container/bootstrap_runtime.py owns lifecycle readback
-# upstream implementation ../agent_tools/smoke_test_research_perspective_pack.py validates research role packet
+# upstream design ../../../../documents/design/source-owned-dependency-validation.md source-owned PR receipt contract
+# upstream design ../../../../documents/design/dependency-manifest-design.md manifest DSL and explicit graph analysis projection
+# upstream implementation ../checks/check_agent_canon_pr.sh writes owner/root/PID/status-bound source receipts
+# upstream implementation ../receipts/pr_gate_receipt.py owns receipt parsing and binding validation
+# upstream implementation ../../../repository/workspace/parent_root_side_effects.py owns explicit control authentication and child execution
+# upstream implementation ../../../runtime/artifacts/runtime_artifacts.py owns external CI state and exact cleanup
+# upstream implementation ../../semantic/dependencies/check_dependency_headers.py validates changed-file dependency manifests
+# upstream implementation ../../semantic/dependencies/check_dependency_header_format.sh validates changed-file manifest syntax
+# upstream implementation ../../semantic/code/check_static_any.py rejects explicit Python Any usage
+# upstream implementation ../../semantic/logging/check_log_helper_names.py validates log helper naming
+# upstream implementation ../../../analysis/code/import_responsibility.py validates import ownership boundaries
+# upstream implementation ../../notebooks/notebook_quality.py validates notebooks as readable runnable demos
+# upstream implementation ../../../bin/agent-canon invokes the canonical Rust algorithm contract checker
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/python_algorithm_contract.rs owns the algorithm contract checker
+# upstream implementation ../../semantic/convention/check_convention_compliance.py validates convention/workflow gate wiring
+# upstream implementation ../../../runtime/manifest/tool_catalog.py validates structured tool catalog
+# upstream implementation ../../semantic/tools/tool_drift.py validates tool/convention trace contracts
+# upstream implementation ../../../agent/skills/skill_tool_commands.py validates runtime skill command packets
+# upstream implementation ../../semantic/responsibility/responsibility_scope.py validates responsibility-scope coverage
+# upstream implementation ../../../../eval/producers/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
+# upstream implementation ../../../../eval/checkers/eval_accumulation_check.py validates eval result accumulation
+# upstream implementation ../../../runtime/archive/runtime_log_archive_git.py manages mounted hook/eval log archive branches
+# upstream implementation ../../semantic/skills/check_skill_frontmatter.py validates runtime skill YAML frontmatter
+# upstream implementation ../../../../eval/producers/evaluate_workflow_selection.py validates workflow selection routing cases
+# upstream implementation ../../../../eval/producers/evaluate_report_quality.py validates report writing quality checklist cases
+# upstream implementation ../checks/check_github_workflows.py validates GitHub workflow and PR checklist contracts
+# upstream implementation ../../../../bootstrap/container/image/Dockerfile defines the shared tool image
+# upstream implementation ../../../runtime/container/bootstrap_runtime.py owns lifecycle readback
+# upstream implementation ../../../../eval/checkers/smoke_test_research_perspective_pack.py validates research role packet
 # @dependency-end
 set -euo pipefail
 

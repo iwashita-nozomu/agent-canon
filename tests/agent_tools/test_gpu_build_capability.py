@@ -5,8 +5,8 @@
 # responsibility Verifies fail-closed GPU build admission, WSL thunk diagnosis, and runtime/build separation.
 # upstream design ../../documents/design/environment-resolution-gpu-build-capability.md staged GPU build capability contract
 # upstream implementation ../../tools/runtime/container/gpu_build_capability.py typed receipt and decision model
-# upstream data ../fixtures/environment_resolution/wsl2_rootless_nvml_failed.json sanitized WSL2 failure readback
-# upstream data ../fixtures/environment_resolution/wsl2_rootless_cuda_build_repaired.json sanitized WSL2 repaired readback
+# upstream implementation ../fixtures/environment_resolution/wsl2_rootless_nvml_failed.json sanitized WSL2 failure readback
+# upstream implementation ../fixtures/environment_resolution/wsl2_rootless_cuda_build_repaired.json sanitized WSL2 repaired readback
 # @dependency-end
 
 from __future__ import annotations

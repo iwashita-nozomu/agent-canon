@@ -2,21 +2,21 @@
 # @dependency-start
 # contract tool
 # responsibility Predicts tool and hook rejection gates before edits are handed to agents.
-# upstream design ../../agents/COMMUNICATION_PROTOCOL.md defines handoff packet fields
-# upstream design ../../agents/skills/codex-task-workflow.md owns implementation preflight routing
-# upstream design ../../.codex/personal/skills/codex-task-workflow/SKILL.md exposes implementation preflight routing
-# upstream design ../../agents/skills/experiment-lifecycle.md owns experiment execution lifecycle routing
-# upstream design ../../.codex/personal/skills/experiment-lifecycle/SKILL.md exposes experiment execution lifecycle routing
-# upstream design ../../documents/experiments/experiment-registry.md defines managed experiment registry contract
-# upstream design ../../tools/README.md documents tool entrypoints
-# upstream design ../../documents/tools/README.md documents user-facing tool routes
-# upstream implementation ./log_surface_inventory.py checks hook/tool/skill log-surface drift
-# upstream implementation ../../.codex/personal/skills/oop-readability-check/SKILL.md owns OOP readability review routing
-# upstream implementation ./task_authority.py owns library implementation authority.
-# upstream implementation ../bin/agent-canon owns selected style checks.
-# upstream implementation ./responsibility_scope.py validates responsibility owner scopes
-# downstream implementation ../../tools/runtime/manifest/manifest_rendering.py injects preflight protocol into team manifests
-# downstream implementation ../../tests/agent_tools/test_tool_rejection_preflight.py validates predicted gate routing
+# upstream design ../../../../agents/COMMUNICATION_PROTOCOL.md defines handoff packet fields
+# upstream design ../../../../agents/skills/codex-task-workflow.md owns implementation preflight routing
+# upstream design ../../../../.codex/personal/skills/codex-task-workflow/SKILL.md exposes implementation preflight routing
+# upstream design ../../../../agents/skills/experiment-lifecycle.md owns experiment execution lifecycle routing
+# upstream design ../../../../.codex/personal/skills/experiment-lifecycle/SKILL.md exposes experiment execution lifecycle routing
+# upstream design ../../../../documents/experiments/experiment-registry.md defines managed experiment registry contract
+# upstream design ../../../README.md documents tool entrypoints
+# upstream design ../../../../documents/tools/README.md documents user-facing tool routes
+# upstream implementation ../../../runtime/archive/log_surface_inventory.py checks hook/tool/skill log-surface drift
+# upstream implementation ../../../../.codex/personal/skills/oop-readability-check/SKILL.md owns OOP readability review routing
+# upstream implementation ../../../runtime/authority/task_authority.py owns library implementation authority.
+# upstream implementation ../../../bin/agent-canon owns selected style checks.
+# upstream implementation ../responsibility/responsibility_scope.py validates responsibility owner scopes
+# downstream implementation ../../../runtime/manifest/manifest_rendering.py injects preflight protocol into team manifests
+# downstream implementation ../../../../tests/agent_tools/test_tool_rejection_preflight.py validates predicted gate routing
 # @dependency-end
 """Predict edit-time tool/hook rejection gates from planned paths."""
 

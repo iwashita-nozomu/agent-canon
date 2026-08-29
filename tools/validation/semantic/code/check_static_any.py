@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Rejects explicit Python Any usage in static-analysis surfaces.
-# upstream design ../../documents/conventions/python/04_type_annotations.md type annotation policy
-# upstream design ../../documents/conventions/python/07_type_checker.md pyright policy
-# downstream implementation ../../tests/agent_tools/test_check_static_any.py tests checker
+# upstream design ../../../../documents/conventions/python/04_type_annotations.md type annotation policy
+# upstream design ../../../../documents/conventions/python/07_type_checker.md pyright policy
+# downstream implementation ../../../../tests/agent_tools/test_check_static_any.py tests checker
 # @dependency-end
 """Reject explicit ``Any`` usage in Python source files."""
 

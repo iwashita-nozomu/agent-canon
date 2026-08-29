@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Validates the typed shared tool dependency plan used by the bootstrap image.
-# upstream design ../CONTAINER_OPERATIONS.md canonical shared image and mounted-target separation
-# upstream design ../documents/design/agent-canon-bootstrap-tool-runtime.md bootstrap dependency contract
-# downstream implementation agent_tools/dependency_plan.py parses, merges, and orders the plan
-# downstream implementation ../tests/agent_tools/test_devcontainer_dependencies.py exercises the validator route
+# upstream design ../../../CONTAINER_OPERATIONS.md canonical shared image and mounted-target separation
+# upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md bootstrap dependency contract
+# downstream implementation ../../analysis/dependencies/dependency_plan.py parses, merges, and orders the plan
+# downstream implementation ../../../tests/agent_tools/test_devcontainer_dependencies.py exercises the validator route
 # @dependency-end
 
 set -euo pipefail

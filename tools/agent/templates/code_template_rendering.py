@@ -1,8 +1,8 @@
 # @dependency-start
 # contract tool
 # responsibility Owns the package-safe canonical renderer for materializable code templates.
-# upstream design ../../templates/code/README.md code-template source and readback contract.
-# downstream implementation ../../templates/code/python/docstring_template.py parse-valid source.
+# upstream design ../../../templates/code/README.md code-template source and readback contract.
+# downstream implementation ../../../templates/code/python/docstring_template.py parse-valid source.
 # @dependency-end
 
 """Code template を canonical source root から安全に materialize します."""

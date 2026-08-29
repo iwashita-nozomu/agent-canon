@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Provides generic CMake compile-database selection plus clangd and clang-tidy checks.
-# upstream design ../../../documents/conventions/coding-conventions-cpp.md C++ build and validation conventions
-# upstream implementation ../../../tools/repository/support/repo_paths.sh resolves standalone/vendored tool views
-# downstream implementation ../../../tests/tools/test_cpp_static_analysis.py focused CLI and policy tests
+# upstream design ../../../../../documents/conventions/coding-conventions-cpp.md C++ build and validation conventions
+# upstream implementation ../../../../repository/support/repo_paths.sh resolves standalone/vendored tool views
+# downstream implementation ../../../../../tests/tools/test_cpp_static_analysis.py focused CLI and policy tests
 # @dependency-end
 """Select a CMake compile database and run clangd/clang-tidy against sources."""
 

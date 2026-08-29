@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Exports canonical template profiles to fresh external directories.
-# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md template ownership
-# upstream design ../../documents/contracts/template-bundle-manifest.toml profile manifest
-# downstream implementation ../../tests/agent_tools/test_template_bundle.py exporter tests
+# upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md template ownership
+# upstream design ../../../documents/contracts/template-bundle-manifest.toml profile manifest
+# downstream implementation ../../../tests/agent_tools/test_template_bundle.py exporter tests
 # @dependency-end
 """Deterministic source-commit-bound template bundle exporter."""
 

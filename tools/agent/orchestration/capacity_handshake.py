@@ -2,12 +2,12 @@
 # @dependency-start
 # contract tool
 # responsibility Owns typed capacity derivation, spawn reservations, saturation queues, and descendant lifecycle CAS.
-# upstream implementation ../../agents/capacity_policy.toml declares topology and projection policy
-# upstream implementation ../../.codex/config.toml provides configured capacity loader readback
+# upstream implementation ../../../agents/capacity_policy.toml declares topology and projection policy
+# upstream implementation ../../../.codex/config.toml provides configured capacity loader readback
 # downstream implementation ./implementation_dispatch.py consumes capacity and records successful spawns
 # downstream implementation ./implementation_route.py consumes availability for Spark routing
-# downstream implementation ./task_close.py validates postorder close tokens and release state
-# downstream implementation ../../tests/agent_tools/test_capacity_handshake.py tests capacity and lifecycle behavior
+# downstream implementation ../../runtime/lifecycle/task_close.py validates postorder close tokens and release state
+# downstream implementation ../../../tests/agent_tools/test_capacity_handshake.py tests capacity and lifecycle behavior
 # @dependency-end
 """Typed capacity handshake, queue, reservation, and lifecycle owner."""
 

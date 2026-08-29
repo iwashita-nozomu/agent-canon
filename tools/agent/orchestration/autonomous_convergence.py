@@ -2,11 +2,11 @@
 # @dependency-start
 # contract tool
 # responsibility Enforces finite autonomous review and implementation convergence for exact candidate epochs.
-# upstream design ../../agents/skills/agent-orchestration.execution-contract.toml machine-readable convergence owner
-# upstream design ../../agents/skills/agent-orchestration.md canonical convergence semantics
+# upstream design ../../../agents/skills/agent-orchestration.execution-contract.toml machine-readable convergence owner
+# upstream design ../../../agents/skills/agent-orchestration.md canonical convergence semantics
 # upstream implementation ./packets.py owns owner-local receipt normalization and compatibility.
-# downstream implementation ./task_close.py consumes the terminal closeout projection
-# downstream implementation ../../tests/agent_tools/test_autonomous_convergence.py exercises transition and closeout invariants
+# downstream implementation ../../runtime/lifecycle/task_close.py consumes the terminal closeout projection
+# downstream implementation ../../../tests/agent_tools/test_autonomous_convergence.py exercises transition and closeout invariants
 # @dependency-end
 """Finite-state autonomous execution convergence validator."""
 

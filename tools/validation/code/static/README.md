@@ -3,7 +3,7 @@
 @dependency-start
 contract tool
 responsibility Documents language-organized static analysis tool entrypoints.
-upstream design ../README.md shared tool index
+upstream design ../../../README.md shared tool index
 downstream design python/README.md Python static analysis entrypoints
 downstream design cpp/README.md C and C++ static analysis entrypoints
 downstream design common/README.md cross-language static analysis entrypoints

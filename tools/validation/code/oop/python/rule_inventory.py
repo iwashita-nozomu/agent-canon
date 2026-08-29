@@ -3,10 +3,10 @@
 # @dependency-start
 # contract tool
 # responsibility Inventories Python OOP policy, tool, document, and test surfaces.
-# upstream design ../../../documents/tools/README.md tool documentation placement policy
-# upstream design ../../../documents/conventions/object-oriented-design.md OOP policy source
+# upstream design ../../../../../documents/tools/README.md tool documentation placement policy
+# upstream design ../../../../../documents/conventions/object-oriented-design.md OOP policy source
 # upstream implementation ../shared/rule_inventory_core.py shared OOP inventory behavior
-# downstream implementation ../../../tests/agent_tools/test_oop_rule_inventory.py tests inventory entrypoint
+# downstream implementation ../../../../../tests/agent_tools/test_oop_rule_inventory.py tests inventory entrypoint
 # @dependency-end
 """Inventory Python OOP rule surfaces."""
 

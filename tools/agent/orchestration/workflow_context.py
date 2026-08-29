@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Owns the paired workflow context JSON load/store boundary.
-# upstream design ../../documents/design/agentcanon-hook-simplification-wave3.md owns context-path and fail-open semantics.
-# downstream implementation ./behavior_event_assembly.py uses workflow context readback.
+# upstream design ../../../documents/design/agentcanon-hook-simplification-wave3.md owns context-path and fail-open semantics.
+# downstream implementation ../../runtime/archive/behavior_event_assembly.py uses workflow context readback.
 # downstream implementation ./subagent_selection.py consumes loaded context.
 # @dependency-end
 """Atomic workflow context store/load with fail-open empty-state semantics."""

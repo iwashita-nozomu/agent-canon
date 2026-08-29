@@ -1,10 +1,10 @@
 # @dependency-start
 # contract tool
 # responsibility AgentTeam tool calls owner module.
-# upstream design ../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
-# upstream implementation ./update_lifecycle_contract.py owns gate and receipt validators.
+# upstream design ../../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
+# upstream implementation ../../runtime/lifecycle/update_lifecycle_contract.py owns gate and receipt validators.
 # downstream implementation ./agent_team.py facade consumes ToolCall APIs.
-# downstream implementation ./task_close.py consumes ToolCall APIs.
+# downstream implementation ../../runtime/lifecycle/task_close.py consumes ToolCall APIs.
 # @dependency-end
 """Own AgentTeam ToolCall materialization and close lifecycle receipts."""
 

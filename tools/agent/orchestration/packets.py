@@ -1,10 +1,10 @@
 # @dependency-start
 # contract tool
 # responsibility AgentTeam packets owner module.
-# upstream design ../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
+# upstream design ../../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
 # downstream implementation ./agent_team.py facade consumes packet APIs.
-# downstream implementation ./bootstrap_agent_run.py consumes packet APIs.
-# downstream implementation ./waterfall_gate_check.py consumes packet APIs.
+# downstream implementation ../../runtime/lifecycle/bootstrap_agent_run.py consumes packet APIs.
+# downstream implementation ../../validation/semantic/lifecycle/waterfall_gate_check.py consumes packet APIs.
 # @dependency-end
 """Own AgentTeam packet identity, normalization, and document references."""
 

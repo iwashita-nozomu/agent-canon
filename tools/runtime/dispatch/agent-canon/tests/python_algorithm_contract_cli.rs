@@ -1,7 +1,7 @@
 // @dependency-start
 // contract test
 // responsibility Verifies the public Rust CLI parity matrix for Python algorithm contracts.
-// upstream design ../../../documents/design/jax_util/algorithm_module_contract.md parity matrix and CLI artifact contract
+// upstream design ../../../../../documents/design/jax_util/algorithm_module_contract.md parity matrix and CLI artifact contract
 // upstream implementation ../src/python_algorithm_contract.rs canonical Rust checker
 // @dependency-end
 

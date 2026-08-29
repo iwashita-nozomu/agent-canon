@@ -2,11 +2,11 @@
 # @dependency-start
 # contract tool
 # responsibility Checks changed-file dependency headers and registered contract kind metadata.
-# upstream design ../../templates/agents/closeout_gate.md closeout requires dependency evidence
-# upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL design
-# upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
+# upstream design ../../../../templates/agents/closeout_gate.md closeout requires dependency evidence
+# upstream design ../../../../documents/design/dependency-manifest-design.md dependency manifest DSL design
+# upstream design ../../../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
 # downstream implementation ./check_dependency_header_format.sh validates manifest syntax
-# downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies changed-file checker
+# downstream implementation ../../../../tests/agent_tools/test_check_dependency_headers.py verifies changed-file checker
 # @dependency-end
 """Check that changed human-authored text files declare dependency manifests."""
 
@@ -46,6 +46,7 @@ SKIP_PREFIXES = (
     "reports/",
 )
 RAW_NVIDIA_FIXTURE_PREFIX = "tests/fixtures/nvidia/"
+NON_OWNING_PACKAGE_MARKER = '"""Repository-local package namespace."""'
 HEADER_SCAN_LINES = 80
 BINARY_SNIFF_BYTES = 4096
 CONTRACT_REGISTRY = Path("documents/design/dependency-contract-kinds.toml")
@@ -181,9 +182,26 @@ def is_binary(path: Path) -> bool:
         return True
 
 
+def is_non_owning_package_marker(path: Path) -> bool:
+    """Return whether a namespace-only package marker needs no manifest."""
+    if path.name != "__init__.py":
+        return False
+    try:
+        meaningful = "\n".join(
+            line.strip()
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        )
+    except (OSError, UnicodeDecodeError):
+        return False
+    return meaningful in {"", NON_OWNING_PACKAGE_MARKER}
+
+
 def should_check(root: Path, path: Path) -> bool:
     """Return whether one file is in scope for dependency header validation."""
     if not path.is_file() or path.is_symlink() or is_binary(path):
+        return False
+    if is_non_owning_package_marker(path):
         return False
     relative = repo_relative(root, path)
     if any(relative.startswith(prefix) for prefix in SKIP_PREFIXES):

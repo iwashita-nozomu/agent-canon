@@ -3,11 +3,11 @@
 // @dependency-start
 // contract implementation
 // responsibility Provides the AgentCanon Rust CLI entrypoint.
-// upstream design ../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
-// upstream implementation ../../../tools/validation/semantic/tools/visualization_contract.py defines typed visualization coverage consumed by docs gates
+// upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
+// upstream implementation ../../../../validation/semantic/tools/visualization_contract.py defines typed visualization coverage consumed by docs gates
 // downstream implementation docs.rs routes unified documentation formatting and checks
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
-// downstream implementation ../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
+// downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation migration_audit.rs validates migration boundaries
 // downstream implementation rust_migration_plan.rs prints sequential Rust migration candidates

@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Decides ChatGPT conversation closure versus Codex workspace execution from explicit request facts.
-# upstream design ../../agents/internal-routines/chatgpt-codex-routing.md owns route semantics and handoff policy.
-# downstream implementation ../../tests/agent_tools/test_chatgpt_codex_routing.py validates the finite decision relation.
+# upstream design ../../../agents/internal-routines/chatgpt-codex-routing.md owns route semantics and handoff policy.
+# downstream implementation ../../../tests/agent_tools/test_chatgpt_codex_routing.py validates the finite decision relation.
 # @dependency-end
 """Deterministic ChatGPT/Codex request-modality routing."""
 

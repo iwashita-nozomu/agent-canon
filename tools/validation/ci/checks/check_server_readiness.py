@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Checks server readiness CI readiness.
-# upstream design ../README.md shared automation index
+# upstream design ../../../README.md shared automation index
 # @dependency-end
 
 """Inspect host-side readiness for using this machine as the main server."""

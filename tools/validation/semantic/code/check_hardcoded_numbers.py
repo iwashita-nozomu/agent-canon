@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Detects unexplained numeric literals in Python and C++ sources.
-# upstream design ../../documents/conventions/common/01_principles.md magic-number policy
-# upstream design ../../documents/conventions/coding-conventions-python.md Python convention entrypoint
-# upstream design ../../documents/conventions/coding-conventions-cpp.md C++ convention entrypoint
-# downstream implementation ../../tests/agent_tools/test_check_hardcoded_numbers.py tests checker
+# upstream design ../../../../documents/conventions/common/01_principles.md magic-number policy
+# upstream design ../../../../documents/conventions/coding-conventions-python.md Python convention entrypoint
+# upstream design ../../../../documents/conventions/coding-conventions-cpp.md C++ convention entrypoint
+# downstream implementation ../../../../tests/agent_tools/test_check_hardcoded_numbers.py tests checker
 # @dependency-end
 """Check Python and C++ sources for unexplained hardcoded numeric literals."""
 

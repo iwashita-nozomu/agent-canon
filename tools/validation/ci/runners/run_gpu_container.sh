@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Runs one Docker GPU container through one public entrypoint and an internally selected injection route.
-# upstream design ../../documents/experiments/gpu-direct-command.md full UUID admission and Docker injection contract
-# upstream design ../../agents/skills/gpu-execution.md operator route and JAX GPU acceptance
-# downstream implementation ../../tests/tools/test_run_gpu_container.py command and failure regression tests
+# upstream design ../../../../documents/experiments/gpu-direct-command.md full UUID admission and Docker injection contract
+# upstream design ../../../../agents/skills/gpu-execution.md operator route and JAX GPU acceptance
+# downstream implementation ../../../../tests/tools/test_run_gpu_container.py command and failure regression tests
 # @dependency-end
 
 set -euo pipefail

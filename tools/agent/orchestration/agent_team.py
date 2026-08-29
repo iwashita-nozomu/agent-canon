@@ -1,16 +1,16 @@
 # @dependency-start
 # contract tool
 # responsibility AgentTeam facade owner module.
-# upstream design ../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
+# upstream design ../../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
 # upstream implementation ./team_config.py provides the approved config APIs.
 # upstream implementation ./packets.py provides the approved packet APIs.
 # upstream implementation ./tool_calls.py provides the approved ToolCall APIs.
-# upstream implementation ./issue_worker_dispatch.py provides the IssueWorker publisher route.
+# upstream implementation ../../repository/github/issue_worker_dispatch.py provides the IssueWorker publisher route.
 # upstream implementation ./implementation_dispatch.py provides the approved dispatch APIs.
-# upstream implementation ./manifest_rendering.py provides the approved rendering APIs.
-# upstream implementation ./workspace_scope.py provides the approved scope APIs.
-# downstream implementation ./bootstrap_agent_run.py consumes the facade allowlist.
-# downstream implementation ./task_close.py consumes the facade allowlist.
+# upstream implementation ../../runtime/manifest/manifest_rendering.py provides the approved rendering APIs.
+# upstream implementation ../../repository/workspace/workspace_scope.py provides the approved scope APIs.
+# downstream implementation ../../runtime/lifecycle/bootstrap_agent_run.py consumes the facade allowlist.
+# downstream implementation ../../runtime/lifecycle/task_close.py consumes the facade allowlist.
 # @dependency-end
 """Public facade for the AgentTeam owner modules."""
 

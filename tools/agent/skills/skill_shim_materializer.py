@@ -2,13 +2,13 @@
 # @dependency-start
 # contract tool
 # responsibility Materializes and reads back the complete public Codex skill-shim adapter set.
-# upstream design ../../documents/design/skill-runtime-shim-materialization.md owns the v3 schema, migration, and fixed-point contract
-# upstream design ../../agents/skills/catalog.yaml owns public skill identity, discovery metadata, and command phases
+# upstream design ../../../documents/design/skill-runtime-shim-materialization.md owns the v3 schema, migration, and fixed-point contract
+# upstream design ../../../agents/skills/catalog.yaml owns public skill identity, discovery metadata, and command phases
 # upstream implementation ./skill_route_catalog.py owns typed route and dependency projections
 # upstream implementation ./skill_dependency_map.py owns graph/tool identity projections
 # upstream implementation ./skill_tool_commands.py owns read-only command packets
-# upstream implementation ./tool_calls.py owns skill ToolCall token materialization
-# downstream implementation ../../tests/agent_tools/test_skill_shim_materializer.py validates migration, readback, and fixed point
+# upstream implementation ../orchestration/tool_calls.py owns skill ToolCall token materialization
+# downstream implementation ../../../tests/agent_tools/test_skill_shim_materializer.py validates migration, readback, and fixed point
 # @dependency-end
 """Materialize the canonical thin runtime shims for all public skills."""
 

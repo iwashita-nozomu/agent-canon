@@ -2,9 +2,8 @@
 # @dependency-start
 # contract test
 # responsibility Verifies the private feedback/knowledge adapter's owner-local observations.
-# upstream implementation ../../tools/runtime/archive/private_feedback.py
-# upstream external-schema git@github.com:iwashita-nozomu/agent-canon-log.git@db3722b817be8574c682949db733df0fb5c2674a
-# downstream documentation ../../documents/runtime/private-feedback-knowledge.md
+# upstream implementation ../../tools/runtime/archive/private_feedback.py private feedback adapter behavior
+# upstream design ../../documents/runtime/private-feedback-knowledge.md private feedback command and storage contract
 # @dependency-end
 """Focused tests for private feedback storage and promotion."""
 

@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Fixes markdown headers documentation formatting.
-# upstream design ../README.md shared automation index
+# upstream design ../../../README.md shared automation index
 # @dependency-end
 
 """Markdown header level auto-fixer.

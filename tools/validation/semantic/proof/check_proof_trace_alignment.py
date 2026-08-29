@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Checks package-retained formal-proof trace claims against code-path anchors.
-# upstream design ../../agents/skills/formal-proof-workflow.md defines alignment policy.
-# downstream design ../../documents/tools/check_proof_trace_alignment.md documents CLI usage.
-# downstream implementation ../../tests/agent_tools/test_check_proof_trace_alignment.py tests it.
+# upstream design ../../../../agents/skills/formal-proof-workflow.md defines alignment policy.
+# downstream design ../../../../documents/tools/check_proof_trace_alignment.md documents CLI usage.
+# downstream implementation ../../../../tests/agent_tools/test_check_proof_trace_alignment.py tests it.
 # @dependency-end
 """Check that formal-proof trace contracts align with implementation anchors."""
 

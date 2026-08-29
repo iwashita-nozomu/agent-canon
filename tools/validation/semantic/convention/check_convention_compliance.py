@@ -2,35 +2,35 @@
 # @dependency-start
 # contract tool
 # responsibility Verifies repository convention compliance wiring and workflow gates.
-# upstream design ../../documents/conventions/README.md convention index
-# upstream design ../../agents/canonical/CODEX_WORKFLOW.md completion readiness policy
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing policy
-# upstream design ../../agents/TASK_WORKFLOWS.md workflow skill routing policy
-# upstream design ../../agents/skills/agent-orchestration.md canonical orchestration skill
-# upstream design ../../agents/skills/codex-task-workflow.md implementation workflow skill
-# upstream design ../../agents/skills/subagent-bootstrap.md subagent handoff skill
-# upstream design ../../agents/skills/tool-finding-report.md tool warning closeout skill
-# upstream design ../../agents/workflows/agent-canon-pr-workflow.md AgentCanon PR essence workflow
-# upstream design ../../agents/workflows/pr-queue-cleanup-workflow.md PR queue cleanup body update workflow
-# upstream design ../../agents/skills/md-style-check.md Markdown small-edit skill route
-# upstream design ../../agents/skills/long-form-writing.md document claim grounding skill route
-# upstream design ../../agents/USER_GUIDE_JA.md user-facing small-edit route guidance
-# upstream design ../../templates/agents/workflow_monitoring.md tool warning closeout ledger
-# upstream design ../../templates/agents/closeout_gate.md closeout gate policy
-# upstream design ../../eval/definitions/skill_workflow_prompt_eval.toml prompt eval gate
-# upstream implementation ./agent_canon_source_root.py resolves canonical parent adapter targets
-# upstream design ../../documents/codex/codex-configuration-reference.md Codex hook severity policy
-# upstream design ../../documents/conventions/coding-conventions-house-style.md implementation ownership guardrail
-# upstream design ../../documents/notes/guardrails/engineering_avoidances.md recurring implementation avoidances
-# upstream design ../../.codex/README.md Codex runtime hook behavior summary
-# upstream design ../../tools/catalog.yaml structured tool catalog
-# upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR body checklist
-# upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template PR body checklist
-# upstream implementation ./tool_drift.py validates tool/convention drift
+# upstream design ../../../../documents/conventions/README.md convention index
+# upstream design ../../../../agents/canonical/CODEX_WORKFLOW.md completion readiness policy
+# upstream design ../../../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing policy
+# upstream design ../../../../agents/TASK_WORKFLOWS.md workflow skill routing policy
+# upstream design ../../../../agents/skills/agent-orchestration.md canonical orchestration skill
+# upstream design ../../../../agents/skills/codex-task-workflow.md implementation workflow skill
+# upstream design ../../../../agents/skills/subagent-bootstrap.md subagent handoff skill
+# upstream design ../../../../agents/skills/tool-finding-report.md tool warning closeout skill
+# upstream design ../../../../agents/workflows/agent-canon-pr-workflow.md AgentCanon PR essence workflow
+# upstream design ../../../../agents/workflows/pr-queue-cleanup-workflow.md PR queue cleanup body update workflow
+# upstream design ../../../../agents/skills/md-style-check.md Markdown small-edit skill route
+# upstream design ../../../../agents/skills/long-form-writing.md document claim grounding skill route
+# upstream design ../../../../agents/USER_GUIDE_JA.md user-facing small-edit route guidance
+# upstream design ../../../../templates/agents/workflow_monitoring.md tool warning closeout ledger
+# upstream design ../../../../templates/agents/closeout_gate.md closeout gate policy
+# upstream design ../../../../eval/definitions/skill_workflow_prompt_eval.toml prompt eval gate
+# upstream implementation ../../../runtime/source/agent_canon_source_root.py resolves canonical parent adapter targets
+# upstream design ../../../../documents/codex/codex-configuration-reference.md Codex hook severity policy
+# upstream design ../../../../documents/conventions/coding-conventions-house-style.md implementation ownership guardrail
+# upstream design ../../../../documents/notes/guardrails/engineering_avoidances.md recurring implementation avoidances
+# upstream design ../../../../.codex/README.md Codex runtime hook behavior summary
+# upstream design ../../../catalog.yaml structured tool catalog
+# upstream design ../../../../.github/PULL_REQUEST_TEMPLATE.md standalone PR body checklist
+# upstream design ../../../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template PR body checklist
+# upstream implementation ../tools/tool_drift.py validates tool/convention drift
 # upstream implementation ./convention_compliance_contracts.toml declares marker contracts
-# upstream implementation ./check_skill_frontmatter.py validates runtime skill frontmatter
-# downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs convention compliance gate
-# downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py tests verifier  # noqa: E501
+# upstream implementation ../skills/check_skill_frontmatter.py validates runtime skill frontmatter
+# downstream implementation ../../ci/runners/run_all_checks.sh runs convention compliance gate
+# downstream implementation ../../../../tests/agent_tools/test_check_convention_compliance.py tests verifier  # noqa: E501
 # @dependency-end
 """Verify that convention, workflow, and skill-routing gates are wired."""
 

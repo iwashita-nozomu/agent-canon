@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Checks the generated v2 public skill/tool invocation graph and its Mermaid readback.
-# upstream design ../../documents/design/skill-tool-invocation-graph.md owns checker obligations
-# upstream implementation ./skill_dependency_map.py owns materialization and actual Mermaid parsing
-# downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py checks checker failures
+# upstream design ../../../../documents/design/skill-tool-invocation-graph.md owns checker obligations
+# upstream implementation ../../../agent/skills/skill_dependency_map.py owns materialization and actual Mermaid parsing
+# downstream implementation ../../../../tests/agent_tools/test_skill_dependency_map.py checks checker failures
 # @dependency-end
 """Fail-closed checker for the generated skill/tool invocation graph."""
 

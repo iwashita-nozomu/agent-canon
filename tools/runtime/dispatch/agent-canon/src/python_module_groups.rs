@@ -1,7 +1,7 @@
 // @dependency-start
 // contract implementation
 // responsibility Validates parent-repo Python module group contracts and maps Python files to design groups.
-// upstream design ../../../documents/design/python-structure-hash.md Python module-group contract policy
+// upstream design ../../../../../documents/design/python-structure-hash.md Python module-group contract policy
 // downstream implementation main.rs exposes python-module-groups-check
 // downstream implementation python_structure_hash_report.rs uses contract-backed group names
 // @dependency-end

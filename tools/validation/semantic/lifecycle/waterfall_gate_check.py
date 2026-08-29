@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Provides waterfall gate check agent workflow automation.
-# upstream design ../README.md shared automation index
-# upstream design ../../agents/COMMUNICATION_PROTOCOL.md active design packet schema contract
-# upstream implementation ./packets.py owns active design packet schema constants and normalization
-# upstream implementation ./workspace_scope.py owns report path resolution
+# upstream design ../../../README.md shared automation index
+# upstream design ../../../../agents/COMMUNICATION_PROTOCOL.md active design packet schema contract
+# upstream implementation ../../../agent/orchestration/packets.py owns active design packet schema constants and normalization
+# upstream implementation ../../../repository/workspace/workspace_scope.py owns report path resolution
 # @dependency-end
 
 """Check intermediate waterfall gate readiness for one agent run bundle."""

@@ -2,13 +2,13 @@
 # @dependency-start
 # contract tool
 # responsibility Runs one standalone AgentCanon static-gate execution unit without selecting whether that unit is required.
-# upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
+# upstream design ../../../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
 # upstream implementation ./run_all_checks.sh owns the full-confidence check body executed from a read-only target
-# downstream implementation ./check_agent_canon_pr.sh aggregates all units for the manual full-confidence route
-# downstream implementation ../../.github/workflows/agent-canon-static-gates.yml remote execution boundary
-# downstream implementation ../../tests/tools/test_standalone_static_gate_units.py unit partition regression
-# downstream implementation ../../tests/tools/test_read_only_full_check.py read-only full-check regression
-# downstream implementation ../../tests/tools/test_standalone_static_gate_source_runtime_contract.py source/runtime ownership regression
+# downstream implementation ../checks/check_agent_canon_pr.sh aggregates all units for the manual full-confidence route
+# downstream implementation ../../../../.github/workflows/agent-canon-static-gates.yml remote execution boundary
+# downstream implementation ../../../../tests/tools/test_standalone_static_gate_units.py unit partition regression
+# downstream implementation ../../../../tests/tools/test_read_only_full_check.py read-only full-check regression
+# downstream implementation ../../../../tests/tools/test_standalone_static_gate_source_runtime_contract.py source/runtime ownership regression
 # @dependency-end
 
 set -euo pipefail

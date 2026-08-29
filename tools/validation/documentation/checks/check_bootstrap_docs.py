@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Validates bootstrap-facing docs and source-free static-seed consumer structure.
-# upstream design ../../documents/contracts/template-bootstrap.md default static-seed bootstrap contract
-# upstream design ../../documents/contracts/static-seed-export.md static seed ownership and exclusion contract
-# downstream implementation ../../tests/tools/test_check_bootstrap_docs.py exercises bootstrap and source-hidden consumer validation
+# upstream design ../../../../documents/contracts/template-bootstrap.md default static-seed bootstrap contract
+# upstream design ../../../../documents/contracts/static-seed-export.md static seed ownership and exclusion contract
+# downstream implementation ../../../../tests/tools/test_check_bootstrap_docs.py exercises bootstrap and source-hidden consumer validation
 # @dependency-end
 
 """Validate bootstrap docs and the source-free static-seed consumer boundary."""

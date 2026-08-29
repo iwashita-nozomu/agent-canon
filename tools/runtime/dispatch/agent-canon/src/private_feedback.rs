@@ -1,9 +1,9 @@
 // @dependency-start
 // contract implementation
 // responsibility Exposes the private feedback/knowledge command family from the Rust CLI.
-// upstream design ../../../documents/runtime/private-feedback-knowledge.md
-// upstream implementation ../../../tools/runtime/archive/private_feedback.py owns private storage and sync semantics
-// downstream implementation ../../../tests/agent_tools/test_private_feedback.py validates metadata/redaction boundaries
+// upstream design ../../../../../documents/runtime/private-feedback-knowledge.md private feedback command and storage contract
+// upstream implementation ../../../archive/private_feedback.py owns private storage and sync semantics
+// downstream implementation ../../../../../tests/agent_tools/test_private_feedback.py validates metadata/redaction boundaries
 // @dependency-end
 
 //! Rust-owned public command boundary for private feedback and knowledge.

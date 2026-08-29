@@ -1,8 +1,8 @@
 # @dependency-start
 # contract tool
 # responsibility Builds and verifies bounded direct-Luna subagent handoff packets.
-# upstream design ../../agents/skills/direct-luna-communication.md direct Luna routing contract
-# downstream implementation ../../tests/tools/test_direct_luna_dispatch.py validates packet behavior
+# upstream design ../../../agents/skills/direct-luna-communication.md direct Luna routing contract
+# downstream implementation ../../../tests/tools/test_direct_luna_dispatch.py validates packet behavior
 # @dependency-end
 """Build and verify bounded direct-Luna subagent handoff packets.
 

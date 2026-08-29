@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Detects structural project-owned skill lane routing concepts.
-# upstream design ../../agents/skills/task-routing.md task routing skill contract
-# upstream design ../../agents/skills/structure-refactor.md project .codex/.agents boundary contract
-# downstream implementation ./route.py selects public skills from structural concepts
-# downstream implementation ./prompt_classifier.py consumes structural lane evidence
+# upstream design ../../../agents/skills/task-routing.md task routing skill contract
+# upstream design ../../../agents/skills/structure-refactor.md project .codex/.agents boundary contract
+# downstream implementation ../orchestration/route.py selects public skills from structural concepts
+# downstream implementation ../orchestration/prompt_classifier.py consumes structural lane evidence
 # @dependency-end
 
 """Detect route-owned prompt concepts that should not live in catalog keywords."""

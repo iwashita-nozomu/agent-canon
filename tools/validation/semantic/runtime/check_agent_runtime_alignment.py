@@ -2,18 +2,17 @@
 # @dependency-start
 # contract tool
 # responsibility Checks public catalog/document/shim/config registration and path parity plus agent workflow state.
-# upstream design ../README.md shared automation index
-# upstream design ../../agents/skills/README.md public skill surface contract
-# upstream design ../../agents/canonical/skills.md official system skill delegation boundary
-# upstream design ../../agents/internal-routines/README.md internal routine surface contract
-# upstream design ../../agents/skills/catalog.yaml public skill routing and related-skill catalog
-# upstream implementation ./skill_route_catalog.py canonical skill-route rules and capability metadata
-# upstream implementation ./vendor_skill_adapters.py validates third-party skill adapter surface
-# upstream implementation ./model_profile_registry.py owns canonical model/profile projections
-# upstream implementation ./capacity_handshake.py owns typed capacity readback
-# upstream implementation ./packets.py owns active design packet normalization and materialization
-# upstream implementation ./team_config.py owns team and role configuration resolution
-# upstream implementation ./workspace_scope.py owns typed workspace/source/report roots
+# upstream design ../../../README.md shared automation index
+# upstream design ../../../../agents/skills/README.md public skill surface contract
+# upstream design ../../../../agents/canonical/skills.md official system skill delegation boundary
+# upstream design ../../../../agents/internal-routines/README.md internal routine surface contract
+# upstream design ../../../../agents/skills/catalog.yaml public skill routing and related-skill catalog
+# upstream implementation ../../../agent/skills/skill_route_catalog.py canonical skill-route rules and capability metadata
+# upstream implementation ../../../agent/orchestration/model_profile_registry.py owns canonical model/profile projections
+# upstream implementation ../../../agent/orchestration/capacity_handshake.py owns typed capacity readback
+# upstream implementation ../../../agent/orchestration/packets.py owns active design packet normalization and materialization
+# upstream implementation ../../../agent/orchestration/team_config.py owns team and role configuration resolution
+# upstream implementation ../../../repository/workspace/workspace_scope.py owns typed workspace/source/report roots
 # @dependency-end
 
 """Validate that agent runtime surfaces, task catalog, and bundle outputs align."""

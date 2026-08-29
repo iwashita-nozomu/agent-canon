@@ -4,7 +4,7 @@ contract tool
 responsibility Defines internal AgentCanon tool placement areas.
 upstream design ../catalog.yaml structured tool audience and placement catalog
 upstream design ../README.md shared tool family ownership and migration policy
-downstream implementation ../agent_tools/tool_catalog.py validates effective tool audience and placement
+downstream implementation ../runtime/manifest/tool_catalog.py validates effective tool audience and placement
 @dependency-end
 -->
 

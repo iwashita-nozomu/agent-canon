@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Runs in repo container CI automation.
-# upstream design ../README.md shared automation index
+# upstream design ../../../README.md shared automation index
 # @dependency-end
 
 """Build one repo-defined container pack and run a command inside it."""

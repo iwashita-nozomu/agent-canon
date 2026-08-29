@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Dispatches versioned AgentCanon catalog entries through typed tool run without shell evaluation.
-# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md catalog v2 and parity cutover
-# upstream design ../../tools/catalog.yaml typed runtime catalog
-# downstream implementation ../bin/agent-canon stable CLI namespace
-# downstream implementation ../../tests/agent_tools/test_tool_dispatch.py dispatcher contract tests
+# upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md catalog v2 and parity cutover
+# upstream design ../../catalog.yaml typed runtime catalog
+# downstream implementation ../../bin/agent-canon stable CLI namespace
+# downstream implementation ../../../tests/agent_tools/test_tool_dispatch.py dispatcher contract tests
 # @dependency-end
 """Run a parity-verified AgentCanon tool from the versioned catalog.
 

@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Detects drift between runtime profile inventory JSON and its rendered markdown doc.
-# upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json runtime profile inventory source of truth
-# upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md human-readable runtime profile doc
-# upstream implementation ../docs/render_runtime_profile_inventory.py renderer used for drift comparison
-# downstream implementation ../../tests/agent_tools/test_check_runtime_profile_inventory.py tests it
+# upstream design ../../../../documents/runtime/runtime-profiles-and-check-matrix.json runtime profile inventory source of truth
+# upstream design ../../../../documents/runtime/runtime-profiles-and-check-matrix.md human-readable runtime profile doc
+# upstream implementation ../../documentation/formatting/render_runtime_profile_inventory.py renderer used for drift comparison
+# downstream implementation ../../../../tests/agent_tools/test_check_runtime_profile_inventory.py tests it
 # @dependency-end
 """Fail when runtime profile inventory docs drift from the machine-readable source."""
 

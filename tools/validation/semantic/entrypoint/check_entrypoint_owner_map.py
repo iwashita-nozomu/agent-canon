@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Verifies that root agent instruction entrypoints remain thin owner maps instead of procedural policy stores.
-# upstream design ../../documents/design/entrypoint-owner-map.md structural grammar and owner-map contract
-# upstream implementation ./convention_compliance_contracts.toml operational marker ownership manifest
-# downstream implementation ../../tests/agent_tools/test_check_entrypoint_owner_map.py focused regression
-# downstream implementation ../../.github/workflows/entrypoint-owner-map.yml remote verification
+# upstream design ../../../../documents/design/entrypoint-owner-map.md structural grammar and owner-map contract
+# upstream implementation ../convention/convention_compliance_contracts.toml operational marker ownership manifest
+# downstream implementation ../../../../tests/agent_tools/test_check_entrypoint_owner_map.py focused regression
+# downstream implementation ../../../../.github/workflows/entrypoint-owner-map.yml remote verification
 # @dependency-end
 """Validate the structural owner-map contract for root instruction files."""
 

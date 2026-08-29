@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Owns the exact executable typed visualization universe, ToolCall, artifact readback, and projection coverage contract.
-# upstream design ../../agents/skills/code-visualization.md visualization ownership and projection semantics
-# downstream implementation ../../tests/agent_tools/test_visualization_contract.py contract and checker test coverage
-# downstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py consumes exact source, adapter, marker, and readback records
+# upstream design ../../../../agents/skills/code-visualization.md visualization ownership and projection semantics
+# downstream implementation ../../../../tests/agent_tools/test_visualization_contract.py contract and checker test coverage
+# downstream implementation ../../../analysis/dependencies/render_dependency_manifest_graph.py consumes exact source, adapter, marker, and readback records
 # @dependency-end
 """Exact D2.4 typed visualization contract and deterministic coverage checker."""
 

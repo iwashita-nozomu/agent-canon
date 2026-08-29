@@ -1,12 +1,12 @@
 // @dependency-start
 // contract implementation
 // responsibility Provides unified Rust Markdown documentation formatting and checks.
-// upstream design ../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
-// upstream design ../../../agents/skills/md-style-check.md Markdown style check skill contract
-// upstream design ../../../documents/runtime/runtime-profiles-and-check-matrix.json canonical runtime profile inventory rendered by this module
-// upstream implementation ../../../tools/validation/semantic/tools/visualization_contract.py owns typed source-universe, manifest, ToolCall, marker, readback, and coverage status
-// downstream implementation ../../../tools/bin/agent-canon invokes this command through the CLI wrapper
-// downstream implementation ../../../tests/tools/test_fix_mermaid.py tests syntax-only Mermaid formatting
+// upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
+// upstream design ../../../../../agents/skills/md-style-check.md Markdown style check skill contract
+// upstream design ../../../../../documents/runtime/runtime-profiles-and-check-matrix.json canonical runtime profile inventory rendered by this module
+// upstream implementation ../../../../validation/semantic/tools/visualization_contract.py owns typed source-universe, manifest, ToolCall, marker, readback, and coverage status
+// downstream implementation ../../../../bin/agent-canon invokes this command through the CLI wrapper
+// downstream implementation ../../../../../tests/tools/test_fix_mermaid.py tests syntax-only Mermaid formatting
 // @dependency-end
 
 use serde_json::Value;

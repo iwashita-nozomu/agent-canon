@@ -1,9 +1,9 @@
 // @dependency-start
 // contract implementation
 // responsibility Prints sequential Rust migration candidates for AgentCanon tools.
-// upstream design ../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
-// upstream design ../../../documents/runtime/runtime-log-archive.md hook and skill usage log archive policy
-// downstream implementation ../../../tools/bin/agent-canon invokes this command through the CLI wrapper
+// upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
+// upstream design ../../../../../documents/runtime/runtime-log-archive.md hook and skill usage log archive policy
+// downstream implementation ../../../../bin/agent-canon invokes this command through the CLI wrapper
 // @dependency-end
 
 use std::collections::{BTreeMap, HashSet};

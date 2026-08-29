@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Runs shared Python syntax and static quality checks for CI and pre-review gates.
-# upstream design ../README.md shared automation index
-# upstream design ../../documents/conventions/DOCSTRING_GUIDE.md explicit Docstring review convention
-# downstream implementation ./run_all_checks.sh calls this runner for Python checks
-# downstream implementation ./pre_review.sh calls this runner before role write-scope enforcement
+# upstream design ../../../README.md shared automation index
+# upstream design ../../../../documents/conventions/DOCSTRING_GUIDE.md explicit Docstring review convention
+# downstream implementation ../runners/run_all_checks.sh calls this runner for Python checks
+# downstream implementation ../runners/pre_review.sh calls this runner before role write-scope enforcement
 # @dependency-end
 set -euo pipefail
 

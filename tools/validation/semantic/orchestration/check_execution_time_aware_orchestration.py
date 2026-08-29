@@ -2,11 +2,11 @@
 # @dependency-start
 # contract tool
 # responsibility Enforces the machine-readable execution-time-aware orchestration contract and its exact consumer projections.
-# upstream design ../../agents/skills/agent-orchestration.execution-contract.toml canonical machine contract
-# upstream design ../../agents/skills/agent-orchestration.md sole execution-time-aware policy owner
-# upstream implementation ./skill_tool_commands.py selected-skill required-command packet owner
-# downstream implementation ../../tests/agent_tools/test_execution_time_aware_orchestration_contract.py negative contract tests
-# downstream implementation ../catalog.yaml production tool registry
+# upstream design ../../../../agents/skills/agent-orchestration.execution-contract.toml canonical machine contract
+# upstream design ../../../../agents/skills/agent-orchestration.md sole execution-time-aware policy owner
+# upstream implementation ../../../agent/skills/skill_tool_commands.py selected-skill required-command packet owner
+# downstream implementation ../../../../tests/agent_tools/test_execution_time_aware_orchestration_contract.py negative contract tests
+# downstream implementation ../../../catalog.yaml production tool registry
 # @dependency-end
 """Check the canonical execution-time-aware orchestration owner closure."""
 

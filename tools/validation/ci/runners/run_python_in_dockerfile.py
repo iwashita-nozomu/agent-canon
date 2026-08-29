@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Runs python in dockerfile CI automation.
-# upstream design ../README.md shared automation index
+# upstream design ../../../README.md shared automation index
 # @dependency-end
 
 """Run one Python file inside the repo-defined Docker runtime."""

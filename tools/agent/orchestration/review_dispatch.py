@@ -2,22 +2,22 @@
 # @dependency-start
 # contract tool
 # responsibility Materializes automatic independent-review candidates, frames, dispatch transitions, and decisions.
-# upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns candidate, frame, event, lineage, and handoff schemas.
-# upstream design ../../agents/canonical/CODEX_WORKFLOW.md owns automatic-review state transitions and APPROVE-only publication.
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md owns independent reviewer routing and same-context resume policy.
-# upstream design ../../agents/skills/agent-orchestration.md owns automatic review workflow routing.
-# upstream design ../../agents/skills/subagent-bootstrap.md owns review launch and resume mechanics.
-# upstream design ../../agents/skills/change-review.md owns findings-first candidate review decisions.
-# upstream design ../../agents/skills/pr-processing.md owns PR-head review handling.
+# upstream design ../../../agents/COMMUNICATION_PROTOCOL.md owns candidate, frame, event, lineage, and handoff schemas.
+# upstream design ../../../agents/canonical/CODEX_WORKFLOW.md owns automatic-review state transitions and APPROVE-only publication.
+# upstream design ../../../agents/canonical/CODEX_SUBAGENTS.md owns independent reviewer routing and same-context resume policy.
+# upstream design ../../../agents/skills/agent-orchestration.md owns automatic review workflow routing.
+# upstream design ../../../agents/skills/subagent-bootstrap.md owns review launch and resume mechanics.
+# upstream design ../../../agents/skills/change-review.md owns findings-first candidate review decisions.
+# upstream design ../../../agents/skills/pr-processing.md owns PR-head review handling.
 # upstream implementation ./team_config.py resolves task, role, and resume routing.
 # upstream implementation ./implementation_dispatch.py resolves agent type and dispatch routing.
-# upstream implementation ./workflow_monitor.py produces write-result triggers and records review waves.
-# upstream implementation ./github_publish.py produces verified PR-head update triggers.
-# upstream implementation ./artifact_identity.py materializes review artifact byte identities.
-# upstream implementation ./external_artifact_binding.py maps provider readback to local events.
-# downstream implementation ./publication_integrator.py resolves current explicit APPROVE state.
-# downstream implementation ./report_artifact_checks.py consumes unresolved automatic review evidence.
-# downstream implementation ../../tests/agent_tools/test_review_dispatch.py validates automatic-review state and routing.
+# upstream implementation ../../runtime/lifecycle/workflow_monitor.py produces write-result triggers and records review waves.
+# upstream implementation ../../repository/github/github_publish.py produces verified PR-head update triggers.
+# upstream implementation ../../runtime/artifacts/artifact_identity.py materializes review artifact byte identities.
+# upstream implementation ../../runtime/artifacts/external_artifact_binding.py maps provider readback to local events.
+# downstream implementation ../../repository/github/publication_integrator.py resolves current explicit APPROVE state.
+# downstream implementation ../../runtime/artifacts/report_artifact_checks.py consumes unresolved automatic review evidence.
+# downstream implementation ../../../tests/agent_tools/test_review_dispatch.py validates automatic-review state and routing.
 # @dependency-end
 """Drive automatic independent review from canonical repository state."""
 

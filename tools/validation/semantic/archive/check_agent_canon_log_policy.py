@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Validates the read-only AgentCanon-log legacy inventory contract.
-# upstream design ../../documents/design/runtime-log-repository-lifecycle.md RL-009..RL-012 policy evidence
-# downstream implementation ../../tests/agent_tools/test_agent_canon_log_policy.py exercises deterministic validation
-# downstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py consumes legacy import/readback boundaries
+# upstream design ../../../../documents/design/runtime-log-repository-lifecycle.md RL-009..RL-012 policy evidence
+# downstream implementation ../../../../tests/agent_tools/test_agent_canon_log_policy.py exercises deterministic validation
+# downstream implementation ../../../runtime/archive/runtime_log_archive_git.py consumes legacy import/readback boundaries
 # @dependency-end
 """Validate the fixed AgentCanon-log PR #4 legacy inventory blob."""
 

@@ -226,6 +226,14 @@ is_binary_file() {
   LC_ALL=C grep -Iq . "$1" 2>/dev/null
 }
 
+is_non_owning_package_marker() {
+  local path="$1"
+  [[ "${path##*/}" == "__init__.py" ]] || return 1
+  local content
+  content="$(sed '/^[[:space:]]*$/d' "$path")"
+  [[ -z "$content" || "$content" == '"""Repository-local package namespace."""' ]]
+}
+
 has_manifest_marker() {
   local path="$1"
   local marker="$2"
@@ -381,6 +389,7 @@ while IFS= read -r raw_path; do
   is_skip_path "$path" && { skipped=$((skipped + 1)); continue; }
   is_checkable_suffix "$path" || { skipped=$((skipped + 1)); continue; }
   is_selected_surface "$path" || { skipped=$((skipped + 1)); continue; }
+  is_non_owning_package_marker "$path" && { skipped=$((skipped + 1)); continue; }
   is_binary_file "$path" || { skipped=$((skipped + 1)); continue; }
   checked=$((checked + 1))
   if ! has_manifest_markers "$path"; then

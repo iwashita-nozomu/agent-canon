@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Owns the private feedback/knowledge spool adapter and the
-# metadata-only promotion/readback boundary for agent-canon-log.
-# upstream design ../../documents/runtime/private-feedback-knowledge.md
-# upstream external-schema git@github.com:iwashita-nozomu/agent-canon-log.git@db3722b817be8574c682949db733df0fb5c2674a
+# responsibility Owns the private feedback/knowledge spool adapter and the metadata-only promotion/readback boundary for agent-canon-log.
+# upstream design ../../documents/runtime/private-feedback-knowledge.md private feedback command and storage contract
 # downstream implementation ../../tools/runtime/dispatch/agent-canon/src/private_feedback.rs exposes the Rust CLI route
 # downstream implementation ../../../tests/agent_tools/test_private_feedback.py validates the bounded adapter
 # @dependency-end

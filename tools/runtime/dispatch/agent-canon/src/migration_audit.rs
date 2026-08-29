@@ -1,9 +1,9 @@
 // @dependency-start
 // contract implementation
 // responsibility Validates AgentCanon Rust migration boundaries.
-// upstream design ../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
-// upstream environment ../../../bootstrap.sh owns shared tool-runtime installation
-// downstream implementation ../../../tools/bin/agent-canon invokes this command through the CLI wrapper
+// upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
+// upstream environment ../../../../../bootstrap.sh owns shared tool-runtime installation
+// downstream implementation ../../../../bin/agent-canon invokes this command through the CLI wrapper
 // @dependency-end
 
 use std::fs;

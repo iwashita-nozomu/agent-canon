@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Proposes conservative design-document organization and requires explicit capability for source changes.
-# upstream design ../README.md shared tool index
-# upstream implementation ./_runtime_output.py external output and mutation capability boundary
-# downstream design ../../documents/design/README.md documents design placement
+# upstream design ../../../README.md shared tool index
+# upstream implementation ../../../analysis/documents/formatting/_runtime_output.py external output and mutation capability boundary
+# downstream design ../../../../documents/design/README.md documents design placement
 # @dependency-end
 """Plan design-document organization without implicit source mutation.
 

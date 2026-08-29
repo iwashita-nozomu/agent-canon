@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Provides validate role write scope agent workflow automation.
-# upstream design ../README.md shared automation index
+# upstream design ../../../README.md shared automation index
 # @dependency-end
 
 """Validate changed files against one agent role's write scope."""

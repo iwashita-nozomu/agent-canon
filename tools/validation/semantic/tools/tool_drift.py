@@ -2,22 +2,22 @@
 # @dependency-start
 # contract tool
 # responsibility Detects drift between tool contracts, convention docs, and dependency manifests.
-# upstream design ../../documents/design/source-owned-dependency-validation.md source-owned dependency receipt and review authority
-# upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL and graph semantics
-# upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR validation contract
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing contract
-# upstream design ../../agents/TASK_WORKFLOWS.md workflow routing contract
-# upstream design ../../agents/skills/agent-orchestration.md orchestration routing contract
-# upstream design ../../eval/definitions/skill_workflow_prompt_eval.toml prompt routing eval contract
-# upstream design ../../documents/conventions/REVIEW_PROCESS.md closeout validation policy
-# upstream design ../../tools/catalog.yaml structured tool catalog
-# upstream design ../../documents/tools/tool-docs.toml one-to-one tool documentation map
-# upstream implementation ./tool_catalog.py validates catalog structure
-# upstream implementation ./check_convention_compliance.py verifies skill-routing markers
-# upstream implementation ./graph_client.py provides verified manifest dependency facts
-# upstream implementation ./tool_path_policy.py defines retired legacy path policy
-# downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs drift checker
-# downstream implementation ../../tests/agent_tools/test_tool_drift.py tests checker
+# upstream design ../../../../documents/design/source-owned-dependency-validation.md source-owned dependency receipt and review authority
+# upstream design ../../../../documents/design/dependency-manifest-design.md dependency manifest DSL and graph semantics
+# upstream design ../../../../agents/workflows/agent-canon-pr-workflow.md PR validation contract
+# upstream design ../../../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing contract
+# upstream design ../../../../agents/TASK_WORKFLOWS.md workflow routing contract
+# upstream design ../../../../agents/skills/agent-orchestration.md orchestration routing contract
+# upstream design ../../../../eval/definitions/skill_workflow_prompt_eval.toml prompt routing eval contract
+# upstream design ../../../../documents/conventions/REVIEW_PROCESS.md closeout validation policy
+# upstream design ../../../catalog.yaml structured tool catalog
+# upstream design ../../../../documents/tools/tool-docs.toml one-to-one tool documentation map
+# upstream implementation ../../../runtime/manifest/tool_catalog.py validates catalog structure
+# upstream implementation ../convention/check_convention_compliance.py verifies skill-routing markers
+# upstream implementation ../../../analysis/dependencies/graph_client.py provides verified manifest dependency facts
+# upstream implementation ../../../runtime/authority/tool_path_policy.py defines retired legacy path policy
+# downstream implementation ../../ci/runners/run_all_checks.sh runs drift checker
+# downstream implementation ../../../../tests/agent_tools/test_tool_drift.py tests checker
 # @dependency-end
 """Check tool/convention drift using dependency manifests as the trace map."""
 

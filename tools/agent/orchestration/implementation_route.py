@@ -4,10 +4,10 @@
 # responsibility Routes one immutable fixed implementation packet to Spark or the saturation queue.
 # upstream implementation ./model_profile_registry.py owns profile and prompt materialization
 # upstream implementation ./capacity_handshake.py owns typed capacity availability and queue semantics
-# upstream implementation ./update_lifecycle_contract.py imports the canonical owner-produced Decision Sufficiency verdict
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md defines fixed Spark continuation policy
+# upstream implementation ../../runtime/lifecycle/update_lifecycle_contract.py imports the canonical owner-produced Decision Sufficiency verdict
+# upstream design ../../../agents/canonical/CODEX_SUBAGENTS.md defines fixed Spark continuation policy
 # downstream implementation ./implementation_dispatch.py performs actual typed implementation dispatch
-# downstream implementation ../../tests/agent_tools/test_implementation_route.py tests fail-closed routing
+# downstream implementation ../../../tests/agent_tools/test_implementation_route.py tests fail-closed routing
 # @dependency-end
 """Fail-closed implementation routing for fixed Spark packets."""
 

@@ -2,11 +2,11 @@
 # @dependency-start
 # contract tool
 # responsibility Compares observed repository path existence and kinds with the AgentCanon structure contract.
-# upstream design ../../documents/structure/repo-structure-contract.toml expected repository structure profiles
-# upstream design ../../responsibility-scope.toml canonical path owner and class relation
-# upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md standalone runtime surface policy
-# upstream design ../../documents/tools/README.md tool entrypoint policy
-# downstream implementation ../../tests/agent_tools/test_repo_structure_contract.py tests tree and contract comparison
+# upstream design ../../../../documents/structure/repo-structure-contract.toml expected repository structure profiles
+# upstream design ../../../../responsibility-scope.toml canonical path owner and class relation
+# upstream design ../../../../documents/runtime/SHARED_RUNTIME_SURFACES.md standalone runtime surface policy
+# upstream design ../../../../documents/tools/README.md tool entrypoint policy
+# downstream implementation ../../../../tests/agent_tools/test_repo_structure_contract.py tests tree and contract comparison
 # @dependency-end
 """Compare a repository tree with the AgentCanon structure contract."""
 

@@ -2,12 +2,12 @@
 # @dependency-start
 # contract tool
 # responsibility Runs dedicated secret scanners against current tree and git history.
-# upstream design ../../CONTAINER_OPERATIONS.md shared tool-runtime security policy
-# upstream implementation ../agent_tools/parent_root_side_effects.py owns scanner scratch allocation and exact cleanup
-# downstream environment ../../bootstrap.sh invokes the shared scanner setup
-# downstream design ../../tools/README.md documents the command surface
-# downstream design ../../documents/tools/README.md documents operator usage
-# downstream implementation ../../tests/tools/test_scan_secrets_script.py verifies external read-only scan input and runtime-local scratch
+# upstream design ../../../../CONTAINER_OPERATIONS.md shared tool-runtime security policy
+# upstream implementation ../../../repository/workspace/parent_root_side_effects.py owns scanner scratch allocation and exact cleanup
+# downstream environment ../../../../bootstrap.sh invokes the shared scanner setup
+# downstream design ../../../README.md documents the command surface
+# downstream design ../../../../documents/tools/README.md documents operator usage
+# downstream implementation ../../../../tests/tools/test_scan_secrets_script.py verifies external read-only scan input and runtime-local scratch
 # @dependency-end
 
 set -euo pipefail

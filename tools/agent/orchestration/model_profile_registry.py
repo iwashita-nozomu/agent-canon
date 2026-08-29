@@ -2,12 +2,12 @@
 # @dependency-start
 # contract tool
 # responsibility Owns the closed model-profile registry, prompt/token materialization, and generated role projections.
-# upstream implementation ../../agents/model_profiles.toml declares canonical profiles and explicit role bindings
-# upstream implementation ../../.codex/config.toml declares registered role descriptions
+# upstream implementation ../../../agents/model_profiles.toml declares canonical profiles and explicit role bindings
+# upstream implementation ../../../.codex/config.toml declares registered role descriptions
 # downstream implementation ./implementation_route.py selects the fixed Spark profile
 # downstream implementation ./implementation_dispatch.py materializes implementation prompts and close tokens
-# downstream implementation ./check_agent_runtime_alignment.py validates generated projections
-# downstream implementation ../../tests/agent_tools/test_model_profile_registry.py tests closed registry behavior
+# downstream implementation ../../validation/semantic/runtime/check_agent_runtime_alignment.py validates generated projections
+# downstream implementation ../../../tests/agent_tools/test_model_profile_registry.py tests closed registry behavior
 # @dependency-end
 """Closed model-profile registry and canonical runtime materializers."""
 

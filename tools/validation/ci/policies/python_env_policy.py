@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Provides python env policy CI automation.
-# upstream design ../README.md shared automation index
+# upstream design ../../../README.md shared automation index
 # @dependency-end
 
 """Report the Python policy for the shared AgentCanon tool runtime."""
