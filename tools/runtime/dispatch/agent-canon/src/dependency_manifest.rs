@@ -8,6 +8,7 @@
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::env;
 use std::fmt;
 use std::fs;
 use std::io::Write;
@@ -483,7 +484,17 @@ fn load_surface_manifest_snapshot(
     manifest: Option<&Path>,
 ) -> Result<SurfaceManifestSnapshot, ManifestError> {
     let script = surface_manifest_script(root, producer)?;
+    let mut python_paths = vec![root.to_path_buf()];
+    if let Some(existing) = env::var_os("PYTHONPATH") {
+        python_paths.extend(env::split_paths(&existing));
+    }
+    let pythonpath = env::join_paths(python_paths).map_err(|error| {
+        ManifestError::SurfaceManifest(format!(
+            "surface_manifest_snapshot: invalid Python import path: {error}"
+        ))
+    })?;
     let output = Command::new("python3")
+        .env("PYTHONPATH", pythonpath)
         .arg(script)
         .args([
             "--root",

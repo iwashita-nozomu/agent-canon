@@ -158,7 +158,7 @@ options:\n\
 examples:\n\
   tools/bin/agent-canon test-design -h\n\
   tools/bin/agent-canon test-design check tests/tools/test_example.py\n\
-  tools/bin/agent-canon test-design check --root . tests rust/agent-canon/src"
+  tools/bin/agent-canon test-design check --root . tests tools/runtime/dispatch/agent-canon/src"
 }
 
 fn print_usage() {
