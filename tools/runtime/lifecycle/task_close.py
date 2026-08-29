@@ -27,9 +27,10 @@ import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-import tools.agent.orchestration.capacity_handshake
+from tools.agent.orchestration import capacity_handshake
 from tools.runtime.artifacts.runtime_artifacts import (
     RUNTIME_ROOT_ENV,
     RuntimeArtifactError,

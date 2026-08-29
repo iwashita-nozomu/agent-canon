@@ -43,10 +43,10 @@ Docstring の意味契約は日本語で記述します。
 1. renderer を使った場合は rendered source と destination の path/sha256 を read back する。
 
 ```bash
-PYTHONPATH=tools python3 - <<'PY'
+PYTHONPATH=. python3 - <<'PY'
 from pathlib import Path
 
-from agent_tools.code_template_rendering import render_code_template
+from tools.agent.templates.code_template_rendering import render_code_template
 
 source = render_code_template("python/docstring_template.py")
 Path("python/docstring_template.py").write_text(source, encoding="utf-8")

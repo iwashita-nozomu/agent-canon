@@ -138,15 +138,24 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
         """Run a source-owned route from an isolated development clone."""
         with tempfile.TemporaryDirectory() as workspace:
             clone = Path(workspace) / "agent-canon"
-            copy_ignore = shutil.ignore_patterns(
-                ".git",
-                ".agent-canon",
-                "reports",
-                "workspace",
-                "__pycache__",
-                ".pytest_cache",
-                ".ruff_cache",
-            )
+            def copy_ignore(directory: str, names: list[str]) -> set[str]:
+                """Ignore clone-local state while retaining canonical packages."""
+                ignored = set(
+                    shutil.ignore_patterns(
+                        ".git",
+                        ".agent-canon",
+                        "reports",
+                        "workspace",
+                        "__pycache__",
+                        ".pytest_cache",
+                        ".ruff_cache",
+                    )(directory, names)
+                )
+                if Path(directory).resolve() == (
+                    PROJECT_ROOT / "tools" / "repository"
+                ).resolve():
+                    ignored.discard("workspace")
+                return ignored
 
             shutil.copytree(
                 PROJECT_ROOT,
@@ -186,6 +195,10 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                         ".git", ".agent-canon", "reports", "workspace"
                     )(directory, names)
                 )
+                if Path(directory).resolve() == (
+                    PROJECT_ROOT / "tools" / "repository"
+                ).resolve():
+                    ignored.discard("workspace")
                 return ignored
 
             shutil.copytree(

@@ -36,9 +36,11 @@ if __package__:
     )
     from tools.runtime.authority.checkout_identity import resolve_checkout_identity
 else:
-    import tools.agent.orchestration.capacity_handshake
-    import tools.agent.orchestration.implementation_route
-    import tools.agent.orchestration.model_profile_registry
+    from tools.agent.orchestration import (
+        capacity_handshake,
+        implementation_route,
+        model_profile_registry,
+    )
     from tools.runtime.authority.writer_target import (  # type: ignore[no-redef]
         WriterTarget,
         WriterTargetError,

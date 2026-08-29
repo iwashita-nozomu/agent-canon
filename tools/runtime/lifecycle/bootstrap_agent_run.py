@@ -13,6 +13,7 @@ import argparse
 import json
 import os
 import shutil
+import sys
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -20,6 +21,9 @@ from datetime import datetime, timezone
 
 UTC = timezone.utc
 from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 try:
     from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary

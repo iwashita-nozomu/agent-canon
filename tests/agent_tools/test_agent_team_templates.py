@@ -26,9 +26,8 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-import tools.agent.orchestration.capacity_handshake  # noqa: E402
-import tools.runtime.lifecycle.task_close  # noqa: E402
-import tools.runtime.lifecycle.update_lifecycle_contract  # noqa: E402
+from tools.agent.orchestration import capacity_handshake  # noqa: E402
+from tools.runtime.lifecycle import task_close, update_lifecycle_contract  # noqa: E402
 from tools.agent.orchestration.agent_team import (  # noqa: E402
     RunBundleSpec,
     create_run_bundle,
@@ -255,13 +254,13 @@ class AgentTeamTemplateTest(unittest.TestCase):
     def test_code_template_renderer_works_from_repo_root_package_route(self) -> None:
         """リポジトリ root の canonical package invocation が source を読み戻せます."""
         environment = dict(os.environ)
-        environment["PYTHONPATH"] = str(PROJECT_ROOT / "tools")
+        environment["PYTHONPATH"] = str(PROJECT_ROOT)
         result = subprocess.run(
             [
                 sys.executable,
                 "-c",
                 (
-                    "from agent_tools.code_template_rendering import "
+                    "from tools.agent.templates.code_template_rendering import "
                     "render_code_template; "
                     "source = render_code_template('python/docstring_template.py'); "
                     "assert 'class ExampleState' in source"
@@ -625,7 +624,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
         )
         self.assertEqual(nonmath_dispatch.status, "spawned")
         with patch(
-            "implementation_dispatch.resolve_checkout_identity",
+            "tools.agent.orchestration.implementation_dispatch.resolve_checkout_identity",
             side_effect=AssertionError("checkout identity must be reused"),
         ):
             snapshot_dispatch = dispatch_fixed_implementation(

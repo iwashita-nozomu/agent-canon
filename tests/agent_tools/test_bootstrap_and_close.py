@@ -2004,7 +2004,10 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
         self.assertIn("worker", unique_codex_agents_for_roles(roles))
 
-        with patch("implementation_dispatch.registered_codex_agent_types", return_value=set()):
+        with patch(
+            "tools.agent.orchestration.implementation_dispatch.registered_codex_agent_types",
+            return_value=set(),
+        ):
             initial_wave = recommended_initial_subagent_wave(
                 roles,
                 active_subagents,

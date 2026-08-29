@@ -21,8 +21,8 @@ from typing import Any, cast
 try:
     from tools.repository.workspace import parent_root_side_effects as _parent_boundary
 except ImportError:  # direct script execution
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import tools.repository.workspace.parent_root_side_effects as _parent_boundary  # type: ignore[no-redef]
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from tools.repository.workspace import parent_root_side_effects as _parent_boundary  # type: ignore[no-redef]
 
 LAYOUT_STANDALONE = "standalone"
 LAYOUT_EXTERNAL = "external"
