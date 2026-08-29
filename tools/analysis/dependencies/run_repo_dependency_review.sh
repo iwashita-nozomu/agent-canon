@@ -20,6 +20,8 @@ set -euo pipefail
 
 ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+CANON_SOURCE_ROOT="$(realpath -e "$script_dir/../../..")"
+export PYTHONPATH="${CANON_SOURCE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"
 REVIEW_TEMP_BASE=""
 RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT:-}"
 CONTROL_ROOT="${AGENT_CANON_CONTROL_PARENT_ROOT:-}"
@@ -36,8 +38,8 @@ from pathlib import Path
 import sys
 
 source, root, control, runtime, candidate = map(Path, sys.argv[1:])
-sys.path.insert(0, str(source))
-from runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
+sys.path.insert(0, str(source.parents[2].resolve(strict=True)))
+from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
 
 try:
     source_root = source.parents[2].resolve(strict=True)
@@ -211,7 +213,6 @@ if [[ -n "$REPORT_DIR" ]]; then
   REPORT_DIR="$(runtime_path "$REPORT_DIR")" || exit $?
   mkdir -p "$REPORT_DIR"
 fi
-SCRIPT_TOOLS_ROOT="$(realpath -m "$(dirname "$(realpath -m "$script_dir")")")"
 cd "$ROOT_DIR"
 
 if [[ "$HEADER_SCAN_ONLY" -eq 1 && "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
@@ -223,11 +224,11 @@ if [[ "$HEADER_SCAN_ONLY" -eq 1 && ( -z "$CHANGED_PATH_PACKET" || -z "$TRUSTED_B
   exit 2
 fi
 
-CANON_TOOLS_ROOT="$SCRIPT_TOOLS_ROOT"
-SCAN_DEPENDENCY_HEADERS="${CANON_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh"
-CHECK_DEPENDENCY_HEADER_FORMAT="${CANON_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh"
-CHECK_DEPENDENCY_GRAPH="${CANON_TOOLS_ROOT}/agent_tools/check_dependency_graph.sh"
-CHECK_DESIGN_DOC_CLAIMS_TOOL="${CANON_TOOLS_ROOT}/agent_tools/check_design_doc_claims.py"
+CANON_TOOLS_ROOT="$script_dir"
+SCAN_DEPENDENCY_HEADERS="${CANON_TOOLS_ROOT}/scan_dependency_headers.sh"
+CHECK_DEPENDENCY_HEADER_FORMAT="${CANON_TOOLS_ROOT}/../../validation/semantic/dependencies/check_dependency_header_format.sh"
+CHECK_DEPENDENCY_GRAPH="${CANON_TOOLS_ROOT}/check_dependency_graph.sh"
+CHECK_DESIGN_DOC_CLAIMS_TOOL="${CANON_TOOLS_ROOT}/../../validation/semantic/documents/check_design_doc_claims.py"
 # Persisted graph operations are repository-scoped; source review tools remain script-owned.
 if [[ -n "${AGENT_CANON_GRAPH_CLI:-}" ]]; then
   GRAPH_CLI="$(realpath -e "$AGENT_CANON_GRAPH_CLI")" || {
@@ -237,7 +238,7 @@ if [[ -n "${AGENT_CANON_GRAPH_CLI:-}" ]]; then
 else
   GRAPH_CLI="$(command -v agent-canon || true)"
 fi
-WORKFLOW_MONITOR="${CANON_TOOLS_ROOT}/agent_tools/workflow_monitor.py"
+WORKFLOW_MONITOR="${CANON_TOOLS_ROOT}/../../runtime/lifecycle/workflow_monitor.py"
 
 if [[ "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
   GRAPH_CLI="$(realpath -e "$GRAPH_CLI")" || {
