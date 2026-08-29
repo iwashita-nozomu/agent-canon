@@ -39,7 +39,7 @@ EXECUTABLE_SCAN_PATHS = (
     "tools/validation/notebooks/notebook_quality.py",
 )
 METADATA_ALLOWLIST = {"tools/runtime/authority/hook_retirement.py", "documents/design/agentcanon-hook-simplification-wave3.md"}
-_COMMAND_RE = re.compile(r"^(?:import-only:tools\.agent_tools\.[A-Za-z0-9_]+:[A-Za-z0-9_]+|command-only:python3 tools/(?:agent_tools|validation)/[A-Za-z0-9_]+\.py(?: [^\n]*)?|skill-only:\$[A-Za-z0-9][A-Za-z0-9_-]*|docs-only:tools/bin/agent-canon docs check)$")
+_COMMAND_RE = re.compile(r"^(?:import-only:tools\.[A-Za-z0-9_.]+:[A-Za-z0-9_]+|command-only:python3 tools/[A-Za-z0-9_./-]+\.py(?: [^\n]*)?|skill-only:\$[A-Za-z0-9][A-Za-z0-9_-]*|docs-only:tools/bin/agent-canon docs check)$")
 
 
 def _files(root: Path, relative: str) -> list[Path]:

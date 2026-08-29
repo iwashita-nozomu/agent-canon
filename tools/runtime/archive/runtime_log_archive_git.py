@@ -605,7 +605,7 @@ def check_hook_hot_path(path: Path) -> tuple[str, ...]:
     findings: set[str] = set()
     if runtime_imports:
         runtime_path = (
-            path.resolve().parents[3]
+            path.resolve().parents[2]
             / "tools"
             / "runtime"
             / "archive"

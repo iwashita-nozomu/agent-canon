@@ -29,9 +29,9 @@ from pathlib import Path
 
 UTC = timezone.utc
 
-TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools" / "agent_tools"
-if TOOLS_DIR.is_dir():
-    sys.path.insert(0, str(TOOLS_DIR))
+SOURCE_ROOT = Path(__file__).resolve().parents[2]
+if str(SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SOURCE_ROOT))
 
 from tools.repository.workspace.parent_root_side_effects import (  # noqa: E402
     ParentRootAttestationRequest,

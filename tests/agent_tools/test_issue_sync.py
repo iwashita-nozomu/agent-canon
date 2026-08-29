@@ -21,7 +21,7 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-import tools.repository.github.issue_sync  # noqa: E402
+from tools.repository.github import issue_sync  # noqa: E402
 
 
 def test_github_reference_requires_repository_and_number() -> None:

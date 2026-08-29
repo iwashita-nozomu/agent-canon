@@ -31,7 +31,7 @@ sys.path.insert(0, str(TOOLS_DIR))
 
 import hook_dispatcher  # noqa: E402
 import hook_event_log  # noqa: E402
-import tools.runtime.archive.runtime_log_archive_git  # noqa: E402
+from tools.runtime.archive import runtime_log_archive_git  # noqa: E402
 
 
 def hook_entry(hook_run_id: str, *, status: str = "pass") -> dict[str, object]:
@@ -266,15 +266,20 @@ class HookEventLogHotPathTest(unittest.TestCase):
         def capture(entry: dict[str, object]) -> None:
             captured.update(entry)
 
-        with (
-            patch.object(
-                hook_dispatcher.HookLogContext,
-                "append",
-                side_effect=capture,
-            ) as append,
-            contextlib.redirect_stdout(dispatcher_stdout),
-        ):
-            result = hook_dispatcher.dispatch_event("PreToolUse", raw)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with (
+                patch.dict(
+                    os.environ,
+                    {"AGENT_CANON_RUNTIME_ROOT": tmp_dir},
+                ),
+                patch.object(
+                    hook_dispatcher.HookLogContext,
+                    "append",
+                    side_effect=capture,
+                ) as append,
+                contextlib.redirect_stdout(dispatcher_stdout),
+            ):
+                result = hook_dispatcher.dispatch_event("PreToolUse", raw)
 
         self.assertEqual(result, 0)
         append.assert_called_once()
@@ -289,6 +294,7 @@ class HookEventLogHotPathTest(unittest.TestCase):
                 "hook_event_name",
                 "safety_decision",
                 "operation",
+                "mutation_control",
             },
         )
         self.assertNotIn("prompt", captured)
