@@ -12,7 +12,7 @@ set -euo pipefail
 export PYTHONDONTWRITEBYTECODE=1
 # Check each git worktree for WORKTREE_SCOPE.md and report.  Runtime output is
 # external by construction; missing or unsafe roots fail before enumeration.
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-/usr/bin/python3}"
 export PYTHONPATH="${ROOT_DIR}/python${PYTHONPATH:+:${PYTHONPATH}}"
 RUN_DIR="$({

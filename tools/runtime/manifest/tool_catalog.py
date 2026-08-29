@@ -30,7 +30,16 @@ from pathlib import Path
 from typing import cast
 
 import yaml
-from ..authority.tool_path_policy import is_retired_legacy_tool_path
+
+if __package__ in (None, ""):
+    # Direct execution must resolve the canonical package from the repository
+    # root rather than treating this relocated manifest directory as a module.
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from tools.runtime.authority.tool_path_policy import is_retired_legacy_tool_path
+else:
+    from ..authority.tool_path_policy import is_retired_legacy_tool_path
 
 CATALOG_PATH = "tools/catalog.yaml"
 TOOL_DOCS_PATH = "documents/tools/tool-docs.toml"

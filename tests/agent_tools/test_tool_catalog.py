@@ -160,7 +160,7 @@ class CheckToolCatalogTest(unittest.TestCase):
             catalog.write_text(
                 catalog.read_text(encoding="utf-8").replace(
                     "tools/runtime/manifest/tool_catalog.py",
-                    "tools/agent_tools/missing_tool.py",
+                    "tools/runtime/manifest/missing_tool.py",
                 ),
                 encoding="utf-8",
             )
@@ -169,7 +169,7 @@ class CheckToolCatalogTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "TOOL_CATALOG_FINDING=entry:tools/agent_tools/missing_tool.py:missing-path",
+                "TOOL_CATALOG_FINDING=entry:tools/runtime/manifest/missing_tool.py:missing-path",
                 result.stdout,
             )
 
@@ -335,11 +335,11 @@ class CheckToolCatalogTest(unittest.TestCase):
                 root,
                 "tools/validation/ci/runners/run_all_checks.sh",
                 self.manifest("Run all checks.")
-                + "\npython3 tools/agent_tools/uncataloged.py\n",
+                + "\npython3 tools/runtime/manifest/uncataloged.py\n",
             )
             self.write_file(
                 root,
-                "tools/agent_tools/uncataloged.py",
+                "tools/runtime/manifest/uncataloged.py",
                 self.manifest("Fixture uncataloged tool."),
             )
 
@@ -347,7 +347,7 @@ class CheckToolCatalogTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "default_wiring:tools/agent_tools/uncataloged.py:uncataloged-tool-reference",
+                "default_wiring:tools/runtime/manifest/uncataloged.py:uncataloged-tool-reference",
                 result.stdout,
             )
 
@@ -363,13 +363,13 @@ class CheckToolCatalogTest(unittest.TestCase):
             pattern.findall(
                 "python3 tests/tools/test_catalog_fixture.py\n"
                 "python3 tests/tools/tools/run_symlink_lint.py\n"
-                "python3 tools/agent_tools/uncataloged.py\n"
+                "python3 tools/runtime/manifest/uncataloged.py\n"
             )
         )
 
         self.assertNotIn("tools/test_catalog_fixture.py", matches)
         self.assertNotIn("tools/tools/run_symlink_lint.py", matches)
-        self.assertIn("tools/agent_tools/uncataloged.py", matches)
+        self.assertIn("tools/runtime/manifest/uncataloged.py", matches)
 
     def test_entry_summary_is_required(self) -> None:
         """Catalog entries must include a reader-facing summary."""
@@ -684,7 +684,7 @@ class CheckToolCatalogTest(unittest.TestCase):
                     "  - compatibility_wrapper",
                     "families:",
                     "  agent_tools:",
-                    "    root: tools/agent_tools",
+                    "    root: tools",
                     "    audience: agent",
                     "    placement: workflow_helper",
                     "entries:",

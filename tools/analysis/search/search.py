@@ -22,7 +22,7 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import tools.analysis.code.lsp_code_analysis  # noqa: E402
+from tools.analysis.code import lsp_code_analysis  # noqa: E402
 import tools.analysis.search.search_index as search_index  # noqa: E402
 import tools.analysis.search.vector_search as vector_search  # noqa: E402
 

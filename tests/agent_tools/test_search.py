@@ -23,10 +23,10 @@ from unittest import mock
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SEARCH = PROJECT_ROOT / "tools" / "analysis" / "search" / "search.py"
 
-if str(PROJECT_ROOT / "tools" / "agent_tools") not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-import tools.analysis.code.lsp_code_analysis as lsp  # noqa: E402
+from tools.analysis.code import lsp_code_analysis as lsp  # noqa: E402
 import tools.analysis.search.search as search_tool  # noqa: E402
 
 

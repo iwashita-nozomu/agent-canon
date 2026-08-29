@@ -25,7 +25,7 @@ set -euo pipefail
 export PYTHONDONTWRITEBYTECODE=1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="${SCRIPT_DIR%/*}"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 PYTHON_BIN="${PYTHON_BIN:-}"
 if [ -z "$PYTHON_BIN" ]; then

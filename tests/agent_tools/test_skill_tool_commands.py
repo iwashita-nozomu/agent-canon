@@ -19,7 +19,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+sys.path.insert(0, str(PROJECT_ROOT))
 from tools.runtime.source.agent_canon_source_root import RootResolution  # noqa: E402
 from tools.agent.skills.skill_tool_commands import project_public_command  # noqa: E402
 TOOL = PROJECT_ROOT / "tools" / "agent" / "skills" / "skill_tool_commands.py"
@@ -80,13 +80,13 @@ class SkillToolCommandsTest(unittest.TestCase):
 
     def write_skill(self, root: Path, skill: str, body: str) -> Path:
         """Create one runtime and human-facing skill pair."""
-        runtime = root / ".agents" / "skills" / skill / "SKILL.md"
+        runtime = root / ".codex" / "personal" / "skills" / skill / "SKILL.md"
         runtime.parent.mkdir(parents=True, exist_ok=True)
         runtime.write_text(f"# {skill}\n\n{body}", encoding="utf-8")
         canon = root / "agents" / "skills" / f"{skill}.md"
         canon.parent.mkdir(parents=True, exist_ok=True)
         canon.write_text(
-            f"# {skill}\n\n```bash\npython3 tools/agent_tools/example.py\n```\n",
+            f"# {skill}\n\n```bash\npython3 tools/runtime/lifecycle/workflow_monitor.py\n```\n",
             encoding="utf-8",
         )
         self.write_dependency_map(
@@ -187,7 +187,7 @@ class SkillToolCommandsTest(unittest.TestCase):
         self.assertEqual(payload["required_commands"], [])
         self.assertIn("make check-matrix", payload["discovered_commands"])
         self.assertIn(
-            "python3 tools/agent_tools/example.py",
+            "python3 tools/runtime/lifecycle/workflow_monitor.py",
             payload["discovered_commands"],
         )
 
@@ -198,21 +198,21 @@ class SkillToolCommandsTest(unittest.TestCase):
             self.write_skill(
                 root,
                 "start-repository",
-                "```bash\npython3 tools/agent_tools/example.py\n```\n",
+                "```bash\npython3 tools/runtime/lifecycle/workflow_monitor.py\n```\n",
             )
             (root / "agents" / "skills" / "start-repository.md").write_text(
                 (
                     "```bash\n"
                     "bash scripts/start_repository.sh --validate-only\n"
                     "bash -c 'scripts/start_repository.sh --validate-only'\n"
-                    "python3 tools/agent_tools/example.py --root .\n"
-                    "bash ./tools/agent_tools/example.sh --root .\n"
-                    "PYTHONPATH=tools python3 tools/agent_tools/example.py check\n"
-                    "python3 tools/agent_tools/example.py .\n"
-                    "bash ./tools/agent_tools/example.sh .\n"
-                    "python3 tools/agent_tools/example.py --root /tmp/explicit\n"
-                    "python3 tools/agent_tools/example.py --root=.\n"
-                    "python3 tools/agent_tools/example.py --root=. .\n"
+                    "python3 tools/runtime/lifecycle/workflow_monitor.py --root .\n"
+                    "bash ./tools/validation/ci/runners/run_all_checks.sh --root .\n"
+                    "PYTHONPATH=tools python3 tools/runtime/lifecycle/workflow_monitor.py check\n"
+                    "python3 tools/runtime/lifecycle/workflow_monitor.py .\n"
+                    "bash ./tools/validation/ci/runners/run_all_checks.sh .\n"
+                    "python3 tools/runtime/lifecycle/workflow_monitor.py --root /tmp/explicit\n"
+                    "python3 tools/runtime/lifecycle/workflow_monitor.py --root=.\n"
+                    "python3 tools/runtime/lifecycle/workflow_monitor.py --root=. .\n"
                     "```\n"
                 ),
                 encoding="utf-8",
@@ -246,150 +246,150 @@ class SkillToolCommandsTest(unittest.TestCase):
                 ["bash", "-c", "scripts/start_repository.sh --validate-only"],
             )
             self.assertIn(
-                "python3 tools/agent_tools/example.py --root .",
+                "python3 tools/runtime/lifecycle/workflow_monitor.py --root .",
                 resolved,
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root ."][0],
-                "python3 tools/agent_tools/example.py --root .",
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root ."][0],
+                "python3 tools/runtime/lifecycle/workflow_monitor.py --root .",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root ."][1],
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root ."][1],
                 expected_root,
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root ."][2],
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root ."][2],
                 expected_root,
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root ."][4][0],
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root ."][4][0],
                 "python3",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root ."][4][1],
-                f"{expected_root}/tools/agent_tools/example.py",
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root ."][4][1],
+                f"{expected_root}/tools/runtime/lifecycle/workflow_monitor.py",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root ."][4][2],
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root ."][4][2],
                 "--root",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root ."][4][3],
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root ."][4][3],
                 expected_root,
             )
             self.assertEqual(
-                resolved["bash ./tools/agent_tools/example.sh --root ."][4][0],
+                resolved["bash ./tools/validation/ci/runners/run_all_checks.sh --root ."][4][0],
                 "bash",
             )
             self.assertEqual(
-                resolved["bash ./tools/agent_tools/example.sh --root ."][4][1],
-                f"{expected_root}/tools/agent_tools/example.sh",
+                resolved["bash ./tools/validation/ci/runners/run_all_checks.sh --root ."][4][1],
+                f"{expected_root}/tools/validation/ci/runners/run_all_checks.sh",
             )
             self.assertIn(
-                "python3 tools/agent_tools/example.py --root /tmp/explicit",
+                "python3 tools/runtime/lifecycle/workflow_monitor.py --root /tmp/explicit",
                 resolved,
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][4][0],
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root /tmp/explicit"][4][0],
                 "python3",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][4][1],
-                f"{expected_root}/tools/agent_tools/example.py",
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root /tmp/explicit"][4][1],
+                f"{expected_root}/tools/runtime/lifecycle/workflow_monitor.py",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][4][2],
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root /tmp/explicit"][4][2],
                 "--root",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][4][3],
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root /tmp/explicit"][4][3],
                 "/tmp/explicit",
             )
             self.assertEqual(
-                len(resolved["python3 tools/agent_tools/example.py --root /tmp/explicit"][4]),
+                len(resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root /tmp/explicit"][4]),
                 4,
             )
             self.assertIn(
-                "python3 tools/agent_tools/example.py --root=.",
+                "python3 tools/runtime/lifecycle/workflow_monitor.py --root=.",
                 resolved,
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root=."][4][0],
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root=."][4][0],
                 "python3",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root=."][4][1],
-                f"{expected_root}/tools/agent_tools/example.py",
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root=."][4][1],
+                f"{expected_root}/tools/runtime/lifecycle/workflow_monitor.py",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root=."][4][2],
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root=."][4][2],
                 f"--root={expected_root}",
             )
             self.assertIn(
-                "python3 tools/agent_tools/example.py --root=. .",
+                "python3 tools/runtime/lifecycle/workflow_monitor.py --root=. .",
                 resolved,
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root=. ."][4][0],
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root=. ."][4][0],
                 "python3",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root=. ."][4][1],
-                f"{expected_root}/tools/agent_tools/example.py",
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root=. ."][4][1],
+                f"{expected_root}/tools/runtime/lifecycle/workflow_monitor.py",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root=. ."][4][2],
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root=. ."][4][2],
                 f"--root={expected_root}",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py --root=. ."][4][3],
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py --root=. ."][4][3],
                 ".",
             )
             self.assertIn(
-                "python3 tools/agent_tools/example.py .",
+                "python3 tools/runtime/lifecycle/workflow_monitor.py .",
                 resolved,
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py ."][4][0],
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py ."][4][0],
                 "python3",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py ."][4][1],
-                f"{expected_root}/tools/agent_tools/example.py",
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py ."][4][1],
+                f"{expected_root}/tools/runtime/lifecycle/workflow_monitor.py",
             )
             self.assertEqual(
-                resolved["python3 tools/agent_tools/example.py ."][4][2],
+                resolved["python3 tools/runtime/lifecycle/workflow_monitor.py ."][4][2],
                 ".",
             )
             self.assertIn(
-                "bash ./tools/agent_tools/example.sh .",
+                "bash ./tools/validation/ci/runners/run_all_checks.sh .",
                 resolved,
             )
             self.assertEqual(
-                resolved["bash ./tools/agent_tools/example.sh ."][4][0],
+                resolved["bash ./tools/validation/ci/runners/run_all_checks.sh ."][4][0],
                 "bash",
             )
             self.assertEqual(
-                resolved["bash ./tools/agent_tools/example.sh ."][4][1],
-                f"{expected_root}/tools/agent_tools/example.sh",
+                resolved["bash ./tools/validation/ci/runners/run_all_checks.sh ."][4][1],
+                f"{expected_root}/tools/validation/ci/runners/run_all_checks.sh",
             )
             self.assertEqual(
-                resolved["bash ./tools/agent_tools/example.sh ."][4][2],
+                resolved["bash ./tools/validation/ci/runners/run_all_checks.sh ."][4][2],
                 ".",
             )
             self.assertIn(
-                "PYTHONPATH=tools python3 tools/agent_tools/example.py check",
+                "PYTHONPATH=tools python3 tools/runtime/lifecycle/workflow_monitor.py check",
                 resolved,
             )
             self.assertEqual(
-                resolved["PYTHONPATH=tools python3 tools/agent_tools/example.py check"][3],
+                resolved["PYTHONPATH=tools python3 tools/runtime/lifecycle/workflow_monitor.py check"][3],
                 [["PYTHONPATH", "tools"]],
             )
             self.assertEqual(
-                resolved["PYTHONPATH=tools python3 tools/agent_tools/example.py check"][4],
+                resolved["PYTHONPATH=tools python3 tools/runtime/lifecycle/workflow_monitor.py check"][4],
                 [
                     "python3",
-                    f"{expected_root}/tools/agent_tools/example.py",
+                    f"{expected_root}/tools/runtime/lifecycle/workflow_monitor.py",
                     "check",
                 ],
             )

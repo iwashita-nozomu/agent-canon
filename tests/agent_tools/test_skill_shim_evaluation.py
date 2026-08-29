@@ -21,10 +21,10 @@ from types import SimpleNamespace
 from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
-sys.path.insert(0, str(TOOLS_ROOT))
+TOOLS_ROOT = PROJECT_ROOT / "eval" / "producers"
+sys.path.insert(0, str(PROJECT_ROOT))
 
-import eval.producers.skill_shim_evaluation  # noqa: E402
+from eval.producers import skill_shim_evaluation  # noqa: E402
 from tools.agent.skills.skill_shim_materializer import build_context  # noqa: E402
 from eval.producers.skill_shim_evaluation import (  # noqa: E402
     ProducerError,

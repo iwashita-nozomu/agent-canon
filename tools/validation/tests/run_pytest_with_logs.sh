@@ -14,7 +14,7 @@ set -euo pipefail
 # the helper itself must not create a source-tree cache while resolving roots.
 export PYTHONDONTWRITEBYTECODE=1
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-}"
 if [ -z "${PYTHON_BIN}" ]; then
   if command -v python3 >/dev/null 2>&1; then

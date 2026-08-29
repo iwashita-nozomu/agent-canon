@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "tools" / "agent_tools"))
+sys.path.insert(0, str(ROOT))
 
 from eval.producers.run_accumulated_agent_evals import (  # noqa: E402
     EvalProducer,
@@ -120,7 +120,7 @@ def test_eval_producers_leave_source_status_and_bytes_unchanged(tmp_path: Path) 
     )
     for command in commands:
         result = subprocess.run(
-            [sys.executable, str(ROOT / "tools" / "agent_tools" / command[0]), *command[1:]],
+            [sys.executable, str(ROOT / "eval" / "producers" / command[0]), *command[1:]],
             cwd=ROOT,
             check=False,
             capture_output=True,
