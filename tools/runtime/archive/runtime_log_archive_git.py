@@ -40,7 +40,9 @@ from typing import BinaryIO, cast
 UTC = timezone.utc
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    # Direct execution must resolve imports from the repository source root,
+    # not from this relocated archive package directory.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from tools.runtime.archive.log_repository_identity import source_repository_id_for_write  # noqa: E402
 from tools.runtime.artifacts.report_artifact_checks import (  # noqa: E402

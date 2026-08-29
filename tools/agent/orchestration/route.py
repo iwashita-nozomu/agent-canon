@@ -27,6 +27,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
 
+if __package__ in (None, ""):
+    # Direct execution must import the canonical package from this checkout,
+    # even when the caller's cwd is a standalone source root.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
 from tools.runtime.source.agent_canon_source_root import SourceRootFailure, resolve_agent_canon_source_root
 from tools.agent.orchestration.capability_route import (
     FORMAT_VALUES,

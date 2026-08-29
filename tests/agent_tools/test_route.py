@@ -25,8 +25,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROUTE = PROJECT_ROOT / "tools" / "agent" / "orchestration" / "route.py"
 AGENT_CANON_CLI = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-import tools.runtime.source.agent_canon_source_root  # noqa: E402
+sys.path.insert(0, str(PROJECT_ROOT))
+from tools.runtime.source import agent_canon_source_root  # noqa: E402
 import tools.agent.orchestration.capability_route as capability_module  # noqa: E402
 import tools.agent.orchestration.route as route_module  # noqa: E402
 import tools.agent.skills.skill_route_catalog as catalog_module  # noqa: E402
@@ -1193,7 +1193,12 @@ class RouteToolTest(unittest.TestCase):
     def test_code_visualization_small_model_route_is_exact_and_early(self) -> None:
         """The canonical owner exposes the exact renderer route."""
         runtime_text = (
-            PROJECT_ROOT / ".agents" / "skills" / "code-visualization" / "SKILL.md"
+            PROJECT_ROOT
+            / ".codex"
+            / "personal"
+            / "skills"
+            / "code-visualization"
+            / "SKILL.md"
         ).read_text(encoding="utf-8")
         self.assertIn("Canonical workflow and policy", runtime_text)
         canonical_text = (

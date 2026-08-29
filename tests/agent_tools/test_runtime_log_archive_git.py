@@ -34,8 +34,7 @@ from unittest.mock import patch
 # modules.  When this test is run from a parent template checkout, pytest can
 # otherwise cache the parent's ``tools`` package and its top-level helpers.
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CURRENT_TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
-sys.path[:0] = [str(PROJECT_ROOT), str(CURRENT_TOOLS_ROOT)]
+sys.path[:0] = [str(PROJECT_ROOT)]
 
 
 def _module_belongs_to_current_checkout(module_name: str) -> bool:
@@ -63,16 +62,13 @@ def _module_belongs_to_current_checkout(module_name: str) -> bool:
 
 for _module_name in (
     "tools",
-    "tools.agent_tools",
     "tools.analysis.dependencies.graph_client",
     "tools.repository.github.github_publish",
     "tools.runtime.archive.log_repository_identity",
     "tools.runtime.archive.runtime_log_paths",
-    "runtime_log_archive_git",
-    "runtime_log_paths",
-    "log_repository_identity",
-    "report_artifact_checks",
-    "task_authority",
+    "tools.runtime.archive.runtime_log_archive_git",
+    "tools.runtime.artifacts.report_artifact_checks",
+    "tools.runtime.authority.task_authority",
 ):
     if not _module_belongs_to_current_checkout(_module_name):
         sys.modules.pop(_module_name, None)
@@ -100,7 +96,7 @@ LIFECYCLE_REVERSE_COVERAGE = {
     "tools/runtime/archive/runtime_log_archive_git.py": {"RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-011", "RL-013", "RL-015"},
     "tools/runtime/container/bootstrap_runtime.py": {"RL-002", "RL-004"},
 }
-import tools.runtime.archive.runtime_log_archive_git  # noqa: E402
+from tools.runtime.archive import runtime_log_archive_git  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -606,6 +602,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         run_id: str = "run-materializer",
     ) -> RuntimeMaterializationFixture:
         """Create one active-run, rollout, result, and target/base identity fixture."""
+        canon = root / "agent-canon"
         source = root / "source"
         source.mkdir(parents=True)
         # The external runtime boundary still needs an authenticated parent
@@ -723,9 +720,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         old_state = run_dir / "runtime_event.0000000000000000.json"
         runtime_root = root / "runtime"
         runtime_root.mkdir(mode=0o700)
+        canon.mkdir()
         context = runtime_log_archive_git.ArchiveContext(
             source_root=source,
-            canon_root=source,
+            canon_root=canon,
             archive_root=root / "archive",
             repo_key="fixture",
             env_key="fixture",
