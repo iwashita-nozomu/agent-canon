@@ -1389,16 +1389,6 @@ class RuntimePaths:
         return self.runtime_root / "source-sync.json"
 
     @property
-    def source_staging(self) -> Path:
-        """Return the fixed owned source staging path."""
-        return self.runtime_root / "source-staging" / "agent-canon"
-
-    @property
-    def source_backup(self) -> Path:
-        """Return the fixed owned live-source backup path."""
-        return self.runtime_root / "source-backup" / "agent-canon"
-
-    @property
     def docker_config(self) -> Path:
         """Return the temporary registry authentication directory."""
         return self.runtime_root / "docker-config"
@@ -1982,8 +1972,6 @@ class BootstrapRuntime:
         image_ref: str,
         image_record: Mapping[str, Any],
         source_head: str,
-        *,
-        reconcile_manifest: bool = False,
     ) -> dict[str, Any]:
         """Adopt one already-pulled immutable image without invoking Docker build."""
         if state.get("state") == "uninstalled":
@@ -2025,11 +2013,6 @@ class BootstrapRuntime:
                 "architecture": image_record.get("Architecture"),
                 "source_head": source_head,
             }
-            if reconcile_manifest:
-                # SourceSync has atomically installed the candidate checkout.
-                # The candidate lifecycle is the only route allowed to move
-                # the runtime state across the checkout's manifest boundary.
-                state["manifest_digest"] = self.manifest_digest
             state["state"] = "maintenance_pending"
             self._write_state(state)
             self._stop_owned_container(state)
@@ -2579,16 +2562,8 @@ class BootstrapRuntime:
     def _install_locked(self, image_ref: str | None = None) -> dict[str, Any]:
         """Install while the caller owns the lifecycle lock."""
         result: dict[str, Any] | None = None
-        # Keep this implementation lock-free so SourceSync can invoke it for
-        # the swapped checkout while retaining its transaction lock.
         with contextlib.nullcontext():
             state = self._read_state(allow_manifest_drift=True)
-            if state.get("state") == "uninstalled":
-                stale = self._prune_stale_targets(state)
-                if stale:
-                    self._write_mounts(state)
-                    self._write_mount_manifest(state)
-                    self._write_state(state)
             if state.get("state") != "uninstalled":
                 if image_ref:
                     raise BootstrapError(
@@ -2628,55 +2603,12 @@ class BootstrapRuntime:
                         image_ref,
                         image_record,
                         source_head,
-                        reconcile_manifest=True,
                     )
                     self._ensure_global_links(state)
                     self._write_state(state)
-                    continue_install = False
                 else:
-                    continue_install = True
-                shallow = False
-                try:
-                    shallow = (
-                        (self.repository_root / ".git").exists()
-                        and subprocess.run(
-                            ["git", "-C", str(self.repository_root), "rev-parse", "--is-shallow-repository"],
-                            check=False,
-                            capture_output=True,
-                            text=True,
-                        ).stdout.strip()
-                        == "true"
-                    )
-                except OSError:
-                    shallow = False
-                self._materialize_skill_view()
-                registry = self.manifest.get("registry", {})
-                if continue_install and shallow and isinstance(registry, dict) and registry.get("image"):
-                    try:
-                        from .source_sync import SourceSync
-                    except ImportError:
-                        from source_sync import SourceSync  # type: ignore[no-redef]
-                    source_head = _source_snapshot(self.repository_root)["head"]
-                    image_ref = f"{registry['image']}:sha-{source_head}"
-                    image_record = SourceSync(self, self.repository_root)._pull(image_ref)
-                    correspondence = self.docker.validate_registry_image(
-                        image_record, source_head=source_head, image_ref=image_ref
-                    )
-                    state["resources"] = self._resource_records()
-                    state["resources"]["image"] = {
-                        "id": correspondence["image_id"],
-                        "tag": image_ref,
-                        "owned": True,
-                        "labels": {},
-                        "state": "present",
-                        "repo_digest": correspondence["image_repo_digest"],
-                        "os": correspondence["image_os"],
-                        "architecture": correspondence["image_architecture"],
-                        "source_head": source_head,
-                    }
-                elif continue_install:
+                    self._materialize_skill_view()
                     self._image(state)
-                if continue_install:
                     state["state"] = "installed"
                     state.setdefault("resources", self._resource_records()).setdefault(
                         "container", self._resource_records()["container"]
@@ -2911,12 +2843,7 @@ class BootstrapRuntime:
                 evidence={**exc.evidence, "receipt_path": receipt["receipt_path"], "recovered": True},
             ) from exc
 
-    def update(
-        self,
-        image_ref: str | None = None,
-        *,
-        source_sync: bool = False,
-    ) -> dict[str, Any]:
+    def update(self, image_ref: str | None = None) -> dict[str, Any]:
         """Reconcile only the current checkout; never acquires a Git revision."""
         with self.locked():
             self._prepare_legacy_runtime_reset()
@@ -2930,11 +2857,6 @@ class BootstrapRuntime:
                     self._write_mounts(state)
                     self._write_mount_manifest(state)
                     self._write_state(state)
-            if source_sync and not image_ref:
-                raise BootstrapError(
-                    "source_sync_image_required",
-                    "source-sync update requires an immutable image reference",
-                )
             fresh_result: dict[str, Any] | None = None
             if state.get("state") == "uninstalled":
                 before = state["state"]
@@ -2979,7 +2901,6 @@ class BootstrapRuntime:
                     image_ref,
                     image_record,
                     source_head,
-                    reconcile_manifest=source_sync,
                 )
                 self._ensure_global_links(state)
                 self._write_state(state)
@@ -6189,11 +6110,6 @@ def build_parser() -> argparse.ArgumentParser:
     install_parser.add_argument("--image-ref")
     update_parser = sub.add_parser("update")
     update_parser.add_argument("--image-ref")
-    update_parser.add_argument(
-        "--source-sync",
-        action="store_true",
-        help="Reconcile an atomically installed source-sync candidate across its manifest boundary",
-    )
     source_identity = sub.add_parser(
         "source-identity",
         help=argparse.SUPPRESS,
@@ -6276,7 +6192,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     if operation == "install":
         return runtime.install(image_ref=args.image_ref)
     if operation == "update":
-        return runtime.update(image_ref=args.image_ref, source_sync=args.source_sync)
+        return runtime.update(image_ref=args.image_ref)
     if operation == "scheduler":
         if args.scheduler_operation == "enable":
             return runtime.scheduler_enable()

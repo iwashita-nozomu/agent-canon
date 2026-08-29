@@ -979,6 +979,65 @@ def test_managed_install_source_fetch_failure_preserves_checkout(tmp_path: Path)
     ).stdout.strip() == "main"
 
 
+@pytest.mark.parametrize("checkout_state", ["dirty", "detached", "alternate"])
+def test_install_source_admission_only_requires_matching_commit(
+    tmp_path: Path, checkout_state: str
+) -> None:
+    """Install admission ignores branch, detached, dirty, and shallow state."""
+    origin = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    repository = tmp_path / "agent-canon"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    subprocess.run(["git", "clone", "--no-hardlinks", str(ROOT), str(seed)], check=True, capture_output=True)
+    subprocess.run(["git", "push", str(origin), "HEAD:refs/heads/main"], cwd=seed, check=True, capture_output=True)
+    subprocess.run(["git", "clone", "--no-hardlinks", str(origin), str(repository)], check=True, capture_output=True)
+    head = subprocess.run(
+        ["git", "-C", str(repository), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if checkout_state == "dirty":
+        with (repository / "README.md").open("a", encoding="utf-8") as handle:
+            handle.write("dirty\n")
+    elif checkout_state == "detached":
+        subprocess.run(["git", "-C", str(repository), "switch", "--detach", head], check=True, capture_output=True)
+    else:
+        subprocess.run(["git", "-C", str(repository), "switch", "-c", "alternate"], check=True, capture_output=True)
+    script = f"""
+source {str(ADAPTER)!r}
+AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
+AGENT_CANON_RUNTIME_ROOT={str(tmp_path / 'runtime')!r}
+_agent_canon_install_source_admission "$AGENT_CANON_REPOSITORY_ROOT" >/dev/null
+"""
+    completed = subprocess.run(["bash", "-c", script], check=False, capture_output=True, text=True)
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_install_source_admission_rejects_commit_mismatch(tmp_path: Path) -> None:
+    """A fetched origin/main mismatch is a typed source admission failure."""
+    origin = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    repository = tmp_path / "agent-canon"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    subprocess.run(["git", "clone", "--no-hardlinks", str(ROOT), str(seed)], check=True, capture_output=True)
+    subprocess.run(["git", "push", str(origin), "HEAD:refs/heads/main"], cwd=seed, check=True, capture_output=True)
+    subprocess.run(["git", "clone", "--no-hardlinks", str(origin), str(repository)], check=True, capture_output=True)
+    with (repository / "README.md").open("a", encoding="utf-8") as handle:
+        handle.write("ahead\n")
+    subprocess.run(["git", "-C", str(repository), "add", "README.md"], check=True)
+    subprocess.run(["git", "-C", str(repository), "commit", "-m", "ahead"], check=True, capture_output=True)
+    script = f"""
+source {str(ADAPTER)!r}
+AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
+AGENT_CANON_RUNTIME_ROOT={str(tmp_path / 'runtime')!r}
+_agent_canon_install_source_admission "$AGENT_CANON_REPOSITORY_ROOT"
+"""
+    completed = subprocess.run(["bash", "-c", script], check=False, capture_output=True, text=True)
+    assert completed.returncode == 2
+    assert '"code":"source_sync_commit_mismatch"' in completed.stderr
+
+
 def test_source_sync_state_writer_reconciles_terminal_records_atomically(
     tmp_path: Path,
 ) -> None:
@@ -1664,11 +1723,11 @@ exit "$rc"
     assert "rm " not in calls_text
 
 
-@pytest.mark.parametrize("operation", ["install", "update"])
+@pytest.mark.parametrize("operation", ["update"])
 def test_install_update_reject_foreign_before_build_or_state_mutation(
     tmp_path: Path, operation: str
 ) -> None:
-    """Install/update ownership preflight precedes build and runtime setup."""
+    """Update ownership preflight precedes build and runtime setup."""
     repository = tmp_path / "agent-canon"
     control = tmp_path / "control"
     repository.mkdir()
@@ -1720,9 +1779,9 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         "/var/lib/agent-canon/source-sync.json"
     ]
     repository = tmp_path / "agent-canon"
-    # Model the distribution install identity for install: HOME owns the
-    # disposable ~/agent-canon source checkout.  The update half remains a
-    # normal candidate replacement test and does not invoke source alignment.
+    # Both routes use a local origin.  Install deliberately exercises a
+    # detached checkout whose HEAD already matches origin/main; source
+    # admission must not require a branch name or a clean worktree.
     control = tmp_path
     subprocess.run(
         ["git", "clone", "--no-hardlinks", str(ROOT), str(repository)],
@@ -1730,20 +1789,16 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         capture_output=True,
     )
     if operation == "install":
-        old_head = subprocess.run(
-            ["git", "-C", str(repository), "rev-parse", "HEAD^"],
+        current_head = subprocess.run(
+            ["git", "-C", str(repository), "rev-parse", "HEAD"],
             check=True,
             capture_output=True,
             text=True,
         ).stdout.strip()
         subprocess.run(
-            ["git", "-C", str(repository), "switch", "--detach", old_head],
+            ["git", "-C", str(repository), "switch", "--detach", current_head],
             check=True,
             capture_output=True,
-        )
-        subprocess.run(
-            ["git", "-C", str(repository), "update-ref", "refs/remotes/origin/main", old_head],
-            check=True,
         )
     runtime = repository / ".runtime"
     state_path = tmp_path / "docker-state.json"
@@ -1919,16 +1974,19 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
     calls = calls_path.read_text(encoding="utf-8").splitlines()
     build_index = next(index for index, call in enumerate(calls) if call.startswith("build\t"))
     stop_index = next(index for index, call in enumerate(calls) if call.startswith("stop\t"))
-    assert build_index < stop_index
+    if operation == "install":
+        assert stop_index < build_index
+    else:
+        assert build_index < stop_index
     assert resident["id"] in calls[stop_index]
     assert any(old_image_id in call for call in calls if call.startswith("tag\t"))
     if operation == "install":
         assert subprocess.run(
-            ["git", "-C", str(repository), "branch", "--show-current"],
-            check=True,
+            ["git", "-C", str(repository), "symbolic-ref", "--quiet", "--short", "HEAD"],
+            check=False,
             capture_output=True,
             text=True,
-        ).stdout.strip() == "main"
+        ).returncode != 0
         assert subprocess.run(
             ["git", "-C", str(repository), "rev-parse", "HEAD"],
             check=True,
