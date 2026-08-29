@@ -11,8 +11,9 @@ downstream design common/README.md cross-language static analysis entrypoints
 -->
 
 This directory is the index for language-specific static analysis surfaces.
-Canonical implementations still live in `tools/agent_tools/` unless a language
-family needs a dedicated executable package.
+Canonical implementations live in their owner packages under `tools/analysis/`
+and `tools/validation/`; language-specific directories group only the relevant
+static-analysis entrypoints.
 
 Use this split for routing:
 

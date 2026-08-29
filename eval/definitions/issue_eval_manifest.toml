@@ -237,8 +237,8 @@ forbidden_route = [
   "diagnose only one copied root file while ignoring shared root view state",
 ]
 linked_rules = [
-  "tools/agent_tools/parent_repo_readiness.py",
-  "tests/agent_tools/test_parent_repo_readiness.py",
+  "tools/analysis/code/parent_repository_audit.py",
+  "tests/agent_tools/test_parent_repository_audit.py",
 ]
 
 [[eval]]
@@ -259,7 +259,7 @@ forbidden_route = [
 ]
 linked_rules = [
   "documents/contracts/derived-repo-bootstrap-runbook.md",
-  "tools/agent_tools/parent_repo_readiness.py",
+  "tools/analysis/code/parent_repository_audit.py",
 ]
 
 [[eval]]

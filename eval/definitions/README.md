@@ -19,15 +19,14 @@ run-bundle behavior evidence.
 Prompt evals are frozen checklists for one prompt surface or one glob-expanded prompt family.
 Behavior evals are frozen criteria for observable agent actions recorded in run artifacts.
 
-These manifests must stay in `evidence/agent-evals/` because the dependency
-header makes this directory the source-controlled evidence contract. Runtime
-outputs stay in the mounted archive, and `agents/evals/` remains only a legacy
-path resolver.
+These manifests stay in `eval/definitions/` as the source-controlled eval
+definition contract. Runtime outputs stay in the mounted archive, and
+`agents/evals/` remains only a legacy path resolver.
 
 ## Reader Map
 
 Use this README to answer which source-controlled eval manifests live under
-`evidence/agent-evals/`, which producer owns each eval family, and how closeout
+`eval/definitions/`, which producer owns each eval family, and how closeout
 uses prompt and behavior eval evidence. Read the manifest table first, then the
 extension order before adding a new eval domain. The closeout and protocol
 sections explain how source manifests connect to accumulated runtime evidence

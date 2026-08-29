@@ -21,9 +21,9 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import cast
 
-AGENT_TOOLS_ROOT = Path(__file__).resolve().parents[1] / "agent_tools"
-if str(AGENT_TOOLS_ROOT) not in sys.path:
-    sys.path.insert(0, str(AGENT_TOOLS_ROOT))
+SOURCE_ROOT = Path(__file__).resolve().parents[4]
+if str(SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SOURCE_ROOT))
 
 from tools.runtime.artifacts.artifact_identity import canonical_json_bytes  # noqa: E402
 from tools.repository.workspace.parent_root_side_effects import (  # noqa: E402

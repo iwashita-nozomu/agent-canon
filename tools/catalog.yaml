@@ -4,9 +4,9 @@
 # upstream design README.md shared tool family ownership
 # upstream design ../documents/tools/repo-local-tool-imports.md legacy import disposition ledger
 # upstream design ../documents/tools/visualization_contract.md canonical visualization coverage and readback tool contract
-# downstream implementation agent_tools/tool_catalog.py validates this catalog
-# downstream implementation agent_tools/tool_drift.py checks catalog drift contracts
-# downstream implementation agent_tools/check_design_doc_claims.py validates design-document evidence claims
+# downstream implementation runtime/manifest/tool_catalog.py validates this catalog
+# downstream implementation validation/semantic/tools/tool_drift.py checks catalog drift contracts
+# downstream implementation validation/semantic/documents/check_design_doc_claims.py validates design-document evidence claims
 # downstream design ../documents/tools/tool-docs.toml maps same-named tool docs
 # downstream implementation ../tests/agent_tools/test_tool_catalog.py validates canonical visualization tool registration
 # @dependency-end
@@ -1498,7 +1498,7 @@ entries:
       - documents/design/rust-agent-tool-migration.md
       - .codex/README.md
     tests: []
-    test_exempt_reason: Validated by rust/agent-canon cargo tests and devcontainer smoke.
+    test_exempt_reason: Validated by tools/runtime/dispatch/agent-canon cargo tests and devcontainer smoke.
 
   - id: materialize-agent-canon-pr-g2
     summary: Materializes the canonical G2 receipt from the ordered passing AgentCanon generated-completeness checks.

@@ -168,9 +168,9 @@ run_contracts() {
     tests.agent_tools.test_tool_drift \
     tests.agent_tools.test_vector_search \
     tests.agent_tools.test_dependency_manifest_tools
-  python3 "${TOOLS_ROOT}/agent_tools/tool_catalog.py"
-  python3 "${TOOLS_ROOT}/agent_tools/tool_proof_coverage.py"
-  python3 "${TOOLS_ROOT}/agent_tools/responsibility_scope.py"
+  python3 "${TOOLS_ROOT}/runtime/manifest/tool_catalog.py"
+  python3 "${TOOLS_ROOT}/analysis/proof/tool_proof_coverage.py"
+  python3 "${TOOLS_ROOT}/validation/semantic/responsibility/responsibility_scope.py"
   local base_ref="${GITHUB_BASE_REF:-main}"
   git rev-parse --verify "origin/${base_ref}^{commit}" >/dev/null
   python3 "${TOOLS_ROOT}/agent_tools/import_responsibility.py" \

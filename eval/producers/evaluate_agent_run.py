@@ -1367,9 +1367,9 @@ def render_markdown_title_lines() -> list[str]:
         "",
         "<!--",
         "@dependency-start",
-        "upstream design ../../../../vendor/agent-canon/agents/workflows/"
+        "upstream design ../../agents/workflows/"
         "agent-learning-workflow.md agent feedback workflow",
-        "upstream implementation ../../../../vendor/agent-canon/tools/agent_tools/"
+        "upstream implementation ../../eval/producers/"
         "evaluate_agent_run.py generates this artifact",
         "@dependency-end",
         "-->",

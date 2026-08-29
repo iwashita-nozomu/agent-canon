@@ -6,9 +6,9 @@ contract tool
 responsibility Documents the standalone AgentCanon tool surface and execution-plane boundary.
 upstream design ../documents/runtime/bootstrap-runtime.md shared bootstrap user contract
 upstream design ../documents/runtime/runtime-log-archive.md external archive publication contract
-upstream implementation agent_tools/bootstrap_runtime.py lifecycle implementation
-upstream implementation agent_tools/tool_dispatch.py typed dispatch implementation
-upstream implementation agent_tools/runtime_artifacts.py external artifact boundary
+upstream implementation runtime/container/bootstrap_runtime.py lifecycle implementation
+upstream implementation runtime/dispatch/tool_dispatch.py typed dispatch implementation
+upstream implementation runtime/artifacts/runtime_artifacts.py external artifact boundary
 upstream design catalog.yaml public tool registry
 @dependency-end
 -->
