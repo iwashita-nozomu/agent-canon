@@ -9,7 +9,7 @@
 # upstream design ../../tools/catalog.yaml structured tool ownership
 # upstream design ../../tools/README.md tool entrypoint index
 # upstream design ../../documents/tools/README.md user-facing tool index
-# downstream implementation ../../tools/ci/run_all_checks.sh runs responsibility scope checks
+# downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs responsibility scope checks
 # downstream implementation ../../tests/agent_tools/test_responsibility_scope.py tests scope validation
 # @dependency-end
 """Validate AgentCanon responsibility scopes."""

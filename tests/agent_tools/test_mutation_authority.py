@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests runtime parent-mutation rejection and authenticated child-scope admission.
-# upstream implementation ../../tools/agent_tools/mutation_authority.py owns mutation authority.
+# upstream implementation ../../tools/runtime/authority/mutation_authority.py owns mutation authority.
 # upstream implementation ../../.codex/hooks/hook_dispatcher.py applies the PreToolUse decision.
 # @dependency-end
 """Focused tests for parent orchestration-only mutation control."""
@@ -18,7 +18,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from mutation_authority import (  # noqa: E402
+from tools.runtime.authority.mutation_authority import (  # noqa: E402
     IDENTITY_SCHEMA,
     evaluate_mutation_authority,
 )

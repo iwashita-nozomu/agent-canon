@@ -5,7 +5,7 @@
 # upstream design ../../documents/runtime/task-contract-observation.md defines the collection flow
 # upstream implementation ./task_contract_observation_core.py owns schema and transitions
 # upstream implementation ./workflow_monitor.py owns locked monitoring append
-# downstream design ../../evidence/agent-evals/agent_behavior_eval.toml requires coverage
+# downstream design ../../eval/definitions/agent_behavior_eval.toml requires coverage
 # downstream implementation ../../tests/agent_tools/test_task_contract_observation.py tests it
 # @dependency-end
 """Record and score task-local contract observations."""
@@ -31,7 +31,7 @@ if __package__:
         parse_token_fields,
     )
 else:
-    from task_contract_observation_core import (
+    from tools.runtime.lifecycle.task_contract_observation_core import (
         ARCHIVE_ROUTE,
         KIND_KEY,
         SCHEMA,
@@ -61,7 +61,7 @@ def append_behavior_events(report_dir: Path, events: Sequence[str], *, timestamp
     if __package__:
         from .workflow_monitor import MonitoringEntries, append_monitoring
     else:
-        from workflow_monitor import MonitoringEntries, append_monitoring
+        from tools.runtime.lifecycle.workflow_monitor import MonitoringEntries, append_monitoring
     append_monitoring(
         report_dir,
         MonitoringEntries(behavior_events=tuple(events), timestamp=timestamp),

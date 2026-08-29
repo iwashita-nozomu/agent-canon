@@ -9,7 +9,7 @@
 # upstream design ../../tools/README.md documents shared tool entrypoints
 # upstream design ../../documents/tools/README.md documents user-facing tool usage
 # upstream implementation ./responsibility_scope.py validates responsibility scope metadata
-# downstream implementation ../../tools/ci/run_all_checks.sh runs import responsibility checks
+# downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs import responsibility checks
 # downstream implementation ../../tests/agent_tools/test_import_responsibility.py validates import findings
 # @dependency-end
 """Check Python imports against responsibility scopes."""

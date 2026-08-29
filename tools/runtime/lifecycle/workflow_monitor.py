@@ -26,18 +26,18 @@ from pathlib import Path
 from typing import IO, cast
 
 if __package__:
-    from .workspace_scope import (
+    from tools.repository.workspace.workspace_scope import (
         resolve_report_root,
         resolve_runtime_artifact_path,
         schedule_wave_row,
     )
 else:
-    from workspace_scope import (  # type: ignore[no-redef]
+    from tools.repository.workspace.workspace_scope import (  # type: ignore[no-redef]
         resolve_report_root,
         resolve_runtime_artifact_path,
         schedule_wave_row,
     )
-from mid_task_user_input_policy import (
+from tools.agent.orchestration.mid_task_user_input_policy import (
     MID_TASK_CLASSIFICATION_ACTIONS,
     MID_TASK_CLASSIFICATION_SCOPE_STATUS,
     MID_TASK_EVIDENCE_FIELDS,
@@ -50,7 +50,7 @@ from mid_task_user_input_policy import (
     is_empty_policy_value,
 )
 from tools.runtime.lifecycle.update_lifecycle_contract import TRANSACTION_STATES
-from work_log import MONITOR_PASSTHROUGH_FIELDS, append_ledger_event
+from tools.runtime.archive.work_log import MONITOR_PASSTHROUGH_FIELDS, append_ledger_event
 
 DECISION_KEYS = (
     "skill_improvement_decision",
@@ -1536,9 +1536,9 @@ def main() -> int:
     # enters the monitoring receipt or dashboard.
     if args.runtime_feedback and effective_runtime_root:
         try:
-            from .private_feedback import capture_runtime_feedback
+            from tools.runtime.archive.private_feedback import capture_runtime_feedback
         except ImportError:
-            from private_feedback import capture_runtime_feedback
+            from tools.runtime.archive.private_feedback import capture_runtime_feedback
         for entry in args.runtime_feedback:
             try:
                 capture_runtime_feedback(

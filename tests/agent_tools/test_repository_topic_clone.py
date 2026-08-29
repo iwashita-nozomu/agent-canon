@@ -5,8 +5,8 @@
 # contract test
 # responsibility Verifies repository-topic clone prepare, merge-main, and cleanup gates.
 # upstream design ../../documents/rule/repository-topic-clone.md repository-topic clone lifecycle contract
-# downstream implementation ../../tools/agent_tools/repository_topic_clone.py owns lifecycle behavior exercised by this test
-# downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this test header
+# downstream implementation ../../tools/repository/workspace/repository_topic_clone.py owns lifecycle behavior exercised by this test
+# downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates this test header
 # @dependency-end
 
 from __future__ import annotations
@@ -17,21 +17,21 @@ import sys
 from pathlib import Path
 
 import pytest
-import tools.agent_tools.repository_topic_clone as rtc
-from tools.agent_tools.checkout_identity import CheckoutIdentity
-from tools.agent_tools.writer_target import read_writer_target_packet
+import tools.repository.workspace.repository_topic_clone as rtc
+from tools.runtime.authority.checkout_identity import CheckoutIdentity
+from tools.runtime.authority.writer_target import read_writer_target_packet
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "repository_topic_clone.py"
+TOOL_PATH = PROJECT_ROOT / "tools" / "repository" / "workspace" / "repository_topic_clone.py"
 sys.path.insert(0, str(TOOL_PATH.parent))
 
-from parent_root_side_effects import (  # noqa: E402
+from tools.repository.workspace.parent_root_side_effects import (  # noqa: E402
     ParentRootAttestationRequest,
     ParentRootReject,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
 )
-from update_lifecycle_contract import (  # noqa: E402
+from tools.runtime.lifecycle.update_lifecycle_contract import (  # noqa: E402
     materialize_publication_readback_receipt,
     pull_request_branch_table,
 )

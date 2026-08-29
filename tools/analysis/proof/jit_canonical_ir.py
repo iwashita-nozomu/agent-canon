@@ -5,7 +5,7 @@
 # upstream design ../../documents/tools/jit_canonical_ir.md defines StableHLO/backend witness extraction.
 # upstream implementation ../experiments/execution_resource_plan.py owns GPU discovery, reservation, and the frozen admission plan.
 # upstream implementation ../experiments/run_managed_experiment.py owns the only managed ExperimentRunner entrypoint and applies the admitted environment.
-# downstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs lowers this JSON into Lean defs.
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs lowers this JSON into Lean defs.
 # downstream implementation ../../tests/agent_tools/test_jit_canonical_ir.py validates the schema on a tiny JAX root.
 # @dependency-end
 """Extract a thin operational IR from a JIT-lowered Python root."""

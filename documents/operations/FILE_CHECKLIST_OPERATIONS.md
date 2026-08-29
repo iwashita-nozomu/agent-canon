@@ -51,7 +51,7 @@ field が揃うまで作成しません。
 make ci-quick
 python3 -m pyright
 python3 -m pytest tests/ -q --tb=short
-bash tools/ci/run_python_quality_checks.sh
+bash tools/validation/ci/checks/run_python_quality_checks.sh
 ```
 
 確認:
@@ -79,7 +79,7 @@ tools/bin/agent-canon docs check <changed-file>.md
 手順:
 
 ```bash
-bash tools/docker_dependency_validator.sh
+bash tools/validation/dependencies/docker_dependency_validator.sh
 python3 -m pytest -q tests/tools/test_bootstrap_container_contract.py
 bash bootstrap.sh --control-parent-root <root> --runtime-root <runtime> install
 ```
@@ -100,7 +100,7 @@ git status --short
 make ci-quick
 git add <files>
 git commit -m "<type>: <summary>"
-python3 tools/agent_tools/github_publish.py push \
+python3 tools/repository/github/github_publish.py push \
   --user-task "<current user task>" \
   --repo <owner/name>
 ```

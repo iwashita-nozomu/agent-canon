@@ -28,13 +28,13 @@ if TYPE_CHECKING:
     if __package__:
         from .packets import ActiveDesignPacketConfig
         from .packets import MathematicalIntentPacket
-        from .workspace_scope import RepositoryRoots
-        from .writer_target import WriterTarget
+        from tools.repository.workspace.workspace_scope import RepositoryRoots
+        from tools.runtime.authority.writer_target import WriterTarget
     else:
-        from packets import ActiveDesignPacketConfig
-        from packets import MathematicalIntentPacket
-        from workspace_scope import RepositoryRoots
-        from writer_target import WriterTarget
+        from tools.agent.orchestration.packets import ActiveDesignPacketConfig
+        from tools.agent.orchestration.packets import MathematicalIntentPacket
+        from tools.repository.workspace.workspace_scope import RepositoryRoots
+        from tools.runtime.authority.writer_target import WriterTarget
 
 ROOT = Path(__file__).resolve().parents[3]
 

@@ -4,7 +4,7 @@
 # responsibility Owns the host-only Docker/Git adapter for the shared AgentCanon
 # container. AgentCanon Python is invoked only through docker exec.
 # upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md
-# downstream implementation ../../tools/agent_tools/bootstrap_runtime.py
+# downstream implementation ../../tools/runtime/container/bootstrap_runtime.py
 # @dependency-end
 
 set -euo pipefail

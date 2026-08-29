@@ -3,9 +3,9 @@
 # @dependency-start
 # contract test
 # responsibility Verifies PR dependency validation runs without graph runtime state.
-# upstream implementation ../../tools/ci/run_pr_dependency_source_gate.sh owns source review routing
-# upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh owns source validation
-# downstream implementation ../../tools/ci/check_agent_canon_pr.sh consumes the gate status
+# upstream implementation ../../tools/validation/ci/checks/run_pr_dependency_source_gate.sh owns source review routing
+# upstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh owns source validation
+# downstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh consumes the gate status
 # @dependency-end
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SOURCE_GATE = PROJECT_ROOT / "tools" / "ci" / "run_pr_dependency_source_gate.sh"
+SOURCE_GATE = PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "run_pr_dependency_source_gate.sh"
 
 
 def write_executable(path: Path, content: str) -> None:

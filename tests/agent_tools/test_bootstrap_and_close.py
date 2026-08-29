@@ -2,11 +2,11 @@
 # contract test
 # responsibility Tests run bootstrap and close behavior.
 # upstream design ../../tools/README.md validated automation surface
-# upstream implementation ../../tools/agent_tools/agent_canon_preflight.py preflight routing under test
-# upstream implementation ../../tools/agent_tools/packets.py owns packet normalization under test
-# upstream implementation ../../tools/agent_tools/tool_calls.py owns typed lifecycle tool calls under test
-# upstream implementation ../../tools/agent_tools/team_config.py owns team configuration under test
-# upstream implementation ../../tools/agent_tools/implementation_dispatch.py owns dispatch under test
+# upstream implementation ../../tools/runtime/source/agent_canon_preflight.py preflight routing under test
+# upstream implementation ../../tools/agent/orchestration/packets.py owns packet normalization under test
+# upstream implementation ../../tools/agent/orchestration/tool_calls.py owns typed lifecycle tool calls under test
+# upstream implementation ../../tools/agent/orchestration/team_config.py owns team configuration under test
+# upstream implementation ../../tools/agent/orchestration/implementation_dispatch.py owns dispatch under test
 # @dependency-end
 
 """Tests for machine-driven run bootstrap and close commands."""
@@ -34,11 +34,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "ci"))
 
-from check_agent_canon_pr import (  # noqa: E402
+from tools.validation.ci.checks.check_agent_canon_pr import (  # noqa: E402
     GENERATED_COMPLETENESS_CHECK_IDS,
     materialize_generated_completeness_receipt,
 )
-from implementation_dispatch import (  # noqa: E402
+from tools.agent.orchestration.implementation_dispatch import (  # noqa: E402
     codex_runtime_max_threads,
     default_quality_check_agent_types,
     recommended_dynamic_expansion_wave_slots,
@@ -47,44 +47,44 @@ from implementation_dispatch import (  # noqa: E402
     validate_agent_type_selections,
     workflow_spawn_budget,
 )
-from packets import (  # noqa: E402
+from tools.agent.orchestration.packets import (  # noqa: E402
     active_design_packet_mapping,
     resolve_active_design_packet_config,
 )
-from report_artifact_checks import (  # noqa: E402
+from tools.runtime.artifacts.report_artifact_checks import (  # noqa: E402
     check_completion_coverage,
     evaluate_completion_boundary,
     project_completion_coverage,
 )
-from task_authority import hash_baseline_bytes  # noqa: E402
-from task_close import (  # noqa: E402
+from tools.runtime.authority.task_authority import hash_baseline_bytes  # noqa: E402
+from tools.runtime.lifecycle.task_close import (  # noqa: E402
     _child_closeout_evidence,
     update_lifecycle_closeout_consumer,
 )
-from team_config import (  # noqa: E402
+from tools.agent.orchestration.team_config import (  # noqa: E402
     AgentTypeSelection,
     load_task_catalog,
     load_team_config,
     select_roles,
 )
-from tool_calls import (  # noqa: E402
+from tools.agent.orchestration.tool_calls import (  # noqa: E402
     CloseAgentLifecycleEvidence,
     materialize_close_agent_tool_call,
 )
-from update_lifecycle_contract import (  # noqa: E402
+from tools.runtime.lifecycle.update_lifecycle_contract import (  # noqa: E402
     materialize_descendant_close_receipt,
     materialize_gate_verdict,
     materialize_reservation_release_receipt,
 )
-from work_log import append_ledger_event, read_ledger_snapshot  # noqa: E402
+from tools.runtime.archive.work_log import append_ledger_event, read_ledger_snapshot  # noqa: E402
 
 RUNTIME_PROFILE_INVENTORY = (
     PROJECT_ROOT / "documents" / "runtime" / "runtime-profiles-and-check-matrix.json"
 )
-BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
-TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py"
-WORKTREE_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "worktree_start.py"
-SETUP_WORKTREE_SCRIPT = PROJECT_ROOT / "tools" / "setup_worktree.sh"
+BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"
+TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "task_close.py"
+WORKTREE_START_SCRIPT = PROJECT_ROOT / "tools" / "repository" / "workspace" / "worktree_start.py"
+SETUP_WORKTREE_SCRIPT = PROJECT_ROOT / "tools" / "repository" / "worktree" / "setup_worktree.sh"
 TEST_PARENT_ROOT = PROJECT_ROOT.parents[2]
 # Keep test artifacts outside both the parent checkout and AgentCanon source;
 # the exact process-owned root is removed when the test process exits.
@@ -184,22 +184,22 @@ def update_lifecycle_closeout_fixture() -> dict[str, object]:
     gate_contracts = {
         "G1": (
             "source_correctness",
-            PROJECT_ROOT / "tools" / "agent_tools" / "publication_integrator.py",
+            PROJECT_ROOT / "tools" / "repository" / "github" / "publication_integrator.py",
             "resolve_publication_eligibility",
         ),
         "G3": (
             "pr_identity_cas",
-            PROJECT_ROOT / "tools" / "agent_tools" / "github_publish.py",
+            PROJECT_ROOT / "tools" / "repository" / "github" / "github_publish.py",
             "materialize_pr_identity_gate",
         ),
         "G4": (
             "standalone_source_branch_integrity",
-            PROJECT_ROOT / "tools" / "agent_tools" / "repository_topic_clone.py",
+            PROJECT_ROOT / "tools" / "repository" / "workspace" / "repository_topic_clone.py",
             "_ensure_branch",
         ),
         "G5": (
             "remote_publication_readback",
-            PROJECT_ROOT / "tools" / "agent_tools" / "publication_integrator.py",
+            PROJECT_ROOT / "tools" / "repository" / "github" / "publication_integrator.py",
             "integrate_publication",
         ),
     }
@@ -468,11 +468,11 @@ def ready_closeout_evidence_lines(
         "- diff_check_artifact: diff_check_review.md",
         "",
         "## Runtime Log Archive Evidence",
-        "- runtime_log_archive_sync_command: python3 tools/agent_tools/runtime_log_archive_git.py sync",
+        "- runtime_log_archive_sync_command: python3 tools/runtime/archive/runtime_log_archive_git.py sync",
         "- runtime_log_archive_sync_status: pass",
         (
             "- runtime_log_archive_check_clean_command: "
-            "python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain"
+            "python3 tools/runtime/archive/runtime_log_archive_git.py check-clean --porcelain"
         ),
         "- runtime_log_archive_check_clean_status: pass",
         "- runtime_log_archive_repo_key: fixture-repo",
@@ -793,7 +793,7 @@ def write_ready_completion_coverage(report_dir: Path, run_id: str) -> None:
                     "outcome": "pass",
                     "artifact_refs": ["fixture-oop"],
                     "source_event_refs": ["fixture-event-1"],
-                    "scanned_paths": ["tools/agent_tools/task_close.py"],
+                    "scanned_paths": ["tools/runtime/lifecycle/task_close.py"],
                     "signal_counts": {"review_signal_findings": 0},
                     "typed_boundary_counts": {"api_boundary": 0},
                     "solid_counts": {"single responsibility": 0},
@@ -806,8 +806,8 @@ def write_ready_completion_coverage(report_dir: Path, run_id: str) -> None:
                     "outcome": "pass",
                     "artifact_refs": ["fixture-solid"],
                     "source_event_refs": ["fixture-event-1"],
-                    "scanned_paths": ["tools/agent_tools/task_close.py"],
-                    "covered_paths": ["tools/agent_tools/task_close.py"],
+                    "scanned_paths": ["tools/runtime/lifecycle/task_close.py"],
+                    "covered_paths": ["tools/runtime/lifecycle/task_close.py"],
                     "solid_counts": {"single responsibility": 0},
                 },
                 {

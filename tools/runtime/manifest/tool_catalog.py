@@ -9,7 +9,7 @@
 # upstream implementation ./visualization_contract.py canonical typed visualization contract/checker
 # upstream design ../../documents/tools/repo-local-tool-imports.md legacy tool disposition policy
 # upstream implementation ./tool_path_policy.py defines retired legacy path policy
-# downstream implementation ../../tools/ci/run_all_checks.sh runs catalog validation
+# downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs catalog validation
 # downstream implementation ../../tests/agent_tools/test_tool_catalog.py tests validator
 # @dependency-end
 """Validate the structured AgentCanon tool catalog."""

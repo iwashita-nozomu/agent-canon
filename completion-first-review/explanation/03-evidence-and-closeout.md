@@ -5,9 +5,9 @@ contract reference
 responsibility Explains evidence quality and closeout verifier requirements for completion-first AgentCanon improvements.
 upstream design ../README.md completion-first review index
 upstream design 00-completion-first-principle.md completion-first rationale
-upstream implementation ../../tools/agent_tools/task_close.py current closeout evaluator
-upstream implementation ../../tools/agent_tools/evaluate_agent_run.py current run evaluator
-upstream implementation ../../tools/agent_tools/workflow_monitor.py current monitoring helper
+upstream implementation ../../tools/runtime/lifecycle/task_close.py current closeout evaluator
+upstream implementation ../../eval/producers/evaluate_agent_run.py current run evaluator
+upstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py current monitoring helper
 @dependency-end
 -->
 

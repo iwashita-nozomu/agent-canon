@@ -1,9 +1,9 @@
 # @dependency-start
 # contract test
 # responsibility Tests fail-closed fixed-packet Spark eligibility, identity, continuity, and queue routing.
-# upstream implementation ../../tools/agent_tools/implementation_route.py implements typed routing
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py owns Decision Sufficiency and profiles
-# upstream implementation ../../tools/agent_tools/capacity_handshake.py owns capacity evidence
+# upstream implementation ../../tools/agent/orchestration/implementation_route.py implements typed routing
+# upstream implementation ../../tools/agent/orchestration/model_profile_registry.py owns Decision Sufficiency and profiles
+# upstream implementation ../../tools/agent/orchestration/capacity_handshake.py owns capacity evidence
 # @dependency-end
 
 from __future__ import annotations
@@ -12,21 +12,21 @@ import hashlib
 
 import pytest
 
-from tools.agent_tools import capacity_handshake
-from tools.agent_tools import implementation_route as route
-from tools.agent_tools import update_lifecycle_contract
+from tools.agent.orchestration import capacity_handshake
+from tools.agent.orchestration import implementation_route as route
+from tools.runtime.lifecycle import update_lifecycle_contract
 
 SHA = "a" * 64
 PACKET_SHA = "b" * 64
 PACKET_REF = "packet://P3_implementation_route"
 DECISION_REF = "dsv:" + "d" * 64
 WRITE_SET = (
-    "tools/agent_tools/implementation_route.py",
+    "tools/agent/orchestration/implementation_route.py",
     "tests/agent_tools/test_implementation_route.py",
 )
 VALIDATION = (
     "python3 -m pytest tests/agent_tools/test_implementation_route.py",
-    "python3 -m py_compile tools/agent_tools/implementation_route.py",
+    "python3 -m py_compile tools/agent/orchestration/implementation_route.py",
 )
 
 
@@ -129,7 +129,7 @@ def _decision() -> dict[str, object]:
         ],
         "invariant": {
             "owner": "implementation_route",
-            "owner_path": "tools/agent_tools/implementation_route.py",
+            "owner_path": "tools/agent/orchestration/implementation_route.py",
             "owner_symbol": "route_implementation",
             "edit": "replacement://generic-route",
             "validation": "implementation-execution://v1",

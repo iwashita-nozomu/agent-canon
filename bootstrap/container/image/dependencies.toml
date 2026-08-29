@@ -3,7 +3,7 @@
 # responsibility Declares only the shared AgentCanon Python, Rust, and LSP image capabilities.
 # upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared tool runtime boundary
 # downstream implementation ./Dockerfile image-install and immutable receipts
-# downstream implementation ../../tools/agent_tools/dependency_plan.py typed dependency planner
+# downstream implementation ../../tools/analysis/dependencies/dependency_plan.py typed dependency planner
 # @dependency-end
 
 schema = "agent-canon.tool-dependencies"

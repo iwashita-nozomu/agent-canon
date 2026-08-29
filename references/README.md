@@ -46,7 +46,7 @@ Use the reference materializer for consulted PDF or HTML sources:
 
 ```bash
 AGENT_CANON_PARENT_ROOT=/abs/path/to/parent-repository \
-python3 tools/agent_tools/reference_materializer.py \
+python3 tools/analysis/documents/reference_materializer.py \
   --url "https://example.com/source.pdf" \
   --input /path/to/downloaded-source.pdf
 ```

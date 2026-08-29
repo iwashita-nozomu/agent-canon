@@ -135,7 +135,7 @@ def _materialize_skill_exchange(state: dict, container: dict) -> None:
     # owner shipped with this test checkout while reading all canonical inputs
     # from the image's source snapshot, including older source snapshots used
     # by stale-resident fixtures.
-    materializer = Path(__file__).resolve().parents[2] / "tools/agent_tools/skill_shim_materializer.py"
+    materializer = Path(__file__).resolve().parents[2] / "tools/agent/skills/skill_shim_materializer.py"
     if not materializer.is_file():
         return
     staging_root = Path(runtime_mount["Source"]) / "container-runtime/skill-projection"
@@ -458,7 +458,7 @@ def main(argv: list[str]) -> int:
             return 0
         if command[:2] == [
             "python3",
-            "/usr/local/share/agent-canon/runtime/tools/agent_tools/bootstrap_runtime.py",
+            "/usr/local/share/agent-canon/runtime/tools/runtime/container/bootstrap_runtime.py",
         ]:
             failed_operation = os.environ.get("FAKE_DOCKER_FAIL_CONTROLLER_OPERATION", "")
             if failed_operation and failed_operation in command[2:]:
@@ -609,7 +609,7 @@ def main(argv: list[str]) -> int:
             return 0
         if command[:2] == [
             "python3",
-            "/usr/local/share/agent-canon/runtime/tools/agent_tools/run_accumulated_agent_evals.py",
+            "/usr/local/share/agent-canon/runtime/eval/producers/run_accumulated_agent_evals.py",
         ]:
             runtime_arg = command[command.index("--runtime-root") + 1]
             run_id = command[command.index("--run-id") + 1]
@@ -677,7 +677,7 @@ def main(argv: list[str]) -> int:
             return 1 if eval_failed else 0
         if command == [
             "python3",
-            "/usr/local/share/agent-canon/runtime/tools/agent_tools/runtime_exchange_cleanup.py",
+            "/usr/local/share/agent-canon/runtime/tools/runtime/archive/runtime_exchange_cleanup.py",
         ]:
             runtime_mount = next(
                 mount

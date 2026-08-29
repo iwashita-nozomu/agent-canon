@@ -2,9 +2,9 @@
 @dependency-start
 contract agent-runtime
 responsibility Documents legacy eval manifest path compatibility for this repository.
-upstream design ../../evidence/README.md evidence directory ownership
-upstream design ../../evidence/agent-evals/README.md canonical eval manifest source
-downstream implementation ../../tools/agent_tools/eval_manifest_paths.py resolves legacy manifest paths
+upstream design ../../eval/README.md evidence directory ownership
+upstream design ../../eval/definitions/README.md canonical eval manifest source
+downstream implementation ../../eval/checkers/eval_manifest_paths.py resolves legacy manifest paths
 downstream implementation ../../templates/documents/github/issue/eval-capture.yml captures eval issues.
 downstream implementation ../../documents/operations/issue-label-taxonomy.md defines eval labels and routing.
 @dependency-end

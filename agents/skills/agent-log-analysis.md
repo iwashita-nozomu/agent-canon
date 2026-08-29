@@ -8,8 +8,8 @@ upstream design ../../documents/runtime/runtime-log-archive.md accumulated eval 
 upstream design ../../documents/tools/search-coordination.md coordinated search policy
 upstream design ../../documents/runtime/runtime-log-archive.md defines the external log archive mount
 downstream design issue-finding-report.md converts compact log findings into durable issues
-upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py owns structured dashboard API fields
-upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py resolves the mounted log archive
+upstream implementation ../../eval/producers/generate_agent_runtime_dashboard.py owns structured dashboard API fields
+upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py resolves the mounted log archive
 downstream implementation ../../.codex/personal/skills/agent-log-analysis/SKILL.md exposes this workflow as a runtime skill
 downstream design agent-eval-accumulation.md repairs missing accumulated eval family evidence
 @dependency-end
@@ -60,10 +60,10 @@ skill、tool、workflow、hook、eval の蓄積ログを、AgentCanon source tre
    `~/.codex/sessions`; an absent root is a fail-closed source absence.
 
 ```bash
-python3 tools/agent_tools/runtime_log_archive_git.py ensure
-python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
-python3 tools/agent_tools/runtime_log_archive_git.py sync
-python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain
+python3 tools/runtime/archive/runtime_log_archive_git.py ensure
+python3 tools/runtime/archive/runtime_log_archive_git.py status --porcelain
+python3 tools/runtime/archive/runtime_log_archive_git.py sync
+python3 tools/runtime/archive/runtime_log_archive_git.py check-clean --porcelain
 ```
 
 1. archive hygiene は `sync`、`check-clean`、dashboard 生成、final `sync`
@@ -213,7 +213,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. When `generate_agent_runtime_dashboard.py` lacks a needed compact field,
    record `dashboard_api_contract_gap`, route that finding to the dashboard API owner,
    and rerun it after the source tool is repaired.
-1. For eval family gaps, run `python3 tools/agent_tools/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json --format text`; if it reports missing, stale, or failing families, add `$agent-eval-accumulation` and use its producer/checker/archive loop.
+1. For eval family gaps, run `python3 eval/checkers/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json --format text`; if it reports missing, stale, or failing families, add `$agent-eval-accumulation` and use its producer/checker/archive loop.
 1. Event-file drilldown is for tool development, schema debugging, corruption audit, or an API-named drilldown path; record an explicit rationale before reading it.
 1. Answer token-use questions from the API token coverage/moving-average fields. If token status is missing, say token claims are unsupported.
 1. Report observations separately from interpretation, repair target, and unknowns.

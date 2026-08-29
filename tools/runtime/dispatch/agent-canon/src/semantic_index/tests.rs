@@ -964,7 +964,7 @@ fn responsibility_scope_bucket_tracks_manifest_surfaces() {
         "shared-policy-documents"
     );
     assert_eq!(
-        responsibility_scope_bucket("rust/agent-canon/src/semantic_index/mod.rs"),
+        responsibility_scope_bucket("tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs"),
         "shared-tooling"
     );
     assert_eq!(

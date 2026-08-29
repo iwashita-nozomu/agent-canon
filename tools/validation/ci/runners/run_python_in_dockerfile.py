@@ -15,7 +15,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from container_runtime import (
+from tools.validation.ci.runners.container_runtime import (
     apply_pack_overrides,
     build_build_command,
     build_run_command,

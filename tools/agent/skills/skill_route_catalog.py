@@ -28,9 +28,9 @@ try:
     import yaml
 except ModuleNotFoundError:  # clean host before the shared tool image exists
     try:
-        from . import stdlib_yaml as yaml
+        from tools.runtime.container import stdlib_yaml as yaml
     except ImportError:
-        import stdlib_yaml as yaml  # type: ignore[no-redef]
+        import tools.runtime.container.stdlib_yaml as yaml  # type: ignore[no-redef]
 from tools.validation.semantic.tools.visualization_contract import (
     TOOL_ARGUMENT_SCHEMAS,
     ArgumentSchemaID,

@@ -11,7 +11,7 @@
 # upstream design ../../agents/skills/experiment-lifecycle.md experiment run identity and publication decision contract
 # upstream design ../../agents/skills/result-artifact-writeout.md concrete artifact persistence contract
 # upstream design ../../agents/internal-routines/README.md internal routine document owner surface
-# downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py runs these evals
+# downstream implementation ../../eval/producers/evaluate_skill_workflow_prompts.py runs these evals
 # @dependency-end
 
 version = 1

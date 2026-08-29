@@ -29,12 +29,12 @@
 !tools/
 !tools/**
 tools/ci/**
-!tools/ci/run_standalone_static_gate_unit.sh
+!tools/validation/ci/runners/run_standalone_static_gate_unit.sh
 tools/experiments/**
 tools/run_gpu_container.sh
-tools/run_comprehensive_review.sh
-tools/run_pytest_with_logs.sh
-tools/docker_dependency_validator.sh
+tools/validation/review/run_comprehensive_review.sh
+tools/validation/tests/run_pytest_with_logs.sh
+tools/validation/dependencies/docker_dependency_validator.sh
 !tools/repository/workspace/parent_root_side_effects.py
 !tools/runtime/dispatch/agent-canon/
 !tools/runtime/dispatch/agent-canon/**

@@ -22,9 +22,9 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import lsp_code_analysis  # noqa: E402
-import search_index  # noqa: E402
-import vector_search  # noqa: E402
+import tools.analysis.code.lsp_code_analysis  # noqa: E402
+import tools.analysis.search.search_index as search_index  # noqa: E402
+import tools.analysis.search.vector_search as vector_search  # noqa: E402
 
 DEFAULT_PROVIDERS = ("text", "semantic", "vector", "tool", "header-deps", "code-deps")
 DEFAULT_INDEX_DIR = search_index.DEFAULT_INDEX_DIR

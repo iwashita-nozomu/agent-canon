@@ -3,8 +3,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests request-local task authority lookup behavior.
-# upstream implementation ../../tools/agent_tools/task_authority.py locates active task authority files.
-# downstream implementation ../../tools/agent_tools/task_authority.py owns active task authority.
+# upstream implementation ../../tools/runtime/authority/task_authority.py locates active task authority files.
+# downstream implementation ../../tools/runtime/authority/task_authority.py owns active task authority.
 # @dependency-end
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.agent_tools.task_authority import (
+from tools.runtime.authority.task_authority import (
     AUTHORITY_ENV,
     AUTHORITY_FILE_NAME,
     find_authority_path,

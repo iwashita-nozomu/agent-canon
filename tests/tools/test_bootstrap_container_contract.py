@@ -4,10 +4,10 @@
 # contract test
 # responsibility Verifies the shared tool image boundary, runtime invariants, and LSP/Rust scope.
 # upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared tool image contract
-# upstream implementation ../../bootstrap/container/Dockerfile image definition
-# upstream implementation ../../bootstrap/container/entrypoint.sh health and dispatch entrypoint
-# upstream implementation ../../bootstrap/container/dependencies.toml typed image capabilities
-# upstream implementation ../../tools/agent_tools/devcontainer_dependencies.py canonical Cargo snapshot digest owner
+# upstream implementation ../../bootstrap/container/image/Dockerfile image definition
+# upstream implementation ../../bootstrap/container/lifecycle/entrypoint.sh health and dispatch entrypoint
+# upstream implementation ../../bootstrap/container/image/dependencies.toml typed image capabilities
+# upstream implementation ../../tools/runtime/container/devcontainer_dependencies.py canonical Cargo snapshot digest owner
 # @dependency-end
 
 from __future__ import annotations
@@ -23,8 +23,8 @@ try:
 except ModuleNotFoundError:
     import tomli as tomllib  # type: ignore[no-redef]
 
-from tools.agent_tools import tool_dispatch
-from tools.agent_tools.devcontainer_dependencies import Installer
+from tools.runtime.dispatch import tool_dispatch
+from tools.runtime.container.devcontainer_dependencies import Installer
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -71,8 +71,8 @@ def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     assert "rootless" not in text.lower()
     digests = re.findall(r"@sha256:([0-9a-f]{64})(?:\s|$)", text, re.MULTILINE)
     assert len(digests) == 2
-    assert "--manifest /opt/agent-canon/bootstrap/container/dependencies.toml" in text
-    assert "COPY bootstrap/container/dependencies.toml" in text
+    assert "--manifest /opt/agent-canon/bootstrap/container/image/dependencies.toml" in text
+    assert "COPY bootstrap/container/image/dependencies.toml" in text
     assert "COPY tools /usr/local/share/agent-canon/runtime/tools" in text
     assert "skill_shim_materializer.py" in text
     assert "materialize --root /usr/local/share/agent-canon/runtime --all --image-build" in text
@@ -82,9 +82,9 @@ def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     assert "COPY AGENTS.md ROOT_AGENTS.md /usr/local/share/agent-canon/runtime/" in text
     assert "COPY agents /usr/local/share/agent-canon/runtime/agents" in text
     assert "tools/catalog.yaml" in text
-    assert "tools/agent_tools/tool_dispatch.py" in text
+    assert "tools/runtime/dispatch/tool_dispatch.py" in text
     assert "COPY rust/agent-canon /opt/agent-canon/rust/agent-canon" in text
-    assert "COPY bootstrap/container/agent-canon-tool-wrapper.sh" in text
+    assert "COPY bootstrap/container/dispatch/tool-wrapper.sh" in text
     assert "/.devcontainer/" not in text
 
 
@@ -270,7 +270,7 @@ def test_single_repository_dockerignore_is_deny_by_default() -> None:
     assert "rust/agent-canon/target/**" in lines
     assert "**/__pycache__/**" in lines
     assert "tools/ci/**" in lines
-    assert "!tools/ci/run_standalone_static_gate_unit.sh" in lines
+    assert "!tools/validation/ci/runners/run_standalone_static_gate_unit.sh" in lines
 
 
 def test_repository_root_dockerignore_exposes_every_copy_source() -> None:
@@ -287,7 +287,7 @@ def test_repository_root_dockerignore_exposes_every_copy_source() -> None:
         "!references/**",
         "!templates/**",
         "!tools/**",
-        "!tools/ci/run_standalone_static_gate_unit.sh",
+        "!tools/validation/ci/runners/run_standalone_static_gate_unit.sh",
         "!rust/agent-canon/**",
     ):
         assert source in lines

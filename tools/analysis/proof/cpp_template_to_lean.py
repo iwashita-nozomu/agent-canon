@@ -16,8 +16,8 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from cpp_source_canonical_ir import build_cpp_source_canonical_ir, render_record
-from operational_ir_to_lean import (
+from tools.analysis.code.cpp_source_canonical_ir import build_cpp_source_canonical_ir, render_record
+from tools.analysis.proof.operational_ir_to_lean import (
     enforce_complete_coverage,
     normalize_render_input,
     render_lean,

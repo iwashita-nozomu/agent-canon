@@ -16,4 +16,4 @@ roots = ["templates/experiments/_template"]
 
 [profiles.static-seed]
 roots = []
-producer = "tools/agent_tools/export_static_seed.py"
+producer = "tools/runtime/source/export_static_seed.py"

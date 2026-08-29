@@ -7,7 +7,7 @@ responsibility Points readers to the public skill registry and internal routine 
 upstream design README.md canonical workflow index
 upstream design ../skills/README.md public skill surface contract
 upstream design ../internal-routines/README.md internal routine registry
-downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates official system skill delegation
+downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates official system skill delegation
 @dependency-end
 -->
 

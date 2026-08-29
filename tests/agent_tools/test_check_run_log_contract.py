@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests run-log contract checker behavior.
-# upstream implementation ../../tools/agent_tools/check_run_log_contract.py checker under test
+# upstream implementation ../../tools/validation/semantic/logging/check_run_log_contract.py checker under test
 # @dependency-end
 """Tests for ``check_run_log_contract.py``."""
 
@@ -15,7 +15,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "check_run_log_contract.py"
+TOOL = PROJECT_ROOT / "tools" / "validation" / "semantic" / "logging" / "check_run_log_contract.py"
 
 
 class CheckRunLogContractTest(unittest.TestCase):

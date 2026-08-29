@@ -25,7 +25,7 @@ import subprocess
 from pathlib import Path
 
 try:
-    from .runtime_artifacts import (
+    from tools.runtime.artifacts.runtime_artifacts import (
         RUNTIME_ROOT_ENV,
         RuntimeArtifactBoundary,
         RuntimePathEscape,
@@ -48,7 +48,7 @@ try:
         stable_source_id_from_runtime_env,
     )
 except ImportError:
-    from log_repository_identity import (
+    from tools.runtime.archive.log_repository_identity import (
         SourceRepositoryIdentityError,
         stable_source_id,
         stable_source_id_from_runtime_env,

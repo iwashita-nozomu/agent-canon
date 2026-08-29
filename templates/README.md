@@ -9,10 +9,10 @@ downstream implementation ./agents/README.md reusable agent artifact template so
 downstream implementation ./documents/README.md reader-facing document template source
 downstream implementation ./code/README.md materializable code and Docstring template source
 downstream implementation ./experiments/_template/run.py runnable experiment scaffold source
-downstream implementation ../tools/agent_tools/export_static_seed.py produces the exact default-consumer seed
-downstream implementation ../tools/agent_tools/code_template_rendering.py renders AgentCanon-internal code templates
-downstream implementation ../tools/agent_tools/agent_team.py renders AgentCanon-internal agent templates
-downstream implementation ../tools/experiments/create_experiment_topic.py copies AgentCanon-internal experiment templates
+downstream implementation ../tools/runtime/source/export_static_seed.py produces the exact default-consumer seed
+downstream implementation ../tools/agent/templates/code_template_rendering.py renders AgentCanon-internal code templates
+downstream implementation ../tools/agent/orchestration/agent_team.py renders AgentCanon-internal agent templates
+downstream implementation ../tools/experiments/lifecycle/create_experiment_topic.py copies AgentCanon-internal experiment templates
 @dependency-end
 -->
 

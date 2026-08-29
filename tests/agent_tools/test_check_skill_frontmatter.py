@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests runtime skill frontmatter validation.
-# upstream implementation ../../tools/agent_tools/check_skill_frontmatter.py validates SKILL.md frontmatter
+# upstream implementation ../../tools/validation/semantic/skills/check_skill_frontmatter.py validates SKILL.md frontmatter
 # upstream design ../../agents/canonical/skills.md skill runtime registry contract
 # @dependency-end
 """Tests for runtime skill frontmatter validation."""
@@ -16,7 +16,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "check_skill_frontmatter.py"
+SCRIPT = PROJECT_ROOT / "tools" / "validation" / "semantic" / "skills" / "check_skill_frontmatter.py"
 
 
 def skill_text(name: str, description: str) -> str:

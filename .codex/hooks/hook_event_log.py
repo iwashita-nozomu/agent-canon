@@ -4,10 +4,10 @@
 # responsibility Provides Canon-owned append-only hook event log paths and IDs.
 # upstream design ../../documents/runtime/runtime-log-archive.md runtime log archive contract
 # upstream design ../../documents/runtime/runtime-log-archive.md hook result accumulation contract
-# upstream implementation ../../tools/agent_tools/runtime_log_paths.py resolves archive paths
-# downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py checkpoints immutable per-event spool files
+# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves archive paths
+# downstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py checkpoints immutable per-event spool files
 # downstream implementation ./hook_dispatcher.py creates one bounded context per active event
-# downstream implementation ../../tools/agent_tools/hook_safety.py keeps prompt/command values out of spool telemetry
+# downstream implementation ../../tools/runtime/authority/hook_safety.py keeps prompt/command values out of spool telemetry
 # downstream design ../../documents/runtime/runtime-log-archive.md assigns archive work to explicit checkpoints
 # @dependency-end
 

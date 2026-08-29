@@ -1031,9 +1031,9 @@ def preservation_authorized(
                 continue
             try:
                 try:
-                    from .conflict_preservation import validate_plan, validate_snapshot
+                    from tools.repository.git.conflict_preservation import validate_plan, validate_snapshot
                 except ImportError:
-                    from conflict_preservation import validate_plan, validate_snapshot
+                    from tools.repository.git.conflict_preservation import validate_plan, validate_snapshot
                 validate_plan(inventory, plan, repo=clone, readback=False)
                 validate_snapshot(clone, inventory, target_paths)
             except (OSError, TypeError, ValueError, RuntimeError):

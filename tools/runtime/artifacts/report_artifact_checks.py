@@ -28,7 +28,7 @@ from pathlib import Path, PurePosixPath
 from typing import cast
 
 try:
-    from .parent_root_side_effects import (
+    from tools.repository.workspace.parent_root_side_effects import (
         ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
@@ -404,7 +404,7 @@ def _validation_locator(workspace: Path) -> dict[str, object]:
 
 def _validation_ledger_events(report_dir: Path) -> list[dict[str, object]]:
     """Read the current logical ledger through its canonical work-log owner."""
-    from work_log import read_ledger_snapshot
+    from tools.runtime.archive.work_log import read_ledger_snapshot
 
     snapshot = read_ledger_snapshot(
         report_dir,
@@ -889,7 +889,7 @@ def materialize_required_validation(workspace: Path) -> dict[str, object]:
             "producer_role_id": producer_role_id,
             "producer_runtime_agent_id": producer_runtime_agent_id,
         }
-        from work_log import append_ledger_event
+        from tools.runtime.archive.work_log import append_ledger_event
 
         append_ledger_event(report_dir, pending)
     pending_event_sha256 = _validation_event_hash(pending)
@@ -1046,7 +1046,7 @@ def materialize_required_validation(workspace: Path) -> dict[str, object]:
         ],
         "completed_at_utc": "materialized",
     }
-    from work_log import append_ledger_event
+    from tools.runtime.archive.work_log import append_ledger_event
 
     append_ledger_event(report_dir, terminal_event)
     return _validation_projection(
@@ -1564,7 +1564,7 @@ def materialize_completion_coverage_from_work_log(
     monitor_evidence: Sequence[Mapping[str, object]] = (),
 ) -> Path:
     """Read the canonical work ledger and materialize one checked read model."""
-    from work_log import read_ledger_snapshot
+    from tools.runtime.archive.work_log import read_ledger_snapshot
 
     ledger_snapshot = read_ledger_snapshot(report_dir, snapshot_identity)
     return write_completion_coverage_artifact(
@@ -1595,7 +1595,7 @@ def generated_completion_coverage_errors(
     if not isinstance(snapshot_identity, str) or not snapshot_identity.strip():
         return ["ledger_snapshot_identity_missing"]
     try:
-        from work_log import ledger_snapshot_digest, read_ledger_snapshot
+        from tools.runtime.archive.work_log import ledger_snapshot_digest, read_ledger_snapshot
 
         snapshot = read_ledger_snapshot(report_dir, snapshot_identity)
         expected = project_completion_coverage(snapshot, source_binding)

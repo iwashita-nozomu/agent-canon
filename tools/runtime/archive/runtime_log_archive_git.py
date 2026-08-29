@@ -42,14 +42,14 @@ UTC = timezone.utc
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from log_repository_identity import source_repository_id_for_write  # noqa: E402
-from report_artifact_checks import (  # noqa: E402
+from tools.runtime.archive.log_repository_identity import source_repository_id_for_write  # noqa: E402
+from tools.runtime.artifacts.report_artifact_checks import (  # noqa: E402
     MECHANICALLY_REGENERATED_REPORT_FILE_PATTERNS,
     check_final_review_artifact,
     final_review_decision_lines,
     parse_review_identity,
 )
-from runtime_log_paths import (  # noqa: E402
+from tools.runtime.archive.runtime_log_paths import (  # noqa: E402
     LOG_ARCHIVE_REMOTE,
     agent_canon_git_commit_key,
     codex_trace_key,
@@ -70,7 +70,7 @@ from tools.repository.workspace.parent_root_side_effects import (  # noqa: E402
     ParentRootSideEffectError,
     attest_parent_root,
 )
-from task_authority import ACTIVE_RUN_POINTER  # noqa: E402
+from tools.runtime.authority.task_authority import ACTIVE_RUN_POINTER  # noqa: E402
 
 DEFAULT_COMMIT_NAME = "AgentCanon Log Archive"
 DEFAULT_COMMIT_EMAIL = "agent-canon-log@example.invalid"

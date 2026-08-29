@@ -9,7 +9,7 @@ upstream design ../../documents/operations/issue-label-taxonomy.toml machine-rea
 upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue packet convention
 downstream design ../skills/pr-processing.md invokes this routine inside the GitHub publication boundary
 downstream implementation ../../.codex/personal/skills/_github-status-lifecycle/SKILL.md exposes this routine as a private runtime skill
-downstream implementation ../../tools/agent_tools/github_status_lifecycle.py projects the transport and reconciliation contract
+downstream implementation ../../tools/repository/github/github_status_lifecycle.py projects the transport and reconciliation contract
 @dependency-end
 -->
 
@@ -19,7 +19,7 @@ downstream implementation ../../tools/agent_tools/github_status_lifecycle.py pro
 `pr-processing` が対象 Issue、fresh remote state、write authority、PR/Issue
 publication を所有し、この routine は lifecycle classification、evidence admission、
 ordered transition、observable concurrency stop、final predicate を所有します。
-実装は `tools/agent_tools/github_status_lifecycle.py` の機械的投影であり、第二の
+実装は `tools/repository/github/github_status_lifecycle.py` の機械的投影であり、第二の
 state machine や別の label taxonomy を定義しません。
 
 ## Activation Gate

@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Literal, cast
 
 try:
-    from .parent_root_side_effects import (
+    from tools.repository.workspace.parent_root_side_effects import (
         ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
@@ -42,7 +42,7 @@ except ImportError:
 try:
     from .runtime_log_paths import is_agent_canon_root
 except ImportError:
-    from runtime_log_paths import is_agent_canon_root  # type: ignore[no-redef]
+    from tools.runtime.archive.runtime_log_paths import is_agent_canon_root  # type: ignore[no-redef]
 
 SurfaceKind = Literal["hook", "skill", "tool"]
 Certainty = Literal["static", "dynamic"]

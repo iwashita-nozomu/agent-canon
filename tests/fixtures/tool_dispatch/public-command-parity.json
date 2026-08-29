@@ -6,7 +6,7 @@
       "id": "route",
       "probe_args": ["--list"],
       "observed": {
-        "argv": ["python3", "tools/agent_tools/route.py"],
+        "argv": ["python3", "tools/agent/orchestration/route.py"],
         "cwd": "source-root",
         "stdin": "inherited",
         "stdout": "inherited",

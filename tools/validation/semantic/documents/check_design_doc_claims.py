@@ -24,9 +24,9 @@ from itertools import groupby
 from pathlib import Path
 
 try:
-    from .graph_client import GraphClient, GraphClientError
+    from tools.analysis.dependencies.graph_client import GraphClient, GraphClientError
 except ImportError:  # pragma: no cover - direct CLI execution
-    from graph_client import GraphClient, GraphClientError
+    from tools.analysis.dependencies.graph_client import GraphClient, GraphClientError
 
 HEADER_SCAN_LINES = 80
 MANIFEST_FIELD_COUNT = 4

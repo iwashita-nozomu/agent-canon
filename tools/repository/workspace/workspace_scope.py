@@ -21,7 +21,7 @@ from datetime import datetime
 from pathlib import Path
 
 try:
-    from .runtime_artifacts import (
+    from tools.runtime.artifacts.runtime_artifacts import (
         RUNTIME_ROOT_ENV,
         RuntimeRootRequired,
         SourceLocalArtifact,
@@ -58,25 +58,25 @@ except ImportError:  # direct script/module execution
 from typing import TYPE_CHECKING
 
 if __package__:
-    from .agent_canon_source_root import (
+    from tools.runtime.source.agent_canon_source_root import (
         RepositoryRoots,
         RootResolution,
         resolve_agent_canon_source_root,
     )
-    from .team_config import Role, TeamConfig, resolve_role
+    from tools.agent.orchestration.team_config import Role, TeamConfig, resolve_role
 else:
     from tools.runtime.source.agent_canon_source_root import (  # type: ignore[no-redef]
         RepositoryRoots,
         RootResolution,
         resolve_agent_canon_source_root,
     )
-    from team_config import Role, TeamConfig, resolve_role
+    from tools.agent.orchestration.team_config import Role, TeamConfig, resolve_role
 
 if TYPE_CHECKING:
     if __package__:
-        from .packets import ActiveDesignPacketConfig
+        from tools.agent.orchestration.packets import ActiveDesignPacketConfig
     else:
-        from packets import ActiveDesignPacketConfig
+        from tools.agent.orchestration.packets import ActiveDesignPacketConfig
 
 GIT_STATUS_SHORT_MIN_LINE_LENGTH = 4
 
@@ -384,9 +384,9 @@ def role_allowed_artifact_files(
 ) -> tuple[Path, ...]:
     """Resolve generated artifact files one role may write."""
     if __package__:
-        from .packets import resolve_active_design_packet_config, selected_artifact_name
+        from tools.agent.orchestration.packets import resolve_active_design_packet_config, selected_artifact_name
     else:
-        from packets import resolve_active_design_packet_config, selected_artifact_name
+        from tools.agent.orchestration.packets import resolve_active_design_packet_config, selected_artifact_name
     packet = active_design_packet or resolve_active_design_packet_config(config)
     return tuple(
         sorted(

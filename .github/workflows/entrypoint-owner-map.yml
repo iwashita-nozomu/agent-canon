@@ -2,7 +2,7 @@
 # contract configuration
 # responsibility Verifies the thin root entrypoint owner-map contract on pull requests.
 # upstream design ../../documents/design/entrypoint-owner-map.md structural grammar and ownership contract
-# upstream implementation ../../tools/agent_tools/check_entrypoint_owner_map.py verifier
+# upstream implementation ../../tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py verifier
 # upstream implementation ../../tests/agent_tools/test_check_entrypoint_owner_map.py regression suite
 # @dependency-end
 

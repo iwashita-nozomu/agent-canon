@@ -4,7 +4,7 @@
 contract workflow
 responsibility Defines branch lanes for Template and AgentCanon runtime updates.
 upstream design ../canonical/CODEX_WORKFLOW.md provides closeout gates
-downstream implementation ../../tools/agent_tools/agent_update_branch.sh validates lane-specific diffs
+downstream implementation ../../tools/repository/git/agent_update_branch.sh validates lane-specific diffs
 downstream design ../skills/agent-update-branch.md exposes the workflow as a skill
 @dependency-end
 -->
@@ -46,16 +46,16 @@ the user.
 1. Reuse the current branch if it already owns this private knowledge/eval lane.
 1. Otherwise request user direction and approval for `agent-updates/knowledge-eval/<slug>` after recording `branch_creation_reason=<reason>`; create it only through the same-segment creation-authority guard contract. Add the destructive authority/reason pair only when the route force-creates or overwrites a ref.
 1. Change only `evidence/agent-evals/`, `.codex/personal/skills/*/SKILL.md`, or run-local evaluation artifacts that document private feedback.
-1. Run `bash tools/agent_tools/agent_update_branch.sh validate knowledge-eval`.
+1. Run `bash tools/repository/git/agent_update_branch.sh validate knowledge-eval`.
 1. Commit with a message that states this is a private knowledge/eval-only agent update branch.
-1. Push with `bash tools/agent_tools/agent_update_branch.sh push knowledge-eval <branch>`.
+1. Push with `bash tools/repository/git/agent_update_branch.sh push knowledge-eval <branch>`.
 
 ## Canon Source Branch
 
 1. Reuse the current branch if it already owns this canon-source lane.
 1. Otherwise request user direction and approval for `agent-updates/canon-source/<slug>` after recording `branch_creation_reason=<reason>`; create it only through the same-segment creation-authority guard contract. Add the destructive authority/reason pair only when the route force-creates or overwrites a ref.
 1. Update the standalone AgentCanon source in the qualified development clone and keep the parent tracked tree unchanged.
-1. Run the AgentCanon focused checks, bootstrap runtime checks, and `bash tools/agent_tools/agent_update_branch.sh validate canon-source`.
+1. Run the AgentCanon focused checks, bootstrap runtime checks, and `bash tools/repository/git/agent_update_branch.sh validate canon-source`.
 1. Commit with the AgentCanon Issue and source commit in the message.
 1. Push the branch.
 
@@ -68,7 +68,7 @@ the user.
 1. Run:
 
 ```bash
-bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
+bash tools/analysis/dependencies/run_repo_dependency_review.sh --fail-missing
 make agent-checks
 tools/bin/agent-canon docs check
 make ci
@@ -79,4 +79,4 @@ make ci
 
 ## Convention Compliance Gate
 
-Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.
+Before closeout or handoff, run `python3 tools/validation/semantic/convention/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

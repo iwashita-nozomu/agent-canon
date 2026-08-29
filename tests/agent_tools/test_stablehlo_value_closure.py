@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests scoped StableHLO SSA dependency closure tracing.
-# upstream implementation ../../tools/agent_tools/stablehlo_value_closure.py traces scoped value dependencies.
+# upstream implementation ../../tools/analysis/proof/stablehlo_value_closure.py traces scoped value dependencies.
 # upstream design ../../documents/tools/stablehlo_value_closure.md defines the tool contract.
 # @dependency-end
 
@@ -29,7 +29,7 @@ class _ClosureModule(Protocol):
 
 
 def _load_module() -> _ClosureModule:
-    tool_path = Path(__file__).resolve().parents[2] / "tools/agent_tools/stablehlo_value_closure.py"
+    tool_path = Path(__file__).resolve().parents[2] / "tools/analysis/proof/stablehlo_value_closure.py"
     spec = importlib.util.spec_from_file_location("_agent_canon_test_stablehlo_value_closure", tool_path)
     assert spec is not None
     assert spec.loader is not None

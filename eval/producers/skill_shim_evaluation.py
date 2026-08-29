@@ -40,7 +40,7 @@ from tools.agent.skills.skill_shim_materializer import (  # pyright: ignore[repo
 )
 
 try:
-    from .runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
+    from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
 except ImportError:
     from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError  # type: ignore[no-redef]
 

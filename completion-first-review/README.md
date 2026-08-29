@@ -6,8 +6,8 @@ responsibility Indexes the completion-first AgentCanon improvement review.
 upstream design ../AGENTS.md AgentCanon runtime and closeout expectations
 upstream design ../agents/workflows/agent-learning-workflow.md agent self-growth workflow
 upstream design ../agents/workflows/adaptive-improvement-workflow.md adaptive improvement loop
-upstream implementation ../tools/agent_tools/task_close.py current closeout evaluator
-upstream implementation ../tools/agent_tools/evaluate_agent_run.py current run evaluator
+upstream implementation ../tools/runtime/lifecycle/task_close.py current closeout evaluator
+upstream implementation ../eval/producers/evaluate_agent_run.py current run evaluator
 @dependency-end
 -->
 

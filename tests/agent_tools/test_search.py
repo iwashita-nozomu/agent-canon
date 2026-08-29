@@ -3,9 +3,9 @@
 # @dependency-start
 # contract test
 # responsibility Tests purpose-based search across tool, deterministic semantic card, header dependency, and code dependency providers.
-# upstream implementation ../../tools/agent_tools/search.py coordinates search providers
-# upstream implementation ../../tools/agent_tools/search_index.py supplies deterministic semantic cards
-# upstream implementation ../../tools/agent_tools/vector_search.py supplies dependency and code facts
+# upstream implementation ../../tools/analysis/search/search.py coordinates search providers
+# upstream implementation ../../tools/analysis/search/search_index.py supplies deterministic semantic cards
+# upstream implementation ../../tools/analysis/search/vector_search.py supplies dependency and code facts
 # upstream design ../../documents/tools/search-coordination.md coordinated search provider contract
 # @dependency-end
 
@@ -21,13 +21,13 @@ from pathlib import Path
 from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SEARCH = PROJECT_ROOT / "tools" / "agent_tools" / "search.py"
+SEARCH = PROJECT_ROOT / "tools" / "analysis" / "search" / "search.py"
 
 if str(PROJECT_ROOT / "tools" / "agent_tools") not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-import lsp_code_analysis as lsp  # noqa: E402
-import search as search_tool  # noqa: E402
+import tools.analysis.code.lsp_code_analysis as lsp  # noqa: E402
+import tools.analysis.search.search as search_tool  # noqa: E402
 
 
 def write_search_fixture(root: Path) -> None:

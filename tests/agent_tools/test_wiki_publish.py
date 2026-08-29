@@ -5,7 +5,7 @@ from __future__ import annotations
 # @dependency-start
 # contract test
 # responsibility Tests the AgentCanon wiki page-set publication gates and workflow transitions.
-# upstream implementation ../../tools/agent_tools/wiki_publish.py owns the canonical wiki publish tool.
+# upstream implementation ../../tools/repository/github/wiki_publish.py owns the canonical wiki publish tool.
 # upstream design ../../agents/skills/wiki-publication.md owns the workflow contract.
 # downstream implementation ../../documents/tools/wiki_publish.md documents the command semantics.
 # @dependency-end
@@ -19,7 +19,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from tools.agent_tools import wiki_publish
+from tools.repository.github import wiki_publish
 
 
 class FakeRunner:

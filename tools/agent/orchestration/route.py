@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import cast
 
 from tools.runtime.source.agent_canon_source_root import SourceRootFailure, resolve_agent_canon_source_root
-from capability_route import (
+from tools.agent.orchestration.capability_route import (
     FORMAT_VALUES,
     MODE_VALUES,
     RISK_VALUES,

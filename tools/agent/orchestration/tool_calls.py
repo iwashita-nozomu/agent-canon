@@ -18,15 +18,15 @@ from pathlib import Path
 from typing import cast
 
 if __package__:
-    from .artifact_identity import canonical_json_bytes
-    from .writer_target import (
+    from tools.runtime.artifacts.artifact_identity import canonical_json_bytes
+    from tools.runtime.authority.writer_target import (
         WriterTarget,
         validate_mathematical_writer_target,
         validate_spawn_handoff,
     )
 else:
     from tools.runtime.artifacts.artifact_identity import canonical_json_bytes
-    from writer_target import (  # type: ignore[no-redef]
+    from tools.runtime.authority.writer_target import (  # type: ignore[no-redef]
         WriterTarget,
         validate_mathematical_writer_target,
         validate_spawn_handoff,
@@ -445,7 +445,7 @@ def materialize_subagent_spawn_tool_call(
             validate_mathematical_intent_route,
         )
     else:
-        from packets import (  # type: ignore[no-redef]
+        from tools.agent.orchestration.packets import (  # type: ignore[no-redef]
             MATHEMATICAL_INTENT_ROUTE_ID,
             mathematical_intent_packet_mapping,
             normalize_mathematical_intent_packet,

@@ -610,7 +610,7 @@ mod tests {
         write(root, "tools/bin/agent-canon", "fixture\n");
         for relative in [
             "bootstrap.sh",
-            "bootstrap/manifest.toml",
+            "bootstrap/host/manifest.toml",
             "bootstrap/container/image/Dockerfile",
             "bootstrap/container/image/dependencies.toml",
             "bootstrap/container/lifecycle/entrypoint.sh",

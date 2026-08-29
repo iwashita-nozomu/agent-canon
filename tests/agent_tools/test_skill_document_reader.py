@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests bounded UTF-8-safe Skill section reading and read admission.
-# upstream implementation ../../tools/agent_tools/skill_document_reader.py owns the reader
+# upstream implementation ../../tools/agent/skills/skill_document_reader.py owns the reader
 # upstream design ../../agents/skills/agent-orchestration.md owns implementation-read admission
 # @dependency-end
 
@@ -16,7 +16,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.agent_tools.skill_document_reader import (
+from tools.agent.skills.skill_document_reader import (
     SkillDocumentError,
     SkillDocumentReader,
     admit_implementation_read,
@@ -25,7 +25,7 @@ from tools.agent_tools.skill_document_reader import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-READER = PROJECT_ROOT / "tools" / "agent_tools" / "skill_document_reader.py"
+READER = PROJECT_ROOT / "tools" / "agent" / "skills" / "skill_document_reader.py"
 
 
 class SkillDocumentReaderTest(unittest.TestCase):

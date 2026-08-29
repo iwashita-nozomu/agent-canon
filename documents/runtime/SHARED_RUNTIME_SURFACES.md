@@ -3,9 +3,9 @@
 contract reference
 responsibility Explains the standalone AgentCanon runtime-surface inventory and archive boundary.
 upstream design ./bootstrap-runtime.md bootstrap lifecycle and resource policy
-upstream implementation ../../tools/agent_tools/surface_manifest.py validates source classifications
-upstream implementation ../../tools/agent_tools/skill_projection_registry.py resolves generated skill owners
-downstream implementation ../../rust/agent-canon/src/dependency_manifest.rs consumes normalized classifications
+upstream implementation ../../tools/runtime/manifest/surface_manifest.py validates source classifications
+upstream implementation ../../tools/agent/skills/skill_projection_registry.py resolves generated skill owners
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest.rs consumes normalized classifications
 @dependency-end
 -->
 
@@ -59,6 +59,6 @@ standalone source checks for the changed tool or runtime surface. Check the
 inventory with:
 
 ```bash
-python3 tools/agent_tools/surface_manifest.py --root . --prefix . \
+python3 tools/runtime/manifest/surface_manifest.py --root . --prefix . \
   --manifest documents/runtime/shared-runtime-surfaces.toml normalized-snapshot
 ```

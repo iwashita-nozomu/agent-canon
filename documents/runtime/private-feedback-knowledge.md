@@ -3,9 +3,9 @@
 contract runtime
 responsibility Defines the private feedback/knowledge command boundary and its external agent-canon-log storage route.
 upstream external-schema git@github.com:iwashita-nozomu/agent-canon-log.git@db3722b817be8574c682949db733df0fb5c2674a docs/FEEDBACK_KNOWLEDGE_SCHEMA.md
-downstream implementation ../../tools/agent_tools/private_feedback.py
-downstream implementation ../../rust/agent-canon/src/private_feedback.rs
-downstream implementation ../../tools/agent_tools/workflow_monitor.py structured feedback capture
+downstream implementation ../../tools/runtime/archive/private_feedback.py
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/private_feedback.rs
+downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py structured feedback capture
 @dependency-end
 -->
 
@@ -40,7 +40,7 @@ structured runtime-feedback capture creates or reuses one typed, body-free
 request below that spool; explicit `k/f sync` remains available for retry and
 readback. Bootstrap invokes the host archive adapter after every successful
 managed tool or Codex command, passing the bind-mounted host path to the
-adapter implemented in `bootstrap/lib/entrypoint.sh`; this crossing uses only
+adapter implemented in `bootstrap/host/lifecycle/entrypoint.sh`; this crossing uses only
 the host shell's Git/Git-annex commands and never imports AgentCanon Python.
 The adapter performs fetch, non-force publication, compare/readback and
 spool/request retention on conflict. The operational checkout is mounted into

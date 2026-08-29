@@ -6,8 +6,8 @@ contract agent-runtime
 responsibility Defines the standalone shared AgentCanon tool container and its host boundary.
 upstream design documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
 upstream design documents/runtime/bootstrap-runtime.md user lifecycle contract
-upstream implementation bootstrap/container/Dockerfile shared tool image
-upstream implementation tools/agent_tools/bootstrap_runtime.py container controller
+upstream implementation bootstrap/container/image/Dockerfile shared tool image
+upstream implementation tools/runtime/container/bootstrap_runtime.py container controller
 downstream implementation tests/bootstrap/test_bootstrap_runtime.py lifecycle validation
 @dependency-end
 -->
@@ -45,7 +45,7 @@ GitHub token, host home, arbitrary Git state, or a general network.
 
 `bootstrap.sh` is usable on a host with Docker and Git but without AgentCanon's
 Python dependencies. Its shell adapter uses only fixed bootstrap constants in
-`bootstrap/lib/entrypoint.sh`, builds or adopts the image, and starts the
+`bootstrap/host/lifecycle/entrypoint.sh`, builds or adopts the image, and starts the
 resident container. The controller and all structured TOML/JSON, state, tool,
 check, and eval work run through `docker exec` in that container; the
 controller has no Docker lifecycle or Docker RPC path. The writable mount is
@@ -68,7 +68,7 @@ AgentCanon does not create a user or pass `--user`.
 
 ## Shared image and resident container
 
-`bootstrap/container/Dockerfile` is the sole AgentCanon tool image definition.
+`bootstrap/container/image/Dockerfile` is the sole AgentCanon tool image definition.
 It reuses dependency planning and installs the configured Python, Rust, and
 LSP tools once. It does not contain editor post-create behavior, project
 dependencies, project tests, GPU setup, or a Compose workspace lifecycle.
@@ -105,7 +105,7 @@ The default limits are:
 | privilege escalation | `no-new-privileges` |
 
 `/tmp` is a task-local writable tmpfs. Runtime, cache, task-state, log, and
-archive-lease quotas are recorded in `bootstrap/manifest.toml`. At 80% of a
+archive-lease quotas are recorded in `bootstrap/host/manifest.toml`. At 80% of a
 quota, `gc` may remove completed and unpinned owned state using LRU order.
 Active tasks, current and rollback generations, unpublished spool, and
 pre-existing Docker resources are retained.

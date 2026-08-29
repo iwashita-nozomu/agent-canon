@@ -4,9 +4,9 @@ contract reference
 responsibility Defines coordinated AgentCanon search across exact text, deterministic semantic cards, tool catalog, dependency headers, and code facts.
 upstream design ../../tools/README.md shared tool command surface
 upstream design ../../tools/README.md operator-facing tool guide
-downstream implementation ../../tools/agent_tools/search.py coordinates search providers from one purpose string
-downstream implementation ../../tools/agent_tools/search_index.py builds repo-local semantic search cards
-downstream implementation ../../rust/agent-canon/src/semantic_index/mod.rs builds SQLite-backed semantic vector candidate indexes
+downstream implementation ../../tools/analysis/search/search.py coordinates search providers from one purpose string
+downstream implementation ../../tools/analysis/search/search_index.py builds repo-local semantic search cards
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs builds SQLite-backed semantic vector candidate indexes
 downstream implementation ../../tests/agent_tools/test_search.py validates provider coordination
 @dependency-end
 -->
@@ -28,9 +28,9 @@ AgentCanon coordinated search has six provider classes:
 
 ## Evidence And Assumption Ledger
 
-- Evidence sources: `../../tools/agent_tools/search.py`,
-  `../../tools/agent_tools/search_index.py`, and
-  `../../rust/agent-canon/src/semantic_index/mod.rs`.
+- Evidence sources: `../../tools/analysis/search/search.py`,
+  `../../tools/analysis/search/search_index.py`, and
+  `../../tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs`.
 - Assumption:
   implementation surface routing is a bounded candidate-selection step. Search
   providers can nominate tool, document, code, or dependency-header surfaces,
@@ -39,7 +39,7 @@ AgentCanon coordinated search has six provider classes:
 - Parent-doc alignment: deterministic search output is advisory and remains
   bounded by the owner and dependency evidence in the upstream design.
 
-LSP code facts are selected through `tools/agent_tools/lsp_code_analysis.py` and
+LSP code facts are selected through `tools/analysis/code/lsp_code_analysis.py` and
 are never persisted by `search.py`. A failed or unavailable required LSP
 capability leaves the existing compatibility provider available for advisory
 search, while canonical analysis callers receive the typed failure report.
@@ -57,7 +57,7 @@ Use `search.py` when the user gives a purpose rather than an
 exact symbol:
 
 ```bash
-python3 tools/agent_tools/search.py \
+python3 tools/analysis/search/search.py \
   --purpose "find tool for dependency graph edit scope validation" \
   --providers semantic,tool,vector \
   --format json
@@ -65,7 +65,7 @@ python3 tools/agent_tools/search.py \
 
 ## Deterministic Search Boundary
 
-`tools/agent_tools/search.py` is the search command surface for purpose-based
+`tools/analysis/search/search.py` is the search command surface for purpose-based
 candidate discovery. Its result surface is a bounded candidate list with
 provider, path, score, and short evidence text; it is not a rewrite packet,
 acceptance decision, or dependency graph proof.
@@ -115,7 +115,7 @@ agent-canon semantic-index context-pack \
   --max-total-chars 6000 \
   --format text
 
-python3 tools/agent_tools/search.py \
+python3 tools/analysis/search/search.py \
   --query-file reports/query.txt \
   --providers text,semantic,tool,header-deps,code-deps,vector \
   --format json
@@ -138,7 +138,7 @@ The follow-up dependency expansion is:
 
 ```bash
 git grep -l "search phrase" -- <responsibility-scoped dirs> > reports/search_hits.txt
-bash tools/agent_tools/run_repo_dependency_review.sh \
+bash tools/analysis/dependencies/run_repo_dependency_review.sh \
   --report-dir reports/dependency-review \
   --search-hits-file reports/search_hits.txt
 ```
@@ -170,7 +170,7 @@ The responsibility-first order relies on generated search state, so storage
 rules come before provider interpretation.
 
 The first generated-state owner is the deterministic semantic-card index.
-`python3 tools/agent_tools/search_index.py build --root .` writes generated cards under
+`python3 tools/analysis/search/search_index.py build --root .` writes generated cards under
 `.agent-canon/search-index/`. That directory is repo-local ignored state. Do
 not commit generated cards, embeddings, or index state. Rebuild
 the index after AgentCanon updates or when a repository adds important tools,

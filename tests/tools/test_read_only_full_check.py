@@ -3,8 +3,8 @@
 # @dependency-start
 # contract test
 # responsibility Verifies full checks are admitted only after a read-only target mount proof and reuse the existing full-check body without checkout mutation.
-# upstream implementation ../../tools/ci/run_standalone_static_gate_unit.sh owns target admission and full-check dispatch
-# upstream implementation ../../tools/ci/run_all_checks.sh owns the existing full-confidence check body
+# upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh owns target admission and full-check dispatch
+# upstream implementation ../../tools/validation/ci/runners/run_all_checks.sh owns the existing full-confidence check body
 # @dependency-end
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-RUNNER = ROOT / "tools" / "ci" / "run_standalone_static_gate_unit.sh"
+RUNNER = ROOT / "tools" / "validation" / "ci" / "runners" / "run_standalone_static_gate_unit.sh"
 
 
 def runner_text() -> str:
@@ -44,7 +44,7 @@ def test_full_unit_reuses_existing_body_and_forwards_options() -> None:
     text = runner_text()
     body = text.split("run_full() {", 1)[1].split("\n}\n\nrun_rust()", 1)[0]
 
-    assert 'bash "${ROOT}/tools/ci/run_all_checks.sh" "${UNIT_ARGS[@]}"' in body
+    assert 'bash "${ROOT}/tools/validation/ci/runners/run_all_checks.sh" "${UNIT_ARGS[@]}"' in body
     assert (
         'AGENT_CANON_CONTROL_PARENT_ROOT="${control_parent_root}"' in body
     )
@@ -101,7 +101,7 @@ def test_full_unit_preserves_body_status_without_target_mutation(
     (tmp_path / "tool-container-marker").touch()
 
     capture = tmp_path / "capture.txt"
-    fake_checks = target / "tools" / "ci" / "run_all_checks.sh"
+    fake_checks = target / "tools" / "validation" / "ci" / "runners" / "run_all_checks.sh"
     fake_checks.write_text(
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"

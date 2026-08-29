@@ -3,7 +3,7 @@
 contract template
 responsibility Provides reusable review evidence, oracle, failure, and conflict fields.
 upstream design ../README.md partial expansion and generated artifact boundary.
-downstream implementation ../../../tools/agent_tools/agent_team.py expands this partial.
+downstream implementation ../../../tools/agent/orchestration/agent_team.py expands this partial.
 @dependency-end
 -->
 

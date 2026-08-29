@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Resolves canonical and legacy eval manifest source paths.
-# upstream design ../../evidence/README.md evidence directory ownership
-# upstream design ../../evidence/agent-evals/README.md canonical eval manifest source
+# upstream design ../../eval/README.md evidence directory ownership
+# upstream design ../../eval/definitions/README.md canonical eval manifest source
 # downstream implementation ./evaluate_skill_workflow_prompts.py resolves prompt eval manifests
 # downstream implementation ./evaluate_agent_run.py resolves behavior eval manifests
 # downstream implementation ./evaluate_workflow_selection.py resolves workflow selection manifests

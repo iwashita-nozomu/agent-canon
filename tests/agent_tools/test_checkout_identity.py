@@ -1,8 +1,8 @@
 # @dependency-start
 # contract test
 # responsibility Verifies the bounded checkout identity readback and transition projections.
-# upstream implementation ../../tools/agent_tools/checkout_identity.py owns read-only checkout identity
-# downstream implementation ../../tools/agent_tools/manifest_rendering.py projects the identity contract into handoffs
+# upstream implementation ../../tools/runtime/authority/checkout_identity.py owns read-only checkout identity
+# downstream implementation ../../tools/runtime/manifest/manifest_rendering.py projects the identity contract into handoffs
 # @dependency-end
 """Focused tests for checkout identity boundaries."""
 
@@ -11,7 +11,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from tools.agent_tools.checkout_identity import resolve_checkout_identity
+from tools.runtime.authority.checkout_identity import resolve_checkout_identity
 
 
 def _git(root: Path, *args: str) -> str:

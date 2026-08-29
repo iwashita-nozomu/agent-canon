@@ -5,7 +5,7 @@
 # upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 # upstream design ../../agents/skills/formal-proof-workflow.md formal proof status policy
 # upstream design ../../documents/tools/lean_capability_matrix.md Lean capability routing policy
-# upstream implementation ../../tools/agent_tools/tool_catalog.py validates tool catalog rows
+# upstream implementation ../../tools/runtime/manifest/tool_catalog.py validates tool catalog rows
 # downstream design ../../documents/tools/tool_proof_coverage.md documents proof coverage reports
 # downstream implementation ../../tests/agent_tools/test_tool_proof_coverage.py tests proof coverage reporting
 # @dependency-end
@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import cast
 
 import yaml
-from tool_catalog import (
+from tools.runtime.manifest.tool_catalog import (
     CATALOG_PATH,
     as_mapping,
     as_sequence,

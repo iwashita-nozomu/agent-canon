@@ -4,7 +4,7 @@ contract reference
 responsibility Documents GitHub Copilot and PR automation configuration boundaries.
 upstream design ../../ROOT_AGENTS.md defines PR mutation authority and Copilot-visible evidence rules.
 upstream implementation ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md records template / derived repo AgentCanon-pin PR evidence fields.
-downstream implementation ../../tools/ci/check_github_workflows.py validates GitHub workflow and PR-template conventions.
+downstream implementation ../../tools/validation/ci/checks/check_github_workflows.py validates GitHub workflow and PR-template conventions.
 @dependency-end
 -->
 
@@ -48,7 +48,7 @@ Copilot / PR automation policy:
 - `ROOT_AGENTS.md`: repository-wide PR mutation authority rules.
 - `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`: template / derived repo
   AgentCanon-pin PR checklist and evidence fields.
-- `tools/ci/check_github_workflows.py`: GitHub workflow and PR-template
+- `tools/validation/ci/checks/check_github_workflows.py`: GitHub workflow and PR-template
   convention checker.
 
 Repository-specific Copilot MCP server settings, Copilot environment variables,
@@ -60,7 +60,7 @@ AgentCanon PR explicitly adds a reusable non-secret surface.
 After changing PR automation, Copilot, or GitHub workflow surfaces, run:
 
 ```bash
-python3 tools/ci/check_github_workflows.py
+python3 tools/validation/ci/checks/check_github_workflows.py
 ```
 
 Parent repositories do not synchronize a vendor checkout or root view. If an

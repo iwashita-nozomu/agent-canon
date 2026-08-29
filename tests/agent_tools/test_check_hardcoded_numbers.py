@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests hardcoded numeric literal checker behavior.
-# upstream implementation ../../tools/agent_tools/check_hardcoded_numbers.py checker
+# upstream implementation ../../tools/validation/semantic/code/check_hardcoded_numbers.py checker
 # upstream design ../../documents/conventions/common/01_principles.md magic-number policy
 # @dependency-end
 
@@ -17,7 +17,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "check_hardcoded_numbers.py"
+CHECKER = PROJECT_ROOT / "tools" / "validation" / "semantic" / "code" / "check_hardcoded_numbers.py"
 
 
 class CheckHardcodedNumbersTest(unittest.TestCase):

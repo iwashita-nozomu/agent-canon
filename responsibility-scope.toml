@@ -4,9 +4,9 @@
 # upstream design documents/design/responsibility-scope-management.md scope ownership policy
 # upstream design documents/structure/repo-structure-contract.toml separate path existence and kind contract
 # upstream design tools/catalog.yaml protecting tool ownership
-# downstream implementation tools/agent_tools/responsibility_scope.py validates this manifest
-# downstream implementation tools/agent_tools/import_responsibility.py checks import boundaries
-# downstream implementation tools/agent_tools/tool_drift.py checks scope/tool trace links
+# downstream implementation tools/validation/semantic/responsibility/responsibility_scope.py validates this manifest
+# downstream implementation tools/analysis/code/import_responsibility.py checks import boundaries
+# downstream implementation tools/validation/semantic/tools/tool_drift.py checks scope/tool trace links
 # @dependency-end
 
 catalog_kind = "agent_canon_responsibility_scope"

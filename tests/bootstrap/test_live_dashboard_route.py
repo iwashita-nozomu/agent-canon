@@ -12,8 +12,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "agent_tools"))
-from tools.agent_tools.runtime_log_paths import repo_log_key  # noqa: E402
-from tools.agent_tools.tool_calls import materialize_issue_worker_tool_call  # noqa: E402
+from tools.runtime.archive.runtime_log_paths import repo_log_key  # noqa: E402
+from tools.agent.orchestration.tool_calls import materialize_issue_worker_tool_call  # noqa: E402
 
 LIVE_DOCKER = os.environ.get("AGENT_CANON_LIVE_DOCKER") == "1"
 

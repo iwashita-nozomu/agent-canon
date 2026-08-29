@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests skill tool-command packet production and read-only validation.
-# upstream implementation ../../tools/agent_tools/skill_tool_commands.py command packet tool
+# upstream implementation ../../tools/agent/skills/skill_tool_commands.py command packet tool
 # upstream design ../../agents/skills/task-routing.md deterministic skill routing contract
 # upstream design ../../agents/skills/catalog.yaml public skill identity and trigger catalog
 # upstream design ../../agents/skills/skill-dependencies.yaml canonical dependency-derived candidates
@@ -20,9 +20,9 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from agent_canon_source_root import RootResolution  # noqa: E402
-from skill_tool_commands import project_public_command  # noqa: E402
-TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "skill_tool_commands.py"
+from tools.runtime.source.agent_canon_source_root import RootResolution  # noqa: E402
+from tools.agent.skills.skill_tool_commands import project_public_command  # noqa: E402
+TOOL = PROJECT_ROOT / "tools" / "agent" / "skills" / "skill_tool_commands.py"
 STANDALONE_CATALOG = """version: 1
 skill_families:
 """
@@ -34,7 +34,7 @@ class SkillToolCommandsTest(unittest.TestCase):
     def test_public_projection_keeps_logical_plan_and_layout_prefix(self) -> None:
         """Derived public argv is separate from the source execution spelling."""
         logical = (
-            "PYTHONPATH=tools python3 tools/agent_tools/workflow_monitor.py "
+            "PYTHONPATH=tools python3 tools/runtime/lifecycle/workflow_monitor.py "
             "--root . --contract documents/structure/repo-structure-contract.toml"
         )
         standalone = project_public_command(
@@ -45,8 +45,8 @@ class SkillToolCommandsTest(unittest.TestCase):
             logical,
             RootResolution(Path("."), Path("."), "external", Path(".")),
         )
-        self.assertEqual(standalone.public_argv[1], "tools/agent_tools/workflow_monitor.py")
-        self.assertEqual(derived.public_argv[1], "tools/agent_tools/workflow_monitor.py")
+        self.assertEqual(standalone.public_argv[1], "tools/runtime/lifecycle/workflow_monitor.py")
+        self.assertEqual(derived.public_argv[1], "tools/runtime/lifecycle/workflow_monitor.py")
         self.assertEqual(
             standalone.public_argv[2:],
             ("--root", ".", "--contract", "documents/structure/repo-structure-contract.toml"),
@@ -423,13 +423,13 @@ class SkillToolCommandsTest(unittest.TestCase):
             expected_root = str(root.resolve())
             self.assertEqual(
                 logical,
-                "python3 tools/agent_tools/route.py --prompt '<user request>' --format json",
+                "python3 tools/agent/orchestration/route.py --prompt '<user request>' --format json",
             )
             self.assertEqual(source_root, expected_root)
             self.assertEqual(execution_env, [])
             self.assertEqual(execution_cwd, expected_root)
             self.assertEqual(argv[0], "python3")
-            self.assertEqual(argv[1], f"{expected_root}/tools/agent_tools/route.py")
+            self.assertEqual(argv[1], f"{expected_root}/tools/agent/orchestration/route.py")
             self.assertEqual(argv[2:], ["--prompt", "<user request>", "--format", "json"])
 
     def test_generated_entry_is_a_read_only_packet_projection(self) -> None:
@@ -512,8 +512,8 @@ class SkillToolCommandsTest(unittest.TestCase):
         self.assertEqual(
             payload["discovered_commands"],
             [
-                "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
-                "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
+                "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
+                "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
             ],
         )
         for command in payload["discovered_commands"]:
@@ -539,7 +539,7 @@ class SkillToolCommandsTest(unittest.TestCase):
         self.assertEqual(
             payload["required_commands"],
             [
-                "python3 tools/agent_tools/check_execution_time_aware_orchestration.py --root ."
+                "python3 tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py --root ."
             ],
         )
         shim = (PROJECT_ROOT / ".codex/personal/skills/agent-orchestration/SKILL.md").read_text(

@@ -2,7 +2,7 @@
 # contract test
 # responsibility Tests test check agent runtime alignment behavior.
 # upstream design ../../tools/README.md validated automation surface
-# upstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates runtime alignment contracts
+# upstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates runtime alignment contracts
 # @dependency-end
 
 """Integration test for the agent runtime alignment checker."""
@@ -24,16 +24,16 @@ from unittest.mock import patch
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "check_agent_runtime_alignment.py"
+SCRIPT_PATH = PROJECT_ROOT / "tools" / "validation" / "semantic" / "runtime" / "check_agent_runtime_alignment.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-import check_agent_runtime_alignment as runtime_alignment  # noqa: E402
-from check_agent_runtime_alignment import validate_permanent_team_mapping  # noqa: E402
-from implementation_dispatch import (  # noqa: E402
+import tools.validation.semantic.runtime.check_agent_runtime_alignment as runtime_alignment  # noqa: E402
+from tools.validation.semantic.runtime.check_agent_runtime_alignment import validate_permanent_team_mapping  # noqa: E402
+from tools.agent.orchestration.implementation_dispatch import (  # noqa: E402
     codex_runtime_max_depth,
     workflow_topology_policy_violations,
 )
-from packets import (  # noqa: E402
+from tools.agent.orchestration.packets import (  # noqa: E402
     markdown_document_headings,
     markdown_heading_anchor,
     resolve_active_design_packet_config,
@@ -41,8 +41,8 @@ from packets import (  # noqa: E402
     resolve_document_section_locators,
     resolve_role_document_packet,
 )
-from team_config import TaskCatalog, load_team_config, resolve_role  # noqa: E402
-from workspace_scope import resolve_report_bundle_artifact_path  # noqa: E402
+from tools.agent.orchestration.team_config import TaskCatalog, load_team_config, resolve_role  # noqa: E402
+from tools.repository.workspace.workspace_scope import resolve_report_bundle_artifact_path  # noqa: E402
 
 
 def task_catalog_from_raw(raw: dict[str, object]) -> TaskCatalog:
@@ -199,7 +199,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
     def test_retired_command_accepts_catalog_backed_validation_owner(self) -> None:
         """A tombstone may route to a canonical validation tool in the catalog."""
         runtime_alignment.validate_retired_command_or_skill(
-            "command-only:python3 tools/validation/notebook_quality.py",
+            "command-only:python3 tools/validation/notebooks/notebook_quality.py",
             "notebook_quality_guard.py",
         )
         with self.assertRaisesRegex(RuntimeError, "invalid tombstone representation"):
@@ -474,13 +474,13 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         )
         owner_document = owner_document_path.read_text(encoding="utf-8")
         manifest_rendering = (
-            PROJECT_ROOT / "tools" / "agent_tools" / "manifest_rendering.py"
+            PROJECT_ROOT / "tools" / "runtime" / "manifest" / "manifest_rendering.py"
         ).read_text(encoding="utf-8")
         lifecycle_contract = (
-            PROJECT_ROOT / "tools" / "agent_tools" / "update_lifecycle_contract.py"
+            PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "update_lifecycle_contract.py"
         ).read_text(encoding="utf-8")
         implementation_route = (
-            PROJECT_ROOT / "tools" / "agent_tools" / "implementation_route.py"
+            PROJECT_ROOT / "tools" / "agent" / "orchestration" / "implementation_route.py"
         ).read_text(encoding="utf-8")
         pointer_docs = [
             PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md",
@@ -590,7 +590,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         """Canonical source and generated-readback wording remains valid."""
         valid_claim = (
             "agents/model_profiles.toml is the canonical typed profile authority. "
-            "tools/agent_tools/model_profile_registry.py materializes closed generated "
+            "tools/agent/orchestration/model_profile_registry.py materializes closed generated "
             ".codex/agents/*.toml and agents/agents_config.json views. Generated views "
             "are projection digest/readback surfaces and must never be edited manually; "
             "change registry/team/runtime source, regenerate, restart, and validate readback."

@@ -132,7 +132,7 @@ verified completion に昇格させず remaining verification として残しま
 ## Standard Bundle
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
   --task-id T12 \
   --owner "codex" \

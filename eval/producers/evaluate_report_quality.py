@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Evaluates report-writing quality checklist surfaces.
-# upstream design ../../evidence/agent-evals/README.md eval usage contract
-# upstream design ../../evidence/agent-evals/report_quality_eval.toml report quality eval manifest
+# upstream design ../../eval/definitions/README.md eval usage contract
+# upstream design ../../eval/definitions/report_quality_eval.toml report quality eval manifest
 # upstream design ../../agents/skills/report-writing.md report writing skill contract
 # upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # upstream implementation ./runtime_artifacts.py owns external report-quality artifact writes

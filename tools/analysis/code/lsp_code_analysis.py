@@ -237,7 +237,7 @@ class LspServerSpec:
         if manifest_override:
             manifest = Path(manifest_override).expanduser().resolve()
         else:
-            source_manifest = repo_root / "bootstrap" / "container" / "dependencies.toml"
+            source_manifest = repo_root / "bootstrap" / "container" / "image" / "dependencies.toml"
             image_manifest = IMAGE_MANIFEST_ROOT / "dependencies.toml"
             manifest = source_manifest if source_manifest.is_file() else image_manifest
         if not manifest.is_file():

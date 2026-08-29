@@ -6,7 +6,7 @@
 # contract test
 # responsibility Validates ChatGPT closure, Codex execution, conflict, input, and monotonicity invariants.
 # upstream design ../../agents/internal-routines/chatgpt-codex-routing.md owns route semantics.
-# upstream implementation ../../tools/agent_tools/chatgpt_codex_routing.py implements the decision relation.
+# upstream implementation ../../tools/agent/orchestration/chatgpt_codex_routing.py implements the decision relation.
 # @dependency-end
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "agent_tools"))
 
-import chatgpt_codex_routing as routing  # noqa: E402
+import tools.agent.orchestration.chatgpt_codex_routing as routing  # noqa: E402
 
 
 class ChatgptCodexRoutingTest(unittest.TestCase):

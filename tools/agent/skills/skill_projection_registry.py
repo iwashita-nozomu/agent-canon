@@ -21,9 +21,9 @@ try:
     import yaml
 except ModuleNotFoundError:  # pragma: no cover - clean host before the tool image exists.
     try:
-        from . import stdlib_yaml as yaml
+        from tools.runtime.container import stdlib_yaml as yaml
     except ImportError:
-        import stdlib_yaml as yaml  # type: ignore[no-redef]
+        import tools.runtime.container.stdlib_yaml as yaml  # type: ignore[no-redef]
 
 SKILL_CATALOG = Path("agents/skills/catalog.yaml")
 GENERATED_SKILL_PREFIX = ".codex/personal/skills/"

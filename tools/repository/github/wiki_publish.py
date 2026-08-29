@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .parent_root_side_effects import (
+    from tools.repository.workspace.parent_root_side_effects import (
         ParentRootReject,
         ParentRootSideEffectError,
     )
@@ -37,7 +37,7 @@ except ImportError:
     )
 
 try:
-    from .runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
+    from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
 except ImportError:  # pragma: no cover - direct script execution
     from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError  # type: ignore[no-redef]
 

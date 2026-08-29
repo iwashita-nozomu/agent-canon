@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Verifies pre-review report publication stays in the external runtime root.
-# upstream implementation ../../tools/ci/pre_review.sh owns verifier report and runtime orchestration.
+# upstream implementation ../../tools/validation/ci/runners/pre_review.sh owns verifier report and runtime orchestration.
 # @dependency-end
 
 """Focused external-runtime tests for the pre-review shell entrypoint."""
@@ -14,9 +14,9 @@ import subprocess
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "ci" / "pre_review.sh"
-BOUNDARY = PROJECT_ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py"
-RUNTIME_ARTIFACTS = PROJECT_ROOT / "tools" / "agent_tools" / "runtime_artifacts.py"
+SCRIPT = PROJECT_ROOT / "tools" / "validation" / "ci" / "runners" / "pre_review.sh"
+BOUNDARY = PROJECT_ROOT / "tools" / "repository" / "workspace" / "parent_root_side_effects.py"
+RUNTIME_ARTIFACTS = PROJECT_ROOT / "tools" / "runtime" / "artifacts" / "runtime_artifacts.py"
 PATH_ENV_KEYS = {
     "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
     "AGENT_CANON_CHILD_HANDOFF",
@@ -44,7 +44,7 @@ def test_pre_review_uses_boundary_report_and_parent_local_child_env(
     shutil.copy2(SCRIPT, parent / "tools" / "ci" / SCRIPT.name)
     shutil.copy2(BOUNDARY, parent / "tools" / "agent_tools" / BOUNDARY.name)
     shutil.copy2(RUNTIME_ARTIFACTS, parent / "tools" / "agent_tools" / RUNTIME_ARTIFACTS.name)
-    quality = parent / "tools" / "ci" / "run_python_quality_checks.sh"
+    quality = parent / "tools" / "validation" / "ci" / "checks" / "run_python_quality_checks.sh"
     quality.write_text(
         "#!/bin/sh\n"
         'case "$TMPDIR:$CARGO_HOME" in "$PWD"/*:"$PWD"/*) exit 91 ;; esac\n'
@@ -89,7 +89,7 @@ def test_pre_review_accepts_external_report_dir_without_source_side_effect(
     shutil.copy2(SCRIPT, parent / "tools" / "ci" / SCRIPT.name)
     shutil.copy2(BOUNDARY, parent / "tools" / "agent_tools" / BOUNDARY.name)
     shutil.copy2(RUNTIME_ARTIFACTS, parent / "tools" / "agent_tools" / RUNTIME_ARTIFACTS.name)
-    quality = parent / "tools" / "ci" / "run_python_quality_checks.sh"
+    quality = parent / "tools" / "validation" / "ci" / "checks" / "run_python_quality_checks.sh"
     quality.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     quality.chmod(0o755)
     subprocess.run(("git", "init", "-q", "-b", "main"), cwd=parent, check=True)

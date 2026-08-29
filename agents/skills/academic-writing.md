@@ -100,7 +100,7 @@ method note、symbol-dense claim-heavy explanation の文書を、共通 graph/D
 ## Standard Command
 
 ```bash
-python3 tools/agent_tools/doc_start.py \
+python3 tools/analysis/documents/doc_start.py \
   --task "academic writing task" \
   --kind academic \
   --owner "codex" \

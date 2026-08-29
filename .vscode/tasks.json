@@ -19,14 +19,14 @@
     {
       "label": "AgentCanon: Convention Check",
       "type": "shell",
-      "command": "python3 \"${workspaceFolder}/tools/agent_tools/check_convention_compliance.py\"",
+      "command": "python3 \"${workspaceFolder}/tools/validation/semantic/convention/check_convention_compliance.py\"",
       "group": "test",
       "problemMatcher": []
     },
     {
       "label": "AgentCanon: Dependency Headers",
       "type": "shell",
-      "command": "python3 \"${workspaceFolder}/tools/agent_tools/check_dependency_headers.py\" --changed && bash \"${workspaceFolder}/tools/agent_tools/scan_dependency_headers.sh\" --changed --fail-missing && bash \"${workspaceFolder}/tools/agent_tools/check_dependency_header_format.sh\" --changed --require-header",
+      "command": "python3 \"${workspaceFolder}/tools/validation/semantic/dependencies/check_dependency_headers.py\" --changed && bash \"${workspaceFolder}/tools/analysis/dependencies/scan_dependency_headers.sh\" --changed --fail-missing && bash \"${workspaceFolder}/tools/validation/semantic/dependencies/check_dependency_header_format.sh\" --changed --require-header",
       "group": "test",
       "problemMatcher": []
     },

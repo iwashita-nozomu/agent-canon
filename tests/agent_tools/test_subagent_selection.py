@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests normalized subagent-selection evidence.
-# upstream implementation ../../tools/agent_tools/subagent_selection.py owns subagent selection.
+# upstream implementation ../../tools/agent/orchestration/subagent_selection.py owns subagent selection.
 # @dependency-end
 """Focused tests for pure subagent selection."""
 from __future__ import annotations
@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "agent_tools"))
-from subagent_selection import build_coordination_receipt, select_subagents  # noqa: E402
+from tools.agent.orchestration.subagent_selection import build_coordination_receipt, select_subagents  # noqa: E402
 
 
 class SubagentSelectionTest(unittest.TestCase):

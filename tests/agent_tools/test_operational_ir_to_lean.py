@@ -1,8 +1,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests shared thin operational IR to Lean evidence rendering.
-# upstream implementation ../../tools/agent_tools/operational_ir_to_lean.py renders Lean evidence.
-# upstream implementation ../../tools/agent_tools/cpp_source_canonical_ir.py produces C++ source IR.
+# upstream implementation ../../tools/analysis/proof/operational_ir_to_lean.py renders Lean evidence.
+# upstream implementation ../../tools/analysis/code/cpp_source_canonical_ir.py produces C++ source IR.
 # upstream design ../../documents/tools/operational_ir_to_lean.md documents the renderer contract.
 # @dependency-end
 """Tests for operational IR to Lean evidence rendering."""
@@ -17,8 +17,8 @@ from pathlib import Path
 from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "operational_ir_to_lean.py"
-CPP_IR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "cpp_source_canonical_ir.py"
+SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "proof" / "operational_ir_to_lean.py"
+CPP_IR_SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "code" / "cpp_source_canonical_ir.py"
 
 
 def run_tool(*args: str) -> subprocess.CompletedProcess[str]:

@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests AgentCanon improvement guide generation.
-# upstream implementation ../../tools/agent_tools/generate_agent_improvement_guide.py generates guide reports
+# upstream implementation ../../eval/producers/generate_agent_improvement_guide.py generates guide reports
 # @dependency-end
 
 """Tests for generated AgentCanon improvement guides."""
@@ -17,9 +17,9 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "generate_agent_improvement_guide.py"
+SCRIPT = PROJECT_ROOT / "eval" / "producers" / "generate_agent_improvement_guide.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from runtime_log_paths import mounted_log_archive_root  # noqa: E402
+from tools.runtime.archive.runtime_log_paths import mounted_log_archive_root  # noqa: E402
 
 
 class GenerateAgentImprovementGuideTest(unittest.TestCase):
@@ -104,7 +104,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn("human_feedback_action_counts:", guide)
         self.assertIn("prompt_repair", guide)
         self.assertIn("Top Failure Repair Targets", guide)
-        self.assertIn("tools/agent_tools/bootstrap_agent_run.py", guide)
+        self.assertIn("tools/runtime/lifecycle/bootstrap_agent_run.py", guide)
         self.assertIn("hook_quality_counts:", guide)
         self.assertIn("unknown_event", guide)
         self.assertIn("Hook Quality Findings", guide)
@@ -227,10 +227,10 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                         {
                             "command": [
                                 "python3",
-                                "tools/oop/python/readability.py",
+                                "tools/validation/code/oop/python/readability.py",
                                 "--root",
                                 str(root),
-                                "tools/agent_tools/bootstrap_agent_run.py",
+                                "tools/runtime/lifecycle/bootstrap_agent_run.py",
                             ],
                             "returncode": 0,
                             "output_snippet": (

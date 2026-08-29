@@ -6,7 +6,7 @@ upstream design ../../documents/rule/README.md document filename, placement, and
 downstream implementation ./github/README.md GitHub template source and checked-in standalone target map
 downstream implementation ../experiments/_template/README.md runnable experiment topic planning contract
 downstream implementation ../experiments/_template/provenance.toml machine-readable provenance contract
-downstream implementation ../../tools/experiments/create_experiment_topic.py places experiment templates in new topics
+downstream implementation ../../tools/experiments/lifecycle/create_experiment_topic.py places experiment templates in new topics
 @dependency-end
 -->
 
@@ -26,7 +26,7 @@ reader path の要約を置き、読者が本文を逆戻りせずに owner と�
 - intended reader: 文書作成者、実装者、reviewer、親repo integrator。
 - what this directory contains: Markdown、TOML、GitHub Issue Form、PR source。
 - canonical source: `templates/documents/` for document templates and `templates/experiments/_template/` for the runnable experiment topic scaffold。checked-in standalone `.github` targets と run-local report は source とは別の責務を持つ。
-- validation: dependency header、YAML/TOML parse、`agent-canon docs check`、`python3 tools/ci/check_github_workflows.py --root .`。
+- validation: dependency header、YAML/TOML parse、`agent-canon docs check`、`python3 tools/validation/ci/checks/check_github_workflows.py --root .`。
 - lifecycle: checked-in standalone targets と result/report artifact の retention/cleanup owner を本文で固定する。
 
 ## 責務
@@ -61,7 +61,7 @@ standalone AgentCanon の `.github/ISSUE_TEMPLATE/` と `.github/PULL_REQUEST_TE
 は source と同時更新する checked-in targets であり、手作業の第二正本ではありません。
 Template / derived parent の `.github` target は parent-owned regular content として
 保持し、AgentCanon source から反映しません。GitHub semantic validation は
-`python3 tools/ci/check_github_workflows.py --root .` を使用します。
+`python3 tools/validation/ci/checks/check_github_workflows.py --root .` を使用します。
 
 ## Remote Execution
 

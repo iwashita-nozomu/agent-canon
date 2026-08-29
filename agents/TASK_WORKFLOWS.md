@@ -8,9 +8,9 @@ upstream implementation task_catalog.yaml workflow family defaults.
 upstream implementation agents_config.json permanent team and role mapping.
 upstream design canonical/CODEX_SUBAGENTS.md subagent role contract.
 downstream design workflows/implementation-waterfall-workflow.md stage gate implementation flow.
-downstream implementation ../tools/agent_tools/bootstrap_agent_run.py emits workflow packets and creates workflow run bundles.
-downstream implementation ../tools/agent_tools/workflow_monitor.py records dynamic wave events.
-downstream implementation ../tools/agent_tools/check_agent_runtime_alignment.py validates the canonical packet owner marker.
+downstream implementation ../tools/runtime/lifecycle/bootstrap_agent_run.py emits workflow packets and creates workflow run bundles.
+downstream implementation ../tools/runtime/lifecycle/workflow_monitor.py records dynamic wave events.
+downstream implementation ../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates the canonical packet owner marker.
 @dependency-end
 -->
 
@@ -35,7 +35,7 @@ task catalog, runtime profile matrix, or closeout tools as policy authority.
 | default specialists and review packs | `agents/task_catalog.yaml`; `agents/agents_config.json` |
 | role behavior, stage conditions, and review separation | `.codex/agents/*.toml` |
 | run bundle, declared workflow / skills / review, and dynamic wave ledger | `bootstrap_agent_run.py`; `workflow_monitor.py` |
-| skill selection | `agents/skills/catalog.yaml`; `.codex/personal/skills/*/SKILL.md`; `python3 tools/agent_tools/route.py --prompt` |
+| skill selection | `agents/skills/catalog.yaml`; `.codex/personal/skills/*/SKILL.md`; `python3 tools/agent/orchestration/route.py --prompt` |
 | implementation stage gate | `agents/workflows/implementation-waterfall-workflow.md` |
 | active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; `agents/agents_config.json#artifacts.active_design_packet` |
 | semantic responsibility allocation | `documents/design/semantic-responsibility-contract.md`; run-local instance via active-packet `source_refs` |
@@ -136,6 +136,6 @@ The runtime cap is in `.codex/config.toml`; family budgets are in
 
 ## Validation
 
-- `python3 tools/agent_tools/check_agent_runtime_alignment.py`
-- `python3 tools/agent_tools/check_convention_compliance.py`
-- `python3 tools/agent_tools/task_close.py ...`
+- `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py`
+- `python3 tools/validation/semantic/convention/check_convention_compliance.py`
+- `python3 tools/runtime/lifecycle/task_close.py ...`

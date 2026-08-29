@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Generates bounded PR/manual guidance from private knowledge/feedback, eval, hook, and Issue evidence.
-# upstream design ../../evidence/agent-evals/README.md eval evidence contract
+# upstream design ../../eval/definitions/README.md eval evidence contract
 # upstream design ../../documents/runtime/runtime-log-archive.md hook result accumulation contract
 # upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
 # upstream implementation ./historical_skill_usage_reader.py reads archived skill_usage.jsonl read-only
@@ -734,7 +734,7 @@ def is_agentcanon_root(root: Path) -> bool:
         return (
             (root / "agents" / "evals" / "README.md").is_file()
             or (root / ".codex" / "personal" / "skills").is_dir()
-            or (root / "tools" / "agent_tools" / "generate_agent_improvement_guide.py").is_file()
+            or (root / "eval" / "producers" / "generate_agent_improvement_guide.py").is_file()
             or (root / "agents" / "evals" / "results").is_dir()
         )
     except OSError:

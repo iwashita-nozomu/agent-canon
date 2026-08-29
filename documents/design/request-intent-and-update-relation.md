@@ -12,13 +12,13 @@ downstream design ../../agents/canonical/CODEX_SUBAGENTS.md consumes reuse, para
 downstream design ../../agents/skills/worktree-health.md consumes worktree and scratch cleanup clauses.
 downstream design ../../agents/skills/dependency-module-change.md consumes dependency-clone cleanup clause.
 downstream design ../../agents/internal-routines/design-implementation-correspondence.md owns correspondence and related-document closure.
-downstream implementation ../../tools/agent_tools/bootstrap_agent_run.py materializes task packets.
-downstream implementation ../../tools/agent_tools/task_close.py materializes closeout receipts.
-downstream implementation ../../tools/agent_tools/dependency_module_change.py executes dependency-clone cleanup.
-downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py archives and checks retained run-bundle reports.
-downstream implementation ../../tools/agent_tools/generated_artifact_guard.py reads generated-artifact cleanup status.
-downstream implementation ../../tools/agent_tools/report_artifact_checks.py classifies report placement and transient state.
-downstream implementation ../../tools/agent_tools/agent_team.py materializes lifecycle cleanup and terminal ToolCall receipts.
+downstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py materializes task packets.
+downstream implementation ../../tools/runtime/lifecycle/task_close.py materializes closeout receipts.
+downstream implementation ../../tools/repository/workspace/dependency_module_change.py executes dependency-clone cleanup.
+downstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py archives and checks retained run-bundle reports.
+downstream implementation ../../tools/runtime/artifacts/generated_artifact_guard.py reads generated-artifact cleanup status.
+downstream implementation ../../tools/runtime/artifacts/report_artifact_checks.py classifies report placement and transient state.
+downstream implementation ../../tools/agent/orchestration/agent_team.py materializes lifecycle cleanup and terminal ToolCall receipts.
 downstream design ../../ROOT_AGENTS.md canonical root reader projection.
 downstream design ../../AGENTS.md AgentCanon root-view projection.
 @dependency-end
@@ -34,13 +34,13 @@ downstream design ../../AGENTS.md AgentCanon root-view projection.
 | responsibility | canonical owner | この note の境界 |
 | --- | --- | --- |
 | request clause、authority、owner、write set、route | `agents/skills/agent-orchestration.md` | semantic decision を所有し、task packet へ渡す |
-| intake、task packet、workflow、validation | `agents/skills/codex-task-workflow.md`、`tools/agent_tools/bootstrap_agent_run.py` | request clauses と active work state を保持する |
+| intake、task packet、workflow、validation | `agents/skills/codex-task-workflow.md`、`tools/runtime/lifecycle/bootstrap_agent_run.py` | request clauses と active work state を保持する |
 | active context、handoff、transport | `agents/COMMUNICATION_PROTOCOL.md` | packet/capsule と write scope を運ぶ |
 | agent reuse、必要な並列 handoff、descendant close | `agents/canonical/CODEX_SUBAGENTS.md` | 同じ context の再利用と独立 scope の handoff を所有する |
-| dependency/topic clone cleanup | `agents/skills/dependency-module-change.md`、`tools/agent_tools/dependency_module_change.py` | reconstructibility-gated cleanup を実行し `CLEANUP` receipt を返す |
-| run bundle temporary state / retention | `tools/agent_tools/runtime_log_archive_git.py`、`documents/runtime/runtime-log-archive.md` | archive、sync、check-clean の retention receipt を返す |
-| task/run lifecycle cleanup | `agents/canonical/CODEX_SUBAGENTS.md`、`tools/agent_tools/task_close.py`、`tools/agent_tools/agent_team.py` | CleanupProof、G6、terminal close_agent receipt を検証・materializeする |
-| generated report / local graph-cache readback | `tools/agent_tools/generated_artifact_guard.py`、`tools/agent_tools/report_artifact_checks.py`、`tools/agent_tools/graph_client.py` | 既存 guard/producer の状態を読み、owner-bounded cleanup write set の根拠を返す |
+| dependency/topic clone cleanup | `agents/skills/dependency-module-change.md`、`tools/repository/workspace/dependency_module_change.py` | reconstructibility-gated cleanup を実行し `CLEANUP` receipt を返す |
+| run bundle temporary state / retention | `tools/runtime/archive/runtime_log_archive_git.py`、`documents/runtime/runtime-log-archive.md` | archive、sync、check-clean の retention receipt を返す |
+| task/run lifecycle cleanup | `agents/canonical/CODEX_SUBAGENTS.md`、`tools/runtime/lifecycle/task_close.py`、`tools/agent/orchestration/agent_team.py` | CleanupProof、G6、terminal close_agent receipt を検証・materializeする |
+| generated report / local graph-cache readback | `tools/runtime/artifacts/generated_artifact_guard.py`、`tools/runtime/artifacts/report_artifact_checks.py`、`tools/analysis/dependencies/graph_client.py` | 既存 guard/producer の状態を読み、owner-bounded cleanup write set の根拠を返す |
 | worktree health / merge-readback | `agents/skills/worktree-health.md` | health、scope、linked worktree、clean status の readback だけを返す |
 | design read、clause fingerprint、implementation correspondence | `agents/internal-routines/design-implementation-correspondence.md` | design-to-implementation trace を所有する |
 | root reader projection | `ROOT_AGENTS.md`（正本）、`AGENTS.md`（root view） | 同じ positive contract とこの note の route を投影する |
@@ -95,9 +95,9 @@ executors を dispatch し、final closeout は各 receipt を統合します。
 
 | operation | existing executor | receipt |
 | --- | --- | --- |
-| dependency/topic clone cleanup | `python3 tools/agent_tools/dependency_module_change.py cleanup --apply` with the existing same-command authority and reconstructibility readback | `CLEANUP module=... action=removed` または owner の hold/readback evidence |
-| run bundle temporary state / retention | `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report` → `sync` → `check-clean` | `RUNTIME_LOG_ARCHIVE_AGENT_REPORT=pass`、`RUNTIME_LOG_ARCHIVE_SYNC=pass`、`RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=pass` |
-| generated report roots | artifact owner operation followed by `python3 tools/agent_tools/generated_artifact_guard.py --root .` | `GENERATED_ARTIFACT_GUARD=pass` と `report_artifact_checks.py` placement readback |
+| dependency/topic clone cleanup | `python3 tools/repository/workspace/dependency_module_change.py cleanup --apply` with the existing same-command authority and reconstructibility readback | `CLEANUP module=... action=removed` または owner の hold/readback evidence |
+| run bundle temporary state / retention | `python3 tools/runtime/archive/runtime_log_archive_git.py archive-agent-report` → `sync` → `check-clean` | `RUNTIME_LOG_ARCHIVE_AGENT_REPORT=pass`、`RUNTIME_LOG_ARCHIVE_SYNC=pass`、`RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=pass` |
+| generated report roots | artifact owner operation followed by `python3 tools/runtime/artifacts/generated_artifact_guard.py --root .` | `GENERATED_ARTIFACT_GUARD=pass` と `report_artifact_checks.py` placement readback |
 | generated local graph/cache | current graph producer `agent-canon graph build`; general delete executor は current tools に存在しない | artifact-owner cleanup operation を今回の design write set として選定し、owner receipt を追加する |
 | completed agent and descendants | `task_close.py` / `agent_team.py` lifecycle materializer under `agents/canonical/CODEX_SUBAGENTS.md` | `CleanupProof` → `G6` → terminal `close_agent` ToolCall、descendants-closed、reservations-released receipt |
 
@@ -116,7 +116,7 @@ receipt は既存 closeout packet へ read-back します。 `agents/internal-ro
   safe checkpoint で既存 packet を再読し、差分 handoff または必要並列を選択します。
 - merge/readback evidence が揃う場合は dependency cleanup receipt、scratch cleanup または
   typed retention receipt、CleanupProof、G6、terminal close_agent receipt が順に closeout
-  packet へ入ります。 `tools/agent_tools/task_close.py`
+  packet へ入ります。 `tools/runtime/lifecycle/task_close.py`
 
 ## Validation / Performance Observation
 
@@ -137,7 +137,7 @@ checks がこの flow の validation evidence です。 <!-- evidence: `agents/i
 | scope | evidence / owner |
 | --- | --- |
 | current owner flow | `agents/skills/agent-orchestration.md`; `agents/skills/codex-task-workflow.md`; `agents/COMMUNICATION_PROTOCOL.md` |
-| current lifecycle route | `agents/canonical/CODEX_SUBAGENTS.md`; `agents/skills/worktree-health.md`; `tools/agent_tools/task_close.py` |
+| current lifecycle route | `agents/canonical/CODEX_SUBAGENTS.md`; `agents/skills/worktree-health.md`; `tools/runtime/lifecycle/task_close.py` |
 | correspondence and closure | `agents/internal-routines/design-implementation-correspondence.md`; `documents/design/README.md` |
 | planned evaluator observation | `documents/codex/prompt-skill-evaluation-checklist.md` |
 
@@ -146,13 +146,13 @@ checks がこの flow の validation evidence です。 <!-- evidence: `agents/i
 | clause | current/planned owner and files | completion evidence / reverse rule |
 | --- | --- | --- |
 | `QWA-01` | `agents/skills/agent-orchestration.md`; `agents/skills/codex-task-workflow.md`; `agents/COMMUNICATION_PROTOCOL.md`; `ROOT_AGENTS.md`; `AGENTS.md` | read evidence、回答、unchanged write scope の packet readback。質問回答経路の変更はこの clause と既存 owner packet を先に読む |
-| `QWA-02` | `agents/skills/agent-orchestration.md`; `tools/agent_tools/bootstrap_agent_run.py`; `agents/COMMUNICATION_PROTOCOL.md` | explicit write clause gate を通った request clause だけが owner/write set/acceptance handoff に接続される |
+| `QWA-02` | `agents/skills/agent-orchestration.md`; `tools/runtime/lifecycle/bootstrap_agent_run.py`; `agents/COMMUNICATION_PROTOCOL.md` | explicit write clause gate を通った request clause だけが owner/write set/acceptance handoff に接続される |
 | `UPD-01` | `agents/skills/agent-orchestration.md`; `agents/skills/codex-task-workflow.md`; `agents/COMMUNICATION_PROTOCOL.md` | gate-approved effect が goal/artifact/order/handoff の各 sparse delta として既存 packet に更新される |
 | `UPD-02` | `agents/COMMUNICATION_PROTOCOL.md`; `agents/canonical/CODEX_SUBAGENTS.md` | compatible context は reuse、disjoint scope は必要並列 handoff。追加入力の routing 変更はこの clause と active packet を先に読む |
-| `LIFE-01` | `agents/skills/dependency-module-change.md`; `tools/agent_tools/dependency_module_change.py` | merge/readback 直後に dependency cleanup が dispatch され、`CLEANUP` receipt が read-back される |
-| `LIFE-02` | `tools/agent_tools/runtime_log_archive_git.py`; `documents/runtime/runtime-log-archive.md`; `tools/agent_tools/generated_artifact_guard.py`; `tools/agent_tools/report_artifact_checks.py` | run bundle は archive/sync/check-clean、generated roots は owner operation/guard readback の existing route へ接続される |
-| `LIFE-03` | `agents/canonical/CODEX_SUBAGENTS.md`; `tools/agent_tools/task_close.py`; `tools/agent_tools/agent_team.py` | dependency receipt → scratch/retention receipt → CleanupProof → G6 → terminal close_agent ToolCall の実 sequence が read-back される |
-| `LIFE-04` | `tools/agent_tools/graph_client.py`; `documents/design/dependency-manifest-design.md`; `tools/agent_tools/generated_artifact_guard.py` | general graph/cache delete executor の欠落を artifact-owner cleanup write set として明示し、guard/producer を cleanup executor として扱わない |
+| `LIFE-01` | `agents/skills/dependency-module-change.md`; `tools/repository/workspace/dependency_module_change.py` | merge/readback 直後に dependency cleanup が dispatch され、`CLEANUP` receipt が read-back される |
+| `LIFE-02` | `tools/runtime/archive/runtime_log_archive_git.py`; `documents/runtime/runtime-log-archive.md`; `tools/runtime/artifacts/generated_artifact_guard.py`; `tools/runtime/artifacts/report_artifact_checks.py` | run bundle は archive/sync/check-clean、generated roots は owner operation/guard readback の existing route へ接続される |
+| `LIFE-03` | `agents/canonical/CODEX_SUBAGENTS.md`; `tools/runtime/lifecycle/task_close.py`; `tools/agent/orchestration/agent_team.py` | dependency receipt → scratch/retention receipt → CleanupProof → G6 → terminal close_agent ToolCall の実 sequence が read-back される |
+| `LIFE-04` | `tools/analysis/dependencies/graph_client.py`; `documents/design/dependency-manifest-design.md`; `tools/runtime/artifacts/generated_artifact_guard.py` | general graph/cache delete executor の欠落を artifact-owner cleanup write set として明示し、guard/producer を cleanup executor として扱わない |
 | `STYLE-01` | `ROOT_AGENTS.md`; `AGENTS.md`; `agents/internal-routines/design-implementation-correspondence.md` | operation、state、completion evidence の肯定形と、対応 precondition/alternative route が design fingerprint と root projection に現れる |
 | `DOC-01` | `agents/internal-routines/design-implementation-correspondence.md` `DIC-010` | Related Document Closure の traversal、packet closure、worker先読み、changed-path reverse readback は DIC の clause/ref だけで接続される |
 

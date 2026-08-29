@@ -15,7 +15,7 @@
 # upstream implementation ../agent_tools/import_responsibility.py validates import ownership boundaries
 # upstream implementation ../validation/notebook_quality.py validates notebooks as readable runnable demos
 # upstream implementation ../bin/agent-canon invokes the canonical Rust algorithm contract checker
-# upstream implementation ../../rust/agent-canon/src/python_algorithm_contract.rs owns the algorithm contract checker
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/python_algorithm_contract.rs owns the algorithm contract checker
 # upstream implementation ../agent_tools/check_convention_compliance.py validates convention/workflow gate wiring
 # upstream implementation ../agent_tools/tool_catalog.py validates structured tool catalog
 # upstream implementation ../agent_tools/tool_drift.py validates tool/convention trace contracts
@@ -28,8 +28,8 @@
 # upstream implementation ../agent_tools/evaluate_workflow_selection.py validates workflow selection routing cases
 # upstream implementation ../agent_tools/evaluate_report_quality.py validates report writing quality checklist cases
 # upstream implementation ./check_github_workflows.py validates GitHub workflow and PR checklist contracts
-# upstream implementation ../../bootstrap/container/Dockerfile defines the shared tool image
-# upstream implementation ../../tools/agent_tools/bootstrap_runtime.py owns lifecycle readback
+# upstream implementation ../../bootstrap/container/image/Dockerfile defines the shared tool image
+# upstream implementation ../../tools/runtime/container/bootstrap_runtime.py owns lifecycle readback
 # upstream implementation ../agent_tools/smoke_test_research_perspective_pack.py validates research role packet
 # @dependency-end
 set -euo pipefail

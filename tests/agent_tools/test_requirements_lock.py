@@ -4,7 +4,7 @@
 # contract test
 # responsibility Verifies PEP 508 logical records, hash locks, comments, markers, and strict parser errors.
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md requirements lock parser ownership and checker projection
-# upstream implementation ../../tools/agent_tools/requirements_lock.py canonical parser and result/error model
+# upstream implementation ../../tools/runtime/container/requirements_lock.py canonical parser and result/error model
 # @dependency-end
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.agent_tools.requirements_lock import (  # pyright: ignore[reportMissingTypeStubs]
+from tools.runtime.container.requirements_lock import (  # pyright: ignore[reportMissingTypeStubs]
     RequirementErrorCode,
     parse_requirements,
 )

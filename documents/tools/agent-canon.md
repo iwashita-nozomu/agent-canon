@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents the unified Rust docs formatter and checker.
-upstream implementation ../../rust/agent-canon/src/docs.rs implements docs check, format, fix-math, and fix-mermaid.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs implements docs check, format, fix-math, and fix-mermaid.
 downstream design ../../agents/skills/md-style-check.md routes Markdown style work to this tool.
 @dependency-end
 -->
@@ -14,7 +14,7 @@ tooling. This page covers the command families that share the wrapper.
 `agent-canon docs` owns Markdown documentation formatting and adjacent checks.
 `agent-canon test-design` owns resilient test-design diagnostics.
 Deterministic prompt-to-skill routing is owned by
-`python3 tools/agent_tools/route.py --prompt`.
+`python3 tools/agent/orchestration/route.py --prompt`.
 
 Use `tools/bin/agent-canon docs -h` as the option contract before opening
 implementation files. The help output lists commands, shared options, and
@@ -28,7 +28,7 @@ examples in a compact text block.
 - Read this before using `agent-canon docs` or deciding whether a legacy
   Python entrypoint should forward to the Rust wrapper.
 - Boundary: prompt-to-skill routing remains owned by
-  `python3 tools/agent_tools/route.py --prompt`.
+  `python3 tools/agent/orchestration/route.py --prompt`.
 
 ## Commands
 
@@ -39,7 +39,7 @@ tools/bin/agent-canon docs format <paths...>
 tools/bin/agent-canon docs fix-math <paths...>
 tools/bin/agent-canon docs fix-mermaid <paths...>
 tools/bin/agent-canon test-design check <test-paths...>
-python3 tools/agent_tools/route.py --prompt "<request>" --format json
+python3 tools/agent/orchestration/route.py --prompt "<request>" --format json
 ```
 
 `check` verifies Markdown lint, heading order, fenced-code language, math
@@ -85,7 +85,7 @@ a blocker.
 
 ## Compatibility Entrypoints
 
-`python3 tools/docs/audit_and_fix_links.py --check` is a compatibility spelling
+`python3 tools/validation/documentation/checks/audit_and_fix_links.py --check` is a compatibility spelling
 that forwards to the single canonical Rust route, `tools/bin/agent-canon docs
 check ...`; it does not create `reports/broken_links.txt`. Its `--apply` mode
 is source mutation and requires a typed `--mutation-capability-json` covering

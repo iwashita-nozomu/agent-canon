@@ -3,8 +3,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests runtime log archive Git clone, branch, status, and push behavior.
-# upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py manages the ignored log archive clone
-# upstream implementation ../../tools/agent_tools/runtime_log_paths.py defines repo keys and archive mount paths
+# upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py manages the ignored log archive clone
+# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py defines repo keys and archive mount paths
 # upstream design ../../documents/runtime/runtime-log-archive.md documents archive branch and push policy
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md source-bound runtime-event communication and checkpoint contract
 # @dependency-end
@@ -64,10 +64,10 @@ def _module_belongs_to_current_checkout(module_name: str) -> bool:
 for _module_name in (
     "tools",
     "tools.agent_tools",
-    "tools.agent_tools.graph_client",
-    "tools.agent_tools.github_publish",
-    "tools.agent_tools.log_repository_identity",
-    "tools.agent_tools.runtime_log_paths",
+    "tools.analysis.dependencies.graph_client",
+    "tools.repository.github.github_publish",
+    "tools.runtime.archive.log_repository_identity",
+    "tools.runtime.archive.runtime_log_paths",
     "runtime_log_archive_git",
     "runtime_log_paths",
     "log_repository_identity",
@@ -77,18 +77,18 @@ for _module_name in (
     if not _module_belongs_to_current_checkout(_module_name):
         sys.modules.pop(_module_name, None)
 
-from tools.agent_tools.graph_client import GraphClient
-from tools.agent_tools import github_publish
-from tools.agent_tools.log_repository_identity import stable_source_repository_id
-from tools.agent_tools.runtime_log_paths import (
+from tools.analysis.dependencies.graph_client import GraphClient
+from tools.repository.github import github_publish
+from tools.runtime.archive.log_repository_identity import stable_source_repository_id
+from tools.runtime.archive.runtime_log_paths import (
     mounted_log_archive_root,
     repo_log_key,
     runtime_event_publication_outcome_spool_root,
 )
 
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "runtime_log_archive_git.py"
+SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "archive" / "runtime_log_archive_git.py"
 LIFECYCLE_REVERSE_COVERAGE = {
-    "bootstrap/container/Dockerfile": {"RL-002", "RL-004", "RL-013"},
+    "bootstrap/container/image/Dockerfile": {"RL-002", "RL-004", "RL-013"},
     "agent-canon-environment.toml": {"RL-002", "RL-004"},
     "agents/skills/agent-log-analysis.md": {"RL-013"},
     "documents/design/runtime-log-repository-lifecycle-correspondence.json": {"RL-014"},
@@ -97,10 +97,10 @@ LIFECYCLE_REVERSE_COVERAGE = {
     "tests/agent_tools/test_runtime_log_archive_git.py": {"RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-011", "RL-013", "RL-014", "RL-015"},
     "tests/tools/test_bootstrap_container_contract.py": {"RL-002", "RL-004"},
     "tests/bootstrap/test_bootstrap_runtime.py": {"RL-002", "RL-004"},
-    "tools/agent_tools/runtime_log_archive_git.py": {"RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-011", "RL-013", "RL-015"},
-    "tools/agent_tools/bootstrap_runtime.py": {"RL-002", "RL-004"},
+    "tools/runtime/archive/runtime_log_archive_git.py": {"RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-011", "RL-013", "RL-015"},
+    "tools/runtime/container/bootstrap_runtime.py": {"RL-002", "RL-004"},
 }
-import runtime_log_archive_git  # noqa: E402
+import tools.runtime.archive.runtime_log_archive_git  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -2023,7 +2023,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         targets = {item["path"] for item in manifest["implementation_targets"]}
         for target in targets:
             self.assertTrue((PROJECT_ROOT / target).exists(), target)
-        self.assertNotIn("tools/agent_tools/runtime_log_paths.py", targets)
+        self.assertNotIn("tools/runtime/archive/runtime_log_paths.py", targets)
         reverse_coverage = LIFECYCLE_REVERSE_COVERAGE
         self.assertEqual(set(reverse_coverage), targets)
         clause_ids = set(manifest["clause_ids"])

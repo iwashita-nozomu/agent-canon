@@ -22,7 +22,7 @@ from typing import TypeAlias, cast
 import yaml
 
 try:
-    from .runtime_artifacts import (
+    from tools.runtime.artifacts.runtime_artifacts import (
         RUNTIME_ROOT_ENV,
         RuntimeRootRequired,
         runtime_artifact_boundary,

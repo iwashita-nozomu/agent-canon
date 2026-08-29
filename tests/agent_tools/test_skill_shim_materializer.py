@@ -4,7 +4,7 @@
 # contract test
 # responsibility Verifies catalog-derived materializer fixed-point and readback evidence.
 # upstream design ../../documents/design/skill-runtime-shim-materialization.md approved materializer contract
-# upstream implementation ../../tools/agent_tools/skill_shim_materializer.py single shim writer
+# upstream implementation ../../tools/agent/skills/skill_shim_materializer.py single shim writer
 # @dependency-end
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
 sys.path.insert(0, str(TOOLS_ROOT))
 
-from skill_shim_materializer import (  # noqa: E402
+from tools.agent.skills.skill_shim_materializer import (  # noqa: E402
     build_context,
     build_record,
     check,
@@ -98,7 +98,7 @@ class SkillShimMaterializerTest(unittest.TestCase):
         runtime_path.write_text(
             "<!-- generated: agent_canon.skill_runtime_shim.v1 -->\n"
             "## Tool Commands\n"
-            "python3 tools/agent_tools/skill_tool_commands.py show --skill agent-orchestration --format text\n",
+            "python3 tools/agent/skills/skill_tool_commands.py show --skill agent-orchestration --format text\n",
             encoding="utf-8",
         )
         try:

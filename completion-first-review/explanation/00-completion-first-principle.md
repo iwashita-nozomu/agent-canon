@@ -6,7 +6,7 @@ responsibility Explains why completion judgment rules must precede agent setting
 upstream design ../README.md completion-first review index
 upstream design ../../AGENTS.md AgentCanon repository instructions
 upstream design ../../ROOT_AGENTS.md shared runtime entrypoint
-upstream implementation ../../tools/agent_tools/task_close.py current closeout evaluator
+upstream implementation ../../tools/runtime/lifecycle/task_close.py current closeout evaluator
 @dependency-end
 -->
 

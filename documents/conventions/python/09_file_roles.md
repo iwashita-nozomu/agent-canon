@@ -55,7 +55,7 @@ responsibility Documents Python の配置と定義順 for this repository.
 
 ## 検証
 
-- この文書の定義順規約は `python3 tools/agent_tools/check_convention_compliance.py`
+- この文書の定義順規約は `python3 tools/validation/semantic/convention/check_convention_compliance.py`
   の `source_file_definition_order` marker contract で経路の網羅を確認します。
 - 個別 Python ファイルの定義順は、変更差分ごとの `python-review` と
   `check_convention_compliance.py` の根拠で確認します。

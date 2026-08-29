@@ -41,9 +41,9 @@ specialist dispatch、統合、再レビューを [`responsibility-cleanup`](../
 
 ```bash
 tree -a -J --noreport
-python3 tools/agent_tools/repo_structure_contract.py --root . --contract documents/structure/repo-structure-contract.toml
-python3 tools/agent_tools/responsibility_scope.py --root .
-python3 tools/agent_tools/skill_dependency_map.py check --root .
+python3 tools/validation/semantic/structure/repo_structure_contract.py --root . --contract documents/structure/repo-structure-contract.toml
+python3 tools/validation/semantic/responsibility/responsibility_scope.py --root .
+python3 tools/agent/skills/skill_dependency_map.py check --root .
 ```
 
 ## Boundary

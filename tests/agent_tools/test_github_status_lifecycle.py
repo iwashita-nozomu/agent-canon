@@ -9,7 +9,7 @@
 # contract test
 # responsibility Tests status lifecycle taxonomy, transport, evidence, drift, and failure boundaries.
 # upstream design ../../agents/internal-routines/github-status-lifecycle.md owns lifecycle semantics.
-# upstream implementation ../../tools/agent_tools/github_status_lifecycle.py implements the adapter.
+# upstream implementation ../../tools/repository/github/github_status_lifecycle.py implements the adapter.
 # @dependency-end
 
 from __future__ import annotations
@@ -25,8 +25,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools" / "agent_tools"))
 
-import github_publish  # noqa: E402
-import github_status_lifecycle as lifecycle  # noqa: E402
+import tools.repository.github.github_publish  # noqa: E402
+import tools.repository.github.github_status_lifecycle as lifecycle  # noqa: E402
 
 
 class FakeRunner:

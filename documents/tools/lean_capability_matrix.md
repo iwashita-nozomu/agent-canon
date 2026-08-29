@@ -3,7 +3,7 @@
 contract reference
 responsibility Summarizes Lean/Mathlib/Aesop/Plausible/LeanSearch capabilities for AgentCanon proof workflows.
 upstream design README.md lists proof-tool documentation entrypoints.
-upstream implementation ../../tools/agent_tools/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments.
+upstream implementation ../../tools/analysis/proof/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments.
 upstream design ../../agents/skills/formal-proof-workflow.md routes checker-backed proof attempts.
 upstream design ../../agents/skills/algorithm-proof-exploration.md routes algorithm-derived proof frontiers.
 upstream design ../../references/agent-canon-technology-bibliography.md records adopted Lean sources.
@@ -102,7 +102,7 @@ AgentCanon owns a reusable proof environment for Mathlib, Aesop, Plausible, and
 LeanSearchClient:
 
 ```bash
-python3 tools/agent_tools/lean_proof_env.py smoke \
+python3 tools/analysis/proof/lean_proof_env.py smoke \
   --env-dir reports/formal-proof/lean-proof-env \
   --execute
 ```
@@ -110,7 +110,7 @@ python3 tools/agent_tools/lean_proof_env.py smoke \
 Use `all-smoke` when proving environment readiness for agents:
 
 ```bash
-python3 tools/agent_tools/lean_proof_env.py all-smoke \
+python3 tools/analysis/proof/lean_proof_env.py all-smoke \
   --env-dir reports/formal-proof/lean-proof-env \
   --execute
 ```

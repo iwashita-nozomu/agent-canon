@@ -2,7 +2,7 @@
 # contract test
 # responsibility Verifies the root entrypoint owner-map grammar and regression failures.
 # upstream design ../../documents/design/entrypoint-owner-map.md structural contract
-# upstream implementation ../../tools/agent_tools/check_entrypoint_owner_map.py verifier under test
+# upstream implementation ../../tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py verifier under test
 # @dependency-end
 """Tests for the root entrypoint owner-map checker."""
 
@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.agent_tools import check_entrypoint_owner_map as checker
+from tools.validation.semantic.entrypoint import check_entrypoint_owner_map as checker
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]

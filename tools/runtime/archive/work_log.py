@@ -27,9 +27,9 @@ from pathlib import Path
 from typing import Literal
 
 if __package__:
-    from .workspace_scope import resolve_report_root, resolve_runtime_artifact_path
+    from tools.repository.workspace.workspace_scope import resolve_report_root, resolve_runtime_artifact_path
 else:
-    from workspace_scope import (  # type: ignore[no-redef]
+    from tools.repository.workspace.workspace_scope import (  # type: ignore[no-redef]
         resolve_report_root,
         resolve_runtime_artifact_path,
     )

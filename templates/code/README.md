@@ -6,7 +6,7 @@ upstream design ../../documents/rule/README.md filename, placement, and Japanese
 upstream design ../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring contract.
 upstream design ../README.md centralized template index and canonical source boundary.
 downstream implementation ./python/docstring_template.py parse-valid module/class/function example.
-downstream implementation ../../tools/agent_tools/code_template_rendering.py code-template renderer/readback route.
+downstream implementation ../../tools/agent/templates/code_template_rendering.py code-template renderer/readback route.
 @dependency-end
 -->
 

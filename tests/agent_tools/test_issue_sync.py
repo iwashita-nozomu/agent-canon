@@ -2,7 +2,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests repository-qualified GitHub Issue parsing, private packet transport, host readback, and clause routing.
-# upstream implementation ../../tools/agent_tools/issue_sync.py owns the host adapter
+# upstream implementation ../../tools/repository/github/issue_sync.py owns the host adapter
 # upstream design ../../documents/runtime/private-feedback-knowledge.md owns the private packet path
 # @dependency-end
 """Focused GitHub Issue authority tests."""
@@ -21,7 +21,7 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-import issue_sync  # noqa: E402
+import tools.repository.github.issue_sync  # noqa: E402
 
 
 def test_github_reference_requires_repository_and_number() -> None:

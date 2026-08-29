@@ -24,21 +24,21 @@ try:
     from . import parent_root_side_effects as _parent_boundary
 except ImportError:  # direct CLI execution
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import parent_root_side_effects as _parent_boundary  # type: ignore[no-redef]
+    import tools.repository.workspace.parent_root_side_effects as _parent_boundary  # type: ignore[no-redef]
 
-from repository_topic_clone import (
+from tools.repository.workspace.repository_topic_clone import (
     RepositoryTopicCloneError,
     RepositoryTopicCloneRequest,
     projected_clone_path,
     topic_slug,
 )
-from repository_topic_clone import (
+from tools.repository.workspace.repository_topic_clone import (
     cleanup as generic_cleanup,
 )
-from repository_topic_clone import (
+from tools.repository.workspace.repository_topic_clone import (
     merge_main as generic_merge_main,
 )
-from repository_topic_clone import (
+from tools.repository.workspace.repository_topic_clone import (
     request as generic_request,
 )
 

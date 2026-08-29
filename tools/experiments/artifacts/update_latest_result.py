@@ -33,7 +33,7 @@ if __package__:
         validate_segment,
     )
 else:
-    from experiment_identity import (  # type: ignore[no-redef]
+    from tools.experiments.lifecycle.experiment_identity import (  # type: ignore[no-redef]
         DuplicateJSONKeyError,
         ExperimentIdentity,
         contained_path,

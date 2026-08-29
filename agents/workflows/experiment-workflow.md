@@ -56,7 +56,7 @@ agent がこの反復を自律実行する場合、単一 run と rerun 分岐�
 `templates/experiments/_template/` の直接コピーは利用者向けの作成手順にしません。
 
 ```bash
-python3 tools/experiments/create_experiment_topic.py <topic>
+python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
 ```
 
 コピー後は次の順で編集します。
@@ -94,7 +94,7 @@ python3 tools/experiments/create_experiment_topic.py <topic>
 - `Execution Plan:`
   - formal run は `main` source checkout で進めます。隔離が必要な実験だけ短期 branch を使い、生成結果は独立した annex worktree に archive します。
 - `Server Run Surface:`
-  - main server host で formal run を回す場合、`tools/experiments/run_managed_experiment.py` を使い、`command.json`、`environment.json`、`source_snapshot.json`、`artifact_manifest.json`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` を topic README の artifact plan に固定します。
+  - main server host で formal run を回す場合、`tools/experiments/execution/run_managed_experiment.py` を使い、`command.json`、`environment.json`、`source_snapshot.json`、`artifact_manifest.json`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` を topic README の artifact plan に固定します。
 
 次に、隔離の要否を決めます。
 
@@ -251,7 +251,7 @@ topic、Hook、admission context、互換 wrapper が runner return を result �
 - `ruff check`
   - import、未使用変数、到達不能コード、雑な例外処理を早めに落とす。
 - CLI help
-  - `python3 -m tools.experiments.run_managed_experiment --help` で managed runner の CLI を確認し、topic の実行例は `--topic <topic> --variant formal -- python3 experiments/<topic>/run.py` の managed route と一致させる。
+  - `python3 -m tools.experiments.execution.run_managed_experiment --help` で managed runner の CLI を確認し、topic の実行例は `--topic <topic> --variant formal -- python3 experiments/<topic>/run.py` の managed route と一致させる。
 - import path
   - top-level import と package path が壊れていないことを確認する。
 - 出力 schema
@@ -316,7 +316,7 @@ main server host で formal run を回す場合は、次を推奨します。
 make experiment-formal TOPIC=<topic>
 ```
 
-この Make target は内側で `tools/experiments/run_managed_experiment.py` を呼びます。
+この Make target は内側で `tools/experiments/execution/run_managed_experiment.py` を呼びます。
 wrapper は `experiments/registry.toml` の `formal_inner_command` を見て `result/<run-id>/`、`config.json`、`config_source.yaml`、`command.json`、`environment.json`、`source_snapshot.json`、`run_manifest.json`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log`、`experiments/<topic>/report/<run-id>.md` の初期 stub をそろえます。
 run 終了時に `eval_manifest.json` と `artifact_manifest.json` も更新されます。
 
@@ -325,7 +325,7 @@ source checkout は `main` のまま保ち、保存対象は `result/<run-id>/` 
 `experiments/<topic>/report/<run-id>.md` に限定します。
 
 ```bash
-python3 -m tools.experiments.save_experiment_result_annex \
+python3 -m tools.experiments.artifacts.save_experiment_result_annex \
   --result-dir experiments/<topic>/result/<run-id> \
   --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
 ```
@@ -404,7 +404,7 @@ carry-over のルールは次です。
 - 実行ごとの追加ログは `experiments/<topic>/result/<run-id>/logs/` に残す
 - 可視化 visualization.py renderer は `experiments/<topic>/visualization.py` に残し、run artifact を読む形にする
 - 1 回の実験 report は `experiments/<topic>/report/<run-id>.md` に残す
-- formal run の生成物は `tools/experiments/save_experiment_result_annex.py` で専用 annex worktree に archive する
+- formal run の生成物は `tools/experiments/artifacts/save_experiment_result_annex.py` で専用 annex worktree に archive する
 - 複数 run をまたぐ知見だけを `documents/notes/` へ持ち上げる
 - partial run は診断用とし、正式な report の正本にしない
 
@@ -553,4 +553,4 @@ repo と対応する worktree logs から抽出した再発防止事項を、実
 
 ## Convention Compliance Gate
 
-Before closeout or handoff, run `python3 tools/agent_tools/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.
+Before closeout or handoff, run `python3 tools/validation/semantic/convention/check_convention_compliance.py` and fix any `CONVENTION_COMPLIANCE=fail` finding. This keeps workflow prohibitions, convention tool gates, and skill-routing hooks mechanically checked instead of relying on prompt memory.

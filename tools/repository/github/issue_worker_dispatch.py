@@ -20,35 +20,12 @@ from pathlib import Path
 from typing import Any
 
 if __package__:
-    from .checkout_identity import (
+    from tools.runtime.authority.checkout_identity import (
         CheckoutIdentity,
         resolve_checkout_identity,
         resolve_checkout_identity as resolve_agentcanon_checkout_identity,
     )
     from .issue_sync import (
-        IssueWorkerHandoff,
-        normalize_repository,
-        qualify_issue_worker_finding,
-    )
-    from .model_profile_registry import (
-        ContextItem,
-        MaterializedPromptCapsule,
-        PromptMaterializationRequest,
-        load_model_profile_registry,
-        materialize_prompt_capsule,
-    )
-    from .tool_calls import (
-        build_issue_receipt_stage_command,
-        materialize_issue_worker_tool_call,
-        materialize_subagent_spawn_tool_call,
-    )
-else:
-    from checkout_identity import (  # type: ignore[no-redef]
-        CheckoutIdentity,
-        resolve_checkout_identity,
-        resolve_checkout_identity as resolve_agentcanon_checkout_identity,
-    )
-    from issue_sync import (  # type: ignore[no-redef]
         IssueWorkerHandoff,
         normalize_repository,
         qualify_issue_worker_finding,
@@ -60,7 +37,30 @@ else:
         load_model_profile_registry,
         materialize_prompt_capsule,
     )
-    from tool_calls import (  # type: ignore[no-redef]
+    from tools.agent.orchestration.tool_calls import (
+        build_issue_receipt_stage_command,
+        materialize_issue_worker_tool_call,
+        materialize_subagent_spawn_tool_call,
+    )
+else:
+    from tools.runtime.authority.checkout_identity import (  # type: ignore[no-redef]
+        CheckoutIdentity,
+        resolve_checkout_identity,
+        resolve_checkout_identity as resolve_agentcanon_checkout_identity,
+    )
+    from tools.repository.github.issue_sync import (  # type: ignore[no-redef]
+        IssueWorkerHandoff,
+        normalize_repository,
+        qualify_issue_worker_finding,
+    )
+    from tools.agent.orchestration.model_profile_registry import (
+        ContextItem,
+        MaterializedPromptCapsule,
+        PromptMaterializationRequest,
+        load_model_profile_registry,
+        materialize_prompt_capsule,
+    )
+    from tools.agent.orchestration.tool_calls import (  # type: ignore[no-redef]
         build_issue_receipt_stage_command,
         materialize_issue_worker_tool_call,
         materialize_subagent_spawn_tool_call,

@@ -3,7 +3,7 @@
 contract reference
 responsibility Documents the explicit source-to-consumer root instruction composition route.
 upstream design ../design/entrypoint-owner-map.md consumer root composition contract
-upstream implementation ../../tools/agent_tools/entrypoint_composer.py deterministic composer
+upstream implementation ../../tools/agent/templates/entrypoint_composer.py deterministic composer
 downstream design ../../ROOT_AGENTS.md common consumer base
 @dependency-end
 -->

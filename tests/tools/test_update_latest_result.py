@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests flat-result variant-scoped latest pointer update behavior.
-# upstream implementation ../../tools/experiments/update_latest_result.py helper under test
+# upstream implementation ../../tools/experiments/artifacts/update_latest_result.py helper under test
 # @dependency-end
 
 """Tests for flat-result variant-scoped latest pointers."""
@@ -13,9 +13,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
-import tools.experiments.update_latest_result as latest_module
-from tools.experiments.experiment_identity import ExperimentIdentity
-from tools.experiments.update_latest_result import (
+import tools.experiments.artifacts.update_latest_result as latest_module
+from tools.experiments.lifecycle.experiment_identity import ExperimentIdentity
+from tools.experiments.artifacts.update_latest_result import (
     latest_result_dir,
     update_latest_result,
 )

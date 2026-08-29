@@ -14,7 +14,7 @@ import argparse
 import json
 from pathlib import Path
 
-from skill_dependency_map import CHECK_SCHEMA, check_artifacts
+from tools.agent.skills.skill_dependency_map import CHECK_SCHEMA, check_artifacts
 
 
 def main(argv: list[str] | None = None) -> int:

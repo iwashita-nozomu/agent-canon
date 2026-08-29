@@ -38,9 +38,9 @@ analyzer の candidate 扱い、validation/rollback は [`responsibility-cleanup
 ## Tool Commands
 
 ```bash
-python3 tools/agent_tools/check_dependency_headers.py --changed
-bash tools/agent_tools/scan_code_dependencies.sh --changed
-bash tools/agent_tools/run_repo_dependency_review.sh
+python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed
+bash tools/analysis/dependencies/scan_code_dependencies.sh --changed
+bash tools/analysis/dependencies/run_repo_dependency_review.sh
 ```
 
 ## Boundary

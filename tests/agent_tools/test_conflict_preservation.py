@@ -2,7 +2,7 @@
 # @dependency-start
 # contract test
 # responsibility Exercises the focused conflict/rework content-preservation checker.
-# upstream implementation ../../tools/agent_tools/conflict_preservation.py owns inventory and readback.
+# upstream implementation ../../tools/repository/git/conflict_preservation.py owns inventory and readback.
 # downstream design ../../agents/skills/pr-processing.md defines conflict/rework preservation obligations.
 # @dependency-end
 
@@ -14,13 +14,13 @@ from pathlib import Path
 
 import pytest
 
-from tools.agent_tools.conflict_preservation import (
+from tools.repository.git.conflict_preservation import (
     ConflictPreservationError,
     capture_inventory,
     validate_plan,
     validate_rework_packet,
 )
-from tools.agent_tools.hook_safety import preservation_authorized, preservation_intent
+from tools.runtime.authority.hook_safety import preservation_authorized, preservation_intent
 
 
 def git(repo: Path, *args: str, check: bool = True) -> str:

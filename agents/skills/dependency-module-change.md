@@ -8,8 +8,8 @@ upstream design ../canonical/skills.md shared skill canon registry
 upstream design ../../documents/rule/dependency-module-changes.md detailed dependency module policy
 upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md canonical topic workspace and VS Code workspace boundary
 upstream design ../../documents/design/request-intent-and-update-relation.md immediate dependency-clone cleanup projection
-downstream implementation ../../tools/agent_tools/dependency_module_change.py lifecycle tool
-downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates skill registration
+downstream implementation ../../tools/repository/workspace/dependency_module_change.py lifecycle tool
+downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates skill registration
 @dependency-end
 -->
 
@@ -49,7 +49,7 @@ generic lifecycle または operation-level approval carve-out には含めま�
 などは従来どおり protected Git route として明示 authority を必要とします。
 
 ```bash
-python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare \
+python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> prepare \
   --topic <topic> --module <path> --branch <branch> \
   --owner-evidence <file> [--allowed-path <relative-path> ...]
 ```
@@ -60,7 +60,7 @@ python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepa
 同じ call に渡します。dry-run も同じ選択された proof を検証し、pass 後だけ `--apply` します。
 
 ```bash
-python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup \
+python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> cleanup \
   --topic <topic> --module <path> --branch <branch> \
   --owner-evidence <file> [--allowed-path <relative-path> ...] \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \

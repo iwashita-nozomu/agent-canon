@@ -5,7 +5,7 @@
 # responsibility Tests O(1) hook spooling, no-replace identity, and dispatcher-clean failures.
 # upstream design ../../documents/runtime/runtime-log-archive.md bounded hook-event spool and explicit checkpoint policy
 # upstream implementation ../../.codex/hooks/hook_event_log.py publishes per-event spool files
-# upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py checks hot-path reachability
+# upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py checks hot-path reachability
 # @dependency-end
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ sys.path.insert(0, str(TOOLS_DIR))
 
 import hook_dispatcher  # noqa: E402
 import hook_event_log  # noqa: E402
-import runtime_log_archive_git  # noqa: E402
+import tools.runtime.archive.runtime_log_archive_git  # noqa: E402
 
 
 def hook_entry(hook_run_id: str, *, status: str = "pass") -> dict[str, object]:
@@ -68,7 +68,7 @@ class HookEventLogHotPathTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             hook_path = root / ".codex" / "hooks" / "hook_event_log.py"
-            runtime_paths = root / "tools" / "agent_tools" / "runtime_log_paths.py"
+            runtime_paths = root / "tools" / "runtime" / "archive" / "runtime_log_paths.py"
             hook_path.parent.mkdir(parents=True)
             runtime_paths.parent.mkdir(parents=True)
             runtime_paths.write_text(

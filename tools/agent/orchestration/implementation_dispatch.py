@@ -26,7 +26,7 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
 
 if __package__:
     from . import capacity_handshake, implementation_route, model_profile_registry
-    from .writer_target import (
+    from tools.runtime.authority.writer_target import (
         WriterTarget,
         WriterTargetError,
         parse_writer_target,
@@ -34,12 +34,12 @@ if __package__:
         validate_wave_writer_targets,
         validate_writer_target_identity,
     )
-    from .checkout_identity import resolve_checkout_identity
+    from tools.runtime.authority.checkout_identity import resolve_checkout_identity
 else:
-    import capacity_handshake
-    import implementation_route
-    import model_profile_registry
-    from writer_target import (  # type: ignore[no-redef]
+    import tools.agent.orchestration.capacity_handshake
+    import tools.agent.orchestration.implementation_route
+    import tools.agent.orchestration.model_profile_registry
+    from tools.runtime.authority.writer_target import (  # type: ignore[no-redef]
         WriterTarget,
         WriterTargetError,
         parse_writer_target,
@@ -47,7 +47,7 @@ else:
         validate_wave_writer_targets,
         validate_writer_target_identity,
     )
-    from checkout_identity import resolve_checkout_identity  # type: ignore[no-redef]
+    from tools.runtime.authority.checkout_identity import resolve_checkout_identity  # type: ignore[no-redef]
 
 
 if __package__:
@@ -66,7 +66,7 @@ if __package__:
         catalog_stage_waves,
     )
 else:
-    from team_config import (
+    from tools.agent.orchestration.team_config import (
         ROOT,
         AgentTypeSelection,
         Role,
@@ -84,7 +84,7 @@ else:
 if __package__:
     from .team_config import CODEX_AGENT_ROOT
 else:
-    from team_config import CODEX_AGENT_ROOT
+    from tools.agent.orchestration.team_config import CODEX_AGENT_ROOT
 
 DEFAULT_QUALITY_CHECK_ROLE_IDS = (
     "docs_workflow_steward",
@@ -363,7 +363,7 @@ def capacity_runtime_for_spec(spec: RunBundleSpec) -> _CapacityRuntime:
     if __package__:
         from .packets import math_intent_route_id_for_spec
     else:
-        from packets import math_intent_route_id_for_spec  # type: ignore[no-redef]
+        from tools.agent.orchestration.packets import math_intent_route_id_for_spec  # type: ignore[no-redef]
     derivation = declared_team_capacity_derivation(
         spec.task_catalog,
         include_math_intent=math_intent_route_id_for_spec(spec) is not None,
@@ -599,7 +599,7 @@ def dispatch_fixed_implementation(
             normalize_mathematical_intent_packet,
         )
     else:
-        from packets import (  # type: ignore[no-redef]
+        from tools.agent.orchestration.packets import (  # type: ignore[no-redef]
             mathematical_intent_packet_mapping,
             math_intent_route_id_from_context,
             normalize_mathematical_intent_packet,
@@ -1184,7 +1184,7 @@ def _materialize_stage_wave_slots(
             validate_mathematical_intent_route,
         )
     else:
-        from packets import (  # type: ignore[no-redef]
+        from tools.agent.orchestration.packets import (  # type: ignore[no-redef]
             validate_mathematical_intent_route,
         )
     validate_mathematical_intent_route(math_intent_route_id)
@@ -1466,7 +1466,7 @@ def dispatch_subagent_wave(
             validate_mathematical_intent_route,
         )
     else:
-        from packets import (  # type: ignore[no-redef]
+        from tools.agent.orchestration.packets import (  # type: ignore[no-redef]
             MATHEMATICAL_INTENT_ROUTE_ID,
             mathematical_intent_packet_mapping,
             normalize_mathematical_intent_packet,

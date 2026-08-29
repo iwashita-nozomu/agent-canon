@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Verifies semantic branch, PR, and worktree classification plus fail-closed cleanup admission.
-# upstream implementation ../../tools/agent_tools/orphan_lifecycle.py inventories and classifies orphan candidates.
+# upstream implementation ../../tools/repository/git/orphan_lifecycle.py inventories and classifies orphan candidates.
 # upstream design ../../documents/operations/orphan-lifecycle.md defines lifecycle states and cleanup admission.
 # @dependency-end
 
@@ -19,7 +19,7 @@ from pathlib import Path
 from types import ModuleType
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "orphan_lifecycle.py"
+TOOL_PATH = PROJECT_ROOT / "tools" / "repository" / "git" / "orphan_lifecycle.py"
 
 
 def load_tool() -> ModuleType:

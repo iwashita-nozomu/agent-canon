@@ -5,7 +5,7 @@ contract agent-runtime
 responsibility Documents static-check selection and read-only full-confidence execution for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/runtime/bootstrap-runtime.md shared runtime and target registration boundary
-upstream implementation ../../tools/ci/run_standalone_static_gate_unit.sh read-only target admission and full-check dispatch
+upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh read-only target admission and full-check dispatch
 @dependency-end
 -->
 
@@ -25,10 +25,10 @@ upstream implementation ../../tools/ci/run_standalone_static_gate_unit.sh read-o
 
 - `agents/internal-routines/static-validation.md`
 - `documents/tools/README.md`
-- `tools/ci/run_standalone_static_gate_unit.sh`
-- `tools/ci/run_all_checks.sh`
+- `tools/validation/ci/runners/run_standalone_static_gate_unit.sh`
+- `tools/validation/ci/runners/run_all_checks.sh`
 - `tools/bin/agent-canon docs check`
-- `tools/ci/check_docker_build.sh`
+- `tools/validation/ci/checks/check_docker_build.sh`
 
 ## Expected Outcome
 
@@ -41,7 +41,7 @@ upstream implementation ../../tools/ci/run_standalone_static_gate_unit.sh read-o
 
 - agent runtime、skill、mirror を触ったら `make agent-checks` を先に実行します。
 - code / docs 変更では、まず `make ci-quick` を基礎 gate にします。
-- Python / C++ 実装変更では `python3 tools/agent_tools/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports` を追加します。
+- Python / C++ 実装変更では `python3 tools/validation/semantic/code/check_hardcoded_numbers.py --changed --exclude tests --exclude vendor --exclude reports` を追加します。
 - Markdown 中心の変更では `tools/bin/agent-canon docs check` を追加します。
 - Docker / runtime / dependency 変更では `make docker-build-check` を追加します。
 - 失敗が出た場合は、追加コマンドを増やす前に、どの gate が不足しているかを明示します。
@@ -64,7 +64,7 @@ upstream implementation ../../tools/ci/run_standalone_static_gate_unit.sh read-o
 
 ## Read-only Full Confidence
 
-`tools/ci/run_all_checks.sh` は full-confidence body であり、caller checkout 上から直接起動しません。既存 bootstrap runtime に source checkout を read-only targetとして登録し、image-owned unit runnerの `full` unitから起動します。
+`tools/validation/ci/runners/run_all_checks.sh` は full-confidence body であり、caller checkout 上から直接起動しません。既存 bootstrap runtime に source checkout を read-only targetとして登録し、image-owned unit runnerの `full` unitから起動します。
 
 ```bash
 SOURCE_ROOT="$(git rev-parse --show-toplevel)"
@@ -82,7 +82,7 @@ COMMON=(
   --mode read-only
 ./bootstrap.sh "${COMMON[@]}" exec \
   --root "${SOURCE_ROOT}" \
-  -- bash /usr/local/share/agent-canon/runtime/tools/ci/run_standalone_static_gate_unit.sh \
+  -- bash /usr/local/share/agent-canon/runtime/tools/validation/ci/runners/run_standalone_static_gate_unit.sh \
   full --quick
 ```
 

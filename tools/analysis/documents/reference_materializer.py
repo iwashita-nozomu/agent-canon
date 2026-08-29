@@ -30,7 +30,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 try:
-    from .parent_root_side_effects import (
+    from tools.repository.workspace.parent_root_side_effects import (
         ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
@@ -341,7 +341,7 @@ def path_relative_to(start: Path, target: Path) -> str:
 def render_markdown(root: Path, path: Path, reference: ExtractedReference) -> str:
     """Render one extracted reference as Markdown."""
     readme = path_relative_to(path.parent, root / "references" / "README.md")
-    tool = path_relative_to(path.parent, root / "tools" / "agent_tools" / "reference_materializer.py")
+    tool = path_relative_to(path.parent, root / "tools" / "analysis" / "documents" / "reference_materializer.py")
     text = reference.text[:MAX_SNIPPET_LENGTH].strip()
     if len(reference.text) > MAX_SNIPPET_LENGTH:
         text += "\n\n[Extraction truncated by reference_materializer.py.]"

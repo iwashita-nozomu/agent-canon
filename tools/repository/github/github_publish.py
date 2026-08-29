@@ -27,7 +27,7 @@ from typing import cast
 from urllib.parse import urlparse
 
 try:
-    from .parent_root_side_effects import (
+    from tools.repository.workspace.parent_root_side_effects import (
         ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,

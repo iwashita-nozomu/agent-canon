@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Traces scoped StableHLO value dependencies from JIT-canonical operational IR.
 # upstream implementation jit_canonical_ir.py emits operational_ir functions, regions, and ops.
-# upstream implementation ../../rust/agent-canon/src/jit_ir_to_lean.rs emits the matching Lean operational op fields.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/jit_ir_to_lean.rs emits the matching Lean operational op fields.
 # downstream implementation theorem_graph_circularity_check.py consumes closure frontiers when theorem graph leaves are audited.
 # @dependency-end
 

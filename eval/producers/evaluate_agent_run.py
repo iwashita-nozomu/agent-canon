@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import cast
 
 if __package__:
-    from .workspace_scope import resolve_report_root
+    from tools.repository.workspace.workspace_scope import resolve_report_root
 else:
     from tools.repository.workspace.workspace_scope import resolve_report_root
 from eval.checkers.eval_manifest_paths import eval_manifest_path, resolve_eval_manifest

@@ -5,7 +5,7 @@
 # upstream design ../runtime/SHARED_RUNTIME_SURFACES.md standalone runtime surface policy
 # upstream design ../runtime/shared-runtime-surfaces.toml machine-readable runtime inventory
 # upstream design ../../responsibility-scope.toml canonical path owner and class relation
-# downstream implementation ../../tools/agent_tools/repo_structure_contract.py compares observed trees against this contract
+# downstream implementation ../../tools/validation/semantic/structure/repo_structure_contract.py compares observed trees against this contract
 # downstream implementation ../../tests/agent_tools/test_repo_structure_contract.py tests structure contract validation
 # @dependency-end
 
@@ -48,7 +48,7 @@ detect_all = [
   "agents/TASK_WORKFLOWS.md",
   "documents/runtime/shared-runtime-surfaces.toml",
   "tools/catalog.yaml",
-  "rust/agent-canon/Cargo.toml",
+  "tools/runtime/dispatch/agent-canon/Cargo.toml",
 ]
 [[profile.required]]
 path = "README.md"
@@ -139,7 +139,7 @@ path = "tools/agent_tools"
 kind = "dir"
 
 [[profile.required]]
-path = "tools/agent_tools/update_lifecycle_contract.py"
+path = "tools/runtime/lifecycle/update_lifecycle_contract.py"
 kind = "file"
 
 [[profile.required]]
@@ -159,7 +159,7 @@ path = "rust/agent-canon"
 kind = "dir"
 
 [[profile.required]]
-path = "rust/agent-canon/Cargo.toml"
+path = "tools/runtime/dispatch/agent-canon/Cargo.toml"
 kind = "file"
 
 [[profile.required]]

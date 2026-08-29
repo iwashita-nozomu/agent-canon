@@ -4083,7 +4083,7 @@ def append_workflow_monitor_timing(
 ) -> None:
     """Append OOP checker timing to workflow monitoring when a run bundle is active."""
     report_dir = os.environ.get(WORKFLOW_MONITOR_REPORT_DIR_ENV, "").strip()
-    monitor = root / "tools" / "agent_tools" / "workflow_monitor.py"
+    monitor = root / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
     if not report_dir or not monitor.is_file():
         return
     duration_ms = int((time.perf_counter() - started_at) * MILLISECONDS_PER_SECOND)

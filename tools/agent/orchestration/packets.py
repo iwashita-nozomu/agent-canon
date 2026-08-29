@@ -19,7 +19,7 @@ from pathlib import Path, PurePosixPath
 from typing import Literal, cast
 
 if __package__:
-    from .artifact_identity import canonical_json_bytes
+    from tools.runtime.artifacts.artifact_identity import canonical_json_bytes
 else:
     from tools.runtime.artifacts.artifact_identity import canonical_json_bytes
 
@@ -35,7 +35,7 @@ if __package__:
         _as_string_tuple,
     )
 else:
-    from team_config import (
+    from tools.agent.orchestration.team_config import (
         Role,
         RunBundleSpec,
         TaskCatalog,
@@ -46,12 +46,12 @@ else:
     )
 
 if __package__:
-    from .workspace_scope import (
+    from tools.repository.workspace.workspace_scope import (
         resolve_report_bundle_artifact_path,
         resolve_workspace_document_path,
     )
 else:
-    from workspace_scope import (
+    from tools.repository.workspace.workspace_scope import (
         resolve_report_bundle_artifact_path,
         resolve_workspace_document_path,
     )

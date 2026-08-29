@@ -30,14 +30,14 @@ from pathlib import Path
 from typing import cast
 
 try:
-    from .runtime_artifacts import RuntimeArtifactBoundary  # type: ignore[no-redef]
+    from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary  # type: ignore[no-redef]
 except ImportError:
     from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary  # type: ignore[no-redef]
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from runtime_log_paths import (  # noqa: E402
+from tools.runtime.archive.runtime_log_paths import (  # noqa: E402
     agent_canon_root,
     codex_runtime_index_path,
     codex_runtime_summary_path,

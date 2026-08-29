@@ -104,7 +104,7 @@ if __package__:
         validate_segment,
     )
 else:
-    from execution_resource_plan import (  # type: ignore[no-redef]
+    from tools.experiments.execution.execution_resource_plan import (  # type: ignore[no-redef]
         CALLER_ALLOCATION_PROVENANCE,
         COMPLETION_COVERAGE_FILENAME,
         HOST_RUNTIME_ROOT,
@@ -147,7 +147,7 @@ else:
         read_shared_runtime_provision,
         read_shared_runtime_readback,
     )
-    from experiment_identity import (  # type: ignore[no-redef]
+    from tools.experiments.lifecycle.experiment_identity import (  # type: ignore[no-redef]
         ExperimentIdentity,
         ExperimentIdentityError,
         contained_path,

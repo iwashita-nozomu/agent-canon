@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests AgentCanon runtime dashboard generation.
-# upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py generates dashboard reports
+# upstream implementation ../../eval/producers/generate_agent_runtime_dashboard.py generates dashboard reports
 # upstream design ../../documents/runtime/runtime-log-archive.md documents result families shown by dashboard
 # @dependency-end
 
@@ -21,9 +21,9 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "generate_agent_runtime_dashboard.py"
+SCRIPT = PROJECT_ROOT / "eval" / "producers" / "generate_agent_runtime_dashboard.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from generate_agent_runtime_dashboard import (  # noqa: E402
+from eval.producers.generate_agent_runtime_dashboard import (  # noqa: E402
     AgentRuntimeDashboard,
     HookWorkflowBreakdownReader,
     TokenUsageBreakdownReader,
@@ -36,7 +36,7 @@ from generate_agent_runtime_dashboard import (  # noqa: E402
     token_usage_next_action,
     tool_source_path_candidates,
 )
-from runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E402
+from tools.runtime.archive.runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E402
 
 DASHBOARD_PROMPT_CHAR_COUNT = 27
 
@@ -486,7 +486,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         self.assertIn("# Agent Runtime Compact Summary", compact_dashboard)
         self.assertIn("## Evidence Drilldown", compact_dashboard)
         self.assertNotIn(
-            "python3 tools/agent_tools/generate_agent_runtime_dashboard.py",
+            "python3 eval/producers/generate_agent_runtime_dashboard.py",
             compact_dashboard,
         )
 

@@ -4,7 +4,7 @@
 # responsibility Tracks AgentCanon update TODOs that parent-repo agents must apply.
 # upstream design ../../documents/agent-canon/agent-canon-parent-repo-latest-checklist.md parent repo latest-state workflow
 # upstream design ../../documents/agent-canon/agent-canon-update-tasks.toml shared update TODO manifest
-# downstream implementation ../../tools/agent_tools/agent_canon_preflight.py routes task-start agents through pending TODOs
+# downstream implementation ../../tools/runtime/source/agent_canon_preflight.py routes task-start agents through pending TODOs
 # downstream implementation ../../tests/agent_tools/test_agent_canon_update_todos.py tests update TODO state transitions
 # @dependency-end
 """Manage parent-repository TODOs introduced by AgentCanon updates."""
@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import cast
 
 try:
-    from .parent_root_side_effects import (  # type: ignore[no-redef]
+    from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]
         ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,

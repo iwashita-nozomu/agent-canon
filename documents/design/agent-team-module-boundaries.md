@@ -6,22 +6,22 @@ upstream design README.md design index and evidence-ledger policy
 upstream design dependency-manifest-design.md dependency graph and claim-evidence contract
 upstream design ../../agents/COMMUNICATION_PROTOCOL.md active-design packet and caller readback contract
 upstream design ../../agents/canonical/CODEX_WORKFLOW.md workflow and repository-changing gate
-downstream implementation ../../tools/agent_tools/agent_team.py facade and public-surface source
-downstream implementation ../../tools/agent_tools/team_config.py owner source identity
-downstream implementation ../../tools/agent_tools/packets.py owner source identity
-downstream implementation ../../tools/agent_tools/tool_calls.py owner source identity
-downstream implementation ../../tools/agent_tools/implementation_dispatch.py owner source identity
-downstream implementation ../../tools/agent_tools/manifest_rendering.py owner source identity
-downstream implementation ../../tools/agent_tools/workspace_scope.py owner source identity
-upstream implementation ../../tools/agent_tools/helper_function_inventory.py function/class inventory producer
-upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh static import-edge producer
-downstream implementation ../../tools/agent_tools/bootstrap_agent_run.py run-bundle caller
-downstream implementation ../../tools/agent_tools/bootstrap_agent_run.py task-start caller
-downstream implementation ../../tools/agent_tools/task_close.py close-agent caller
-downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py runtime alignment caller
-downstream implementation ../../tools/agent_tools/validate_role_write_scope.py write-scope caller
-downstream implementation ../../tools/agent_tools/workflow_monitor.py lifecycle event caller
-downstream implementation ../../tools/agent_tools/check_design_doc_claims.py changed design claim checker
+downstream implementation ../../tools/agent/orchestration/agent_team.py facade and public-surface source
+downstream implementation ../../tools/agent/orchestration/team_config.py owner source identity
+downstream implementation ../../tools/agent/orchestration/packets.py owner source identity
+downstream implementation ../../tools/agent/orchestration/tool_calls.py owner source identity
+downstream implementation ../../tools/agent/orchestration/implementation_dispatch.py owner source identity
+downstream implementation ../../tools/runtime/manifest/manifest_rendering.py owner source identity
+downstream implementation ../../tools/repository/workspace/workspace_scope.py owner source identity
+upstream implementation ../../tools/analysis/code/helper_function_inventory.py function/class inventory producer
+upstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh static import-edge producer
+downstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py run-bundle caller
+downstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py task-start caller
+downstream implementation ../../tools/runtime/lifecycle/task_close.py close-agent caller
+downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py runtime alignment caller
+downstream implementation ../../tools/validation/semantic/authority/validate_role_write_scope.py write-scope caller
+downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py lifecycle event caller
+downstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py changed design claim checker
 downstream design README.md AgentCanon design reader index
 @dependency-end
 -->
@@ -30,14 +30,14 @@ downstream design README.md AgentCanon design reader index
 
 ## Reader Map
 
-この文書は、Python runtime の責務分割を実装者と reviewer が同じ caller/API `tools/agent_tools/agent_team.py`
+この文書は、Python runtime の責務分割を実装者と reviewer が同じ caller/API `tools/agent/orchestration/agent_team.py`
 evidence から再現するための design contract です。最初に tree と exact
-inventory を読み、次に current/target map と DAG を `tools/agent_tools/agent_team.py` から読みます。その後に import
+inventory を読み、次に current/target map と DAG を `tools/agent/orchestration/agent_team.py` から読みます。その後に import
 mode と side effect、migration wave、validation oracle、rollback を読みます。
 この文書が決めるのは module boundary と公開 API 契約 `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a` と target owner set（`team_config.py`、`packets.py`、`tool_calls.py`、`implementation_dispatch.py`、`manifest_rendering.py`、`workspace_scope.py`、`agent_team.py` facade）であり、実装コードの移動そのもの
 ではありません。
 
-最初の図は、現在の一枚岩から target owner `tools/agent_tools/agent_team.py` への責務移動 `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a` と、最後に残る facade の
+最初の図は、現在の一枚岩から target owner `tools/agent/orchestration/agent_team.py` への責務移動 `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a` と、最後に残る facade の
 問い「どの依存がどの owner を通るか」を答えます。図は caller の全列挙や実行順を
 表すものではありません。
 
@@ -68,48 +68,48 @@ flowchart LR
 | audience | AgentTeam 実装者、runtime caller の owner、Python reviewer |
 | decision context | 一つの `agent_team.py` を六つの replaceable owner と facade に分ける |
 | first artifact | 上記の Mermaid dependency DAG |
-| source-to-structure map | current source `tools/agent_tools/agent_team.py` と caller inventory は 2–4 節、target map は 5 節、検証は 9 節 |
-| document unit | Python runtime の module boundary `tools/agent_tools/agent_team.py`、public import surface、side effect、validation route `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a` |
+| source-to-structure map | current source `tools/agent/orchestration/agent_team.py` と caller inventory は 2–4 節、target map は 5 節、検証は 9 節 |
+| document unit | Python runtime の module boundary `tools/agent/orchestration/agent_team.py`、public import surface、side effect、validation route `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a` |
 | document split decision | `split:semantic-index-module-boundaries.md`。Rust CLI/cache は別 owner、別 compiler、別 behavior oracle |
 | invalid split boundaries | line count、token budget、chunking convenience、近い path、同じ test oracle |
 | validation gate | fresh graph、`agent-canon docs check`、changed design claim checker、既存 Python static/behavior checks |
 
-行数や token 数で module を割りません。各 owner `tools/agent_tools/team_config.py` は独立した責務、依存方向 `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`、
-validation route、rollback 単位を持つ replaceable responsibility unit `tools/agent_tools/agent_team.py` とします `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`。
+行数や token 数で module を割りません。各 owner `tools/agent/orchestration/team_config.py` は独立した責務、依存方向 `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`、
+validation route、rollback 単位を持つ replaceable responsibility unit `tools/agent/orchestration/agent_team.py` とします `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`。
 
 ## 2. Evidence And Assumption Ledger
 
-- Evidence sources は `tools/agent_tools/agent_team.py`、
-  `tools/agent_tools/helper_function_inventory.py`、
-  `tools/agent_tools/scan_code_dependencies.sh` です。inventory
+- Evidence sources は `tools/agent/orchestration/agent_team.py`、
+  `tools/analysis/code/helper_function_inventory.py`、
+  `tools/analysis/dependencies/scan_code_dependencies.sh` です。inventory
   の対象 source は AgentCanon origin/main source snapshot
   `ebba9ea058ec61abad6cdaf96f22badf2784c8b3` です。
 - Approved target-state contract は
   `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`
   です。この token を持つ claim は reviewer が確定した未実装 target であり、current
   behavior の evidence とは分類しません。
-- caller evidence は `tools/agent_tools/bootstrap_agent_run.py`、
-  `tools/agent_tools/bootstrap_agent_run.py`、
-  `tools/agent_tools/task_close.py`、
-  `tools/agent_tools/check_agent_runtime_alignment.py`、
-  `tools/agent_tools/doc_start.py`、
-  `tools/agent_tools/evaluate_agent_run.py`、
-  `tools/agent_tools/evaluate_codex_agent_roles.py`、
-  `tools/agent_tools/skill_shim_materializer.py`、
-  `tools/agent_tools/smoke_test_research_perspective_pack.py`、
-  `tools/agent_tools/validate_role_write_scope.py`、
-  `tools/agent_tools/waterfall_gate_check.py`、
-  `tools/agent_tools/work_log.py`、
-  `tools/agent_tools/workflow_monitor.py` から収集します。
+- caller evidence は `tools/runtime/lifecycle/bootstrap_agent_run.py`、
+  `tools/runtime/lifecycle/bootstrap_agent_run.py`、
+  `tools/runtime/lifecycle/task_close.py`、
+  `tools/validation/semantic/runtime/check_agent_runtime_alignment.py`、
+  `tools/analysis/documents/doc_start.py`、
+  `eval/producers/evaluate_agent_run.py`、
+  `eval/producers/evaluate_codex_agent_roles.py`、
+  `tools/agent/skills/skill_shim_materializer.py`、
+  `eval/checkers/smoke_test_research_perspective_pack.py`、
+  `tools/validation/semantic/authority/validate_role_write_scope.py`、
+  `tools/validation/semantic/lifecycle/waterfall_gate_check.py`、
+  `tools/runtime/archive/work_log.py`、
+  `tools/runtime/lifecycle/workflow_monitor.py` から収集します。
 - 静的 import graph は `agent_team.py` の package 分岐で
   `capacity_handshake`、`implementation_route`、`model_profile_registry`、
   `agent_canon_source_root`、`artifact_identity` を読み、route、skill packet、
-  task authority、lifecycle contract を `tools/agent_tools/agent_team.py` が接続することを示します。これは実装済みの
+  task authority、lifecycle contract を `tools/agent/orchestration/agent_team.py` が接続することを示します。これは実装済みの
   behavior であり、target module の ownership ではありません。
-- Assumptions は `tools/agent_tools/agent_team.py` の既存 caller observable API、生成 artifact、template text、
+- Assumptions は `tools/agent/orchestration/agent_team.py` の既存 caller observable API、生成 artifact、template text、
   YAML/JSON field、例外型、stdout/stderr、exit status を移行中に維持することです。
   実装者は未列挙の public symbol を facade に追加しません。
-- Assumption contract は `normalization` を `tools/agent_tools/agent_team.py` の packet/path 入力 identity と出力 shape を
+- Assumption contract は `normalization` を `tools/agent/orchestration/agent_team.py` の packet/path 入力 identity と出力 shape を
   変えない behavior-preserving 変換として登録し、owner 移動で意味を変更しません。
 - `agent_team.py` に現れる `capacity_handshake`、`implementation_route` などの
   module object と `_closeout_projection` のような private helper は caller test が
@@ -120,7 +120,7 @@ validation route、rollback 単位を持つ replaceable responsibility unit `too
 
 ### 3.1 対象 tree
 
-fresh clone の責務対象は次の一つの source file `tools/agent_tools/agent_team.py` とその直接 caller です。
+fresh clone の責務対象は次の一つの source file `tools/agent/orchestration/agent_team.py` とその直接 caller です。
 
 ```text
 tools/
@@ -147,17 +147,17 @@ tools/
 
 | set | caller |
 | --- | --- |
-| `STARTER_SET` | `tools/agent_tools/bootstrap_agent_run.py` |
-| `ALIGNMENT_SET` | `tools/agent_tools/check_agent_runtime_alignment.py` |
-| `DOC_START_SET` | `tools/agent_tools/doc_start.py` |
-| `EVALUATE_SET` | `tools/agent_tools/evaluate_codex_agent_roles.py` |
-| `PACK_SET` | `tools/agent_tools/smoke_test_research_perspective_pack.py` |
-| `CLOSE_SET` | `tools/agent_tools/task_close.py` |
-| `SCOPE_SET` | `tools/agent_tools/validate_role_write_scope.py` |
-| `WATERFALL_SET` | `tools/agent_tools/waterfall_gate_check.py` |
-| `SINGLE_SET` | `tools/agent_tools/evaluate_agent_run.py`、`tools/agent_tools/work_log.py` |
-| `TOOL_CALL_SET` | `tools/agent_tools/skill_shim_materializer.py` |
-| `MONITOR_SET` | `tools/agent_tools/workflow_monitor.py` |
+| `STARTER_SET` | `tools/runtime/lifecycle/bootstrap_agent_run.py` |
+| `ALIGNMENT_SET` | `tools/validation/semantic/runtime/check_agent_runtime_alignment.py` |
+| `DOC_START_SET` | `tools/analysis/documents/doc_start.py` |
+| `EVALUATE_SET` | `eval/producers/evaluate_codex_agent_roles.py` |
+| `PACK_SET` | `eval/checkers/smoke_test_research_perspective_pack.py` |
+| `CLOSE_SET` | `tools/runtime/lifecycle/task_close.py` |
+| `SCOPE_SET` | `tools/validation/semantic/authority/validate_role_write_scope.py` |
+| `WATERFALL_SET` | `tools/validation/semantic/lifecycle/waterfall_gate_check.py` |
+| `SINGLE_SET` | `eval/producers/evaluate_agent_run.py`、`tools/runtime/archive/work_log.py` |
+| `TOOL_CALL_SET` | `tools/agent/skills/skill_shim_materializer.py` |
+| `MONITOR_SET` | `tools/runtime/lifecycle/workflow_monitor.py` |
 
 `STARTER_SET` は `ACTIVE_DESIGN_PACKET_SCHEMA`, `ActiveDesignPacketConfig`,
 `AgentTypeSelection`, `Role`, `RunBundleSpec`, `TaskCatalog`, `TeamConfig`,
@@ -226,7 +226,7 @@ test caller は `tests/agent_tools/test_agent_team_templates.py` の次の exact
 
 ### 3.3 direct-script と package import の current contract
 
-`tools/agent_tools/agent_team.py` は `__package__` が truthy の
+`tools/agent/orchestration/agent_team.py` は `__package__` が truthy の
 package import では相対 import を使い、falsey の direct-script import では同じ
 module を top-level import します。`route`, `skill_tool_commands`, `task_authority`,
 `update_lifecycle_contract` は両 mode で top-level import のままです。この inventory
@@ -245,7 +245,7 @@ module を top-level import します。`route`, `skill_tool_commands`, `task_au
 
 ## 4. Current responsibility map と side effect map
 
-| current surface `tools/agent_tools/agent_team.py` | 実際に混在する責務 | observable effect |
+| current surface `tools/agent/orchestration/agent_team.py` | 実際に混在する責務 | observable effect |
 | --- | --- | --- |
 | `agent_team.py` の 603–911 行付近 | YAML config/catalog、role と wave の dataclass、run spec、capacity binding | import 時は定義のみ、load callable は config を読む |
 | `agent_team.py` の 982–1360 行付近 | active-design packet schema、normalization、reference projection | malformed packet は `RuntimeError` 系の既存失敗を返す |
@@ -265,13 +265,13 @@ module を top-level import します。`route`, `skill_tool_commands`, `task_au
 
 | target path | owner | current symbol cluster | 公開境界 |
 | --- | --- | --- | --- |
-| `tools/agent_tools/team_config.py` | config/catalog/base types | `WritePolicy`, `Role`, `SubagentWaveSlot`, `AgentTypeSelection`, `StageWave`, `TeamConfig`, `TaskCatalog`, `RunBundleSpec`, `CapacityHandshakeConsumerBinding`, `load_team_config`, `load_task_catalog`, role/task/workflow/stage selection | `WritePolicy` と config/catalog の dataclass、loader、resolver、型検証だけ。scope result type、template rendering、write は持たない |
-| `tools/agent_tools/packets.py` | document/active-design packets | `DocumentSectionLocator`, `DocumentPacketEntry`, `RoleDocumentPacket`, `ActiveDesignClause`, `ActiveDesignPacketEntry`, `ActiveDesignPacketConfig`、active packet normalization/mapping/reference projection、document packet resolution | packet schema、identity、reference、section locator だけ。manifest line rendering は持たない |
-| `tools/agent_tools/tool_calls.py` | ToolCall materialization | `materialize_tool_call_token`, `materialize_skill_tool_call_token`, `materialize_dynamic_route_tool_call_token`, `CloseAgentLifecycleEvidence`, `materialize_close_agent_tool_call` | ToolCall と close receipt の typed output だけ。capacity reservation は持たない |
-| `tools/agent_tools/implementation_dispatch.py` | capacity + fixed implementation dispatch | `ImplementationDispatch`、capacity derivation/runtime/projection、agent type selection、spawn budget、`dispatch_fixed_implementation` | capacity reservation、eligibility、dispatch の state transition。prompt/manifest text は持たない |
-| `tools/agent_tools/manifest_rendering.py` | manifest/prompt/topology rendering | policy output lines、wave formatting、`build_manifest`、manifest sections、`render_role_topology`、`render_subagent_prompt_packet`、template helper | deterministic text projection と template expansion。config load、git snapshot、capacity mutation は持たない |
-| `tools/agent_tools/workspace_scope.py` | report paths/write scope/snapshots | `RoleWriteScope`, `resolve_workspace_document_path`, `resolve_report_root`, `ReportBundleArtifactPathError`, report artifact path、role scope、changed-path/snapshot helpers、`slugify`, `make_run_id` | `RoleWriteScope`、path validation、scope read、snapshot read/write。manifest schema は持たない |
-| `tools/agent_tools/agent_team.py` | canonical public orchestration entrypoint | `run_workflow_family`, `run_active_design_packet`, `create_run_bundle` と explicit facade re-export | orchestration sequence と allowlist のみ。private helper/module object は export しない |
+| `tools/agent/orchestration/team_config.py` | config/catalog/base types | `WritePolicy`, `Role`, `SubagentWaveSlot`, `AgentTypeSelection`, `StageWave`, `TeamConfig`, `TaskCatalog`, `RunBundleSpec`, `CapacityHandshakeConsumerBinding`, `load_team_config`, `load_task_catalog`, role/task/workflow/stage selection | `WritePolicy` と config/catalog の dataclass、loader、resolver、型検証だけ。scope result type、template rendering、write は持たない |
+| `tools/agent/orchestration/packets.py` | document/active-design packets | `DocumentSectionLocator`, `DocumentPacketEntry`, `RoleDocumentPacket`, `ActiveDesignClause`, `ActiveDesignPacketEntry`, `ActiveDesignPacketConfig`、active packet normalization/mapping/reference projection、document packet resolution | packet schema、identity、reference、section locator だけ。manifest line rendering は持たない |
+| `tools/agent/orchestration/tool_calls.py` | ToolCall materialization | `materialize_tool_call_token`, `materialize_skill_tool_call_token`, `materialize_dynamic_route_tool_call_token`, `CloseAgentLifecycleEvidence`, `materialize_close_agent_tool_call` | ToolCall と close receipt の typed output だけ。capacity reservation は持たない |
+| `tools/agent/orchestration/implementation_dispatch.py` | capacity + fixed implementation dispatch | `ImplementationDispatch`、capacity derivation/runtime/projection、agent type selection、spawn budget、`dispatch_fixed_implementation` | capacity reservation、eligibility、dispatch の state transition。prompt/manifest text は持たない |
+| `tools/runtime/manifest/manifest_rendering.py` | manifest/prompt/topology rendering | policy output lines、wave formatting、`build_manifest`、manifest sections、`render_role_topology`、`render_subagent_prompt_packet`、template helper | deterministic text projection と template expansion。config load、git snapshot、capacity mutation は持たない |
+| `tools/repository/workspace/workspace_scope.py` | report paths/write scope/snapshots | `RoleWriteScope`, `resolve_workspace_document_path`, `resolve_report_root`, `ReportBundleArtifactPathError`, report artifact path、role scope、changed-path/snapshot helpers、`slugify`, `make_run_id` | `RoleWriteScope`、path validation、scope read、snapshot read/write。manifest schema は持たない |
+| `tools/agent/orchestration/agent_team.py` | canonical public orchestration entrypoint | `run_workflow_family`, `run_active_design_packet`, `create_run_bundle` と explicit facade re-export | orchestration sequence と allowlist のみ。private helper/module object は export しない |
 
 型名は capability owner の module に一度だけ置きます。たとえば
 `ActiveDesignPacketConfig` を `team_config.py` に複製せず `packets.py` の型として
@@ -281,7 +281,7 @@ module を top-level import します。`route`, `skill_tool_commands`, `task_au
 production caller の AST inventory が class identity の re-export を要求する場合だけ、
 その承認済み class object を `agent_team.py` から再公開します。別名 class、subclass、
 duplicate dataclass は作りません。ただし `RoleWriteScope` は
-`tools/agent_tools/workspace_scope.py` の owner-only type とし、facade re-export の
+`tools/repository/workspace/workspace_scope.py` の owner-only type とし、facade re-export の
 候補に含めません。
 
 ### 5.2 `agent_team.py` facade allowlist
@@ -301,7 +301,7 @@ allowlist に追加しません。
 旧 forbidden facade name として削除する `ROOT`、`RoleWriteScope`、`render_template`、
 `capacity_handshake`、`implementation_route`、`model_profile_registry`、
 `update_lifecycle_contract` だけです。この facade contract の owner は
-`tools/agent_tools/agent_team.py` です。
+`tools/agent/orchestration/agent_team.py` です。
 
 - base/config: `Role`, `RunBundleSpec`, `TaskCatalog`, `TeamConfig`,
   `AgentTypeSelection`, `ReportBundleArtifactPathError`,
@@ -345,11 +345,11 @@ allowlist に追加しません。
 `update_lifecycle_contract` は module object として re-export しません。
 `_closeout_projection`、その他 leading underscore の helper、dataclass の private
 method、monkey-patch target は public API ではありません。packet invariant は future
-owner `tools/agent_tools/packets.py`、ToolCall invariant は future owner
-`tools/agent_tools/tool_calls.py`、scope/snapshot invariant は future owner
-`tools/agent_tools/workspace_scope.py`、capacity/dispatch invariant は future owner
-`tools/agent_tools/implementation_dispatch.py`、rendering invariant は future owner
-`tools/agent_tools/manifest_rendering.py` の named callable と behavior oracle で検証します。
+owner `tools/agent/orchestration/packets.py`、ToolCall invariant は future owner
+`tools/agent/orchestration/tool_calls.py`、scope/snapshot invariant は future owner
+`tools/repository/workspace/workspace_scope.py`、capacity/dispatch invariant は future owner
+`tools/agent/orchestration/implementation_dispatch.py`、rendering invariant は future owner
+`tools/runtime/manifest/manifest_rendering.py` の named callable と behavior oracle で検証します。
 
 `ROOT` は facade から export しません。root を必要とする caller は
 `agent_canon_source_root` の accessor を呼ぶか、owner 内の local constant を使います。
@@ -390,15 +390,15 @@ invariant は次のとおりです。
 - import は定義を登録するだけで、config/template/report/snapshot/capacity の I/O を
   発生させません。
 - packet identity、reference prefix、field set は future owner
-  `tools/agent_tools/packets.py` への移動前後で一致します。
-- ToolCall schema と close receipt は future owner `tools/agent_tools/tool_calls.py` への
+  `tools/agent/orchestration/packets.py` への移動前後で一致します。
+- ToolCall schema と close receipt は future owner `tools/agent/orchestration/tool_calls.py` への
   移動前後で一致します。
 - manifest section 順序、template replacement、rendered bytes は future owner
-  `tools/agent_tools/manifest_rendering.py` への移動前後で一致します。
-- capacity reservation は future owner `tools/agent_tools/implementation_dispatch.py` の一つの state transition
+  `tools/runtime/manifest/manifest_rendering.py` への移動前後で一致します。
+- capacity reservation は future owner `tools/agent/orchestration/implementation_dispatch.py` の一つの state transition
   であり、二重予約、解放漏れ、dispatch 前の prompt mutation を許しません。
 - workspace scope と snapshot digest は future owner
-  `tools/agent_tools/workspace_scope.py` が allowed file/directory の境界で判定し、
+  `tools/repository/workspace/workspace_scope.py` が allowed file/directory の境界で判定し、
   manifest rendering は path 判定を再実装しません。
 - direct-script/package の二つの import mode は同じ callable identity と例外/戻り値
   shape を返します。
@@ -418,7 +418,7 @@ resolution は side-effect free とします。
 | structure | file split、relative/absolute import shim、`__all__`、private helper の所在変更 | caller が知らない新 namespace、line-count split、型の重複 |
 | API | owner module の明示 import、facade の列挙済み class/callable identity、underscore collaborator alias、test import の移動 | `RoleWriteScope`/`ROOT`/`render_template` の facade export、allowlist 外 public name、private helper、module object、monkey-patch target、compatibility wrapper |
 | runtime | import graph の整理、同じ callable の参照元変更 | config/template/report の schema、ToolCall field、stdout/stderr、exit status、exception class の変更 |
-| data | packet と manifest の同じ field/order/identity、同じ snapshot digest | YAML/JSON key、template text、path normalization `tools/agent_tools/workspace_scope.py`、capacity state、write scope の意味変更 `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a` |
+| data | packet と manifest の同じ field/order/identity、同じ snapshot digest | YAML/JSON key、template text、path normalization `tools/repository/workspace/workspace_scope.py`、capacity state、write scope の意味変更 `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a` |
 | validation | static inventory の追加、owner ごとの test file 移動 | impossible-input 専用 test、実装を満たすための oracle/tolerance の弱化 |
 
 `agent_team.py` の split は behavior-preserving `Implementation Boundary Change` です。
@@ -453,7 +453,7 @@ CLI、config、packet、manifest、capacity、scope の仕様変更は別 design
 static/behavior readback を一つの commit に含めます。private forwarding、module object
 forwarding、monkey-patch seam、temporary alias、wrapper、fallback、compatibility wiring、
 二重定義はどの wave にも置きません。失敗時は wave 全体を最後の成功 commit へ戻し、
-生成 report/snapshot は削除せず `tools/agent_tools/workspace_scope.py` の read-only evidence として比較します。この確定順序は `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`
+生成 report/snapshot は削除せず `tools/repository/workspace/workspace_scope.py` の read-only evidence として比較します。この確定順序は `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`
 `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a` に属します。
 
 ## 9. Compiler/static trust と behavior oracle
@@ -463,17 +463,17 @@ runtime を信頼します。
 
 | 判定 | 一次 evidence | oracle |
 | --- | --- | --- |
-| owner/path/DAG | `tools/agent_tools/scan_code_dependencies.sh`、Python AST、`helper_function_inventory.py` | import graph に cycle がないこと、各 symbol に一 owner があること |
+| owner/path/DAG | `tools/analysis/dependencies/scan_code_dependencies.sh`、Python AST、`helper_function_inventory.py` | import graph に cycle がないこと、各 symbol に一 owner があること |
 | public surface | `agent_team.py` の `__all__`、`vars(agent_team)`、caller AST、`git grep` | public names と `__all__` が一致し、旧 forbidden facade names だけが explicit import で `ImportError` になること。underscore alias は判定対象外 |
 | Python shape | pyright/ruff と owner module import | direct/package の同一 return/exception shape |
-| packet/config | `ACTIVE_DESIGN_PACKET_SCHEMA`、future owner `tools/agent_tools/packets.py` の field inventories | normalization、reference projection、malformed input の既存エラー |
-| ToolCall | future owner `tools/agent_tools/tool_calls.py` の typed schema inventory | token/receipt/stdout-stderr equality |
-| rendering | future owner `tools/agent_tools/manifest_rendering.py` の template/manifest source inventory | rendered bytes、heading/order、required output、stdout/stderr |
-| workspace | future owner `tools/agent_tools/workspace_scope.py` と `tools/agent_tools/validate_role_write_scope.py` | allowed path、snapshot digest、atomic write |
-| dispatch | future owner `tools/agent_tools/implementation_dispatch.py` と既存 capacity owner | reservation/release、eligibility、capacity receipt |
+| packet/config | `ACTIVE_DESIGN_PACKET_SCHEMA`、future owner `tools/agent/orchestration/packets.py` の field inventories | normalization、reference projection、malformed input の既存エラー |
+| ToolCall | future owner `tools/agent/orchestration/tool_calls.py` の typed schema inventory | token/receipt/stdout-stderr equality |
+| rendering | future owner `tools/runtime/manifest/manifest_rendering.py` の template/manifest source inventory | rendered bytes、heading/order、required output、stdout/stderr |
+| workspace | future owner `tools/repository/workspace/workspace_scope.py` と `tools/validation/semantic/authority/validate_role_write_scope.py` | allowed path、snapshot digest、atomic write |
+| dispatch | future owner `tools/agent/orchestration/implementation_dispatch.py` と既存 capacity owner | reservation/release、eligibility、capacity receipt |
 
 コンパイラや static checker は import、型、未使用/循環、公開名の形を保証できますが、
-生成 artifact の意味や副作用の正しさを `tools/agent_tools/agent_team.py` の static evidence だけでは保証しません。behavior oracle は既存 caller の
+生成 artifact の意味や副作用の正しさを `tools/agent/orchestration/agent_team.py` の static evidence だけでは保証しません。behavior oracle は既存 caller の
 smoke/test、manifest bytes、JSON snapshot、capacity receipt、stdout/stderr/exit status
 を `tests/agent_tools/test_agent_team_templates.py` で直接比較します。test は line count や到達しない impossible input を oracle にしません。
 
@@ -481,18 +481,18 @@ smoke/test、manifest bytes、JSON snapshot、capacity receipt、stdout/stderr/e
 
 | clause | current evidence | target mechanism | completion evidence |
 | --- | --- | --- | --- |
-| `RC-01` | `tools/agent_tools/agent_team.py` と caller AST | 六 owner module + underscore collaborator alias を持つ facade の一つの DAG | public names と `__all__` の集合一致、旧 forbidden facade names の explicit import failure、cycle-free import readback |
-| `RC-02` | `tools/agent_tools/bootstrap_agent_run.py` | `team_config.py` が `WritePolicy`、`workspace_scope.py` が facade re-export なしで `RoleWriteScope`、`implementation_dispatch.py` が capacity を所有 | owner direct import readback と capacity/scope behavior oracle |
-| `RC-03` | `tools/agent_tools/agent_team.py` の packet declarations | `packets.py` が identity/reference/normalization を所有 | packet field/reference equality |
-| `RC-04` | `tools/agent_tools/skill_shim_materializer.py` | `tool_calls.py` が ToolCall materialization を所有 | schema/receipt/stdout-stderr equality |
-| `RC-05` | `tools/agent_tools/validate_role_write_scope.py`、`workflow_monitor.py` | `workspace_scope.py` と `manifest_rendering.py` の side-effect boundary | snapshot/scope/manifest oracle |
+| `RC-01` | `tools/agent/orchestration/agent_team.py` と caller AST | 六 owner module + underscore collaborator alias を持つ facade の一つの DAG | public names と `__all__` の集合一致、旧 forbidden facade names の explicit import failure、cycle-free import readback |
+| `RC-02` | `tools/runtime/lifecycle/bootstrap_agent_run.py` | `team_config.py` が `WritePolicy`、`workspace_scope.py` が facade re-export なしで `RoleWriteScope`、`implementation_dispatch.py` が capacity を所有 | owner direct import readback と capacity/scope behavior oracle |
+| `RC-03` | `tools/agent/orchestration/agent_team.py` の packet declarations | `packets.py` が identity/reference/normalization を所有 | packet field/reference equality |
+| `RC-04` | `tools/agent/skills/skill_shim_materializer.py` | `tool_calls.py` が ToolCall materialization を所有 | schema/receipt/stdout-stderr equality |
+| `RC-05` | `tools/validation/semantic/authority/validate_role_write_scope.py`、`workflow_monitor.py` | `workspace_scope.py` と `manifest_rendering.py` の side-effect boundary | snapshot/scope/manifest oracle |
 | `RC-06` | package branch と direct branch の imports | 両 branch で同じ underscore collaborator alias と明示 public assignment | 両 mode の import/behavior smoke |
 | `RC-07` | test caller の `_closeout_projection`、`capacity_handshake`、`implementation_route` | test は explicit owner API のみを import し、underscore collaborator の明示 import 可能性を API 承認に使わない | `capacity_handshake`、`implementation_route` 等の旧 forbidden facade names だけが失敗する negative check |
-| `RC-08` | `tools/agent_tools/check_design_doc_claims.py` | fresh graph と changed claim check | graph `status=fresh`、docs pass、claim findings 0 |
+| `RC-08` | `tools/validation/semantic/documents/check_design_doc_claims.py` | fresh graph と changed claim check | graph `status=fresh`、docs pass、claim findings 0 |
 
 `RC-01` から `RC-08` はこの design pass の request clauses です。実装者は各 wave
 の commit message と review packet で該当 clause を再掲し、future module path を
-実装後の graph source identities（`tools/agent_tools/agent_team.py` facade と六つの owner module）に接続します `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`。
+実装後の graph source identities（`tools/agent/orchestration/agent_team.py` facade と六つの owner module）に接続します `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`。
 
 ## 11. Rollback と旧内部 surface の削除条件
 
@@ -525,4 +525,4 @@ rollback は wave の最後の成功 commit に戻す設計で、target module �
 
 これらは approved target-state contract
 `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`
-の確定判断であり、owner source identities（六つの owner module と `tools/agent_tools/agent_team.py` facade）、implementation mechanism、validation route に未解決分岐はありません `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`。
+の確定判断であり、owner source identities（六つの owner module と `tools/agent/orchestration/agent_team.py` facade）、implementation mechanism、validation route に未解決分岐はありません `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`。

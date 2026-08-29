@@ -3,7 +3,7 @@
 contract design
 responsibility Documents check_semantic_responsibility_contract.py operator usage.
 upstream design ../design/semantic-responsibility-contract.md semantic responsibility contract schema
-upstream implementation ../../tools/agent_tools/check_semantic_responsibility_contract.py validates schema, identity, and references
+upstream implementation ../../tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py validates schema, identity, and references
 downstream implementation ../../tests/agent_tools/test_check_semantic_responsibility_contract.py validates focused checker behavior
 @dependency-end
 -->
@@ -24,7 +24,7 @@ active design packet が所有します。
 ## Command
 
 ```bash
-python3 tools/agent_tools/check_semantic_responsibility_contract.py \
+python3 tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py \
   --root . \
   --template templates/documents/semantic-responsibility-contract.template.toml \
   --instance reports/agents/<run-id>/semantic_responsibility_contract.toml \

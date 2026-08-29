@@ -27,15 +27,15 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Mapping
 
-from prompt_capture import PromptCapture, capture_prompt  # noqa: E402
-from prompt_classifier import (  # noqa: E402
+from tools.agent.orchestration.prompt_capture import PromptCapture, capture_prompt  # noqa: E402
+from tools.agent.orchestration.prompt_classifier import (  # noqa: E402
     PromptClassifierInputs,
     PromptIntakeSignals,
     prompt_intake_signals,
 )
-from subagent_selection import SubagentSelection  # noqa: E402
-from tool_selection import ToolSelection  # noqa: E402
-from workflow_context import WorkflowContext  # noqa: E402
+from tools.agent.orchestration.subagent_selection import SubagentSelection  # noqa: E402
+from tools.agent.orchestration.tool_selection import ToolSelection  # noqa: E402
+from tools.agent.orchestration.workflow_context import WorkflowContext  # noqa: E402
 
 SCHEMA = "agent-canon.behavior-event.v1"
 RECORD_KIND = "behavior_event"

@@ -2,7 +2,7 @@
 # contract template
 # responsibility Owns the managed experiment entrypoint, run/raw/summary layout, schemas, atomic publication, and aggregation.
 # upstream design ../../../documents/design/experiment-topic-template.md defines the single run owner and artifact layout.
-# upstream implementation ../../../tools/experiments/run_managed_experiment.py owns admission and invokes this entrypoint.
+# upstream implementation ../../../tools/experiments/execution/run_managed_experiment.py owns admission and invokes this entrypoint.
 # upstream implementation cases.py owns case models and execution.
 # downstream implementation visualization.py owns visualization status and renderer extension.
 # @dependency-end
@@ -270,7 +270,7 @@ def require_managed_runner_route() -> None:
     """
     if not os.environ.get("EXPERIMENT_RUN_MANIFEST", ""):
         raise RuntimeError(
-            "managed_runner_required=tools/experiments/run_managed_experiment.py"
+            "managed_runner_required=tools/experiments/execution/run_managed_experiment.py"
         )
     if not os.environ.get("EXPERIMENT_VARIANT", ""):
         raise RuntimeError("managed_runner_required=explicit EXPERIMENT_VARIANT")

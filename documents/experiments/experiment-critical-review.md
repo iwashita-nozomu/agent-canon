@@ -188,7 +188,7 @@ total time だけでなく、residual / objective / KKT trajectory、iteration c
 step acceptance / size、termination status、conditioning、inner-solver work、
 objective / gradient / eval / linear-solve / matvec work counters、finite / non-finite
 events、per-iteration cost、cold compile/JIT と warm execution、transfer / synchronization
-を区別します。観測 JSON は `python3 tools/agent_tools/numeric_performance.py
+を区別します。観測 JSON は `python3 tools/analysis/numerical/numeric_performance.py
 --input <post-run-observations.json> --format json` で分類し、prose だけで owner を
 選びません。iteration、trajectory、受理、conditioning、または inner solver が
 変わった場合は数学 / algorithm の原因として `computational-optimization` に

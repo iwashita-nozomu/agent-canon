@@ -697,9 +697,9 @@ def build_container_receipt_stager(
 ) -> ContainerReceiptStager:
     """Build the executable resident-container receipt route."""
     try:
-        from .tool_calls import build_issue_receipt_stage_command
+        from tools.agent.orchestration.tool_calls import build_issue_receipt_stage_command
     except ImportError:  # pragma: no cover - direct script execution
-        from tool_calls import build_issue_receipt_stage_command
+        from tools.agent.orchestration.tool_calls import build_issue_receipt_stage_command
 
     identity = (
         checkout_identity.as_dict()

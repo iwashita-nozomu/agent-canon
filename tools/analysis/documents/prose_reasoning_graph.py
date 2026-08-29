@@ -32,7 +32,7 @@ from urllib.parse import quote
 import yaml
 
 try:
-    from .runtime_artifacts import (
+    from tools.runtime.artifacts.runtime_artifacts import (
         RuntimeArtifactBoundary,
         RuntimeArtifactError,
         runtime_artifact_boundary,
@@ -45,14 +45,14 @@ except ImportError:
     )
 
 try:
-    from .graph_client import (
+    from tools.analysis.dependencies.graph_client import (
         CANONICAL_GRAPH_EXECUTABLE,
         GraphClient,
         GraphClientError,
         GraphResponse,
     )
 except ImportError:  # pragma: no cover - direct CLI execution
-    from graph_client import (
+    from tools.analysis.dependencies.graph_client import (
         CANONICAL_GRAPH_EXECUTABLE,
         GraphClient,
         GraphClientError,

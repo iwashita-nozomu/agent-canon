@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 try:
-    from .skill_projection_registry import (
+    from tools.agent.skills.skill_projection_registry import (
         GENERATED_SKILL_PREFIX,
         GENERATED_SKILL_SUFFIX,
         GeneratedProjection,
@@ -32,7 +32,7 @@ try:
         generated_skill_projection_target,
     )
 except ImportError:  # pragma: no cover - direct script execution
-    from skill_projection_registry import (  # type: ignore[no-redef]
+    from tools.agent.skills.skill_projection_registry import (  # type: ignore[no-redef]
         GENERATED_SKILL_PREFIX,
         GENERATED_SKILL_SUFFIX,
         GeneratedProjection,

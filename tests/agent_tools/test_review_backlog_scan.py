@@ -3,9 +3,9 @@
 # @dependency-start
 # contract test
 # responsibility Tests integrated review backlog scan reporting behavior.
-# upstream implementation ../../tools/agent_tools/review_backlog_scan.sh runs scan wrapper
-# upstream implementation ../../tools/agent_tools/file_surface_inventory.py writes inventory reports
-# upstream design ../../tools/static_analysis/common/README.md documents scan entrypoint
+# upstream implementation ../../tools/repository/github/review_backlog_scan.sh runs scan wrapper
+# upstream implementation ../../tools/analysis/code/file_surface_inventory.py writes inventory reports
+# upstream design ../../tools/validation/code/static/common/README.md documents scan entrypoint
 # @dependency-end
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-REVIEW_SCAN = PROJECT_ROOT / "tools" / "agent_tools" / "review_backlog_scan.sh"
+REVIEW_SCAN = PROJECT_ROOT / "tools" / "repository" / "github" / "review_backlog_scan.sh"
 
 
 class ReviewBacklogScanTest(unittest.TestCase):

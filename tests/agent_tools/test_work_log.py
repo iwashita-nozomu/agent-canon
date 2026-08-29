@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests test work log behavior.
-# upstream implementation ../../tools/agent_tools/work_log.py appends run-local logs
+# upstream implementation ../../tools/runtime/archive/work_log.py appends run-local logs
 # @dependency-end
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-WORK_LOG_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "work_log.py"
+WORK_LOG_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "archive" / "work_log.py"
 
 
 class WorkLogTest(unittest.TestCase):

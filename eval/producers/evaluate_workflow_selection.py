@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Evaluates deterministic workflow selection routing cases.
-# upstream design ../../evidence/agent-evals/README.md eval usage contract
-# upstream design ../../evidence/agent-evals/workflow_selection_eval.toml workflow selection eval manifest
+# upstream design ../../eval/definitions/README.md eval usage contract
+# upstream design ../../eval/definitions/workflow_selection_eval.toml workflow selection eval manifest
 # upstream implementation ./prompt_classifier.py owns prompt-to-workflow classification
 # upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # downstream implementation ../../tests/agent_tools/test_evaluate_workflow_selection.py tests workflow selection eval behavior

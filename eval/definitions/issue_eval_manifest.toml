@@ -3,8 +3,8 @@
 # responsibility Registers issue-derived AgentCanon behavior eval cases.
 # upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md defines eval taxonomy and close conditions.
 # upstream design ../../agents/skills/issue-finding-report.md defines GitHub-only Issue ownership and reorganization.
-# downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py consumes skill/workflow eval patterns.
-# downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval accumulation surfaces.
+# downstream implementation ../../eval/producers/evaluate_skill_workflow_prompts.py consumes skill/workflow eval patterns.
+# downstream implementation ../../eval/checkers/eval_accumulation_check.py validates eval accumulation surfaces.
 # @dependency-end
 
 catalog_kind = "agent_canon_issue_eval_manifest"

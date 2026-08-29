@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests path-risk classifier smoke routing.
-# upstream implementation ../../tools/agent_tools/classify_path_risk.py classifies changed paths.
+# upstream implementation ../../tools/validation/semantic/path/classify_path_risk.py classifies changed paths.
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md defines risk/check routing.
 # @dependency-end
 
@@ -16,7 +16,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CLASSIFIER = PROJECT_ROOT / "tools" / "agent_tools" / "classify_path_risk.py"
+CLASSIFIER = PROJECT_ROOT / "tools" / "validation" / "semantic" / "path" / "classify_path_risk.py"
 
 
 class ClassifyPathRiskTest(unittest.TestCase):

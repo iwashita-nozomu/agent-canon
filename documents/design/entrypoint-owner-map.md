@@ -5,9 +5,9 @@ responsibility Defines the structural grammar and ownership invariant for root a
 upstream design ../conventions/software-engineering-principles.md single-owner, information-hiding, and contract-complete change policy
 downstream design ../../AGENTS.md standalone source-tree entrypoint
 downstream design ../../ROOT_AGENTS.md common consumer root base
-downstream implementation ../../tools/agent_tools/entrypoint_composer.py consumer root composer
-downstream implementation ../../tools/agent_tools/check_entrypoint_owner_map.py structural verifier
-downstream implementation ../../tools/agent_tools/convention_compliance_contracts.toml canonical marker ownership projection
+downstream implementation ../../tools/agent/templates/entrypoint_composer.py consumer root composer
+downstream implementation ../../tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py structural verifier
+downstream implementation ../../tools/validation/semantic/convention/convention_compliance_contracts.toml canonical marker ownership projection
 downstream implementation ../../tests/agent_tools/test_check_entrypoint_owner_map.py contract regression
 downstream design ../../agents/skills/comprehensive-development.md implementation-basis consumer
 @dependency-end
@@ -104,7 +104,7 @@ surface は checker が拒否します。この分担により、自然言語 cl
 
 ## Consumer root composition
 
-`tools/agent_tools/entrypoint_composer.py` は、明示された base、consumer-specific source、
+`tools/agent/templates/entrypoint_composer.py` は、明示された base、consumer-specific source、
 output の三つの path と source checkout から現在 commit を読み、通常 file を同一 directory
 内で atomic に置き換えます。出力には managed marker、source commit、base/specific の exact
 byte count と SHA-256、固定 separator、二つの exact source byte 列が入ります。新規 output は

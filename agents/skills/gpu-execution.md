@@ -9,9 +9,9 @@ upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md ca
 upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md NVIDIA topology and full UUID boundary
 upstream design experiment-lifecycle.md managed experiment artifact boundary
 downstream design ./environment-maintenance.md consumes canonical Docker device and exact environment forwarding
-downstream implementation ../../tools/experiments/run_gpu_command.py provider-independent direct-command CLI
-downstream implementation ../../tools/experiments/run_managed_experiment.py optional managed provider adapter
-downstream implementation ../../tools/ci/run_gpu_container.sh single-entry Docker injection adapter with internal CDI/all selection
+downstream implementation ../../tools/experiments/execution/run_gpu_command.py provider-independent direct-command CLI
+downstream implementation ../../tools/experiments/execution/run_managed_experiment.py optional managed provider adapter
+downstream implementation ../../tools/validation/ci/runners/run_gpu_container.sh single-entry Docker injection adapter with internal CDI/all selection
 downstream implementation ../../.codex/personal/skills/gpu-execution/SKILL.md Codex discovery shim
 downstream implementation ../../tests/agent_tools/test_gpu_execution_docker_all_contract.py single-entry Docker documentation regression contract
 upstream environment ../../agent-canon-environment.toml audited managed ExperimentRunner provider identity and runtime item
@@ -51,7 +51,7 @@ blocker evidence を残します。
   必要としない。
 
 ```text
-python3 tools/experiments/run_gpu_command.py \
+python3 tools/experiments/execution/run_gpu_command.py \
   --gpu-count 1 \
   --min-free-memory <bytes> \
   -- <argv...>
@@ -65,7 +65,7 @@ python3 tools/experiments/run_gpu_command.py \
 - provider lifecycle result、worker coverage、completion coverage
 
 ```text
-python3 -m tools.experiments.run_managed_experiment \
+python3 -m tools.experiments.execution.run_managed_experiment \
   --topic <topic> --variant <variant> -- <inner argv...>
 ```
 
@@ -122,9 +122,9 @@ admitted child が Docker container を起動する public 経路は一つだけ
 repository-owned shell adapter を同じ形で呼びます。
 
 ```text
-python3 tools/experiments/run_gpu_command.py \
+python3 tools/experiments/execution/run_gpu_command.py \
   --gpu-count 1 --min-free-memory <bytes> -- \
-  bash tools/ci/run_gpu_container.sh \
+  bash tools/validation/ci/runners/run_gpu_container.sh \
     --image <canonical-image> -- <argv...>
 ```
 
@@ -185,7 +185,7 @@ python3 -m pytest tests/tools/test_run_gpu_command.py -q
 実機 JAX smoke:
 
 ```text
-python3 tools/experiments/run_gpu_command.py \
+python3 tools/experiments/execution/run_gpu_command.py \
   --gpu-count 1 --min-free-memory 2147483648 -- \
   python3 -c 'import jax; assert jax.default_backend() == "gpu"; print(jax.devices())'
 ```
@@ -193,9 +193,9 @@ python3 tools/experiments/run_gpu_command.py \
 Docker 実機 smoke:
 
 ```text
-python3 tools/experiments/run_gpu_command.py \
+python3 tools/experiments/execution/run_gpu_command.py \
   --gpu-count 1 --min-free-memory 2147483648 -- \
-  bash tools/ci/run_gpu_container.sh \
+  bash tools/validation/ci/runners/run_gpu_container.sh \
     --image <canonical-image> -- \
     python3 -c 'import jax; assert jax.default_backend() == "gpu"; print(jax.devices())'
 ```

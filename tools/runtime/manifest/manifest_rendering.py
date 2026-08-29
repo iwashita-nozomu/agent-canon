@@ -25,7 +25,7 @@ from typing import cast
 import yaml
 
 if __package__:
-    from .parent_root_side_effects import (
+    from tools.repository.workspace.parent_root_side_effects import (
         ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
@@ -42,12 +42,12 @@ else:
     )
 
 if __package__:
-    from .checkout_identity import resolve_checkout_identity
+    from tools.runtime.authority.checkout_identity import resolve_checkout_identity
 else:
-    from checkout_identity import resolve_checkout_identity  # type: ignore[no-redef]
+    from tools.runtime.authority.checkout_identity import resolve_checkout_identity  # type: ignore[no-redef]
 
 if __package__:
-    from .agent_canon_source_root import resolve_agent_canon_source_root
+    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 else:
     from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 
@@ -62,7 +62,7 @@ from tools.runtime.lifecycle.update_lifecycle_contract import (
 )
 
 if __package__:
-    from .packets import (
+    from tools.agent.orchestration.packets import (
         ActiveDesignPacketConfig,
         active_design_packet_artifact_map,
         active_design_packet_mapping,
@@ -79,7 +79,7 @@ if __package__:
         selected_role_outputs,
     )
 else:
-    from packets import (
+    from tools.agent.orchestration.packets import (
         ActiveDesignPacketConfig,
         active_design_packet_artifact_map,
         active_design_packet_mapping,
@@ -97,25 +97,25 @@ else:
     )
 
 if __package__:
-    from .workspace_scope import (
+    from tools.repository.workspace.workspace_scope import (
         resolve_role_write_scope,
         schedule_wave_row,
     )
 else:
-    from workspace_scope import (
+    from tools.repository.workspace.workspace_scope import (
         resolve_role_write_scope,
         schedule_wave_row,
     )
 
 if __package__:
-    from .subagent_selection import COLLABORATION_OPERATIONS
-    from .writer_target import parse_writer_target
+    from tools.agent.orchestration.subagent_selection import COLLABORATION_OPERATIONS
+    from tools.runtime.authority.writer_target import parse_writer_target
 else:
-    from subagent_selection import COLLABORATION_OPERATIONS  # type: ignore[no-redef]
-    from writer_target import parse_writer_target  # type: ignore[no-redef]
+    from tools.agent.orchestration.subagent_selection import COLLABORATION_OPERATIONS  # type: ignore[no-redef]
+    from tools.runtime.authority.writer_target import parse_writer_target  # type: ignore[no-redef]
 
 if __package__:
-    from .team_config import (
+    from tools.agent.orchestration.team_config import (
         ROOT,
         Role,
         RunBundleSpec,
@@ -130,7 +130,7 @@ if __package__:
         resolve_workflow_family,
     )
 else:
-    from team_config import (
+    from tools.agent.orchestration.team_config import (
         ROOT,
         Role,
         RunBundleSpec,
@@ -146,20 +146,20 @@ else:
     )
 
 if __package__:
-    from .tool_calls import (
+    from tools.agent.orchestration.tool_calls import (
         TOOL_CALL_SCHEMA,
         materialize_dynamic_route_tool_call_token,
         materialize_skill_tool_call_token,
     )
 else:
-    from tool_calls import (
+    from tools.agent.orchestration.tool_calls import (
         TOOL_CALL_SCHEMA,
         materialize_dynamic_route_tool_call_token,
         materialize_skill_tool_call_token,
     )
 
 if __package__:
-    from .implementation_dispatch import (
+    from tools.agent.orchestration.implementation_dispatch import (
         _capacity_projection,
         _CapacityRuntime,
         _closeout_projection,
@@ -174,7 +174,7 @@ if __package__:
         workflow_spawn_budget,
     )
 else:
-    from implementation_dispatch import (
+    from tools.agent.orchestration.implementation_dispatch import (
         _capacity_projection,
         _CapacityRuntime,
         _closeout_projection,
@@ -1076,9 +1076,9 @@ def render_template(
 def render_code_template(template_name: str) -> str:
     """互換 facade から package-safe code-template renderer を呼び出します."""
     if __package__:
-        from .code_template_rendering import render_code_template as render_source
+        from tools.agent.templates.code_template_rendering import render_code_template as render_source
     else:
-        from code_template_rendering import render_code_template as render_source
+        from tools.agent.templates.code_template_rendering import render_code_template as render_source
     return render_source(template_name)
 
 
@@ -1340,7 +1340,7 @@ def manifest_run_lines(
         f"  report_dir: {str(spec.report_dir)!r}",
         f"  workspace_root: {str(spec.workspace_root)!r}",
         f"  team_config: {str(source_root / 'agents' / 'agents_config.json')!r}",
-        f"  team_runtime: {str(source_root / 'tools' / 'agent_tools' / 'agent_team.py')!r}",
+        f"  team_runtime: {str(source_root / "tools" / "agent" / "orchestration" / "agent_team.py")!r}",
         f"  task_catalog: {str(source_root / str(spec.config.team['task_catalog']))!r}",
         "  checkout_identity:",
         *(

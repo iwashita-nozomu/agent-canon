@@ -1,8 +1,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests log surface inventory, Rust CLI field extraction, and baseline drift detection.
-# upstream implementation ../../tools/agent_tools/log_surface_inventory.py inventories emitted machine-readable fields
-# downstream implementation ../../tools/agent_tools/check_hook_retirement.py consumes inventory checks
+# upstream implementation ../../tools/runtime/archive/log_surface_inventory.py inventories emitted machine-readable fields
+# downstream implementation ../../tools/validation/semantic/hooks/check_hook_retirement.py consumes inventory checks
 # @dependency-end
 """Tests for log-surface field inventory."""
 
@@ -17,7 +17,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "log_surface_inventory.py"
+TOOL = PROJECT_ROOT / "tools" / "runtime" / "archive" / "log_surface_inventory.py"
 
 
 class LogSurfaceInventoryTest(unittest.TestCase):

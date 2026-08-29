@@ -4,8 +4,8 @@
 # contract test
 # responsibility Verifies container pack runtime mount resolution and direct-runner command construction.
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent default/opt-in runtime boundary
-# upstream implementation ../../tools/ci/container_runtime.py shared container pack runtime helpers under test
-# upstream implementation ../../tools/ci/run_container_pack.py direct pack runner exercised by the regression suite
+# upstream implementation ../../tools/validation/ci/runners/container_runtime.py shared container pack runtime helpers under test
+# upstream implementation ../../tools/validation/ci/runners/run_container_pack.py direct pack runner exercised by the regression suite
 # @dependency-end
 
 from __future__ import annotations
@@ -22,11 +22,11 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from tools.ci import container_runtime as runtime_module
+from tools.validation.ci.runners import container_runtime as runtime_module
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RUNNER_SCRIPT = PROJECT_ROOT / "tools" / "ci" / "run_container_pack.py"
-REPO_PROGRAM_SCRIPT = PROJECT_ROOT / "tools" / "ci" / "run_repo_program.py"
+RUNNER_SCRIPT = PROJECT_ROOT / "tools" / "validation" / "ci" / "runners" / "run_container_pack.py"
+REPO_PROGRAM_SCRIPT = PROJECT_ROOT / "tools" / "validation" / "ci" / "runners" / "run_repo_program.py"
 
 
 def load_runtime_module() -> Any:

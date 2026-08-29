@@ -7,8 +7,8 @@ upstream design ../README.md completion-first review index
 upstream design 00-completion-first-principle.md completion-first rationale
 upstream design ../../agents/workflows/agent-learning-workflow.md agent learning workflow
 upstream design ../../agents/workflows/adaptive-improvement-workflow.md adaptive improvement workflow
-upstream implementation ../../tools/agent_tools/evaluate_agent_run.py current agent run evaluator
-upstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py current prompt evaluator
+upstream implementation ../../eval/producers/evaluate_agent_run.py current agent run evaluator
+upstream implementation ../../eval/producers/evaluate_skill_workflow_prompts.py current prompt evaluator
 @dependency-end
 -->
 

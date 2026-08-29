@@ -4,7 +4,7 @@ contract reference
 responsibility Documents the default source-free template bootstrap path.
 upstream design ./static-seed-export.md static seed ownership, provenance, and exclusion contract
 upstream design ./template-github-remote.md template GitHub canonical remote policy
-downstream implementation ../../tools/docs/check_bootstrap_docs.py rejects live runtime requirements in the default path
+downstream implementation ../../tools/validation/documentation/checks/check_bootstrap_docs.py rejects live runtime requirements in the default path
 downstream design ../../agents/skills/start-repository.md default repository-start workflow
 @dependency-end
 -->

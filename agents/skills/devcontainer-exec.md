@@ -6,8 +6,8 @@ responsibility Preserves a narrow compatibility route for an explicitly selected
 upstream design ../canonical/skills.md public skill registry
 upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md AgentCanon tool-container boundary
 upstream design ./agent-canon-bootstrap.md shared AgentCanon tool-runtime owner
-downstream implementation ../../tools/agent_tools/skill_shim_materializer.py runtime discovery shim
-downstream implementation ../../tools/agent_tools/route.py prompt route
+downstream implementation ../../tools/agent/skills/skill_shim_materializer.py runtime discovery shim
+downstream implementation ../../tools/agent/orchestration/route.py prompt route
 @dependency-end
 -->
 

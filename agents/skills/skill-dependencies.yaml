@@ -3,8 +3,8 @@ version: 1
 # contract registry
 # responsibility Owns the canonical public-skill dependency DAG, responsibility groups, order constraints, and parallel-independent relations.
 # upstream design ./catalog.yaml enumerates the complete public skill identity set
-# downstream implementation ../../tools/agent_tools/skill_route_catalog.py derives routing order and related candidates
-# downstream implementation ../../tools/agent_tools/skill_dependency_map.py checks the DAG and generates the Mermaid projection
+# downstream implementation ../../tools/agent/skills/skill_route_catalog.py derives routing order and related candidates
+# downstream implementation ../../tools/agent/skills/skill_dependency_map.py checks the DAG and generates the Mermaid projection
 # downstream design ../../agents/skills/agent-orchestration.md consumes canonical invocation order
 # downstream design ../../agents/skills/task-routing.md consumes canonical routing order
 # downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py validates cycle, reference, order, and graph contracts

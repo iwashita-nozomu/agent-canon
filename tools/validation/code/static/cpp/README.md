@@ -19,7 +19,7 @@ include paths, compiler flags, or provider-specific diagnostics.
 Select one module database for the shared editor view:
 
 ```bash
-python3 tools/static_analysis/cpp/static_analysis.py \
+python3 tools/validation/code/static/cpp/static_analysis.py \
   select-db --workspace-root <workspace-root> --build-dir <module-build-dir>
 ```
 
@@ -32,10 +32,10 @@ Run the checks against a source and explicit build directory (or pass
 `--compile-database`):
 
 ```bash
-python3 tools/static_analysis/cpp/static_analysis.py \
+python3 tools/validation/code/static/cpp/static_analysis.py \
   clangd-check --workspace-root <workspace-root> --source <source> \
   --build-dir <module-build-dir>
-python3 tools/static_analysis/cpp/static_analysis.py \
+python3 tools/validation/code/static/cpp/static_analysis.py \
   clang-tidy --workspace-root <workspace-root> --source <source> \
   --build-dir <module-build-dir> --config-file <clang-tidy-config>
 ```
@@ -52,5 +52,5 @@ before invocation.
 The existing readability aid remains available separately:
 
 ```bash
-python3 tools/oop/cpp/readability.py --format markdown cpp/include cpp/src tests/cpp cpp/experiments
+python3 tools/validation/code/oop/cpp/readability.py --format markdown cpp/include cpp/src tests/cpp cpp/experiments
 ```

@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import cast
 
 try:
-    from .parent_root_side_effects import (
+    from tools.repository.workspace.parent_root_side_effects import (
         ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
@@ -45,14 +45,14 @@ except ImportError:
     )
 
 from tools.runtime.artifacts.artifact_identity import canonical_body_sha256, canonical_json_bytes
-from review_dispatch import resolve_current_review_state, resolve_review_eligibility
+from tools.agent.orchestration.review_dispatch import resolve_current_review_state, resolve_review_eligibility
 from tools.runtime.lifecycle.update_lifecycle_contract import (
     binding_identity,
     materialize_gate_verdict,
     validate_publication_readback_receipt,
     validate_record_binding,
 )
-from packets import (
+from tools.agent.orchestration.packets import (
     normalize_owner_guarantee_packet,
     owner_receipt_is_compatible,
     owner_receipt_key,
@@ -426,7 +426,7 @@ def _review_candidate(workspace: Path) -> dict[str, object]:
 
 def _validation_provenance(workspace: Path) -> dict[str, object]:
     """Regenerate materializer-only required validation provenance."""
-    from report_artifact_checks import resolve_validation_result
+    from tools.runtime.artifacts.report_artifact_checks import resolve_validation_result
 
     result = resolve_validation_result(workspace)
     if result.get("outcome") != "pass":

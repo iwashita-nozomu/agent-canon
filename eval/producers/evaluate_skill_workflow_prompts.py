@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Evaluates skill and workflow prompt surfaces against frozen prompt evals.
-# upstream design ../../evidence/agent-evals/README.md prompt eval directory contract
-# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml default prompt eval manifest
+# upstream design ../../eval/definitions/README.md prompt eval directory contract
+# upstream design ../../eval/definitions/skill_workflow_prompt_eval.toml default prompt eval manifest
 # upstream implementation ./runtime_log_paths.py resolves accumulated eval archive paths
 # upstream implementation ./runtime_artifacts.py owns external prompt-eval artifact writes
 # downstream implementation ../../tests/agent_tools/test_evaluate_skill_workflow_prompts.py tests it
@@ -732,7 +732,7 @@ def report_dependency_paths(report_path: Path, root: Path, manifest: Path) -> Re
     """Return dependency paths that are valid from the generated report."""
     report_dir = report_path.parent
     manifest_path = manifest if manifest.is_absolute() else root / manifest
-    tool_path = root / "tools" / "agent_tools" / "evaluate_skill_workflow_prompts.py"
+    tool_path = root / "eval" / "producers" / "evaluate_skill_workflow_prompts.py"
     return ReportDependencyPaths(
         tool=relative_posix_path(report_dir, tool_path),
         manifest=relative_posix_path(report_dir, manifest_path),

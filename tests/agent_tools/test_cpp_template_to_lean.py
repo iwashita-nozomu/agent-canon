@@ -1,9 +1,9 @@
 # @dependency-start
 # contract test
 # responsibility Tests the single full-expansion C++ template source to Lean evidence tool.
-# upstream implementation ../../tools/agent_tools/cpp_template_to_lean.py expands C++ roots.
-# upstream implementation ../../tools/agent_tools/cpp_source_canonical_ir.py extracts C++ IR.
-# upstream implementation ../../tools/agent_tools/operational_ir_to_lean.py renders Lean.
+# upstream implementation ../../tools/analysis/proof/cpp_template_to_lean.py expands C++ roots.
+# upstream implementation ../../tools/analysis/code/cpp_source_canonical_ir.py extracts C++ IR.
+# upstream implementation ../../tools/analysis/proof/operational_ir_to_lean.py renders Lean.
 # upstream design ../../documents/tools/cpp_template_to_lean.md documents the canonical route.
 # @dependency-end
 """Tests for the C++ template to Lean full-expansion tool."""
@@ -17,7 +17,7 @@ import textwrap
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "cpp_template_to_lean.py"
+SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "proof" / "cpp_template_to_lean.py"
 
 
 def run_tool(*args: str) -> subprocess.CompletedProcess[str]:

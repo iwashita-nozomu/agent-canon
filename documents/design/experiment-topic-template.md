@@ -5,7 +5,7 @@ responsibility Defines the single-source experiment topic template, materializat
 upstream design ../experiments/experiment-registry.md owns topic identity and registered execution
 upstream design ../experiments/result-log-retention-and-visualization.md owns result retention classes
 upstream design ./experiment_runner.md owns runner and experiment-side execution responsibilities
-downstream implementation ../../tools/experiments/create_experiment_topic.py materializes one topic and registry entry
+downstream implementation ../../tools/experiments/lifecycle/create_experiment_topic.py materializes one topic and registry entry
 downstream implementation ../../templates/experiments/_template/run.py owns run aggregation and summary publication
 downstream implementation ../../templates/experiments/_template/cases.py owns case models and execution
 downstream implementation ../../templates/experiments/_template/visualization.py owns visualization status
@@ -123,7 +123,7 @@ operational stop condition など実行に必要な宣言だけを対象にす�
 canonical commandは次である。
 
 ```bash
-python3 tools/experiments/create_experiment_topic.py <topic>
+python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
 ```
 
 creatorはregistry `defaults.topic_template_dir`またはcanonical defaultを解決し、single `copytree`でtopicを
@@ -138,8 +138,8 @@ creatorはregistry `defaults.topic_template_dir`またはcanonical defaultを解
 ```text
 .codex/personal/skills/experiment-lifecycle/SKILL.md
   -> agents/skills/experiment-lifecycle.md#Topic Preparation
-  -> python3 tools/experiments/create_experiment_topic.py <topic>
-  -> tools/experiments/create_experiment_topic.py
+  -> python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
+  -> tools/experiments/lifecycle/create_experiment_topic.py
   -> templates/experiments/_template/
   -> experiments/registry.toml
 ```
@@ -184,8 +184,8 @@ Targeted commands:
 ```bash
 python3 -m pytest -q tests/tools/test_experiment_template_contracts.py
 python3 -m pytest -q tests/tools/test_run_managed_experiment.py
-python3 tools/agent_tools/check_agent_runtime_alignment.py
-python3 tools/agent_tools/check_dependency_headers.py --changed
+python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed
 ```
 
 ## Design-to-Implementation Trace

@@ -23,17 +23,17 @@ from pathlib import Path
 import yaml
 
 if __package__:
-    from .agent_canon_source_root import resolve_agent_canon_source_root
+    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 else:
     from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 
 if __package__:
-    from .packets import ActiveDesignPacketConfig
+    from tools.agent.orchestration.packets import ActiveDesignPacketConfig
 else:
     from tools.agent.orchestration.packets import ActiveDesignPacketConfig
 
 if __package__:
-    from .team_config import (
+    from tools.agent.orchestration.team_config import (
         RunBundleSpec,
         load_task_catalog,
         load_team_config,
@@ -48,12 +48,12 @@ else:
     )
 
 if __package__:
-    from .agent_team import create_run_bundle, run_active_design_packet
+    from tools.agent.orchestration.agent_team import create_run_bundle, run_active_design_packet
 else:
     from tools.agent.orchestration.agent_team import create_run_bundle, run_active_design_packet
 
 if __package__:
-    from .workspace_scope import resolve_repository_roots, resolve_role_write_scope
+    from tools.repository.workspace.workspace_scope import resolve_repository_roots, resolve_role_write_scope
 else:
     from tools.repository.workspace.workspace_scope import resolve_repository_roots, resolve_role_write_scope
 

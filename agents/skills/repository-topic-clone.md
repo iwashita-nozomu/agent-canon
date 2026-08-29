@@ -8,8 +8,8 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../internal-routines/design-implementation-correspondence.md design read/fingerprint/handoff route
 upstream design ../../documents/rule/repository-topic-clone.md repository-topic clone policy
 upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md topic workspace boundary
-downstream implementation ../../tools/agent_tools/repository_topic_clone.py lifecycle tool
-downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates skill registration
+downstream implementation ../../tools/repository/workspace/repository_topic_clone.py lifecycle tool
+downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates skill registration
 @dependency-end
 -->
 
@@ -28,10 +28,10 @@ file size、diff size で owner route を固定しません。
 
 ## 使う command
 
-- `python3 tools/agent_tools/repository_topic_clone.py prepare ...`
-- `python3 tools/agent_tools/repository_topic_clone.py merge-main ...`
-- `python3 tools/agent_tools/repository_topic_clone.py finalize-merge ...`
-- `python3 tools/agent_tools/repository_topic_clone.py cleanup ...`
+- `python3 tools/repository/workspace/repository_topic_clone.py prepare ...`
+- `python3 tools/repository/workspace/repository_topic_clone.py merge-main ...`
+- `python3 tools/repository/workspace/repository_topic_clone.py finalize-merge ...`
+- `python3 tools/repository/workspace/repository_topic_clone.py cleanup ...`
 
 `prepare` の write-capable clone は repeated `--allowed-path <relative-path>` を handoff
 から forward します。既存の `.agent-canon/writer-target.json` がある場合はその

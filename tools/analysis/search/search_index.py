@@ -30,10 +30,10 @@ import yaml
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import vector_search  # noqa: E402
+import tools.analysis.search.vector_search as vector_search  # noqa: E402
 
 try:
-    from .runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
+    from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
 except ImportError:
     from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
         RuntimeArtifactBoundary,

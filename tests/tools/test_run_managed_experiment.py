@@ -3,10 +3,10 @@
 # responsibility Tests test run managed experiment behavior.
 # upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 managed-route test frame
 # upstream design ../../documents/design/experiment_runner.md ExperimentRunner owner boundary
-# upstream implementation ../../tools/experiments/execution_resource_plan.py canonical resource-plan/admission owner
-# upstream implementation ../../tools/experiments/run_managed_experiment.py canonical managed CLI owner
+# upstream implementation ../../tools/experiments/execution/execution_resource_plan.py canonical resource-plan/admission owner
+# upstream implementation ../../tools/experiments/execution/run_managed_experiment.py canonical managed CLI owner
 # upstream implementation ./resource_plan_test_evidence.py deterministic test-only injection boundary
-# upstream implementation ../../tools/ci/check_experiment_registry.py checker under test
+# upstream implementation ../../tools/validation/ci/checks/check_experiment_registry.py checker under test
 # downstream implementation ../../documents/experiments/gpu-admission-r5-ordered-integration-interface.json W1 public selectors
 # upstream environment ../../agent-canon-environment.toml audited ExperimentRunner provider identity and runtime item
 # @dependency-end
@@ -36,7 +36,7 @@ from tests.tools.resource_plan_test_evidence import (
     SnapshotResourceProbe,
     discover_test_resources,
 )
-from tools.experiments.execution_resource_plan import (
+from tools.experiments.execution.execution_resource_plan import (
     GPUDevice,
     LockReadback,
     ProcessIdentity,
@@ -48,8 +48,8 @@ from tools.experiments.execution_resource_plan import (
     managed_run_adapter_integration_contract,
     plan_gpu_allocation,
 )
-from tools.experiments.experiment_identity import ExperimentIdentity
-from tools.experiments.run_managed_experiment import (
+from tools.experiments.lifecycle.experiment_identity import ExperimentIdentity
+from tools.experiments.execution.run_managed_experiment import (
     ReservationReceipt,
     RunContext,
     build_run_paths,
@@ -59,21 +59,15 @@ from tools.experiments.run_managed_experiment import (
 
 SYNC_CONTEXT_SCRIPT = (
     Path(__file__).resolve().parents[2]
-    / "tools"
-    / "experiments"
-    / "sync_experiment_registry_context.py"
+    / "tools" / "experiments" / "registry" / "sync_experiment_registry_context.py"
 )
 SCRIPT = (
     Path(__file__).resolve().parents[2]
-    / "tools"
-    / "experiments"
-    / "run_managed_experiment.py"
+    / "tools" / "experiments" / "execution" / "run_managed_experiment.py"
 )
 CHECK_SCRIPT = (
     Path(__file__).resolve().parents[2]
-    / "tools"
-    / "ci"
-    / "check_experiment_registry.py"
+    / "tools" / "validation" / "ci" / "checks" / "check_experiment_registry.py"
 )
 CANONICAL_ENTRYPOINT = "experiments/demo_topic/run.py"
 DEFAULT_INNER_COMMAND = (
@@ -85,7 +79,7 @@ FORMAL_INNER_COMMAND = (
     "--config {config_path} --mode formal"
 )
 RECURSIVE_RUNNER_COMMAND = (
-    "python3 -m tools.experiments.run_managed_experiment "
+    "python3 -m tools.experiments.execution.run_managed_experiment "
     "--topic demo_topic --variant default"
 )
 
@@ -114,7 +108,7 @@ def write_template_topic(repo_root: Path) -> None:
     )
     (template_dir / "README.md").write_text(
         "# Experiment Topic Template\n\n"
-        "registered command: `python3 -m tools.experiments.run_managed_experiment "
+        "registered command: `python3 -m tools.experiments.execution.run_managed_experiment "
         "--topic <topic> --variant <variant> "
         "--use-registered-command <registered-command>`\n",
         encoding="utf-8",
@@ -161,7 +155,7 @@ def write_demo_topic_base(repo_root: Path) -> None:
         "from __future__ import annotations\n",
         encoding="utf-8",
     )
-    (repo_root / "tools" / "experiments" / "run_managed_experiment.py").write_text(
+    (repo_root / "tools" / "experiments" / "execution" / "run_managed_experiment.py").write_text(
         "# placeholder\n",
         encoding="utf-8",
     )
@@ -183,7 +177,7 @@ def write_demo_registry(repo_root: Path) -> None:
                 "schema_version = 1",
                 "",
                 "[defaults]",
-                'managed_runner = "tools/experiments/run_managed_experiment.py"',
+                'managed_runner = "tools/experiments/execution/run_managed_experiment.py"',
                 'report_root = "experiments/demo_topic/report"',
                 'integration_branch = "main"',
                 'topic_template_dir = "vendor/agent-canon/templates/experiments/_template"',
@@ -250,7 +244,7 @@ def test_managed_runner_requires_variant_at_cli_boundary(tmp_path: Path) -> None
         [
             sys.executable,
             "-m",
-            "tools.experiments.run_managed_experiment",
+            "tools.experiments.execution.run_managed_experiment",
             "--topic",
             "demo_topic",
             "--",
@@ -380,24 +374,24 @@ def test_rollback_rejects_replaced_report_parent_inode(tmp_path: Path) -> None:
     ("script_path", "module_name"),
     (
         (
-            "tools/experiments/run_managed_experiment.py",
-            "tools.experiments.run_managed_experiment",
+            "tools/experiments/execution/run_managed_experiment.py",
+            "tools.experiments.execution.run_managed_experiment",
         ),
         (
-            "tools/experiments/save_experiment_result_annex.py",
-            "tools.experiments.save_experiment_result_annex",
+            "tools/experiments/artifacts/save_experiment_result_annex.py",
+            "tools.experiments.artifacts.save_experiment_result_annex",
         ),
         (
-            "tools/experiments/update_latest_result.py",
-            "tools.experiments.update_latest_result",
+            "tools/experiments/artifacts/update_latest_result.py",
+            "tools.experiments.artifacts.update_latest_result",
         ),
         (
-            "tools/experiments/create_experiment_topic.py",
-            "tools.experiments.create_experiment_topic",
+            "tools/experiments/lifecycle/create_experiment_topic.py",
+            "tools.experiments.lifecycle.create_experiment_topic",
         ),
         (
-            "tools/ci/check_experiment_registry.py",
-            "tools.ci.check_experiment_registry",
+            "tools/validation/ci/checks/check_experiment_registry.py",
+            "tools.validation.ci.checks.check_experiment_registry",
         ),
     ),
 )
@@ -705,7 +699,7 @@ def _valid_environment_plan(uuid: str) -> SimpleNamespace:
 
 def test_r5_admitted_environment_and_context_are_composition_only() -> None:
     """Composition uses a valid lock-bound composite and materializes UUIDs post-freeze."""
-    from tools.experiments.run_managed_experiment import (
+    from tools.experiments.execution.run_managed_experiment import (
         RunGpuAdmissionContext,
         build_admitted_environment,
     )
@@ -738,7 +732,7 @@ def test_r5_admitted_environment_and_context_are_composition_only() -> None:
 
 def test_r5_admitted_environment_missing_composite_fails_closed() -> None:
     """The post-freeze environment refuses an unbound GPU allocation."""
-    from tools.experiments.run_managed_experiment import build_admitted_environment
+    from tools.experiments.execution.run_managed_experiment import build_admitted_environment
 
     uuid = "GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     plan = SimpleNamespace(
@@ -761,8 +755,8 @@ def test_r5_runner_lifecycle_fingerprint_uses_protocol_projection() -> None:
     """The terminal reducer fingerprints the admitted CLI lifecycle projection."""
     import hashlib
 
-    from tools.experiments.execution_resource_plan import ManagedGpuOutcomeReducer
-    from tools.experiments.run_managed_experiment import ManagedRunLifecycleEvidence
+    from tools.experiments.execution.execution_resource_plan import ManagedGpuOutcomeReducer
+    from tools.experiments.execution.run_managed_experiment import ManagedRunLifecycleEvidence
 
     lifecycle = ManagedRunLifecycleEvidence(
         run_id="r5-lifecycle",
@@ -808,7 +802,7 @@ def test_r5_admitted_runner_fake_cli_protocol(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The managed owner invokes the approved provider wire protocol exactly once."""
-    from tools.experiments.run_managed_experiment import _run_admitted_runner
+    from tools.experiments.execution.run_managed_experiment import _run_admitted_runner
 
     fake = tmp_path / "experiment-runner-admitted"
     fake.write_text(
@@ -904,7 +898,7 @@ def test_r5_admitted_runner_fake_cli_protocol(
 
 def test_r5_provider_request_wire_fields_forward_opaque_gpu_identifiers() -> None:
     """The request forwards admission GPU identities without ordinal conversion."""
-    from tools.experiments.run_managed_experiment import _provider_gpu_ids
+    from tools.experiments.execution.run_managed_experiment import _provider_gpu_ids
 
     source = SCRIPT.read_text(encoding="utf-8")
     request_builder = source[
@@ -1024,7 +1018,7 @@ def test_r5_provider_result_mismatches_fail_closed(
     expected_code: str,
 ) -> None:
     """Provider schema, fingerprint, quiescence, and exit mismatches are typed failures."""
-    from tools.experiments.run_managed_experiment import _validate_admitted_result
+    from tools.experiments.execution.run_managed_experiment import _validate_admitted_result
 
     request_fingerprint = "a" * 64
     result = _valid_provider_result(request_fingerprint)
@@ -1065,7 +1059,7 @@ def test_r5_provider_result_identity_is_required_and_matches_request(
     remove_identity: bool,
 ) -> None:
     """Provider results must preserve the request's complete nested identity."""
-    from tools.experiments.run_managed_experiment import _validate_admitted_result
+    from tools.experiments.execution.run_managed_experiment import _validate_admitted_result
 
     request_identity = ExperimentIdentity("demo", "smoke", "run-mismatch")
     result = _valid_provider_result("a" * 64)
@@ -1101,7 +1095,7 @@ def test_r5_provider_quiescence_and_completion_cover_lock_release() -> None:
     """Lock release requires provider quiescence and completion coverage evidence."""
     from dataclasses import replace
 
-    from tools.experiments.run_managed_experiment import (
+    from tools.experiments.execution.run_managed_experiment import (
         ManagedRunLifecycleEvidence,
         _lifecycle_quiescence_is_proven,
     )
@@ -1163,18 +1157,14 @@ def test_public_alternate_gpu_routes_are_typed_or_managed() -> None:
     ).read_text(encoding="utf-8")
     jit_source = (
         Path(__file__).resolve().parents[2]
-        / "tools"
-        / "agent_tools"
-        / "jit_canonical_ir.py"
+        / "tools" / "analysis" / "proof" / "jit_canonical_ir.py"
     ).read_text(encoding="utf-8")
     planner_source = (
         Path(__file__).resolve().parents[2]
-        / "tools"
-        / "experiments"
-        / "execution_resource_plan.py"
+        / "tools" / "experiments" / "execution" / "execution_resource_plan.py"
     ).read_text(encoding="utf-8")
     assert (
-        "managed_runner_required=tools/experiments/run_managed_experiment.py"
+        "managed_runner_required=tools/experiments/execution/run_managed_experiment.py"
         in template_source
     )
     assert (
@@ -1308,14 +1298,14 @@ def test_public_gpu_discovery_fails_typed_when_structured_probe_is_missing(
     """The production entrypoint never substitutes an empty observation or CPU fallback."""
     from unittest.mock import patch
 
-    from tools.experiments.execution_resource_plan import (
+    from tools.experiments.execution.execution_resource_plan import (
         TypedPreflightFailure,
         discover_resources,
     )
 
     request = make_resource_request(tmp_path, None)
     with patch(
-        "tools.experiments.execution_resource_plan.shutil.which",
+        "tools.experiments.execution.execution_resource_plan.shutil.which",
         return_value=None,
     ):
         try:
@@ -1336,7 +1326,7 @@ def test_check_experiment_registry_accepts_valid_registry(tmp_path: Path) -> Non
         [
             sys.executable,
             "-m",
-            "tools.ci.check_experiment_registry",
+            "tools.validation.ci.checks.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1367,7 +1357,7 @@ def test_check_experiment_registry_rejects_double_topic_report_root(
         [
             sys.executable,
             "-m",
-            "tools.ci.check_experiment_registry",
+            "tools.validation.ci.checks.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1395,7 +1385,7 @@ def test_check_experiment_registry_reports_missing_required_field(
         [
             sys.executable,
             "-m",
-            "tools.ci.check_experiment_registry",
+            "tools.validation.ci.checks.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1426,7 +1416,7 @@ def test_check_experiment_registry_reports_invalid_eval_artifact_item(
         [
             sys.executable,
             "-m",
-            "tools.ci.check_experiment_registry",
+            "tools.validation.ci.checks.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1494,7 +1484,7 @@ def test_check_experiment_registry_accepts_valid_branch_topic(tmp_path: Path) ->
         [
             sys.executable,
             "-m",
-            "tools.ci.check_experiment_registry",
+            "tools.validation.ci.checks.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1537,7 +1527,7 @@ def test_check_experiment_registry_rejects_duplicate_branch_topic_name(
         [
             sys.executable,
             "-m",
-            "tools.ci.check_experiment_registry",
+            "tools.validation.ci.checks.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1555,7 +1545,7 @@ def test_check_experiment_registry_defaults_to_repo_root_via_symlink(
 ) -> None:
     """The checker should infer the derived repo root from the invoked symlink path."""
     repo_root = build_repo(tmp_path)
-    script_path = repo_root / "tools" / "ci" / "check_experiment_registry.py"
+    script_path = repo_root / "tools" / "validation" / "ci" / "checks" / "check_experiment_registry.py"
     script_path.parent.mkdir(parents=True, exist_ok=True)
     script_path.symlink_to(CHECK_SCRIPT)
 
@@ -1592,7 +1582,7 @@ def test_check_experiment_registry_rejects_recursive_runner_command(
         [
             sys.executable,
             "-m",
-            "tools.ci.check_experiment_registry",
+            "tools.validation.ci.checks.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1624,7 +1614,7 @@ def test_check_experiment_registry_accepts_command_without_run_dir(
         [
             sys.executable,
             "-m",
-            "tools.ci.check_experiment_registry",
+            "tools.validation.ci.checks.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1653,7 +1643,7 @@ def test_check_experiment_registry_rejects_command_without_config_path(
         [
             sys.executable,
             "-m",
-            "tools.ci.check_experiment_registry",
+            "tools.validation.ci.checks.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1685,7 +1675,7 @@ def test_check_experiment_registry_rejects_non_topic_local_entrypoint(
         [
             sys.executable,
             "-m",
-            "tools.ci.check_experiment_registry",
+            "tools.validation.ci.checks.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1717,7 +1707,7 @@ def test_check_experiment_registry_rejects_reserved_eval_artifact_pattern(
         [
             sys.executable,
             "-m",
-            "tools.ci.check_experiment_registry",
+            "tools.validation.ci.checks.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1739,7 +1729,7 @@ def test_create_experiment_topic_scaffolds_directory_and_registry(
     result = subprocess.run(
         [
             sys.executable,
-            "tools/experiments/create_experiment_topic.py",
+            "tools/experiments/lifecycle/create_experiment_topic.py",
             "--repo-root",
             str(repo_root),
             "--active-branch",

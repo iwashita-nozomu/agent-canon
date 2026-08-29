@@ -22,26 +22,26 @@ UTC = timezone.utc
 from pathlib import Path
 
 try:
-    from .runtime_artifacts import runtime_artifact_boundary
+    from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
 except ImportError:  # direct script/module execution
     from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
         runtime_artifact_boundary,
     )
 
 if __package__:
-    from .writer_target import WriterTargetError, parse_writer_target
+    from tools.runtime.authority.writer_target import WriterTargetError, parse_writer_target
 else:
-    from writer_target import WriterTargetError, parse_writer_target  # type: ignore[no-redef]
+    from tools.runtime.authority.writer_target import WriterTargetError, parse_writer_target  # type: ignore[no-redef]
 
 if __package__:
-    from .agent_canon_source_root import resolve_agent_canon_source_root
+    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 else:
     from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 
 from tools.runtime.source.agent_canon_preflight import AgentCanonPreflightResult, run_agent_canon_preflight
 
 if __package__:
-    from .packets import (
+    from tools.agent.orchestration.packets import (
         ACTIVE_DESIGN_PACKET_SCHEMA,
         ActiveDesignPacketConfig,
         MATHEMATICAL_INTENT_PACKET_SCHEMA,
@@ -55,7 +55,7 @@ if __package__:
         resolve_role_document_packet,
     )
 else:
-    from packets import (
+    from tools.agent.orchestration.packets import (
         ACTIVE_DESIGN_PACKET_SCHEMA,
         ActiveDesignPacketConfig,
         MATHEMATICAL_INTENT_PACKET_SCHEMA,
@@ -70,7 +70,7 @@ else:
     )
 
 if __package__:
-    from .team_config import (
+    from tools.agent.orchestration.team_config import (
         AgentTypeSelection,
         Role,
         RunBundleSpec,
@@ -91,7 +91,7 @@ if __package__:
         task_ids,
     )
 else:
-    from team_config import (
+    from tools.agent.orchestration.team_config import (
         AgentTypeSelection,
         Role,
         RunBundleSpec,
@@ -113,7 +113,7 @@ else:
     )
 
 if __package__:
-    from .manifest_rendering import (
+    from tools.runtime.manifest.manifest_rendering import (
         contract_complete_implementation_policy_output_lines,
         checkout_identity_policy_output_lines,
         coordination_capability_policy_output_lines,
@@ -135,7 +135,7 @@ if __package__:
         implementation_handoff_required,
     )
 else:
-    from manifest_rendering import (
+    from tools.runtime.manifest.manifest_rendering import (
         contract_complete_implementation_policy_output_lines,
         checkout_identity_policy_output_lines,
         coordination_capability_policy_output_lines,
@@ -158,7 +158,7 @@ else:
     )
 
 if __package__:
-    from .implementation_dispatch import (
+    from tools.agent.orchestration.implementation_dispatch import (
         capacity_start_output_lines,
         codex_runtime_max_depth,
         codex_runtime_max_threads,
@@ -171,7 +171,7 @@ if __package__:
         workflow_spawn_budget,
     )
 else:
-    from implementation_dispatch import (
+    from tools.agent.orchestration.implementation_dispatch import (
         capacity_start_output_lines,
         codex_runtime_max_depth,
         codex_runtime_max_threads,
@@ -185,35 +185,35 @@ else:
     )
 
 if __package__:
-    from .agent_team import (
+    from tools.agent.orchestration.agent_team import (
         PreparedRunBundle,
         dispatch_issue_worker,
         prepare_run_bundle,
     )
 else:
-    from agent_team import (  # type: ignore[no-redef]
+    from tools.agent.orchestration.agent_team import (  # type: ignore[no-redef]
         PreparedRunBundle,
         dispatch_issue_worker,
         prepare_run_bundle,
     )
 
 if __package__:
-    from .workspace_scope import (
+    from tools.repository.workspace.workspace_scope import (
         make_run_id,
         resolve_report_root,
         resolve_repository_roots,
     )
 else:
-    from workspace_scope import (  # type: ignore[no-redef]
+    from tools.repository.workspace.workspace_scope import (  # type: ignore[no-redef]
         make_run_id,
         resolve_report_root,
         resolve_repository_roots,
     )
-from task_authority import (
+from tools.runtime.authority.task_authority import (
     AUTHORITY_FILE_NAME,
     hash_baseline_bytes,
 )
-from workflow_monitor import append_monitoring
+from tools.runtime.lifecycle.workflow_monitor import append_monitoring
 
 
 @dataclass(frozen=True)

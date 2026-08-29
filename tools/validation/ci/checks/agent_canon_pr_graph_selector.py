@@ -29,9 +29,9 @@ from pathlib import Path
 from typing import TypedDict, cast
 from urllib.parse import quote
 
-AGENT_TOOLS_ROOT = Path(__file__).resolve().parents[1] / "agent_tools"
-if str(AGENT_TOOLS_ROOT) not in sys.path:
-    sys.path.insert(0, str(AGENT_TOOLS_ROOT))
+SOURCE_ROOT = Path(__file__).resolve().parents[4]
+if str(SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SOURCE_ROOT))
 
 from tools.repository.workspace.parent_root_side_effects import (  # noqa: E402
     ParentRootReject,
@@ -2222,7 +2222,7 @@ def base_source_is_unchanged(
 
 def selector_source_root() -> Path:
     """Return the source tree that owns this selector and its producer."""
-    return Path(__file__).resolve().parents[2]
+    return SOURCE_ROOT
 
 
 def authorized_source_root(source_root: Path | None) -> Path:
@@ -2416,7 +2416,7 @@ def parent_bound_graph_command(
             "trusted_base_graph_parent_invalid",
             "field=AGENT_CANON_CONTROL_PARENT_ROOT;detail=source_root_same",
         )
-    boundary = source_root / "tools" / "agent_tools" / "parent_root_side_effects.py"
+    boundary = source_root / "tools" / "repository" / "workspace" / "parent_root_side_effects.py"
     return [
         sys.executable,
         str(boundary),
@@ -2437,7 +2437,7 @@ def parent_bound_graph_command(
 def surface_manifest_producer(source_root: Path | None) -> Path:
     """Resolve the current source producer injected into trusted-base builds."""
     root = authorized_source_root(source_root)
-    candidate = root / "tools" / "agent_tools" / "surface_manifest.py"
+    candidate = root / "tools" / "runtime" / "manifest" / "surface_manifest.py"
     try:
         resolved = candidate.resolve(strict=True)
     except OSError:

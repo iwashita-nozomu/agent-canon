@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Routes link checks to the canonical Rust docs checker and keeps link apply behind explicit source mutation capability.
 # upstream design ../README.md shared automation index
-# upstream implementation ../../rust/agent-canon/src/docs.rs canonical Markdown link diagnostics
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs canonical Markdown link diagnostics
 # upstream implementation ./_runtime_output.py explicit source mutation capability
 # downstream implementation ../../tests/tools/test_audit_and_fix_links.py validates the compatibility route
 # @dependency-end

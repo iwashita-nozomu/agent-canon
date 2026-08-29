@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Verifies G2 receipt publication is delegated to the selected parent boundary.
-# upstream implementation ../../tools/ci/check_agent_canon_pr.py owns G2 receipt publication.
+# upstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.py owns G2 receipt publication.
 # @dependency-end
 
 """Focused parent-boundary test for the G2 receipt adapter."""
@@ -17,10 +17,10 @@ CI_ROOT = PROJECT_ROOT / "tools" / "ci"
 if str(CI_ROOT) not in sys.path:
     sys.path.insert(0, str(CI_ROOT))
 
-from check_agent_canon_pr import (
+from tools.validation.ci.checks.check_agent_canon_pr import (
     _persist,  # pyright: ignore[reportPrivateUsage]  # noqa: E402
 )
-from parent_root_side_effects import (  # noqa: E402
+from tools.repository.workspace.parent_root_side_effects import (  # noqa: E402
     ParentRootAttestationRequest,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,

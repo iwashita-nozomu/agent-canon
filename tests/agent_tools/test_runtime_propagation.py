@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Verifies eval child runtime propagation and source immutability.
-# upstream implementation ../../tools/agent_tools/run_accumulated_agent_evals.py propagates typed runtime roots
+# upstream implementation ../../eval/producers/run_accumulated_agent_evals.py propagates typed runtime roots
 # upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md external artifact boundary
 # @dependency-end
 
@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools" / "agent_tools"))
 
-from run_accumulated_agent_evals import (  # noqa: E402
+from eval.producers.run_accumulated_agent_evals import (  # noqa: E402
     EvalProducer,
     run_producers,
 )

@@ -5,9 +5,9 @@ responsibility Documents 文書の配置・分割・正本境界の規約。
 upstream design ./README.md document rule canon index
 upstream design ../design/README.md design canon reader route
 upstream design ../structure/repo-structure-contract.toml machine validator companion
-downstream implementation ../../tools/agent_tools/repo_structure_contract.py expected tree validation
-downstream implementation ../../tools/agent_tools/responsibility_scope.py responsibility validation
-downstream implementation ../../tools/agent_tools/import_responsibility.py import boundary validation
+downstream implementation ../../tools/validation/semantic/structure/repo_structure_contract.py expected tree validation
+downstream implementation ../../tools/validation/semantic/responsibility/responsibility_scope.py responsibility validation
+downstream implementation ../../tools/analysis/code/import_responsibility.py import boundary validation
 @dependency-end
 -->
 

@@ -74,7 +74,7 @@ responsibility Documents Server Host Inventory Template for this repository.
 - `df -h`:
 - `mount`:
 - `docker version`:
-- `python3 tools/ci/check_server_readiness.py`:
+- `python3 tools/validation/ci/checks/check_server_readiness.py`:
 
 ## Gaps
 

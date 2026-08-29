@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests semantic provider HTML report rendering.
-# upstream implementation ../../tools/agent_tools/semantic_provider_html_report.py renders semantic provider comparison HTML
+# upstream implementation ../../tools/analysis/search/reporting/semantic_provider_html_report.py renders semantic provider comparison HTML
 # upstream design ../../agents/skills/html-output.md owns HTML artifact generation and validation
 # upstream design ../../documents/tools/semantic_index.md defines semantic provider comparison authority boundaries
 # @dependency-end
@@ -17,7 +17,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "semantic_provider_html_report.py"
+SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "search" / "reporting" / "semantic_provider_html_report.py"
 
 
 def sample_compare_report() -> dict[str, object]:

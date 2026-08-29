@@ -3,8 +3,8 @@
 # responsibility Declares the closed canonical model-profile registry and explicit role bindings.
 # upstream design ./canonical/CODEX_SUBAGENTS.md defines role/profile responsibilities
 # upstream design ./skills/agent-orchestration.md canonical validation trust boundary owner
-# downstream implementation ../tools/agent_tools/model_profile_registry.py loads and materializes this registry
-# downstream implementation ../tools/agent_tools/check_agent_runtime_alignment.py validates generated views
+# downstream implementation ../tools/agent/orchestration/model_profile_registry.py loads and materializes this registry
+# downstream implementation ../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates generated views
 # downstream implementation ../.codex/agents/spark_worker.toml projects the Spark runtime role
 # downstream implementation ../.codex/agents/terra.toml projects the Terra runtime role
 # @dependency-end

@@ -2,8 +2,8 @@
 @dependency-start
 contract reference
 responsibility Documents dependency manifest graph report rendering.
-upstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py renders Markdown and DOT graph reports.
-upstream implementation ../../tools/agent_tools/visualization_contract.py owns projection identity, marker, readback, and coverage semantics.
+upstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py renders Markdown and DOT graph reports.
+upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py owns projection identity, marker, readback, and coverage semantics.
 upstream design ../design/dependency-manifest-design.md defines dependency manifest semantics.
 upstream design ../structured-analysis/graph-dsl.md defines shared graph storage and projection contract.
 upstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph adapter vocabulary when dependency graph views are embedded in prose workflows.
@@ -32,7 +32,7 @@ first covers the full repository and the second filters the canonical query to
 the current change set.
 
 ```bash
-python3 tools/agent_tools/render_dependency_manifest_graph.py \
+python3 tools/analysis/dependencies/render_dependency_manifest_graph.py \
   --root . \
   --scope full \
   --bundle-dir reports/dependency-graph \
@@ -40,7 +40,7 @@ python3 tools/agent_tools/render_dependency_manifest_graph.py \
 ```
 
 ```bash
-python3 tools/agent_tools/render_dependency_manifest_graph.py \
+python3 tools/analysis/dependencies/render_dependency_manifest_graph.py \
   --root . \
   --scope changed \
   --bundle-dir reports/dependency-graph \
@@ -121,7 +121,7 @@ The ToolCall order and exact pairs are:
 2. `agent_canon.visualization.adapter.dependency_manifest` /
    `agent_canon.visualization.arguments.dependency_manifest.v1`
 
-`tools/agent_tools/render_dependency_manifest_graph.py` remains the executable
+`tools/analysis/dependencies/render_dependency_manifest_graph.py` remains the executable
 command path. It is never a ToolCall ID.
 
 `dependency_graph.tsv` remains one of the six basenames and the native
@@ -248,7 +248,7 @@ output publication の契約は維持します。
 ## CLI and Reference
 
 ```bash
-python3 tools/agent_tools/render_dependency_manifest_graph.py \
+python3 tools/analysis/dependencies/render_dependency_manifest_graph.py \
   --root . \
   --ir-out reports/dependency_graph.ir.json \
   --markdown-out reports/dependency_graph.md \

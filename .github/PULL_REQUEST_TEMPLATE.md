@@ -5,8 +5,8 @@ responsibility Owns the concise standalone AgentCanon PR evidence fields.
 upstream design ../agents/workflows/agent-canon-pr-workflow.md AgentCanon PR identity and publication route
 upstream design AGENTS.md GitHub subtree boundary
 upstream design ../templates/documents/github/README.md canonical GitHub template source
-downstream implementation ../tools/ci/check_github_workflows.py validates the evidence fields and workflow conventions
-downstream implementation ../tools/ci/run_pr_dependency_source_gate.sh validates dependency completeness from tracked source
+downstream implementation ../tools/validation/ci/checks/check_github_workflows.py validates the evidence fields and workflow conventions
+downstream implementation ../tools/validation/ci/checks/run_pr_dependency_source_gate.sh validates dependency completeness from tracked source
 @dependency-end
 -->
 

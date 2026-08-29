@@ -6,7 +6,7 @@ upstream design ../../../documents/experiments/README.md experiment directory an
 upstream design ../../../documents/design/experiment-topic-template.md single-source topic scaffold and result layout.
 downstream implementation ./provenance.toml records machine-readable plan and provenance.
 downstream implementation ./run.py provides the runnable topic scaffold and atomic summary publication.
-downstream implementation ../../../tools/experiments/create_experiment_topic.py materializes this topic pair.
+downstream implementation ../../../tools/experiments/lifecycle/create_experiment_topic.py materializes this topic pair.
 @dependency-end
 -->
 
@@ -50,7 +50,7 @@ experiments/<topic>/
 
 ## 実行契約
 
-topic は `tools/experiments/run_managed_experiment.py` から呼び出します。topic の `run.py` を
+topic は `tools/experiments/execution/run_managed_experiment.py` から呼び出します。topic の `run.py` を
 直接起動せず、caller が `EXPERIMENT_RUN_DIR`、`EXPERIMENT_RUN_MANIFEST`、
 `EXPERIMENT_VARIANT` を設定した managed route を使います。
 

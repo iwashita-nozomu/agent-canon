@@ -1,8 +1,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests Codex agent role eval automation.
-# upstream implementation ../../tools/agent_tools/evaluate_codex_agent_roles.py helper
-# upstream design ../../evidence/agent-evals/README.md role eval contract
+# upstream implementation ../../eval/producers/evaluate_codex_agent_roles.py helper
+# upstream design ../../eval/definitions/README.md role eval contract
 # @dependency-end
 """Tests for Codex agent role eval automation."""
 
@@ -24,15 +24,15 @@ else:
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_codex_agent_roles.py"
+SCRIPT = PROJECT_ROOT / "eval" / "producers" / "evaluate_codex_agent_roles.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from implementation_dispatch import (  # noqa: E402
+from tools.agent.orchestration.implementation_dispatch import (  # noqa: E402
     recommended_dynamic_expansion_wave_slots,
     recommended_initial_subagent_wave,
 )
-from team_config import load_task_catalog, load_team_config, select_roles  # noqa: E402
-from model_profile_registry import generate_role_views, load_model_profile_registry  # noqa: E402
+from tools.agent.orchestration.team_config import load_task_catalog, load_team_config, select_roles  # noqa: E402
+from tools.agent.orchestration.model_profile_registry import generate_role_views, load_model_profile_registry  # noqa: E402
 
 FIRST_RUNTIME_TOKENS = 100
 FIRST_RUNTIME_LATENCY_MS = 25

@@ -2,8 +2,8 @@
 # @dependency-start
 # contract test
 # responsibility Exercises public ExecutionResourcePlan resource, environment, certificate, lock, readback, terminal, cleanup, and completion observables.
-# upstream implementation ../../tools/experiments/execution_resource_plan.py canonical resource-plan owner
-# downstream implementation ../../tools/agent_tools/execution_resource_projection.py validates exact projected bytes
+# upstream implementation ../../tools/experiments/execution/execution_resource_plan.py canonical resource-plan owner
+# downstream implementation ../../tools/runtime/container/execution_resource_projection.py validates exact projected bytes
 # downstream implementation ../../.codex/hooks/hook_dispatcher.py forwards only validator-approved projection output
 # upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md approved AgentCanon GPU admission R5 test frame
 # upstream design ../../documents/design/experiment_runner.md ExperimentRunner lifecycle and scheduler boundary
@@ -25,7 +25,7 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.experiments.execution_resource_plan import (
+from tools.experiments.execution.execution_resource_plan import (
     CALLER_ALLOCATION_PROVENANCE,
     COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION,
     CompletionCoverageAdapter,
@@ -971,9 +971,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
         """Admission ancestry code is observational and cannot signal a process."""
         source = (
             Path(__file__).resolve().parents[2]
-            / "tools"
-            / "experiments"
-            / "execution_resource_plan.py"
+            / "tools" / "experiments" / "execution" / "execution_resource_plan.py"
         ).read_text(encoding="utf-8")
         for forbidden in ("os.kill(", "os.killpg(", "signal.SIG", "[\"kill\""):
             with self.subTest(forbidden=forbidden):
@@ -1005,7 +1003,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             write_proc_record(proc_root, 123, 2, "start-123")
             write_proc_record(proc_root, 2, 1, "start-2")
             write_proc_record(proc_root, 1, 0, "start-1")
-            with patch("tools.experiments.execution_resource_plan.shutil.which", return_value=None):
+            with patch("tools.experiments.execution.execution_resource_plan.shutil.which", return_value=None):
                 evidence = ProcAncestryProbe(proc_root=proc_root).observe(123)
             self.assertFalse(evidence.pstree_available)
             self.assertEqual(tuple(item.pid for item in evidence.chain), (123, 2))
@@ -1186,7 +1184,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
     def test_source_freeze_fd_snapshot_lineage_and_reverse_release(self) -> None:
         """Source bytes, manifest records, and receipt lineage share one fd freeze."""
         source_root = Path(__file__).resolve().parents[2]
-        source_path = "tools/experiments/execution_resource_plan.py"
+        source_path = "tools/experiments/execution/execution_resource_plan.py"
         with tempfile.TemporaryDirectory() as temporary:
             request = GpuRunRequest(
                 gpu_count=0,
@@ -1231,10 +1229,10 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             root = Path(temporary)
             subprocess.run(["git", "init", "--quiet", str(root)], check=True)
             for relative_path in (
-                "tools/experiments/execution_resource_plan.py",
-                "tools/experiments/run_managed_experiment.py",
-                "tools/experiments/registry_lib.py",
-                "tools/agent_tools/jit_canonical_ir.py",
+                "tools/experiments/execution/execution_resource_plan.py",
+                "tools/experiments/execution/run_managed_experiment.py",
+                "tools/experiments/registry/registry_lib.py",
+                "tools/analysis/proof/jit_canonical_ir.py",
                 "experiments/registry.toml",
                 "experiments/topic/cases.py",
             ):
@@ -1252,10 +1250,10 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             root = Path(temporary)
             subprocess.run(["git", "init", "--quiet", str(root)], check=True)
             for relative_path in (
-                "tools/experiments/execution_resource_plan.py",
-                "tools/experiments/run_managed_experiment.py",
-                "tools/experiments/registry_lib.py",
-                "tools/agent_tools/jit_canonical_ir.py",
+                "tools/experiments/execution/execution_resource_plan.py",
+                "tools/experiments/execution/run_managed_experiment.py",
+                "tools/experiments/registry/registry_lib.py",
+                "tools/analysis/proof/jit_canonical_ir.py",
                 "experiments/topic/run.py",
             ):
                 path = root / relative_path
@@ -1282,7 +1280,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             environment={},
             source_root=str(source_root),
             runtime_route="HOST_DIRECT",
-            source_paths=("tools/experiments/execution_resource_plan.py",),
+            source_paths=("tools/experiments/execution/execution_resource_plan.py",),
             planned_chunk_ids=(),
         )
         primary = TypedPreflightFailure(
@@ -1307,10 +1305,10 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 real_close(descriptor)
 
             with patch(
-                "tools.experiments.execution_resource_plan._read_git_identity",
+                "tools.experiments.execution.execution_resource_plan._read_git_identity",
                 side_effect=fail_identity,
             ), patch(
-                "tools.experiments.execution_resource_plan.os.close",
+                "tools.experiments.execution.execution_resource_plan.os.close",
                 side_effect=close_once_with_ambiguity,
             ):
                 with self.assertRaises(TypedPreflightFailure) as raised:

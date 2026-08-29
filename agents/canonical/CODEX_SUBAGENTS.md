@@ -20,7 +20,7 @@ downstream implementation ../../.codex/agents/oop_readability_reviewer.toml OOP 
 shared workflow は `agents/canonical/CODEX_WORKFLOW.md` に置き、この文書は inventory、mapping、activation に寄せます。
 permanent team role ownership、required output、write policy は `agents/agents_config.json` を正本にします。
 role profile/instruction authority は `agents/model_profiles.toml` と
-`tools/agent_tools/model_profile_registry.py` が所有し、`.codex/agents/*.toml`
+`tools/agent/orchestration/model_profile_registry.py` が所有し、`.codex/agents/*.toml`
 は closed generated readback view です。
 project-level subagent registration と runtime budget は `.codex/config.toml` の `[agents]` と `[agents.<name>]` を正本にします。
 prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` を先に通し、
@@ -218,7 +218,7 @@ structured handoff または、coordination/resumption が必要な場合の dur
 
 - `role_scope`: その role が判断する subdomain、stage、risk class。
 - `allowed_paths`: 対象 file / directory / glob の bounded list。repo root や `/workspace` は workspace identity として扱い、編集候補、検索 hit、checker finding、changed path を seed にし、responsibility search、reuse survey、stale-surface scan、dependency header graph の再帰展開結果である `dependency_edit_scope.txt` / `dependency_graph.tsv` を優先します。
-- `required_artifacts`: checker output、structured dashboard、dependency-expanded scope、design / implementation packet、または review packet。context artifact を先に渡します。dependency-expanded scope が必要な場合は `bash tools/agent_tools/run_repo_dependency_review.sh --report-dir <run-or-review-dir> --search-hits-file <hits>` または changed-path 相当の dependency review output を handoff に含めます。
+- `required_artifacts`: checker output、structured dashboard、dependency-expanded scope、design / implementation packet、または review packet。context artifact を先に渡します。dependency-expanded scope が必要な場合は `bash tools/analysis/dependencies/run_repo_dependency_review.sh --report-dir <run-or-review-dir> --search-hits-file <hits>` または changed-path 相当の dependency review output を handoff に含めます。
 - `canon_refs`: 必要な AgentCanon / project canon の節。
 - `do_not_read`: unrelated modules、generated raw logs、historical reports、他 role の scope など、読まない surface。
 - `expected_output`: findings schema、decision vocabulary、uncertainty / residual risk、test gaps。
@@ -337,7 +337,7 @@ bootstrap stdout field for executable dynamic expansion is
 `team_manifest.yaml` `role_instances` is the authoritative manifest ledger.
 After a parent or delegated stage owner actually spawns, skips, or replaces a
 wave, record the actual result with
-`python3 tools/agent_tools/workflow_monitor.py --subagent-wave ...`; this
+`python3 tools/runtime/lifecycle/workflow_monitor.py --subagent-wave ...`; this
 updates `schedule.md` and `workflow_monitoring.md` by `wave_id` and replaces the
 bootstrap authority blocker for `WAVE-1`. Delegated child waves must include
 `remaining_spawn_budget` so nested launch remains bounded by
@@ -599,7 +599,7 @@ Activation Conditions:
 - これらは session-level setting で、per-agent TOML には書きません
 - runtime が `/agent` を提供する場合は inventory 確認に使います
 - `/agent` が使えない runtime では `.codex/agents/*.toml` を直接見ます
-- run bundle は `python3 tools/agent_tools/bootstrap_agent_run.py ...` で、
+- run bundle は `python3 tools/runtime/lifecycle/bootstrap_agent_run.py ...` で、
   coordination、resumption、または selected workflow が durable lifecycle
   evidence を必要とするときだけ先に作ります
 - `--task-id` の task-default specialist と default review pack は候補として
@@ -795,7 +795,7 @@ checkout が変わった後、conflict 解消前、commit / push / PR 前、clea
 destructive Git 前、subagent handoff と final handback でも同じ block を更新します。
 通常のコマンドごとには繰り返しません。
 
-readback は `python3 tools/agent_tools/checkout_identity.py --format lines` で取得し、
+readback は `python3 tools/runtime/authority/checkout_identity.py --format lines` で取得し、
 絶対 `cwd`、Git root、branch（detached を含む）、HEAD、normalized remote
 `owner/repository` を運びます。これは観測情報だけであり、branch / worktree authority、
 approval、merge、cleanup、Issue、publication の権限を追加しません。Git root または
@@ -824,7 +824,7 @@ writer target は短命な handoff 値であり、claim file、PID、expiry、da
 `agents/model_profiles.toml` が canonical typed profile authority です。
 `agents/execution_topology.json` は logical role と physical execution profile の
 分離、および direct-Luna default を所有します。
-`tools/agent_tools/model_profile_registry.py` は closed generated views として
+`tools/agent/orchestration/model_profile_registry.py` は closed generated views として
 `.codex/agents/*.toml` と `agents/agents_config.json` を materialize します。
 generated views は projection digest / readback surfaces であり、手動で編集しては
 なりません。model / reasoning の変更は registry / team / runtime source から始め、
@@ -885,8 +885,8 @@ runtime は再生成後に restart し、readback で反映を確認します。
 
 runtime inventory や review pack を変えたら、まず次を実行します。
 
-    python3 tools/agent_tools/check_agent_runtime_alignment.py
-    python3 tools/agent_tools/smoke_test_research_perspective_pack.py
+    python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+    python3 eval/checkers/smoke_test_research_perspective_pack.py
 
 この smoke test は次を確認します。
 

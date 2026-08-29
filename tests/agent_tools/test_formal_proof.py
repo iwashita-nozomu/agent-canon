@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests natural-language to formal-proof scaffold planning.
-# upstream implementation ../../tools/agent_tools/formal_proof.py builds proof scaffold artifacts.
+# upstream implementation ../../tools/analysis/proof/formal_proof.py builds proof scaffold artifacts.
 # upstream design ../../agents/skills/formal-proof-workflow.md defines proof workflow requirements.
 # upstream design ../../documents/tools/formal_proof.md documents the CLI contract.
 # @dependency-end
@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "formal_proof.py"
+SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "proof" / "formal_proof.py"
 PRODUCER_TEST = PROJECT_ROOT / "tests" / "agent_tools" / "test_jit_canonical_ir.py"
 
 
@@ -72,7 +72,7 @@ class FormalProofToolTest(unittest.TestCase):
             {
                 "status": "awaiting_native_receipt",
                 "paths": [
-                    "tools/agent_tools/jit_canonical_ir.py",
+                    "tools/analysis/proof/jit_canonical_ir.py",
                     "generated Lean return projection",
                 ],
             },
@@ -85,14 +85,14 @@ class FormalProofToolTest(unittest.TestCase):
             "JIT boundary",
             "backend runtime",
         }
-        self.assertTrue({"tools/agent_tools/jit_canonical_ir.py", "lean/"} <= math_forbidden)
+        self.assertTrue({"tools/analysis/proof/jit_canonical_ir.py", "lean/"} <= math_forbidden)
         self.assertTrue(forbidden_production_surfaces <= math_forbidden)
         self.assertTrue(forbidden_production_surfaces <= proof_forbidden)
         self.assertTrue(forbidden_production_surfaces.isdisjoint(proof_allowed))
         self.assertTrue(proof_allowed.isdisjoint(math_allowed))
         self.assertEqual(
             failure["producer_surface"],
-            "tools/agent_tools/jit_canonical_ir.py",
+            "tools/analysis/proof/jit_canonical_ir.py",
         )
 
     def test_writes_lean_scaffold_and_search_queries(self) -> None:

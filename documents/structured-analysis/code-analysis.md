@@ -5,8 +5,8 @@ responsibility Defines code dependency analysis scope for the structured analysi
 upstream design README.md structured analysis package index
 upstream design database-design.md defines SQLite tables and DB artifact placement
 upstream design ../design/dependency-manifest-design.md separates code dependency evidence from manifest graph evidence
-upstream implementation ../../tools/agent_tools/lsp_code_analysis.py extracts canonical LSP code facts
-upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh preserves compatibility evidence
+upstream implementation ../../tools/analysis/code/lsp_code_analysis.py extracts canonical LSP code facts
+upstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh preserves compatibility evidence
 downstream design dependency-header-analysis.md joins code evidence with report trace without merging edge semantics
 @dependency-end
 -->
@@ -60,7 +60,7 @@ best-effort edge を report trace と impact packet に渡す。
 ## Evidence And Assumption Ledger
 
 - Evidence sources: `documents/structured-analysis/code-analysis.md` owns this scope.
-- Evidence sources: `tools/agent_tools/lsp_code_analysis.py` owns the LSP adapter and report.
+- Evidence sources: `tools/analysis/code/lsp_code_analysis.py` owns the LSP adapter and report.
 - Evidence sources: `.devcontainer/dependencies.toml` and `documents/design/dependency-manifest-design.md` provide manifest, receipt, and live-verification evidence.
 - Evidence sources: `tests/agent_tools/test_lsp_code_analysis.py`, `tests/agent_tools/test_dependency_manifest_tools.py`, `tests/agent_tools/test_search.py`, and `tests/agent_tools/test_git_dependency_diff_summary.py` cover protocol, scanner, consumer, and summary behavior.
 - Assumptions: the manifest receipt/live verifier is the authority for executable selection.

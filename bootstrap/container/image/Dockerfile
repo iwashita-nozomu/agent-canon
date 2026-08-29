@@ -2,7 +2,7 @@
 # contract environment
 # responsibility Defines the one shared AgentCanon Python, Rust, and LSP tool image.
 # upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared tool runtime boundary
-# upstream implementation ../../tools/agent_tools/dependency_plan.py typed image dependency installer
+# upstream implementation ../../tools/analysis/dependencies/dependency_plan.py typed image dependency installer
 # downstream implementation ./entrypoint.sh resident runtime and health probe
 # @dependency-end
 

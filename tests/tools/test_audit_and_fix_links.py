@@ -1,9 +1,9 @@
 # @dependency-start
 # contract test
 # responsibility Tests the canonical Rust link-check route and explicit source mutation boundary.
-# upstream implementation ../../tools/docs/audit_and_fix_links.py link audit compatibility wrapper
-# upstream implementation ../../tools/docs/_runtime_output.py mutation capability parser
-# downstream implementation ../../rust/agent-canon/src/docs.rs canonical link diagnostics
+# upstream implementation ../../tools/validation/documentation/checks/audit_and_fix_links.py link audit compatibility wrapper
+# upstream implementation ../../tools/analysis/documents/formatting/_runtime_output.py mutation capability parser
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs canonical link diagnostics
 # @dependency-end
 """Tests for the Markdown link compatibility wrapper."""
 
@@ -19,7 +19,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = PROJECT_ROOT / "tools" / "docs" / "audit_and_fix_links.py"
+SCRIPT_PATH = PROJECT_ROOT / "tools" / "validation" / "documentation" / "checks" / "audit_and_fix_links.py"
 
 
 def load_module():

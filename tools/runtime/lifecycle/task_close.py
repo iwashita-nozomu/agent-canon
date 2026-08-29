@@ -29,7 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import capacity_handshake
+import tools.agent.orchestration.capacity_handshake
 from tools.runtime.artifacts.runtime_artifacts import (
     RUNTIME_ROOT_ENV,
     RuntimeArtifactError,
@@ -58,21 +58,21 @@ def _parent_validate(path: Path, purpose: str) -> None:
     ParentRootSideEffectBoundary().resolve_parent_owned_path(attestation, path, purpose, create=False)
 
 if __package__:
-    from .tool_calls import (
+    from tools.agent.orchestration.tool_calls import (
         CloseAgentLifecycleEvidence,
         materialize_close_agent_tool_call,
     )
 else:
-    from tool_calls import (
+    from tools.agent.orchestration.tool_calls import (
         CloseAgentLifecycleEvidence,
         materialize_close_agent_tool_call,
     )
 
 if __package__:
-    from .workspace_scope import resolve_report_root
+    from tools.repository.workspace.workspace_scope import resolve_report_root
 else:
-    from workspace_scope import resolve_report_root
-from report_artifact_checks import (
+    from tools.repository.workspace.workspace_scope import resolve_report_root
+from tools.runtime.artifacts.report_artifact_checks import (
     COMPLETION_COVERAGE_SCHEMA,
     COMPLETION_COVERAGE_TAXONOMY_REFS,
     check_final_review_artifact,
@@ -91,8 +91,8 @@ from tools.runtime.lifecycle.update_lifecycle_contract import (
     validate_durable_handback,
     validate_gate_chain,
 )
-from autonomous_convergence import validate_closeout_projection
-from packets import normalize_owner_guarantee_packet, owner_receipt_is_compatible, owner_receipt_key
+from tools.agent.orchestration.autonomous_convergence import validate_closeout_projection
+from tools.agent.orchestration.packets import normalize_owner_guarantee_packet, owner_receipt_is_compatible, owner_receipt_key
 
 STATIC_ANALYSIS_COMPLETE_STATUSES = {"yes", "profile_selected"}
 DOCUMENT_STRUCTURE_MISSING_VALUES = {"", "missing", "none", "not_applicable"}

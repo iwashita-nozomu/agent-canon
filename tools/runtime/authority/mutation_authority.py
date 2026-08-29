@@ -27,7 +27,7 @@ try:
         read_writer_target_packet,
     )
 except ImportError:
-    from writer_target import (  # type: ignore[no-redef]
+    from tools.runtime.authority.writer_target import (  # type: ignore[no-redef]
         WRITER_TARGET_PACKET_RELATIVE,
         WriterTarget,
         WriterTargetError,

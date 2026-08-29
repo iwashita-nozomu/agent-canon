@@ -13,7 +13,7 @@ import argparse
 import subprocess
 import sys
 
-from container_runtime import (
+from tools.validation.ci.runners.container_runtime import (
     ContainerPack,
     apply_pack_overrides,
     build_build_command,

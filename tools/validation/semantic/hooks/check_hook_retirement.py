@@ -18,7 +18,7 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
-from hook_retirement import (
+from tools.runtime.authority.hook_retirement import (
     CALLER_AUDIT_ROOTS,
     CALLER_AUDIT_SCHEMA,
     MOVED_SOURCE_ABSENCES,

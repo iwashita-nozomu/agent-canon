@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Runs all registered AgentCanon eval producers in append-only accumulation mode.
-# upstream design ../../evidence/agent-evals/README.md eval family and accumulation contract
+# upstream design ../../eval/definitions/README.md eval family and accumulation contract
 # upstream design ../../documents/runtime/runtime-log-archive.md external runtime log archive contract
 # upstream design ../../tools/README.md shared tool index
 # upstream design ../../documents/tools/README.md user-facing tool index
@@ -156,7 +156,7 @@ def build_producers(
     eval_root = boundary.resolve(Path("eval-results"))
     prompt_command: list[str] = [
         python_bin,
-        str(canon / "tools" / "agent_tools" / "evaluate_skill_workflow_prompts.py"),
+        str(canon / "eval" / "producers" / "evaluate_skill_workflow_prompts.py"),
         "--root",
         str(root),
         "--manifest",
@@ -176,7 +176,7 @@ def build_producers(
             "codex-agent-role",
             (
                 python_bin,
-                str(canon / "tools" / "agent_tools" / "evaluate_codex_agent_roles.py"),
+                str(canon / "eval" / "producers" / "evaluate_codex_agent_roles.py"),
                 "--root",
                 str(root),
                 "--accumulate",
@@ -192,7 +192,7 @@ def build_producers(
             "workflow-selection",
             (
                 python_bin,
-                str(canon / "tools" / "agent_tools" / "evaluate_workflow_selection.py"),
+                str(canon / "eval" / "producers" / "evaluate_workflow_selection.py"),
                 "--root",
                 str(root),
                 "--accumulate",
@@ -207,7 +207,7 @@ def build_producers(
             "report-quality",
             (
                 python_bin,
-                str(canon / "tools" / "agent_tools" / "evaluate_report_quality.py"),
+                str(canon / "eval" / "producers" / "evaluate_report_quality.py"),
                 "--root",
                 str(root),
                 "--accumulate",

@@ -32,16 +32,16 @@ try:
     import yaml
 except ModuleNotFoundError:  # clean host before the shared tool image exists
     try:
-        from . import stdlib_yaml as yaml
+        from tools.runtime.container import stdlib_yaml as yaml
     except ImportError:
-        import stdlib_yaml as yaml  # type: ignore[no-redef]
+        import tools.runtime.container.stdlib_yaml as yaml  # type: ignore[no-redef]
 from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 
 if __package__:
-    from .tool_calls import materialize_skill_tool_call_token
+    from tools.agent.orchestration.tool_calls import materialize_skill_tool_call_token
 else:
-    from tool_calls import materialize_skill_tool_call_token
-from skill_dependency_map import build_graph
+    from tools.agent.orchestration.tool_calls import materialize_skill_tool_call_token
+from tools.agent.skills.skill_dependency_map import build_graph
 from tools.agent.skills.skill_route_catalog import (
     SkillDependencyRule,
     SkillRoutingRule,
@@ -52,7 +52,7 @@ from tools.agent.skills.skill_route_catalog import (
 from tools.agent.skills.skill_tool_commands import SkillCommandPacket, packet_for_skill
 
 try:
-    from .parent_root_side_effects import (
+    from tools.repository.workspace.parent_root_side_effects import (
         ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,

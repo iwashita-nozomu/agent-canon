@@ -2,8 +2,8 @@
 # contract test
 # responsibility Tests result-log conversion and summary tools.
 # upstream design ../../documents/experiments/result-log-retention-and-visualization.md result policy
-# upstream implementation ../../tools/data/jsonl_to_md.py converter under test
-# upstream implementation ../../tools/hlo/summarize_hlo_jsonl.py HLO summary under test
+# upstream implementation ../../tools/analysis/documents/formatting/jsonl_to_md.py converter under test
+# upstream implementation ../../tools/analysis/hlo/summarization/summarize_hlo_jsonl.py HLO summary under test
 # @dependency-end
 
 """Tests for result-log conversion and summary helpers."""
@@ -16,8 +16,8 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-JSONL_TO_MD = PROJECT_ROOT / "tools" / "data" / "jsonl_to_md.py"
-HLO_SUMMARY = PROJECT_ROOT / "tools" / "hlo" / "summarize_hlo_jsonl.py"
+JSONL_TO_MD = PROJECT_ROOT / "tools" / "analysis" / "documents" / "formatting" / "jsonl_to_md.py"
+HLO_SUMMARY = PROJECT_ROOT / "tools" / "analysis" / "hlo" / "summarization" / "summarize_hlo_jsonl.py"
 
 
 def test_jsonl_to_md_writes_markdown_table(tmp_path: Path) -> None:

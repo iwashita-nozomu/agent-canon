@@ -10,9 +10,9 @@ downstream design skills/codex-task-workflow.md consumes pre-edit investigation 
 downstream design skills/subagent-bootstrap.md consumes fresh subagent context capsules
 downstream design TASK_WORKFLOWS.md routes active design packet ownership
 downstream design workflows/implementation-waterfall-workflow.md consumes the active design packet contract
-downstream implementation ../tools/agent_tools/agent_team.py normalizes and materializes active design packets
-downstream implementation ../tools/agent_tools/waterfall_gate_check.py validates persisted active design packets
-downstream implementation ../tools/agent_tools/tool_rejection_preflight.py predicts edit-time tool rejection gates
+downstream implementation ../tools/agent/orchestration/agent_team.py normalizes and materializes active design packets
+downstream implementation ../tools/validation/semantic/lifecycle/waterfall_gate_check.py validates persisted active design packets
+downstream implementation ../tools/validation/semantic/tools/tool_rejection_preflight.py predicts edit-time tool rejection gates
 @dependency-end
 -->
 
@@ -263,11 +263,11 @@ next_decision_changed=<routing|edit-location|validation|review|handoff|deferral>
 Canonical tool commands:
 
 ```bash
-python3 tools/agent_tools/repo_structure_contract.py --root <root> --format json > <run>/repo_structure_contract.json
-python3 tools/agent_tools/responsibility_scope.py --root <root> --format json > <run>/responsibility_scope.json
-python3 tools/agent_tools/file_surface_inventory.py --root <root> --submodule-aware --json-out <run>/file_surface_inventory.json --markdown-out <run>/file_surface_inventory.md
+python3 tools/validation/semantic/structure/repo_structure_contract.py --root <root> --format json > <run>/repo_structure_contract.json
+python3 tools/validation/semantic/responsibility/responsibility_scope.py --root <root> --format json > <run>/responsibility_scope.json
+python3 tools/analysis/code/file_surface_inventory.py --root <root> --submodule-aware --json-out <run>/file_surface_inventory.json --markdown-out <run>/file_surface_inventory.md
 agent-canon structured-analysis document-inventory --root <root> > <run>/document_inventory.txt
-python3 tools/agent_tools/import_responsibility.py --root <root> --format json > <run>/import_responsibility.json
+python3 tools/analysis/code/import_responsibility.py --root <root> --format json > <run>/import_responsibility.json
 ```
 
 Run `document-inventory` when document, README, generated report, stale-doc,
@@ -434,7 +434,7 @@ guessing an edit path.
 Every agent and work unit that can inspect or change repository state carries
 one observational `checkout_identity` block at bounded lifecycle transitions.
 The block is produced by
-`python3 tools/agent_tools/checkout_identity.py --format lines` and contains
+`python3 tools/runtime/authority/checkout_identity.py --format lines` and contains
 exactly these fields:
 
 - `cwd`: absolute directory in which the operation is acting
@@ -526,7 +526,7 @@ Before the parent edits directly or a write-capable subagent starts repository
 edits, the parent runs or cites:
 
 ```bash
-python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>
+python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>
 ```
 
 The handoff work log includes the resulting

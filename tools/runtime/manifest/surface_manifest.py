@@ -5,7 +5,7 @@
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md bootstrap runtime surface policy
 # upstream design ../../documents/runtime/shared-runtime-surfaces.toml machine-readable runtime inventory
 # upstream implementation ./skill_projection_registry.py resolves generated skill-view owner paths
-# downstream implementation ../../rust/agent-canon/src/dependency_manifest.rs consumes normalized source classification
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest.rs consumes normalized source classification
 # downstream implementation ./check_convention_compliance.py validates runtime catalog wiring
 # @dependency-end
 """Parse AgentCanon standalone runtime-surface classification metadata.
@@ -30,12 +30,12 @@ except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
 try:
-    from .skill_projection_registry import (
+    from tools.agent.skills.skill_projection_registry import (
         GeneratedProjection,
         generated_skill_projections,
     )
 except ImportError:  # pragma: no cover - direct script execution
-    from skill_projection_registry import (  # type: ignore[no-redef]
+    from tools.agent.skills.skill_projection_registry import (  # type: ignore[no-redef]
         GeneratedProjection,
         generated_skill_projections,
     )

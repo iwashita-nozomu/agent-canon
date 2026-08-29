@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test fixture
 # responsibility Builds and exposes the Rust CLI for formatter tests without invoking the bootstrap wrapper.
-# upstream implementation ../../rust/agent-canon/src/main.rs owns the standalone formatter CLI
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/main.rs owns the standalone formatter CLI
 # upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md assigns bootstrap routing to user tools
 # downstream implementation ../tools/test_check_markdown_math.py uses the fixture for math checks
 # downstream implementation ../tools/test_fix_markdown_math.py uses the fixture for math fixes
@@ -50,7 +50,7 @@ def standalone_agent_canon() -> Path:
             "build",
             "--locked",
             "--manifest-path",
-            str(PROJECT_ROOT / "rust/agent-canon/Cargo.toml"),
+            str(PROJECT_ROOT / "tools/runtime/dispatch/agent-canon/Cargo.toml"),
         ],
         cwd=PROJECT_ROOT,
         env=environment,

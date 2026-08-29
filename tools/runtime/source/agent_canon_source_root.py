@@ -2,8 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Resolve AgentCanon runtime source root for command execution and route entry.
-# upstream implementation ../../tools/agent_tools/route.py consumes deterministic source root for route-root selection
-# upstream implementation ../../tools/agent_tools/skill_tool_commands.py consumes deterministic command execution roots
+# upstream implementation ../../tools/agent/orchestration/route.py consumes deterministic source root for route-root selection
+# upstream implementation ../../tools/agent/skills/skill_tool_commands.py consumes deterministic command execution roots
 # @dependency-end
 """Resolve the AgentCanon source root used by runtime entrypoints."""
 
@@ -19,10 +19,10 @@ from pathlib import Path
 from typing import Any, cast
 
 try:
-    from . import parent_root_side_effects as _parent_boundary
+    from tools.repository.workspace import parent_root_side_effects as _parent_boundary
 except ImportError:  # direct script execution
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import parent_root_side_effects as _parent_boundary  # type: ignore[no-redef]
+    import tools.repository.workspace.parent_root_side_effects as _parent_boundary  # type: ignore[no-redef]
 
 LAYOUT_STANDALONE = "standalone"
 LAYOUT_EXTERNAL = "external"

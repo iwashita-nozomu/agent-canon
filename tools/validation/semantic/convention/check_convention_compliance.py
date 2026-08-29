@@ -17,7 +17,7 @@
 # upstream design ../../agents/USER_GUIDE_JA.md user-facing small-edit route guidance
 # upstream design ../../templates/agents/workflow_monitoring.md tool warning closeout ledger
 # upstream design ../../templates/agents/closeout_gate.md closeout gate policy
-# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt eval gate
+# upstream design ../../eval/definitions/skill_workflow_prompt_eval.toml prompt eval gate
 # upstream implementation ./agent_canon_source_root.py resolves canonical parent adapter targets
 # upstream design ../../documents/codex/codex-configuration-reference.md Codex hook severity policy
 # upstream design ../../documents/conventions/coding-conventions-house-style.md implementation ownership guardrail
@@ -29,7 +29,7 @@
 # upstream implementation ./tool_drift.py validates tool/convention drift
 # upstream implementation ./convention_compliance_contracts.toml declares marker contracts
 # upstream implementation ./check_skill_frontmatter.py validates runtime skill frontmatter
-# downstream implementation ../../tools/ci/run_all_checks.sh runs convention compliance gate
+# downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs convention compliance gate
 # downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py tests verifier  # noqa: E501
 # @dependency-end
 """Verify that convention, workflow, and skill-routing gates are wired."""

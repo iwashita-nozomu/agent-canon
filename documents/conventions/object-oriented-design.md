@@ -9,12 +9,12 @@ upstream design ./coding-conventions-python.md Python convention entrypoint
 upstream design ./coding-conventions-cpp.md C++ source/header ownership and target boundary
 upstream design ../design/protocols.md Protocol and type-boundary placement contract
 upstream design ../design/semantic-responsibility-contract.md semantic responsibility allocation and hard-edge grouping
-downstream implementation ../../tools/oop/python/readability.py Python OOP typed-boundary evidence
-downstream implementation ../../tools/oop/cpp/readability.py C++ OOP typed-boundary evidence
-downstream implementation ../../tools/oop/python/rule_inventory.py inventories Python OOP rule surfaces
-downstream implementation ../../tools/oop/cpp/rule_inventory.py inventories C++ OOP rule surfaces
+downstream implementation ../../tools/validation/code/oop/python/readability.py Python OOP typed-boundary evidence
+downstream implementation ../../tools/validation/code/oop/cpp/readability.py C++ OOP typed-boundary evidence
+downstream implementation ../../tools/validation/code/oop/python/rule_inventory.py inventories Python OOP rule surfaces
+downstream implementation ../../tools/validation/code/oop/cpp/rule_inventory.py inventories C++ OOP rule surfaces
 downstream implementation ../../tools/catalog.yaml records OOP tool catalog status
-downstream implementation ../../tools/agent_tools/tool_catalog.py validates OOP catalog entries
+downstream implementation ../../tools/runtime/manifest/tool_catalog.py validates OOP catalog entries
 upstream implementation ../../bootstrap.sh standalone runtime entrypoint
 @dependency-end
 -->
@@ -85,7 +85,7 @@ SOLID は、この文書の責務、状態、契約、公開面の規約をレ�
 `software-engineering-principles.md` が所有します。この section は object model が material に
 変わる場合の specialization であり、全 change へ一律適用しません。
 機械 checker は finding kind を SOLID principle signal へ投影し、Markdown / JSON report に集計を出します。
-投影の正本は `tools/oop/shared/readability_core.py` の `SOLID_PRINCIPLES_BY_KIND` です。
+投影の正本は `tools/validation/code/oop/shared/readability_core.py` の `SOLID_PRINCIPLES_BY_KIND` です。
 
 - Single responsibility: 曖昧名、state 過多、副作用混在、不要 wrapper、責務語彙の広がりを同じ責務境界の risk として読む。
 - Open/closed: `Optional` / `None` / `nullptr` routing や深い分岐を、variant や entrypoint の増設で表す候補として読む。
@@ -217,15 +217,15 @@ OOP 的な可読性は reviewer の判断を必要としますが、危険な形
 Python surface では次を baseline として使います。
 
 ```bash
-python3 tools/oop/python/readability.py python tools tests
-python3 tools/oop/python/rule_inventory.py
+python3 tools/validation/code/oop/python/readability.py python tools tests
+python3 tools/validation/code/oop/python/rule_inventory.py
 ```
 
 C++ surface では次を baseline として使います。
 
 ```bash
-python3 tools/oop/cpp/readability.py cpp/include cpp/src tests/cpp cpp/experiments
-python3 tools/oop/cpp/rule_inventory.py
+python3 tools/validation/code/oop/cpp/readability.py cpp/include cpp/src tests/cpp cpp/experiments
+python3 tools/validation/code/oop/cpp/rule_inventory.py
 ```
 
 この tool は次の risk を検出します。
@@ -260,7 +260,7 @@ state ownership、既存責務語彙、または周辺 source shape から安定
 重要な変更では、機械 report の status、count、path、line を正本にします。
 
 ```bash
-python3 tools/oop/python/readability.py \
+python3 tools/validation/code/oop/python/readability.py \
   --format markdown \
   --include-snippets \
   --exclude vendor \
@@ -275,7 +275,7 @@ python3 tools/oop/python/readability.py \
 除外した surface を後で評価する必要がある場合は、別 report として分けます。
 
 OOP policy、analyzer、reviewer、test の配置確認は、言語別の
-`tools/oop/python/rule_inventory.py` と `tools/oop/cpp/rule_inventory.py`
+`tools/validation/code/oop/python/rule_inventory.py` と `tools/validation/code/oop/cpp/rule_inventory.py`
 を使います。旧 `tools/legacy/` provenance は廃止済みであり、workflow や
 CI の正本入口には戻しません。canonical analyzer と inventory の tool
 status は `tools/catalog.yaml` に記録し、`tool_catalog.py` の検査対象にします。

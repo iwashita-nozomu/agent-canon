@@ -12,24 +12,24 @@ downstream implementation ../agent_tools/pydocstyle_review.py explicit AgentCano
 
 ## Reader Map
 
-- Purpose: explain the `tools/ci/pre_review.sh` verifier entrypoint.
+- Purpose: explain the `tools/validation/ci/runners/pre_review.sh` verifier entrypoint.
 - Use When: maintaining GitHub agent-coordination verifier jobs or running the
   same Python quality gate with optional role write-scope evidence.
 - Section path: Entry Contract shows the owner boundary; Commands gives local
   usage; Report Evidence explains `AGENT_REPORT_DIR` and role write-scope
   output.
 - Boundary: Python quality check behavior is owned by
-  `tools/ci/run_python_quality_checks.sh`; this guide does not duplicate its
+  `tools/validation/ci/checks/run_python_quality_checks.sh`; this guide does not duplicate its
   command list.
 
 ## Entry Contract
 
-`tools/ci/pre_review.sh` is a thin verifier wrapper. It calls
-`tools/ci/run_python_quality_checks.sh` and, when requested by the workflow,
+`tools/validation/ci/runners/pre_review.sh` is a thin verifier wrapper. It calls
+`tools/validation/ci/checks/run_python_quality_checks.sh` and, when requested by the workflow,
 records `verification.txt` plus role write-scope evidence.
 
 It is not a separate PR-quality policy surface. Update
-`tools/ci/run_python_quality_checks.sh` when the shared Python gate changes.
+`tools/validation/ci/checks/run_python_quality_checks.sh` when the shared Python gate changes.
 Update this guide only when verifier report or role-scope behavior changes.
 
 ## Commands
@@ -37,20 +37,20 @@ Update this guide only when verifier report or role-scope behavior changes.
 Run the verifier gate:
 
 ```bash
-bash tools/ci/pre_review.sh
+bash tools/validation/ci/runners/pre_review.sh
 ```
 
 Run the same gate with ruff skipped:
 
 ```bash
-bash tools/ci/pre_review.sh --quick
+bash tools/validation/ci/runners/pre_review.sh --quick
 ```
 
 Run the shared Python gate directly when report/write-scope evidence is not
 needed:
 
 ```bash
-bash tools/ci/run_python_quality_checks.sh
+bash tools/validation/ci/checks/run_python_quality_checks.sh
 ```
 
 The PR quick chain intentionally runs pytest and pyright while skipping Ruff;
@@ -84,7 +84,7 @@ unaffected.
 export AGENT_REPORT_DIR="<run-bundle-report-dir>"
 export AGENT_ROLE="verifier"
 export AGENT_ENFORCE_WRITE_SCOPE="1"
-bash tools/ci/pre_review.sh
+bash tools/validation/ci/runners/pre_review.sh
 ```
 
 When `AGENT_REPORT_DIR` is set, `pre_review.sh` writes
@@ -97,7 +97,7 @@ is active.
 After editing this wrapper or the shared Python gate, run:
 
 ```bash
-bash -n tools/ci/pre_review.sh
-bash -n tools/ci/run_python_quality_checks.sh
+bash -n tools/validation/ci/runners/pre_review.sh
+bash -n tools/validation/ci/checks/run_python_quality_checks.sh
 python3 -m pytest tests/tools/test_run_all_checks_script.py -q
 ```

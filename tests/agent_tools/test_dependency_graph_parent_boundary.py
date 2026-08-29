@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Verifies dependency graph scratch and publication stay in the external runtime.
-# upstream implementation ../../tools/agent_tools/check_dependency_graph.sh owns graph scratch and TSV publication.
+# upstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh owns graph scratch and TSV publication.
 # @dependency-end
 
 """Focused external-runtime tests for the dependency graph shell entrypoint."""
@@ -13,7 +13,7 @@ import subprocess
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "check_dependency_graph.sh"
+SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "check_dependency_graph.sh"
 
 
 def _git(*args: str, cwd: Path) -> None:

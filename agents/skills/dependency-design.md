@@ -5,8 +5,8 @@ responsibility Places dependencies under the canonical Dockerfile-image-test str
 upstream design ../../CONTAINER_OPERATIONS.md container ownership boundary
 upstream design ./environment-maintenance.md expected environment structure owner
 downstream implementation environment-maintenance.md consumes the dependency placement decision
-downstream implementation ../../tools/agent_tools/devcontainer_dependencies.py optional typed build-input manifest validator
-downstream implementation ../../tools/docker_dependency_validator.sh validates dependency placement
+downstream implementation ../../tools/runtime/container/devcontainer_dependencies.py optional typed build-input manifest validator
+downstream implementation ../../tools/validation/dependencies/docker_dependency_validator.sh validates dependency placement
 downstream implementation ../../tests/agent_tools/test_environment_skill_expected_structure.py expected-structure contract
 @dependency-end
 -->
@@ -72,9 +72,9 @@ declarative inputとして扱います。manifest engine、receipt、provider cl
 manifestをbuild inputとして使う場合だけ、typed validationを実行します。
 
 ```bash
-python3 tools/agent_tools/devcontainer_dependencies.py validate --workspace . --vendor-root . --format text
-python3 tools/agent_tools/devcontainer_dependencies.py dry-run --workspace . --vendor-root . --format json
-bash tools/docker_dependency_validator.sh
+python3 tools/runtime/container/devcontainer_dependencies.py validate --workspace . --vendor-root . --format text
+python3 tools/runtime/container/devcontainer_dependencies.py dry-run --workspace . --vendor-root . --format json
+bash tools/validation/dependencies/docker_dependency_validator.sh
 docker build -f <Dockerfile> --target <canonical-target> -t <image> .
 docker run --rm <runtime-wiring> <image> <canonical-full-test-command>
 ```

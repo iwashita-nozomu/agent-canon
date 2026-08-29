@@ -1,9 +1,9 @@
 # @dependency-start
 # contract test
 # responsibility Reproduces shared-checkout writer collisions before spawn and target-bound mutation rejection.
-# upstream implementation ../../tools/agent_tools/writer_target.py owns writer-target validation.
-# upstream implementation ../../tools/agent_tools/implementation_dispatch.py materializes writer waves.
-# upstream implementation ../../tools/agent_tools/mutation_authority.py owns active mutation admission.
+# upstream implementation ../../tools/runtime/authority/writer_target.py owns writer-target validation.
+# upstream implementation ../../tools/agent/orchestration/implementation_dispatch.py materializes writer waves.
+# upstream implementation ../../tools/runtime/authority/mutation_authority.py owns active mutation admission.
 # @dependency-end
 """Focused tests for task-scoped writer targets."""
 
@@ -19,28 +19,28 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from tools.agent_tools.implementation_dispatch import (  # noqa: E402
+from tools.agent.orchestration.implementation_dispatch import (  # noqa: E402
     dispatch_subagent_wave,
     recommended_dynamic_expansion_wave_slots,
     recommended_initial_subagent_wave,
     validate_writer_handoff_waves,
     workflow_spawn_budget,
 )
-from tools.agent_tools.mutation_authority import evaluate_mutation_authority  # noqa: E402
-from tools.agent_tools.team_config import (  # noqa: E402
+from tools.runtime.authority.mutation_authority import evaluate_mutation_authority  # noqa: E402
+from tools.agent.orchestration.team_config import (  # noqa: E402
     SubagentWaveSlot,
     load_task_catalog,
     load_team_config,
     select_roles,
 )
-from tools.agent_tools.writer_target import (  # noqa: E402
+from tools.runtime.authority.writer_target import (  # noqa: E402
     WriterTarget,
     WriterTargetError,
     materialize_writer_target_packet,
     validate_writer_target_allocations,
     validate_writer_target_identity,
 )
-from tool_calls import materialize_subagent_spawn_tool_call  # noqa: E402
+from tools.agent.orchestration.tool_calls import materialize_subagent_spawn_tool_call  # noqa: E402
 
 
 def target(root: str, branch: str = "fix/942") -> WriterTarget:
@@ -680,7 +680,7 @@ def test_canonical_merge_main_is_integration_only_and_preservation_gated() -> No
             "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
         }
         command = (
-            "python3 tools/agent_tools/repository_topic_clone.py merge-main "
+            "python3 tools/repository/workspace/repository_topic_clone.py merge-main "
             "--url git@github.com:iwashita-nozomu/agent-canon.git "
             "--repo-name agent-canon --workspace-root /tmp --topic issue-942 "
             "--branch fix/942 --owner-evidence evidence.txt"

@@ -3,10 +3,10 @@
 # @dependency-start
 # contract test
 # responsibility Tests short task routing helper behavior and explicit capability owner partitions.
-# upstream implementation ../../tools/agent_tools/route.py selects short tool and skill routes
-# upstream implementation ../../tools/agent_tools/skill_route_catalog.py owns catalog/rule/index behavior
-# upstream implementation ../../tools/agent_tools/capability_route.py owns capability preflight/decision behavior
-# upstream implementation ../../tools/agent_tools/visualization_contract.py owns exact ToolCall validation
+# upstream implementation ../../tools/agent/orchestration/route.py selects short tool and skill routes
+# upstream implementation ../../tools/agent/skills/skill_route_catalog.py owns catalog/rule/index behavior
+# upstream implementation ../../tools/agent/orchestration/capability_route.py owns capability preflight/decision behavior
+# upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py owns exact ToolCall validation
 # upstream design ../../documents/design/tool-skill-routing-refactor.md defines naming policy
 # upstream design ../../.codex/personal/skills/code-visualization/SKILL.md owns the runtime direct-route text
 # upstream design ../../agents/skills/code-visualization.md owns the canonical direct-route contract
@@ -23,19 +23,19 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-ROUTE = PROJECT_ROOT / "tools" / "agent_tools" / "route.py"
+ROUTE = PROJECT_ROOT / "tools" / "agent" / "orchestration" / "route.py"
 AGENT_CANON_CLI = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-import agent_canon_source_root  # noqa: E402
-import capability_route as capability_module  # noqa: E402
-import route as route_module  # noqa: E402
-import skill_route_catalog as catalog_module  # noqa: E402
-from team_config import (  # noqa: E402
+import tools.runtime.source.agent_canon_source_root  # noqa: E402
+import tools.agent.orchestration.capability_route as capability_module  # noqa: E402
+import tools.agent.orchestration.route as route_module  # noqa: E402
+import tools.agent.skills.skill_route_catalog as catalog_module  # noqa: E402
+from tools.agent.orchestration.team_config import (  # noqa: E402
     default_specialists_for_task,
     load_task_catalog,
     load_team_config,
 )
-from implementation_dispatch import declared_team_capacity_derivation  # noqa: E402
+from tools.agent.orchestration.implementation_dispatch import declared_team_capacity_derivation  # noqa: E402
 
 
 class RouteToolTest(unittest.TestCase):
@@ -250,8 +250,8 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("AREA=search", result.stdout)
         self.assertIn("NEXT_ACTION=run_coordinated_search", result.stdout)
-        self.assertIn("python3 tools/agent_tools/search.py --purpose", result.stdout)
-        self.assertIn("python3 tools/agent_tools/search.py --purpose", result.stdout)
+        self.assertIn("python3 tools/analysis/search/search.py --purpose", result.stdout)
+        self.assertIn("python3 tools/analysis/search/search.py --purpose", result.stdout)
 
     def test_search_alias_resolves_to_search_area(self) -> None:
         """Legacy vector-search names should route to coordinated search."""
@@ -1204,8 +1204,8 @@ class RouteToolTest(unittest.TestCase):
         direct_text = canonical_text[direct_start:renderer_choice]
         self.assertLess(direct_start, renderer_choice)
         for command in (
-            "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
-            "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
+            "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
+            "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
         ):
             self.assertIn(command, direct_text)
         self.assertNotIn("<path>", direct_text)
@@ -1227,7 +1227,7 @@ class RouteToolTest(unittest.TestCase):
             "The renderer performs one typed dependency query through `GraphClient` and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
         ):
             self.assertIn(boundary, direct_flat)
-        self.assertNotIn("tools/agent_tools/check_dependency_graph.sh", direct_flat)
+        self.assertNotIn("tools/analysis/dependencies/check_dependency_graph.sh", direct_flat)
         self.assertIn(
             "There is no supplied-input, raw-checker, scan, helper, or Mermaid fallback.",
             direct_flat,
@@ -1235,7 +1235,7 @@ class RouteToolTest(unittest.TestCase):
         packet_result = subprocess.run(
             [
                 sys.executable,
-                str(PROJECT_ROOT / "tools" / "agent_tools" / "skill_tool_commands.py"),
+                str(PROJECT_ROOT / "tools" / "agent" / "skills" / "skill_tool_commands.py"),
                 "show",
                 "--skill",
                 "code-visualization",
@@ -1257,8 +1257,8 @@ class RouteToolTest(unittest.TestCase):
         self.assertEqual(
             packet_payload["discovered_commands"],
             [
-                "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
-                "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
+                "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
+                "python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
             ],
         )
         for forbidden in (
@@ -1311,7 +1311,7 @@ class RouteToolTest(unittest.TestCase):
             "The renderer performs one typed dependency query through `GraphClient` and owns only Graph IR, Markdown, DOT, HTML, and bundle/manifest projection creation.",
         ):
             self.assertIn(boundary, source_flat)
-        self.assertNotIn("tools/agent_tools/check_dependency_graph.sh", source_flat)
+        self.assertNotIn("tools/analysis/dependencies/check_dependency_graph.sh", source_flat)
         self.assertIn(
             "There is no supplied-input, raw-checker, scan, helper, or Mermaid fallback.",
             source_flat,
@@ -2775,7 +2775,7 @@ class CapabilityRouteTest(unittest.TestCase):
             payload["visualization_adapter_tool_call"]["arguments"][
                 "dependency_manifest_locator"
             ],
-            "tools/agent_tools/render_dependency_manifest_graph.py",
+            "tools/analysis/dependencies/render_dependency_manifest_graph.py",
         )
         self.assertIsNone(payload["visualization_rejection"])
 

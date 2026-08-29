@@ -4,7 +4,7 @@
 # contract test
 # responsibility Verifies CMake database selection, native checker forwarding, and VS Code policy.
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared editor surface ownership
-# upstream implementation ../../tools/static_analysis/cpp/static_analysis.py canonical C++ route
+# upstream implementation ../../tools/validation/code/static/cpp/static_analysis.py canonical C++ route
 # downstream implementation ../../.vscode/extensions.json shared extension recommendations
 # downstream implementation ../../.vscode/settings.json shared provider settings
 # downstream implementation ../../.vscode/tasks.json shared task entrypoints
@@ -22,7 +22,7 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "static_analysis" / "cpp" / "static_analysis.py"
+SCRIPT = PROJECT_ROOT / "tools" / "validation" / "code" / "static" / "cpp" / "static_analysis.py"
 
 
 def run_tool(root: Path, *args: str) -> subprocess.CompletedProcess[str]:

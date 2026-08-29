@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests Rust markdown math check behavior.
-# upstream implementation ../../rust/agent-canon/src/docs.rs implements docs check.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs implements docs check.
 # upstream design ../../tools/README.md validates automation surface.
 # @dependency-end
 

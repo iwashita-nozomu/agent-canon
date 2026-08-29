@@ -4,7 +4,7 @@
 # upstream design README.md eval directory contract
 # upstream design ../../templates/agents/workflow_monitoring.md stores behavior events during a run
 # upstream design ../../documents/runtime/task-contract-observation.md defines task contract observation coverage
-# downstream implementation ../../tools/agent_tools/evaluate_agent_run.py consumes these criteria
+# downstream implementation ../../eval/producers/evaluate_agent_run.py consumes these criteria
 # downstream implementation ../../tests/agent_tools/test_evaluate_agent_run.py verifies behavior scoring
 # @dependency-end
 

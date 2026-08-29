@@ -6,7 +6,7 @@ contract reference
 responsibility Defines the sole Host entrypoint and typed command routes for the standalone AgentCanon runtime.
 upstream implementation ../../bootstrap.sh owns Host lifecycle admission
 upstream design ../../documents/runtime/bootstrap-runtime.md owns runtime, target, eval, and cleanup semantics
-downstream implementation ../../tools/agent_tools/bootstrap_runtime.py implements the command family
+downstream implementation ../../tools/runtime/container/bootstrap_runtime.py implements the command family
 downstream design ./CODEX_WORKFLOW.md consumes task and closeout routes
 @dependency-end
 -->

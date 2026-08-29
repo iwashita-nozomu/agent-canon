@@ -1,10 +1,10 @@
 # @dependency-start
 # contract test
 # responsibility Tests mathematical-intent packet normalization, bootstrap admission, and spawn scope.
-# upstream implementation ../../tools/agent_tools/packets.py owns packet normalization and manifest identity
-# upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py owns normal run admission
-# upstream implementation ../../tools/agent_tools/tool_calls.py owns spawn ToolCall admission
-# upstream implementation ../../tools/agent_tools/writer_target.py owns math writer target narrowing
+# upstream implementation ../../tools/agent/orchestration/packets.py owns packet normalization and manifest identity
+# upstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py owns normal run admission
+# upstream implementation ../../tools/agent/orchestration/tool_calls.py owns spawn ToolCall admission
+# upstream implementation ../../tools/runtime/authority/writer_target.py owns math writer target narrowing
 # @dependency-end
 
 from __future__ import annotations
@@ -23,17 +23,17 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOLS = PROJECT_ROOT / "tools" / "agent_tools"
 sys.path.insert(0, str(TOOLS))
 
-from packets import (  # noqa: E402
+from tools.agent.orchestration.packets import (  # noqa: E402
     MATHEMATICAL_INTENT_PACKET_SCHEMA,
     mathematical_intent_packet_mapping,
     math_intent_route_id_from_context,
     normalize_mathematical_intent_packet,
     validate_mathematical_intent_route,
 )
-from tool_calls import materialize_subagent_spawn_tool_call  # noqa: E402
-from implementation_dispatch import dispatch_subagent_wave  # noqa: E402
-from team_config import SubagentWaveSlot  # noqa: E402
-from writer_target import WriterTarget  # noqa: E402
+from tools.agent.orchestration.tool_calls import materialize_subagent_spawn_tool_call  # noqa: E402
+from tools.agent.orchestration.implementation_dispatch import dispatch_subagent_wave  # noqa: E402
+from tools.agent.orchestration.team_config import SubagentWaveSlot  # noqa: E402
+from tools.runtime.authority.writer_target import WriterTarget  # noqa: E402
 
 
 FORBIDDEN = [

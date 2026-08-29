@@ -23,7 +23,7 @@ from typing import TypeGuard, cast
 import yaml
 
 if __package__:
-    from .packets import (
+    from tools.agent.orchestration.packets import (
         ACTIVE_DESIGN_PACKET_ARTIFACT_FIELDS,
         ACTIVE_DESIGN_PACKET_FIELDS,
         ACTIVE_DESIGN_PACKET_SCHEMA,
@@ -31,7 +31,7 @@ if __package__:
         normalize_active_design_packet_config,
     )
 else:
-    from packets import (
+    from tools.agent.orchestration.packets import (
         ACTIVE_DESIGN_PACKET_ARTIFACT_FIELDS,
         ACTIVE_DESIGN_PACKET_FIELDS,
         ACTIVE_DESIGN_PACKET_SCHEMA,
@@ -40,18 +40,18 @@ else:
     )
 
 if __package__:
-    from .workspace_scope import (
+    from tools.repository.workspace.workspace_scope import (
         ReportBundleArtifactPathError,
         resolve_report_bundle_artifact_path,
         resolve_report_root,
     )
 else:
-    from workspace_scope import (
+    from tools.repository.workspace.workspace_scope import (
         ReportBundleArtifactPathError,
         resolve_report_bundle_artifact_path,
         resolve_report_root,
     )
-from report_artifact_checks import (
+from tools.runtime.artifacts.report_artifact_checks import (
     check_schedule_artifact,
     check_work_log_artifact,
     has_approve_decision,

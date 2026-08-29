@@ -3,7 +3,7 @@
 # responsibility Tests experiment completion, terminal case invariants, and nested manifest readback.
 # upstream implementation ../../templates/experiments/_template/run.py owns schemas and artifact publication.
 # upstream implementation ../../templates/experiments/_template/cases.py owns case invariants.
-# upstream implementation ../../tools/experiments/create_experiment_topic.py owns topic materialization.
+# upstream implementation ../../tools/experiments/lifecycle/create_experiment_topic.py owns topic materialization.
 # @dependency-end
 
 """experiment template の completion、state、manifest contract を検証します."""
@@ -25,7 +25,7 @@ TEMPLATE_ROOT = (
     Path(__file__).resolve().parents[2] / "templates" / "experiments" / "_template"
 )
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CREATE_TOPIC = PROJECT_ROOT / "tools" / "experiments" / "create_experiment_topic.py"
+CREATE_TOPIC = PROJECT_ROOT / "tools" / "experiments" / "lifecycle" / "create_experiment_topic.py"
 sys.path.insert(0, str(TEMPLATE_ROOT))
 
 from run import (  # noqa: E402

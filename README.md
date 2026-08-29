@@ -192,8 +192,8 @@ artifact build/distribution only. Do not use #821 as the lifecycle issue.
 The minimum focused checks for documentation changes are:
 
 ```bash
-python3 tools/docs/check_bootstrap_docs.py --root .
-bash tools/agent_tools/check_dependency_header_format.sh --root . --changed
+python3 tools/validation/documentation/checks/check_bootstrap_docs.py --root .
+bash tools/validation/semantic/dependencies/check_dependency_header_format.sh --root . --changed
 git diff --check
 ```
 

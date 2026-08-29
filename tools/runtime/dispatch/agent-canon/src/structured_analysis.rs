@@ -6,7 +6,7 @@
 // upstream design ../../../documents/prose-reasoning-graph/dsl-spec.md document responsibility diagnostic boundary
 // upstream design ../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 // downstream implementation ../../../tests/agent_tools/test_structured_document_inventory_cli.py tests the canonical CLI
-// downstream implementation ../../../rust/agent-canon/src/main.rs routes structured-analysis commands
+// downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/main.rs routes structured-analysis commands
 // @dependency-end
 
 use crate::runtime_boundary::{
@@ -1492,7 +1492,7 @@ fn render_markdown(report: &InventoryReport) -> String {
         "<!--".to_string(),
         "@dependency-start".to_string(),
         "responsibility Records non-canonical document candidates for cleanup review.".to_string(),
-        "upstream implementation rust/agent-canon/src/structured_analysis.rs generates this report"
+        "upstream implementation tools/runtime/dispatch/agent-canon/src/structured_analysis.rs generates this report"
             .to_string(),
         "@dependency-end".to_string(),
         "-->".to_string(),

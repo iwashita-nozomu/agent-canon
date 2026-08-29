@@ -37,12 +37,12 @@ from tools.runtime.artifacts.artifact_identity import (
     canonical_json_bytes,
     materialize_artifact_identity,
 )
-from external_artifact_binding import (
+from tools.runtime.artifacts.external_artifact_binding import (
     materialize_external_projection_acknowledgement,
 )
-from task_authority import ACTIVE_RUN_POINTER
-from work_log import append_ledger_event, read_ledger_snapshot
-from report_artifact_checks import markdown_without_adjudicated_rejected_hypotheses
+from tools.runtime.authority.task_authority import ACTIVE_RUN_POINTER
+from tools.runtime.archive.work_log import append_ledger_event, read_ledger_snapshot
+from tools.runtime.artifacts.report_artifact_checks import markdown_without_adjudicated_rejected_hypotheses
 
 REVIEW_CANDIDATE_SCHEMA = "agent-canon.review-candidate-event.v1"
 REVIEW_INTENT_SCHEMA = "agent-canon.terminal-resume-intent.v1"
@@ -1024,7 +1024,7 @@ def resolve_current_review_state(workspace: Path) -> dict[str, object]:
 def resolve_review_eligibility(workspace: Path) -> dict[str, object]:
     """Regenerate the current review eligibility from validation and L."""
     root = workspace.resolve()
-    from report_artifact_checks import resolve_validation_result
+    from tools.runtime.artifacts.report_artifact_checks import resolve_validation_result
 
     validation = resolve_validation_result(root)
     report_dir = _active_report_dir(root)

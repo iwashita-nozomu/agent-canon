@@ -4,8 +4,8 @@
 # contract test
 # responsibility Verifies schema, merge, order, security, and receipt semantics for the shared tool image.
 # upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md bootstrap dependency contract
-# upstream implementation ../../tools/agent_tools/dependency_plan.py typed dependency engine
-# downstream implementation ../../bootstrap/container/dependencies.toml canonical manifest inventory
+# upstream implementation ../../tools/analysis/dependencies/dependency_plan.py typed dependency engine
+# downstream implementation ../../bootstrap/container/image/dependencies.toml canonical manifest inventory
 # @dependency-end
 
 from __future__ import annotations
@@ -27,8 +27,8 @@ from pathlib import Path
 from typing import Any
 from unittest import mock
 
-from tools.agent_tools import devcontainer_dependencies as dependency_module
-from tools.agent_tools.devcontainer_dependencies import (
+from tools.runtime.container import devcontainer_dependencies as dependency_module
+from tools.runtime.container.devcontainer_dependencies import (
     BASE_CAPABILITIES,
     CommandCapability,
     CommandProvenance,
@@ -58,7 +58,7 @@ from tools.agent_tools.devcontainer_dependencies import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
-ENGINE = ROOT / "tools" / "agent_tools" / "devcontainer_dependencies.py"
+ENGINE = ROOT / "tools" / "runtime" / "container" / "devcontainer_dependencies.py"
 _PARENT_BOUNDARY_PATH_KEYS = (
     "TMPDIR",
     "TEMP",
@@ -1688,7 +1688,7 @@ class DependencyModelTests(unittest.TestCase):
             destination.write_bytes(payload)
 
         with mock.patch(
-            "tools.agent_tools.devcontainer_dependencies._download",
+            "tools.runtime.container.devcontainer_dependencies._download",
             side_effect=write_fixture,
         ):
             Installer(image_owned=True)._verify_repository_packages_digest(parsed)
@@ -1697,7 +1697,7 @@ class DependencyModelTests(unittest.TestCase):
             parsed, repository_packages_sha256=hashlib.sha256(b"different").hexdigest()
         )
         with mock.patch(
-            "tools.agent_tools.devcontainer_dependencies._download",
+            "tools.runtime.container.devcontainer_dependencies._download",
             side_effect=write_fixture,
         ):
             with self.assertRaisesRegex(DependencyError, "Packages index SHA256 mismatch"):
@@ -1806,7 +1806,7 @@ class DependencyModelTests(unittest.TestCase):
             with (
                 mock.patch.object(runner, "run", side_effect=run_with_key_fingerprint),
                 mock.patch(
-                    "tools.agent_tools.devcontainer_dependencies._download",
+                    "tools.runtime.container.devcontainer_dependencies._download",
                     side_effect=write_download,
                 ),
             ):
@@ -2044,7 +2044,7 @@ class DependencyModelTests(unittest.TestCase):
                 target.write_text("#!/usr/bin/env true\n", encoding="utf-8")
                 target.chmod(0o755)
             (bin_dir / "pyright").symlink_to(target_v1)
-            manifest = root / "bootstrap" / "container" / "dependencies.toml"
+            manifest = root / "bootstrap" / "container" / "image" / "dependencies.toml"
             write_manifest(
                 manifest,
                 [
@@ -2362,11 +2362,11 @@ class DependencyModelTests(unittest.TestCase):
             init_authentic_git(root)
             with (
                 mock.patch(
-                    "tools.agent_tools.devcontainer_dependencies.architecture",
+                    "tools.runtime.container.devcontainer_dependencies.architecture",
                     return_value="x86_64",
                 ),
                 mock.patch(
-                    "tools.agent_tools.devcontainer_dependencies._download",
+                    "tools.runtime.container.devcontainer_dependencies._download",
                     side_effect=download,
                 ),
             ):
@@ -2510,7 +2510,7 @@ class DependencyModelTests(unittest.TestCase):
         """Automatic discovery has one bootstrap-owned source."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            manifest = root / "bootstrap" / "container" / "dependencies.toml"
+            manifest = root / "bootstrap" / "container" / "image" / "dependencies.toml"
             legacy = root / ".devcontainer" / "dependencies.toml"
             vendor = root / "vendor" / "agent-canon" / "dependencies.toml"
             write_manifest(manifest, [record("bootstrap")])
@@ -2536,7 +2536,7 @@ class DependencyModelTests(unittest.TestCase):
         """An explicit image manifest bypasses parent and synthetic path discovery."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            explicit = root / "bootstrap" / "container" / "dependencies.toml"
+            explicit = root / "bootstrap" / "container" / "image" / "dependencies.toml"
             parent = root / ".devcontainer" / "dependencies.toml"
             vendor = root / "vendor" / "agent-canon" / ".devcontainer" / "dependencies.toml"
             write_manifest(explicit, [record("explicit")])
@@ -2562,7 +2562,7 @@ class DependencyModelTests(unittest.TestCase):
         self.assertFalse((ROOT / ".devcontainer").exists())
         plan = load_plan(
             ROOT,
-            manifest=ROOT / "bootstrap" / "container" / "dependencies.toml",
+            manifest=ROOT / "bootstrap" / "container" / "image" / "dependencies.toml",
         )
         self.assertTrue(plan.records)
 
@@ -2570,8 +2570,8 @@ class DependencyModelTests(unittest.TestCase):
         """Boundary validation does not require editor hooks or product mounts."""
         report = EnvironmentBoundaryModel(ROOT, ROOT).validate()
         self.assertEqual(report.status, "pass")
-        self.assertIn("bootstrap/container/dependencies.toml", report.checked)
-        self.assertIn("bootstrap/container/Dockerfile", report.checked)
+        self.assertIn("bootstrap/container/image/dependencies.toml", report.checked)
+        self.assertIn("bootstrap/container/image/Dockerfile", report.checked)
         self.assertNotIn(".devcontainer/devcontainer.json", report.checked)
         self.assertNotIn(".devcontainer/post-create.sh", report.checked)
 
@@ -2579,7 +2579,7 @@ class DependencyModelTests(unittest.TestCase):
         """Default startup retains only LSP and small structure/agent tools."""
         plan = load_plan(
             ROOT,
-            manifest=ROOT / "bootstrap" / "container" / "dependencies.toml",
+            manifest=ROOT / "bootstrap" / "container" / "image" / "dependencies.toml",
         )
         ids = {item.id for item in plan.records}
         self.assertEqual(
@@ -2613,7 +2613,7 @@ class DependencyModelTests(unittest.TestCase):
         """Shared apt records target Jammy without pinning one host architecture."""
         plan = load_plan(
             ROOT,
-            manifest=ROOT / "bootstrap" / "container" / "dependencies.toml",
+            manifest=ROOT / "bootstrap" / "container" / "image" / "dependencies.toml",
         )
         apt_records = [
             item for item in plan.records if item.method.value == "apt-package"
@@ -2727,7 +2727,7 @@ class DependencyModelTests(unittest.TestCase):
         """Reject an empty bootstrap canonical manifest."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            manifest = root / "bootstrap" / "container" / "dependencies.toml"
+            manifest = root / "bootstrap" / "container" / "image" / "dependencies.toml"
             write_manifest(manifest, [])
 
             with self.assertRaisesRegex(DependencyError, "non-empty"):
@@ -3094,7 +3094,7 @@ class DependencyModelTests(unittest.TestCase):
                 encoding="utf-8",
             )
             binary.chmod(0o755)
-            (repository / "rust" / "agent-canon" / "Cargo.toml").write_text(
+            (repository / "tools" / "runtime" / "dispatch" / "agent-canon" / "Cargo.toml").write_text(
                 "[package]\nname = 'agent-canon'\nversion = '0.1.0'\nedition = '2021'\n",
                 encoding="utf-8",
             )
@@ -3118,9 +3118,7 @@ class DependencyModelTests(unittest.TestCase):
                             "bash",
                             str(
                                 ROOT
-                                / "tools"
-                                / "lib"
-                                / "agent_canon_source_identity.sh"
+                                / "tools" / "runtime" / "support" / "agent_canon_source_identity.sh"
                             ),
                             str(root),
                             source_prefix,
@@ -3229,7 +3227,7 @@ class DependencyModelTests(unittest.TestCase):
                     "current=\"$(agent_canon_source_identity \"$2\" \"$3\" \"$4\")\"\n"
                     "agent_canon_receipt_matches_identity \"$5\" \"$current\"\n",
                     "bash",
-                    str(ROOT / "tools" / "lib" / "agent_canon_source_identity.sh"),
+                    str(ROOT / "tools" / "runtime" / "support" / "agent_canon_source_identity.sh"),
                     str(root),
                     "vendor/agent-canon",
                     str(root),
@@ -3314,15 +3312,15 @@ class DependencyModelTests(unittest.TestCase):
             (tools / "agent_tools").mkdir()
             shutil.copy2(ROOT / "bootstrap.sh", tools / "retired-rebuild-agent-tools")
             shutil.copy2(
-                ROOT / "tools" / "lib" / "agent_canon_source_identity.sh",
+                ROOT / "tools" / "runtime" / "support" / "agent_canon_source_identity.sh",
                 tools / "lib",
             )
             shutil.copy2(
-                ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py",
+                ROOT / "tools" / "repository" / "workspace" / "parent_root_side_effects.py",
                 tools / "agent_tools",
             )
             shutil.copy2(
-                ROOT / "tools" / "agent_tools" / "runtime_artifacts.py",
+                ROOT / "tools" / "runtime" / "artifacts" / "runtime_artifacts.py",
                 tools / "agent_tools",
             )
             fake_bin = root / "fake-bin"
@@ -3665,7 +3663,7 @@ class DependencyModelTests(unittest.TestCase):
             )
 
     def test_image_owned_dependency_and_shared_bootstrap_contract(self) -> None:
-        dockerfile = (ROOT / "bootstrap" / "container" / "Dockerfile").read_text(
+        dockerfile = (ROOT / "bootstrap" / "container" / "image" / "Dockerfile").read_text(
             encoding="utf-8"
         )
         dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
@@ -3673,11 +3671,11 @@ class DependencyModelTests(unittest.TestCase):
         self.assertIn("node:22.14.0-bullseye-slim@sha256:", dockerfile)
         self.assertIn("COPY --from=node-provider /usr/local/lib/node_modules", dockerfile)
         self.assertIn(
-            "COPY tools/agent_tools/parent_root_side_effects.py "
-            "/opt/agent-canon/tools/agent_tools/parent_root_side_effects.py",
+            "COPY tools/repository/workspace/parent_root_side_effects.py "
+            "/opt/agent-canon/tools/repository/workspace/parent_root_side_effects.py",
             dockerfile,
         )
-        self.assertIn("!tools/agent_tools/parent_root_side_effects.py", dockerignore)
+        self.assertIn("!tools/repository/workspace/parent_root_side_effects.py", dockerignore)
         self.assertIn("dependency_plan.py", dockerfile)
         self.assertIn("image-install --workspace /opt/agent-canon", dockerfile)
         self.assertIn(

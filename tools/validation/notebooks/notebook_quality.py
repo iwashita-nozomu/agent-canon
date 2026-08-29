@@ -5,7 +5,7 @@
 # upstream design ../../tools/README.md shared validation tool family ownership
 # upstream design ../../documents/tools/README.md root-facing tool entrypoint policy
 # downstream implementation ../agent_tools/tool_rejection_preflight.py consumes changed notebook quality findings
-# downstream implementation ../../tools/ci/run_all_checks.sh runs notebook quality validation in CI
+# downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs notebook quality validation in CI
 # downstream implementation ../../tests/tools/test_notebook_quality.py tests notebook quality checks
 # @dependency-end
 """Validate notebooks as practical, readable, visualization-oriented demos."""

@@ -4,29 +4,29 @@ contract reference
 responsibility Documents the repository-topic clone lifecycle command.
 upstream design ../rule/repository-topic-clone.md generic repository-topic clone policy
 upstream design ../contracts/github-first-module-and-devcontainer-policy.md canonical topic workspace boundary
-upstream implementation ../../tools/agent_tools/repository_topic_clone.py lifecycle implementation
+upstream implementation ../../tools/repository/workspace/repository_topic_clone.py lifecycle implementation
 downstream implementation ../../tests/agent_tools/test_repository_topic_clone.py validates cleanup and merge gates
 @dependency-end
 -->
 
 # repository_topic_clone.py
 
-`tools/agent_tools/repository_topic_clone.py` は、`repository-topic` clone の
+`tools/repository/workspace/repository_topic_clone.py` は、`repository-topic` clone の
 `workspace/<topic>/<repo>` 形 lifecycle を管理する tool です。詳細責務と
 clause は
 [`documents/rule/repository-topic-clone.md`](../rule/repository-topic-clone.md)
 を参照します。
 
 ```bash
-python3 tools/agent_tools/repository_topic_clone.py prepare \
+python3 tools/repository/workspace/repository_topic_clone.py prepare \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
   --topic <topic> --branch <task-branch> --owner-evidence <evidence-file>
 
-python3 tools/agent_tools/repository_topic_clone.py merge-main \
+python3 tools/repository/workspace/repository_topic_clone.py merge-main \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
   --topic <topic> --branch <task-branch> --owner-evidence <evidence-file>
 
-python3 tools/agent_tools/repository_topic_clone.py cleanup \
+python3 tools/repository/workspace/repository_topic_clone.py cleanup \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
   --topic <topic> --branch <task-branch> --owner-evidence <evidence-file> \
   [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
@@ -60,16 +60,16 @@ reference、staged/unmerged state、各 hunk、unaffected user/unknown content �
 edit delta、rationale を含む plan を作り、次の checker で readback を確認します。
 
 ```bash
-python3 tools/agent_tools/conflict_preservation.py capture \
+python3 tools/repository/git/conflict_preservation.py capture \
   --repo-root <clone> --base <merge-base> --ours <head> --theirs <origin-main> \
   --output <clone>/.agent-canon/conflict-preservation.json
-python3 tools/agent_tools/conflict_preservation.py validate \
+python3 tools/repository/git/conflict_preservation.py validate \
   --inventory <clone>/.agent-canon/conflict-preservation.json \
   --plan <preservation-plan.json> --repo-root <clone>
-python3 tools/agent_tools/conflict_preservation.py validate-rework \
+python3 tools/repository/git/conflict_preservation.py validate-rework \
   --packet <rework-preservation.json>
 
-python3 tools/agent_tools/repository_topic_clone.py finalize-merge \
+python3 tools/repository/workspace/repository_topic_clone.py finalize-merge \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
   --topic <topic> --branch <task-branch> --owner-evidence <evidence-file> \
   [--inventory <inventory.json> --plan <preservation-plan.json>]

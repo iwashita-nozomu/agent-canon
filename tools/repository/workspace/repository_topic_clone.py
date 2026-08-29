@@ -24,9 +24,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
 try:
-    from .conflict_preservation import capture_inventory, validate_plan
-    from .checkout_identity import resolve_checkout_identity
-    from .writer_target import (
+    from tools.repository.git.conflict_preservation import capture_inventory, validate_plan
+    from tools.runtime.authority.checkout_identity import resolve_checkout_identity
+    from tools.runtime.authority.writer_target import (
         WriterTarget,
         WriterTargetError,
         WRITER_TARGET_PACKET_RELATIVE,
@@ -34,9 +34,9 @@ try:
         read_writer_target_packet,
     )
 except ImportError:  # direct CLI execution
-    from conflict_preservation import capture_inventory, validate_plan
-    from checkout_identity import resolve_checkout_identity  # type: ignore[no-redef]
-    from writer_target import (  # type: ignore[no-redef]
+    from tools.repository.git.conflict_preservation import capture_inventory, validate_plan
+    from tools.runtime.authority.checkout_identity import resolve_checkout_identity  # type: ignore[no-redef]
+    from tools.runtime.authority.writer_target import (  # type: ignore[no-redef]
         WriterTarget,
         WriterTargetError,
         WRITER_TARGET_PACKET_RELATIVE,
@@ -50,7 +50,7 @@ elif __package__:
     from . import parent_root_side_effects as _parent_boundary
 else:  # direct CLI execution
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import parent_root_side_effects as _parent_boundary
+    import tools.repository.workspace.parent_root_side_effects as _parent_boundary
 
 
 def _attest_parent(

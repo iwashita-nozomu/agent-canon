@@ -6,7 +6,7 @@ responsibility Documents document-canon cleanup workflow for this repository.
 upstream design README.md shared skill canon
 upstream design ../canonical/CODEX_WORKFLOW.md shared workflow contract
 downstream implementation ../../.codex/personal/skills/document-canon-cleanup/SKILL.md exposes runtime skill
-downstream implementation ../../rust/agent-canon/src/structured_analysis.rs canonical document inventory implementation
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs canonical document inventory implementation
 @dependency-end
 -->
 
@@ -58,8 +58,8 @@ that still names one to the Rust command before returning to the original task.
 
 ```bash
 agent-canon structured-analysis document-inventory --root .
-bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing
-python3 tools/agent_tools/check_convention_compliance.py
+bash tools/analysis/dependencies/run_repo_dependency_review.sh --fail-missing
+python3 tools/validation/semantic/convention/check_convention_compliance.py
 ```
 
 残す finding は、生成 evidence のように「非正本だが必要」なものだけにします。

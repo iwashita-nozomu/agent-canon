@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests path existence/kind comparison without duplicating responsibility owner/class.
-# upstream implementation ../../tools/agent_tools/repo_structure_contract.py compares repo trees with contract profiles
+# upstream implementation ../../tools/validation/semantic/structure/repo_structure_contract.py compares repo trees with contract profiles
 # upstream design ../../documents/structure/repo-structure-contract.toml defines expected repository structure profiles
 # upstream design ../../responsibility-scope.toml owns path owner and class
 # @dependency-end
@@ -23,7 +23,7 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "repo_structure_contract.py"
+CHECKER = PROJECT_ROOT / "tools" / "validation" / "semantic" / "structure" / "repo_structure_contract.py"
 CONTRACT = PROJECT_ROOT / "documents" / "structure" / "repo-structure-contract.toml"
 
 
@@ -203,8 +203,8 @@ class RepoStructureContractTest(unittest.TestCase):
             "documents/runtime/shared-runtime-surfaces.toml",
             "documents/structure/repo-structure-contract.toml",
             "tools/catalog.yaml",
-            "rust/agent-canon/Cargo.toml",
-            "tools/agent_tools/update_lifecycle_contract.py",
+            "tools/runtime/dispatch/agent-canon/Cargo.toml",
+            "tools/runtime/lifecycle/update_lifecycle_contract.py",
         ]:
             self.write_file(root, file_path, f"{file_path}\n")
         for dir_path in [

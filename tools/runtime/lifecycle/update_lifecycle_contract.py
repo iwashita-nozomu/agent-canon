@@ -6,7 +6,7 @@
 # upstream design ../../documents/agent-canon/agent-canon-update-route.md owns the standalone source update transaction.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md owns the source PR sequence.
 # upstream implementation ./artifact_identity.py provides canonical JSON serialization.
-# upstream implementation ../../tools/ci/check_agent_canon_pr.py provides the authoritative G2 owner API consumed through SourceProjectionGateOwnerApis.
+# upstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.py provides the authoritative G2 owner API consumed through SourceProjectionGateOwnerApis.
 # upstream implementation ./github_publish.py provides the authoritative G3 owner API consumed through SourceProjectionGateOwnerApis.
 # downstream implementation ./tool_calls.py materializes lifecycle-bound subagent and close ToolCall packets.
 # downstream implementation ./github_publish.py consumes immutable pull-request lifecycle and gate evidence.

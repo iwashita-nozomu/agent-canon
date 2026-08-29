@@ -15,7 +15,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from container_runtime import (
+from tools.validation.ci.runners.container_runtime import (
     apply_pack_overrides,
     build_build_command,
     build_run_command,
@@ -31,7 +31,7 @@ from container_runtime import (
     workspace_path,
     write_lifecycle_receipt,
 )
-from run_python_in_dockerfile import PythonExecutionRule, load_rules, resolve_rule
+from tools.validation.ci.runners.run_python_in_dockerfile import PythonExecutionRule, load_rules, resolve_rule
 
 
 @dataclass(frozen=True)

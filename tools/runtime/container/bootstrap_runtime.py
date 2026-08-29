@@ -782,7 +782,7 @@ def _dir_bytes(path: Path) -> int:
 
 
 def _manifest_path(repository_root: Path, explicit: Path | None) -> Path:
-    path = explicit or (repository_root / "bootstrap" / "manifest.toml")
+    path = explicit or (repository_root / "bootstrap" / "host" / "manifest.toml")
     _assert_absolute(path, "manifest")
     if path.is_symlink() or not path.is_file():
         raise BootstrapError(
@@ -1943,7 +1943,7 @@ class BootstrapRuntime:
     def _image(self, state: dict[str, Any], *, force_build: bool = False) -> dict[str, Any]:
         image = self.docker.ensure_image(
             repository_root=self.repository_root,
-            dockerfile=self.repository_root / "bootstrap" / "container" / "Dockerfile",
+            dockerfile=self.repository_root / "bootstrap" / "container" / "image" / "Dockerfile",
             tag=self._image_tag(),
             labels=self._labels(),
             force_build=force_build,
@@ -3693,7 +3693,7 @@ class BootstrapRuntime:
                 shutil.rmtree(staging)
             staging.mkdir(parents=True, exist_ok=True)
             try:
-                from skill_shim_materializer import materialize
+                from tools.agent.skills.skill_shim_materializer import materialize
 
                 previous_image_build = os.environ.get("AGENT_CANON_IMAGE_BUILD")
                 os.environ["AGENT_CANON_IMAGE_BUILD"] = "1"
@@ -3721,7 +3721,7 @@ class BootstrapRuntime:
         tools_root = self.repository_root / "tools" / "agent_tools"
         if str(tools_root) not in sys.path:
             sys.path.insert(0, str(tools_root))
-        from skill_shim_materializer import materialize
+        from tools.agent.skills.skill_shim_materializer import materialize
 
         previous = os.environ.get("AGENT_CANON_PARENT_ROOT")
         os.environ["AGENT_CANON_PARENT_ROOT"] = str(self.repository_root)
@@ -5494,12 +5494,12 @@ def _container_source_identity(
 ) -> dict[str, str]:
     """Return a canonical source or generic remote identity without I/O."""
     try:
-        from .log_repository_identity import (  # type: ignore[import-not-found]
+        from tools.runtime.archive.log_repository_identity import (  # type: ignore[import-not-found]
             normalize_remote,
             stable_source_repository_id,
         )
     except ImportError:  # pragma: no cover - direct container script execution
-        from log_repository_identity import normalize_remote, stable_source_repository_id
+        from tools.runtime.archive.log_repository_identity import normalize_remote, stable_source_repository_id
 
     try:
         normalized = normalize_remote(remote)

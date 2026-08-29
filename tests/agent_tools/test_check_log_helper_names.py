@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests log helper naming checker.
-# upstream implementation ../../tools/agent_tools/check_log_helper_names.py checker under test
+# upstream implementation ../../tools/validation/semantic/logging/check_log_helper_names.py checker under test
 # @dependency-end
 """Tests for ``check_log_helper_names.py``."""
 
@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-TOOL = ROOT / "tools" / "agent_tools" / "check_log_helper_names.py"
+TOOL = ROOT / "tools" / "validation" / "semantic" / "logging" / "check_log_helper_names.py"
 
 
 def run_checker(tmp_path: Path) -> subprocess.CompletedProcess[str]:

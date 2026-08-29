@@ -24,29 +24,29 @@ if __package__:
     from .implementation_dispatch import _capacity_projection as __capacity_projection
     from .implementation_dispatch import _closeout_projection as __closeout_projection
 else:
-    from implementation_dispatch import _capacity_projection as __capacity_projection
-    from implementation_dispatch import _closeout_projection as __closeout_projection
+    from tools.agent.orchestration.implementation_dispatch import _capacity_projection as __capacity_projection
+    from tools.agent.orchestration.implementation_dispatch import _closeout_projection as __closeout_projection
 
 if __package__:
-    from .manifest_rendering import build_manifest as _build_manifest
-    from .manifest_rendering import has_template as _has_template
-    from .manifest_rendering import render_template as _render_template
-    from .manifest_rendering import (
+    from tools.runtime.manifest.manifest_rendering import build_manifest as _build_manifest
+    from tools.runtime.manifest.manifest_rendering import has_template as _has_template
+    from tools.runtime.manifest.manifest_rendering import render_template as _render_template
+    from tools.runtime.manifest.manifest_rendering import (
         initial_wave_execution_gate_lines as _initial_wave_execution_gate_lines,
     )
 else:
-    from manifest_rendering import build_manifest as _build_manifest
-    from manifest_rendering import has_template as _has_template
-    from manifest_rendering import render_template as _render_template
-    from manifest_rendering import (
+    from tools.runtime.manifest.manifest_rendering import build_manifest as _build_manifest
+    from tools.runtime.manifest.manifest_rendering import has_template as _has_template
+    from tools.runtime.manifest.manifest_rendering import render_template as _render_template
+    from tools.runtime.manifest.manifest_rendering import (
         initial_wave_execution_gate_lines as _initial_wave_execution_gate_lines,
     )
 
 if __package__:
-    from .skill_tool_commands import (
+    from tools.agent.skills.skill_tool_commands import (
         validate_command_plan_executables as _validate_command_plan_executables,
     )
-    from .agent_canon_source_root import resolve_agent_canon_source_root as _resolve_source_root
+    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root as _resolve_source_root
 else:
     from tools.agent.skills.skill_tool_commands import (  # type: ignore[no-redef]
         validate_command_plan_executables as _validate_command_plan_executables,
@@ -69,7 +69,7 @@ if __package__:
         validate_mathematical_intent_route,
     )
 else:
-    from packets import (  # type: ignore[no-redef]
+    from tools.agent.orchestration.packets import (  # type: ignore[no-redef]
         MATHEMATICAL_INTENT_PACKET_SCHEMA,
         MATHEMATICAL_INTENT_ROUTE_ID,
         MathematicalIntentPacket,
@@ -89,8 +89,8 @@ from collections.abc import Mapping as _Mapping
 from dataclasses import dataclass as _dataclass
 from pathlib import Path as _Path
 
-from task_authority import AUTHORITY_FILE_NAME as _AUTHORITY_FILE_NAME
-from task_authority import build_default_task_authority as _build_default_task_authority
+from tools.runtime.authority.task_authority import AUTHORITY_FILE_NAME as _AUTHORITY_FILE_NAME
+from tools.runtime.authority.task_authority import build_default_task_authority as _build_default_task_authority
 
 if __package__:
     from .team_config import (
@@ -116,7 +116,7 @@ if __package__:
         task_ids,
     )
 else:
-    from team_config import (
+    from tools.agent.orchestration.team_config import (
         AgentTypeSelection,
         Role,
         RunBundleSpec,
@@ -140,12 +140,12 @@ else:
     )
 
 if __package__:
-    from .writer_target import validate_mathematical_writer_target
+    from tools.runtime.authority.writer_target import validate_mathematical_writer_target
 else:
-    from writer_target import validate_mathematical_writer_target  # type: ignore[no-redef]
+    from tools.runtime.authority.writer_target import validate_mathematical_writer_target  # type: ignore[no-redef]
 
 if __package__:
-    from .workspace_scope import (
+    from tools.repository.workspace.workspace_scope import (
         ReportBundleArtifactPathError,
         load_directory_snapshot,
         make_run_id,
@@ -158,7 +158,7 @@ if __package__:
         write_workspace_change_snapshot,
     )
 else:
-    from workspace_scope import (
+    from tools.repository.workspace.workspace_scope import (
         ReportBundleArtifactPathError,
         load_directory_snapshot,
         make_run_id,
@@ -186,7 +186,7 @@ if __package__:
         resolve_role_document_packet,
     )
 else:
-    from packets import (
+    from tools.agent.orchestration.packets import (
         ACTIVE_DESIGN_PACKET_ARTIFACT_FIELDS,
         ACTIVE_DESIGN_PACKET_FIELDS,
         ACTIVE_DESIGN_PACKET_SCHEMA,
@@ -224,7 +224,7 @@ if __package__:
         workflow_topology_policy_violations,
     )
 else:
-    from implementation_dispatch import (
+    from tools.agent.orchestration.implementation_dispatch import (
         agent_type_selection_map,
         capacity_runtime_for_spec,
         capacity_start_output_lines,
@@ -248,7 +248,7 @@ else:
     )
 
 if __package__:
-    from .manifest_rendering import (
+    from tools.runtime.manifest.manifest_rendering import (
         checkout_identity_policy_output_lines,
         contract_complete_implementation_policy_output_lines,
         coordination_capability_policy_output_lines,
@@ -270,7 +270,7 @@ if __package__:
         writer_target_policy_output_lines,
     )
 else:
-    from manifest_rendering import (
+    from tools.runtime.manifest.manifest_rendering import (
         checkout_identity_policy_output_lines,
         contract_complete_implementation_policy_output_lines,
         coordination_capability_policy_output_lines,
@@ -301,7 +301,7 @@ if __package__:
         materialize_skill_tool_call_token,
     )
 else:
-    from tool_calls import (
+    from tools.agent.orchestration.tool_calls import (
         CloseAgentLifecycleEvidence,
         materialize_close_agent_tool_call,
         materialize_issue_worker_tool_call,
@@ -313,9 +313,9 @@ else:
 def dispatch_issue_worker(*args: object, **kwargs: object) -> object:
     """Expose the logical IssueWorker route through the AgentTeam facade."""
     if __package__:
-        from .issue_worker_dispatch import dispatch_issue_worker as dispatch
+        from tools.repository.github.issue_worker_dispatch import dispatch_issue_worker as dispatch
     else:
-        from issue_worker_dispatch import dispatch_issue_worker as dispatch  # type: ignore[no-redef]
+        from tools.repository.github.issue_worker_dispatch import dispatch_issue_worker as dispatch  # type: ignore[no-redef]
     return dispatch(*args, **kwargs)  # type: ignore[arg-type]
 
 del annotations
@@ -519,9 +519,9 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
     # The import is deliberately lazy because bootstrap imports this facade to
     # prepare its bundle before invoking the publisher with monitoring.
     if __package__:
-        from .bootstrap_agent_run import publish_prepared_run
+        from tools.runtime.lifecycle.bootstrap_agent_run import publish_prepared_run
     else:
-        from bootstrap_agent_run import publish_prepared_run  # type: ignore[no-redef]
+        from tools.runtime.lifecycle.bootstrap_agent_run import publish_prepared_run  # type: ignore[no-redef]
     return publish_prepared_run(spec, prepared, report_root)
 
 

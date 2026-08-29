@@ -2,7 +2,7 @@
 # contract data
 # responsibility Defines answer-free fresh skill runtime shim evaluation packets.
 # upstream design ../../documents/design/skill-runtime-shim-materialization.md packet and measurement contract
-# downstream implementation ../../tools/agent_tools/skill_shim_evaluation.py packet producer
+# downstream implementation ../../eval/producers/skill_shim_evaluation.py packet producer
 # downstream implementation ../../tests/agent_tools/test_skill_shim_evaluation.py producer tests
 # @dependency-end
 

@@ -58,5 +58,5 @@ upstream design README.md durable document index
 ## 整理ルール
 
 - 新しい skill を追加するときは `agents/canonical/skills.md` を更新します。
-- Skill の `SKILL.md` や `agents/skills/*.md` を編集する前に `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を実行し、`log_surface_inventory_guard` が予測された場合は log-surface baseline check を同じ変更内で通します。
-- Skill 内の code fence に `KEY=value` 形式の機械出力例を追加・削除した場合は `python3 tools/agent_tools/log_surface_inventory.py --root . --check --baseline documents/runtime/log-surface-inventory.json` を通し、意図した field change なら `documents/runtime/log-surface-inventory.json` を再生成します。
+- Skill の `SKILL.md` や `agents/skills/*.md` を編集する前に `python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を実行し、`log_surface_inventory_guard` が予測された場合は log-surface baseline check を同じ変更内で通します。
+- Skill 内の code fence に `KEY=value` 形式の機械出力例を追加・削除した場合は `python3 tools/runtime/archive/log_surface_inventory.py --root . --check --baseline documents/runtime/log-surface-inventory.json` を通し、意図した field change なら `documents/runtime/log-surface-inventory.json` を再生成します。

@@ -52,7 +52,7 @@ upstream design README.md notes lifecycle index
 
 ## 運用チェックリスト
 
-- `tools/setup_worktree.sh` で作られた `WORKTREE_SCOPE.md` を埋める
+- `tools/repository/worktree/setup_worktree.sh` で作られた `WORKTREE_SCOPE.md` を埋める
 - `documents/notes/worktrees/worktree_<topic>_YYYY-MM-DD.md` を action log の正本にする
 - 実装を `main` に取り込む前に関連テストを実行する
 - ドキュメント更新はコード変更と同時に持ち帰る

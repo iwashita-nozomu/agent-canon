@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Verifies server readiness does not assume a machine-local workspace path.
-# upstream implementation ../../tools/ci/check_server_readiness.py host readiness collector
+# upstream implementation ../../tools/validation/ci/checks/check_server_readiness.py host readiness collector
 # upstream design ../../documents/contracts/server-host-contract.md explicit path/layout contract
 # @dependency-end
 
@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "ci" / "check_server_readiness.py"
+SCRIPT = PROJECT_ROOT / "tools" / "validation" / "ci" / "checks" / "check_server_readiness.py"
 
 
 def load_module():

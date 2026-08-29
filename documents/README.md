@@ -6,7 +6,7 @@ upstream design ./rule/README.md filename、配置、分割規約。
 upstream design ./design/README.md target state と実装境界。
 upstream design ./runtime/bootstrap-runtime.md shared bootstrap runtime policy。
 downstream design ./parent-repository/README.md parent repository structure and projection boundary。
-downstream implementation ../rust/agent-canon/src/structured_analysis.rs document inventory。
+downstream implementation ../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs document inventory。
 @dependency-end
 -->
 

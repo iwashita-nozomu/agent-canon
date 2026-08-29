@@ -3,8 +3,8 @@
 # @dependency-start
 # contract test
 # responsibility Verifies canonical pydocstyle configuration resolution for standalone and derived roots.
-# upstream implementation ../../tools/agent_tools/pydocstyle_review.py owns explicit Docstring review execution.
-# upstream implementation ../../tools/agent_tools/agent_canon_source_root.py owns source-root resolution.
+# upstream implementation ../../tools/validation/semantic/code/pydocstyle_review.py owns explicit Docstring review execution.
+# upstream implementation ../../tools/runtime/source/agent_canon_source_root.py owns source-root resolution.
 # upstream design ../../documents/conventions/DOCSTRING_GUIDE.md owns the D213 Docstring contract.
 # @dependency-end
 
@@ -14,8 +14,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from tools.agent_tools.agent_canon_source_root import RootResolution, SourceRootFailure
-from tools.agent_tools.pydocstyle_review import (
+from tools.runtime.source.agent_canon_source_root import RootResolution, SourceRootFailure
+from tools.validation.semantic.code.pydocstyle_review import (
     build_parser,
     resolve_canonical_config,
     resolve_target,
@@ -39,7 +39,7 @@ def test_standalone_and_derived_roots_resolve_source_config(tmp_path: Path) -> N
     derived = derived_parent / "vendor" / "agent-canon"
     for source in (standalone, derived):
         (source / "tools" / "ci").mkdir(parents=True)
-        (source / "tools" / "ci" / "pydocstyle.toml").write_text(
+        (source / "tools" / "validation" / "ci" / "config" / "pydocstyle.toml").write_text(
             '[tool.pydocstyle]\nadd-select = "D213"\n',
             encoding="utf-8",
         )
@@ -53,21 +53,21 @@ def test_standalone_and_derived_roots_resolve_source_config(tmp_path: Path) -> N
         resolver=lambda _: _resolution(derived_parent, derived, "vendored"),
     )
 
-    assert standalone_config == (standalone / "tools/ci/pydocstyle.toml").resolve()
-    assert derived_config == (derived / "tools/ci/pydocstyle.toml").resolve()
-    assert not (derived_parent / "tools/ci/pydocstyle.toml").exists()
+    assert standalone_config == (standalone / "tools/validation/ci/config/pydocstyle.toml").resolve()
+    assert derived_config == (derived / "tools/validation/ci/config/pydocstyle.toml").resolve()
+    assert not (derived_parent / "tools/validation/ci/config/pydocstyle.toml").exists()
 
 
 def test_run_binds_absolute_source_config(tmp_path: Path) -> None:
     """The delegated pydocstyle command receives the resolved absolute config."""
     source = tmp_path / "source"
-    config = source / "tools" / "ci" / "pydocstyle.toml"
+    config = source / "tools" / "validation" / "ci" / "config" / "pydocstyle.toml"
     config.parent.mkdir(parents=True)
     config.write_text("[tool.pydocstyle]\n", encoding="utf-8")
     target = tmp_path / "changed.py"
     target.write_text("# target\n", encoding="utf-8")
     parsed = build_parser().parse_args(["--target", "changed.py"])
-    with patch("tools.agent_tools.pydocstyle_review.subprocess.run") as process:
+    with patch("tools.validation.semantic.code.pydocstyle_review.subprocess.run") as process:
         process.return_value.returncode = 0
         assert (
             run(
@@ -91,7 +91,7 @@ def test_target_boundaries_reject_escape_injection_symlink_and_wrong_type(
     root = tmp_path / "repo"
     source = root / "vendor" / "agent-canon"
     (source / "tools" / "ci").mkdir(parents=True)
-    (source / "tools" / "ci" / "pydocstyle.toml").write_text(
+    (source / "tools" / "validation" / "ci" / "config" / "pydocstyle.toml").write_text(
         "[tool.pydocstyle]\n", encoding="utf-8"
     )
     (root / "valid.py").write_text("# valid\n", encoding="utf-8")
@@ -129,7 +129,7 @@ def test_parser_rejects_config_override_and_multiple_targets() -> None:
 def test_missing_tool_and_diagnostic_exit_codes_are_preserved(tmp_path: Path) -> None:
     """Explicit review failures remain nonzero without affecting the shared gate."""
     source = tmp_path / "source"
-    config = source / "tools" / "ci" / "pydocstyle.toml"
+    config = source / "tools" / "validation" / "ci" / "config" / "pydocstyle.toml"
     config.parent.mkdir(parents=True)
     config.write_text("[tool.pydocstyle]\n", encoding="utf-8")
     (tmp_path / "target.py").write_text("# target\n", encoding="utf-8")
@@ -139,6 +139,6 @@ def test_missing_tool_and_diagnostic_exit_codes_are_preserved(tmp_path: Path) ->
         return _resolution(tmp_path, source, "vendored")
 
     for returncode in (127, 1):
-        with patch("tools.agent_tools.pydocstyle_review.subprocess.run") as process:
+        with patch("tools.validation.semantic.code.pydocstyle_review.subprocess.run") as process:
             process.return_value.returncode = returncode
             assert run(parsed, raw_root=tmp_path, resolver=resolver) == returncode

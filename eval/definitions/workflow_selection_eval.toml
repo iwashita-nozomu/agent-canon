@@ -2,8 +2,8 @@
 # contract data
 # responsibility Defines deterministic prompt-to-workflow routing eval cases.
 # upstream design README.md workflow selection eval contract
-# upstream implementation ../../tools/agent_tools/prompt_classifier.py owns prompt-intake workflow classification
-# downstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py runs these evals
+# upstream implementation ../../tools/agent/orchestration/prompt_classifier.py owns prompt-intake workflow classification
+# downstream implementation ../../eval/producers/evaluate_workflow_selection.py runs these evals
 # downstream implementation ../../tests/agent_tools/test_evaluate_workflow_selection.py tests routing eval behavior
 # @dependency-end
 

@@ -5,9 +5,9 @@
 # upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md bootstrap manifest and image lifecycle
 # upstream design ../../CONTAINER_OPERATIONS.md shared tool-runtime and project execution boundary
 # upstream design ../../CONTAINER_OPERATIONS.md image versus mounted tool boundary
-# downstream environment ../../bootstrap/container/dependencies.toml AgentCanon shared tool records
-# downstream implementation ../../bootstrap/container/Dockerfile image installation and receipt verification
-# downstream implementation ../../tools/docker_dependency_validator.sh no-install validation route
+# downstream environment ../../bootstrap/container/image/dependencies.toml AgentCanon shared tool records
+# downstream implementation ../../bootstrap/container/image/Dockerfile image installation and receipt verification
+# downstream implementation ../../tools/validation/dependencies/docker_dependency_validator.sh no-install validation route
 # downstream implementation ../../tests/agent_tools/test_devcontainer_dependencies.py focused model and security tests
 # @dependency-end
 """Compatibility implementation for the typed shared dependency planner.
@@ -45,7 +45,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
 try:
-    from .parent_root_side_effects import (
+    from tools.repository.workspace.parent_root_side_effects import (
         ParentRootAttestationReceipt,
         ParentRootAttestationRequest,
         ParentRootSideEffectBoundary,
@@ -55,7 +55,7 @@ try:
         ensure_parent_owned_directory,
         resolve_parent_owned_path,
     )
-    from .runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
+    from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
 except ImportError:  # direct script execution
     from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]
         ParentRootAttestationReceipt,
@@ -2101,7 +2101,7 @@ def manifest_sources(
         if not explicit.is_file():
             raise DependencyError(f"manifest not found: {explicit}")
         return (ManifestSource(explicit, ManifestRole.CANONICAL),)
-    bootstrap_path = workspace / "bootstrap" / "container" / "dependencies.toml"
+    bootstrap_path = workspace / "bootstrap" / "container" / "image" / "dependencies.toml"
     return (
         (ManifestSource(bootstrap_path, ManifestRole.CANONICAL),)
         if bootstrap_path.is_file()

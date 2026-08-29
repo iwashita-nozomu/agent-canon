@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Verifies deterministic static-seed export, forbidden-surface rejection, and source-hidden consumer validation.
-# upstream implementation ../../tools/agent_tools/export_static_seed.py exports one committed exact-path seed.
+# upstream implementation ../../tools/runtime/source/export_static_seed.py exports one committed exact-path seed.
 # upstream design ../../documents/contracts/static-seed-export.md defines the static seed boundary.
 # upstream design ../../documents/contracts/static-seed-allowlist.toml defines the canonical production allowlist.
 # @dependency-end
@@ -27,7 +27,7 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "export_static_seed.py"
+SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "source" / "export_static_seed.py"
 ALLOWLIST_PATH = Path("documents/contracts/static-seed-allowlist.toml")
 PROVENANCE_PATH = "agent-canon-static-seed.json"
 
@@ -290,7 +290,7 @@ class ExportStaticSeedTest(unittest.TestCase):
             checker = subprocess.run(
                 (
                     sys.executable,
-                    str(PROJECT_ROOT / "tools" / "docs" / "check_bootstrap_docs.py"),
+                    str(PROJECT_ROOT / "tools" / "validation" / "documentation" / "checks" / "check_bootstrap_docs.py"),
                     "--root",
                     str(first),
                     "--static-seed-consumer",

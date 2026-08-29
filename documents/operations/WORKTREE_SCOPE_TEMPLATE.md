@@ -89,7 +89,7 @@ upstream design worktree-lifecycle.md worktree lifecycle policy
 - Branch summary path: `documents/notes/branches/<branch_topic>.md`
 - User request contract path: `reports/agents/<run-id>/user_request_contract.md`
 - Note template: `documents/notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
-- Append command: `python3 tools/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"`
+- Append command: `python3 tools/runtime/archive/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"`
 - When contract path is concrete, the same append command also updates `reports/agents/<run-id>/work_log.md`.
 - worktree 内でも、最終配置と同じ相対パスで下書きする
 

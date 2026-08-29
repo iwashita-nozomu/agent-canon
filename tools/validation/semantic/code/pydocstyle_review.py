@@ -5,7 +5,7 @@
 # upstream implementation ./agent_canon_source_root.py resolves standalone and derived source roots.
 # upstream design ../../documents/conventions/DOCSTRING_GUIDE.md owns the D213 Docstring contract.
 # downstream implementation ../../agents/skills/python-review.md documents the explicit review route.
-# downstream implementation ../../tools/ci/PRE_REVIEW_GUIDE.md documents the explicit review route.
+# downstream implementation ../../tools/validation/ci/guides/PRE_REVIEW_GUIDE.md documents the explicit review route.
 # @dependency-end
 """Run the explicit AgentCanon pydocstyle review with source-root authority."""
 

@@ -42,7 +42,7 @@ from types import TracebackType
 from typing import TextIO, cast
 
 try:
-    from .runtime_artifacts import (
+    from tools.runtime.artifacts.runtime_artifacts import (
         RuntimeArtifactBoundary,
         RuntimeArtifactError,
         RuntimePathEscape,

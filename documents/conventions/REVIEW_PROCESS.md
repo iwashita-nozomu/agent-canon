@@ -141,7 +141,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 1. checkpoint review と final acceptance review では、task が数式、擬似コード、仕様、protocol を持つ場合、implementation boundary が Boundary Map と一致しているか、どこに近似や逸脱があるかを確認します。run が成功しても alignment が崩れていれば `fix now` です。
 1. checkpoint review と final acceptance review では、文書や prompt の readability / reader flow を tool 結果だけで accept せず、`document_flow_reviewer` や別 reviewer の judgement が artifact に残っていることを確認します。
 1. checkpoint review と final acceptance review では、implementation が設計上の問題を勝手に吸収していないことを確認します。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾が local fallback、wrapper、helper、分岐、互換 route、test 緩和、docs 上書きで処理されていれば `fix now` です。正しい処理は `design_issue_blocker` と evidence を残して design gate へ戻すことです。
-1. checkpoint review と final acceptance review では、`bash tools/agent_tools/run_repo_dependency_review.sh` を全 repo に対して実行し、missing header、invalid manifest、isolated manifest、self reference、cycle が残っていないことを確認します。`--changed` だけの依存チェックは review evidence として不足です。
+1. checkpoint review と final acceptance review では、`bash tools/analysis/dependencies/run_repo_dependency_review.sh` を全 repo に対して実行し、missing header、invalid manifest、isolated manifest、self reference、cycle が残っていないことを確認します。`--changed` だけの依存チェックは review evidence として不足です。
 1. checkpoint review 後から closeout までに、planned work、review findings、validation、dependency review、static analysis、commit / push、shared canon sync、follow-up 判断を機械的に列挙し、未完了項目がある限り closeout へ進みません。
 1. checkpoint review と final acceptance review では、`fix now` と
    `follow-up` finding ごとに `issue_route` を記録します。現在の review loop で
@@ -244,7 +244,7 @@ Review artifact の finding table には `issue_route` を置きます。
 
 Durable operational defect は GitHub Issue を正本にします。オフライン時は
 private `agent-canon-log/feedback/issue-packets/pending/` にlocator/digestだけを置き、
-host adapterが `python3 tools/agent_tools/issue_sync.py --sync-pending --repo <owner>/<repo>`
+host adapterが `python3 tools/repository/github/issue_sync.py --sync-pending --repo <owner>/<repo>`
 で公開し、URL/number/title/body/stateをreadbackしてpacketを解決します。
 
 ## 関連正本

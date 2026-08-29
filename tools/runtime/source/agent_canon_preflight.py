@@ -109,6 +109,6 @@ def is_agent_canon_source_repo(project_root: Path) -> bool:
     """Recognize only the standalone source layout owned by AgentCanon."""
     return (
         (project_root / "bootstrap.sh").is_file()
-        and (project_root / "bootstrap" / "manifest.toml").is_file()
-        and (project_root / "rust" / "agent-canon" / "Cargo.toml").is_file()
+        and (project_root / "bootstrap" / "host" / "manifest.toml").is_file()
+        and (project_root / "tools" / "runtime" / "dispatch" / "agent-canon" / "Cargo.toml").is_file()
     )

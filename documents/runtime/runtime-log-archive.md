@@ -3,9 +3,9 @@
 contract agent-runtime
 responsibility Defines external AgentCanon hook, eval, runtime-summary, and report archive publication.
 upstream design bootstrap-runtime.md shared runtime boundary
-upstream implementation ../../tools/agent_tools/runtime_log_paths.py external path resolver
-upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py canonical archive publisher
-upstream implementation ../../tools/agent_tools/eval_accumulation_check.py eval completeness gate
+upstream implementation ../../tools/runtime/archive/runtime_log_paths.py external path resolver
+upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py canonical archive publisher
+upstream implementation ../../eval/checkers/eval_accumulation_check.py eval completeness gate
 downstream design runtime-log-archive-migration.md archive migration route
 @dependency-end
 -->

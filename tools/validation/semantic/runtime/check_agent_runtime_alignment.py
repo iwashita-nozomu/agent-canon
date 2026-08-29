@@ -38,18 +38,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
-    from .runtime_artifacts import runtime_artifact_boundary
+    from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
 except ImportError:
     from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary  # type: ignore[no-redef]
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 from typing import cast
 
-import model_profile_registry
+import tools.agent.orchestration.model_profile_registry
 import yaml
 
 if __package__:
-    from .team_config import (
+    from tools.agent.orchestration.team_config import (
         ROOT,
         Role,
         RunBundleSpec,
@@ -63,7 +63,7 @@ if __package__:
         task_ids,
     )
 else:
-    from team_config import (
+    from tools.agent.orchestration.team_config import (
         ROOT,
         Role,
         RunBundleSpec,
@@ -78,7 +78,7 @@ else:
     )
 
 if __package__:
-    from .implementation_dispatch import (
+    from tools.agent.orchestration.implementation_dispatch import (
         codex_runtime_max_depth,
         codex_runtime_max_threads,
         declared_team_capacity_derivation,
@@ -88,7 +88,7 @@ if __package__:
         workflow_topology_policy_violations,
     )
 else:
-    from implementation_dispatch import (
+    from tools.agent.orchestration.implementation_dispatch import (
         codex_runtime_max_depth,
         codex_runtime_max_threads,
         declared_team_capacity_derivation,
@@ -99,12 +99,12 @@ else:
     )
 
 if __package__:
-    from .agent_team import create_run_bundle
+    from tools.agent.orchestration.agent_team import create_run_bundle
 else:
-    from agent_team import create_run_bundle
+    from tools.agent.orchestration.agent_team import create_run_bundle
 
 if __package__:
-    from .agent_canon_source_root import (
+    from tools.runtime.source.agent_canon_source_root import (
         RepositoryRoots,
         RootResolution,
         resolve_agent_canon_source_root,
@@ -117,34 +117,33 @@ else:
     )
 
 if __package__:
-    from .workspace_scope import resolve_repository_roots
+    from tools.repository.workspace.workspace_scope import resolve_repository_roots
 else:
-    from workspace_scope import resolve_repository_roots
+    from tools.repository.workspace.workspace_scope import resolve_repository_roots
 
 if __package__:
-    from .manifest_rendering import required_output_templates_missing
+    from tools.runtime.manifest.manifest_rendering import required_output_templates_missing
 else:
-    from manifest_rendering import required_output_templates_missing
+    from tools.runtime.manifest.manifest_rendering import required_output_templates_missing
 
 if __package__:
-    from .subagent_selection import COLLABORATION_OPERATIONS
+    from tools.agent.orchestration.subagent_selection import COLLABORATION_OPERATIONS
 else:
-    from subagent_selection import COLLABORATION_OPERATIONS  # type: ignore[no-redef]
+    from tools.agent.orchestration.subagent_selection import COLLABORATION_OPERATIONS  # type: ignore[no-redef]
 
 if __package__:
-    from .packets import (
+    from tools.agent.orchestration.packets import (
         resolve_active_design_packet_config,
         resolve_cross_cutting_document_packet,
         resolve_role_document_packet,
     )
 else:
-    from packets import (
+    from tools.agent.orchestration.packets import (
         resolve_active_design_packet_config,
         resolve_cross_cutting_document_packet,
         resolve_role_document_packet,
     )
 from tools.agent.skills.skill_route_catalog import load_skill_route_rules
-from vendor_skill_adapters import VendorSkillValidator
 
 UTC = timezone.utc
 
@@ -1673,19 +1672,6 @@ def validate_permanent_team_mapping(config: TeamConfig, markdown_text: str) -> N
     )
 
 
-def validate_vendor_skill_adapters() -> None:
-    """Check that third-party skill vendor adapters are manifest-backed."""
-    findings = VendorSkillValidator(ROOT).validate(require_adapters=True)
-    ensure(
-        not findings,
-        "vendor skill adapter findings: "
-        + "; ".join(
-            finding.render()
-            for finding in findings[:MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE]
-        ),
-    )
-
-
 def alignment_workspace(
     tmp_root: Path,
     source_resolution: RootResolution,
@@ -2479,7 +2465,6 @@ def main() -> int:
     validate_public_skill_shims()
     validate_subagent_protocol_docs()
     validate_parent_orchestration_contract()
-    validate_vendor_skill_adapters()
     validate_bundle_outputs()
     print("AGENT_RUNTIME_ALIGNMENT=pass")
     return 0

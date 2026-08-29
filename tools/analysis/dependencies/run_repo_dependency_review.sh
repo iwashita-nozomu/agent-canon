@@ -13,7 +13,7 @@
 # upstream implementation ./check_dependency_header_format.sh validates repo-wide manifest syntax
 # upstream implementation ./check_dependency_graph.sh validates source-derived dependency relations
 # upstream implementation ./check_design_doc_claims.py validates design claims against dependency evidence
-# downstream implementation ../../tools/ci/check_agent_canon_pr.sh runs strict dependency review
+# downstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh runs strict dependency review
 # downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies wrapper behavior
 # @dependency-end
 set -euo pipefail

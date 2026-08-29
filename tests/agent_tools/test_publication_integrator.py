@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests publication eligibility refuses CAS ingress without current approval.
-# upstream implementation ../../tools/agent_tools/publication_integrator.py resolves publication authority and CAS eligibility
+# upstream implementation ../../tools/repository/github/publication_integrator.py resolves publication authority and CAS eligibility
 # @dependency-end
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from publication_integrator import (  # noqa: E402
+from tools.repository.github.publication_integrator import (  # noqa: E402
     _construct_result_commit,
     _review_approval,
     _publication_gate,

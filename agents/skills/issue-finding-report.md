@@ -11,9 +11,9 @@ upstream design responsibility-cleanup.md complete owning responsibility-unit an
 upstream design subagent-bootstrap.md multi-agent partition and handoff workflow
 upstream design pr-processing.md repository-qualified Issue identity and publication boundary
 upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue packet route
-upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py emits structured log evidence
-upstream implementation ../../tools/agent_tools/runtime_log_archive_git.py resolves accumulated log archive state
-upstream implementation ../../tools/agent_tools/issue_sync.py resolves GitHub Issues and private packets
+upstream implementation ../../eval/producers/generate_agent_runtime_dashboard.py emits structured log evidence
+upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py resolves accumulated log archive state
+upstream implementation ../../tools/repository/github/issue_sync.py resolves GitHub Issues and private packets
 downstream design ../../.codex/personal/skills/issue-finding-report/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
@@ -141,7 +141,7 @@ to implement it.
 Use structured artifacts as the normal evidence input:
 
 ```bash
-python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain
+python3 tools/runtime/archive/runtime_log_archive_git.py status --porcelain
 ./bootstrap.sh --control-parent-root <control-parent-root> \
   --runtime-root <runtime-root> \
   tool run --root <registered-source-root> generate-agent-runtime-dashboard -- \
@@ -564,7 +564,7 @@ Before writing a new Issue:
    review.
 
    ```bash
-   bash tools/agent_tools/run_repo_dependency_review.sh \
+   bash tools/analysis/dependencies/run_repo_dependency_review.sh \
      --report-dir reports/agents/<run-id>/dependency-review/<slug> \
      --search-hits-file reports/agents/<run-id>/<slug>-search-hits.txt
    ```
@@ -678,10 +678,10 @@ Run the focused resident-container receipt route and skill wiring checks after c
 ./bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root> \
   tool run --root <registered-target-root> issue-sync -- --receipt-preflight \
   --checkout-head <target-commit> --checkout-repository <owner/repository>
-python3 tools/agent_tools/check_skill_frontmatter.py --root .
-python3 tools/agent_tools/skill_tool_commands.py check
-python3 tools/agent_tools/skill_shim_materializer.py check --root .
-python3 tools/agent_tools/check_dependency_headers.py --changed
-bash tools/agent_tools/scan_dependency_headers.sh --changed --fail-missing
-bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header
+python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
+python3 tools/agent/skills/skill_tool_commands.py check
+python3 tools/agent/skills/skill_shim_materializer.py check --root .
+python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed
+bash tools/analysis/dependencies/scan_dependency_headers.sh --changed --fail-missing
+bash tools/validation/semantic/dependencies/check_dependency_header_format.sh --changed --require-header
 ```

@@ -5,7 +5,7 @@
 # metadata-only promotion/readback boundary for agent-canon-log.
 # upstream design ../../documents/runtime/private-feedback-knowledge.md
 # upstream external-schema git@github.com:iwashita-nozomu/agent-canon-log.git@db3722b817be8574c682949db733df0fb5c2674a
-# downstream implementation ../../rust/agent-canon/src/private_feedback.rs exposes the Rust CLI route
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/private_feedback.rs exposes the Rust CLI route
 # downstream implementation ../../../tests/agent_tools/test_private_feedback.py validates the bounded adapter
 # @dependency-end
 """Private feedback and reusable knowledge adapter.
@@ -35,7 +35,7 @@ from typing import Any, Iterable
 try:
     from .log_repository_identity import stable_log_branch
 except ImportError:  # pragma: no cover - direct script execution
-    from log_repository_identity import stable_log_branch
+    from tools.runtime.archive.log_repository_identity import stable_log_branch
 
 SCHEMA = "agent-canon.private-feedback.v1"
 LOG_REMOTE = "git@github.com:iwashita-nozomu/agent-canon-log.git"
@@ -201,7 +201,7 @@ def _runtime_archive_module() -> Any:
         tools_root = str(Path(__file__).resolve().parent)
         if tools_root not in sys.path:
             sys.path.insert(0, tools_root)
-        import runtime_log_archive_git
+        import tools.runtime.archive.runtime_log_archive_git
 
         return runtime_log_archive_git
 

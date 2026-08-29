@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents lean_recursive_proof_search.py operator usage.
-upstream implementation ../../tools/agent_tools/lean_recursive_proof_search.py runs target-driven Lean proof attempts.
+upstream implementation ../../tools/analysis/proof/lean_recursive_proof_search.py runs target-driven Lean proof attempts.
 upstream design lean_capability_matrix.md routes Lean tactics and theorem search features.
 upstream design ../../agents/skills/formal-proof-workflow.md defines recursive target-driven proof search.
 @dependency-end
@@ -19,7 +19,7 @@ escapes closes a proof obligation.
 Use it with a topic-local Lake package or a generated Lean proof environment:
 
 ```bash
-python3 tools/agent_tools/lean_recursive_proof_search.py \
+python3 tools/analysis/proof/lean_recursive_proof_search.py \
   --config lean/<topic>/proof_search_targets.json \
   --format markdown \
   --out lean/<topic>/recursive_proof_search.md

@@ -2,7 +2,7 @@
 # @dependency-start
 # contract environment
 # responsibility Exposes the typed agent-canon tool run namespace without an arbitrary shell executor.
-# upstream implementation ../../tools/agent_tools/tool_dispatch.py catalog dispatcher
+# upstream implementation ../../tools/runtime/dispatch/tool_dispatch.py catalog dispatcher
 # downstream implementation ./entrypoint.sh resident container command boundary
 # @dependency-end
 

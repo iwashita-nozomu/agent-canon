@@ -6,7 +6,7 @@ responsibility Audits required repository path existence and filesystem kinds wi
 upstream design ../README.md owns the parent audit surface and tracked-tree evidence semantics
 upstream design ../../structure/repo-structure-contract.toml owns expected repository path existence and kinds
 upstream design ../../../responsibility-scope.toml owns the canonical path owner/class relation
-upstream implementation ../../../tools/agent_tools/parent_repository_audit.py enumerates semantic audit units
+upstream implementation ../../../tools/analysis/code/parent_repository_audit.py enumerates semantic audit units
 downstream implementation ../../../agents/skills/structure-refactor.md repairs structure ownership
 @dependency-end
 -->
@@ -33,9 +33,9 @@ external source clone 内部は親 tree に混ぜず、generated report を sour
 
 - `documents/structure/repo-structure-contract.toml`
 - `responsibility-scope.toml`
-- `tools/agent_tools/repo_structure_contract.py`
-- `tools/agent_tools/responsibility_scope.py`
-- `tools/agent_tools/parent_repository_audit.py list`
+- `tools/validation/semantic/structure/repo_structure_contract.py`
+- `tools/validation/semantic/responsibility/responsibility_scope.py`
+- `tools/analysis/code/parent_repository_audit.py list`
 
 ## Repair Route
 

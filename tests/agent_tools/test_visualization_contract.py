@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests exact source-universe, manifest, ToolCall, final-artifact readback, and coverage records.
-# upstream implementation ../../tools/agent_tools/visualization_contract.py executable contract under test
+# upstream implementation ../../tools/validation/semantic/tools/visualization_contract.py executable contract under test
 # downstream implementation ../../agents/skills/catalog.yaml contract owner and router consume this contract
 # @dependency-end
 
@@ -16,7 +16,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-import visualization_contract as contract  # noqa: E402
+import tools.validation.semantic.tools.visualization_contract as contract  # noqa: E402
 
 
 def source_item(

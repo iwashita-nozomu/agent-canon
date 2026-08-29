@@ -3,9 +3,9 @@
 # @dependency-start
 # contract test
 # responsibility Tests workflow monitor accumulation behavior.
-# upstream implementation ../../tools/agent_tools/workflow_monitor.py appends evidence
-# upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py seeds evidence
-# upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns update lifecycle evidence identities
+# upstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py appends evidence
+# upstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py seeds evidence
+# upstream implementation ../../tools/runtime/lifecycle/update_lifecycle_contract.py owns update lifecycle evidence identities
 # @dependency-end
 
 from __future__ import annotations
@@ -22,10 +22,10 @@ from typing import Protocol, cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from runtime_artifacts import RuntimeSymlinkEscape  # noqa: E402
+from tools.runtime.artifacts.runtime_artifacts import RuntimeSymlinkEscape  # noqa: E402
 
-MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
-BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
+MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
+BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"
 RUNTIME_PROFILE_INVENTORY = (
     PROJECT_ROOT
     / "documents"

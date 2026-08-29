@@ -10,7 +10,7 @@ upstream design tool-finding-report.md tool-based finding packet and prompt feed
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner contract
 upstream design ../../documents/conventions/software-engineering-principles.md contract-first refactor precedence and abstraction admission
 upstream design ./agent-orchestration.md write-capable handoff validation trust boundary and work-conservation owner
-upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits design evidence findings for refactor plans
+upstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py emits design evidence findings for refactor plans
 upstream design ../internal-routines/design-implementation-correspondence.md design read, clause fingerprint, and drift-block route
 @dependency-end
 -->
@@ -217,7 +217,7 @@ the design trace before accepting a path or dependency-direction change.
    capture、full scan / rescan は、`Validation route` が選択した exact command の場合だけ使います。
    prompt / docs / static-contract refactor では、owner が選んだ static
    validation と targeted validation で閉じます。
-1. closeout 前に `python3 tools/ci/check_merge_structure.py ...` の要否を確認します。
+1. closeout 前に `python3 tools/validation/ci/checks/check_merge_structure.py ...` の要否を確認します。
 
 ## Canonicalization-First Refactors
 
@@ -665,4 +665,4 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Run `test_designer` only after the owning mechanism is established or repaired and
    an unresolved test-owned runtime risk remains. For contract-only wrapper refactors,
    use static contract validation and canonical command evidence.
-1. If file structure changes, plan the integration check with `python3 tools/ci/check_merge_structure.py ...`.
+1. If file structure changes, plan the integration check with `python3 tools/validation/ci/checks/check_merge_structure.py ...`.

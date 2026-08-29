@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 if __package__:
-    from .agent_canon_source_root import resolve_agent_canon_source_root
+    from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 else:
     from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
 

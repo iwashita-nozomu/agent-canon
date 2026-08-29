@@ -43,12 +43,12 @@ downstream design ../../.codex/personal/skills/worktree-start/SKILL.md runtime s
 - `documents/notes/worktrees/WORKTREE_LOG_TEMPLATE.md`
 - `documents/notes/branches/README.md`
 - `reports/agents/<run-id>/user_request_contract.md`
-- `tools/setup_worktree.sh` (legacy reference only; do not use for new tasks)
-- `tools/worktree_start.sh` (legacy cleanup diagnostic only)
-- `tools/agent_tools/worktree_start.py` (legacy cleanup diagnostic only)
-- `tools/agent_tools/worktree_scope_lint.py`
-- `tools/experiments/sync_experiment_registry_context.py`
-- `tools/docs/check_worktree_scopes.sh`
+- `tools/repository/worktree/setup_worktree.sh` (legacy reference only; do not use for new tasks)
+- `tools/repository/worktree/worktree_start.sh` (legacy cleanup diagnostic only)
+- `tools/repository/workspace/worktree_start.py` (legacy cleanup diagnostic only)
+- `tools/repository/workspace/worktree_scope_lint.py`
+- `tools/experiments/registry/sync_experiment_registry_context.py`
+- `tools/validation/documentation/checks/check_worktree_scopes.sh`
 
 ## Expected Outcome
 
@@ -57,7 +57,7 @@ downstream design ../../.codex/personal/skills/worktree-start/SKILL.md runtime s
 - user request contract の path が必要なら current checkout の run-local `work_log.md` から辿れる
 - 必要なら branch summary の path が決まり、handoff 先をそこから辿れる
 - 初期状態の `git` / worktree 棚卸し結果と cleanup の次の一手が残っている
-- `python3 tools/agent_tools/work_log.py ...` で current checkout の継続ログを追記できる
+- `python3 tools/runtime/archive/work_log.py ...` で current checkout の継続ログを追記できる
 
 ## Mandatory Checklist
 
@@ -73,31 +73,31 @@ downstream design ../../.codex/personal/skills/worktree-start/SKILL.md runtime s
 - `git status --short --branch` を確認し、unexpected dirty state があれば action log に残す
 - `git worktree list --porcelain` を確認し、duplicate / stale worktree が無いか見る
 - `documents/notes/guardrails/README.md` と `documents/notes/failures/README.md` を読み、今の task で踏みやすい avoid pattern と既知 failure を確認する
-- `python3 tools/agent_tools/worktree_scope_lint.py --current` で scope の placeholder や stale field を診断する。`bash tools/worktree_start.sh --current` は cleanup diagnostic 以外では使わない
-- 複数 worktree がある、または stale な再開で不安がある場合は `bash tools/docs/check_worktree_scopes.sh` を実行する
+- `python3 tools/repository/workspace/worktree_scope_lint.py --current` で scope の placeholder や stale field を診断する。`bash tools/repository/worktree/worktree_start.sh --current` は cleanup diagnostic 以外では使わない
+- 複数 worktree がある、または stale な再開で不安がある場合は `bash tools/validation/documentation/checks/check_worktree_scopes.sh` を実行する
 - conflict risk、scope drift、carry-over 漏れの兆候があれば、編集前に action log に残す
 
 ## Default Kickoff Sequence
 
-1. `python3 tools/agent_tools/worktree_scope_lint.py --current` で legacy `WORKTREE_SCOPE.md` と action log の不足を診断します。新しい `git worktree` は作成しません。
+1. `python3 tools/repository/workspace/worktree_scope_lint.py --current` で legacy `WORKTREE_SCOPE.md` と action log の不足を診断します。新しい `git worktree` は作成しません。
 1. `documents/operations/WORKTREE_SCOPE_TEMPLATE.md` は legacy scope の照合用としてだけ読み、current checkout の作業 scope は run-local handoff packet と `work_log.md` で管理します。
 1. experiment topic を持つ branch なら `experiments/registry.toml` の entry を見て、stale `active_worktree` と `scope_file` を cleanup 対象として記録します。
 1. `documents/notes/worktrees/WORKTREE_LOG_TEMPLATE.md` 由来の action log は legacy evidence として読み、current checkout の run-local `work_log.md` に carry-over 判断を書きます。
-1. 以後の継続ログは `python3 tools/agent_tools/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"` を既定にし、entry に `request_clause_ids=` を残します。
+1. 以後の継続ログは `python3 tools/runtime/archive/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"` を既定にし、entry に `request_clause_ids=` を残します。
 1. `documents/notes/guardrails/README.md` と `documents/notes/failures/README.md` を見て、今回の task で避けるべき既知 pattern を拾います。
-1. `git status --short --branch`、`git worktree list --porcelain`、必要なら `bash tools/docs/check_worktree_scopes.sh` を実行します。
+1. `git status --short --branch`、`git worktree list --porcelain`、必要なら `bash tools/validation/documentation/checks/check_worktree_scopes.sh` を実行します。
 1. 次の一手と carry-over 先を action log に書いてから編集を始めます。
 
 ## Default Commands
 
-- `python3 tools/agent_tools/worktree_start.py --current` (legacy cleanup diagnostic only)
-- `python3 tools/agent_tools/worktree_scope_lint.py --current`
-- `python3 tools/experiments/sync_experiment_registry_context.py --topic <topic> --branch <branch>`
-- `python3 tools/agent_tools/work_log.py --kind cleanup --message "<legacy worktree state>" --next "<carry-over or remove>"`
-- `python3 tools/agent_tools/work_log.py --kind edit --request-clause-id R1 --message "..." --next "..."`
+- `python3 tools/repository/workspace/worktree_start.py --current` (legacy cleanup diagnostic only)
+- `python3 tools/repository/workspace/worktree_scope_lint.py --current`
+- `python3 tools/experiments/registry/sync_experiment_registry_context.py --topic <topic> --branch <branch>`
+- `python3 tools/runtime/archive/work_log.py --kind cleanup --message "<legacy worktree state>" --next "<carry-over or remove>"`
+- `python3 tools/runtime/archive/work_log.py --kind edit --request-clause-id R1 --message "..." --next "..."`
 - `git status --short --branch`
 - `git worktree list --porcelain`
-- `bash tools/docs/check_worktree_scopes.sh`
+- `bash tools/validation/documentation/checks/check_worktree_scopes.sh`
 
 ## Boundary
 

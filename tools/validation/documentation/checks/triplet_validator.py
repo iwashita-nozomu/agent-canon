@@ -23,7 +23,7 @@ from typing import Dict, List, Set
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
 
-from error_handler import ErrorCode, ExecutionResult
+from tools.support.error_handler import ErrorCode, ExecutionResult
 
 
 AFFECTED_FUNCTION_LIMIT = 10

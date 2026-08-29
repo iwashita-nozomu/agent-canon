@@ -11,8 +11,8 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency-
 upstream design ../internal-routines/design-implementation-correspondence.md universal design-to-implementation correspondence route
 downstream implementation ../../.codex/personal/skills/oop-type-design/SKILL.md runtime discovery shim
 downstream implementation ../../agents/skills/catalog.yaml public skill and capability metadata
-downstream implementation ../../tools/agent_tools/route.py explicit capability route
-downstream implementation ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt-evaluation targets
+downstream implementation ../../tools/agent/orchestration/route.py explicit capability route
+downstream implementation ../../eval/definitions/skill_workflow_prompt_eval.toml prompt-evaluation targets
 @dependency-end
 -->
 
@@ -29,7 +29,7 @@ This is the pre-implementation OOP/type-design route. Invoke it explicitly with
 the capability ID `oop_type_design`:
 
 ```bash
-python3 tools/agent_tools/route.py --capability oop_type_design
+python3 tools/agent/orchestration/route.py --capability oop_type_design
 ```
 
 The `--capability` route selects the owner
@@ -168,9 +168,9 @@ owners:
 - C++ target responsibility: `cpp-core` is the provider; individual test and experiment
   targets are consumers; root-anchored build/install paths and lifecycle-owned result paths
   are read back from `documents/design/cpp-build-layout.md`.
-- Explicit `Any`: `python3 tools/agent_tools/check_static_any.py --submodule-aware`.
+- Explicit `Any`: `python3 tools/validation/semantic/code/check_static_any.py --submodule-aware`.
 - OOP/SOLID signals: `$oop-readability-check`; keep its evidence with the owning review.
-- Dependency headers/graph: `bash tools/agent_tools/run_repo_dependency_review.sh --report-dir <run-dir>/dependency-review --fail-missing`.
+- Dependency headers/graph: `bash tools/analysis/dependencies/run_repo_dependency_review.sh --report-dir <run-dir>/dependency-review --fail-missing`.
 - Schema or algorithm checks: existing checker only when the changed implementation
   path is in that checker’s scope; otherwise `not_applicable`.
 

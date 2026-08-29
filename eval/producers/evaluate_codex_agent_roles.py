@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Evaluates Codex subagent role configuration, routing, model settings, and runtime metrics.
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
-# upstream design ../../evidence/agent-evals/README.md eval directory contract
+# upstream design ../../eval/definitions/README.md eval directory contract
 # upstream implementation ./team_config.py loads team and task routing metadata
 # upstream implementation ./implementation_dispatch.py owns capacity and wave routing
 # upstream implementation ./model_profile_registry.py owns canonical model/profile expectations
@@ -47,7 +47,7 @@ if __package__ in (None, ""):
 
 
 if __package__:
-    from .team_config import (
+    from tools.agent.orchestration.team_config import (
         Role,
         default_specialists_for_task,
         load_task_catalog,
@@ -64,7 +64,7 @@ else:
     )
 
 if __package__:
-    from .implementation_dispatch import (
+    from tools.agent.orchestration.implementation_dispatch import (
         declared_team_capacity_derivation,
         recommended_dynamic_expansion_wave_slots,
         recommended_initial_subagent_wave,

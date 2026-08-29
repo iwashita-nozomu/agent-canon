@@ -21,21 +21,21 @@ from pathlib import PurePosixPath
 from typing import Any, Iterable, Mapping
 
 if __package__:
-    from . import artifact_identity as _artifact_identity
+    from tools.runtime.artifacts import artifact_identity as _artifact_identity
     from . import capacity_handshake
     from . import model_profile_registry
 
     _direct_artifact_identity = sys.modules.get("artifact_identity")
     sys.modules["artifact_identity"] = _artifact_identity
-    from . import update_lifecycle_contract
+    from tools.runtime.lifecycle import update_lifecycle_contract
     if _direct_artifact_identity is None:
         del sys.modules["artifact_identity"]
     else:
         sys.modules["artifact_identity"] = _direct_artifact_identity
 else:
-    import capacity_handshake
-    import model_profile_registry
-    import update_lifecycle_contract
+    import tools.agent.orchestration.capacity_handshake
+    import tools.agent.orchestration.model_profile_registry
+    import tools.runtime.lifecycle.update_lifecycle_contract
 
 SCHEMA_IDS = {
     "fixed_implementation_packet": "fixed_implementation_packet_v1",

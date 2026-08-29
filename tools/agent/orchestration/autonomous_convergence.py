@@ -23,7 +23,7 @@ from pathlib import Path
 try:
     from .packets import normalize_owner_guarantee_packet, owner_receipt_is_compatible, owner_receipt_key
 except ImportError:
-    from packets import normalize_owner_guarantee_packet, owner_receipt_is_compatible, owner_receipt_key
+    from tools.agent.orchestration.packets import normalize_owner_guarantee_packet, owner_receipt_is_compatible, owner_receipt_key
 
 try:
     import tomllib

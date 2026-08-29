@@ -3,8 +3,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests accumulated agent eval producer routing and bounded output capture.
-# upstream implementation ../../tools/agent_tools/run_accumulated_agent_evals.py runs eval producers in accumulation mode
-# upstream design ../../evidence/agent-evals/README.md eval accumulation contract
+# upstream implementation ../../eval/producers/run_accumulated_agent_evals.py runs eval producers in accumulation mode
+# upstream design ../../eval/definitions/README.md eval accumulation contract
 # upstream design ../../documents/runtime/runtime-log-archive.md external eval archive contract
 # @dependency-end
 
@@ -21,7 +21,7 @@ from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from run_accumulated_agent_evals import (  # noqa: E402
+from eval.producers.run_accumulated_agent_evals import (  # noqa: E402
     EvalProducer,
     build_producers,
     render_results,
@@ -114,7 +114,7 @@ class RunAccumulatedAgentEvalsTest(unittest.TestCase):
                 run_id="run-123",
                 skill_used=("agent-orchestration", "result-artifact-writeout"),
                 report_dir=root.parent / "runtime" / "tasks" / "run-123" / "reports",
-                prompt_eval_manifest=root / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml",
+                prompt_eval_manifest=root / "eval" / "definitions" / "skill_workflow_prompt_eval.toml",
                 python_bin=sys.executable,
                 runtime_root=runtime_root,
             )

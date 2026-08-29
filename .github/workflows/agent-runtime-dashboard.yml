@@ -3,10 +3,10 @@
 # responsibility Publishes scheduled/manual read-only AgentCanon runtime log and eval dashboards.
 # upstream design ../../documents/design/responsibility-rationale.md diagnostic-product activation rationale
 # upstream design ../../agents/evals/README.md eval evidence contract
-# upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates accumulated evidence
-# upstream implementation ../../tools/agent_tools/run_accumulated_agent_evals.py produces accumulated eval evidence
-# upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py renders dashboard artifact
-# upstream implementation ../../tools/agent_tools/agent_canon_source_root.py resolves the canonical Graph CLI
+# upstream implementation ../../eval/checkers/eval_accumulation_check.py validates accumulated evidence
+# upstream implementation ../../eval/producers/run_accumulated_agent_evals.py produces accumulated eval evidence
+# upstream implementation ../../eval/producers/generate_agent_runtime_dashboard.py renders dashboard artifact
+# upstream implementation ../../tools/runtime/source/agent_canon_source_root.py resolves the canonical Graph CLI
 # @dependency-end
 
 name: Agent Runtime Dashboard

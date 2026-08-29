@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests exact artifact identity and stable source readback.
-# upstream implementation ../../tools/agent_tools/artifact_identity.py materializes and verifies artifact identities
+# upstream implementation ../../tools/runtime/artifacts/artifact_identity.py materializes and verifies artifact identities
 # @dependency-end
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from artifact_identity import (  # noqa: E402
+from tools.runtime.artifacts.artifact_identity import (  # noqa: E402
     ArtifactIdentityError,
     canonical_json_bytes,
     materialize_artifact_identity,
@@ -30,14 +30,14 @@ class ArtifactIdentityTest(unittest.TestCase):
         """A tracked source file round-trips through identity readback."""
         record = materialize_artifact_identity(
             PROJECT_ROOT,
-            Path("tools/agent_tools/artifact_identity.py"),
+            Path("tools/runtime/artifacts/artifact_identity.py"),
         )
 
         verified = verify_identity_record(PROJECT_ROOT, record)
 
         self.assertTrue(verified["ok"])
         self.assertEqual(
-            verified["artifact_path"], "tools/agent_tools/artifact_identity.py"
+            verified["artifact_path"], "tools/runtime/artifacts/artifact_identity.py"
         )
         self.assertEqual(verified["identity_record_id"], record["identity_record_id"])
 

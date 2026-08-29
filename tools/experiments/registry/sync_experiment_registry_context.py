@@ -13,9 +13,9 @@ import argparse
 import subprocess
 from pathlib import Path
 
-from registry_lib import find_topic
-from registry_lib import load_registry
-from registry_lib import write_registry
+from tools.experiments.registry.registry_lib import find_topic
+from tools.experiments.registry.registry_lib import load_registry
+from tools.experiments.registry.registry_lib import write_registry
 
 
 def repo_root_from_script() -> Path:

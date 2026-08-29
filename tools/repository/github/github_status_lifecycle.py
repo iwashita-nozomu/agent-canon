@@ -38,7 +38,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
     import tomli as tomllib  # type: ignore[no-redef]
 
 from tools.runtime.artifacts.artifact_identity import canonical_json_bytes
-from github_publish import CommandResult, Runner, run_command, subprocess_runner
+from tools.repository.github.github_publish import CommandResult, Runner, run_command, subprocess_runner
 
 MODULE_OWNER = "github_status_lifecycle.py"
 LIFECYCLE_SCOPE = "status-label-lifecycle"

@@ -3,9 +3,9 @@
 # responsibility Selects and runs standalone AgentCanon validation in one shared tool runtime and one required check.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
-# upstream implementation ../../tools/agent_tools/classify_path_risk.py canonical changed-path selector and unit mapping
-# upstream implementation ../../tools/ci/run_standalone_static_gate_unit.sh executes one selected static-gate unit
-# downstream implementation ../../tools/ci/check_github_workflows.py validates workflow and PR template conventions
+# upstream implementation ../../tools/validation/semantic/path/classify_path_risk.py canonical changed-path selector and unit mapping
+# upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh executes one selected static-gate unit
+# downstream implementation ../../tools/validation/ci/checks/check_github_workflows.py validates workflow and PR template conventions
 # downstream implementation ../../tests/tools/test_standalone_static_gate_units.py validates execution-unit boundaries and selection
 # @dependency-end
 

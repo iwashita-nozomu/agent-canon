@@ -7,10 +7,10 @@ responsibility Documents Shared Skill Canon for this repository.
 upstream design ./catalog.yaml enumerates public skill families
 upstream design ./skill-dependencies.yaml owns the typed public-skill dependency dictionary
 downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon during task routing
-downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates public and official skill boundaries
+downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates public and official skill boundaries
 upstream design code-visualization.md sole public visualization owner and typed projection contract
-downstream implementation ../../tools/agent_tools/skill_route_catalog.py validates visualization owner and adapter metadata
-downstream implementation ../../tools/agent_tools/skill_dependency_map.py validates the dependency dictionary and generates its Mermaid projection
+downstream implementation ../../tools/agent/skills/skill_route_catalog.py validates visualization owner and adapter metadata
+downstream implementation ../../tools/agent/skills/skill_dependency_map.py validates the dependency dictionary and generates its Mermaid projection
 @dependency-end
 -->
 
@@ -86,13 +86,13 @@ checkout の `documents/runtime/` を暗黙に更新しません。tracked reade
 GPU profile の admission semantics は `gpu-execution` に残します。
 
 確認入口:
-- public skill の一覧と shim/doc/config の整合: `python3 tools/agent_tools/check_agent_runtime_alignment.py`
-- prompt からの skill 選択: `python3 tools/agent_tools/route.py --prompt "<user request>" --format json`
-- skill ごとの command packet: `python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text`
-- 依存辞書の静的検査: `python3 tools/agent_tools/skill_dependency_map.py check --root .`
-- 依存辞書の静的検査（source tree を変更しない）: `python3 tools/agent_tools/skill_dependency_map.py check --root .`
-- 通常の Mermaid/JSON 生成（外部 runtime artifact）: `python3 tools/agent_tools/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>`
-- tracked reader pair の更新: `python3 tools/agent_tools/skill_dependency_map.py graph --root . --output documents/runtime/skill-dependency-graph.md --runtime-root <external-runtime-root> --source-mutation-capability-json <exact-two-path-capability.json>`
+- public skill の一覧と shim/doc/config の整合: `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py`
+- prompt からの skill 選択: `python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json`
+- skill ごとの command packet: `python3 tools/agent/skills/skill_tool_commands.py show --skill <skill> --format text`
+- 依存辞書の静的検査: `python3 tools/agent/skills/skill_dependency_map.py check --root .`
+- 依存辞書の静的検査（source tree を変更しない）: `python3 tools/agent/skills/skill_dependency_map.py check --root .`
+- 通常の Mermaid/JSON 生成（外部 runtime artifact）: `python3 tools/agent/skills/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>`
+- tracked reader pair の更新: `python3 tools/agent/skills/skill_dependency_map.py graph --root . --output documents/runtime/skill-dependency-graph.md --runtime-root <external-runtime-root> --source-mutation-capability-json <exact-two-path-capability.json>`
 
 ## Internal Review And Runtime Routines
 
@@ -127,7 +127,7 @@ in the Codex host runtime.
   parent- or subtree-owned `.codex/personal/skills/<skill>/SKILL.md` surface.
 - AgentCanon-owned public skills appear in `catalog.yaml`; official system skills stay in the host-provided lane above.
 - Codex では `AGENTS.md` と `agents/canonical/CODEX_WORKFLOW.md` を先に読み、repo task の skill 選択は `$agent-orchestration` から始めます。
-- task ごとの skill 選択は `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。依存 module の source clone、lifecycle、cleanup が scope の場合は `$dependency-module-change` を先に通し、AgentCanon 固有の pin/update route はその一般規約を参照する具体例として扱います。
+- task ごとの skill 選択は `python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。依存 module の source clone、lifecycle、cleanup が scope の場合は `$dependency-module-change` を先に通し、AgentCanon 固有の pin/update route はその一般規約を参照する具体例として扱います。
 - user が skill を明示したい場合は `$skill-name` の形を既定にし、曖昧な prose より優先します。
 - template clone から新 repo を始めるときは `start-repository` を使います。
 - 長い tool / skill 候補名を短い command に落とすときは `task-routing` を使います。

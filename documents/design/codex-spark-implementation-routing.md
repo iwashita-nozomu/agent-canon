@@ -15,14 +15,14 @@ upstream design ../../agents/skills/agent-orchestration.md routing and handoff r
 upstream design ../../agents/skills/subagent-bootstrap.md writer selection and lifecycle rules
 upstream design ../../agents/skills/task-routing.md public route/tool ownership rules
 upstream design ../../agents/skills/oop-type-design.md approved OOP type and capability-route ownership
-upstream implementation ../../tools/agent_tools/skill_route_catalog.py canonical explicit skill capability catalog/index owner
-upstream implementation ../../tools/agent_tools/capability_route.py canonical explicit skill capability preflight/decision owner
-upstream implementation ../../tools/agent_tools/check_design_doc_claims.py current implementation-backed design claim checker
-downstream implementation ../../tools/agent_tools/agent_team.py packet projection, queueing, lineage, and generated views
-downstream implementation ../../tools/agent_tools/route.py existing public skill route composition/rendering; implementation-model imports forbidden
-downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py static runtime/profile/view checker
-downstream implementation ../../tools/agent_tools/evaluate_codex_agent_roles.py role/profile/capacity evaluation
-downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py prompt-contract evaluation
+upstream implementation ../../tools/agent/skills/skill_route_catalog.py canonical explicit skill capability catalog/index owner
+upstream implementation ../../tools/agent/orchestration/capability_route.py canonical explicit skill capability preflight/decision owner
+upstream implementation ../../tools/validation/semantic/documents/check_design_doc_claims.py current implementation-backed design claim checker
+downstream implementation ../../tools/agent/orchestration/agent_team.py packet projection, queueing, lineage, and generated views
+downstream implementation ../../tools/agent/orchestration/route.py existing public skill route composition/rendering; implementation-model imports forbidden
+downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py static runtime/profile/view checker
+downstream implementation ../../eval/producers/evaluate_codex_agent_roles.py role/profile/capacity evaluation
+downstream implementation ../../eval/producers/evaluate_skill_workflow_prompts.py prompt-contract evaluation
 downstream design ./README.md design index entry
 @dependency-end
 -->
@@ -76,11 +76,11 @@ the implementation authority.
 - Evidence sources: the landed explicit-skill/OOP predecessor identities are
   `agents/skills/oop-type-design.md`
   (`147906d68db1c24eed3c12a53f07c914130d9fe99c53977af94a0613c424e1c6`),
-  `tools/agent_tools/skill_route_catalog.py`
+  `tools/agent/skills/skill_route_catalog.py`
   (`c09ef7d29a378aa31000157847e7d742cea77e734c4cc2c155d712c582161e28`),
-  `tools/agent_tools/capability_route.py`
+  `tools/agent/orchestration/capability_route.py`
   (`f9bdc819cae5f66c7f3450f2948fde7d89668a9248e57e80b153b5de90534482`),
-  and `tools/agent_tools/route.py`
+  and `tools/agent/orchestration/route.py`
   (`544ce80bfba6be4817f28e4c16801483f9e929e5502a6e7698d7f328f50e4ee7`).
 - Evidence sources: user-observed runtime events establish only that a
   completed-but-open descendant occupied a slot until close, a subsequent
@@ -97,9 +97,9 @@ the implementation authority.
   minimal/incremental/static-budget prose is a named replacement set, not
   evidence that the target behavior already exists.
 - Refactor handoff: the OOP predecessor is landed and read-only. The planned
-  sibling `tools/agent_tools/implementation_route.py` owns fixed
+  sibling `tools/agent/orchestration/implementation_route.py` owns fixed
   implementation-packet/profile decisions without adding policy to
-  `tools/agent_tools/route.py`.
+  `tools/agent/orchestration/route.py`.
 - Implementation gap evidence: P5 readback recorded
   `StructuralDesignGap(P1_P2_OWNER_CLI_ENTRYPOINTS)` after the P1 and P2
   modules passed their original owner tests but exposed neither of the CLI
@@ -206,9 +206,9 @@ failure.
 
 The OOP capability-routing predecessor is landed on main
 `404678e1e9c242737e2f610e98743328931edd8f`. Its exact owners are
-`tools/agent_tools/skill_route_catalog.py` for the explicit skill capability
-catalog/index and `tools/agent_tools/capability_route.py` for raw-argv
-preflight/immutable explicit-skill decisions; `tools/agent_tools/route.py`
+`tools/agent/skills/skill_route_catalog.py` for the explicit skill capability
+catalog/index and `tools/agent/orchestration/capability_route.py` for raw-argv
+preflight/immutable explicit-skill decisions; `tools/agent/orchestration/route.py`
 composes and renders that public CLI route. This design does not modify or
 duplicate those owners. The new sibling `implementation_route.py` consumes an
 already fixed implementation packet and emits only a worker/profile/continuity
@@ -554,18 +554,18 @@ projection_status: generated_from_verified_contract
 canonical_root: agent_canon
 bound_predecessor_paths:
   - agents/skills/oop-type-design.md
-  - tools/agent_tools/skill_route_catalog.py
-  - tools/agent_tools/capability_route.py
-  - tools/agent_tools/route.py
+  - tools/agent/skills/skill_route_catalog.py
+  - tools/agent/orchestration/capability_route.py
+  - tools/agent/orchestration/route.py
 source_paths:
   - agents/model_profiles.toml
   - agents/capacity_policy.toml
-  - tools/agent_tools/model_profile_registry.py
-  - tools/agent_tools/capacity_handshake.py
-  - tools/agent_tools/implementation_route.py
-  - tools/agent_tools/agent_team.py
-  - tools/agent_tools/bootstrap_agent_run.py
-  - tools/agent_tools/task_close.py
+  - tools/agent/orchestration/model_profile_registry.py
+  - tools/agent/orchestration/capacity_handshake.py
+  - tools/agent/orchestration/implementation_route.py
+  - tools/agent/orchestration/agent_team.py
+  - tools/runtime/lifecycle/bootstrap_agent_run.py
+  - tools/runtime/lifecycle/task_close.py
 generated_view_paths:
   - .codex/agents/artifact_reviewer.toml
   - .codex/agents/benchmark_reviewer.toml
@@ -624,13 +624,13 @@ policy_paths:
   - .codex/config.toml
   - .codex/README.md
 evidence_paths:
-  - evidence/agent-evals/agent_behavior_eval.toml
-  - evidence/agent-evals/skill_workflow_prompt_eval.toml
+  - eval/definitions/agent_behavior_eval.toml
+  - eval/definitions/skill_workflow_prompt_eval.toml
 checker_paths:
-  - tools/agent_tools/check_agent_runtime_alignment.py
-  - tools/agent_tools/evaluate_codex_agent_roles.py
-  - tools/agent_tools/evaluate_skill_workflow_prompts.py
-  - tools/agent_tools/check_design_doc_claims.py
+  - tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+  - eval/producers/evaluate_codex_agent_roles.py
+  - eval/producers/evaluate_skill_workflow_prompts.py
+  - tools/validation/semantic/documents/check_design_doc_claims.py
 test_paths:
   - tests/agent_tools/test_model_profile_registry.py
   - tests/agent_tools/test_implementation_route.py
@@ -648,9 +648,9 @@ The exact replacement set is: numeric budget/hard-cap statements in
 `agents/canonical/CODEX_WORKFLOW.md`, `agents/skills/subagent-bootstrap.md`,
 and `.codex/README.md`; duplicated model/prompt fields in the 34 generated
 role views above; generic prompt construction branches in
-`tools/agent_tools/agent_team.py`; and duplicate lifecycle/queue arithmetic
-outside `tools/agent_tools/capacity_handshake.py` and
-`tools/agent_tools/task_close.py`; task-size/risk labels or hardcoded
+`tools/agent/orchestration/agent_team.py`; and duplicate lifecycle/queue arithmetic
+outside `tools/agent/orchestration/capacity_handshake.py` and
+`tools/runtime/lifecycle/task_close.py`; task-size/risk labels or hardcoded
 read/search/check/review/time/count budgets used as investigation authority;
 any precautionary micro-slice, speculative-test, repeated-preflight,
 rollback-checkpoint, worker-substitution, or conservative fallback branch after
@@ -1001,11 +1001,11 @@ only where the new canonical owner is explicit:
 | `.codex/config.toml` | Parent/runtime registry and configured runtime settings | Runtime registration plus `configured_max_threads`; no duplicated workflow budget or capsule prose |
 | `agents/canonical/CODEX_SUBAGENTS.md` | Inventory, activation, handoff, and model mapping | Human-facing projection of the typed registry, capacity contract, and lifecycle ledger |
 | `agents/COMMUNICATION_PROTOCOL.md` | Capsule fields and lineage contract | Adds `TargetStateContract`, profile-specific projection, and capacity lineage fields |
-| `tools/agent_tools/agent_team.py` | Packet projection and manifest generation | Consumes materializer/handshake, queues, reserves, reclaims, and records readback |
-| `tools/agent_tools/route.py` | Public catalog-backed skill/area/prompt router | Preserve current task-routing ownership; it must not import or expose implementation capability/model selection |
-| `tools/agent_tools/check_agent_runtime_alignment.py` | Runtime alignment checker | Validates registry, generated views, capacity references, and role/profile constraints |
-| `tools/agent_tools/evaluate_codex_agent_roles.py` | Static role/model evaluation | Adds target-state, profile, Spark-gate, saturation, and attribution checks |
-| `tools/agent_tools/evaluate_skill_workflow_prompts.py` | Frozen prompt checklist evaluator | Checks generated profile/capsule prompt surfaces without becoming the registry owner |
+| `tools/agent/orchestration/agent_team.py` | Packet projection and manifest generation | Consumes materializer/handshake, queues, reserves, reclaims, and records readback |
+| `tools/agent/orchestration/route.py` | Public catalog-backed skill/area/prompt router | Preserve current task-routing ownership; it must not import or expose implementation capability/model selection |
+| `tools/validation/semantic/runtime/check_agent_runtime_alignment.py` | Runtime alignment checker | Validates registry, generated views, capacity references, and role/profile constraints |
+| `eval/producers/evaluate_codex_agent_roles.py` | Static role/model evaluation | Adds target-state, profile, Spark-gate, saturation, and attribution checks |
+| `eval/producers/evaluate_skill_workflow_prompts.py` | Frozen prompt checklist evaluator | Checks generated profile/capsule prompt surfaces without becoming the registry owner |
 | `documents/design/dependency-manifest-design.md` | Dependency-header and manifest contract | Adds exact new-owner/header edges and rejects undocumented registry/handshake/ledger imports |
 | `documents/runtime/SHARED_RUNTIME_SURFACES.md` | Shared source/view policy | Records AgentCanon source, generated role-view, and template-root projection ownership |
 | `AGENTS.md`, `ROOT_AGENTS.md`, `documents/codex/AGENTS_COORDINATION.md` | Root/handoff guidance | Projects Target-State-First, queue/reclaim, and closeout lifecycle requirements without independent model/capacity prose |
@@ -1222,12 +1222,12 @@ Two designs were considered independently before file scope was selected.
 ### Candidate A — declarative profile registry with generated role views
 
 Create `agents/model_profiles.toml` as the single typed registry. Create
-`tools/agent_tools/model_profile_registry.py` as its parser, validator, typed
+`tools/agent/orchestration/model_profile_registry.py` as its parser, validator, typed
 materializer, and generated-view producer. The registry contains the six
 currently supported model profiles, capsule schemas, field order, context
 allow/deny rules, return schemas, role bindings, and view metadata. Existing
 role TOMLs become generated views. A separate
-`tools/agent_tools/implementation_route.py` owner decides fixed-packet
+`tools/agent/orchestration/implementation_route.py` owner decides fixed-packet
 eligibility and selects a registered profile. It is a sibling of the landed
 explicit-skill `capability_route.py`, not an extension of `route.py`.
 `agent_team.py` uses the materializer and capacity handshake.
@@ -1269,7 +1269,7 @@ of P1, not a P5 integration helper:
 
 ```text
 model_profile_registry_cli_v1 {
-  entrypoint: tools/agent_tools/model_profile_registry.py::main
+  entrypoint: tools/agent/orchestration/model_profile_registry.py::main
   argv_order: [--root, --check-role-views]
   root: Path = "."
   check_role_views: literal true
@@ -1964,7 +1964,7 @@ close_agent_args_v1: ToolArgumentSchema {
   }
   required: [target]
   additional_properties: false
-  validation_ref: tools/agent_tools/model_profile_registry.py::validate_tool_call_token
+  validation_ref: tools/agent/orchestration/model_profile_registry.py::validate_tool_call_token
 }
 
 close_agent_failure_v1 {
@@ -2028,7 +2028,7 @@ its existing instruction bytes and dependency comments.
 
 ### 4.2 Canonical materializer interface
 
-New source: `tools/agent_tools/model_profile_registry.py`.
+New source: `tools/agent/orchestration/model_profile_registry.py`.
 
 The implementation must expose these typed symbols and no alternate public
 selection API:
@@ -2489,7 +2489,7 @@ resolve_implementation_candidate(
 ```
 
 The team-to-implementation seam is equally fixed and remains inside
-`tools/agent_tools/implementation_route.py`:
+`tools/agent/orchestration/implementation_route.py`:
 
 ```text
 ImplementationRouteRequest {
@@ -2577,7 +2577,7 @@ identity; the result is `continue_existing` for that same Spark or a typed
 `same_worker_resume_mismatch`. It cannot select Luna or another Spark. Compile,
 static, and deterministic acceptance feedback never calls this candidate
 resolver again; it returns to the same implementation pass.
-`tools/agent_tools/route.py` remains the landed public explicit-skill route
+`tools/agent/orchestration/route.py` remains the landed public explicit-skill route
 composition/renderer; it neither imports `implementation_route` nor exposes
 model/profile/capacity selection.
 Missing implementation packet/profile/capability evidence is a typed error or
@@ -2587,14 +2587,14 @@ fallback.
 ### 4.3 Typed capacity owner and handshake
 
 New canonical policy source: `agents/capacity_policy.toml`.
-New implementation owner: `tools/agent_tools/capacity_handshake.py`.
+New implementation owner: `tools/agent/orchestration/capacity_handshake.py`.
 
 The capacity owner also exposes the closed projection-check CLI consumed by
 P5:
 
 ```text
 capacity_handshake_cli_v1 {
-  entrypoint: tools/agent_tools/capacity_handshake.py::main
+  entrypoint: tools/agent/orchestration/capacity_handshake.py::main
   argv_order: [--root, --check-config-projection, --expected-max-threads]
   root: Path = "."
   check_config_projection: literal true
@@ -3861,7 +3861,7 @@ ReleaseTransactionFailure {
 
 BranchGuardReadback {
   readback_version: uint64
-  guard_path: "tools/agent_tools/hook_safety.py"
+  guard_path: "tools/runtime/authority/hook_safety.py"
   guard_sha256: Sha256
   payload_ref: Ref
   exact_command_sha256: Sha256
@@ -3882,13 +3882,13 @@ AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request AGENT_CANON_BRANCH_WORKTREE_R
 git add -- <exact target-state write set>
 git commit -m "$COMMIT_MESSAGE"
 git push --set-upstream origin "$BRANCH"
-python3 tools/agent_tools/github_publish.py publish-pr \
+python3 tools/repository/github/github_publish.py publish-pr \
   --user-task "$USER_TASK" \
   --repo iwashita-nozomu/agent-canon \
   --title "$PR_TITLE" \
   --body-file "$PR_BODY" \
   --summary-out "$PUBLISH_SUMMARY"
-python3 tools/ci/check_merge_structure.py \
+python3 tools/validation/ci/checks/check_merge_structure.py \
   --source "$BRANCH" --target origin/main --compare-commit HEAD
 gh pr checks "$PR_NUMBER" --watch
 gh pr merge "$PR_NUMBER" --merge
@@ -3932,9 +3932,9 @@ this design document; all rows below are planned changes after approval.
 | --- | --- | --- | --- |
 | `agents/model_profiles.toml` | Model-profile registry | Add one typed registry for six runtime profiles, capsule schemas, role bindings, generated views, and materialization policy. | No capability decision or capacity arithmetic. |
 | `agents/capacity_policy.toml` | Capacity policy owner | Own the closed family-role intersection derivation, generated `20 + 6 = 26` request, workflow DAG budgets, disjoint-write caps, reservation policy, queue policy, and saturation action names. | No platform-cap claim; no model prompt prose; the projected number cannot be hand-edited. |
-| `tools/agent_tools/model_profile_registry.py` | Model-profile/prompt-materialization owner | Add typed parser, digest validator, profile lookup, implementation-executable target validator, capsule/materialized ToolCall producer, Decision Sufficiency and EvidenceRequest validator, generated role-view generator, and the closed check-only `model_profile_registry_cli_v1` entrypoint. Reject an evidence request unless it machine-readably names the next decision and an outcome-to-complete-action map with at least two distinct actions. | Imports registry types only; never imports `route.py` or either decision owner. P5 consumes the CLI evidence identity and does not duplicate generation parity. |
-| `tools/agent_tools/implementation_route.py` | Fixed implementation-packet decision owner | Add Spark eligibility, immediate executable-target transition, continuation-vs-fresh, same-Spark structural-gap resume, one-owner-gate, and queue action over verified packet/profile/capacity evidence. Identical action projections launch exactly one Spark and no extra agent; compile/static feedback remains in the same pass; only a newly divergent target-structure contradiction reopens design. | No skill catalog/index, raw-argv parsing, keyword inference, task-size classification, prompt prose, public rendering, worker substitution, micro-slicing, speculative-test escalation, or compatibility fallback. |
-| `tools/agent_tools/capacity_handshake.py` | Capacity readback and ledger owner | Add max-threads loader provenance, typed handshake/readback, requested/configured/effective/reserved/available arithmetic, thread and model-capacity events, complete descendant ledger, automatic close/reclaim evidence, ready queues, reservation release, restart-required evidence, lifecycle-leak detection, and the closed check-only `capacity_handshake_cli_v1` entrypoint. | Reads runtime/config and lifecycle evidence; does not choose model profile. P5 consumes the CLI evidence identity and does not duplicate loader/projection validation. |
+| `tools/agent/orchestration/model_profile_registry.py` | Model-profile/prompt-materialization owner | Add typed parser, digest validator, profile lookup, implementation-executable target validator, capsule/materialized ToolCall producer, Decision Sufficiency and EvidenceRequest validator, generated role-view generator, and the closed check-only `model_profile_registry_cli_v1` entrypoint. Reject an evidence request unless it machine-readably names the next decision and an outcome-to-complete-action map with at least two distinct actions. | Imports registry types only; never imports `route.py` or either decision owner. P5 consumes the CLI evidence identity and does not duplicate generation parity. |
+| `tools/agent/orchestration/implementation_route.py` | Fixed implementation-packet decision owner | Add Spark eligibility, immediate executable-target transition, continuation-vs-fresh, same-Spark structural-gap resume, one-owner-gate, and queue action over verified packet/profile/capacity evidence. Identical action projections launch exactly one Spark and no extra agent; compile/static feedback remains in the same pass; only a newly divergent target-structure contradiction reopens design. | No skill catalog/index, raw-argv parsing, keyword inference, task-size classification, prompt prose, public rendering, worker substitution, micro-slicing, speculative-test escalation, or compatibility fallback. |
+| `tools/agent/orchestration/capacity_handshake.py` | Capacity readback and ledger owner | Add max-threads loader provenance, typed handshake/readback, requested/configured/effective/reserved/available arithmetic, thread and model-capacity events, complete descendant ledger, automatic close/reclaim evidence, ready queues, reservation release, restart-required evidence, lifecycle-leak detection, and the closed check-only `capacity_handshake_cli_v1` entrypoint. | Reads runtime/config and lifecycle evidence; does not choose model profile. P5 consumes the CLI evidence identity and does not duplicate loader/projection validation. |
 | `tests/agent_tools/test_model_profile_registry.py` | Registry test owner | Test schema order, implementation-executable target projection, zero unresolved decisions, profile uniqueness, forbidden context, nonblocking checkpoint semantics, digest mismatch, Decision Sufficiency branch equivalence, missing decision/branch-map EvidenceRequest rejection, ToolCall tokens, generated-view parity, check-only CLI pass/drift behavior, and no fallback. | Static production mechanism tests; no empirical performance claim. |
 | `tests/agent_tools/test_implementation_route.py` | Implementation-route test owner | Test immediate fixed Spark direct route with exactly one worker plus one owner gate and no broad/history/duplicate/additional-agent route; one-pass materialization; compile/static feedback staying in implementation; one structural-gap repair resuming the same Spark; rejection of Luna/second-Spark substitution, micro-slicing, speculative-test escalation, and conservative fallback; Luna graph-owned divergent/cross-owner route; divergence-only design reopen; queue outcomes; and negative dependencies. | No keyword/task-size/count-budget fixtures. |
 | `tests/agent_tools/test_capacity_handshake.py` | Capacity test owner | Test loader provenance/restart, known/unknown caps, effective/reserved/available formula, thread saturation, separate model-capacity queueing, terminal reclaim, nested reservations, reload generation, and check-only CLI success/mismatch/malformed-input behavior. | Deterministic injected readback; no disposable spawn probe. |
@@ -3960,12 +3960,12 @@ this design document; all rows below are planned changes after approval.
 | --- | --- | --- |
 | `.codex/config.toml` | Generated runtime registration view | Replace anchored `max_threads = 24` with topology-generated `max_threads = 26`; retain parent/runtime registration and remove duplicated workflow budget or prompt policy. The generator and alignment checker own parity; fresh-session loader readback must equal 26, while an old session emits `restart_required`. |
 | The 34 exact `.codex/agents/*.toml` paths listed in section 2.3 | Generated role-view consumer | Regenerate every listed role view from `model_profiles.toml`; retain role-specific executable instructions only through registry projection; delete duplicate hand-authored model/prompt fields. |
-| `tools/agent_tools/agent_team.py` | Team projector | Replace generic `SubagentPromptPacket` projection with profile materialization; add implementation-execution packet fields, immediate one-pass dispatch, same-Spark gap continuation, lineage, shared capacity-ledger lifecycle transitions, capacity reservations, ready queue, saturation handling, automatic close, slot reclaim, closeout packet generation, and generated-view digests. Preserve the rebound deterministic `search.py` route. |
-| `tools/agent_tools/bootstrap_agent_run.py` | Task/run packet generator | Load the declared-team witness value 26 into `run.capacity_request.requested_total_capacity`, derive actual DAG demand/write frontiers separately, emit `RequestedCapacityLoaderEvidence` plus policy/topology digests in `team_manifest.yaml`, and remove family numeric defaults. Preserve the rebound deterministic `search.py` route in bootstrap output. |
-| `tools/agent_tools/route.py` | Checked unchanged public composition/renderer | Preserve landed name/area/prompt and `capability_route.py` composition. Add no `implementation_route`, model-profile, capacity, or Decision Sufficiency imports; alignment tests enforce those negative edges. |
-| `tools/agent_tools/check_agent_runtime_alignment.py` | Runtime checker | Validate canonical registry, generated role views, profile-role exclusivity, implementation-executable TargetStateContract requirements, immediate one-pass transition, implementation-feedback/design-gap separation, same-Spark resume identity, capacity-policy references, close-agent ToolCall binding, shared-ledger fields, Decision Sufficiency decision/branch declarations, invariant-action one-Spark/one-post-completion-gate topology with no extra agent, and absence of duplicate numeric or conservative procedure claims. |
+| `tools/agent/orchestration/agent_team.py` | Team projector | Replace generic `SubagentPromptPacket` projection with profile materialization; add implementation-execution packet fields, immediate one-pass dispatch, same-Spark gap continuation, lineage, shared capacity-ledger lifecycle transitions, capacity reservations, ready queue, saturation handling, automatic close, slot reclaim, closeout packet generation, and generated-view digests. Preserve the rebound deterministic `search.py` route. |
+| `tools/runtime/lifecycle/bootstrap_agent_run.py` | Task/run packet generator | Load the declared-team witness value 26 into `run.capacity_request.requested_total_capacity`, derive actual DAG demand/write frontiers separately, emit `RequestedCapacityLoaderEvidence` plus policy/topology digests in `team_manifest.yaml`, and remove family numeric defaults. Preserve the rebound deterministic `search.py` route in bootstrap output. |
+| `tools/agent/orchestration/route.py` | Checked unchanged public composition/renderer | Preserve landed name/area/prompt and `capability_route.py` composition. Add no `implementation_route`, model-profile, capacity, or Decision Sufficiency imports; alignment tests enforce those negative edges. |
+| `tools/validation/semantic/runtime/check_agent_runtime_alignment.py` | Runtime checker | Validate canonical registry, generated role views, profile-role exclusivity, implementation-executable TargetStateContract requirements, immediate one-pass transition, implementation-feedback/design-gap separation, same-Spark resume identity, capacity-policy references, close-agent ToolCall binding, shared-ledger fields, Decision Sufficiency decision/branch declarations, invariant-action one-Spark/one-post-completion-gate topology with no extra agent, and absence of duplicate numeric or conservative procedure claims. |
 | `.codex/README.md` | Runtime reader view | Replace “hard ceiling 24” wording with the capacity-input model and handshake/readback link. |
-| `tools/agent_tools/task_close.py` | Closeout checker | Read the complete parent/nested ledger and fail on any lifecycle state before `reservation released`, completed-but-open agent, unknown descendant, missing automatic close evidence, or leaked reservation. |
+| `tools/runtime/lifecycle/task_close.py` | Closeout checker | Read the complete parent/nested ledger and fail on any lifecycle state before `reservation released`, completed-but-open agent, unknown descendant, missing automatic close evidence, or leaked reservation. |
 
 The landed OOP owners in section 9 remain read-only predecessor evidence. The
 new `implementation_route.py` owns `FixedImplementationPacket`,
@@ -3977,11 +3977,11 @@ review. The implementation worker may not invent an alternate path.
 
 | Path | Change |
 | --- | --- |
-| `tools/agent_tools/check_agent_runtime_alignment.py` | Add registry/view/profile/capsule and implementation-executable target checks; read capacity policy by reference; reject duplicated numeric or prompt ownership, task-size/count investigation authority, evidence operations without decision/branch-action declarations, delayed or micro-sliced implementation after the transition guard, implementation-feedback/design-gap conflation, same-Spark resume mismatch, invariant-action routes with other than one Spark plus one post-completion gate or any extra agent, model/thread-capacity conflation, and forbidden `route.py` imports. |
-| `tools/agent_tools/evaluate_codex_agent_roles.py` | Add model/profile attribution, executable-target immediate one-pass Spark fixtures, fixed Spark/one-owner-gate/no-extra-agent positives, same-Spark structural-gap repair/resume, compile/static feedback controls, rejection of worker substitution/micro-slice/speculative-test/repeated-preflight/rollback/conservative fallback, graph-owned Luna controls, Decision Sufficiency rejection of no-value or undeclared evidence requests, divergence-only design reopen, context exclusion, loader-provenance/capacity queue schemas, distinct thread/model-capacity events, and no-spawn-probe validation. |
-| `tools/agent_tools/evaluate_skill_workflow_prompts.py` | Add frozen checklist targets for every generated capsule schema, implementation-executable Target-State-First wording, immediate direct materialization, post-completion owner gate, implementation-feedback/design-gap separation, same-Spark resume, typed ToolCall tokens, machine-readable evidence-request declarations, invariant-action direct execution, and divergence-only reopen comprehension; preserve evaluator-only semantics. |
-| `evidence/agent-evals/agent_behavior_eval.toml` | Add role-attributed scenarios for fixed executable Spark tasks with immediate one-pass implementation, exactly one worker/one post-completion owner gate/no extra agent, same-Spark structural-gap repair/resume, compile/static implementation feedback, prohibited compensation controls, graph-owned Luna unresolved/cross-owner controls, identical/divergent action tuples, rejection of undeclared evidence requests, divergence-only design reopen, thread and model-capacity queueing as distinct events, continuation reuse, and completed/errored nested lineage cleanup. |
-| `evidence/agent-evals/skill_workflow_prompt_eval.toml` | Add prompt/capsule comprehensibility checklist targets with critical ordered fields, implementation-executable target and immediate-transition semantics, implementation-feedback/design-gap distinction, same-Spark resume, ToolCall schema identity, allowed/excluded context, and Decision Sufficiency failure semantics while preserving the rebound deterministic search fixture. |
+| `tools/validation/semantic/runtime/check_agent_runtime_alignment.py` | Add registry/view/profile/capsule and implementation-executable target checks; read capacity policy by reference; reject duplicated numeric or prompt ownership, task-size/count investigation authority, evidence operations without decision/branch-action declarations, delayed or micro-sliced implementation after the transition guard, implementation-feedback/design-gap conflation, same-Spark resume mismatch, invariant-action routes with other than one Spark plus one post-completion gate or any extra agent, model/thread-capacity conflation, and forbidden `route.py` imports. |
+| `eval/producers/evaluate_codex_agent_roles.py` | Add model/profile attribution, executable-target immediate one-pass Spark fixtures, fixed Spark/one-owner-gate/no-extra-agent positives, same-Spark structural-gap repair/resume, compile/static feedback controls, rejection of worker substitution/micro-slice/speculative-test/repeated-preflight/rollback/conservative fallback, graph-owned Luna controls, Decision Sufficiency rejection of no-value or undeclared evidence requests, divergence-only design reopen, context exclusion, loader-provenance/capacity queue schemas, distinct thread/model-capacity events, and no-spawn-probe validation. |
+| `eval/producers/evaluate_skill_workflow_prompts.py` | Add frozen checklist targets for every generated capsule schema, implementation-executable Target-State-First wording, immediate direct materialization, post-completion owner gate, implementation-feedback/design-gap separation, same-Spark resume, typed ToolCall tokens, machine-readable evidence-request declarations, invariant-action direct execution, and divergence-only reopen comprehension; preserve evaluator-only semantics. |
+| `eval/definitions/agent_behavior_eval.toml` | Add role-attributed scenarios for fixed executable Spark tasks with immediate one-pass implementation, exactly one worker/one post-completion owner gate/no extra agent, same-Spark structural-gap repair/resume, compile/static implementation feedback, prohibited compensation controls, graph-owned Luna unresolved/cross-owner controls, identical/divergent action tuples, rejection of undeclared evidence requests, divergence-only design reopen, thread and model-capacity queueing as distinct events, continuation reuse, and completed/errored nested lineage cleanup. |
+| `eval/definitions/skill_workflow_prompt_eval.toml` | Add prompt/capsule comprehensibility checklist targets with critical ordered fields, implementation-executable target and immediate-transition semantics, implementation-feedback/design-gap distinction, same-Spark resume, ToolCall schema identity, allowed/excluded context, and Decision Sufficiency failure semantics while preserving the rebound deterministic search fixture. |
 | `documents/codex/prompt-skill-evaluation-checklist.md` | Add checklist guidance for target-state packet sufficiency, profile-specific fields, ToolCall token completeness, unauthorized extra-reference detection, and no hidden history. |
 | `tests/agent_tools/test_check_agent_runtime_alignment.py` | Add generated-view parity, profile exclusivity, numeric-source uniqueness, executable-target status, immediate one-pass transition, implementation-feedback/design-gap distinction, same-Spark resume, capacity-policy reference, no task-size/count authority, evidence-request declaration, invariant-action one-Spark/one-post-completion-gate/no-extra-agent, no compensation fallback, distinct capacity-event, and forbidden-import tests. |
 | `tests/agent_tools/test_implementation_route.py` | Add identical-action immediate direct-Spark/one-post-completion-owner-gate/no-extra-agent, same-Spark structural-gap repair/resume, compile/static same-pass feedback, prohibited compensation controls, graph-owned divergent-action Luna, divergence-only design reopen, suitable-context continuation, typed queue, stale evidence, forbidden or undeclared evidence request, and no compatibility-fallback tests. |
@@ -3989,7 +3989,7 @@ review. The implementation worker may not invent an alternate path.
 | `tests/agent_tools/test_evaluate_skill_workflow_prompts.py` | Add capsule field-order and forbidden-context checklist tests. |
 | `tests/agent_tools/test_agent_team_templates.py` and `tests/agent_tools/test_bootstrap_and_close.py` | Add minimal worker projection, upstream-evidence identity, queue, reservation, full parent-visible topology, completed/errored handback, lifecycle, and lineage assertions. |
 | `tests/agent_tools/test_task_close.py` | Add closeout failures for completed-open, errored-open, missing durable handback, unknown descendant, missing per-terminal close-agent token, and reservation leaks, plus a passing full-topology lifecycle fixture. |
-| `tools/agent_tools/check_design_doc_claims.py` | Extend the existing owner with `ClaimEvidenceRecord` parsing and separate `current_state`, `request_contract`, `target_state`, and `assumption` outcomes; reject missing readback actions and never report planned targets as current implementation. |
+| `tools/validation/semantic/documents/check_design_doc_claims.py` | Extend the existing owner with `ClaimEvidenceRecord` parsing and separate `current_state`, `request_contract`, `target_state`, and `assumption` outcomes; reject missing readback actions and never report planned targets as current implementation. |
 | `tests/agent_tools/test_check_design_doc_claims.py` | Add preimplementation approved-target, missing request clause, unresolved assumption, nonexistent planned path, and postimplementation readback-transition fixtures. |
 
 ### 5.5 Duplicate-surface removal and replacement set
@@ -4047,7 +4047,7 @@ Each decision is tied to the downstream surface that must change with it.
 | `close_agent` ToolCall token | registry, route packet, closeout packet | model-profile -> handoff/closeout | prompt-config + document flow | token/schema parity and missing-token failure | RC-18/21 | canonical tool identity and typed argument schemas |
 | Dependency/import manifest | `documents/design/dependency-manifest-design.md`, headers on every new source/test path | design -> implementation | detailed design | manifest/header checker and import graph | RC-08/17/21 | existing `@dependency-start` contracts |
 | Shared/root views | `documents/runtime/SHARED_RUNTIME_SURFACES.md`, `AGENTS.md`, `ROOT_AGENTS.md`, `documents/codex/AGENTS_COORDINATION.md` | source -> generated/root view | document flow + structure | root/view parity and stale-surface sweep | RC-09/11/21 | shared runtime surface policy |
-| Evaluation provenance | `evidence/agent-evals/agent_behavior_eval.toml`, `evidence/agent-evals/skill_workflow_prompt_eval.toml`, role/prompt evaluators | implementation -> evaluation | prompt-config + detailed design | `PerformanceEvidenceRecord` plus machine-enforced `AssignmentEvidenceGate` | RC-15/18/19 | existing role and skill eval tools |
+| Evaluation provenance | `eval/definitions/agent_behavior_eval.toml`, `eval/definitions/skill_workflow_prompt_eval.toml`, role/prompt evaluators | implementation -> evaluation | prompt-config + detailed design | `PerformanceEvidenceRecord` plus machine-enforced `AssignmentEvidenceGate` | RC-15/18/19 | existing role and skill eval tools |
 | Claim evidence classification | design ledger, claim checker, final readback | design -> implementation -> closeout | detailed design + document flow | current/request/target/assumption fixtures and target verification transition | RC-09/10/11/17 | existing implementation-backed claim checker |
 
 ## 7. Design-to-implementation trace
@@ -4055,11 +4055,11 @@ Each decision is tied to the downstream surface that must change with it.
 | Planned edit | Design section | Clause IDs | Reuse precedent | Validation |
 | --- | --- | --- | --- | --- |
 | `agents/model_profiles.toml` | 4.1 | RC-04/07 | existing role model matrix | registry schema/view parity |
-| `tools/agent_tools/model_profile_registry.py` | 2.3/2.3.1/4.2/4.4 | RC-02/04/07/10/18/22/25/26 | `agent_team.py` packet projection | executable-target schema, profile capsules, nonblocking checkpoint, Decision Sufficiency decision/branch declarations, ToolCall, view tests + alignment checker |
+| `tools/agent/orchestration/model_profile_registry.py` | 2.3/2.3.1/4.2/4.4 | RC-02/04/07/10/18/22/25/26 | `agent_team.py` packet projection | executable-target schema, profile capsules, nonblocking checkpoint, Decision Sufficiency decision/branch declarations, ToolCall, view tests + alignment checker |
 | `agents/capacity_policy.toml` | 4.3 | RC-12/14 | task catalog spawn budget | policy/reference checker |
-| `tools/agent_tools/capacity_handshake.py` | 4.3 | RC-12/13/19/20/21/23 | workflow monitor lifecycle | loader, arithmetic, thread/model event, reclaim tests |
-| `tools/agent_tools/implementation_route.py` | 2.3/2.3.1/2.4/4.2/5.1 | RC-01/02/03/05/08/22/23/25/26 | landed immutable capability-decision envelope | executable-target immediate direct pass, fixed one-Spark/one-post-completion-gate/no-extra-agent, implementation-feedback continuity, same-Spark structural-gap repair/resume, graph-owned Luna, divergence-only design reopen, queue, negative-import tests |
-| `tools/agent_tools/check_design_doc_claims.py` | Evidence ledger/2.9/5.4 | RC-09/10/11/17 | current dependency-backed claim checker | claim-class parsing and pre/post implementation status tests |
+| `tools/agent/orchestration/capacity_handshake.py` | 4.3 | RC-12/13/19/20/21/23 | workflow monitor lifecycle | loader, arithmetic, thread/model event, reclaim tests |
+| `tools/agent/orchestration/implementation_route.py` | 2.3/2.3.1/2.4/4.2/5.1 | RC-01/02/03/05/08/22/23/25/26 | landed immutable capability-decision envelope | executable-target immediate direct pass, fixed one-Spark/one-post-completion-gate/no-extra-agent, implementation-feedback continuity, same-Spark structural-gap repair/resume, graph-owned Luna, divergence-only design reopen, queue, negative-import tests |
+| `tools/validation/semantic/documents/check_design_doc_claims.py` | Evidence ledger/2.9/5.4 | RC-09/10/11/17 | current dependency-backed claim checker | claim-class parsing and pre/post implementation status tests |
 | landed `skill_route_catalog.py`, `capability_route.py`, and `route.py` | 2.1/9 | RC-08 | main `404678e1` OOP successor | exact identity plus positive/negative import checker; no edit |
 | `agent_team.py` | 4.2/4.3/4.4/4.5 | RC-05/06/12/13/26 | existing prompt packet and manifest projection | immediate direct materialization, same-worker gap continuation, team/lineage/queue tests, rebound deterministic search preservation |
 | `bootstrap_agent_run.py` | 4.3/5.3/10 | RC-12/13/14 | existing task/run manifest producers | requested-capacity derivation, loader identity, and no-static-default tests |
@@ -4087,8 +4087,8 @@ Each decision is tied to the downstream surface that must change with it.
 | `.codex/config.toml` | 4.3/5.3 | RC-12/13/19 | runtime registration | generation/restart readback fixture |
 | `.codex/README.md` | 5.2/8 | RC-12/14/19 | runtime reader view | no hard-ceiling/fixed-budget claim |
 | each exact generated view in section 2.3 | 4.1/4.4/5.3 | RC-04/07 | existing executable TOML view | generated digest parity |
-| `evidence/agent-evals/agent_behavior_eval.toml` | 11 | RC-15/19/20/25/26 | role evaluation manifest | attributed performance, executable-target direct pass, feedback/gap split, same-Spark resume, no-compensation/no-extra-agent, divergence-only reopen, and lifecycle leak fixtures |
-| `evidence/agent-evals/skill_workflow_prompt_eval.toml` | 11 | RC-15/18/25/26 | skill evaluation manifest | capsule/tool-token/Decision-Sufficiency/executable-target/direct-pass comprehension |
+| `eval/definitions/agent_behavior_eval.toml` | 11 | RC-15/19/20/25/26 | role evaluation manifest | attributed performance, executable-target direct pass, feedback/gap split, same-Spark resume, no-compensation/no-extra-agent, divergence-only reopen, and lifecycle leak fixtures |
+| `eval/definitions/skill_workflow_prompt_eval.toml` | 11 | RC-15/18/25/26 | skill evaluation manifest | capsule/tool-token/Decision-Sufficiency/executable-target/direct-pass comprehension |
 | `tests/agent_tools/test_model_profile_registry.py` | 5.4 | RC-04/07/18/25/26 | registry/materializer tests | executable-target schema/order/nonblocking checkpoint/token/no-fallback/evidence-declaration tests |
 | `tests/agent_tools/test_check_design_doc_claims.py` | Evidence ledger/5.4 | RC-09/10/11/17 | current checker tests | current/request/target/assumption and final-readback fixtures |
 | `tests/agent_tools/test_capacity_handshake.py` | 5.4 | RC-12/13/19/20/21/23 | handshake tests | loader identity, unknown cap, min-known, thread/model event separation, completed/errored leak, queue, reload |
@@ -4135,9 +4135,9 @@ owner identities:
 | Path | SHA-256 | Fixed responsibility |
 | --- | --- | --- |
 | `agents/skills/oop-type-design.md` | `147906d68db1c24eed3c12a53f07c914130d9fe99c53977af94a0613c424e1c6` | OOP/type packet and explicit capability owner contract |
-| `tools/agent_tools/skill_route_catalog.py` | `c09ef7d29a378aa31000157847e7d742cea77e734c4cc2c155d712c582161e28` | explicit skill capability catalog/index |
-| `tools/agent_tools/capability_route.py` | `f9bdc819cae5f66c7f3450f2948fde7d89668a9248e57e80b153b5de90534482` | raw-argv preflight and immutable explicit-skill decision |
-| `tools/agent_tools/route.py` | `544ce80bfba6be4817f28e4c16801483f9e929e5502a6e7698d7f328f50e4ee7` | public explicit-skill route composition/rendering; preserves the rebound deterministic `search.py` invocation |
+| `tools/agent/skills/skill_route_catalog.py` | `c09ef7d29a378aa31000157847e7d742cea77e734c4cc2c155d712c582161e28` | explicit skill capability catalog/index |
+| `tools/agent/orchestration/capability_route.py` | `f9bdc819cae5f66c7f3450f2948fde7d89668a9248e57e80b153b5de90534482` | raw-argv preflight and immutable explicit-skill decision |
+| `tools/agent/orchestration/route.py` | `544ce80bfba6be4817f28e4c16801483f9e929e5502a6e7698d7f328f50e4ee7` | public explicit-skill route composition/rendering; preserves the rebound deterministic `search.py` invocation |
 | `documents/conventio../conventions/object-oriented-design.md` | `232d81fa627fc742679aa3c3958b41252330c3585a4f750bde773dd57db338e9` | shared type, invariant, boundary, and dependency policy |
 
 The one permitted rebind from `3ce14a5e` to `404678e1` changed exactly seven
@@ -4146,13 +4146,13 @@ and required preservation are:
 
 | Path | Old SHA-256 | Rebound SHA-256 | Preservation invariant |
 | --- | --- | --- | --- |
-| `ROOT_AGENTS.md` | `3496f3125dab824bb96b9eeee55c10eb6d2f9e2d247b6db4840a4d681bc7788b` | `4aa15ed0f8573f1a6d5b8928a60a10d5b8a51a6f0f7ba14bc528e9cac312688f` | Keep the canonical deterministic `tools/agent_tools/search.py` route while projecting RC-26. |
+| `ROOT_AGENTS.md` | `3496f3125dab824bb96b9eeee55c10eb6d2f9e2d247b6db4840a4d681bc7788b` | `4aa15ed0f8573f1a6d5b8928a60a10d5b8a51a6f0f7ba14bc528e9cac312688f` | Keep the canonical deterministic `tools/analysis/search/search.py` route while projecting RC-26. |
 | `agents/COMMUNICATION_PROTOCOL.md` | `00c3eaa15e81fd19b6a9496c59586aa5d0f5503d3fa9519ee95e17329db3090b` | `9213c4ff92a814298da78b8db34425765e256908de4f5178cf9ceeb95272cff6` | Keep the deterministic search packet/command contract while adding execution-contract and same-worker fields. |
 | `agents/skills/agent-orchestration.md` | `a46020bc9ad549eefd38626898d89d425315bdd1d5a48e5bc1379532202231a0` | `dffcd5ac2fb921f7702636448c3a81948aa02feff9a9f9cc79cb1c2095ff3eb0` | Keep the deterministic search route; RC-26 replaces only conflicting procedure defaults. |
 | `documents/runtime/SHARED_RUNTIME_SURFACES.md` | `1a988cebdfd25fe2a14fd13ce00fd2aa9d92669c8ca40f787df59a6a0401ddb6` | `39d61a341ca9d0ed72b731c362aa72e0102598e7a1300a20f33d5b75cd8985a3` | Keep the rebound GPU-admission R5 identity paragraph and dependency edge. |
-| `evidence/agent-evals/skill_workflow_prompt_eval.toml` | `cf1d2968cbd12ff4b3698cb55a27e42520a804428c932f5fb9d9d370fa3c10db` | `1e2522f9f8e5717e85a2da978119799df7c40dbb6290e6503aab9926b43a5153` | Keep the deterministic-search fixture and add RC-26 comprehension assertions in the same eval owner. |
-| `tools/agent_tools/agent_team.py` | `2165ae6541f002a2db3c970ec291665687535d89bea838d6134921231822374b` | `bfa29be9588641ac76833cfde989b45871a01f7bfe684691e87a6fdb4875d3c4` | Keep deterministic-search packet generation while adding model/capacity/lifecycle materialization. |
-| `tools/agent_tools/bootstrap_agent_run.py` | `0e83c874dc2d954f2c44b5befdd699460b943db41e65ae70d8f2eb2feddc934d` | `54f5a976da85648f45cccbc5b761b28dca8dc4293b24496a6b94ca23c8caf05f` | Keep deterministic-search bootstrap output while adding target/capacity/lifecycle fields. |
+| `eval/definitions/skill_workflow_prompt_eval.toml` | `cf1d2968cbd12ff4b3698cb55a27e42520a804428c932f5fb9d9d370fa3c10db` | `1e2522f9f8e5717e85a2da978119799df7c40dbb6290e6503aab9926b43a5153` | Keep the deterministic-search fixture and add RC-26 comprehension assertions in the same eval owner. |
+| `tools/agent/orchestration/agent_team.py` | `2165ae6541f002a2db3c970ec291665687535d89bea838d6134921231822374b` | `bfa29be9588641ac76833cfde989b45871a01f7bfe684691e87a6fdb4875d3c4` | Keep deterministic-search packet generation while adding model/capacity/lifecycle materialization. |
+| `tools/runtime/lifecycle/bootstrap_agent_run.py` | `0e83c874dc2d954f2c44b5befdd699460b943db41e65ae70d8f2eb2feddc934d` | `54f5a976da85648f45cccbc5b761b28dca8dc4293b24496a6b94ca23c8caf05f` | Keep deterministic-search bootstrap output while adding target/capacity/lifecycle fields. |
 
 No other target write-set path overlaps the rebind. The immutable packet
 anchors bind the rebound hashes above; preserving these two landed changes is
@@ -4423,19 +4423,19 @@ After the typed claim mechanism and target owners exist, validation runs in
 this order:
 
 The P1 owner gate includes
-`python3 tools/agent_tools/model_profile_registry.py --root . --check-role-views`.
+`python3 tools/agent/orchestration/model_profile_registry.py --root . --check-role-views`.
 The P2 owner gate includes
-`python3 tools/agent_tools/capacity_handshake.py --root . --check-config-projection --expected-max-threads 26`.
+`python3 tools/agent/orchestration/capacity_handshake.py --root . --check-config-projection --expected-max-threads 26`.
 P5 invokes those same check-only entrypoints as downstream evidence consumers;
 it neither owns their parsers nor repeats their invariants.
 
-1. `python3 tools/agent_tools/check_design_doc_claims.py --root . --recursive-depth 3 documents/design/codex-spark-implementation-routing.md`; require zero blocked assumptions, verified current/request identities, approved target-state identities before implementation, and verified target-state readbacks at closeout.
-2. `python3 tools/agent_tools/check_dependency_headers.py --changed` and the
+1. `python3 tools/validation/semantic/documents/check_design_doc_claims.py --root . --recursive-depth 3 documents/design/codex-spark-implementation-routing.md`; require zero blocked assumptions, verified current/request identities, approved target-state identities before implementation, and verified target-state readbacks at closeout.
+2. `python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed` and the
    dependency-header scanner for the new design and future implementation
    paths.
-3. `python3 tools/agent_tools/check_agent_runtime_alignment.py` after registry
+3. `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py` after registry
    and generated-view implementation.
-4. `python3 tools/agent_tools/check_convention_compliance.py` in the selected
+4. `python3 tools/validation/semantic/convention/check_convention_compliance.py` in the selected
    workflow closeout.
 5. generated-view check-only comparison; fail if any role TOML differs from
    registry output.
@@ -4528,8 +4528,8 @@ its acceptance input and produces those outputs during validation.
   is not a launch prerequisite.
 - OOP predecessor main `404678e1e9c242737e2f610e98743328931edd8f` and the
   recorded SHA-256 identities for `agents/skills/oop-type-design.md`,
-  `tools/agent_tools/skill_route_catalog.py`,
-  `tools/agent_tools/capability_route.py`, and `tools/agent_tools/route.py`;
+  `tools/agent/skills/skill_route_catalog.py`,
+  `tools/agent/orchestration/capability_route.py`, and `tools/agent/orchestration/route.py`;
   these owners are immutable packet evidence, not worker choices.
 - `dependency_graph.tsv`, `dependency_edit_scope.txt`, responsibility-scope
   result, stale-surface/contradiction sweep, and generated-view digest report.
@@ -4566,12 +4566,12 @@ its acceptance input and produces those outputs during validation.
   `subagent-bootstrap.md`, and `task-routing.md` owner sections.
 - `.codex/config.toml`, `.codex/README.md`, and the generated role views for
   the selected profile only.
-- `tools/agent_tools/model_profile_registry.py`,
+- `tools/agent/orchestration/model_profile_registry.py`,
   `capacity_handshake.py`, `implementation_route.py`, `agent_team.py`, and
   `task_close.py` exact sections named by the approved target-state path;
   `route.py` is read-only boundary evidence for the required negative import
   edge.
-- `tools/agent_tools/check_agent_runtime_alignment.py`,
+- `tools/validation/semantic/runtime/check_agent_runtime_alignment.py`,
   role/prompt eval tools, and their canonical test documentation.
 - Named tests from the target-state contract; no broad repository scan.
 
@@ -4809,13 +4809,13 @@ Spark 実装 routing 契約に対するユーザー明示の後続契約であ�
 | TERRA-04 | Luna は design、review、ordinary ambiguous implementation を保持し、Spark は fixed mechanical leaf を保持する。 | Luna / Spark; `agents/canonical/CODEX_SUBAGENTS.md` |
 | TERRA-05 | Terra の activation evidence は multi-owner dependency closure、compaction・long-run・incomplete handoff による context reconstruction、または複数案・finding の contradiction validation のいずれかである。 | task topology; `agents/task_catalog.yaml` |
 | TERRA-06 | Terra は owner closure、context capsule、accepted・rejected・escalated の handback を返して終了し、unresolved は Sol に返す。descendant と reservation の cleanup は既存 lifecycle 契約で閉じる。 | Terra / Sol; `agents/agents_config.json` |
-| TERRA-07 | `team_manifest.yaml` は run 生成 artifact であり、Terra の恒久正本にはしない。role/profile は canonical source と materializer から生成する。 | runtime owners; `tools/agent_tools/model_profile_registry.py` |
-| TERRA-08 | `CODEX_SUBAGENTS.md` の退役 `branch_worktree_guard.py` owner 参照は現行 `hook_safety.py` route に置換する。 | hook safety owner; `tools/agent_tools/hook_safety.py` |
+| TERRA-07 | `team_manifest.yaml` は run 生成 artifact であり、Terra の恒久正本にはしない。role/profile は canonical source と materializer から生成する。 | runtime owners; `tools/agent/orchestration/model_profile_registry.py` |
+| TERRA-08 | `CODEX_SUBAGENTS.md` の退役 `branch_worktree_guard.py` owner 参照は現行 `hook_safety.py` route に置換する。 | hook safety owner; `tools/runtime/authority/hook_safety.py` |
 | TERRA-09 | Terra を各 workflow family の conditional candidate として宣言するため、宣言 topology の現在値は direct frontier `21` と nested reservation `6` の `27` とする。従来の `20 + 6 = 26` 投影はこの successor amendment で置換する。 | `agents/task_catalog.yaml` capacity derivation、`.codex/config.toml` loader/readback、runtime alignment |
 
 Terra の型契約は `agents/model_profiles.toml` の既存の role/profile projection を
 再利用する。新しい runtime class、coordinator API、write-capable implementation
 path、または恒久 manifest schema は追加しない。最終 validation は
-`tools/agent_tools/model_profile_registry.py` の canonical materializer、generated-view
-readback、`tools/agent_tools/check_agent_runtime_alignment.py` の runtime alignment、
+`tools/agent/orchestration/model_profile_registry.py` の canonical materializer、generated-view
+readback、`tools/validation/semantic/runtime/check_agent_runtime_alignment.py` の runtime alignment、
 Markdown formatter/check の targeted route とする。

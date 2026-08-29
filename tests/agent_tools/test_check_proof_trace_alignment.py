@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests proof trace code path and proposition alignment checker.
-# upstream implementation ../../tools/agent_tools/check_proof_trace_alignment.py checks anchors.
+# upstream implementation ../../tools/validation/semantic/proof/check_proof_trace_alignment.py checks anchors.
 # upstream design ../../agents/skills/formal-proof-workflow.md defines trace policy.
 # @dependency-end
 
@@ -18,7 +18,7 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "check_proof_trace_alignment.py"
+SCRIPT = PROJECT_ROOT / "tools" / "validation" / "semantic" / "proof" / "check_proof_trace_alignment.py"
 
 
 class CheckProofTraceAlignmentTest(unittest.TestCase):

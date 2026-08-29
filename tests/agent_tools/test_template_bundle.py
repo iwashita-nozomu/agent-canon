@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from tools.agent_tools.template_bundle import TemplateBundleError, bundle_identity, export_bundle
+from tools.agent.templates.template_bundle import TemplateBundleError, bundle_identity, export_bundle
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -43,7 +43,7 @@ def test_bundle_identity_has_profile_and_manifest_inputs() -> None:
 
 def test_template_bundle_imports_on_runtime_python() -> None:
     result = subprocess.run(
-        [sys.executable, "-c", "from tools.agent_tools.template_bundle import bundle_identity; print(bundle_identity.__name__)"],
+        [sys.executable, "-c", "from tools.agent.templates.template_bundle import bundle_identity; print(bundle_identity.__name__)"],
         check=False,
         capture_output=True,
         text=True,

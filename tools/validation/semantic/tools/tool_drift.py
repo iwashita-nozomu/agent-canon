@@ -8,7 +8,7 @@
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing contract
 # upstream design ../../agents/TASK_WORKFLOWS.md workflow routing contract
 # upstream design ../../agents/skills/agent-orchestration.md orchestration routing contract
-# upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt routing eval contract
+# upstream design ../../eval/definitions/skill_workflow_prompt_eval.toml prompt routing eval contract
 # upstream design ../../documents/conventions/REVIEW_PROCESS.md closeout validation policy
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream design ../../documents/tools/tool-docs.toml one-to-one tool documentation map
@@ -16,7 +16,7 @@
 # upstream implementation ./check_convention_compliance.py verifies skill-routing markers
 # upstream implementation ./graph_client.py provides verified manifest dependency facts
 # upstream implementation ./tool_path_policy.py defines retired legacy path policy
-# downstream implementation ../../tools/ci/run_all_checks.sh runs drift checker
+# downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs drift checker
 # downstream implementation ../../tests/agent_tools/test_tool_drift.py tests checker
 # @dependency-end
 """Check tool/convention drift using dependency manifests as the trace map."""

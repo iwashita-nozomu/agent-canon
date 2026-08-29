@@ -6,8 +6,8 @@ contract skill
 responsibility Owns AgentCanon agent-side recurrence learning and routes private knowledge or feedback to the external log owner.
 upstream design ../workflows/agent-learning-workflow.md learning workflow and lifecycle
 upstream design ../../documents/runtime/private-feedback-knowledge.md private log command and storage contract
-upstream implementation ../../tools/agent_tools/private_feedback.py metadata-only private log adapter
-downstream implementation ../../tools/agent_tools/workflow_monitor.py runtime feedback evidence
+upstream implementation ../../tools/runtime/archive/private_feedback.py metadata-only private log adapter
+downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py runtime feedback evidence
 @dependency-end
 -->
 
@@ -45,9 +45,9 @@ ownerへの記録です。
 
 - `agents/workflows/agent-learning-workflow.md`
 - `documents/runtime/private-feedback-knowledge.md`
-- `tools/agent_tools/private_feedback.py`
-- `tools/agent_tools/workflow_monitor.py`
-- `evidence/agent-evals/agent_behavior_eval.toml`
+- `tools/runtime/archive/private_feedback.py`
+- `tools/runtime/lifecycle/workflow_monitor.py`
+- `eval/definitions/agent_behavior_eval.toml`
 
 ## Mandatory Behavior and Learning Contract
 
@@ -66,7 +66,7 @@ ownerへの記録です。
 - `skill_improvement_decision=applied` は対象promptまたはeval anchorを変更し、対応validation
   をrerunした場合だけ記録する。private knowledgeへの記録は
   `knowledge_learning_decision=recorded` とし、public skillへの自動昇格はしない。
-- behavior evalは `evidence/agent-evals/agent_behavior_eval.toml` を正本とし、feedback action
+- behavior evalは `eval/definitions/agent_behavior_eval.toml` を正本とし、feedback action
   とimprovement decisionを解決して `AGENT_EVALUATION_STATUS=pass` にする。
 
 ## Operating Route

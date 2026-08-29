@@ -1,8 +1,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests workflow selection eval behavior.
-# upstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py runs workflow selection evals
-# upstream design ../../evidence/agent-evals/workflow_selection_eval.toml defines canonical workflow selection cases
+# upstream implementation ../../eval/producers/evaluate_workflow_selection.py runs workflow selection evals
+# upstream design ../../eval/definitions/workflow_selection_eval.toml defines canonical workflow selection cases
 # @dependency-end
 
 """Tests for workflow selection evals."""
@@ -18,10 +18,10 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_workflow_selection.py"
+SCRIPT = PROJECT_ROOT / "eval" / "producers" / "evaluate_workflow_selection.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from evaluate_workflow_selection import load_manifest  # noqa: E402
-from runtime_log_paths import mounted_log_archive_root  # noqa: E402
+from eval.producers.evaluate_workflow_selection import load_manifest  # noqa: E402
+from tools.runtime.archive.runtime_log_paths import mounted_log_archive_root  # noqa: E402
 
 
 class EvaluateWorkflowSelectionTest(unittest.TestCase):
@@ -50,7 +50,7 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
 
     def test_current_manifest_expands_required_task_groups(self) -> None:
         """The canonical manifest should expand to 21 stable 25-case groups."""
-        manifest = load_manifest(PROJECT_ROOT / "evidence" / "agent-evals" / "workflow_selection_eval.toml")
+        manifest = load_manifest(PROJECT_ROOT / "eval" / "definitions" / "workflow_selection_eval.toml")
         expected_groups = {
             "routing-advisory",
             "scoped-lite-code",
@@ -164,7 +164,7 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.copy_runtime_fixture(root)
-            manifest = root / "evidence" / "agent-evals" / "workflow_selection_eval.toml"
+            manifest = root / "eval" / "definitions" / "workflow_selection_eval.toml"
             manifest.parent.mkdir(parents=True, exist_ok=True)
             manifest.write_text(
                 "\n".join(
@@ -202,7 +202,7 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.copy_runtime_fixture(root)
-            manifest = root / "evidence" / "agent-evals" / "workflow_selection_eval.toml"
+            manifest = root / "eval" / "definitions" / "workflow_selection_eval.toml"
             manifest.parent.mkdir(parents=True, exist_ok=True)
             manifest.write_text(
                 "\n".join(
@@ -241,7 +241,7 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.copy_runtime_fixture(root)
-            manifest = root / "evidence" / "agent-evals" / "workflow_selection_eval.toml"
+            manifest = root / "eval" / "definitions" / "workflow_selection_eval.toml"
             manifest.parent.mkdir(parents=True, exist_ok=True)
             manifest.write_text(
                 "\n".join(
@@ -283,9 +283,9 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
     def copy_runtime_fixture(self, root: Path) -> None:
         """Copy the classifier and manifest needed by the eval runner."""
         for relative in (
-            "tools/agent_tools/prompt_classifier.py",
-            "tools/agent_tools/skill_lane_detector.py",
-            "evidence/agent-evals/workflow_selection_eval.toml",
+            "tools/agent/orchestration/prompt_classifier.py",
+            "tools/agent/skills/skill_lane_detector.py",
+            "eval/definitions/workflow_selection_eval.toml",
         ):
             source = PROJECT_ROOT / relative
             destination = root / relative

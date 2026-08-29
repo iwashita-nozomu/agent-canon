@@ -4,11 +4,11 @@
 # responsibility Dispatches the bounded active hook contract in-process without child processes, Git, or network access.
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md owns coordination capability and receipt semantics.
 # upstream implementation ../hooks.json invokes this dispatcher once per active event.
-# upstream implementation ../../tools/agent_tools/hook_safety.py owns pure secret and destructive Git safety leaves.
-# upstream implementation ../../tools/agent_tools/execution_resource_projection.py validates producer projection bytes.
+# upstream implementation ../../tools/runtime/authority/hook_safety.py owns pure secret and destructive Git safety leaves.
+# upstream implementation ../../tools/runtime/container/execution_resource_projection.py validates producer projection bytes.
 # upstream implementation ./hook_event_log.py provides one bounded local spool context per event.
-# downstream implementation ../../tools/agent_tools/behavior_event_assembly.py records one behavior snapshot.
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates the active/inactive contract.
+# downstream implementation ../../tools/runtime/archive/behavior_event_assembly.py records one behavior snapshot.
+# downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates the active/inactive contract.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates dispatch, redaction, malformed input, and no-subprocess behavior.
 # @dependency-end
 
