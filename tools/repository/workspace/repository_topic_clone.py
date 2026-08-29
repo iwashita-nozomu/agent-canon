@@ -49,7 +49,7 @@ if TYPE_CHECKING:
 elif __package__:
     from . import parent_root_side_effects as _parent_boundary
 else:  # direct CLI execution
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
     import tools.repository.workspace.parent_root_side_effects as _parent_boundary
 
 

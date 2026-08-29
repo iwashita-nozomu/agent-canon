@@ -17,11 +17,15 @@ import json
 import os
 import re
 import subprocess
+import sys
 from collections import deque
 from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from itertools import groupby
 from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
 try:
     from tools.analysis.dependencies.graph_client import GraphClient, GraphClientError

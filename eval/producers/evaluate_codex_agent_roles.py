@@ -22,8 +22,6 @@ import json
 import subprocess
 import sys
 
-import tools.agent.orchestration.model_profile_registry
-
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
@@ -39,6 +37,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
 
+from tools.agent.orchestration import model_profile_registry
 from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactError, runtime_artifact_boundary
 from tools.runtime.archive.runtime_log_paths import eval_results_dir
 

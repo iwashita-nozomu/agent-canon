@@ -3094,7 +3094,9 @@ class DependencyModelTests(unittest.TestCase):
                 encoding="utf-8",
             )
             binary.chmod(0o755)
-            (repository / "tools" / "runtime" / "dispatch" / "agent-canon" / "Cargo.toml").write_text(
+            cargo_manifest = repository / "tools" / "runtime" / "dispatch" / "agent-canon" / "Cargo.toml"
+            cargo_manifest.parent.mkdir(parents=True, exist_ok=True)
+            cargo_manifest.write_text(
                 "[package]\nname = 'agent-canon'\nversion = '0.1.0'\nedition = '2021'\n",
                 encoding="utf-8",
             )
@@ -3696,7 +3698,7 @@ class DependencyModelTests(unittest.TestCase):
         self.assertNotIn("AGENT_CANON_RUNTIME_GID", dockerfile)
         self.assertIn("ARG TARGETARCH", dockerfile)
         self.assertIn("linux/arm64", dockerfile)
-        self.assertNotIn('io.agent-canon.run.network="none"', dockerfile)
+        self.assertIn('io.agent-canon.run.network="none"', dockerfile)
 
     def test_project_extras_are_ordered_and_installed_then_checked(self) -> None:
         workspace = Path(tempfile.mkdtemp())

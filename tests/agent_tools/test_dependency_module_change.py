@@ -155,12 +155,27 @@ def install_public_cli_surface(root: Path, *, derived: bool) -> Path:
     """Install the canonical CLI/library pair in one fresh source surface."""
     tools_root = root / "tools"
     source_tools = root / "vendor" / "agent-canon" / "tools" if derived else tools_root
-    agent_tools = source_tools / "agent_tools"
-    agent_tools.mkdir(parents=True)
-    shutil.copy2(TOOL, agent_tools / TOOL.name)
-    shutil.copy2(GENERIC_TOOL, agent_tools / GENERIC_TOOL.name)
-    shutil.copy2(TOOL.parent / "parent_root_side_effects.py", agent_tools / "parent_root_side_effects.py")
-    shutil.copy2(TOOL.parent / "runtime_artifacts.py", agent_tools / "runtime_artifacts.py")
+    workspace_tools = source_tools / "repository" / "workspace"
+    workspace_tools.mkdir(parents=True)
+    shutil.copy2(TOOL, workspace_tools / TOOL.name)
+    shutil.copy2(GENERIC_TOOL, workspace_tools / GENERIC_TOOL.name)
+    shutil.copy2(TOOL.parent / "parent_root_side_effects.py", workspace_tools / "parent_root_side_effects.py")
+    git_tools = source_tools / "repository" / "git"
+    git_tools.mkdir(parents=True)
+    shutil.copy2(
+        PROJECT_ROOT / "tools" / "repository" / "git" / "conflict_preservation.py",
+        git_tools / "conflict_preservation.py",
+    )
+    authority_tools = source_tools / "runtime" / "authority"
+    authority_tools.mkdir(parents=True)
+    for name in ("checkout_identity.py", "writer_target.py"):
+        shutil.copy2(PROJECT_ROOT / "tools" / "runtime" / "authority" / name, authority_tools / name)
+    artifacts_tools = source_tools / "runtime" / "artifacts"
+    artifacts_tools.mkdir(parents=True)
+    shutil.copy2(
+        PROJECT_ROOT / "tools" / "runtime" / "artifacts" / "runtime_artifacts.py",
+        artifacts_tools / "runtime_artifacts.py",
+    )
     if derived:
         tools_root.mkdir(parents=True)
         (tools_root / "agent-canon").symlink_to(
@@ -168,7 +183,7 @@ def install_public_cli_surface(root: Path, *, derived: bool) -> Path:
             target_is_directory=True,
         )
         source_tools = tools_root / "agent-canon"
-    return source_tools / "agent_tools" / TOOL.name
+    return source_tools / "repository" / "workspace" / TOOL.name
 
 
 @pytest.mark.parametrize("derived", (False, True))

@@ -18,12 +18,16 @@ import fcntl
 import json
 import os
 import re
+import sys
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import IO, cast
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 if __package__:
     from tools.repository.workspace.workspace_scope import (
