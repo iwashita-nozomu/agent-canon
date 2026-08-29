@@ -1175,7 +1175,7 @@ entries:
       runtime: python
       argv: [python3, tools/agent/orchestration/route.py]
       execution_plane: tool-container
-      cwd: source-root
+      cwd: target-root
       env: allowlisted
       stdin: inherited
       stdout: inherited
