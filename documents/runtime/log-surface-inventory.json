@@ -2124,7 +2124,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 245,
+      "line": 248,
       "path": "tools/agent/skills/skill_dependency_map.py",
       "surface": "tool"
     },
@@ -2132,7 +2132,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 525,
+      "line": 528,
       "path": "tools/agent/skills/skill_dependency_map.py",
       "surface": "tool"
     },
@@ -2140,7 +2140,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1356,
+      "line": 1359,
       "path": "tools/agent/skills/skill_dependency_map.py",
       "surface": "tool"
     },
@@ -2148,7 +2148,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1357,
+      "line": 1360,
       "path": "tools/agent/skills/skill_dependency_map.py",
       "surface": "tool"
     },
@@ -2156,7 +2156,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 1366,
+      "line": 1369,
       "path": "tools/agent/skills/skill_dependency_map.py",
       "surface": "tool"
     },
@@ -2164,14 +2164,6 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_DEPENDENCY_MAP",
-      "line": 2175,
-      "path": "tools/agent/skills/skill_dependency_map.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SKILL_TOOL_INVOCATION_GRAPH",
       "line": 2178,
       "path": "tools/agent/skills/skill_dependency_map.py",
       "surface": "tool"
@@ -2180,7 +2172,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_INVOCATION_GRAPH",
-      "line": 2196,
+      "line": 2181,
       "path": "tools/agent/skills/skill_dependency_map.py",
       "surface": "tool"
     },
@@ -2188,7 +2180,15 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_INVOCATION_GRAPH",
-      "line": 2201,
+      "line": 2199,
+      "path": "tools/agent/skills/skill_dependency_map.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "SKILL_TOOL_INVOCATION_GRAPH",
+      "line": 2204,
       "path": "tools/agent/skills/skill_dependency_map.py",
       "surface": "tool"
     },
@@ -2276,7 +2276,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 308,
+      "line": 312,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2284,7 +2284,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 671,
+      "line": 675,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2292,7 +2292,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1173,
+      "line": 1177,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2300,7 +2300,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "content_delta_count",
-      "line": 1137,
+      "line": 1141,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2308,7 +2308,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "content_delta_paths",
-      "line": 1137,
+      "line": 1141,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2316,7 +2316,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "projection_digests",
-      "line": 1137,
+      "line": 1141,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2324,7 +2324,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "record_digest",
-      "line": 642,
+      "line": 646,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2332,7 +2332,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "record_digests",
-      "line": 1137,
+      "line": 1141,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2340,7 +2340,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 642,
+      "line": 646,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2348,7 +2348,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 1137,
+      "line": 1141,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2356,7 +2356,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "source_snapshot_digest",
-      "line": 1137,
+      "line": 1141,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2364,7 +2364,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 1137,
+      "line": 1141,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2372,7 +2372,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "version",
-      "line": 642,
+      "line": 646,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2380,7 +2380,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "version",
-      "line": 1137,
+      "line": 1141,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2388,7 +2388,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "content_delta_count",
-      "line": 1137,
+      "line": 1141,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2396,7 +2396,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "content_delta_paths",
-      "line": 1137,
+      "line": 1141,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2404,7 +2404,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "projection_digests",
-      "line": 1137,
+      "line": 1141,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2412,7 +2412,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "record_digests",
-      "line": 1137,
+      "line": 1141,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2420,7 +2420,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "schema",
-      "line": 1137,
+      "line": 1141,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2428,7 +2428,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "source_snapshot_digest",
-      "line": 1137,
+      "line": 1141,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2436,7 +2436,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "status",
-      "line": 1137,
+      "line": 1141,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2444,7 +2444,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "version",
-      "line": 1137,
+      "line": 1141,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2452,7 +2452,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_DELTA",
-      "line": 1146,
+      "line": 1150,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2460,7 +2460,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_FAILURE",
-      "line": 1175,
+      "line": 1179,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2468,7 +2468,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_FAILURE",
-      "line": 1178,
+      "line": 1182,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2476,7 +2476,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_FAILURE",
-      "line": 1181,
+      "line": 1185,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2484,7 +2484,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_SCHEMA",
-      "line": 1139,
+      "line": 1143,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2492,7 +2492,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_SHIM_MATERIALIZER_STATUS",
-      "line": 1140,
+      "line": 1144,
       "path": "tools/agent/skills/skill_shim_materializer.py",
       "surface": "tool"
     },
@@ -2500,7 +2500,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 900,
+      "line": 904,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2508,7 +2508,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 901,
+      "line": 905,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2516,7 +2516,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 915,
+      "line": 919,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2524,7 +2524,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 916,
+      "line": 920,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2532,7 +2532,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 940,
+      "line": 944,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2540,7 +2540,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 941,
+      "line": 945,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2548,7 +2548,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 951,
+      "line": 955,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2556,7 +2556,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 952,
+      "line": 956,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2564,7 +2564,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 972,
+      "line": 976,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2572,7 +2572,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "findings",
-      "line": 980,
+      "line": 984,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2580,7 +2580,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 980,
+      "line": 984,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2588,7 +2588,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 972,
+      "line": 976,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2596,7 +2596,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "findings",
-      "line": 980,
+      "line": 984,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2604,7 +2604,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "status",
-      "line": 980,
+      "line": 984,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2612,7 +2612,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 376,
+      "line": 380,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2620,7 +2620,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_TOOL_COMMANDS_CANONICAL_DOC",
-      "line": 881,
+      "line": 885,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2628,7 +2628,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_TOOL_COMMANDS_FINDING",
-      "line": 504,
+      "line": 508,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2636,7 +2636,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_TOOL_COMMANDS_PUBLIC_LAYOUT",
-      "line": 931,
+      "line": 935,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2644,7 +2644,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_TOOL_COMMANDS_RUNTIME_SKILL",
-      "line": 880,
+      "line": 884,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2652,7 +2652,7 @@
       "certainty": "static",
       "emitter": "key_value_literal",
       "field": "SKILL_TOOL_COMMANDS_SKILL",
-      "line": 879,
+      "line": 883,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2660,7 +2660,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_COMMANDS",
-      "line": 993,
+      "line": 997,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2668,7 +2668,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_COMMANDS_FINDINGS",
-      "line": 992,
+      "line": 996,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -2676,7 +2676,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "SKILL_TOOL_COMMANDS_SOURCE_ROOT_FAILURE",
-      "line": 965,
+      "line": 969,
       "path": "tools/agent/skills/skill_tool_commands.py",
       "surface": "tool"
     },
@@ -4340,7 +4340,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DEPENDENCY_HEADER_SCAN",
-      "line": 432,
+      "line": 441,
       "path": "tools/analysis/dependencies/scan_dependency_headers.sh",
       "surface": "tool"
     },
@@ -4348,7 +4348,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DEPENDENCY_HEADER_SCAN",
-      "line": 436,
+      "line": 445,
       "path": "tools/analysis/dependencies/scan_dependency_headers.sh",
       "surface": "tool"
     },
@@ -4356,7 +4356,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DEPENDENCY_HEADER_SCAN_BASELINE",
-      "line": 423,
+      "line": 432,
       "path": "tools/analysis/dependencies/scan_dependency_headers.sh",
       "surface": "tool"
     },
@@ -4364,7 +4364,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DEPENDENCY_HEADER_SCAN_BASELINE_MISSING_PATH",
-      "line": 428,
+      "line": 437,
       "path": "tools/analysis/dependencies/scan_dependency_headers.sh",
       "surface": "tool"
     },
@@ -4372,7 +4372,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DEPENDENCY_HEADER_SCAN_BLOCKING",
-      "line": 422,
+      "line": 431,
       "path": "tools/analysis/dependencies/scan_dependency_headers.sh",
       "surface": "tool"
     },
@@ -4380,7 +4380,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DEPENDENCY_HEADER_SCAN_CHANGED_MISSING_PATH",
-      "line": 425,
+      "line": 434,
       "path": "tools/analysis/dependencies/scan_dependency_headers.sh",
       "surface": "tool"
     },
@@ -4388,7 +4388,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DEPENDENCY_HEADER_SCAN_CHECKED",
-      "line": 418,
+      "line": 427,
       "path": "tools/analysis/dependencies/scan_dependency_headers.sh",
       "surface": "tool"
     },
@@ -4396,7 +4396,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DEPENDENCY_HEADER_SCAN_MISSING",
-      "line": 420,
+      "line": 429,
       "path": "tools/analysis/dependencies/scan_dependency_headers.sh",
       "surface": "tool"
     },
@@ -4412,7 +4412,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DEPENDENCY_HEADER_SCAN_SKIPPED",
-      "line": 419,
+      "line": 428,
       "path": "tools/analysis/dependencies/scan_dependency_headers.sh",
       "surface": "tool"
     },
@@ -4420,7 +4420,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "MISSING_DEPENDENCY_EXPLANATION_BEGIN",
-      "line": 317,
+      "line": 325,
       "path": "tools/analysis/dependencies/scan_dependency_headers.sh",
       "surface": "tool"
     },
@@ -4428,7 +4428,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "MISSING_DEPENDENCY_EXPLANATION_END",
-      "line": 321,
+      "line": 329,
       "path": "tools/analysis/dependencies/scan_dependency_headers.sh",
       "surface": "tool"
     },
@@ -4436,7 +4436,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "MISSING_DEPENDENCY_MANIFEST",
-      "line": 410,
+      "line": 419,
       "path": "tools/analysis/dependencies/scan_dependency_headers.sh",
       "surface": "tool"
     },
@@ -4444,7 +4444,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "MISSING_DEPENDENCY_PREVIEW_LINES",
-      "line": 319,
+      "line": 327,
       "path": "tools/analysis/dependencies/scan_dependency_headers.sh",
       "surface": "tool"
     },
@@ -4452,7 +4452,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "MISSING_DEPENDENCY_REASON",
-      "line": 318,
+      "line": 326,
       "path": "tools/analysis/dependencies/scan_dependency_headers.sh",
       "surface": "tool"
     },
@@ -9268,7 +9268,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 276,
+      "line": 274,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9276,7 +9276,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "code",
-      "line": 870,
+      "line": 868,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9284,7 +9284,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "detail",
-      "line": 870,
+      "line": 868,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9292,7 +9292,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "execution_plane",
-      "line": 189,
+      "line": 187,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9300,7 +9300,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "operation",
-      "line": 189,
+      "line": 187,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9308,7 +9308,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "requested_at",
-      "line": 189,
+      "line": 187,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9316,7 +9316,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "results",
-      "line": 861,
+      "line": 859,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9324,7 +9324,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 189,
+      "line": 187,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9332,7 +9332,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 861,
+      "line": 859,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9340,7 +9340,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 870,
+      "line": 868,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9348,7 +9348,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "source_commit",
-      "line": 189,
+      "line": 187,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9356,7 +9356,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 861,
+      "line": 859,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9364,7 +9364,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "status",
-      "line": 870,
+      "line": 868,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9372,7 +9372,7 @@
       "certainty": "dynamic",
       "emitter": "json_stdout",
       "field": "<dynamic>",
-      "line": 276,
+      "line": 274,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9380,7 +9380,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "code",
-      "line": 870,
+      "line": 868,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9388,7 +9388,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "detail",
-      "line": 870,
+      "line": 868,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9396,7 +9396,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "results",
-      "line": 861,
+      "line": 859,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9404,7 +9404,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "schema",
-      "line": 861,
+      "line": 859,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9412,7 +9412,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "schema",
-      "line": 870,
+      "line": 868,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9420,7 +9420,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "status",
-      "line": 861,
+      "line": 859,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -9428,7 +9428,7 @@
       "certainty": "static",
       "emitter": "json_stdout",
       "field": "status",
-      "line": 870,
+      "line": 868,
       "path": "tools/runtime/archive/private_feedback.py",
       "surface": "tool"
     },
@@ -11692,7 +11692,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 170,
+      "line": 169,
       "path": "tools/runtime/container/bootstrap_runtime.py",
       "surface": "tool"
     },
@@ -11700,23 +11700,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 455,
-      "path": "tools/runtime/container/bootstrap_runtime.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 3345,
-      "path": "tools/runtime/container/bootstrap_runtime.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "json_object",
-      "field": "<dynamic>",
-      "line": 3349,
+      "line": 454,
       "path": "tools/runtime/container/bootstrap_runtime.py",
       "surface": "tool"
     },
@@ -11732,7 +11716,23 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 3351,
+      "line": 3354,
+      "path": "tools/runtime/container/bootstrap_runtime.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 3355,
+      "path": "tools/runtime/container/bootstrap_runtime.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 3356,
       "path": "tools/runtime/container/bootstrap_runtime.py",
       "surface": "tool"
     },
@@ -18428,14 +18428,6 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 291,
-      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "shell_key_value_stdout",
-      "field": "<dynamic>",
       "line": 299,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
@@ -18444,7 +18436,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 311,
+      "line": 307,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18452,7 +18444,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 317,
+      "line": 319,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18460,7 +18452,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 321,
+      "line": 325,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18468,7 +18460,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 341,
+      "line": 329,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18476,15 +18468,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 350,
-      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "shell_key_value_stdout",
-      "field": "<dynamic>",
-      "line": 354,
+      "line": 349,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18500,7 +18484,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 367,
+      "line": 362,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18508,7 +18492,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 371,
+      "line": 366,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18516,7 +18500,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 378,
+      "line": 375,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18524,7 +18508,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 382,
+      "line": 379,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18556,7 +18540,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 404,
+      "line": 398,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18564,7 +18548,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 410,
+      "line": 402,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18572,7 +18556,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 414,
+      "line": 412,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18585,10 +18569,18 @@
       "surface": "tool"
     },
     {
-      "certainty": "static",
+      "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
-      "field": "DEPENDENCY_HEADER_FORMAT",
-      "line": 425,
+      "field": "<dynamic>",
+      "line": 422,
+      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "shell_key_value_stdout",
+      "field": "<dynamic>",
+      "line": 426,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18596,7 +18588,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DEPENDENCY_HEADER_FORMAT",
-      "line": 443,
+      "line": 433,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18604,7 +18596,15 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "DEPENDENCY_HEADER_FORMAT",
-      "line": 447,
+      "line": 452,
+      "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "DEPENDENCY_HEADER_FORMAT",
+      "line": 456,
       "path": "tools/validation/semantic/dependencies/check_dependency_header_format.sh",
       "surface": "tool"
     },
@@ -18612,7 +18612,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 286,
+      "line": 304,
       "path": "tools/validation/semantic/dependencies/check_dependency_headers.py",
       "surface": "tool"
     },
@@ -18620,7 +18620,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 293,
+      "line": 311,
       "path": "tools/validation/semantic/dependencies/check_dependency_headers.py",
       "surface": "tool"
     },
@@ -18628,7 +18628,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 299,
+      "line": 317,
       "path": "tools/validation/semantic/dependencies/check_dependency_headers.py",
       "surface": "tool"
     },
@@ -18636,7 +18636,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 316,
+      "line": 334,
       "path": "tools/validation/semantic/dependencies/check_dependency_headers.py",
       "surface": "tool"
     },
@@ -18644,7 +18644,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 318,
+      "line": 336,
       "path": "tools/validation/semantic/dependencies/check_dependency_headers.py",
       "surface": "tool"
     },
@@ -18652,7 +18652,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 320,
+      "line": 338,
       "path": "tools/validation/semantic/dependencies/check_dependency_headers.py",
       "surface": "tool"
     },
@@ -18660,7 +18660,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
-      "line": 335,
+      "line": 353,
       "path": "tools/validation/semantic/dependencies/check_dependency_headers.py",
       "surface": "tool"
     },
@@ -18668,7 +18668,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_HEADERS",
-      "line": 363,
+      "line": 381,
       "path": "tools/validation/semantic/dependencies/check_dependency_headers.py",
       "surface": "tool"
     },
@@ -18676,7 +18676,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_HEADERS",
-      "line": 369,
+      "line": 387,
       "path": "tools/validation/semantic/dependencies/check_dependency_headers.py",
       "surface": "tool"
     },
@@ -18684,7 +18684,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_HEADERS",
-      "line": 386,
+      "line": 404,
       "path": "tools/validation/semantic/dependencies/check_dependency_headers.py",
       "surface": "tool"
     },
@@ -18692,7 +18692,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "DEPENDENCY_HEADERS",
-      "line": 391,
+      "line": 409,
       "path": "tools/validation/semantic/dependencies/check_dependency_headers.py",
       "surface": "tool"
     },
@@ -19436,7 +19436,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "AGENT_RUNTIME_ALIGNMENT",
-      "line": 2469,
+      "line": 2475,
       "path": "tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
       "surface": "tool"
     },
