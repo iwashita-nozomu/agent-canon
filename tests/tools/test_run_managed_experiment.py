@@ -98,7 +98,7 @@ def create_fake_repo_dirs(repo_root: Path) -> None:
     (repo_root / "experiments" / "demo_topic" / "result").mkdir(parents=True)
     (repo_root / "experiments" / "demo_topic" / "report").mkdir(parents=True)
     (repo_root / "experiments" / "report").mkdir(parents=True)
-    (repo_root / "tools" / "experiments").mkdir(parents=True)
+    (repo_root / "tools" / "experiments" / "execution").mkdir(parents=True)
 
 
 def write_template_topic(repo_root: Path) -> None:

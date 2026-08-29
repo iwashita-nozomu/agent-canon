@@ -90,8 +90,9 @@ def test_full_unit_preserves_body_status_without_target_mutation(
         check=True,
     )
 
-    (target / "tools" / "ci").mkdir(parents=True)
-    runner = target / "tools" / "ci" / RUNNER.name
+    runner_parent = target / "tools" / "validation" / "ci" / "runners"
+    runner_parent.mkdir(parents=True)
+    runner = runner_parent / RUNNER.name
     runner_text = RUNNER.read_text(encoding="utf-8").replace(
         "/usr/local/share/agent-canon/.agent-canon-tool-container",
         str(tmp_path / "tool-container-marker"),
@@ -102,6 +103,7 @@ def test_full_unit_preserves_body_status_without_target_mutation(
 
     capture = tmp_path / "capture.txt"
     fake_checks = target / "tools" / "validation" / "ci" / "runners" / "run_all_checks.sh"
+    fake_checks.parent.mkdir(parents=True, exist_ok=True)
     fake_checks.write_text(
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"

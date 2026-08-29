@@ -39,11 +39,13 @@ def test_pre_review_uses_boundary_report_and_parent_local_child_env(
     tmp_path: Path,
 ) -> None:
     parent = tmp_path / "parent"
-    (parent / "tools" / "ci").mkdir(parents=True)
-    (parent / "tools" / "agent_tools").mkdir(parents=True)
-    shutil.copy2(SCRIPT, parent / "tools" / "ci" / SCRIPT.name)
-    shutil.copy2(BOUNDARY, parent / "tools" / "agent_tools" / BOUNDARY.name)
-    shutil.copy2(RUNTIME_ARTIFACTS, parent / "tools" / "agent_tools" / RUNTIME_ARTIFACTS.name)
+    (parent / "tools" / "validation" / "ci" / "runners").mkdir(parents=True)
+    (parent / "tools" / "validation" / "ci" / "checks").mkdir(parents=True)
+    (parent / "tools" / "repository" / "workspace").mkdir(parents=True)
+    (parent / "tools" / "runtime" / "artifacts").mkdir(parents=True)
+    shutil.copy2(SCRIPT, parent / "tools" / "validation" / "ci" / "runners" / SCRIPT.name)
+    shutil.copy2(BOUNDARY, parent / "tools" / "repository" / "workspace" / BOUNDARY.name)
+    shutil.copy2(RUNTIME_ARTIFACTS, parent / "tools" / "runtime" / "artifacts" / RUNTIME_ARTIFACTS.name)
     quality = parent / "tools" / "validation" / "ci" / "checks" / "run_python_quality_checks.sh"
     quality.write_text(
         "#!/bin/sh\n"
@@ -65,7 +67,10 @@ def test_pre_review_uses_boundary_report_and_parent_local_child_env(
     env["AGENT_CANON_RUNTIME_ROOT"] = str(runtime_root)
 
     result = subprocess.run(
-        ("bash", str(parent / "tools" / "ci" / SCRIPT.name)),
+        (
+            "bash",
+            str(parent / "tools" / "validation" / "ci" / "runners" / SCRIPT.name),
+        ),
         cwd=parent,
         env=env,
         check=False,
@@ -84,11 +89,20 @@ def test_pre_review_accepts_external_report_dir_without_source_side_effect(
     tmp_path: Path,
 ) -> None:
     parent = tmp_path / "parent"
-    (parent / "tools" / "ci").mkdir(parents=True)
-    (parent / "tools" / "agent_tools").mkdir(parents=True)
-    shutil.copy2(SCRIPT, parent / "tools" / "ci" / SCRIPT.name)
-    shutil.copy2(BOUNDARY, parent / "tools" / "agent_tools" / BOUNDARY.name)
-    shutil.copy2(RUNTIME_ARTIFACTS, parent / "tools" / "agent_tools" / RUNTIME_ARTIFACTS.name)
+    (parent / "tools" / "validation" / "ci" / "runners").mkdir(parents=True)
+    (parent / "tools" / "validation" / "ci" / "checks").mkdir(parents=True)
+    (parent / "tools" / "repository" / "workspace").mkdir(parents=True)
+    (parent / "tools" / "runtime" / "artifacts").mkdir(parents=True)
+    shutil.copy2(
+        SCRIPT, parent / "tools" / "validation" / "ci" / "runners" / SCRIPT.name
+    )
+    shutil.copy2(
+        BOUNDARY, parent / "tools" / "repository" / "workspace" / BOUNDARY.name
+    )
+    shutil.copy2(
+        RUNTIME_ARTIFACTS,
+        parent / "tools" / "runtime" / "artifacts" / RUNTIME_ARTIFACTS.name,
+    )
     quality = parent / "tools" / "validation" / "ci" / "checks" / "run_python_quality_checks.sh"
     quality.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     quality.chmod(0o755)
@@ -98,7 +112,10 @@ def test_pre_review_accepts_external_report_dir_without_source_side_effect(
     env["AGENT_REPORT_DIR"] = str(outside / "reports")
     env["AGENT_CANON_RUNTIME_ROOT"] = str(outside)
     result = subprocess.run(
-        ("bash", str(parent / "tools" / "ci" / SCRIPT.name)),
+        (
+            "bash",
+            str(parent / "tools" / "validation" / "ci" / "runners" / SCRIPT.name),
+        ),
         cwd=parent,
         env=env,
         check=False,
