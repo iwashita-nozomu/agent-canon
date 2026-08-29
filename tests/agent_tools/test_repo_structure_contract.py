@@ -205,6 +205,7 @@ class RepoStructureContractTest(unittest.TestCase):
             "tools/catalog.yaml",
             "tools/runtime/dispatch/agent-canon/Cargo.toml",
             "tools/runtime/lifecycle/update_lifecycle_contract.py",
+            "eval/definitions/README.md",
         ]:
             self.write_file(root, file_path, f"{file_path}\n")
         for dir_path in [
@@ -214,7 +215,11 @@ class RepoStructureContractTest(unittest.TestCase):
             "agents/canonical",
             "documents/rule",
             "documents/tools",
-            "tools/agent_tools",
+            "tools/agent",
+            "tools/analysis",
+            "tools/repository",
+            "tools/runtime",
+            "tools/validation",
             "tools/user",
             "tools/internal",
             "tools/ci",
@@ -307,40 +312,71 @@ class RepoStructureContractTest(unittest.TestCase):
                         {"type": "directory", "name": "notes"},
                     ],
                 },
-                {
-                    "type": "directory",
-                    "name": "tools",
-                    "contents": [
-                        {"type": "file", "name": "catalog.yaml"},
                         {
                             "type": "directory",
-                            "name": "agent_tools",
+                            "name": "tools",
                             "contents": [
-                                {"type": "file", "name": "update_lifecycle_contract.py"}
+                                {"type": "file", "name": "catalog.yaml"},
+                                {
+                                    "type": "directory",
+                                    "name": "agent",
+                                },
+                                {"type": "directory", "name": "analysis"},
+                                {"type": "directory", "name": "repository"},
+                                {
+                                    "type": "directory",
+                                    "name": "runtime",
+                                    "contents": [
+                                        {
+                                            "type": "directory",
+                                            "name": "dispatch",
+                                            "contents": [
+                                                {
+                                                    "type": "directory",
+                                                    "name": "agent-canon",
+                                                    "contents": [
+                                                        {
+                                                            "type": "file",
+                                                            "name": "Cargo.toml",
+                                                        }
+                                                    ],
+                                                }
+                                            ],
+                                        },
+                                        {
+                                            "type": "directory",
+                                            "name": "lifecycle",
+                                            "contents": [
+                                                {
+                                                    "type": "file",
+                                                    "name": "update_lifecycle_contract.py",
+                                                }
+                                            ],
+                                        },
+                                    ],
+                                },
+                                {"type": "directory", "name": "validation"},
+                                {"type": "directory", "name": "user"},
+                                {"type": "directory", "name": "internal"},
+                                {"type": "directory", "name": "ci"},
                             ],
                         },
-                        {"type": "directory", "name": "user"},
-                        {"type": "directory", "name": "internal"},
-                        {"type": "directory", "name": "ci"},
-                    ],
-                },
-                {
-                    "type": "directory",
-                    "name": "rust",
-                    "contents": [
                         {
                             "type": "directory",
-                            "name": "agent-canon",
-                            "contents": [{"type": "file", "name": "Cargo.toml"}],
-                        }
-                    ],
-                },
+                            "name": "eval",
+                            "contents": [
+                                {
+                                    "type": "directory",
+                                    "name": "definitions",
+                                    "contents": [{"type": "file", "name": "README.md"}],
+                                }
+                            ],
+                        },
                 {
                     "type": "directory",
                     "name": "tests",
                     "contents": [{"type": "directory", "name": "agent_tools"}],
                 },
-                {"type": "directory", "name": "knowledge"},
                 {"type": "directory", "name": "issues"},
             ],
         }

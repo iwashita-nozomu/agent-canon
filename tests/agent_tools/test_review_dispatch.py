@@ -15,9 +15,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+sys.path.insert(0, str(PROJECT_ROOT))
 
-import tools.agent.orchestration.review_dispatch  # noqa: E402
+from tools.agent.orchestration import review_dispatch  # noqa: E402
 from tools.runtime.artifacts.artifact_identity import canonical_body_sha256  # noqa: E402
 
 

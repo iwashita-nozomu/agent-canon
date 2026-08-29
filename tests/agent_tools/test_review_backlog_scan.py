@@ -29,11 +29,11 @@ class ReviewBacklogScanTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir) / "parent"
             subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
-            fixture_tools = root / "tools" / "agent_tools"
+            fixture_tools = root / "tools" / "analysis" / "code"
             fixture_tools.mkdir(parents=True)
             for tool_name in ("file_surface_inventory.py",):
                 shutil.copy2(
-                    PROJECT_ROOT / "tools" / "agent_tools" / tool_name,
+                    PROJECT_ROOT / "tools" / "analysis" / "code" / tool_name,
                     fixture_tools / tool_name,
                 )
             runtime = root.parent / "runtime"

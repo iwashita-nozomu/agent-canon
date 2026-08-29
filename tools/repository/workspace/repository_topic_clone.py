@@ -228,17 +228,9 @@ class CloneState:
 
 def _load_publication_contract():
     """Import the canonical publication transition validators lazily."""
-    root = Path(__file__).parent
-    if str(root) not in sys.path:
-        sys.path.insert(0, str(root))
-    module = __import__(
-        "update_lifecycle_contract",
-        fromlist=[
-            "validate_candidate_cas_pr_transition",
-            "validate_publication_readback_transition",
-        ],
-    )
-    return module
+    from tools.runtime.lifecycle import update_lifecycle_contract
+
+    return update_lifecycle_contract
 
 
 def topic_slug(value: str) -> str:

@@ -120,8 +120,9 @@ class ResponsibilityScopeTest(unittest.TestCase):
         paths = set(scopes["eval-and-hook-evidence"]["paths"])
         runtime_paths = set(scopes["runtime-entrypoints"]["paths"])
 
-        self.assertIn("evidence", paths)
-        self.assertIn("evidence/**", paths)
+        self.assertIn("eval", paths)
+        self.assertIn("eval/**", paths)
+        self.assertIn("reports/**", paths)
         self.assertIn("documents/runtime/runtime-log-archive.md", paths)
         self.assertIn("documents/runtime/runtime-log-archive-migration.md", paths)
         self.assertIn("tools/runtime/archive/runtime_log_paths.py", paths)
@@ -131,7 +132,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
             scopes["runtime-entrypoints"].get("exclude_paths", []),
         )
         self.assertIn(
-            "tools/runtime/archive/runtime_log_paths.py",
+            "eval/**",
             scopes["shared-tooling"]["exclude_paths"],
         )
         self.assertIn(

@@ -39,7 +39,9 @@ def test_standalone_and_derived_roots_resolve_source_config(tmp_path: Path) -> N
     derived = derived_parent / "vendor" / "agent-canon"
     for source in (standalone, derived):
         (source / "tools" / "ci").mkdir(parents=True)
-        (source / "tools" / "validation" / "ci" / "config" / "pydocstyle.toml").write_text(
+        config = source / "tools" / "validation" / "ci" / "config" / "pydocstyle.toml"
+        config.parent.mkdir(parents=True)
+        config.write_text(
             '[tool.pydocstyle]\nadd-select = "D213"\n',
             encoding="utf-8",
         )
@@ -91,7 +93,9 @@ def test_target_boundaries_reject_escape_injection_symlink_and_wrong_type(
     root = tmp_path / "repo"
     source = root / "vendor" / "agent-canon"
     (source / "tools" / "ci").mkdir(parents=True)
-    (source / "tools" / "validation" / "ci" / "config" / "pydocstyle.toml").write_text(
+    config = source / "tools" / "validation" / "ci" / "config" / "pydocstyle.toml"
+    config.parent.mkdir(parents=True)
+    config.write_text(
         "[tool.pydocstyle]\n", encoding="utf-8"
     )
     (root / "valid.py").write_text("# valid\n", encoding="utf-8")
