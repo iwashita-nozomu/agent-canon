@@ -1581,7 +1581,7 @@ def test_parser_has_typed_exec_tool_codex_and_eval_routes() -> None:
 
 
 def test_public_python_source_sync_route_is_removed() -> None:
-    """Only the host shell may mutate source-sync state."""
+    """Only the host shell owns source-sync; dead Python fallback is absent."""
     base = [
         "--repository-root",
         str(REPOSITORY_ROOT),
@@ -1592,6 +1592,12 @@ def test_public_python_source_sync_route_is_removed() -> None:
     ]
     with pytest.raises(SystemExit):
         build_parser().parse_args(base + ["sync", "--install-root", str(REPOSITORY_ROOT)])
+    controller = (REPOSITORY_ROOT / "tools/agent_tools/bootstrap_runtime.py").read_text(
+        encoding="utf-8"
+    )
+    assert "SourceSync" not in controller
+    assert "source_sync_image_required" not in controller
+    assert not (REPOSITORY_ROOT / "tools/agent_tools/source_sync.py").exists()
 
 
 def test_status_reads_host_owned_source_sync_record(tmp_path: Path) -> None:

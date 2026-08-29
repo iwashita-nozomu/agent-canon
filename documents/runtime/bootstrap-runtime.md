@@ -125,38 +125,23 @@ host sync transition.
 
 ### Install source transition
 
-The distribution install path has one SourceSync transition after argument and
-path parsing but before Docker command discovery, host runtime initialization,
-image build, or resident reconciliation. It fetches `refs/heads/main`
-explicitly into `refs/remotes/origin/main`; a `FETCH_HEAD`-only result is not an alignment
-state. Only the exact managed root `~/agent-canon` with `$HOME` as its control
-root is converged automatically. Its tracked source may be detached, behind,
-ahead, or dirty: install attaches local `main` to the fetched remote commit
-with the forced managed transition and then performs a no-op `merge --ff-only`.
-Ignored `.runtime/` and `.codex/personal/` remain local state. A fetch or
-alignment failure ends install before Docker build/create and leaves the prior
-resident untouched.
+The public install path has one SourceSync admission transition after argument
+and path parsing but before Docker command discovery, host runtime
+initialization, image build, or resident reconciliation. It fetches
+`refs/heads/main` explicitly into `refs/remotes/origin/main` and admits the
+checkout only when `git rev-parse HEAD` is exactly equal to
+`git rev-parse refs/remotes/origin/main`. Fetch and commit-read failures remain
+typed operational failures. The transition never switches branches, inspects
+working-tree cleanliness, expands shallow history, or reads a source tree for
+admission; tree identity in the host source-sync receipt is telemetry only.
 
-Other checkouts retain their caller-owned branch and tracked files. The
-SourceSync primitive rejects a detached, non-`main`, dirty, or non-fast-forward
-checkout rather than changing it. The resulting install state is deliberately
-small:
-
-| Source state | SourceSync transition | Install consequence |
-| --- | --- | --- |
-| absent / not a Git checkout | distribution caller must clone first | no Docker operation |
-| managed detached, dirty, or diverged | fetch explicit remote ref; converge tracked source to `main` | continue from aligned `HEAD` |
-| managed `main` already at remote | record `up_to_date` | continue without source rewrite |
-| non-managed detached / other branch / dirty / diverged | preserve and return typed refusal | no source or resident change |
-| remote fetch or ref readback failure | record failure | no Docker build/create |
-
-Only after the source transition succeeds does install reset the stale
-reconstructible runtime projection, build/adopt the expected image, and
-reconcile the named resident. The reset uses the existing resident replacement
-and rollback primitives; a foreign resident is still rejected and unrelated
-Docker resources are untouched. An install failure is terminal for that
-invocation; target registration is a separate caller action and must not be
-inferred from a failed receipt.
+After the commit match, install deletes the exact AgentCanon-owned resident
+and reconstructible runtime projection, then builds and starts the new
+resident. Old `mounts.tsv`, target paths, rollback files, resident layout or
+security configuration, and UID/rootless details are not install inputs.
+Foreign or unlabeled Docker resources remain untouched. A failure in source
+admission, owned-state deletion, build, or start is terminal for that
+invocation; target registration and tool execution remain separate operations.
 
 ## What is installed and where
 

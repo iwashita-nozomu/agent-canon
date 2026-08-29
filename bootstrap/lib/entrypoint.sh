@@ -286,24 +286,15 @@ _agent_canon_source_sync_failure() {
   _agent_canon_json_error "$code" "$detail"
 }
 
-_agent_canon_source_sync_is_managed_install() {
-  local home_root
-  home_root=$(realpath -e -- "$HOME" 2>/dev/null) || return 1
-  [[ "$AGENT_CANON_CONTROL_ROOT" == "$home_root" &&
-     "$AGENT_CANON_REPOSITORY_ROOT" == "$home_root/agent-canon" ]]
-}
-
-_agent_canon_source_sync_align() (
-  # Install is entered by the dotfiles route after it has fetched into
-  # FETCH_HEAD and detached the live checkout.  SourceSync owns the one
-  # normalization point: publish the fetched branch ref, then make the
-  # managed checkout a local main checkout before any Docker operation.
+_agent_canon_install_source_admission() (
+  # Install consumes the caller's checkout.  SourceSync refreshes the exact
+  # remote-tracking ref and admits only an exact commit match; it never
+  # changes the caller's branch, worktree, or generated runtime state.
   set +e
   AGENT_CANON_SYNC_SKIP_STATE=1
   local install_root=${1:-$AGENT_CANON_REPOSITORY_ROOT}
-  local remote=${2:-origin} branch=${3:-main}
-  local remote_url source_head source_tree source_before target_ref target_head
-  local current_branch sync_code
+  local remote=origin branch=main
+  local remote_url source_head source_tree remote_head
   AGENT_CANON_SYNC_SOURCE_ROOT=$install_root
   AGENT_CANON_SYNC_REMOTE=$remote
   AGENT_CANON_SYNC_BRANCH=$branch
@@ -311,81 +302,40 @@ _agent_canon_source_sync_align() (
   AGENT_CANON_SYNC_SOURCE_HEAD=unknown
   AGENT_CANON_SYNC_SOURCE_TREE=unknown
 
-  [[ "$remote" =~ ^[A-Za-z0-9_.-]+$ && "$branch" =~ ^[A-Za-z0-9._/-]+$ ]] || {
-    _agent_canon_source_sync_failure argument_invalid "source-sync remote or branch is invalid"
-    exit 2
-  }
-  if ! source_before=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null) ||
-     ! source_tree=$(git -C "$install_root" rev-parse --verify HEAD^{tree} 2>/dev/null); then
-    _agent_canon_source_sync_failure source_sync_git_failed "source checkout identity is unavailable"
+  if ! source_head=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null); then
+    _agent_canon_source_sync_failure source_sync_git_failed "source checkout HEAD is unavailable"
     exit 2
   fi
-  AGENT_CANON_SYNC_SOURCE_HEAD=$source_before
-  AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
   if ! remote_url=$(git -C "$install_root" remote get-url "$remote" 2>/dev/null); then
     _agent_canon_source_sync_failure source_remote_unavailable "source-sync remote URL is unavailable"
     exit 2
   fi
   AGENT_CANON_SYNC_REMOTE_URL=$remote_url
-  target_ref="refs/remotes/$remote/$branch"
-  # The explicit refspec is intentional. A FETCH_HEAD-only fetch leaves the
-  # local remote-tracking ref stale and makes the following branch transition
-  # depend on whichever checkout state the caller happened to leave behind.
-  if ! git -C "$install_root" fetch "$remote" "+refs/heads/$branch:$target_ref"; then
+  if ! git -C "$install_root" fetch "$remote" "+refs/heads/$branch:refs/remotes/$remote/$branch"; then
     _agent_canon_source_sync_failure source_remote_unavailable "source-sync fetch failed"
     exit 2
   fi
-  if ! target_head=$(git -C "$install_root" rev-parse --verify "$target_ref" 2>/dev/null) ||
-     [[ ! "$target_head" =~ ^[0-9a-f]{40}$ ]]; then
+  if ! remote_head=$(git -C "$install_root" rev-parse --verify "refs/remotes/$remote/$branch" 2>/dev/null); then
     _agent_canon_source_sync_failure source_remote_unavailable "fetched source branch is unavailable"
     exit 2
   fi
-
-  if _agent_canon_source_sync_is_managed_install; then
-    # The managed source root is disposable source state.  Discard tracked
-    # edits and converge its branch/worktree to the fetched remote commit;
-    # ignored .runtime and .codex/personal files remain untouched by switch.
-    if ! git -C "$install_root" switch --discard-changes -C "$branch" "$target_ref" >/dev/null; then
-      _agent_canon_source_sync_failure source_sync_checkout_failed "managed source checkout could not be aligned to main"
-      exit 2
-    fi
-    if ! git -C "$install_root" merge --ff-only "$target_ref" >/dev/null; then
-      _agent_canon_source_sync_failure source_sync_checkout_failed "managed source main could not be fast-forwarded"
-      exit 2
-    fi
-  else
-    # Development/topic/workspace checkouts retain their caller-owned branch
-    # and tracked changes.  They may only advance an already clean main via
-    # the normal fast-forward path.
-    if ! current_branch=$(git -C "$install_root" symbolic-ref --quiet --short HEAD 2>/dev/null); then
-      _agent_canon_source_sync_failure source_sync_checkout_detached "non-managed source checkout is detached"
-      exit 2
-    fi
-    [[ "$current_branch" == "$branch" ]] || {
-      _agent_canon_source_sync_failure source_sync_branch_mismatch "non-managed source checkout is not on $branch"
-      exit 2
-    }
-    if [[ -n "$(git -C "$install_root" status --porcelain --untracked-files=no)" ]]; then
-      _agent_canon_source_sync_failure source_sync_dirty "non-managed source checkout has tracked changes"
-      exit 2
-    fi
-    if ! git -C "$install_root" merge --ff-only "$target_ref" >/dev/null; then
-      _agent_canon_source_sync_failure source_sync_diverged "non-managed source main cannot be fast-forwarded"
-      exit 2
-    fi
-  fi
-
-  if ! source_head=$(git -C "$install_root" rev-parse --verify HEAD 2>/dev/null) ||
-     ! source_tree=$(git -C "$install_root" rev-parse --verify HEAD^{tree} 2>/dev/null); then
-    AGENT_CANON_SYNC_SOURCE_HEAD=${source_head:-unknown}
-    _agent_canon_source_sync_failure source_sync_git_failed "aligned source checkout identity is unavailable"
+  [[ "$source_head" =~ ^[0-9a-f]{40}$ && "$remote_head" =~ ^[0-9a-f]{40}$ ]] || {
+    AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
+    _agent_canon_source_sync_failure source_sync_git_failed "source commit identity is invalid"
     exit 2
-  fi
+  }
+  [[ "$source_head" == "$remote_head" ]] || {
+    AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
+    _agent_canon_source_sync_failure source_sync_commit_mismatch \
+      "source HEAD does not match refs/remotes/origin/main"
+    exit 2
+  }
+  # Tree identity is receipt telemetry only.  It is deliberately not part of
+  # install admission, so an unavailable tree never blocks reconstruction.
+  source_tree=$(git -C "$install_root" rev-parse --verify HEAD^{tree} 2>/dev/null) || source_tree=unknown
   AGENT_CANON_SYNC_SOURCE_HEAD=$source_head
   AGENT_CANON_SYNC_SOURCE_TREE=$source_tree
-  sync_code=up_to_date
-  [[ "$source_before" == "$source_head" ]] || sync_code=updated
-  printf '%s\t%s\t%s\t%s\n' "$sync_code" "$source_head" "$source_tree" "$remote_url"
+  printf 'up_to_date\t%s\t%s\t%s\n' "$source_head" "$source_tree" "$remote_url"
   exit 0
 )
 
@@ -2061,38 +2011,56 @@ _agent_canon_update_locked() {
 _agent_canon_replace_resident_locked() {
   local candidate_image_ref=$1 candidate_image_id=$2
   local replacement_operation=${3:-update}
+  local clean_install_prepared=${4:-0}
   local old_image_id old_image_ref old_container candidate restored rc
   local old_container_present=0 current_resident_valid=0 clean_install=0 old_quiesced=0
-  local old_container_id old_container_runtime old_container_control stale_target_pruned=
-  AGENT_CANON_CLEAN_INSTALL_ACTIVE=0
-  AGENT_CANON_CLEAN_INSTALL_SUCCESS=0
-  AGENT_CANON_CLEAN_INSTALL_OLD_CONTAINER=
-  AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF=
-  AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_ID=
-  AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED=0
+  local old_container_removed=0 old_container_id old_container_runtime old_container_control stale_target_pruned=
+  if [[ "$clean_install_prepared" != 1 ]]; then
+    AGENT_CANON_CLEAN_INSTALL_ACTIVE=0
+    AGENT_CANON_CLEAN_INSTALL_SUCCESS=0
+    AGENT_CANON_CLEAN_INSTALL_OLD_CONTAINER=
+    AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF=
+    AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_ID=
+    AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED=0
+    AGENT_CANON_CLEAN_INSTALL_OLD_REMOVED=0
+  else
+    AGENT_CANON_CLEAN_INSTALL_SUCCESS=0
+  fi
   export AGENT_CANON_CLEAN_INSTALL_OLD_CONTAINER \
     AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF \
     AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_ID \
-    AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED
+    AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED \
+    AGENT_CANON_CLEAN_INSTALL_OLD_REMOVED
   trap '_agent_canon_clean_install_exit' EXIT
   if ! candidate_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Id}}' "$candidate_image_ref"); then
     _agent_canon_json_error candidate_image_missing "candidate resident image disappeared before replacement"
     return 2
   fi
-  old_container=$(_agent_canon_container_name)
-  if "$AGENT_CANON_DOCKER_CMD" container inspect "$old_container" >/dev/null 2>&1; then
-    # A named resident is claimable only by its immutable AgentCanon labels.
-    # Image, mount, and security drift is repaired below after the target
-    # manifest has been re-read.
-    _agent_canon_classify_existing_container "$old_container" || return $?
-    old_container_id=$AGENT_CANON_OBSERVED_CONTAINER_ID
-    old_container_runtime=$AGENT_CANON_OBSERVED_CONTAINER_RUNTIME
-    old_container_control=$AGENT_CANON_OBSERVED_CONTAINER_CONTROL
-    old_container_present=1
+  if [[ "$clean_install_prepared" == 1 ]]; then
+    old_container=${AGENT_CANON_CLEAN_INSTALL_OLD_CONTAINER:-}
+    old_image_ref=${AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF:-}
+    old_image_id=${AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_ID:-}
+    old_container_present=0
+    [[ -n "$old_container" ]] && old_container_present=1
+    old_quiesced=${AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED:-0}
+    old_container_removed=${AGENT_CANON_CLEAN_INSTALL_OLD_REMOVED:-0}
+    clean_install=1
+    stale_target_pruned=clean_install
+  else
+    old_container=$(_agent_canon_container_name)
+    if "$AGENT_CANON_DOCKER_CMD" container inspect "$old_container" >/dev/null 2>&1; then
+      # A named resident is claimable only by its immutable AgentCanon labels.
+      # Install does not validate its old layout, mounts, or security fields.
+      _agent_canon_classify_existing_container "$old_container" || return $?
+      old_container_id=$AGENT_CANON_OBSERVED_CONTAINER_ID
+      old_container_runtime=$AGENT_CANON_OBSERVED_CONTAINER_RUNTIME
+      old_container_control=$AGENT_CANON_OBSERVED_CONTAINER_CONTROL
+      old_container_present=1
+    fi
+    old_image_ref=
+    old_image_id=
   fi
-  old_image_ref=
-  old_image_id=
-  if [[ "$replacement_operation" == install ]]; then
+  if [[ "$replacement_operation" == install && "$clean_install_prepared" != 1 ]]; then
     # Install deliberately ignores the previous active-image and mount
     # records. Capture the owned resident's exact image reference and validate
     # its immutable identity;
@@ -2210,7 +2178,7 @@ _agent_canon_replace_resident_locked() {
   AGENT_CANON_EXPECTED_IMAGE_ID=$candidate_image_id
   AGENT_CANON_PREVIOUS_IMAGE_ID=$old_image_id
   export AGENT_CANON_IMAGE_REF AGENT_CANON_EXPECTED_IMAGE_ID AGENT_CANON_PREVIOUS_IMAGE_ID
-  if ((old_container_present == 1)); then
+  if ((old_container_present == 1 && old_container_removed == 0)); then
     # This is deliberately the final readback before teardown. Stop/remove by
     # the captured immutable ID so a name swap cannot redirect the mutation.
     _agent_canon_require_existing_container_identity "$old_container" \
@@ -2234,7 +2202,8 @@ _agent_canon_replace_resident_locked() {
     AGENT_CANON_PREVIOUS_IMAGE_REF=$old_image_ref
     export AGENT_CANON_PREVIOUS_IMAGE_REF
   fi
-  if [[ -n "$old_image_id" ]] && ((old_container_present == 1)); then
+  if [[ -n "$old_image_id" ]] &&
+     ((old_container_present == 1 && old_container_removed == 0)); then
     if ((old_quiesced == 0)) && ! "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$old_container_id" >/dev/null; then
       _agent_canon_json_error replacement_stop_failed "old resident could not be stopped"
       return 2
@@ -2388,6 +2357,81 @@ _agent_canon_with_replacement_lock() {
     return 2
   fi
   return "$rc"
+}
+
+_agent_canon_install_locked() {
+  # Clean install owns one serialized transition.  Capture and remove only the
+  # named resident after ownership readback, then clear generated state before
+  # building the candidate.  The EXIT trap restores the captured state if any
+  # later phase fails.
+  local old_container=$(_agent_canon_container_name)
+  local old_container_id= old_image_ref= old_image_id=
+  local old_container_present=0
+  if "$AGENT_CANON_DOCKER_CMD" container inspect "$old_container" >/dev/null 2>&1; then
+    _agent_canon_classify_existing_container "$old_container" || return $?
+    old_container_id=$AGENT_CANON_OBSERVED_CONTAINER_ID
+    old_container_present=1
+    if ! old_image_ref=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+      --format '{{.Config.Image}}' "$old_container"); then
+      _agent_canon_json_error active_image_readback_failed "resident image reference readback failed"
+      return 2
+    fi
+    if ! old_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect \
+      --format '{{.Id}}' "$old_image_ref"); then
+      _agent_canon_json_error active_image_readback_failed "resident image ID readback failed"
+      return 2
+    fi
+  fi
+
+  if ((old_container_present == 0)); then
+    old_container=
+  fi
+  AGENT_CANON_CLEAN_INSTALL_OLD_CONTAINER=$old_container
+  AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF=$old_image_ref
+  AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_ID=$old_image_id
+  AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED=0
+  AGENT_CANON_CLEAN_INSTALL_OLD_REMOVED=0
+  AGENT_CANON_CLEAN_INSTALL_ACTIVE=1
+  export AGENT_CANON_CLEAN_INSTALL_OLD_CONTAINER \
+    AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_REF \
+    AGENT_CANON_CLEAN_INSTALL_OLD_IMAGE_ID \
+    AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED \
+    AGENT_CANON_CLEAN_INSTALL_OLD_REMOVED \
+    AGENT_CANON_CLEAN_INSTALL_ACTIVE
+  trap '_agent_canon_clean_install_exit' EXIT
+
+  if ((old_container_present == 1)); then
+    if ! "$AGENT_CANON_DOCKER_CMD" stop --time 10 "$old_container_id" >/dev/null; then
+      _agent_canon_json_error replacement_stop_failed "old resident could not be stopped"
+      return 2
+    fi
+    AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED=1
+    export AGENT_CANON_CLEAN_INSTALL_OLD_QUIESCED
+    if ! "$AGENT_CANON_DOCKER_CMD" rm "$old_container_id" >/dev/null; then
+      _agent_canon_json_error replacement_remove_failed "old resident could not be removed"
+      return 2
+    fi
+    AGENT_CANON_CLEAN_INSTALL_OLD_REMOVED=1
+    export AGENT_CANON_CLEAN_INSTALL_OLD_REMOVED
+  fi
+  _agent_canon_prepare_clean_install
+
+  AGENT_CANON_ALLOW_BUILD=1
+  export AGENT_CANON_ALLOW_BUILD
+  _agent_canon_image "${1:-}"
+  local candidate_image_ref=$AGENT_CANON_IMAGE_REF candidate_image_id
+  if ! candidate_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect \
+    --format '{{.Id}}' "$candidate_image_ref"); then
+    _agent_canon_json_error candidate_image_missing "candidate resident image could not be inspected"
+    return 2
+  fi
+  _agent_canon_replace_resident_locked \
+    "$candidate_image_ref" "$candidate_image_id" install 1
+}
+
+_agent_canon_install() {
+  local requested_ref=${1:-}
+  _agent_canon_with_replacement_lock _agent_canon_install_locked "$requested_ref"
 }
 
 _agent_canon_replace_resident() {
@@ -2940,10 +2984,10 @@ bootstrap_host_entrypoint() {
   [[ -n "$AGENT_CANON_RUNTIME_ROOT" ]] || AGENT_CANON_RUNTIME_ROOT="$AGENT_CANON_REPOSITORY_ROOT/.runtime"
   _agent_canon_validate_roots
   local source_sync_alignment=
-  if [[ "$operation" == install ]] && _agent_canon_source_sync_is_managed_install; then
+  if [[ "$operation" == install ]]; then
     local source_sync_rc
-    if source_sync_alignment=$(_agent_canon_source_sync_align \
-      "$AGENT_CANON_REPOSITORY_ROOT" origin main); then
+    if source_sync_alignment=$(_agent_canon_install_source_admission \
+      "$AGENT_CANON_REPOSITORY_ROOT"); then
       :
     else
       source_sync_rc=$?
@@ -2956,7 +3000,7 @@ bootstrap_host_entrypoint() {
      [[ ! -x "$AGENT_CANON_DOCKER_CMD" ]]; then
     _agent_canon_json_error runtime_unavailable "Docker executable is unavailable"
   fi
-  if [[ "$operation" == install || "$operation" == update ]]; then
+  if [[ "$operation" == update ]]; then
     # Ownership is resolved before image build or runtime-state preparation.
     # A foreign collision therefore cannot trigger any candidate build or
     # host-state mutation.
@@ -2977,7 +3021,7 @@ bootstrap_host_entrypoint() {
         "aligned source-sync state could not be atomically published"
     fi
   fi
-  if [[ "$operation" == install || "$operation" == update ]]; then
+  if [[ "$operation" == update ]]; then
     # mounts.tsv is the host-owned projection consumed before the resident
     # controller runs.  Drop only syntactically valid target rows whose
     # source is already gone, so candidate creation can converge instead of
@@ -3092,17 +3136,9 @@ bootstrap_host_entrypoint() {
       return
       ;;
     install)
-      AGENT_CANON_ALLOW_BUILD=1
-      export AGENT_CANON_ALLOW_BUILD
-      _agent_canon_image "$image_ref"
-      local container install_image_id
-      install_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect \
-        --format '{{.Id}}' "$AGENT_CANON_IMAGE_REF")
-      AGENT_CANON_EXPECTED_IMAGE_ID=$install_image_id
-      export AGENT_CANON_EXPECTED_IMAGE_ID
-      local replace_rc=0
-      _agent_canon_replace_resident "$AGENT_CANON_IMAGE_REF" "$install_image_id" install || replace_rc=$?
-      ((replace_rc == 0)) || return "$replace_rc"
+      local install_rc=0
+      _agent_canon_install "$image_ref" || install_rc=$?
+      ((install_rc == 0)) || return "$install_rc"
       _agent_canon_finish_clean_install
       return 0
       ;;
