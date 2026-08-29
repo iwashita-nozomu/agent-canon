@@ -2564,6 +2564,12 @@ class BootstrapRuntime:
         result: dict[str, Any] | None = None
         with contextlib.nullcontext():
             state = self._read_state(allow_manifest_drift=True)
+            if state.get("state") == "uninstalled":
+                stale = self._prune_stale_targets(state)
+                if stale:
+                    self._write_mounts(state)
+                    self._write_mount_manifest(state)
+                    self._write_state(state)
             if state.get("state") != "uninstalled":
                 if image_ref:
                     raise BootstrapError(

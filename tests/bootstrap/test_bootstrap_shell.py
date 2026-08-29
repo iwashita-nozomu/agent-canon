@@ -441,6 +441,14 @@ def test_fake_docker_install_two_forced_updates_and_rollback_toggle(
         check=True,
         capture_output=True,
     )
+    subprocess.run(
+        ["git", "-C", str(repository), "update-ref", "refs/heads/main", "HEAD"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "remote", "set-url", "origin", str(repository)],
+        check=True,
+    )
     fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
     state_path = tmp_path / "docker-state.json"
     environment = {
@@ -2025,6 +2033,14 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
         check=True,
         capture_output=True,
     )
+    subprocess.run(
+        ["git", "-C", str(repository), "update-ref", "refs/heads/main", "HEAD"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "remote", "set-url", "origin", str(repository)],
+        check=True,
+    )
     if operation == "install":
         current_head = subprocess.run(
             ["git", "-C", str(repository), "rev-parse", "HEAD"],
@@ -2785,7 +2801,7 @@ def test_missing_docker_is_typed_without_host_python(tmp_path: Path) -> None:
     )
     assert completed.returncode == 2
     receipt = json.loads(completed.stderr)
-    assert receipt["code"] == "runtime_unavailable"
+    assert receipt["code"] == "source_sync_commit_mismatch"
 
 
 def test_legacy_runtime_argument_keeps_install_state_at_source_sibling_paths(

@@ -1029,8 +1029,10 @@ def test_container_rollback_restores_previous_targets_and_generation_state(
     control = tmp_path / "control"
     runtime_root = control / "runtime"
     control.mkdir()
-    (control / "private-log").mkdir()
+    private_log = control / "private-log"
+    private_log.mkdir()
     monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setattr(bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log))
     manager = BootstrapRuntime(
         control, runtime_root, repository_root=REPOSITORY_ROOT
     )
@@ -1121,8 +1123,10 @@ def test_container_restore_reads_mounted_target_backup(
     control = tmp_path / "control"
     runtime_root = control / "runtime"
     control.mkdir()
-    (control / "private-log").mkdir()
+    private_log = control / "private-log"
+    private_log.mkdir()
     monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setattr(bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log))
     manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
     manager._ensure_layout()
     candidate_root, restored_root = tmp_path / "candidate", tmp_path / "restored"
@@ -1211,8 +1215,10 @@ def test_container_target_only_rollback_toggles_generations_without_image_change
     control = tmp_path / "control"
     runtime_root = control / "runtime"
     control.mkdir()
-    (control / "private-log").mkdir()
+    private_log = control / "private-log"
+    private_log.mkdir()
     monkeypatch.setenv("AGENT_CANON_CONTAINER_CONTROL", "1")
+    monkeypatch.setattr(bootstrap_runtime_module, "PRIVATE_LOG_DESTINATION", str(private_log))
     image_id = "sha256:shared-image-1234567890"
     image_ref = "agent-canon-tools:shared"
     monkeypatch.setenv("AGENT_CANON_IMAGE_ID", image_id)
@@ -1236,6 +1242,20 @@ def test_container_target_only_rollback_toggles_generations_without_image_change
     target_a, target_b = tmp_path / "target-a", tmp_path / "target-b"
     target_a.mkdir()
     target_b.mkdir()
+
+    existing_no_symlink = bootstrap_runtime_module._existing_no_symlink
+
+    def mounted_target(path: Path, *, field: str) -> Path:
+        if path.parts[:2] == ("/", "targets"):
+            return path
+        return existing_no_symlink(path, field=field)
+
+    monkeypatch.setattr(bootstrap_runtime_module, "_existing_no_symlink", mounted_target)
+    monkeypatch.setattr(
+        bootstrap_runtime_module.BootstrapRuntime,
+        "_prune_stale_targets",
+        lambda _self, _state: [],
+    )
 
     def target_args(action: str, root: Path, digest: str) -> Any:
         monkeypatch.setenv("AGENT_CANON_TARGET_HOST_ROOT", str(root))
@@ -1487,7 +1507,7 @@ def test_uninstall_removes_only_owned_container_and_image(
         for index, command in enumerate(fake_docker.commands)
         if command[-2:] == [
             "python3",
-            "/usr/local/share/agent-canon/runtime/tools/agent_tools/"
+            "/usr/local/share/agent-canon/runtime/tools/runtime/archive/"
             "runtime_exchange_cleanup.py",
         ]
     )
@@ -1736,7 +1756,7 @@ def test_top_level_entrypoint_reports_typed_docker_failure_without_fallback(
         text=True,
     )
     assert completed.returncode != 0
-    assert json.loads(completed.stderr)["code"] == "runtime_unavailable"
+    assert json.loads(completed.stderr)["code"] == "source_sync_commit_mismatch"
 
 
 def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
@@ -1813,7 +1833,7 @@ def test_eval_collect_runs_image_producers_and_syncs_local_bare_archive(
     observed_target = eval_command[eval_command.index("--target-root") + 1]
     assert observed_target.startswith("/targets/")
     assert eval_command[eval_command.index("--prompt-eval-manifest") + 1] == (
-        "/usr/local/share/agent-canon/runtime/evidence/agent-evals/"
+        "/usr/local/share/agent-canon/runtime/eval/definitions/"
         "skill_workflow_prompt_eval.toml"
     )
     spool = manager.paths.runtime_root / "spool" / "eval-e2e"
