@@ -28,7 +28,7 @@ from typing import cast
 UTC = timezone.utc
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from tools.runtime.archive.runtime_log_paths import (  # noqa: E402
     eval_result_search_dirs,

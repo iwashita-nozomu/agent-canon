@@ -650,8 +650,8 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             tmp_root = Path(tmp_dir)
             canon_root = tmp_root / "canon"
             wrapper_root = tmp_root / "wrapper"
-            eval_dir = canon_root / "evidence" / "agent-evals"
-            tools_dir = canon_root / "tools" / "agent_tools"
+            eval_dir = canon_root / "eval" / "definitions"
+            tools_dir = canon_root / "tools" / "agent" / "orchestration"
             eval_dir.mkdir(parents=True)
             tools_dir.mkdir(parents=True)
             runtime = external_runtime(canon_root)
@@ -660,6 +660,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             wrapper_root.mkdir()
             (wrapper_root / "agents").symlink_to(canon_root / "agents")
             (wrapper_root / "evidence").symlink_to(canon_root / "evidence")
+            (wrapper_root / "eval").symlink_to(canon_root / "eval")
             (wrapper_root / "tools").symlink_to(canon_root / "tools")
             (tools_dir / "evaluate_skill_workflow_prompts.py").write_text(
                 "# placeholder for dependency header validation\n",
@@ -677,7 +678,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
                     [[evals]]
                     id = "sample"
-                    target = "evidence/agent-evals/prompt.md"
+                    target = "eval/definitions/prompt.md"
                     kind = "workflow"
                     description = "sample"
 

@@ -30,6 +30,9 @@ from typing import cast
 
 UTC = timezone.utc
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 from eval.producers.generate_agent_improvement_guide import (  # noqa: E402
     AgentImprovementGuide,
     EvidenceSummary,
@@ -4568,7 +4571,23 @@ def tool_source_path_candidates(slug: str) -> tuple[Path, ...]:
         return (Path(slug),)
     return (
         Path(".codex") / "hooks" / slug,
-        Path("tools") / "agent_tools" / slug,
+        Path("tools") / "agent" / slug,
+        Path("tools") / "agent" / "orchestration" / slug,
+        Path("tools") / "agent" / "skills" / slug,
+        Path("tools") / "agent" / "templates" / slug,
+        Path("tools") / "analysis" / "code" / slug,
+        Path("tools") / "analysis" / "dependencies" / slug,
+        Path("tools") / "repository" / "github" / slug,
+        Path("tools") / "repository" / "git" / slug,
+        Path("tools") / "repository" / "workspace" / slug,
+        Path("tools") / "runtime" / "archive" / slug,
+        Path("tools") / "runtime" / "artifacts" / slug,
+        Path("tools") / "runtime" / "authority" / slug,
+        Path("tools") / "runtime" / "lifecycle" / slug,
+        Path("tools") / "runtime" / "manifest" / slug,
+        Path("tools") / "runtime" / "source" / slug,
+        Path("tools") / "validation" / "dependencies" / slug,
+        Path("tools") / "validation" / "semantic" / slug,
         Path("tools") / "ci" / slug,
         Path("tools") / "docs" / slug,
         Path("tools") / "oop" / "python" / slug,

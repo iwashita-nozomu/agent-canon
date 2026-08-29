@@ -12,7 +12,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AGENT_CANON_SOURCE_ROOT="$(realpath -m "$SCRIPT_DIR/../..")"
+AGENT_CANON_SOURCE_ROOT="$(realpath -e "$SCRIPT_DIR/../../..")"
+export PYTHONPATH="${AGENT_CANON_SOURCE_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"
 ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 REPORT_DIR=""
 RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT:-}"
@@ -43,8 +44,8 @@ from pathlib import Path
 import sys
 
 source, root, control, runtime = map(Path, sys.argv[1:])
-sys.path.insert(0, str(source / "tools" / "agent_tools"))
-from runtime_artifacts import (
+sys.path.insert(0, str(source))
+from tools.runtime.artifacts.runtime_artifacts import (
     RuntimeArtifactBoundary,
     RuntimeArtifactError,
 )
@@ -77,8 +78,8 @@ from pathlib import Path
 import sys
 
 source, root, runtime, candidate = map(Path, sys.argv[1:])
-sys.path.insert(0, str(source / "tools" / "agent_tools"))
-from runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
+sys.path.insert(0, str(source))
+from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
 
 try:
     # Path validation must be side-effect free.  In particular, an invalid
@@ -101,8 +102,8 @@ from pathlib import Path
 import sys
 
 source, runtime = map(Path, sys.argv[1:])
-sys.path.insert(0, str(source / "tools" / "agent_tools"))
-from runtime_artifacts import RuntimeArtifactBoundary
+sys.path.insert(0, str(source))
+from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary
 
 RuntimeArtifactBoundary.for_source(source, runtime, create=True)
 PY
@@ -206,7 +207,7 @@ REPORT_DIR="$(runtime_path "$REPORT_DIR")"
 if [[ -n "$SEMANTIC_QUERY_FILE" ]]; then
   SEMANTIC_QUERY_FILE="$(realpath -m "$SEMANTIC_QUERY_FILE")"
 fi
-TOOL_DIR="$AGENT_CANON_SOURCE_ROOT/tools/agent_tools"
+TOOL_DIR="$AGENT_CANON_SOURCE_ROOT/tools"
 REVIEW_SCAN_TARGET_DIR="${AGENT_CANON_REVIEW_SCAN_TARGET_DIR:-review-scan-target}"
 REVIEW_SCAN_TARGET_DIR="$(runtime_path "$REVIEW_SCAN_TARGET_DIR")"
 if [[ -n "${AGENT_CANON_CLI:-}" ]]; then
@@ -295,7 +296,7 @@ run_inventory() {
   record_command \
     "inventory" \
     "$REPORT_DIR/file_surface_inventory.log" \
-    python3 "$TOOL_DIR/file_surface_inventory.py" \
+        python3 "$TOOL_DIR/analysis/code/file_surface_inventory.py" \
       --root "$ROOT_DIR" \
       "$scope_flag" \
       --json-out "$REPORT_DIR/file_surface_inventory.json" \
@@ -350,7 +351,7 @@ run_scope_checks() {
       record_command \
         "code-dependencies:${scope_name}" \
         "$REPORT_DIR/code_dependencies_${scope_name}.txt" \
-        bash "$TOOL_DIR/scan_code_dependencies.sh" \
+        bash "$TOOL_DIR/analysis/dependencies/scan_code_dependencies.sh" \
           --root "$scope_root" \
           --analysis-json "$REPORT_DIR/code_analysis_${scope_name}.json"
     fi
@@ -358,7 +359,7 @@ run_scope_checks() {
       record_command \
         "dependency-review:${scope_name}" \
         "$REPORT_DIR/dependency_review_${scope_name}.txt" \
-        bash "$TOOL_DIR/run_repo_dependency_review.sh" \
+        bash "$TOOL_DIR/analysis/dependencies/run_repo_dependency_review.sh" \
           --root "$scope_root" \
           --report-dir "$REPORT_DIR/dependency-review-${scope_name}" \
           --fail-missing
@@ -389,7 +390,7 @@ run_scope_checks() {
       record_command \
         "static-any:${scope_name}" \
         "$REPORT_DIR/static_any_${scope_name}.txt" \
-        python3 "$TOOL_DIR/check_static_any.py" \
+        python3 "$TOOL_DIR/validation/semantic/code/check_static_any.py" \
           --root "$scope_root" \
           --exclude reports \
           "${paths[@]}"
@@ -398,7 +399,7 @@ run_scope_checks() {
       record_command \
         "hardcoded-numbers:${scope_name}" \
         "$REPORT_DIR/hardcoded_numbers_${scope_name}.txt" \
-        python3 "$TOOL_DIR/check_hardcoded_numbers.py" \
+        python3 "$TOOL_DIR/validation/semantic/code/check_hardcoded_numbers.py" \
           --root "$scope_root" \
           --format text \
           --no-fail-on-findings \
@@ -409,7 +410,7 @@ run_scope_checks() {
       record_command \
         "log-helper:${scope_name}" \
         "$REPORT_DIR/log_helper_names_${scope_name}.txt" \
-        python3 "$TOOL_DIR/check_log_helper_names.py" \
+        python3 "$TOOL_DIR/validation/semantic/logging/check_log_helper_names.py" \
           --root "$scope_root" \
           "${excludes[@]}" \
           "${paths[@]}"
@@ -518,7 +519,7 @@ run_convention() {
   record_command \
     "convention" \
     "$REPORT_DIR/convention_compliance.txt" \
-    python3 "$TOOL_DIR/check_convention_compliance.py"
+    python3 "$TOOL_DIR/validation/semantic/convention/check_convention_compliance.py"
 }
 
 write_report() {

@@ -71,8 +71,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("AGENT_IMPROVEMENT_GUIDE=", result.stdout)
-        self.assertIn("open_issues: `1`", guide)
-        self.assertIn("closed_issues: `1`", guide)
+        self.assertIn("github_issue_refs: `1`", guide)
         self.assertIn("failed_skill_eval_reports: `1`", guide)
         self.assertIn("skill_usage_counts:", guide)
         self.assertIn("agent-orchestration", guide)
@@ -181,22 +180,31 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
     def write_fixture(self, root: Path) -> None:
         """Write a small AgentCanon-like evidence tree."""
         root.mkdir(parents=True, exist_ok=True)
-        evals_root = root / "agents" / "evals"
+        evals_root = root / "eval" / "definitions"
         evals_root.mkdir(parents=True, exist_ok=True)
         (evals_root / "README.md").write_text("# Eval fixture\n", encoding="utf-8")
-        (root / "issues" / "open").mkdir(parents=True)
-        (root / "issues" / "closed").mkdir(parents=True)
         archive_root = mounted_log_archive_root(root)
         skill_results = archive_root / "eval-results" / "skill-workflow-prompt"
         hook_results = archive_root / "hook-runs" / "legacy-import" / "test-container"
         skill_results.mkdir(parents=True)
         hook_results.mkdir(parents=True)
-        (root / "issues" / "open" / "AC-20260513-open.md").write_text(
-            "issue_id: AC-20260513-open\nstatus: open\n",
-            encoding="utf-8",
+        issue_packets = (
+            self.runtime_root
+            / "agent-canon-log"
+            / "feedback"
+            / "issue-packets"
+            / "pending"
         )
-        (root / "issues" / "closed" / "AC-20260513-closed.md").write_text(
-            "issue_id: AC-20260513-closed\nstatus: resolved\n",
+        issue_packets.mkdir(parents=True)
+        (issue_packets / "AC-20260513-open.json").write_text(
+            json.dumps(
+                {
+                    "issue_url": "https://github.com/iwashita-nozomu/agent-canon/issues/20260513",
+                    "repository": "iwashita-nozomu/agent-canon",
+                    "number": "20260513",
+                }
+            )
+            + "\n",
             encoding="utf-8",
         )
         knowledge = self.runtime_root / "agent-canon-log" / "knowledge" / "topics" / "durable-learning"

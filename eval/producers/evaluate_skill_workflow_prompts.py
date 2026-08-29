@@ -772,6 +772,7 @@ def build_eval_run_metadata(
     clean_skills = tuple(skill.strip() for skill in used_skills if skill.strip())
     digest_source = "|".join((manifest.as_posix(), run_id.strip(), ",".join(clean_skills), created_at))
     digest = hashlib.sha256(digest_source.encode("utf-8")).hexdigest()[:RUN_ID_DIGEST_LENGTH]
+    dirty_status = git_output(root, "status", "--short", "--untracked-files=all")
     return EvalRunMetadata(
         created_at=created_at,
         eval_run_id=f"skill-eval-{timestamp}-{digest}",
@@ -783,7 +784,7 @@ def build_eval_run_metadata(
         manifest=manifest.as_posix(),
         git_branch=git_output(root, "rev-parse", "--abbrev-ref", "HEAD"),
         git_commit=git_output(root, "rev-parse", "HEAD"),
-        git_dirty="yes" if git_output(root, "status", "--short", "--untracked-files=all") else "no",
+        git_dirty="yes" if dirty_status not in {"", "-"} else "no",
     )
 
 

@@ -934,6 +934,7 @@ required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
 [[evals]]
 id = "shared-root-agent-entrypoint"
 target = "ROOT_AGENTS.md"
+canonical_target = "agents/skills/agent-canon-update.md"
 kind = "workflow"
 description = "The shared root agent entrypoint must be dependency-linked and reader-addressable."
 
@@ -947,13 +948,13 @@ required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
 id = "ROOT-AGENTS-SHARED-SEARCH-1"
 critical = true
 description = "Routes implementation, runtime, and validation reading through canonical owner surfaces."
-required_regex = ["Reader Map", "implementation and review basis", "shared tool runtime lifecycle", "validation and closeout"]
+required_regex = ["Reader Map", "product implementation and behavior", "build, tests, and runtime environment", "Validation / reader route"]
 
 [[evals.checklist]]
 id = "ROOT-AGENTS-SHARED-PUBLISH-1"
 critical = true
 description = "Routes standalone source publication and eval evidence through explicit owner surfaces."
-required_regex = ["source update and PR lifecycle", "agents/workflows/agent-canon-pr-workflow\\.md", "eval collection and archive publication", "iwashita-nozomu/agent-canon-log"]
+required_regex = ["source repository", "eval producers and archive owner", "agent-canon-log", "source tree unchanged"]
 
 [[evals]]
 id = "agent-canon-pr-gh-publish-workflow"
@@ -1001,7 +1002,7 @@ required_regex = ["@dependency-start", "@dependency-end", "(?m)^#\\s+"]
 id = "CONVENTION-SKILL-ROUTING-1"
 critical = true
 description = "Routes skill selection through the catalog, runtime shims, and deterministic router owner row."
-required_regex = ["Workflow Contract Owners", "skill selection", "agents/skills/catalog\\.yaml", "python3 tools/agent_tools/route\\.py --prompt"]
+required_regex = ["Workflow Contract Owners", "skill selection", "agents/skills/catalog\\.yaml", "python3 tools/agent/orchestration/route\\.py --prompt"]
 
 [[evals.checklist]]
 id = "VERTICAL-WAVE-POLICY-1"
@@ -1761,7 +1762,7 @@ required_regex = ["skill invocation", "subagent lifecycle", "diff-check"]
 id = "ALW-BEHAVIOR-4"
 critical = true
 description = "Requires runtime feedback capture and routing to prompt/eval/memory updates."
-required_regex = ["workflow_monitor\\.py --runtime-feedback", "runtime_feedback=observed", "prompt_repair", "knowledge_record"]
+required_regex = ["tools/runtime/lifecycle/workflow_monitor\\.py", "--runtime-feedback", "runtime_feedback=observed", "prompt_repair", "knowledge_record"]
 
 [[evals]]
 id = "workflow-monitoring-template-behavior-events"
@@ -1828,13 +1829,13 @@ required_regex = ["workflow_monitor\\.py", "behavior-event", "skill invocation"]
 id = "ALS-BEHAVIOR-2"
 critical = true
 description = "Requires behavior-manifest based run evaluation."
-required_regex = ["evaluate_agent_run\\.py", "agent_behavior_eval\\.toml", "feedback actions"]
+required_regex = ["evaluate_agent_run\\.py", "agent_behavior_eval\\.toml", "feedback action"]
 
 [[evals.checklist]]
 id = "ALS-BEHAVIOR-3"
 critical = true
 description = "Requires runtime feedback to be routed to update surfaces."
-required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "prompt_repair", "active skill", "calibrate"]
+required_regex = ["runtime-feedback", "target=<skill-or-workflow-or-eval>", "prompt_repair", "active-skill calibration", "calibration"]
 
 [[evals]]
 id = "agent-learning-human-skill-behavior-eval"
@@ -1858,13 +1859,13 @@ required_regex = ["agent_behavior_eval\\.toml", "AGENT_EVALUATION_STATUS=pass"]
 id = "ALH-BEHAVIOR-3"
 critical = true
 description = "Documents runtime feedback capture and prompt/eval/memory routing."
-required_regex = ["runtime-feedback", "prompt_repair", "eval_update", "knowledge_record", "active skill set", "calibration step", "hard rule"]
+required_regex = ["runtime-feedback", "prompt_repair", "eval_update", "knowledge_record", "active-skill calibration", "first repair candidate", "hard rule"]
 
 [[evals.checklist]]
 id = "ALW-BEHAVIOR-6"
 critical = true
 description = "Requires active-skill feedback to calibrate prompt repair strength before private-knowledge-only closure."
-required_regex = ["active skill set", "first repair candidate", "calibration step", "hard rule", "skill_improvement_decision=applied"]
+required_regex = ["active-skill calibration", "first repair candidate", "hard rule", "skill_improvement_decision=applied"]
 
 [[evals]]
 id = "evals-readme-behavior-eval"
@@ -1917,6 +1918,7 @@ required_regex = ["candidate skill", "workflow / tool", "human feedback labels",
 [[evals]]
 id = "tools-readme-prompt-eval-audit"
 target = "tools/README.md"
+canonical_target = "eval/definitions/README.md"
 kind = "tool-doc"
 description = "The tool index must document prompt eval manifest audit closeout gates."
 
@@ -2090,7 +2092,7 @@ description = "The runtime AgentCanon update skill routes standalone source work
 id = "AGENT-CANON-UPDATE-SHIM-1"
 critical = true
 description = "Requires explicit shared bootstrap roots and target registration."
-required_regex = ["bootstrap\\.sh", "--control-parent-root", "--runtime-root", "target add", "tool run --root <project-root> <verified-catalog-id>"]
+required_regex = ["bootstrap\\.sh", "--control-parent-root", "<install-root>/.runtime/", "target add", "tool run --root <project-root> <verified-catalog-id>"]
 
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-SHIM-2"

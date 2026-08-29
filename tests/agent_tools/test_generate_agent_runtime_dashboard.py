@@ -1366,9 +1366,11 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
 
     def append_selection_normalization_fixture(self, root: Path) -> None:
         """Add workflow display-name and stale selected-skill evidence."""
-        skill_dir = root / ".agents" / "skills" / "agent-orchestration"
+        skill_dir = root / "agents" / "skills"
         skill_dir.mkdir(parents=True)
-        (skill_dir / "SKILL.md").write_text("# agent-orchestration\n", encoding="utf-8")
+        (skill_dir / "agent-orchestration.md").write_text(
+            "# agent-orchestration\n", encoding="utf-8"
+        )
         hook_dir = (
             mounted_log_archive_root(root)
             / "hook-runs"

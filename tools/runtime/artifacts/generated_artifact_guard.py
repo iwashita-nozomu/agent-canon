@@ -22,7 +22,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from tools.runtime.artifacts.report_artifact_checks import (  # noqa: E402
     generated_report_artifact_blockers,

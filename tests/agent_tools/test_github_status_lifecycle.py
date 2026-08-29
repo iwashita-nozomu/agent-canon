@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools" / "agent_tools"))
 
-import tools.repository.github.github_publish  # noqa: E402
+from tools.repository.github import github_publish  # noqa: E402
 import tools.repository.github.github_status_lifecycle as lifecycle  # noqa: E402
 
 

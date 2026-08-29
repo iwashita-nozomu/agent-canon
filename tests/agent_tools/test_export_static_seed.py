@@ -141,7 +141,7 @@ def _make_fixture(root: Path) -> Path:
     return repo
 
 
-def _make_canonical_35_role_fixture(root: Path) -> Path:
+def _make_canonical_37_role_fixture(root: Path) -> Path:
     """Create a committed source snapshot from the canonical static role set."""
     repo = root / "canonical-source"
     repo.mkdir()
@@ -156,7 +156,7 @@ def _make_canonical_35_role_fixture(root: Path) -> Path:
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)
     _write_allowlist(repo, paths)
-    _commit(repo, "canonical 35-role static fixture")
+    _commit(repo, "canonical 37-role static fixture")
     return repo
 
 
@@ -264,11 +264,11 @@ class ExportStaticSeedTest(unittest.TestCase):
             repo.rename(hidden)
             _assert_source_free_seed(self, output)
 
-    def test_canonical_35_role_fixture_is_deterministic_closed_and_source_hidden(self) -> None:
+    def test_canonical_37_role_fixture_is_deterministic_closed_and_source_hidden(self) -> None:
         """The real canonical role set exports as one closed source-free snapshot."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            repo = _make_canonical_35_role_fixture(root)
+            repo = _make_canonical_37_role_fixture(root)
             first = root / "first"
             second = root / "second"
             first_result = _run_export(repo, first)
@@ -277,7 +277,7 @@ class ExportStaticSeedTest(unittest.TestCase):
             self.assertEqual(second_result.returncode, 0, second_result.stderr)
             self.assertEqual(_tree_snapshot(first), _tree_snapshot(second))
             role_files = sorted(first.glob(".codex/agents/*.toml"))
-            self.assertEqual(len(role_files), 35)
+            self.assertEqual(len(role_files), 37)
             config = tomllib.loads((first / ".codex" / "config.toml").read_text(encoding="utf-8"))
             self.assertEqual(
                 {
