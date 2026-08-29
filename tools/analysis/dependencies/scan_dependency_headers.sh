@@ -94,7 +94,7 @@ load_declared_surfaces() {
     local script_path script_dir
     script_path="$(readlink -f "${BASH_SOURCE[0]}")"
     script_dir="$(cd "$(dirname "$script_path")" && pwd)"
-    registry="$(realpath -m "$script_dir/../../documents/design/dependency-contract-kinds.toml")"
+    registry="$(realpath -m "$script_dir/../../../documents/design/dependency-contract-kinds.toml")"
   fi
   [[ -f "$registry" ]] || return 0
   awk '''

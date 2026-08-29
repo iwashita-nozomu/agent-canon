@@ -17,6 +17,12 @@ than copied.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
 try:
     from tools.runtime.container import devcontainer_dependencies as _implementation
     from tools.runtime.container.devcontainer_dependencies import *  # noqa: F401,F403

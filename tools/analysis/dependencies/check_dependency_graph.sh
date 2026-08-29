@@ -42,8 +42,8 @@ from pathlib import Path
 import sys
 
 source, root, control, runtime, candidate = map(Path, sys.argv[1:])
-sys.path.insert(0, str(source))
-from runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
+sys.path.insert(0, str(source.parents[2].resolve(strict=True)))
+from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
 
 try:
     source_root = source.parents[2].resolve(strict=True)
@@ -71,8 +71,8 @@ from pathlib import Path
 import sys
 
 source, runtime, candidate, source_file = map(Path, sys.argv[1:])
-sys.path.insert(0, str(source))
-from runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
+sys.path.insert(0, str(source.parents[2].resolve(strict=True)))
+from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary, RuntimeArtifactError
 
 try:
     boundary = RuntimeArtifactBoundary.for_source(

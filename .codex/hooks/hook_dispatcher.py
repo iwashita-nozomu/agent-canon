@@ -26,9 +26,8 @@ from enum import Enum
 from pathlib import Path
 
 SOURCE_ROOT = Path(__file__).resolve().parents[2]
-TOOLS_ROOT = SOURCE_ROOT / "tools" / "agent_tools"
-if str(TOOLS_ROOT) not in sys.path:
-    sys.path.insert(0, str(TOOLS_ROOT))
+if str(SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SOURCE_ROOT))
 
 from tools.runtime.source.agent_canon_source_root import (  # noqa: E402
     LAYOUT_STANDALONE,

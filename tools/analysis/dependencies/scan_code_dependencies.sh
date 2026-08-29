@@ -97,7 +97,7 @@ if [[ -n "$PATHS_FILE" ]]; then
   fi
 fi
 
-lsp_args=("$TOOL_DIR/lsp_code_analysis.py" scan-legacy --root "$ROOT_DIR")
+lsp_args=("$TOOL_DIR/../code/lsp_code_analysis.py" scan-legacy --root "$ROOT_DIR")
 [[ "$PRINT_UNRESOLVED" -eq 1 ]] && lsp_args+=(--print-unresolved)
 [[ "$LEXICAL_ONLY" -eq 1 ]] && lsp_args+=(--lexical-only)
 if [[ -n "$ANALYSIS_JSON" ]]; then

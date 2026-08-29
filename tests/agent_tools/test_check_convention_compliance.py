@@ -600,27 +600,10 @@ path: tools/validation/ci/checks/check_github_workflows.py
     ),
 }
 
-MINIMAL_AGENT_TOOLS = (
-    "run_repo_dependency_review.sh",
-    "scan_code_dependencies.sh",
-    "check_hardcoded_numbers.py",
-    "check_static_any.py",
-    "check_log_helper_names.py",
-    "import_responsibility.py",
-    "evaluate_skill_workflow_prompts.py",
-    "evaluate_agent_run.py",
-    "check_convention_compliance.py",
-    "check_skill_frontmatter.py",
-    "tool_catalog.py",
-    "tool_drift.py",
-    "check_runtime_profile_inventory.py",
-    "bootstrap_runtime.py",
-)
-
-MINIMAL_PYTHON_TOOLS = (
-    "tools/validation/code/oop/python/readability.py",
-    "tools/validation/code/oop/cpp/readability.py",
-    "tools/validation/notebooks/notebook_quality.py",
+MINIMAL_TOOL_PATHS = tuple(
+    tool_path
+    for tool_path, _references in TOOL_GATES.values()
+    if tool_path != "bootstrap.sh"
 )
 
 
@@ -949,6 +932,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
             forwarder = root / "tools" / "agent_tools" / "legacy_forwarder.py"
+            forwarder.parent.mkdir(parents=True, exist_ok=True)
             forwarder.write_text(
                 "LEGACY_FORWARDER_WARNING_REQUIRED = True\n",
                 encoding="utf-8",
@@ -1852,14 +1836,10 @@ class CheckConventionComplianceTest(unittest.TestCase):
             target = root / path
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(text, encoding="utf-8")
-        for tool in MINIMAL_AGENT_TOOLS:
-            target = root / "tools" / "agent_tools" / tool
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
-        for tool_path in MINIMAL_PYTHON_TOOLS:
+        for tool_path in MINIMAL_TOOL_PATHS:
             target = root / tool_path
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+            target.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
         github_checker = root / "tools" / "validation" / "ci" / "checks" / "check_github_workflows.py"
         github_checker.parent.mkdir(parents=True, exist_ok=True)
         github_checker.write_text(

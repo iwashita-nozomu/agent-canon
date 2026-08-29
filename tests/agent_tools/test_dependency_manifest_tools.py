@@ -1138,12 +1138,14 @@ class DependencyManifestToolTest(unittest.TestCase):
             root = Path(tmp_dir)
             (root / "python").mkdir()
             (root / "docker").mkdir()
-            agent_tools = root / "tools" / "agent_tools"
-            agent_tools.mkdir(parents=True)
-            (agent_tools / "devcontainer_dependencies.py").symlink_to(
+            container_tools = root / "tools" / "runtime" / "container"
+            container_tools.mkdir(parents=True)
+            (container_tools / "devcontainer_dependencies.py").symlink_to(
                 PROJECT_ROOT / "tools" / "runtime" / "container" / "devcontainer_dependencies.py"
             )
-            (agent_tools / "dependency_plan.py").symlink_to(
+            dependency_tools = root / "tools" / "analysis" / "dependencies"
+            dependency_tools.mkdir(parents=True)
+            (dependency_tools / "dependency_plan.py").symlink_to(
                 PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "dependency_plan.py"
             )
             manifest = root / "bootstrap" / "container" / "image" / "dependencies.toml"

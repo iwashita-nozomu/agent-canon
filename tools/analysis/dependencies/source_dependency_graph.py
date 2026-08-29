@@ -23,6 +23,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
 try:
     from tools.agent.skills.skill_projection_registry import (
         GENERATED_SKILL_PREFIX,
