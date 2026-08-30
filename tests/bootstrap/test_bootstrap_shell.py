@@ -978,11 +978,16 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     control = tmp_path / "control"
     runtime = tmp_path / "runtime"
     stage = tmp_path / "stage"
+    codex_stage = tmp_path / "codex-stage"
     volume_root = tmp_path / "volume"
     control.mkdir()
     runtime.mkdir()
     stage.mkdir()
+    codex_stage.mkdir()
     (volume_root / "exchange").mkdir(parents=True)
+    (volume_root / "codex-home").mkdir(parents=True)
+    (volume_root / "codex-home" / "config.toml").write_text("codex = true\n", encoding="utf-8")
+    (codex_stage / "stale.txt").write_text("stale\n", encoding="utf-8")
     source_sync = runtime / "source-sync.json"
     source_sync.write_text("source-sync\n", encoding="utf-8")
     (volume_root / "exchange" / "mounts.tsv").write_text("target\n", encoding="utf-8")
@@ -1053,6 +1058,36 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     assert (stage / "mounts.toml").read_text(encoding="utf-8").startswith(
         'schema = "agent-canon.mount-registry.v2"'
     )
+    codex_export = subprocess.run(
+        ["bash", "-c", common + f"_agent_canon_volume_copy export codex-home {str(codex_stage)!r}"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "FAKE_VOLUME_NAME": volume_name,
+            "FAKE_VOLUME_ROOT": str(volume_root),
+        },
+    )
+    assert codex_export.returncode == 0, codex_export.stderr
+    assert codex_stage.is_dir()
+    assert not (codex_stage / "stale.txt").exists()
+    assert (codex_stage / "config.toml").read_text(encoding="utf-8") == "codex = true\n"
+    (volume_root / "codex-home" / "unexpected").symlink_to(tmp_path / "outside")
+    rejected = subprocess.run(
+        ["bash", "-c", common + f"_agent_canon_volume_copy export codex-home {str(codex_stage)!r}"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "FAKE_VOLUME_NAME": volume_name,
+            "FAKE_VOLUME_ROOT": str(volume_root),
+        },
+    )
+    assert rejected.returncode == 2
+    assert json.loads(rejected.stderr)["code"] == "volume_copy_failed"
+    assert codex_stage.is_dir()
 
 
 def test_volume_export_digest_corruption_is_rejected(tmp_path: Path) -> None:

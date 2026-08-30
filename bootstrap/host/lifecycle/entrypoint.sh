@@ -1228,6 +1228,8 @@ elif [ "$direction" = import ]; then
     printf "volume-copy-digest\t%s\n" "$digest"
   fi
 else
+  output=/agent-canon-copy-output
+  [ -d "$output" ] && [ ! -L "$output" ] || exit 68
   case "$kind" in
     projection)
       source="$root/exchange"; [ -d "$source" ] && [ ! -L "$source" ] || exit 69
@@ -1252,22 +1254,20 @@ else
       [ -z "$(find "/agent-canon-copy-output/$relative" -type l -print -quit)" ] || exit 75 ;;
     private-feedback)
       source="$root/spool/private-feedback"; [ -d "$source" ] && [ ! -L "$source" ] || exit 76
-      rm -rf -- /agent-canon-copy-output
-      mkdir -p /agent-canon-copy-output
-      cp -a "$source/." /agent-canon-copy-output/
-      [ -z "$(find /agent-canon-copy-output -type l -print -quit)" ] || exit 77 ;;
+      find "$output" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+      cp -a "$source/." "$output/"
+      [ -z "$(find "$output" -type l -print -quit)" ] || exit 77 ;;
     codex-home)
       source="$root/codex-home"; [ -d "$source" ] && [ ! -L "$source" ] || exit 78
       validate_codex_links "$source" || exit 79
-      rm -rf -- /agent-canon-copy-output
-      mkdir -p /agent-canon-copy-output
-      cp -a "$source/." /agent-canon-copy-output/
-      validate_codex_links /agent-canon-copy-output || exit 79 ;;
+      find "$output" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+      cp -a "$source/." "$output/"
+      validate_codex_links "$output" || exit 79 ;;
     *) exit 80 ;;
   esac
   if [ "$kind" = projection ]; then
     source_digest=$(projection_digest "$source")
-    destination_digest=$(projection_digest /agent-canon-copy-output)
+    destination_digest=$(projection_digest "$output")
   else
     if [ "$kind" = codex-home ]; then
       source_digest=$(codex_digest "$source")
@@ -1275,14 +1275,14 @@ else
       source_digest=$(tree_digest "$source")
     fi
     if [ "$kind" = eval ]; then
-      destination_digest=$(tree_digest "/agent-canon-copy-output/$relative")
+      destination_digest=$(tree_digest "$output/$relative")
     elif [ "$kind" = skill ]; then
-      destination_digest=$(tree_digest /agent-canon-copy-output/skill-projection)
+      destination_digest=$(tree_digest "$output/skill-projection")
     else
       if [ "$kind" = codex-home ]; then
-        destination_digest=$(codex_digest /agent-canon-copy-output)
+        destination_digest=$(codex_digest "$output")
       else
-        destination_digest=$(tree_digest /agent-canon-copy-output)
+        destination_digest=$(tree_digest "$output")
       fi
     fi
   fi
