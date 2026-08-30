@@ -18,7 +18,7 @@ import json
 import os
 import re
 import shlex
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import cast
 
@@ -53,6 +53,7 @@ else:
 
 from tools.agent.orchestration.route import decide_skills, load_skill_route_rules
 from tools.agent.skills.skill_tool_commands import (
+    CommandPlan,
     SkillCommandPacket,
     packet_for_skill,
     project_public_command_for_layout,
@@ -494,16 +495,14 @@ DEFAULT_QUALITY_CHECK_POLICY_SOURCE = (
 DEFAULT_QUALITY_CHECK_STAGES = ("selected_stages_only",)
 
 DEFAULT_QUALITY_CHECK_STATIC_COMMANDS = (
-    "tools/bin/agent-canon docs check <changed-markdown-paths>",
-    "python3 tools/validation/semantic/convention/check_convention_compliance.py",
-    "python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed",
-    "bash tools/analysis/dependencies/scan_dependency_headers.sh --changed --fail-missing",
-    "bash tools/validation/semantic/dependencies/check_dependency_header_format.sh --changed --require-header",
+    ("tools/bin/agent-canon", "docs", "check", "<changed-markdown-paths>"),
+    ("python3", "tools/validation/semantic/convention/check_convention_compliance.py"),
+    ("python3", "tools/validation/semantic/dependencies/check_dependency_headers.py", "--changed"),
+    ("bash", "tools/analysis/dependencies/scan_dependency_headers.sh", "--changed", "--fail-missing"),
+    ("bash", "tools/validation/semantic/dependencies/check_dependency_header_format.sh", "--changed", "--require-header"),
 )
 
-CANONICAL_FORMAT_CHECK_ROUTE = (
-    "tools/bin/agent-canon docs check <changed-markdown-paths>"
-)
+CANONICAL_FORMAT_CHECK_ROUTE = DEFAULT_QUALITY_CHECK_STATIC_COMMANDS[0]
 
 OFFICIAL_HOOK_DISPATCHER = ".codex/hooks/hook_dispatcher.py"
 
@@ -603,16 +602,6 @@ COORDINATION_RECEIPT_CONTRACT_REF = (
 )
 COORDINATION_OPERATION_OBSERVATION = COLLABORATION_OPERATIONS
 
-SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE = (
-    "python3 tools/runtime/lifecycle/workflow_monitor.py --report-dir {report_dir} "
-    '--subagent-wave "wave_id=<WAVE-N> parent_or_delegate=<parent-or-role> '
-    "spawn_authority=<authority> trigger=<trigger> budget_before=<used/limit> "
-    "budget_after=<used/limit> runtime_max_threads=<n> runtime_max_depth=<n> "
-    "spawned_roles=<roles-or-none> role_instances=<role_id:instance_id:agent_type:packet> "
-    "skipped_roles=<roles-or-none> allowed_paths=<paths> do_not_read=<paths> "
-    "write_scope=<scope> validation_route=<route> review_gate=<gate> "
-    'handoff_artifacts=<artifacts> status=<status>"'
-)
 
 COMMON_PROMPT_MUST_INCLUDE = (
     "request_clause_ids",
@@ -931,26 +920,51 @@ def subagent_wave_record_command(
     layout: str = "standalone",
 ) -> str:
     """Return the canonical command for recording a spawned subagent wave."""
-    logical = SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE.format(report_dir=str(report_dir))
-    projection = project_public_command_for_layout(logical, layout=layout)
-    return shlex.join(
-        [*(f"{key}={value}" for key, value in projection.public_env), *projection.public_argv]
+    argv = (
+        "python3",
+        "tools/runtime/lifecycle/workflow_monitor.py",
+        "--report-dir",
+        str(report_dir),
+        "--subagent-wave",
+        "wave_id=<WAVE-N> parent_or_delegate=<parent-or-role> spawn_authority=<authority> "
+        "trigger=<trigger> budget_before=<used/limit> budget_after=<used/limit> "
+        "runtime_max_threads=<n> runtime_max_depth=<n> spawned_roles=<roles-or-none> "
+        "role_instances=<role_id:instance_id:agent_type:packet> skipped_roles=<roles-or-none> "
+        "allowed_paths=<paths> do_not_read=<paths> write_scope=<scope> "
+        "validation_route=<route> review_gate=<gate> handoff_artifacts=<artifacts> status=<status>",
     )
+    plan = CommandPlan(json.dumps(list(argv)), ".", ".", (), argv)
+    projection = project_public_command_for_layout(plan, layout=layout)
+    return shlex.join(list(projection.public_argv))
 
 
-def public_command_for_layout(logical_command: str, layout: str) -> str:
-    """Render one logical command through the selected public layout."""
-    projection = project_public_command_for_layout(logical_command, layout=layout)
-    return shlex.join(
-        [*(f"{key}={value}" for key, value in projection.public_env), *projection.public_argv]
-    )
+def public_command_for_layout(
+    command: Sequence[str] | CommandPlan | str,
+    layout: str,
+) -> str:
+    """Render structured argv with shell quoting for display only."""
+    del layout
+    if isinstance(command, CommandPlan):
+        argv = command.execution_argv
+    elif isinstance(command, str):
+        # Compatibility callers still provide documentation-only constants;
+        # they are returned verbatim and never parsed or executed.
+        return command
+    else:
+        argv = tuple(command)
+    if any(not isinstance(item, str) for item in argv):
+        raise TypeError("display command argv must contain strings")
+    return shlex.join(argv)
 
 
-def public_command_for_spec(spec: RunBundleSpec, logical_command: str) -> str:
+def public_command_for_spec(
+    spec: RunBundleSpec,
+    command: Sequence[str] | CommandPlan | str,
+) -> str:
     """Render one command through the selected source/public layout owner."""
     roots = spec.repository_roots
     layout = getattr(roots, "layout", "standalone") if roots is not None else "standalone"
-    return public_command_for_layout(logical_command, layout)
+    return public_command_for_layout(command, layout)
 
 
 def language_review_candidates(
@@ -1424,7 +1438,7 @@ def manifest_run_lines(
             "    profile_registry_import: 'tools.agent.orchestration.model_profile_registry'",
             "    dispatch: 'immediate_one_pass'",
             "    same_spark_gap_continuation: 'resume_same_spark_after_gap'",
-            f"    deterministic_search_route: {public_command_for_spec(spec, 'python3 tools/analysis/search/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json')!r}",
+            f"    deterministic_search_route: {public_command_for_spec(spec, ('python3', 'tools/analysis/search/search.py', '--query-file', '<request-or-design-question.txt>', '--providers', 'text,semantic,vector,tool,header-deps,code-deps', '--format', 'json'))!r}",
             "  capacity_request:",
         ]
     )
@@ -1470,10 +1484,10 @@ def manifest_run_lines(
             "    broad_cross_cutting_packet: available_not_default_read",
             "  implementation_gate_defaults:",
             "    implementation_surface_route_status: pending",
-            f"    implementation_surface_route_command: {public_command_for_spec(spec, 'python3 tools/analysis/search/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json')!r}",
+            f"    implementation_surface_route_command: {public_command_for_spec(spec, ('python3', 'tools/analysis/search/search.py', '--query-file', '<request-or-design-question.txt>', '--providers', 'text,semantic,vector,tool,header-deps,code-deps', '--format', 'json'))!r}",
             "    tool_reuse_ledger_status: required_before_custom_implementation",
             "    pre_edit_rejection_prediction_status: pending",
-            f"    pre_edit_rejection_command: {public_command_for_spec(spec, 'python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>')!r}",
+            f"    pre_edit_rejection_command: {public_command_for_spec(spec, ('python3', 'tools/validation/semantic/tools/tool_rejection_preflight.py', '--root', '.', '<planned-edit-paths>'))!r}",
             "  standard_wave_sequence:",
             "    activation: candidate_sequence_selected_per_wave",
             f"    source: {STANDARD_AGENT_WAVE_SEQUENCE_SOURCE!r}",
@@ -1500,9 +1514,9 @@ def manifest_run_lines(
             *manifest_repo_tool_routing_policy_lines(spec),
             *manifest_default_quality_check_policy_lines(spec),
             "  agent_report_collection:",
-            f"    status_command: {public_command_for_spec(spec, 'python3 tools/runtime/archive/runtime_log_archive_git.py status')!r}",
-            f"    archive_current_run_command: {public_command_for_spec(spec, f'python3 tools/runtime/archive/runtime_log_archive_git.py archive-agent-report --report-dir {spec.report_dir}')!r}",
-            f"    sync_command: {public_command_for_spec(spec, 'python3 tools/runtime/archive/runtime_log_archive_git.py sync')!r}",
+            f"    status_command: {public_command_for_spec(spec, ('python3', 'tools/runtime/archive/runtime_log_archive_git.py', 'status'))!r}",
+            f"    archive_current_run_command: {public_command_for_spec(spec, ('python3', 'tools/runtime/archive/runtime_log_archive_git.py', 'archive-agent-report', '--report-dir', str(spec.report_dir)))!r}",
+            f"    sync_command: {public_command_for_spec(spec, ('python3', 'tools/runtime/archive/runtime_log_archive_git.py', 'sync'))!r}",
             "    archive_index: '.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl'",
         ]
     )
@@ -1919,11 +1933,17 @@ def manifest_pre_handoff_gate_status_lines(
     layout: str = "standalone",
 ) -> list[str]:
     """Render the pre-handoff gate status contract."""
-    design_projection = project_public_command_for_layout(
-        "python3 tools/validation/semantic/lifecycle/waterfall_gate_check.py --report-dir <report-dir> --gate design",
-        layout=layout,
+    design_argv = (
+        "python3",
+        "tools/validation/semantic/lifecycle/waterfall_gate_check.py",
+        "--report-dir",
+        "<report-dir>",
+        "--gate",
+        "design",
     )
-    design_command = shlex.join(design_projection.public_argv)
+    design_plan = CommandPlan(json.dumps(list(design_argv)), ".", ".", (), design_argv)
+    design_projection = project_public_command_for_layout(design_plan, layout=layout)
+    design_command = shlex.join(list(design_projection.public_argv))
     lines = [
         "  pre_handoff_gate_status:",
         "    enabled: true",

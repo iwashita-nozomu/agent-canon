@@ -129,22 +129,7 @@
     "dispatch": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "runtime",
-        "argv",
-        "execution_plane",
-        "cwd",
-        "env",
-        "stdin",
-        "stdout",
-        "stderr",
-        "exit",
-        "signal",
-        "side_effect",
-        "output_root",
-        "written_paths",
-        "parity"
-      ],
+      "required": ["argv"],
       "properties": {
         "runtime": { "$ref": "#/$defs/nonEmptyString" },
         "argv": {
@@ -168,7 +153,11 @@
           "uniqueItems": true
         },
         "parity": { "enum": ["legacy", "verified"] },
-        "parity_fixture": { "$ref": "#/$defs/path" }
+        "parity_fixture": { "$ref": "#/$defs/path" },
+        "arguments": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/argument" }
+        }
       }
     },
     "entry": {
@@ -185,7 +174,8 @@
         "writes",
         "default_wiring",
         "docs",
-        "tests"
+        "tests",
+        "dispatch"
       ],
       "properties": {
         "id": {
@@ -215,6 +205,18 @@
         },
         "test_exempt_reason": { "$ref": "#/$defs/nonEmptyString" },
         "dispatch": { "$ref": "#/$defs/dispatch" }
+      }
+    },
+    "argument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["string", "literal", "path", "path-list", "enum", "integer", "boolean", "oid", "issue-number"] },
+        "flag": { "$ref": "#/$defs/nonEmptyString" },
+        "repeat": { "type": "boolean" },
+        "required": { "type": "boolean" },
+        "choices": { "$ref": "#/$defs/nonEmptyStringList" }
       }
     }
   }

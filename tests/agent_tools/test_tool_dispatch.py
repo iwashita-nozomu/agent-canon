@@ -115,10 +115,15 @@ class ToolDispatchTest(unittest.TestCase):
             if item["id"] == "issue-finding-report"
         )
         commands = entry["tool_commands"]["conditional"]
-        lookup_commands = [command for command in commands if "gh issue view" in command]
+        lookup_commands = [
+            command
+            for command in commands
+            if command.get("executable") == "gh"
+            and command.get("argv", [])[:2] == ["issue", "view"]
+        ]
         self.assertEqual(len(lookup_commands), 1)
-        self.assertIn("gh issue view", lookup_commands[0])
-        self.assertNotIn("issue-sync", lookup_commands[0])
+        self.assertEqual(lookup_commands[0]["argv"][:2], ["issue", "view"])
+        self.assertNotEqual(lookup_commands[0].get("tool_id"), "issue-sync")
 
     def test_dashboard_uses_container_and_external_artifact_route(self) -> None:
         """The canonical dashboard route keeps source read-only and output external."""
@@ -288,6 +293,30 @@ class ToolDispatchTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(tool_dispatch.DispatchError, "shell-string-rejected"):
             tool_dispatch.load_specs(root)
+
+    def test_missing_dispatch_fails_before_execution(self) -> None:
+        """An executable catalog entry must declare an explicit argv route."""
+        root = self._minimal_root(
+            dispatch={"runtime": "python", "argv": ["python3", "tools/echo.py"], "parity": "verified"}
+        )
+        catalog_path = root / "tools/catalog.yaml"
+        catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+        catalog["entries"][0].pop("dispatch")
+        catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+        with self.assertRaisesRegex(tool_dispatch.DispatchError, "missing-dispatch"):
+            tool_dispatch.load_specs(root)
+
+    def test_command_display_metadata_is_never_tokenized(self) -> None:
+        """Shell-looking display metadata cannot alter the explicit argv route."""
+        root = self._minimal_root(
+            dispatch={"runtime": "python", "argv": ["python3", "tools/echo.py"], "parity": "verified"}
+        )
+        catalog_path = root / "tools/catalog.yaml"
+        catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+        catalog["entries"][0]["command"] = "python3 tools/echo.py | touch SHOULD_NOT_EXIST"
+        catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+        specs, _ = tool_dispatch.load_specs(root)
+        self.assertEqual(specs["echo"].argv, ("python3", "tools/echo.py"))
 
     def test_parity_fixture_requires_all_observed_fields(self) -> None:
         """A fixture row without measured I/O/path fields cannot cut over."""

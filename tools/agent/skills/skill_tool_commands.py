@@ -1,313 +1,128 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Produces read-only catalog-backed tool-command packets and checks their runtime projections.
-# upstream design ../../../agents/canonical/skills.md skill canon registry
-# upstream design ../../../agents/skills/task-routing.md deterministic skill routing contract
-# upstream design ../../../agents/skills/agent-orchestration.md tool-first skill execution contract
-# upstream design ../../../agents/skills/catalog.yaml public skill related-skill metadata
-# upstream implementation ../orchestration/route.py parses and validates the public skill catalog
-# upstream implementation ../../runtime/source/agent_canon_source_root.py resolves the selected source checkout
-# downstream implementation ../../../.codex/personal/skills/agent-orchestration/SKILL.md materialized runtime skill command entry example
-# downstream implementation ../../validation/semantic/convention/check_convention_compliance.py verifies command section wiring
-# downstream implementation ../../../tests/agent_tools/test_skill_tool_commands.py tests command extraction and read-only checks
+# responsibility Resolves catalog-owned typed command items into argv plans and checks generated runtime projections.
+# upstream design ../../../agents/skills/catalog.yaml structured command item contract
+# upstream design ../../../tools/catalog.yaml existing tool and dispatch catalog
+# upstream implementation ../../runtime/source/agent_canon_source_root.py source-root resolution
+# downstream implementation ../../../.codex/personal/skills/*/SKILL.md generated command projection
+# downstream implementation ../../../tests/agent_tools/test_skill_tool_commands.py typed command tests
 # @dependency-end
-"""Produce read-only tool-command packets for AgentCanon runtime skills."""
+"""Resolve structured Skill command items and execute native argv plans."""
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
-import re
-import shlex
+import os
+import shutil
+import subprocess
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import cast
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
+try:
+    import yaml
+except ModuleNotFoundError:  # pragma: no cover - clean host fallback
+    from tools.runtime.container import stdlib_yaml as yaml
 
 from tools.runtime.source.agent_canon_source_root import (
     RootResolution,
     SourceRootFailure,
     resolve_agent_canon_source_root,
 )
-from tools.agent.orchestration.route import (
-    load_skill_related_map,
-    load_skill_required_tool_commands,
-    load_skill_tool_commands,
-)
+from tools.agent.orchestration.route import load_skill_related_map
 
 DEFAULT_ROOT = Path.cwd()
 RUNTIME_SKILL_ROOT = Path(".codex/personal/skills")
 HUMAN_SKILL_ROOT = Path("agents/skills")
+CATALOG_PATH = Path("agents/skills/catalog.yaml")
+TOOLS_CATALOG_PATH = Path("tools/catalog.yaml")
 SECTION_HEADING = "## Tool Commands"
 SECTION_START = "<!-- skill-tool-commands:start -->"
 SECTION_END = "<!-- skill-tool-commands:end -->"
-COMMAND_TEMPLATE = (
-    "python3 tools/agent/skills/skill_tool_commands.py show "
-    "--skill {skill} --format text"
-)
-PROMPT_PLACEHOLDER = "<user request>"
-FALLBACK_COMMAND = (
-    f'python3 tools/agent/orchestration/route.py --prompt "{PROMPT_PLACEHOLDER}" --format json'
-)
-LEGACY_MAINTENANCE_COMMANDS = (
-    "python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .",
-    "python3 tools/agent/skills/skill_tool_commands.py check",
-)
-COMMON_RESOLUTION_WORDING = (
-    "論理コマンドは、実行前に AgentCanon source root を基準として解決します。"
-    "各解決結果には `source_root`、`execution_cwd`、`execution_argv` を含め、"
-    "fallback-only skill を含む script entry の script path は絶対 path にします。"
-)
-FORMAT_VALUES = ("text", "json")
-SCRIPT_INTERPRETERS = ("python3", "python", "bash")
-SOURCE_ROOT_SCRIPT_PREFIXES = (
-    ".",
-    "tools/",
-    "agents/",
-    ".agents/",
-    "tests/",
-    "scripts/",
-)
-SOURCE_ROOT_COMMAND_PREFIXES = (
-    "./",
-    "tools/",
-    "agents/",
-    ".agents/",
-    "tests/",
-)
-COMMAND_PREFIXES = (
-    "agent-canon ",
-    "bash ",
-    "cargo ",
-    "gh ",
-    "git ",
-    "lake ",
-    "make ",
-    "npm ",
-    "python ",
-    "python3 ",
-    "ruff ",
-    "tools/",
-)
-ASSIGNMENT_TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=.*")
-INLINE_CODE_RE = re.compile(r"`([^`]+)`")
-MAKEFILE_NAMES = ("GNUmakefile", "makefile", "Makefile")
-SOURCE_ROOT_PYTHONPATH = "tools"
+COMMAND_TEMPLATE = "python3 tools/agent/skills/skill_tool_commands.py show --skill {skill} --format text"
+PHASES = ("required", "conditional", "maintenance")
 
 
-def _canonical_makefile(repository_root: Path) -> Path | None:
-    """Return Make's first default file only when it remains inside the repo."""
-    root = repository_root.resolve()
-    for name in MAKEFILE_NAMES:
-        candidate = root / name
-        if not candidate.is_file():
-            continue
-        try:
-            resolved = candidate.resolve()
-            resolved.relative_to(root)
-        except (OSError, RuntimeError, ValueError):
-            return None
-        return resolved
-    return None
+class StructuredCommandError(ValueError):
+    """Typed pre-spawn command failure."""
+
+    def __init__(self, status: str, detail: str) -> None:
+        super().__init__(detail)
+        self.status = status
+        self.detail = detail
 
 
-def _logical_makefile_lines(text: str) -> Iterable[str]:
-    """Yield non-recipe logical lines with odd trailing backslashes joined."""
-    pending = ""
-    pending_is_recipe = False
-    for raw_line in text.splitlines():
-        line = raw_line.rstrip()
-        is_recipe = pending_is_recipe or raw_line.startswith("\t")
-        if pending:
-            line = pending + line.lstrip()
-        trailing_backslashes = len(line) - len(line.rstrip("\\"))
-        if trailing_backslashes % 2 == 1:
-            pending = line[:-1] + " "
-            pending_is_recipe = is_recipe
-            continue
-        if not is_recipe:
-            yield line
-        pending = ""
-        pending_is_recipe = False
-    if pending and not pending_is_recipe:
-        yield pending
+@dataclass(frozen=True)
+class CommandPlan:
+    """Resolved command with argv and execution policy."""
+
+    logical_command: str
+    source_root: str
+    execution_cwd: str
+    execution_env: tuple[tuple[str, str], ...]
+    execution_argv: tuple[str, ...]
+    skill_id: str = ""
+    command_id: str = ""
+    tool_id: str = ""
+    operation_id: str = "default"
+    network: str = "forbidden"
+    mutation: str = "read-only"
+    plan_sha256: str = ""
 
 
-def _strip_unescaped_comment(line: str) -> str:
-    """Remove a Make comment while preserving escaped hash characters."""
-    escaped = False
-    result: list[str] = []
-    for character in line:
-        if character == "#" and not escaped:
-            break
-        result.append(character)
-        if character == "\\" and not escaped:
-            escaped = True
-        else:
-            escaped = False
-    return "".join(result)
+@dataclass(frozen=True)
+class ExecutionReadback:
+    """Native process output and failure classification."""
+
+    plan_sha256: str
+    skill_id: str
+    command_id: str
+    tool_id: str
+    operation_id: str
+    argv: tuple[str, ...]
+    cwd: str
+    selected_environment_keys: tuple[str, ...]
+    exit_code: int | None
+    stdout_log: str
+    stderr_log: str
+    status: str
 
 
-def explicit_make_targets(makefile: Path) -> frozenset[str]:
-    """Return only unconditional top-level literal target declarations."""
-    try:
-        text = makefile.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return frozenset()
+@dataclass(frozen=True)
+class PublicCommandProjection:
+    """Documentation-only projection of a resolved plan."""
 
-    targets: set[str] = set()
-    define_depth = 0
-    conditional_depth = 0
-    for logical_line in _logical_makefile_lines(text):
-        line = _strip_unescaped_comment(logical_line).strip()
-        if not line:
-            continue
-
-        words = line.split()
-        directive_words = words
-        while directive_words and directive_words[0] in {
-            "export",
-            "override",
-            "private",
-        }:
-            directive_words = directive_words[1:]
-        directive = directive_words[0] if directive_words else ""
-
-        if define_depth:
-            if directive == "define":
-                define_depth += 1
-            elif directive == "endef":
-                define_depth -= 1
-            continue
-        if directive == "define":
-            define_depth = 1
-            continue
-        if directive == "endef":
-            return frozenset()
-
-        if directive in {"ifeq", "ifneq", "ifdef", "ifndef"}:
-            conditional_depth += 1
-            continue
-        if directive == "else":
-            if conditional_depth == 0:
-                return frozenset()
-            continue
-        if directive == "endif":
-            if conditional_depth == 0:
-                return frozenset()
-            conditional_depth -= 1
-            continue
-        if conditional_depth or ":" not in line:
-            continue
-
-        left, right = line.split(":", maxsplit=1)
-        # Reject every assignment spelling and directive-shaped line. A
-        # colon in an assignment value is not evidence for a target.
-        if "=" in left or right.lstrip().startswith(("=", ":=")):
-            continue
-        literal_targets = left.split()
-        if (
-            not literal_targets
-            or literal_targets[0]
-            in {
-                "-include",
-                "export",
-                "include",
-                "override",
-                "private",
-                "sinclude",
-                "undefine",
-                "unexport",
-                "vpath",
-            }
-            or any(
-                re.fullmatch(r"[A-Za-z0-9_.@/+,-]+", token) is None
-                for token in literal_targets
-            )
-        ):
-            continue
-        targets.update(literal_targets)
-
-    if define_depth or conditional_depth:
-        return frozenset()
-    return frozenset(targets)
+    logical_command: str
+    layout: str
+    public_cwd: str
+    public_env: tuple[tuple[str, str], ...]
+    public_argv: tuple[str, ...]
 
 
-def make_target_is_explicit(repository_root: Path, target: str) -> bool:
-    """Return whether the selected parent Makefile declares one literal target."""
-    makefile = _canonical_makefile(repository_root)
-    return makefile is not None and target in explicit_make_targets(makefile)
+@dataclass(frozen=True)
+class Finding:
+    """One generated projection finding."""
 
+    check: str
+    path: str
+    detail: str
 
-ISSUE_CONTRACT_MARKERS: dict[str, tuple[tuple[str, str], ...]] = {
-    "experiment-lifecycle": (
-        (
-            "experiment-registry-contract",
-            "documents/experiments/experiment-registry.md",
-        ),
-        (
-            "experiment-registry-template-contract-path",
-            "documents/experiments/experiment-registry.md",
-        ),
-        (
-            "experiment-registry-project-root",
-            "project-root `experiments/registry.toml`",
-        ),
-    ),
-    "research-workflow": (
-        (
-            "critical-review-template-path",
-            "documents/experiments/experiment-critical-review.md",
-        ),
-    ),
-    "start-repository": (
-        (
-            "remote-doc-project-path",
-            "documents/contracts/template-github-remote.md",
-        ),
-        (
-            "bootstrap-doc-project-path",
-            "documents/contracts/template-bootstrap.md",
-        ),
-        (
-            "static-seed-contract-path",
-            "documents/contracts/static-seed-export.md",
-        ),
-    ),
-    "tool-finding-report": (
-        (
-            "workflow-monitoring-run-local-path",
-            "reports/agents/",
-        ),
-        (
-            "workflow-monitoring-template-path",
-            "templates/agents/workflow_monitoring.md",
-        ),
-    ),
-}
-ISSUE_CONTRACT_FORBIDDEN: dict[str, tuple[tuple[str, re.Pattern[str]], ...]] = {
-    "result-artifact-writeout": (
-        (
-            "bare-runtime-log-archive-push",
-            re.compile(r"(?<!tools/runtime/archive/)runtime_log_archive_git\.py push"),
-        ),
-    ),
-    "tool-finding-report": (
-        (
-            "bare-workflow-monitoring-path",
-            re.compile(r"(?<!/)workflow_monitoring\.md"),
-        ),
-    ),
-}
+    def render(self) -> str:
+        """Render one stable finding."""
+        return f"SKILL_TOOL_COMMANDS_FINDING={self.check}:{self.path}:{self.detail}"
 
 
 @dataclass(frozen=True)
 class SkillCommandPacket:
-    """Catalog-owned command phases resolved for one runtime skill."""
+    """Packet preserving the historical text/JSON and resolved-row shape."""
 
     skill: str
     runtime_skill: str
@@ -317,685 +132,514 @@ class SkillCommandPacket:
     discovered_commands: tuple[str, ...]
     conditional_commands: tuple[str, ...]
     maintenance_commands: tuple[str, ...]
-    resolved_required_commands: tuple[
-        tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]], ...
-    ]
-    resolved_discovered_commands: tuple[
-        tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]], ...
-    ]
-    resolved_conditional_commands: tuple[
-        tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]], ...
-    ]
-    resolved_maintenance_commands: tuple[
-        tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]], ...
-    ]
+    resolved_required_commands: tuple[tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]], ...]
+    resolved_discovered_commands: tuple[tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]], ...]
+    resolved_conditional_commands: tuple[tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]], ...]
+    resolved_maintenance_commands: tuple[tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]], ...]
     validation_commands: tuple[str, ...]
+    command_tool_ids: tuple[tuple[str, ...], ...] = ()
+    command_items: tuple[tuple[Mapping[str, object], ...], ...] = ()
 
 
-@dataclass(frozen=True)
-class CommandPlan:
-    """Typed execution plan for one packet command."""
-
-    logical_command: str
-    source_root: str
-    execution_cwd: str
-    execution_env: tuple[tuple[str, str], ...]
-    execution_argv: tuple[str, ...]
+def _mapping(value: object, field: str) -> Mapping[str, object]:
+    if not isinstance(value, Mapping):
+        raise StructuredCommandError("invalid-input", f"{field} must be an object")
+    return cast(Mapping[str, object], value)
 
 
-@dataclass(frozen=True)
-class PublicCommandProjection:
-    """Transient public-layout projection of one logical command.
-
-    ``CommandPlan`` remains the execution authority.  This value is deliberately
-    not persisted in skill packets: it only supplies the path spelling shown to
-    a caller in a standalone or derived checkout.
-    """
-
-    logical_command: str
-    layout: str
-    public_cwd: str
-    public_env: tuple[tuple[str, str], ...]
-    public_argv: tuple[str, ...]
+def _catalog(root: Path, relative: Path) -> Mapping[str, object]:
+    try:
+        value = yaml.safe_load((root / relative).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise StructuredCommandError("invalid-input", f"catalog unreadable: {relative}") from exc
+    return _mapping(value, relative.as_posix())
 
 
-def _public_tool_prefix(root_resolution: RootResolution) -> str:
-    """Return the source checkout's one public tool prefix."""
-    return "tools"
+def _strings(value: object, field: str, *, required: bool = False) -> tuple[str, ...]:
+    if not isinstance(value, list) or (required and not value):
+        raise StructuredCommandError("invalid-input", f"{field} must be a string list")
+    if any(not isinstance(item, str) or not item for item in value):
+        raise StructuredCommandError("invalid-input", f"{field} contains a non-string")
+    return tuple(value)
 
 
-def _project_public_path(token: str, prefix: str) -> str:
-    """Map source-relative AgentCanon tool paths to one public prefix."""
-    if token.startswith("tools/agent-canon/tools/"):
-        raise SourceRootFailure(
-            "agent_canon_public_command_invalid",
-            f"Nested public tools path is not valid: {token}",
+def _entries(root: Path) -> dict[str, Mapping[str, object]]:
+    data = _catalog(root, TOOLS_CATALOG_PATH)
+    raw = data.get("entries")
+    if not isinstance(raw, list):
+        raise StructuredCommandError("invalid-input", "tools.catalog.entries must be a list")
+    result: dict[str, Mapping[str, object]] = {}
+    for index, value in enumerate(raw):
+        entry = _mapping(value, f"tools.catalog.entries[{index}]")
+        tool_id = entry.get("id")
+        if not isinstance(tool_id, str) or not tool_id:
+            raise StructuredCommandError("invalid-input", f"tools.catalog.entries[{index}].id is invalid")
+        result[tool_id] = entry
+    return result
+
+
+def _skill_items(root: Path, skill: str) -> dict[str, tuple[Mapping[str, object], ...]]:
+    data = _catalog(root, CATALOG_PATH)
+    families = data.get("skill_families")
+    if not isinstance(families, list):
+        raise StructuredCommandError("invalid-input", "skill_families must be a list")
+    for raw in families:
+        entry = _mapping(raw, "skill_families[]")
+        if entry.get("id") != skill:
+            continue
+        commands = _mapping(entry.get("tool_commands"), f"{skill}.tool_commands")
+        result: dict[str, tuple[Mapping[str, object], ...]] = {}
+        for phase in PHASES:
+            values = commands.get(phase, [])
+            if not isinstance(values, list):
+                raise StructuredCommandError("invalid-input", f"{skill}.{phase} must be a list")
+            items: list[Mapping[str, object]] = []
+            for index, item in enumerate(values):
+                record = _mapping(item, f"{skill}.{phase}[{index}]")
+                has_catalog = isinstance(record.get("tool_id"), str)
+                has_native = isinstance(record.get("executable"), str)
+                if has_catalog == has_native:
+                    raise StructuredCommandError("invalid-input", f"{skill}.{phase}[{index}] must be catalog or native")
+                if has_catalog:
+                    operation_id = record.get("operation_id", "default")
+                    if not isinstance(operation_id, str) or not operation_id:
+                        raise StructuredCommandError("invalid-input", f"{skill}.{phase}[{index}].operation_id is invalid")
+                    suffix = record.get("argv_suffix", [])
+                    _strings(suffix, f"{skill}.{phase}[{index}].argv_suffix")
+                    bindings = record.get("bindings", {})
+                    _mapping(bindings, f"{skill}.{phase}[{index}].bindings")
+                else:
+                    _strings(record.get("argv"), f"{skill}.{phase}[{index}].argv", required=True)
+                items.append(record)
+            result[phase] = tuple(items)
+        return result
+    raise StructuredCommandError("invalid-input", f"unknown skill: {skill}")
+
+
+def load_skill_command_items(
+    root: Path,
+) -> dict[str, dict[str, tuple[Mapping[str, object], ...]]]:
+    """Load every typed Skill command item through one shared projection."""
+    data = _catalog(root, CATALOG_PATH)
+    families = data.get("skill_families")
+    if not isinstance(families, list):
+        raise StructuredCommandError("invalid-input", "skill_families must be a list")
+    return {
+        cast(str, _mapping(entry, "skill_families[]")["id"]): _skill_items(
+            root, cast(str, _mapping(entry, "skill_families[]")["id"])
         )
-    if token.startswith("tools/agent-canon/"):
-        raise SourceRootFailure(
-            "agent_canon_public_command_invalid",
-            f"Nested public tools path is not valid: {token}",
-        )
-    if token.startswith("tools/"):
-        return f"{prefix}/{token.removeprefix('tools/')}"
-    return token
+        for entry in families
+    }
 
 
-def _project_contract_path(token: str, prefix: str) -> str:
-    """Project a source-document operand independently of the public tool path."""
-    if token.startswith(("documents/", "agents/", "templates/")):
-        return token
-    return token
+def _relative_path(root: Path, value: object, field: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise StructuredCommandError("invalid-input", f"{field} must be a path")
+    path = Path(value)
+    resolved = path.resolve() if path.is_absolute() else (root / path).resolve()
+    try:
+        return resolved.relative_to(root.resolve()).as_posix()
+    except ValueError as exc:
+        raise StructuredCommandError("invalid-input", f"{field} escapes source root") from exc
 
 
-def _public_executable_tokens(tokens: tuple[str, ...]) -> tuple[str, ...]:
-    """Return only public path tokens that are executable positions."""
-    candidates: list[str] = []
-    if tokens and tokens[0].startswith("tools/"):
-        candidates.append(tokens[0])
-    if (
-        len(tokens) > 1
-        and tokens[0] in SCRIPT_INTERPRETERS
-        and tokens[1].startswith("tools/")
-    ):
-        candidates.append(tokens[1])
-    candidates.extend(
-        token
-        for index, token in enumerate(tokens)
-        if index > 0
-        and tokens[index - 1] == "exec"
-        and token.startswith("tools/")
-    )
-    return tuple(dict.fromkeys(candidates))
-
-
-def project_public_command(
-    logical_command: str,
-    root_resolution: RootResolution,
-) -> PublicCommandProjection:
-    """Project a catalog/skill logical command without changing execution.
-
-    The parser is shared with ``build_command_plan``; only executable, source
-    tool, and PYTHONPATH tokens are rewritten.  Operands such as ``--root`` and
-    ``--contract`` remain independent logical paths.
-    """
-    raw = shlex.split(logical_command)
-    if not raw:
-        raise SourceRootFailure("agent_canon_public_command_invalid", "empty command")
-    prefix = _public_tool_prefix(root_resolution)
-    env: list[tuple[str, str]] = []
-    index = 0
-    while index < len(raw) and ASSIGNMENT_TOKEN_RE.fullmatch(raw[index]):
-        key, value = raw[index].split("=", maxsplit=1)
-        if key == "PYTHONPATH":
-            projected: list[str] = []
-            for entry in value.split(":"):
-                if not entry:
-                    continue
-                if entry == "tools":
-                    entry = prefix
-                projected.append(entry)
-            value = ":".join(dict.fromkeys(projected))
-        env.append((key, value))
-        index += 1
-    tokens = raw[index:]
-    projected_tokens: list[str] = []
-    for token_index, token in enumerate(tokens):
-        if token_index == 1 and tokens[0] in SCRIPT_INTERPRETERS:
-            projected_tokens.append(_project_public_path(token, prefix))
-        elif token_index == 0 and token.startswith("tools/"):
-            projected_tokens.append(_project_public_path(token, prefix))
-        elif token_index > 0 and tokens[token_index - 1] == "exec":
-            projected_tokens.append(_project_public_path(token, prefix))
-        elif token_index > 0 and tokens[token_index - 1] == "--contract":
-            projected_tokens.append(_project_contract_path(token, prefix))
-        elif token.startswith("--contract="):
-            key, value = token.split("=", maxsplit=1)
-            projected_tokens.append(f"{key}={_project_contract_path(value, prefix)}")
+def _typed(value: object, spec: Mapping[str, object], root: Path, field: str) -> tuple[object, ...]:
+    kind = spec.get("type")
+    repeat = spec.get("repeat", str(kind).endswith("-list"))
+    if not isinstance(repeat, bool):
+        raise StructuredCommandError("invalid-input", f"{field}.repeat is invalid")
+    if str(kind).endswith("-list") and not isinstance(value, (list, tuple)):
+        raise StructuredCommandError("invalid-input", f"{field} must be a list")
+    values = tuple(value) if isinstance(value, (list, tuple)) else (value,)
+    if isinstance(value, (list, tuple)) and not repeat:
+        raise StructuredCommandError("invalid-input", f"{field} must be scalar")
+    if not repeat and len(values) > 1:
+        raise StructuredCommandError("invalid-input", f"{field} has too many values")
+    output: list[object] = []
+    for item in values:
+        if kind in {"path", "path-list"}:
+            output.append(_relative_path(root, item, field))
+        elif kind in {"string", "literal"} and isinstance(item, str) and item:
+            output.append(item)
+        elif kind == "enum" and isinstance(item, str) and item in spec.get("choices", []):
+            output.append(item)
+        elif kind in {"integer", "issue-number"} and isinstance(item, int) and not isinstance(item, bool) and (kind != "issue-number" or item > 0):
+            output.append(item)
+        elif kind == "boolean" and isinstance(item, bool):
+            output.append(item)
+        elif kind == "oid" and isinstance(item, str) and len(item) == 40 and all(char in "0123456789abcdefABCDEF" for char in item):
+            output.append(item)
         else:
-            projected_tokens.append(token)
-    public_tokens = tuple(projected_tokens)
-    public_root = root_resolution.source_root.resolve()
-    for token in _public_executable_tokens(public_tokens):
-        candidate = (public_root / token).resolve()
+            raise StructuredCommandError("invalid-input", f"{field} has wrong type")
+    if spec.get("required", False) and not output:
+        raise StructuredCommandError("invalid-input", f"{field} is required")
+    return tuple(output)
+
+
+def _dispatch(entry: Mapping[str, object], operation_id: str) -> tuple[tuple[str, ...], Mapping[str, object]]:
+    dispatch = entry.get("dispatch")
+    if dispatch is None:
+        if operation_id != "default":
+            raise StructuredCommandError("invalid-input", f"operation unavailable: {entry.get('id')}:{operation_id}")
+        return (), {}
+    mapping = _mapping(dispatch, f"{entry.get('id')}.dispatch")
+    argv = _strings(mapping.get("argv"), f"{entry.get('id')}.dispatch.argv", required=True)
+    return argv, mapping
+
+
+def _executable(root: Path, argv: Sequence[str], native: str | None = None) -> str:
+    value = native or (argv[0] if argv else "")
+    if value.startswith(("/", "./", "../", "tools/", "scripts/")):
+        path = Path(value) if value.startswith("/") else root / value
         try:
-            candidate.relative_to(public_root)
-        except ValueError as exc:
-            raise SourceRootFailure(
-                "agent_canon_public_command_escape",
-                f"Public command escapes the authenticated source checkout: {token}",
-            ) from exc
-    return PublicCommandProjection(
-        logical_command=shlex.join(raw),
-        layout=root_resolution.layout,
-        public_cwd=".",
-        public_env=tuple(env),
-        public_argv=public_tokens,
+            resolved = path.resolve(strict=True)
+        except OSError as exc:
+            raise StructuredCommandError("tool-unavailable", f"executable unavailable: {value}") from exc
+        if not resolved.is_file() or not os.access(resolved, os.X_OK):
+            raise StructuredCommandError("tool-unavailable", f"executable unavailable: {value}")
+        return str(resolved)
+    located = shutil.which(value)
+    if located is None:
+        raise StructuredCommandError("tool-unavailable", f"executable unavailable: {value}")
+    return located
+
+
+def _pathify(root: Path, argv: list[str]) -> list[str]:
+    if argv and argv[0] in {"python", "python3", "bash"} and len(argv) > 1 and argv[1].startswith(("./", "tools/", "scripts/")):
+        argv[1] = str((root / argv[1]).resolve())
+    elif argv and argv[0].startswith(("./", "tools/", "scripts/")):
+        argv[0] = str((root / argv[0]).resolve())
+    return argv
+
+
+def _logical_argv(item: Mapping[str, object]) -> list[str]:
+    """Return catalog/native tokens before execution-root path resolution."""
+    if "tool_id" in item:
+        return [
+            "catalog",
+            cast(str, item["tool_id"]),
+            cast(str, item.get("operation_id", "default")),
+            *_strings(item.get("argv_suffix", []), "argv_suffix"),
+        ]
+    return [cast(str, item["executable"]), *_strings(item.get("argv"), "argv", required=True)]
+
+
+def _binding_values(item: Mapping[str, object], dispatch: Mapping[str, object], inputs: Mapping[str, object], root: Path, *, allow_unbound: bool = False) -> list[str]:
+    specs = dict(_mapping(dispatch.get("arguments", {}), "dispatch.arguments"))
+    bindings = _mapping(item.get("bindings", {}), "command.bindings")
+    for name, value in bindings.items():
+        if name not in specs:
+            binding = _mapping(value, f"command.bindings.{name}")
+            if "type" in binding:
+                specs[name] = binding
+    unknown = set(bindings) - set(specs)
+    if unknown:
+        raise StructuredCommandError("invalid-input", f"unknown binding: {sorted(unknown)[0]}")
+    result: list[str] = []
+    for name, raw_spec in specs.items():
+        spec = _mapping(raw_spec, f"dispatch.arguments.{name}")
+        raw_binding = bindings.get(name)
+        if raw_binding is None:
+            if spec.get("required", False):
+                if allow_unbound:
+                    continue
+                raise StructuredCommandError("invalid-input", f"missing required binding: {name}")
+            continue
+        binding = _mapping(raw_binding, f"command.bindings.{name}")
+        source = binding.get("from")
+        if not isinstance(source, str) or source not in inputs:
+            if allow_unbound:
+                continue
+            raise StructuredCommandError("invalid-input", f"missing input: {source or name}")
+        values = _typed(inputs[source], spec, root, name)
+        flag = spec.get("flag")
+        for value in values:
+            if spec.get("type") == "boolean":
+                if value and isinstance(flag, str):
+                    result.append(flag)
+            else:
+                if isinstance(flag, str):
+                    result.append(flag)
+                result.append(str(value))
+    if inputs and set(inputs) - {cast(str, _mapping(value, "binding").get("from")) for value in bindings.values()}:
+        unknown_input = sorted(set(inputs) - {cast(str, _mapping(value, "binding").get("from")) for value in bindings.values()})[0]
+        raise StructuredCommandError("invalid-input", f"unknown input: {unknown_input}")
+    return result
+
+
+def _resolve_item(root: Path, skill: str, command_id: str, item: Mapping[str, object], entries: Mapping[str, Mapping[str, object]], inputs: Mapping[str, object], *, check_tool: bool, allow_unbound: bool = False) -> CommandPlan:
+    if isinstance(item.get("tool_id"), str):
+        tool_id = cast(str, item["tool_id"])
+        entry = entries.get(tool_id)
+        if entry is None:
+            raise StructuredCommandError("invalid-input", f"tool unavailable: {tool_id}")
+        operation_id = cast(str, item.get("operation_id", "default"))
+        prefix, dispatch = _dispatch(entry, operation_id)
+        suffix = list(_strings(item.get("argv_suffix", []), "argv_suffix"))
+        argv = [*prefix, *suffix]
+        if not argv:
+            path = entry.get("path")
+            if not isinstance(path, str):
+                raise StructuredCommandError("invalid-input", f"tool {tool_id} has no default argv")
+            argv = [path]
+        argv.extend(_binding_values(item, dispatch, inputs, root, allow_unbound=allow_unbound))
+        executable = _executable(root, argv) if check_tool else (argv[0] if argv else "")
+    else:
+        executable = cast(str, item["executable"])
+        argv = [executable, *_strings(item.get("argv"), "argv", required=True)]
+        if check_tool:
+            executable = _executable(root, argv, executable)
+    argv = _pathify(root, argv)
+    if argv and argv[0] == executable:
+        argv[0] = executable
+    cwd = str(root.resolve())
+    environment: tuple[tuple[str, str], ...] = ()
+    fields = {"skill": skill, "command": command_id, "argv": argv, "cwd": cwd, "env": [], "tool": item.get("tool_id", "native")}
+    digest = hashlib.sha256(json.dumps(fields, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return CommandPlan(json.dumps(_logical_argv(item), ensure_ascii=False), str(root.resolve()), cwd, environment, tuple(argv), skill, command_id, cast(str, item.get("tool_id", "")), cast(str, item.get("operation_id", "default")), "forbidden", "read-only", digest)
+
+
+def resolve_command(root: Path, skill: str, command_id: str, inputs: Mapping[str, object] | None = None) -> CommandPlan:
+    """Resolve one phase-index command using only typed catalog records."""
+    items = _skill_items(root, skill)
+    try:
+        phase, raw_index = command_id.split(":", 1)
+        index = int(raw_index)
+    except (ValueError, TypeError) as exc:
+        raise StructuredCommandError("invalid-input", f"command id must be phase:index: {command_id}") from exc
+    if phase not in PHASES or index < 0 or index >= len(items[phase]):
+        raise StructuredCommandError("invalid-input", f"unknown command: {skill}:{command_id}")
+    return _resolve_item(root, skill, command_id, items[phase][index], _entries(root), dict(inputs or {}), check_tool=True)
+
+
+def execute_plan(plan: CommandPlan, *, runner: Callable[..., subprocess.CompletedProcess[bytes]] = subprocess.run) -> ExecutionReadback:
+    """Execute one plan with shell disabled and native output readback."""
+    selected = tuple(key for key, _ in plan.execution_env)
+    try:
+        result = runner(list(plan.execution_argv), cwd=plan.execution_cwd, env=dict(plan.execution_env), shell=False, check=False, capture_output=True)
+    except FileNotFoundError as exc:
+        return ExecutionReadback(plan.plan_sha256, plan.skill_id, plan.command_id, plan.tool_id, plan.operation_id, plan.execution_argv, plan.execution_cwd, selected, None, "", str(exc), "tool-unavailable")
+    except (OSError, subprocess.SubprocessError) as exc:
+        return ExecutionReadback(plan.plan_sha256, plan.skill_id, plan.command_id, plan.tool_id, plan.operation_id, plan.execution_argv, plan.execution_cwd, selected, None, "", str(exc), "spawn-failed")
+    try:
+        stdout = result.stdout.decode("utf-8")
+        stderr = result.stderr.decode("utf-8")
+    except (AttributeError, UnicodeDecodeError) as exc:
+        return ExecutionReadback(plan.plan_sha256, plan.skill_id, plan.command_id, plan.tool_id, plan.operation_id, plan.execution_argv, plan.execution_cwd, selected, result.returncode, "", str(exc), "readback-failed")
+    status = "completed" if result.returncode == 0 else "command-failed"
+    return ExecutionReadback(plan.plan_sha256, plan.skill_id, plan.command_id, plan.tool_id, plan.operation_id, plan.execution_argv, plan.execution_cwd, selected, result.returncode, stdout, stderr, status)
+
+
+def execute_command(root: Path, skill: str, command_id: str, inputs: Mapping[str, object] | None = None) -> ExecutionReadback:
+    """Resolve then execute one typed command."""
+    try:
+        return execute_plan(resolve_command(root, skill, command_id, inputs))
+    except StructuredCommandError as exc:
+        return ExecutionReadback("", skill, command_id, "", "", (), str(root.resolve()), (), None, "", exc.detail, exc.status)
+
+
+def native_make_target_introspection(root: Path, target: str) -> ExecutionReadback:
+    """Use GNU Make dry-run introspection; never parse Makefile source."""
+    if not target or target.startswith("-") or "\x00" in target:
+        return ExecutionReadback("", "", target, "gnu-make", "default", (), str(root.resolve()), (), None, "", "invalid target", "invalid-input")
+    make = shutil.which("make")
+    if make is None:
+        return ExecutionReadback("", "", target, "gnu-make", "default", (), str(root.resolve()), (), None, "", "make unavailable", "tool-unavailable")
+    try:
+        result = subprocess.run([make, "--no-print-directory", "-n", "--", target], cwd=root.resolve(), env={}, shell=False, check=False, capture_output=True)
+    except OSError as exc:
+        return ExecutionReadback("", "", target, "gnu-make", "default", (), str(root.resolve()), (), None, "", str(exc), "spawn-failed")
+    try:
+        stdout, stderr = result.stdout.decode("utf-8"), result.stderr.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        return ExecutionReadback("", "", target, "gnu-make", "default", (), str(root.resolve()), (), result.returncode, "", str(exc), "readback-failed")
+    argv = (make, "--no-print-directory", "-n", "--", target)
+    return ExecutionReadback("", "", target, "gnu-make", "default", argv, str(root.resolve()), (), result.returncode, stdout, stderr, "completed" if result.returncode == 0 else "command-failed")
+
+
+def make_target_is_explicit(root: Path, target: str) -> bool:
+    """Compatibility name backed by native Make introspection."""
+    return native_make_target_introspection(root, target).status == "completed"
+
+
+def validate_command_plan_executables(
+    resolution: RootResolution, packet: SkillCommandPacket
+) -> None:
+    """Validate source-local executable argv positions for an existing packet."""
+    del resolution
+    rows = (
+        *packet.resolved_required_commands,
+        *packet.resolved_conditional_commands,
+        *packet.resolved_maintenance_commands,
     )
+    for _, _, _, _, argv in rows:
+        if not argv:
+            raise SourceRootFailure("agent_canon_command_preflight_invalid", "empty command")
+        executable = Path(argv[0])
+        if executable.is_absolute() and (not executable.is_file() or not os.access(executable, os.X_OK)):
+            raise SourceRootFailure(
+                "agent_canon_command_preflight_missing",
+                f"command executable is missing: {executable}",
+            )
 
 
-def project_public_command_for_layout(
-    logical_command: str,
-    *,
-    layout: str,
-) -> PublicCommandProjection:
-    """Project a logical command when only the resolved layout is available."""
+def project_public_command(plan: CommandPlan, resolution: RootResolution) -> PublicCommandProjection:
+    """Project an already resolved plan without parsing command text."""
+    if not isinstance(plan, CommandPlan):
+        raise SourceRootFailure("agent_canon_public_command_invalid", "CommandPlan required")
+    return PublicCommandProjection(plan.logical_command, resolution.layout, ".", plan.execution_env, plan.execution_argv)
+
+
+def project_public_command_for_layout(plan: CommandPlan, *, layout: str) -> PublicCommandProjection:
+    """Project an already resolved plan for a public layout."""
     if layout not in {"standalone", "external"}:
         raise SourceRootFailure("agent_canon_public_command_invalid", f"unknown layout: {layout}")
-    # The projection itself is independent of source identity.  A lightweight
-    # resolution object keeps this helper on the same owner seam without
-    # persisting another command schema.
-    resolution = RootResolution(
-        current_repository_root=Path("."),
-        source_root=Path("."),
-        layout=layout,
-        canon_root=Path("."),
-        public_tool_root=Path("tools"),
-    )
-    return project_public_command(logical_command, resolution)
+    return project_public_command(plan, RootResolution(Path("."), Path("."), layout, Path("."), Path("tools")))
 
 
-@dataclass(frozen=True)
-class Finding:
-    """One skill-command-section finding."""
-
-    check: str
-    path: str
-    detail: str
-
-    def render(self) -> str:
-        """Render one stable text finding."""
-        return f"SKILL_TOOL_COMMANDS_FINDING={self.check}:{self.path}:{self.detail}"
-
-
-def build_parser() -> argparse.ArgumentParser:
-    """Create the command-line parser."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", default=str(DEFAULT_ROOT), help="Repository root.")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    show = subparsers.add_parser("show", help="Print one skill command packet.")
-    show.add_argument("--skill", required=True, help="Runtime skill name.")
-    show.add_argument("--format", choices=FORMAT_VALUES, default="text")
-
-    check = subparsers.add_parser("check", help="Check every runtime skill section.")
-    check.add_argument("--format", choices=FORMAT_VALUES, default="text")
-
-    return parser
-
-
-def runtime_skill_paths(root: Path) -> list[Path]:
-    """Return runtime SKILL.md files in stable order."""
-    return sorted((root / RUNTIME_SKILL_ROOT).glob("*/SKILL.md"))
-
-
-def skill_name_from_path(path: Path) -> str:
-    """Return the skill directory name for one runtime SKILL.md."""
-    return path.parent.name
-
-
-def runtime_skill_path(root: Path, skill: str) -> Path:
-    """Return the runtime SKILL.md path for one skill."""
-    return root / RUNTIME_SKILL_ROOT / skill / "SKILL.md"
-
-
-def canonical_skill_doc(root: Path, skill: str) -> Path:
-    """Return the human-facing skill canon path for one skill."""
-    return root / HUMAN_SKILL_ROOT / f"{skill}.md"
-
-
-def repo_relative(root: Path, path: Path) -> str:
-    """Return a POSIX relative path when possible."""
+def _relative(root: Path, path: Path) -> str:
     try:
         return path.relative_to(root).as_posix()
     except ValueError:
         return path.as_posix()
 
 
-def iter_command_lines(text: str) -> Iterable[str]:
-    """Yield command-looking lines from Markdown text."""
-    in_fence = False
-    fence_lang = ""
-    for raw_line in text.splitlines():
-        stripped = raw_line.strip()
-        if stripped.startswith("```"):
-            if in_fence:
-                in_fence = False
-                fence_lang = ""
-            else:
-                in_fence = True
-                fence_lang = stripped.removeprefix("```").strip().lower()
-            continue
-        candidate = stripped
-        if not candidate:
-            continue
-        if in_fence and fence_lang not in ("", "bash", "sh", "shell", "text"):
-            continue
-        if candidate.endswith("\\"):
-            candidate = candidate[:-1].rstrip()
-        if candidate.startswith("$ "):
-            candidate = candidate[2:].strip()
-        if is_command_candidate(candidate):
-            yield candidate
-        for inline in INLINE_CODE_RE.findall(raw_line):
-            command = inline.strip()
-            is_bare_tool_reference = command.startswith("tools/") and len(command.split()) == 1
-            if is_command_candidate(command) and not is_bare_tool_reference:
-                yield command
-
-
-def is_command_candidate(value: str) -> bool:
-    """Return whether a string is command-shaped enough for a packet."""
-    if value.endswith("/"):
-        return False
-    tokens = value.split()
-    token_index = 0
-    while token_index < len(tokens):
-        if not ASSIGNMENT_TOKEN_RE.fullmatch(tokens[token_index]):
-            break
-        token_index += 1
-    if token_index >= len(tokens):
-        return False
-    normalized = " ".join(tokens[token_index:])
-    return normalized.startswith(COMMAND_PREFIXES)
-
-
-def unique_preserve_order(values: Iterable[str]) -> tuple[str, ...]:
-    """Return unique strings in first-seen order."""
-    seen: set[str] = set()
-    result: list[str] = []
-    for value in values:
-        normalized = re.sub(r"\s+", " ", value.strip())
-        if "skill_tool_commands.py show" in normalized:
-            continue
-        if not normalized or normalized in seen:
-            continue
-        seen.add(normalized)
-        result.append(normalized)
-    return tuple(result)
-
-
-def build_command_plan(logical_command: str, source_root: Path) -> CommandPlan:
-    """Return a command execution plan with resolved cwd and argv."""
-    normalized = shlex.join(shlex.split(logical_command)) if logical_command else ""
-    resolved_root = str(source_root.resolve())
-    source_root_as_path = source_root.resolve()
-    raw_tokens = shlex.split(logical_command)
-    token_index = 0
-    env_assignments: dict[str, str] = {}
-    while token_index < len(raw_tokens):
-        token = raw_tokens[token_index]
-        if ASSIGNMENT_TOKEN_RE.fullmatch(token):
-            key, value = token.split("=", maxsplit=1)
-            env_assignments[key] = value
-            token_index += 1
-            continue
-        break
-    tokens = raw_tokens[token_index:]
-    resolved: list[str] = []
-    skip_next_root = False
-
-    for index, token in enumerate(tokens):
-        if token == "--root" and index + 1 < len(tokens):
-            resolved.append(token)
-            if tokens[index + 1] == ".":
-                resolved.append(resolved_root)
-            else:
-                resolved.append(tokens[index + 1])
-            skip_next_root = True
-            continue
-        if skip_next_root:
-            skip_next_root = False
-            continue
-        if token.startswith("--root=") and token.split("=", maxsplit=1)[1] == ".":
-            resolved.append(f"--root={resolved_root}")
-            continue
-        if index == 0 and token in SCRIPT_INTERPRETERS:
-            resolved.append(token)
-            continue
-        if index == 1 and tokens[0] in SCRIPT_INTERPRETERS:
-            resolved.append(
-                str((source_root_as_path / token).resolve())
-                if token.startswith(SOURCE_ROOT_SCRIPT_PREFIXES)
-                else token
-            )
-            continue
-        if (
-            index > 0
-            and tokens[index - 1] == "exec"
-            and token.startswith(SOURCE_ROOT_SCRIPT_PREFIXES)
-        ):
-            resolved.append(str((source_root_as_path / token).resolve()))
-            continue
-        if index == 0 and token.startswith(SOURCE_ROOT_COMMAND_PREFIXES):
-            resolved.append(str((source_root_as_path / token).resolve()))
-            continue
-        resolved.append(token)
-
-    return CommandPlan(
-        logical_command=normalized,
-        source_root=resolved_root,
-        execution_cwd=resolved_root,
-        execution_env=tuple((key, env_assignments[key]) for key in env_assignments),
-        execution_argv=tuple(resolved),
+def packet_for_skill(resolution: RootResolution, skill: str) -> SkillCommandPacket:
+    """Build the historical packet shape from structured records."""
+    root = resolution.source_root
+    items = _skill_items(root, skill)
+    entries = _entries(root)
+    examples: dict[str, tuple[str, ...]] = {}
+    resolved: dict[str, tuple[tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]], ...]] = {}
+    for phase in PHASES:
+        display: list[str] = []
+        rows: list[tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]]] = []
+        for index, item in enumerate(items[phase]):
+            command_id = f"{phase}:{index}"
+            try:
+                plan = _resolve_item(root, skill, command_id, item, entries, {}, check_tool=False, allow_unbound=True)
+            except StructuredCommandError as exc:
+                if exc.status != "invalid-input":
+                    raise
+                plan = _resolve_item(root, skill, command_id, item, entries, {}, check_tool=False, allow_unbound=True)
+            display.append(plan.logical_command)
+            rows.append((plan.logical_command, plan.source_root, plan.execution_cwd, plan.execution_env, plan.execution_argv))
+        examples[phase] = tuple(display)
+        resolved[phase] = tuple(rows)
+    command_tool_ids = tuple(
+        tuple(cast(str, item.get("tool_id", "")) for item in items[phase])
+        for phase in PHASES
     )
-
-
-def packet_for_skill(root_resolution: RootResolution, skill: str) -> SkillCommandPacket:
-    """Build one command packet from catalog-owned command phases."""
-    source_root = root_resolution.source_root
-    root = source_root
-    runtime_path = runtime_skill_path(root, skill)
-    canon_path = canonical_skill_doc(root, skill)
-    spec = load_skill_tool_commands(root).get(skill)
-    if spec is not None and spec.structured:
-        required = spec.required
-        conditional = spec.conditional
-        maintenance = spec.maintenance
-        conditional_for_resolution = conditional
-    else:
-        # Minimal fixture roots may still exercise the legacy readback route;
-        # canonical AgentCanon entries always take the structured branch above.
-        texts: list[str] = []
-        for path in (runtime_path, canon_path):
-            if path.is_file():
-                texts.append(path.read_text(encoding="utf-8", errors="replace"))
-        conditional = unique_preserve_order(
-            command for text in texts for command in iter_command_lines(text)
-        )
-        conditional_for_resolution = conditional or (FALLBACK_COMMAND,)
-        required = load_skill_required_tool_commands(root).get(skill, ())
-        maintenance = LEGACY_MAINTENANCE_COMMANDS
-    resolved_required = tuple(
-        build_command_plan(command, source_root) for command in required
+    command_items = tuple(
+        tuple(dict(item) for item in items[phase]) for phase in PHASES
     )
-    resolved_conditional = tuple(
-        build_command_plan(command, source_root)
-        for command in conditional_for_resolution
-    )
-    resolved_maintenance = tuple(
-        build_command_plan(command, source_root) for command in maintenance
-    )
-    related_skills = related_skills_for(root, skill)
-    return SkillCommandPacket(
-        skill=skill,
-        runtime_skill=repo_relative(root, runtime_path),
-        canonical_doc=repo_relative(root, canon_path),
-        related_skills=related_skills,
-        required_commands=required,
-        discovered_commands=conditional,
-        conditional_commands=conditional,
-        maintenance_commands=maintenance,
-        resolved_required_commands=tuple(
-            (
-                plan.logical_command,
-                plan.source_root,
-                plan.execution_cwd,
-                plan.execution_env,
-                plan.execution_argv,
-            )
-            for plan in resolved_required
-        ),
-        resolved_discovered_commands=tuple(
-            (
-                plan.logical_command,
-                plan.source_root,
-                plan.execution_cwd,
-                plan.execution_env,
-                plan.execution_argv,
-            )
-            for plan in resolved_conditional
-        ),
-        resolved_conditional_commands=tuple(
-            (
-                plan.logical_command,
-                plan.source_root,
-                plan.execution_cwd,
-                plan.execution_env,
-                plan.execution_argv,
-            )
-            for plan in resolved_conditional
-        ),
-        resolved_maintenance_commands=tuple(
-            (
-                plan.logical_command,
-                plan.source_root,
-                plan.execution_cwd,
-                plan.execution_env,
-                plan.execution_argv,
-            )
-            for plan in resolved_maintenance
-        ),
-        validation_commands=maintenance,
-    )
+    return SkillCommandPacket(skill, _relative(root, root / RUNTIME_SKILL_ROOT / skill / "SKILL.md"), _relative(root, root / HUMAN_SKILL_ROOT / f"{skill}.md"), load_skill_related_map(root).get(skill, ()), examples["required"], examples["conditional"], examples["conditional"], examples["maintenance"], resolved["required"], resolved["conditional"], resolved["conditional"], resolved["maintenance"], examples["maintenance"], command_tool_ids, command_items)
 
 
-def _resolved_executable_tokens(argv: tuple[str, ...]) -> tuple[str, ...]:
-    """Return executable path positions from one resolved argv."""
-    candidates: list[str] = []
-    if argv:
-        if argv[0] in SCRIPT_INTERPRETERS and len(argv) > 1:
-            candidates.append(argv[1])
-        else:
-            candidates.append(argv[0])
-    candidates.extend(
-        token
-        for index, token in enumerate(argv)
-        if index > 0 and argv[index - 1] == "exec"
-    )
-    return tuple(dict.fromkeys(candidates))
+def runtime_skill_paths(root: Path) -> list[Path]:
+    """Return generated runtime skill files in stable order."""
+    return sorted((root / RUNTIME_SKILL_ROOT).glob("*/SKILL.md"))
 
 
-def validate_command_plan_executables(
-    root_resolution: RootResolution,
-    packet: SkillCommandPacket,
-) -> None:
-    """Validate every resolved script executable before report publication."""
-    command_groups = (
-        packet.resolved_required_commands,
-        packet.resolved_conditional_commands,
-        packet.resolved_maintenance_commands,
-    )
-    for group in command_groups:
-        for _logical, _source, _cwd, _env, argv in group:
-            if not argv:
-                raise SourceRootFailure(
-                    "agent_canon_command_preflight_invalid",
-                    f"empty command for skill {packet.skill}",
-                )
-            for executable in _resolved_executable_tokens(argv):
-                if not executable.startswith("/"):
-                    continue
-                declared = Path(executable)
-                candidate = declared.resolve()
-                if declared.is_symlink() or not candidate.is_file():
-                    raise SourceRootFailure(
-                        "agent_canon_command_preflight_missing",
-                        f"command executable is missing: {executable}",
-                    )
-                try:
-                    candidate.relative_to(root_resolution.source_root.resolve())
-                except ValueError as exc:
-                    raise SourceRootFailure(
-                        "agent_canon_command_preflight_escape",
-                        f"command executable escapes source root: {executable}",
-                    ) from exc
-
-
-def related_skills_for(root: Path, skill: str) -> tuple[str, ...]:
-    """Return related skills from the public catalog when that catalog exists."""
-    catalog_path = root / HUMAN_SKILL_ROOT / "catalog.yaml"
-    if not catalog_path.is_file():
-        return ()
-    return load_skill_related_map(root).get(skill, ())
-
-
-def skill_pair_text(root: Path, skill: str) -> str:
-    """Return combined runtime and human-facing skill text."""
-    parts: list[str] = []
-    for path in (runtime_skill_path(root, skill), canonical_skill_doc(root, skill)):
-        if path.is_file():
-            parts.append(path.read_text(encoding="utf-8", errors="replace"))
-    return "\n".join(parts)
-
-
-def check_issue_contract_rules(root: Path, skill: str) -> tuple[Finding, ...]:
-    """Check issue-backed skill contract drift markers."""
-    text = skill_pair_text(root, skill)
-    if not text:
-        return ()
-    path = f"{RUNTIME_SKILL_ROOT.as_posix()}/{skill}/SKILL.md+{HUMAN_SKILL_ROOT.as_posix()}/{skill}.md"
-    findings: list[Finding] = []
-    for marker_name, marker in ISSUE_CONTRACT_MARKERS.get(skill, ()):
-        if marker not in text:
-            findings.append(Finding("skill_issue_contract", path, f"{marker_name}:missing"))
-    for marker_name, pattern in ISSUE_CONTRACT_FORBIDDEN.get(skill, ()):
-        if pattern.search(text):
-            findings.append(Finding("skill_issue_contract", path, f"{marker_name}:present"))
-    return tuple(findings)
+def skill_name_from_path(path: Path) -> str:
+    """Return the runtime skill directory name."""
+    return path.parent.name
 
 
 def check(root: Path) -> tuple[Finding, ...]:
-    """Check every runtime skill for the materializer-owned packet projection."""
+    """Check generated sections without interpreting Markdown as commands."""
     findings: list[Finding] = []
     paths = runtime_skill_paths(root)
     if not paths:
         findings.append(Finding("skill_tool_commands", RUNTIME_SKILL_ROOT.as_posix(), "missing-skill-root"))
+    try:
+        catalog = _catalog(root, CATALOG_PATH)
+        families = catalog.get("skill_families", [])
+        if not isinstance(families, list):
+            raise StructuredCommandError("invalid-input", "skill_families must be a list")
+    except StructuredCommandError as exc:
+        return (Finding("skill_tool_commands", CATALOG_PATH.as_posix(), exc.detail),)
     for path in paths:
         skill = skill_name_from_path(path)
-        relative = repo_relative(root, path)
         text = path.read_text(encoding="utf-8", errors="replace")
+        relative = _relative(root, path)
         if SECTION_HEADING not in text:
             findings.append(Finding("skill_tool_commands", relative, "missing-tool-commands-section"))
-        else:
-            if SECTION_START not in text or SECTION_END not in text:
-                findings.append(Finding("skill_tool_commands", relative, "missing-section-markers"))
-            command = COMMAND_TEMPLATE.format(skill=skill)
-            if text.count(command) != 1:
-                findings.append(Finding("skill_tool_commands", relative, "missing-command-packet-entry"))
-        findings.extend(check_issue_contract_rules(root, skill))
+        elif SECTION_START not in text or SECTION_END not in text:
+            findings.append(Finding("skill_tool_commands", relative, "missing-section-markers"))
+        if text.count(COMMAND_TEMPLATE.format(skill=skill)) != 1:
+            findings.append(Finding("skill_tool_commands", relative, "missing-command-packet-entry"))
     return tuple(findings)
 
 
 def render_packet_text(packet: SkillCommandPacket) -> str:
-    """Render one skill command packet."""
-    lines = [
-        f"SKILL_TOOL_COMMANDS_SKILL={packet.skill}",
-        f"SKILL_TOOL_COMMANDS_RUNTIME_SKILL={packet.runtime_skill}",
-        f"SKILL_TOOL_COMMANDS_CANONICAL_DOC={packet.canonical_doc}",
-        "SKILL_TOOL_COMMANDS_RELATED_SKILLS="
-        + (
-            ",".join(f"${skill}" for skill in packet.related_skills)
-            if packet.related_skills
-            else "-"
-        ),
-        "SKILL_TOOL_COMMANDS_REQUIRED:",
-    ]
-    lines.extend(f"- {command}" for command in packet.required_commands)
-    lines.append("SKILL_TOOL_COMMANDS_REQUIRED_RESOLUTION:")
-    for command, source_root, execution_cwd, env, argv in (
-        packet.resolved_required_commands
-    ):
-        lines.extend(
-            (
-                f"- logical={command}",
-                f"- source_root={source_root}",
-                f"- execution_cwd={execution_cwd}",
-                f"- execution_env={json.dumps(list(env))}",
-                f"- execution_argv={json.dumps(list(argv))}",
-            )
-        )
-    lines.append("SKILL_TOOL_COMMANDS_CONDITIONAL:")
-    lines.extend(f"- {command}" for command in packet.conditional_commands)
-    lines.append("SKILL_TOOL_COMMANDS_CONDITIONAL_RESOLUTION:")
-    for command, source_root, execution_cwd, env, argv in (
-        packet.resolved_discovered_commands
-    ):
-        lines.extend(
-            (
-                f"- logical={command}",
-                f"- source_root={source_root}",
-                f"- execution_cwd={execution_cwd}",
-                f"- execution_env={json.dumps(list(env))}",
-                f"- execution_argv={json.dumps(list(argv))}",
-            )
-        )
-    lines.append("SKILL_TOOL_COMMANDS_MAINTENANCE_ONLY:")
-    lines.append("- Run these only when editing skill command sections or checking skill-tool drift.")
-    lines.extend(f"- {command}" for command in packet.maintenance_commands)
+    """Render text and argv projections for a packet."""
+    lines = [f"SKILL_TOOL_COMMANDS_SKILL={packet.skill}", f"SKILL_TOOL_COMMANDS_RUNTIME_SKILL={packet.runtime_skill}", f"SKILL_TOOL_COMMANDS_CANONICAL_DOC={packet.canonical_doc}", "SKILL_TOOL_COMMANDS_RELATED_SKILLS=" + (",".join(f"${skill}" for skill in packet.related_skills) if packet.related_skills else "-")]
+    for phase, commands, rows in (("REQUIRED", packet.required_commands, packet.resolved_required_commands), ("CONDITIONAL", packet.conditional_commands, packet.resolved_conditional_commands), ("MAINTENANCE_ONLY", packet.maintenance_commands, packet.resolved_maintenance_commands)):
+        lines.append(f"SKILL_TOOL_COMMANDS_{phase}:")
+        lines.extend(f"- {command}" for command in commands)
+        lines.append(f"SKILL_TOOL_COMMANDS_{phase}_RESOLUTION:")
+        for logical, source, cwd, env, argv in rows:
+            lines.extend((f"- logical={logical}", f"- source_root={source}", f"- execution_cwd={cwd}", f"- execution_env={json.dumps(list(env))}", f"- execution_argv={json.dumps(list(argv))}"))
     return "\n".join(lines)
 
 
-def render_public_projection_text(
-    packet: SkillCommandPacket,
-    root_resolution: RootResolution,
-) -> str:
-    """Render transient public argv projections without changing packet schema."""
-    lines = [
-        f"SKILL_TOOL_COMMANDS_PUBLIC_LAYOUT={root_resolution.layout}",
-        "SKILL_TOOL_COMMANDS_PUBLIC_REQUIRED:",
-    ]
-    for command in packet.required_commands:
-        projection = project_public_command(command, root_resolution)
-        lines.extend(
-            (
-                f"- logical={projection.logical_command}",
-                f"- public_cwd={projection.public_cwd}",
-                f"- public_env={json.dumps(list(projection.public_env))}",
-                f"- public_argv={json.dumps(list(projection.public_argv))}",
-            )
-        )
-    lines.append("SKILL_TOOL_COMMANDS_PUBLIC_CONDITIONAL:")
-    for command in packet.conditional_commands:
-        projection = project_public_command(command, root_resolution)
-        lines.extend(
-            (
-                f"- logical={projection.logical_command}",
-                f"- public_cwd={projection.public_cwd}",
-                f"- public_env={json.dumps(list(projection.public_env))}",
-                f"- public_argv={json.dumps(list(projection.public_argv))}",
-            )
-        )
-    return "\n".join(lines)
+def build_parser() -> argparse.ArgumentParser:
+    """Create the structured command CLI."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", default=str(DEFAULT_ROOT))
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    show = subparsers.add_parser("show")
+    show.add_argument("--skill", required=True)
+    show.add_argument("--format", choices=("text", "json"), default="text")
+    check_parser = subparsers.add_parser("check")
+    check_parser.add_argument("--format", choices=("text", "json"), default="text")
+    resolve = subparsers.add_parser("resolve")
+    resolve.add_argument("--skill", required=True)
+    resolve.add_argument("--command", dest="command_id", required=True)
+    resolve.add_argument("--inputs", default="{}")
+    execute = subparsers.add_parser("execute")
+    execute.add_argument("--skill", required=True)
+    execute.add_argument("--command", dest="command_id", required=True)
+    execute.add_argument("--inputs", default="{}")
+    return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the selected subcommand."""
-    parser = build_parser()
-    args = parser.parse_args(argv)
+    """Run one packet, validation, resolution, or execution operation."""
+    args = build_parser().parse_args(argv)
     try:
-        root_resolution = resolve_agent_canon_source_root(Path(args.root))
-    except SourceRootFailure as exc:
-        print(f"SKILL_TOOL_COMMANDS_SOURCE_ROOT_FAILURE={exc.code}:{exc.detail}")
+        resolution = resolve_agent_canon_source_root(Path(args.root))
+        root = resolution.source_root
+        if args.command == "show":
+            packet = packet_for_skill(resolution, args.skill)
+            print(render_packet_text(packet) if args.format == "text" else json.dumps(asdict(packet), indent=2, ensure_ascii=False, sort_keys=True))
+            return 0
+        if args.command == "check":
+            findings = check(root)
+            if args.format == "json":
+                print(json.dumps({"status": "pass" if not findings else "fail", "findings": [asdict(item) for item in findings]}, indent=2, ensure_ascii=False, sort_keys=True))
+            else:
+                for finding in findings:
+                    print(finding.render())
+                print(f"SKILL_TOOL_COMMANDS_FINDINGS={len(findings)}")
+                print(f"SKILL_TOOL_COMMANDS={'pass' if not findings else 'fail'}")
+            return 0 if not findings else 1
+        try:
+            inputs = json.loads(args.inputs)
+        except json.JSONDecodeError as exc:
+            raise StructuredCommandError("invalid-input", str(exc)) from exc
+        if not isinstance(inputs, Mapping):
+            raise StructuredCommandError("invalid-input", "inputs must be an object")
+        if args.command == "resolve":
+            print(json.dumps(asdict(resolve_command(root, args.skill, args.command_id, inputs)), indent=2, ensure_ascii=False, sort_keys=True))
+            return 0
+        result = execute_command(root, args.skill, args.command_id, inputs)
+        print(json.dumps(asdict(result), indent=2, ensure_ascii=False, sort_keys=True))
+        return 0 if result.status == "completed" else 1
+    except (StructuredCommandError, SourceRootFailure) as exc:
+        print(json.dumps({"status": getattr(exc, "status", getattr(exc, "code", "invalid-input")), "detail": getattr(exc, "detail", str(exc))}, ensure_ascii=False, sort_keys=True))
         return 2
-
-    root = root_resolution.source_root
-    if args.command == "show":
-        packet = packet_for_skill(root_resolution, args.skill)
-        if args.format == "json":
-            print(json.dumps(asdict(packet), indent=2, sort_keys=True))
-        else:
-            print(render_packet_text(packet))
-            print(render_public_projection_text(packet, root_resolution))
-        return 0
-    findings = check(root)
-    if args.format == "json":
-        print(
-            json.dumps(
-                {
-                    "status": "pass" if not findings else "fail",
-                    "findings": [asdict(finding) for finding in findings],
-                },
-                indent=2,
-                sort_keys=True,
-            )
-        )
-    else:
-        for finding in findings:
-            print(finding.render())
-        print(f"SKILL_TOOL_COMMANDS_FINDINGS={len(findings)}")
-        print(f"SKILL_TOOL_COMMANDS={'pass' if not findings else 'fail'}")
-    return 0 if not findings else 1
 
 
 if __name__ == "__main__":

@@ -24,7 +24,6 @@ import hashlib
 import json
 import os
 import re
-import shlex
 import tempfile
 import sys
 import unicodedata
@@ -410,33 +409,6 @@ def _load_tool_entries(root: Path) -> tuple[Mapping[str, object], ...]:
     return tuple(entries)
 
 
-def _resolve_tool_id(
-    logical_command: str,
-    execution_env: Sequence[tuple[str, str]],
-    execution_argv: Sequence[str],
-    entries: Sequence[Mapping[str, object]],
-) -> str | None:
-    """Resolve a logical command to a catalog ToolID without inventing rows."""
-    for entry in entries:
-        command = entry.get("command")
-        if isinstance(command, str) and (
-            logical_command == command or logical_command.startswith(command + " ")
-        ):
-            return cast(str, entry["id"])
-    tokens = shlex.split(logical_command)
-    for token in tokens[1:2]:
-        for entry in entries:
-            if entry.get("path") == token:
-                return cast(str, entry["id"])
-    if execution_argv:
-        executable = execution_argv[0]
-        for entry in entries:
-            command = entry.get("command")
-            if isinstance(command, str) and command.split(maxsplit=1)[0] == executable:
-                return cast(str, entry["id"])
-    return None
-
-
 def _packets(root: Path, skill_ids: Sequence[str]) -> dict[str, SkillCommandPacket]:
     """Resolve every public skill through the canonical command packet owner."""
     resolution = resolve_agent_canon_source_root(root)
@@ -456,6 +428,45 @@ def _packet_commands(
     if phase == "maintenance":
         return packet.resolved_maintenance_commands
     raise ValueError(f"skill_tool_invocation_graph_unknown_phase:{phase}")
+
+
+def _packet_items(packet: SkillCommandPacket, phase: str) -> tuple[Mapping[str, object], ...]:
+    """Return canonical structured command items for one phase."""
+    if not packet.command_items:
+        return ()
+    return packet.command_items[PHASES.index(phase)]
+
+
+def _logical_item(root: Path, item: Mapping[str, object]) -> dict[str, object]:
+    """Normalize only logical catalog paths for cross-checkout identity."""
+    result: dict[str, object] = {}
+    for key, value in item.items():
+        if isinstance(value, list):
+            normalized: list[object] = []
+            for token in value:
+                if isinstance(token, str) and token.startswith("/"):
+                    candidate = Path(token)
+                    try:
+                        token = "@root/" + candidate.resolve().relative_to(root.resolve()).as_posix()
+                    except ValueError:
+                        token = "@absolute"
+                normalized.append(token)
+            result[key] = normalized
+        else:
+            result[key] = value
+    return result
+
+
+def _logical_item_argv(item: Mapping[str, object]) -> list[str]:
+    """Render structured item identity as argv-like tokens without parsing."""
+    if "tool_id" in item:
+        return [
+            "catalog",
+            cast(str, item["tool_id"]),
+            cast(str, item.get("operation_id", "default")),
+            *cast(Sequence[str], item.get("argv_suffix", [])),
+        ]
+    return [cast(str, item["executable"]), *cast(Sequence[str], item.get("argv", []))]
 
 
 def _route_snapshot(rules: Sequence[object]) -> list[dict[str, object]]:
@@ -679,8 +690,11 @@ def _source_snapshot(
             "skill": skill,
             "phase": phase,
             "commands": [
-                {"logical_command": row[0], "logical_argv": list(shlex.split(row[0]))}
-                for row in _packet_commands(packets[skill], phase)
+                {
+                    "logical_item": _logical_item(root, item),
+                    "logical_argv": _logical_item_argv(item),
+                }
+                for item in _packet_items(packets[skill], phase)
             ],
         }
         for skill in skill_ids
@@ -876,9 +890,13 @@ def build_graph(root: Path) -> dict[str, object]:
                 phase_index,
                 phase_refs[(skill, phase)],
             )
+            direct_tool_ids = packets[skill].command_tool_ids[PHASES.index(phase)]
+            canonical_items = _packet_items(packets[skill], phase)
             for index, logical, _cwd, _env, argv in phase_commands[(skill, phase)]:
                 command_id = f"command:{skill}:{phase}:{index:04d}"
-                tool_id = _resolve_tool_id(logical, _env, argv, tools)
+                tool_id = (direct_tool_ids[index] or None) if index < len(direct_tool_ids) else None
+                logical_item = _logical_item(root, canonical_items[index])
+                logical_argv = _logical_item_argv(canonical_items[index])
                 tool_ids_by_command[(skill, phase, index)] = tool_id
                 command_refs[(skill, phase, index)] = identities.add(
                     "command",
@@ -886,10 +904,11 @@ def build_graph(root: Path) -> dict[str, object]:
                     {
                         "id": command_id,
                         "skill_id": skill,
-                        "logical_argv": list(shlex.split(logical)),
+                        "logical_item": logical_item,
+                        "logical_argv": logical_argv,
                         "source_locator": f"agents/skills/catalog.yaml#skill:{skill}.tool_commands.{phase}[{index}]",
                         "execution_cwd": ".",
-                        "argv_digest": _digest(list(shlex.split(logical))),
+                        "argv_digest": _digest(logical_argv),
                     },
                 )
                 _source_record(
@@ -908,7 +927,8 @@ def build_graph(root: Path) -> dict[str, object]:
                     f"tools/agent/skills/skill_tool_commands.py#{skill}:{phase}:{index}",
                     index,
                     command_refs[(skill, phase, index)],
-                    logical_argv=list(shlex.split(logical)),
+                    logical_item=logical_item,
+                    logical_argv=logical_argv,
                 )
                 if tool_id is not None and tool_id not in tool_refs:
                     entry = next(entry for entry in tools if entry["id"] == tool_id)

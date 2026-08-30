@@ -39,18 +39,17 @@ skill_families:
       description: "Mandatory routing skill for repository tasks. Use before selecting workflow family, skills, review roles, subagents, model/team policy, runtime entrypoints, or run bundles for Codex routing."
     tool_commands:
       required:
-      - python3 tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py --root .
+      - {"tool_id": "check-execution-time-aware-orchestration", "operation_id": "default"}
       conditional:
-      - python3 tools/analysis/search/search.py --query-file <request.txt> --providers text,semantic,vector,tool,header-deps,code-deps
-        --format json
-      - agent-canon structured-analysis document-inventory
-      - python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json
-      - python3 tools/validation/semantic/convention/check_convention_compliance.py
-      - agent-canon docs
-      - ./bootstrap.sh --control-parent-root <parent> --runtime-root <runtime> status
+      - {"tool_id": "agent-search", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/search/search.py", "--query-file", "<request.txt>", "--providers", "text,semantic,vector,tool,header-deps,code-deps", "--format", "json"]}
+      - {"executable": "agent-canon", "argv": ["structured-analysis", "document-inventory"]}
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
+      - {"tool_id": "check-convention-compliance", "operation_id": "default"}
+      - {"executable": "agent-canon", "argv": ["docs"]}
+      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<parent>", "--runtime-root", "<runtime>", "status"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: workflow, skill, subagent, or stage routing is part of the request
@@ -76,10 +75,10 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: task-routing
     purpose: Resolve long proposed tool or skill names into short routing areas and compact commands.
     canonical_doc: agents/skills/task-routing.md
@@ -90,16 +89,16 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent/orchestration/route.py --name <candidate>
-      - python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json
-      - python3 tools/agent/orchestration/route.py --area <area> --changed <paths...>
-      - python3 tools/agent/orchestration/route.py --prompt
-      - python3 tools/agent/orchestration/route.py --area checks --changed <path>
-      - python3 tools/agent/orchestration/route.py --name profile_surface_resolver.py
-      - python3 tools/agent/skills/skill_dependency_map.py check --root .
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--name", "<candidate>"]}
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--area", "<area>", "--changed", "<paths...>"]}
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt"]}
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--area", "checks", "--changed", "<path>"]}
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--name", "profile_surface_resolver.py"]}
+      - {"executable": "python3", "argv": ["tools/agent/skills/skill_dependency_map.py", "check", "--root", "."]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: skill/tool routing architecture or route contract design is in scope
@@ -187,13 +186,13 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - git clone <template> <new-project>
-      - git status --short --branch
-      - bash scripts/start_repository.sh --project-slug <slug> --display-name "<name>"
-      - bash scripts/start_repository.sh --validate-only
+      - {"executable": "git", "argv": ["clone", "<template>", "<new-project>"]}
+      - {"executable": "git", "argv": ["status", "--short", "--branch"]}
+      - {"executable": "bash", "argv": ["scripts/start_repository.sh", "--project-slug", "<slug>", "--display-name", "<name>"]}
+      - {"executable": "bash", "argv": ["scripts/start_repository.sh", "--validate-only"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: codex-task-workflow
     purpose: Execute repository tasks with a context-independent Codex flow.
     canonical_doc: agents/skills/codex-task-workflow.md
@@ -204,20 +203,19 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - tools/bin/agent-canon docs check <changed-markdown-paths>
-      - python3 tools/analysis/search/search.py --query-file <request-or-design-question.txt>
-        --providers text,semantic,vector,tool,header-deps,code-deps --format json
-      - python3 tools/validation/semantic/code/check_solid_evidence.py --changed --evidence <oop-readability-report>
-      - python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>
-      - python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed
-      - bash tools/analysis/dependencies/scan_dependency_headers.sh --changed --fail-missing
-      - bash tools/validation/semantic/dependencies/check_dependency_header_format.sh --changed --require-header
-      - bash tools/analysis/dependencies/check_dependency_graph.sh --print-edges
-      - python3 tools/validation/semantic/convention/check_convention_compliance.py
-      - python3 tools/runtime/lifecycle/bootstrap_agent_run.py ... --task-id <T*>
+      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "check", "<changed-markdown-paths>"]}
+      - {"tool_id": "agent-search", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/search/search.py", "--query-file", "<request-or-design-question.txt>", "--providers", "text,semantic,vector,tool,header-deps,code-deps", "--format", "json"]}
+      - {"tool_id": "check-solid-evidence", "operation_id": "default"}
+      - {"tool_id": "tool-rejection-preflight", "operation_id": "default", "argv_suffix": ["--root", ".", "<planned-edit-paths>"]}
+      - {"tool_id": "check-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed"]}
+      - {"tool_id": "scan-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed", "--fail-missing"]}
+      - {"tool_id": "check-dependency-header-format", "operation_id": "default", "argv_suffix": ["--changed", "--require-header"]}
+      - {"tool_id": "check-dependency-graph", "operation_id": "default", "argv_suffix": ["--print-edges"]}
+      - {"tool_id": "check-convention-compliance", "operation_id": "default"}
+      - {"tool_id": "bootstrap-agent-run", "operation_id": "default", "argv_suffix": ["...", "--task-id", "<T*>"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: subagent-bootstrap
     purpose: Start the right specialist run bundle and make stage subagents explicit before implementation.
     canonical_doc: agents/skills/subagent-bootstrap.md
@@ -228,13 +226,13 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/runtime/lifecycle/workflow_monitor.py --subagent-wave ...
-      - python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>
-      - python3 tools/runtime/lifecycle/bootstrap_agent_run.py
-      - git worktree
+      - {"tool_id": "workflow-monitor", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/lifecycle/workflow_monitor.py", "--subagent-wave", "..."]}
+      - {"tool_id": "tool-rejection-preflight", "operation_id": "default", "argv_suffix": ["--root", ".", "<planned-edit-paths>"]}
+      - {"tool_id": "bootstrap-agent-run", "operation_id": "default"}
+      - {"executable": "git", "argv": ["worktree"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: deferred
       reason: repo-changing implementation, patch, doc-edit, or explicit subagent execution requires write-capable handoff routing
@@ -266,8 +264,8 @@ skill_families:
       required: []
       conditional: []
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: deferred
       reason: logical role, Skill set, Luna profile, and authority must be selected before direct communication
@@ -287,14 +285,13 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/validation/semantic/code/check_solid_evidence.py --root . <changed-python-paths>
-        --evidence <oop-readability-report>
-      - bash tools/analysis/dependencies/run_repo_dependency_review.sh
-      - git diff --stat
-      - git diff --name-only
+      - {"tool_id": "check-solid-evidence", "operation_id": "default", "argv_suffix": ["python3", "tools/validation/semantic/code/check_solid_evidence.py", "--root", ".", "<changed-python-paths>", "--evidence", "<oop-readability-report>"]}
+      - {"tool_id": "run-repo-dependency-review", "operation_id": "default"}
+      - {"executable": "git", "argv": ["diff", "--stat"]}
+      - {"executable": "git", "argv": ["diff", "--name-only"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: review findings or implementation changes need findings-first review
@@ -322,16 +319,15 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - ruff check python tests --select D,E,F,I,UP --ignore E501
-      - python3 tools/validation/semantic/convention/check_convention_compliance.py
-      - python3 tools/validation/code/oop/python/readability.py
-      - python3 tools/validation/semantic/code/check_solid_evidence.py --root . <changed-python-paths>
-        --evidence <oop-readability-report>
-      - bash tools/validation/ci/checks/run_python_quality_checks.sh
-      - python3 tools/validation/code/oop/python/readability.py --root . --language python <changed-python-paths>
+      - {"executable": "ruff", "argv": ["check", "python", "tests", "--select", "D,E,F,I,UP", "--ignore", "E501"]}
+      - {"tool_id": "check-convention-compliance", "operation_id": "default"}
+      - {"tool_id": "oop-python-readability", "operation_id": "default"}
+      - {"tool_id": "check-solid-evidence", "operation_id": "default", "argv_suffix": ["python3", "tools/validation/semantic/code/check_solid_evidence.py", "--root", ".", "<changed-python-paths>", "--evidence", "<oop-readability-report>"]}
+      - {"tool_id": "run-python-quality-checks", "operation_id": "default"}
+      - {"tool_id": "oop-python-readability", "operation_id": "default", "argv_suffix": ["--root", ".", "--language", "python", "<changed-python-paths>"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: deferred
       reason: Python implementation review is in scope
@@ -356,10 +352,10 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: deferred
       reason: C or C++ changed-path evidence selects the native review route.
@@ -381,11 +377,11 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/validation/code/oop/python/readability.py --root . --language all <paths>
-      - python3 tools/validation/code/oop/python/readability.py
+      - {"tool_id": "oop-python-readability", "operation_id": "default", "argv_suffix": ["--root", ".", "--language", "all", "<paths>"]}
+      - {"tool_id": "oop-python-readability", "operation_id": "default"}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: OOP readability or readability guard evidence is in scope
@@ -420,13 +416,12 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent/orchestration/route.py --capability oop_type_design
-      - python3 tools/validation/semantic/code/check_static_any.py --submodule-aware
-      - bash tools/analysis/dependencies/run_repo_dependency_review.sh --report-dir <run-dir>/dependency-review
-        --fail-missing
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--capability", "oop_type_design"]}
+      - {"tool_id": "check-static-any", "operation_id": "default", "argv_suffix": ["--submodule-aware"]}
+      - {"tool_id": "run-repo-dependency-review", "operation_id": "default", "argv_suffix": ["--report-dir", "<run-dir>/dependency-review", "--fail-missing"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: explicit pre-implementation OOP/type design capability owns responsibility and boundary modeling
@@ -446,16 +441,12 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 -m tools.experiments.artifacts.save_experiment_result_annex --result-dir experiments/<topic>/result/<run_name>
-        --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
-      - ./bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root>
-        exec --root <registered-source-root> -- python3 tools/runtime/archive/runtime_log_archive_git.py
-        archive-agent-report --report-dir reports/agents/<run-id>
-      - ./bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root>
-        exec --root <registered-source-root> -- python3 tools/runtime/archive/runtime_log_archive_git.py push
+      - {"tool_id": "save-experiment-result-annex", "operation_id": "default", "argv_suffix": ["--result-dir", "experiments/<topic>/result/<run_name>", "--annex-repo", "$EXPERIMENT_RESULT_ANNEX_REPO"]}
+      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<control-parent-root>", "--runtime-root", "<runtime-root>", "exec", "--root", "<registered-source-root>", "--", "python3", "tools/runtime/archive/runtime_log_archive_git.py", "archive-agent-report", "--report-dir", "reports/agents/<run-id>"]}
+      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<control-parent-root>", "--runtime-root", "<runtime-root>", "exec", "--root", "<registered-source-root>", "--", "python3", "tools/runtime/archive/runtime_log_archive_git.py", "push"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: raw results, reports, manifests, or accumulated evidence must be written out
@@ -484,10 +475,10 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: result figure design, metric calculation, coverage denominator handling, or reusable visualization planning is in scope
@@ -515,12 +506,12 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - tools/validation/code/oop/<language>/readability.py --format json
-      - python3 tools/runtime/lifecycle/workflow_monitor.py
-      - python3 eval/producers/evaluate_skill_workflow_prompts.py
+      - {"executable": "tools/validation/code/oop/<language>/readability.py", "argv": ["--format", "json"]}
+      - {"tool_id": "workflow-monitor", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/lifecycle/workflow_monitor.py"]}
+      - {"tool_id": "evaluate-skill-workflow-prompts", "operation_id": "default"}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: tool warning, checker finding, hardcoded guard, or static-analysis finding must become a typed finding packet
@@ -551,20 +542,17 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/runtime/archive/runtime_log_archive_git.py status --porcelain
-      - ./bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root>
-        tool run --root <registered-source-root> generate-agent-runtime-dashboard -- --root .
-        --compact-out reports/agent-runtime-dashboard/agent-log-analysis-compact.md
-        --api-out reports/agent-runtime-dashboard/agent-log-analysis-api.json
-      - git grep -n "<cause keywords>" -- documents/notes/knowledge documents/notes/failures documents agents
-      - gh issue view <owner/repository#number> --json number,title,body,state,url
-      - bash tools/analysis/dependencies/run_repo_dependency_review.sh
-      - python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed
-      - bash tools/analysis/dependencies/scan_dependency_headers.sh --changed --fail-missing
-      - bash tools/validation/semantic/dependencies/check_dependency_header_format.sh --changed --require-header
+      - {"tool_id": "runtime-log-archive-git", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "status", "--porcelain"]}
+      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<control-parent-root>", "--runtime-root", "<runtime-root>", "tool", "run", "--root", "<registered-source-root>", "generate-agent-runtime-dashboard", "--", "--root", ".", "--compact-out", "reports/agent-runtime-dashboard/agent-log-analysis-compact.md", "--api-out", "reports/agent-runtime-dashboard/agent-log-analysis-api.json"]}
+      - {"executable": "git", "argv": ["grep", "-n", "<cause keywords>", "--", "documents/notes/knowledge", "documents/notes/failures", "documents", "agents"]}
+      - {"executable": "gh", "argv": ["issue", "view", "<owner/repository#number>", "--json", "number,title,body,state,url"]}
+      - {"tool_id": "run-repo-dependency-review", "operation_id": "default"}
+      - {"tool_id": "check-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed"]}
+      - {"tool_id": "scan-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed", "--fail-missing"]}
+      - {"tool_id": "check-dependency-header-format", "operation_id": "default", "argv_suffix": ["--changed", "--require-header"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: a finding or related Issue set needs cause-qualified publication or responsibility reorganization
@@ -596,20 +584,16 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/runtime/archive/runtime_log_archive_git.py ensure
-      - python3 tools/runtime/archive/runtime_log_archive_git.py status --porcelain
-      - python3 tools/runtime/archive/runtime_log_archive_git.py sync
-      - python3 tools/runtime/archive/runtime_log_archive_git.py check-clean --porcelain
-      - ./bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root>
-        tool run --root <registered-source-root> generate-agent-runtime-dashboard -- --root .
-        --compact-out reports/agent-runtime-dashboard/agent-log-analysis-compact.md
-        --api-out reports/agent-runtime-dashboard/agent-log-analysis-api.json
-      - python3 eval/checkers/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json
-        --format text
-      - git grep -n
+      - {"tool_id": "runtime-log-archive-git", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "ensure"]}
+      - {"tool_id": "runtime-log-archive-git", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "status", "--porcelain"]}
+      - {"tool_id": "runtime-log-archive-git", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "sync"]}
+      - {"tool_id": "runtime-log-archive-git", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "check-clean", "--porcelain"]}
+      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<control-parent-root>", "--runtime-root", "<runtime-root>", "tool", "run", "--root", "<registered-source-root>", "generate-agent-runtime-dashboard", "--", "--root", ".", "--compact-out", "reports/agent-runtime-dashboard/agent-log-analysis-compact.md", "--api-out", "reports/agent-runtime-dashboard/agent-log-analysis-api.json"]}
+      - {"tool_id": "eval-accumulation-check", "operation_id": "default", "argv_suffix": ["--root", ".", "--compact-out", "reports/agents/<run-id>/eval-accumulation-before.json", "--format", "text"]}
+      - {"executable": "git", "argv": ["grep", "-n"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: skill/tool/workflow routing misses or selection coverage require runtime log analysis
@@ -664,10 +648,10 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: structured runtime dashboard evidence needs owner-routed repair work
@@ -703,17 +687,15 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 eval/checkers/eval_accumulation_check.py --root . --compact-out reports/agents/<run-id>/eval-accumulation-before.json
-        --format text
-      - python3 eval/producers/run_accumulated_agent_evals.py --root . --run-id <run-id>
-        --report-dir reports/agents/<run-id>
-      - python3 tools/runtime/archive/runtime_log_archive_git.py sync
-      - python3 tools/runtime/artifacts/generated_artifact_guard.py --root .
-      - python3 eval/checkers/eval_accumulation_check.py
-      - python3 eval/producers/run_accumulated_agent_evals.py
+      - {"tool_id": "eval-accumulation-check", "operation_id": "default", "argv_suffix": ["--root", ".", "--compact-out", "reports/agents/<run-id>/eval-accumulation-before.json", "--format", "text"]}
+      - {"tool_id": "run-accumulated-agent-evals", "operation_id": "default", "argv_suffix": ["python3", "eval/producers/run_accumulated_agent_evals.py", "--root", ".", "--run-id", "<run-id>", "--report-dir", "reports/agents/<run-id>"]}
+      - {"tool_id": "runtime-log-archive-git", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "sync"]}
+      - {"tool_id": "generated-artifact-guard", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "eval-accumulation-check", "operation_id": "default"}
+      - {"tool_id": "run-accumulated-agent-evals", "operation_id": "default", "argv_suffix": ["python3", "eval/producers/run_accumulated_agent_evals.py"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: agent-canon-update
     purpose: Update and publish standalone AgentCanon source and its shared bootstrap runtime through a qualified source PR.
     canonical_doc: agents/skills/agent-canon-update.md
@@ -724,12 +706,12 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - ./bootstrap.sh --control-parent-root <parent> status
-      - git status --short --branch
-      - git diff --check
+      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<parent>", "status"]}
+      - {"executable": "git", "argv": ["status", "--short", "--branch"]}
+      - {"executable": "git", "argv": ["diff", "--check"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: Standalone AgentCanon source, bootstrap, runtime, eval, or source PR workflow is in scope
@@ -751,20 +733,20 @@ skill_families:
       description: "Use when AgentCanon's shared Python, Rust, or LSP tool runtime must be installed, started, targeted, inspected, updated, evaluated, or removed; project builds and tests remain in the project Docker/test-runner plane."
     tool_commands:
       required:
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> status
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> target add --root <project-root> --mode read-only
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> tool run <catalog-id> -- <args...>
+      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "status"]}
+      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "target", "add", "--root", "<project-root>", "--mode", "read-only"]}
+      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "tool", "run", "<catalog-id>", "--", "<args...>"]}
       conditional:
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> install
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> start
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> exec -- <argv...>
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> eval collect --root <project-root> --run-id <run-id>
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> eval sync --run-id <run-id>
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> stop
-      - bash bootstrap.sh --repository-root . --control-parent-root <authorized-parent-workspace> gc --dry-run
+      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "install"]}
+      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "start"]}
+      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "exec", "--", "<argv...>"]}
+      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "eval", "collect", "--root", "<project-root>", "--run-id", "<run-id>"]}
+      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "eval", "sync", "--run-id", "<run-id>"]}
+      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "stop"]}
+      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "gc", "--dry-run"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: AgentCanon shared tool-runtime lifecycle, target admission, typed dispatch, eval archive, or cleanup is in scope
@@ -791,12 +773,12 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/repository/workspace/repository_topic_clone.py prepare --url <url> --repo-name <repo> --workspace-root <root> --topic <topic> --branch <branch> --owner-evidence <path>
-      - python3 tools/repository/workspace/repository_topic_clone.py merge-main --url <url> --repo-name <repo> --workspace-root <root> --topic <topic> --branch <branch> --owner-evidence <path>
-      - python3 tools/repository/workspace/repository_topic_clone.py cleanup --url <url> --repo-name <repo> --workspace-root <root> --topic <topic> --branch <branch> --owner-evidence <path> [--candidate-cas <path> --pr-lifecycle <path> [--publication-readback <path>]] [--apply]
+      - {"tool_id": "repository-topic-clone", "operation_id": "default", "argv_suffix": ["prepare", "--url", "<url>", "--repo-name", "<repo>", "--workspace-root", "<root>", "--topic", "<topic>", "--branch", "<branch>", "--owner-evidence", "<path>"]}
+      - {"tool_id": "repository-topic-clone", "operation_id": "default", "argv_suffix": ["merge-main", "--url", "<url>", "--repo-name", "<repo>", "--workspace-root", "<root>", "--topic", "<topic>", "--branch", "<branch>", "--owner-evidence", "<path>"]}
+      - {"tool_id": "repository-topic-clone", "operation_id": "default", "argv_suffix": ["cleanup", "--url", "<url>", "--repo-name", "<repo>", "--workspace-root", "<root>", "--topic", "<topic>", "--branch", "<branch>", "--owner-evidence", "<path>", "[--candidate-cas", "<path>", "--pr-lifecycle", "<path>", "[--publication-readback", "<path>]]", "[--apply]"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: a requested repository clone, branch reuse, origin/main merge, or reconstructibility cleanup operation is in scope
@@ -821,13 +803,13 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> prepare --topic <topic> --module <path> --branch <branch> --owner-evidence <path> [--allowed-path <relative-path> ...]
-      - python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> merge-main --topic <topic> --module <path> --branch <branch> --owner-evidence <path> [--allowed-path <relative-path> ...]
-      - python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> status --topic <topic> [--module <path>]
-      - python3 tools/repository/workspace/dependency_module_change.py --root <parent-root> cleanup --topic <topic> --module <path> --branch <branch> --owner-evidence <path> [--allowed-path <relative-path> ...] [--candidate-cas <path> --pr-lifecycle <path> [--publication-readback <path>]] [--apply]
+      - {"tool_id": "dependency-module-change", "operation_id": "default", "argv_suffix": ["--root", "<parent-root>", "prepare", "--topic", "<topic>", "--module", "<path>", "--branch", "<branch>", "--owner-evidence", "<path>", "[--allowed-path", "<relative-path>", "...]"]}
+      - {"tool_id": "dependency-module-change", "operation_id": "default", "argv_suffix": ["--root", "<parent-root>", "merge-main", "--topic", "<topic>", "--module", "<path>", "--branch", "<branch>", "--owner-evidence", "<path>", "[--allowed-path", "<relative-path>", "...]"]}
+      - {"tool_id": "dependency-module-change", "operation_id": "default", "argv_suffix": ["--root", "<parent-root>", "status", "--topic", "<topic>", "[--module", "<path>]"]}
+      - {"tool_id": "dependency-module-change", "operation_id": "default", "argv_suffix": ["--root", "<parent-root>", "cleanup", "--topic", "<topic>", "--module", "<path>", "--branch", "<branch>", "--owner-evidence", "<path>", "[--allowed-path", "<relative-path>", "...]", "[--candidate-cas", "<path>", "--pr-lifecycle", "<path>", "[--publication-readback", "<path>]]", "[--apply]"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: dependency module identity, gitlink, pin, or projection policy decorates a generic repository topic clone lifecycle
@@ -850,23 +832,22 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - gh pr list --state open --json number,title,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup,updatedAt
-      - gh issue list --state open --json number,title,labels,updatedAt,url
-      - gh pr view
-      - gh pr checks
-      - ./bootstrap.sh --control-parent-root <parent> status
-      - python3 tools/runtime/lifecycle/bootstrap_agent_run.py --task "<task>" --owner codex
-        --workspace-root "$PWD"
-      - gh pr view <n> --json ...
-      - gh pr checks <n>
-      - git merge origin/<base>
-      - python3 tools/repository/git/conflict_preservation.py capture --repo-root <clone> --base <merge-base> --ours <head> --theirs <origin-main> --output <clone>/.agent-canon/conflict-preservation.json
-      - python3 tools/repository/git/conflict_preservation.py validate --inventory <inventory> --plan <preservation-plan> --repo-root <clone>
-      - python3 tools/repository/git/conflict_preservation.py validate-rework --packet <rework-preservation>
-      - python3 tools/repository/workspace/repository_topic_clone.py finalize-merge ... --inventory <inventory> --plan <preservation-plan>
+      - {"executable": "gh", "argv": ["pr", "list", "--state", "open", "--json", "number,title,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup,updatedAt"]}
+      - {"executable": "gh", "argv": ["issue", "list", "--state", "open", "--json", "number,title,labels,updatedAt,url"]}
+      - {"executable": "gh", "argv": ["pr", "view"]}
+      - {"executable": "gh", "argv": ["pr", "checks"]}
+      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<parent>", "status"]}
+      - {"tool_id": "bootstrap-agent-run", "operation_id": "default", "argv_suffix": ["--task", "<task>", "--owner", "codex", "--workspace-root", "$PWD"]}
+      - {"executable": "gh", "argv": ["pr", "view", "<n>", "--json", "..."]}
+      - {"executable": "gh", "argv": ["pr", "checks", "<n>"]}
+      - {"executable": "git", "argv": ["merge", "origin/<base>"]}
+      - {"tool_id": "conflict-preservation", "operation_id": "default", "argv_suffix": ["capture", "--repo-root", "<clone>", "--base", "<merge-base>", "--ours", "<head>", "--theirs", "<origin-main>", "--output", "<clone>/.agent-canon/conflict-preservation.json"]}
+      - {"tool_id": "conflict-preservation", "operation_id": "default", "argv_suffix": ["validate", "--inventory", "<inventory>", "--plan", "<preservation-plan>", "--repo-root", "<clone>"]}
+      - {"tool_id": "conflict-preservation", "operation_id": "default", "argv_suffix": ["validate-rework", "--packet", "<rework-preservation>"]}
+      - {"tool_id": "repository-topic-clone", "operation_id": "default", "argv_suffix": ["finalize-merge", "...", "--inventory", "<inventory>", "--plan", "<preservation-plan>"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: pull request, merge queue, conflict repair, or issue triage processing is in scope
@@ -910,13 +891,13 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - bash tools/repository/git/agent_update_branch.sh validate <lane>
-      - bash tools/repository/git/agent_update_branch.sh push <lane> <branch>
-      - ./bootstrap.sh --control-parent-root <parent> --runtime-root <runtime> status
-      - bash tools/analysis/dependencies/run_repo_dependency_review.sh --fail-missing
+      - {"executable": "bash", "argv": ["tools/repository/git/agent_update_branch.sh", "validate", "<lane>"]}
+      - {"executable": "bash", "argv": ["tools/repository/git/agent_update_branch.sh", "push", "<lane>", "<branch>"]}
+      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<parent>", "--runtime-root", "<runtime>", "status"]}
+      - {"tool_id": "run-repo-dependency-review", "operation_id": "default", "argv_suffix": ["--fail-missing"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: report-writing
     visualization_owner: code-visualization
     visualization_role: adapter
@@ -931,10 +912,10 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: reader-facing report, decision brief, evaluation summary, or presentation narrative is in scope
@@ -974,15 +955,12 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/analysis/documents/prose_reasoning_graph.py ingest <source.md> --stats-out
-        <ingest.stats.json>
-      - python3 tools/analysis/documents/prose_reasoning_graph.py analyze --db <graph.sqlite>
-        --profile <writing|logic|experiment|report|academic|paper|all> --stats-out <analyze.stats.json>
-      - python3 tools/analysis/documents/prose_reasoning_graph.py check-document <source.md>
-        --out-dir <artifact-dir> --profile <profile> --stats-out <stats.json>
+      - {"tool_id": "prose-reasoning-graph", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/documents/prose_reasoning_graph.py", "ingest", "<source.md>", "--stats-out", "<ingest.stats.json>"]}
+      - {"tool_id": "prose-reasoning-graph", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/documents/prose_reasoning_graph.py", "analyze", "--db", "<graph.sqlite>", "--profile", "<writing|logic|experiment|report|academic|paper|all>", "--stats-out", "<analyze.stats.json>"]}
+      - {"tool_id": "prose-reasoning-graph", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/documents/prose_reasoning_graph.py", "check-document", "<source.md>", "--out-dir", "<artifact-dir>", "--profile", "<profile>", "--stats-out", "<stats.json>"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: deferred
       reason: prose structure graphing, diagnostics, or rewrite handoff is in scope
@@ -1010,12 +988,11 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - agent-canon semantic-index discourse-relations --profile <general|experiment-report|methods-protocol|academic-argument|refactor-design>
-        --format jsonl
-      - agent-canon semantic-index discourse-relations
+      - {"executable": "agent-canon", "argv": ["semantic-index", "discourse-relations", "--profile", "<general|experiment-report|methods-protocol|academic-argument|refactor-design>", "--format", "jsonl"]}
+      - {"executable": "agent-canon", "argv": ["semantic-index", "discourse-relations"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: nontrivial design or document structure must be fixed before edits
@@ -1039,13 +1016,11 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope
-        full --bundle-dir reports/dependency-graph --format json
-      - python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope
-        changed --bundle-dir reports/dependency-graph --format json
+      - {"tool_id": "render-dependency-manifest-graph", "operation_id": "default"}
+      - {"tool_id": "render-dependency-manifest-graph", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/dependencies/render_dependency_manifest_graph.py", "--root", ".", "--scope", "changed", "--bundle-dir", "reports/dependency-graph", "--format", "json"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       triggers:
@@ -1076,10 +1051,10 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: explicit HTML or browser-readable output is in scope
@@ -1100,10 +1075,10 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: explicit unresolved oracle, specification, regression, or failure-mode risk remains after the owning implementation mechanism exists
@@ -1137,13 +1112,12 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - agent-canon python-structure-hash-scope-plan --input <report.json> --dependency-report-dir
-        <dependency-review-dir> --output <change-impact-packet.json>
-      - git diff
-      - python3 tools/validation/ci/checks/check_merge_structure.py ...
+      - {"executable": "agent-canon", "argv": ["python-structure-hash-scope-plan", "--input", "<report.json>", "--dependency-report-dir", "<dependency-review-dir>", "--output", "<change-impact-packet.json>"]}
+      - {"executable": "git", "argv": ["diff"]}
+      - {"executable": "python3", "argv": ["tools/validation/ci/checks/check_merge_structure.py", "..."]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: behavior-preserving refactor work needs an explicit loop and review gates
@@ -1183,29 +1157,25 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent/orchestration/route.py --prompt "<request>" --format json
-      - python3 tools/agent/orchestration/route.py --name <candidate>
-      - python3 tools/validation/semantic/structure/repo_structure_contract.py --root <root> --format json
-        > <run>/repo_structure_contract.json
-      - python3 tools/validation/semantic/responsibility/responsibility_scope.py --root <root> --format json
-        > <run>/responsibility_scope.json
-      - python3 tools/analysis/code/import_responsibility.py --root <root> --format json
-        > <run>/import_responsibility.json
-      - ./bootstrap.sh --control-parent-root <parent> status
-      - agent-canon structured-analysis document-inventory --root <root>
-      - python3 tools/validation/semantic/responsibility/responsibility_scope.py --root <root> --format json
-      - python3 tools/analysis/documents/prose_reasoning_graph.py check-document <readme-path>
-        --out-dir <run>/prose/<readme-id> --profile all --stats-out <run>/prose/<readme-id>.stats.json
-      - python3 tools/validation/semantic/documents/check_design_doc_claims.py --root <root> <design-doc>
-      - python3 tools/validation/semantic/responsibility/responsibility_scope.py --root <root>
-      - python3 tools/analysis/code/import_responsibility.py --root <root>
-      - python3 tools/validation/semantic/structure/repo_structure_contract.py --root <root> --format json
-      - python3 tools/validation/semantic/structure/repo_structure_contract.py --root <root>
-      - python3 tools/analysis/code/import_responsibility.py --root <root> --format json
-      - python3 tools/analysis/documents/prose_reasoning_graph.py check-document <readme-path>
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<request>", "--format", "json"]}
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--name", "<candidate>"]}
+      - {"tool_id": "repo-structure-contract", "operation_id": "default", "argv_suffix": ["--root", "<root>", "--format", "json", ">", "<run>/repo_structure_contract.json"]}
+      - {"tool_id": "responsibility-scope", "operation_id": "default", "argv_suffix": ["--root", "<root>", "--format", "json", ">", "<run>/responsibility_scope.json"]}
+      - {"tool_id": "import-responsibility", "operation_id": "default", "argv_suffix": ["--root", "<root>", "--format", "json", ">", "<run>/import_responsibility.json"]}
+      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<parent>", "status"]}
+      - {"executable": "agent-canon", "argv": ["structured-analysis", "document-inventory", "--root", "<root>"]}
+      - {"tool_id": "responsibility-scope", "operation_id": "default", "argv_suffix": ["--root", "<root>", "--format", "json"]}
+      - {"tool_id": "prose-reasoning-graph", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/documents/prose_reasoning_graph.py", "check-document", "<readme-path>", "--out-dir", "<run>/prose/<readme-id>", "--profile", "all", "--stats-out", "<run>/prose/<readme-id>.stats.json"]}
+      - {"tool_id": "check-design-doc-claims", "operation_id": "default", "argv_suffix": ["--root", "<root>", "<design-doc>"]}
+      - {"tool_id": "responsibility-scope", "operation_id": "default", "argv_suffix": ["--root", "<root>"]}
+      - {"tool_id": "import-responsibility", "operation_id": "default", "argv_suffix": ["--root", "<root>"]}
+      - {"tool_id": "repo-structure-contract", "operation_id": "default", "argv_suffix": ["--root", "<root>", "--format", "json"]}
+      - {"tool_id": "repo-structure-contract", "operation_id": "default", "argv_suffix": ["--root", "<root>"]}
+      - {"tool_id": "import-responsibility", "operation_id": "default", "argv_suffix": ["--root", "<root>", "--format", "json"]}
+      - {"tool_id": "prose-reasoning-graph", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/documents/prose_reasoning_graph.py", "check-document", "<readme-path>"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: repository structure, source ownership, path responsibility, or Codex runtime surface boundaries are in scope
@@ -1272,10 +1242,10 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: user explicitly asks for one-issue-at-a-time debugging or visible problem statements before each edit
@@ -1321,12 +1291,12 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - agent-canon semantic-index discourse-relations --profile general
-      - python3 tools/analysis/documents/doc_start.py --kind long-form ...
-      - tools/bin/agent-canon docs check
+      - {"executable": "agent-canon", "argv": ["semantic-index", "discourse-relations", "--profile", "general"]}
+      - {"executable": "python3", "argv": ["tools/analysis/documents/doc_start.py", "--kind", "long-form", "..."]}
+      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "check"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: academic-writing
     purpose: Draft academic documents with explicit claim mapping and mandatory multi-agent review for notation and logic.
     canonical_doc: agents/skills/academic-writing.md
@@ -1337,12 +1307,12 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - agent-canon semantic-index discourse-relations --profile academic-argument
-      - tools/bin/agent-canon docs check
-      - python3 tools/analysis/documents/doc_start.py
+      - {"executable": "agent-canon", "argv": ["semantic-index", "discourse-relations", "--profile", "academic-argument"]}
+      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "check"]}
+      - {"executable": "python3", "argv": ["tools/analysis/documents/doc_start.py"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: academic or scholarly writing needs notation, logic, and evidence review
@@ -1367,12 +1337,12 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - agent-canon semantic-index discourse-relations --profile academic-argument
-      - tools/bin/agent-canon docs check
-      - python3 tools/analysis/documents/doc_start.py
+      - {"executable": "agent-canon", "argv": ["semantic-index", "discourse-relations", "--profile", "academic-argument"]}
+      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "check"]}
+      - {"executable": "python3", "argv": ["tools/analysis/documents/doc_start.py"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: md-style-check
     visualization_owner: code-visualization
     visualization_role: adapter
@@ -1387,16 +1357,16 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - agent-canon docs
-      - tools/bin/agent-canon docs check <paths...>
-      - tools/bin/agent-canon docs format <paths...>
-      - tools/bin/agent-canon docs -h
-      - tools/bin/agent-canon docs fix-math <paths...>
-      - tools/bin/agent-canon docs fix-mermaid <paths...>
-      - tools/bin/agent-canon docs check
+      - {"executable": "agent-canon", "argv": ["docs"]}
+      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "check", "<paths...>"]}
+      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "format", "<paths...>"]}
+      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "-h"]}
+      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "fix-math", "<paths...>"]}
+      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "fix-mermaid", "<paths...>"]}
+      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "check"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: Markdown style, links, headings, or docs lint are in scope
@@ -1430,10 +1400,10 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: document-canon-cleanup
     purpose: Find non-canonical documents and route edits to source canon instead of mirrors, generated evidence, or stale copies.
     canonical_doc: agents/skills/document-canon-cleanup.md
@@ -1444,13 +1414,13 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - agent-canon structured-analysis document-inventory
-      - agent-canon structured-analysis document-inventory --root .
-      - bash tools/analysis/dependencies/run_repo_dependency_review.sh --fail-missing
-      - python3 tools/validation/semantic/convention/check_convention_compliance.py
+      - {"executable": "agent-canon", "argv": ["structured-analysis", "document-inventory"]}
+      - {"executable": "agent-canon", "argv": ["structured-analysis", "document-inventory", "--root", "."]}
+      - {"tool_id": "run-repo-dependency-review", "operation_id": "default", "argv_suffix": ["--fail-missing"]}
+      - {"tool_id": "check-convention-compliance", "operation_id": "default"}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: Document-canon cleanup, stale docs, old docs, or generated-report/document inventory cleanup is in scope
@@ -1486,13 +1456,13 @@ skill_families:
       description: "Use when auditing an AgentCanon-consuming parent repository across structure, ownership, environment, dependencies, code and types, OOP, tests, docs and design trace, CI/hooks/skills, templates, or Git/PR lifecycle, with owner-routed repair and finding closure."
     tool_commands:
       required:
-      - python3 tools/analysis/code/parent_repository_audit.py list --root <parent-root> --format text
+      - {"executable": "python3", "argv": ["tools/analysis/code/parent_repository_audit.py", "list", "--root", "<parent-root>", "--format", "text"]}
       conditional:
-      - python3 tools/analysis/code/parent_repository_audit.py check --root <parent-root> --format text
-      - python3 tools/agent/skills/skill_tool_commands.py show --skill parent-repository-audit --format json
+      - {"executable": "python3", "argv": ["tools/analysis/code/parent_repository_audit.py", "check", "--root", "<parent-root>", "--format", "text"]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default", "argv_suffix": ["python3", "tools/agent/skills/skill_tool_commands.py", "show", "--skill", "parent-repository-audit", "--format", "json"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: parent repository audit capability requires deterministic unit selection and owner-routed finding closure
@@ -1516,26 +1486,25 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - git grep -l
-      - bash tools/analysis/dependencies/scan_code_dependencies.sh --changed
-      - python3 tools/analysis/code/helper_function_inventory.py --changed --all-functions
-        --format json
-      - python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed
-      - bash tools/analysis/dependencies/scan_dependency_headers.sh --changed --fail-missing
-      - bash tools/validation/semantic/dependencies/check_dependency_header_format.sh --changed --require-header
-      - bash tools/analysis/dependencies/check_dependency_graph.sh --changed --print-edges
-      - agent-canon semantic-index context-pack
-      - git grep -l "search phrase" -- <responsibility-scoped dirs> > reports/search_hits.txt
-      - bash tools/analysis/dependencies/run_repo_dependency_review.sh
-      - python3 tools/validation/semantic/documents/check_design_doc_claims.py
-      - agent-canon python-structure-hash-scope-plan
-      - bash tools/analysis/dependencies/check_dependency_graph.sh --changed --print-edges --check-bidirectional
-      - bash tools/analysis/dependencies/scan_dependency_headers.sh
-      - bash tools/analysis/dependencies/check_dependency_graph.sh --print-edges
-      - git grep
+      - {"executable": "git", "argv": ["grep", "-l"]}
+      - {"tool_id": "scan-code-dependencies", "operation_id": "default", "argv_suffix": ["--changed"]}
+      - {"tool_id": "helper-function-inventory", "operation_id": "default", "argv_suffix": ["--changed", "--all-functions", "--format", "json"]}
+      - {"tool_id": "check-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed"]}
+      - {"tool_id": "scan-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed", "--fail-missing"]}
+      - {"tool_id": "check-dependency-header-format", "operation_id": "default", "argv_suffix": ["--changed", "--require-header"]}
+      - {"tool_id": "check-dependency-graph", "operation_id": "default", "argv_suffix": ["--changed", "--print-edges"]}
+      - {"executable": "agent-canon", "argv": ["semantic-index", "context-pack"]}
+      - {"executable": "git", "argv": ["grep", "-l", "search phrase", "--", "<responsibility-scoped", "dirs>", ">", "reports/search_hits.txt"]}
+      - {"tool_id": "run-repo-dependency-review", "operation_id": "default"}
+      - {"tool_id": "check-design-doc-claims", "operation_id": "default"}
+      - {"executable": "agent-canon", "argv": ["python-structure-hash-scope-plan"]}
+      - {"tool_id": "check-dependency-graph", "operation_id": "default", "argv_suffix": ["--changed", "--print-edges", "--check-bidirectional"]}
+      - {"tool_id": "scan-dependency-headers", "operation_id": "default"}
+      - {"tool_id": "check-dependency-graph", "operation_id": "default", "argv_suffix": ["--print-edges"]}
+      - {"executable": "git", "argv": ["grep"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: worktree-start
     purpose: Diagnose stale worktree, WORKTREE_SCOPE.md, and action-log state as legacy cleanup evidence; not for new worktree kickoff, recreation, or resume.
     canonical_doc: agents/skills/worktree-start.md
@@ -1546,25 +1515,21 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - git worktree
-      - python3 tools/repository/workspace/worktree_scope_lint.py --current
-      - git status --short --branch
-      - git worktree list --porcelain
-      - bash tools/validation/documentation/checks/check_worktree_scopes.sh
-      - python3 tools/runtime/archive/work_log.py ...
-      - bash tools/repository/worktree/worktree_start.sh --current
-      - python3 tools/runtime/archive/work_log.py --kind <kind> --request-clause-id R1 --message
-        "<what changed>" --next "<next>"
-      - python3 tools/repository/workspace/worktree_start.py --current
-      - python3 tools/experiments/registry/sync_experiment_registry_context.py --topic <topic>
-        --branch <branch>
-      - python3 tools/runtime/archive/work_log.py --kind cleanup --message "<legacy worktree
-        state>" --next "<carry-over or remove>"
-      - python3 tools/runtime/archive/work_log.py --kind edit --request-clause-id R1 --message
-        "..." --next "..."
+      - {"executable": "git", "argv": ["worktree"]}
+      - {"tool_id": "worktree-scope-lint", "operation_id": "default", "argv_suffix": ["--current"]}
+      - {"executable": "git", "argv": ["status", "--short", "--branch"]}
+      - {"executable": "git", "argv": ["worktree", "list", "--porcelain"]}
+      - {"executable": "bash", "argv": ["tools/validation/documentation/checks/check_worktree_scopes.sh"]}
+      - {"executable": "python3", "argv": ["tools/runtime/archive/work_log.py", "..."]}
+      - {"executable": "bash", "argv": ["tools/repository/worktree/worktree_start.sh", "--current"]}
+      - {"executable": "python3", "argv": ["tools/runtime/archive/work_log.py", "--kind", "<kind>", "--request-clause-id", "R1", "--message", "<what changed>", "--next", "<next>"]}
+      - {"executable": "python3", "argv": ["tools/repository/workspace/worktree_start.py", "--current"]}
+      - {"executable": "python3", "argv": ["tools/experiments/registry/sync_experiment_registry_context.py", "--topic", "<topic>", "--branch", "<branch>"]}
+      - {"executable": "python3", "argv": ["tools/runtime/archive/work_log.py", "--kind", "cleanup", "--message", "<legacy worktree state>", "--next", "<carry-over or remove>"]}
+      - {"executable": "python3", "argv": ["tools/runtime/archive/work_log.py", "--kind", "edit", "--request-clause-id", "R1", "--message", "...", "--next", "..."]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: worktree-health
     purpose: Review worktree scope, drift, and cleanup readiness.
     canonical_doc: agents/skills/worktree-health.md
@@ -1575,17 +1540,16 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/repository/workspace/worktree_scope_lint.py --current
-      - git status --short --branch
-      - git diff --name-only
-      - git worktree list --porcelain
-      - git branch --show-current
-      - bash tools/validation/documentation/checks/check_worktree_scopes.sh
-      - python3 tools/validation/semantic/authority/validate_role_write_scope.py --report-dir reports/agents/<run-id>
-        --workspace-root . --role <role-id>
+      - {"tool_id": "worktree-scope-lint", "operation_id": "default", "argv_suffix": ["--current"]}
+      - {"executable": "git", "argv": ["status", "--short", "--branch"]}
+      - {"executable": "git", "argv": ["diff", "--name-only"]}
+      - {"executable": "git", "argv": ["worktree", "list", "--porcelain"]}
+      - {"executable": "git", "argv": ["branch", "--show-current"]}
+      - {"executable": "bash", "argv": ["tools/validation/documentation/checks/check_worktree_scopes.sh"]}
+      - {"executable": "python3", "argv": ["tools/validation/semantic/authority/validate_role_write_scope.py", "--report-dir", "reports/agents/<run-id>", "--workspace-root", ".", "--role", "<role-id>"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: experiment-lifecycle
     purpose: Run a single experiment protocol, then branch through review, rewrite, extra validation, or rerun.
     canonical_doc: agents/skills/experiment-lifecycle.md
@@ -1595,19 +1559,17 @@ skill_families:
       description: "Use this skill when preparing, running, or validating experiments."
     tool_commands:
       required:
-      - python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
+      - {"executable": "python3", "argv": ["tools/experiments/lifecycle/create_experiment_topic.py", "<topic>"]}
       conditional:
-      - python3 -m tools.validation.ci.checks.check_experiment_registry
-      - python3 -m tools.experiments.execution.run_managed_experiment --topic <topic> --variant
-        <variant> -- python3 experiments/<topic>/run.py
-      - python3 -m tools.experiments.artifacts.save_experiment_result_annex --result-dir experiments/<topic>/result/<run_name>
-        --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
-      - python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>
-      - python3 -m pytest tests/tools/test_run_managed_experiment.py -q
-      - agent-canon semantic-index discourse-relations --profile experiment-report
+      - {"tool_id": "check-experiment-registry", "operation_id": "default"}
+      - {"tool_id": "run-managed-experiment", "operation_id": "default", "argv_suffix": ["--topic", "<topic>", "--variant", "<variant>", "--", "python3", "experiments/<topic>/run.py"]}
+      - {"tool_id": "save-experiment-result-annex", "operation_id": "default", "argv_suffix": ["--result-dir", "experiments/<topic>/result/<run_name>", "--annex-repo", "$EXPERIMENT_RESULT_ANNEX_REPO"]}
+      - {"tool_id": "tool-rejection-preflight", "operation_id": "default", "argv_suffix": ["--root", ".", "<planned-edit-paths>"]}
+      - {"executable": "python3", "argv": ["-m", "pytest", "tests/tools/test_run_managed_experiment.py", "-q"]}
+      - {"executable": "agent-canon", "argv": ["semantic-index", "discourse-relations", "--profile", "experiment-report"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: experiment run, lifecycle, artifacts, results, or rerun workflow is in scope
@@ -1635,13 +1597,11 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 -m tools.experiments.execution.run_managed_experiment --topic <topic> --variant
-        <variant> -- python3 experiments/<topic>/run.py
-      - git grep -n -E "ExperimentRunner|EXPERIMENT_RUN_DIR|JAX_|XLA_|CUDA_VISIBLE|PREALLOC|prealloc|gpu_max_slots|max_workers|subprocess|ProcessPool|multiprocessing|env="
-        --
+      - {"tool_id": "run-managed-experiment", "operation_id": "default", "argv_suffix": ["--topic", "<topic>", "--variant", "<variant>", "--", "python3", "experiments/<topic>/run.py"]}
+      - {"executable": "git", "argv": ["grep", "-n", "-E", "ExperimentRunner|EXPERIMENT_RUN_DIR|JAX_|XLA_|CUDA_VISIBLE|PREALLOC|prealloc|gpu_max_slots|max_workers|subprocess|ProcessPool|multiprocessing|env=", "--"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: experiment topic review, managed runner route, environment ownership, artifact schema, or visualization.py readiness is in scope
@@ -1665,14 +1625,14 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/experiments/execution/run_gpu_command.py --gpu-count 1 --min-free-memory <bytes> -- <argv...>
-      - bash tools/validation/ci/runners/run_gpu_container.sh --image <image> -- <argv...>
-      - python3 -m tools.experiments.execution.run_managed_experiment --topic <topic> --variant <variant> -- <inner argv...>
-      - python3 -m pytest tests/tools/test_run_gpu_command.py -q
-      - python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json
+      - {"executable": "python3", "argv": ["tools/experiments/execution/run_gpu_command.py", "--gpu-count", "1", "--min-free-memory", "<bytes>", "--", "<argv...>"]}
+      - {"tool_id": "run-gpu-container", "operation_id": "default"}
+      - {"tool_id": "run-managed-experiment", "operation_id": "default", "argv_suffix": ["--topic", "<topic>", "--variant", "<variant>", "--", "<inner", "argv...>"]}
+      - {"executable": "python3", "argv": ["-m", "pytest", "tests/tools/test_run_gpu_command.py", "-q"]}
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: GPU/CUDA/JAX/XLA execution, provider-independent direct admission, managed experiment execution, or preallocation-disabled validation is in scope
@@ -1713,12 +1673,11 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json
-      - python3 tools/analysis/numerical/numeric_performance.py --input <post-run-observations.json>
-        --format json
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
+      - {"executable": "python3", "argv": ["tools/analysis/numerical/numeric_performance.py", "--input", "<post-run-observations.json>", "--format", "json"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: numerical optimization, solver, convergence, derivative, or KKT validation contract is in scope
@@ -1752,22 +1711,16 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 eval/producers/evaluate_skill_workflow_prompts.py --manifest eval/definitions/skill_workflow_prompt_eval.toml
-      - python3 tools/runtime/lifecycle/workflow_monitor.py --report-dir <run> --runtime-feedback
-        "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|knowledge_record|no_op>"
-      - python3 tools/runtime/lifecycle/workflow_monitor.py --report-dir <run> --behavior-event
-        "..."
-      - python3 eval/checkers/compare_agent_run_paths.py --baseline-run <run-a> --candidate-run
-        <run-b>
-      - python3 eval/producers/evaluate_agent_run.py --report-dir <run> --behavior-manifest
-        eval/definitions/agent_behavior_eval.toml --write
-      - python3 eval/producers/evaluate_skill_workflow_prompts.py --manifest eval/definitions/skill_workflow_prompt_eval.toml
-        --accumulate --run-id <run-id> --skill-used <skill>
-      - eval/checkers/compare_agent_run_paths.py --baseline-run <run-a> --candidate-run
-        <run-b>
+      - {"tool_id": "evaluate-skill-workflow-prompts", "operation_id": "default", "argv_suffix": ["--manifest", "eval/definitions/skill_workflow_prompt_eval.toml"]}
+      - {"tool_id": "workflow-monitor", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/lifecycle/workflow_monitor.py", "--report-dir", "<run>", "--runtime-feedback", "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|knowledge_record|no_op>"]}
+      - {"tool_id": "workflow-monitor", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/lifecycle/workflow_monitor.py", "--report-dir", "<run>", "--behavior-event", "..."]}
+      - {"tool_id": "compare-agent-run-paths", "operation_id": "default", "argv_suffix": ["--baseline-run", "<run-a>", "--candidate-run", "<run-b>"]}
+      - {"tool_id": "evaluate-agent-run", "operation_id": "default", "argv_suffix": ["--report-dir", "<run>", "--behavior-manifest", "eval/definitions/agent_behavior_eval.toml", "--write"]}
+      - {"tool_id": "evaluate-skill-workflow-prompts", "operation_id": "default", "argv_suffix": ["--manifest", "eval/definitions/skill_workflow_prompt_eval.toml", "--accumulate", "--run-id", "<run-id>", "--skill-used", "<skill>"]}
+      - {"executable": "eval/checkers/compare_agent_run_paths.py", "argv": ["--baseline-run", "<run-a>", "--candidate-run", "<run-b>"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: backlog-driven iterative experiment, tuning, or code improvement loop is in scope
@@ -1800,10 +1753,10 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: formal-proof-workflow
     visualization_owner: code-visualization
     visualization_role: adapter
@@ -1818,28 +1771,21 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/analysis/proof/formal_proof.py
-      - python3 tools/analysis/proof/jit_canonical_ir.py --python-symbol <path.py::qualname>
-        --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir>
-        --backend-trace-dir <dir> --backend-trace-out <backend.json>
-      - python3 tools/analysis/proof/cpp_template_to_lean.py --cpp-symbol <path.hpp::qualname>
-        --namespace <Lean.Namespace> --out <Generated.lean> --record-out <record.json>
-      - tools/bin/agent-canon jit-ir-to-lean
-      - python3 tools/analysis/proof/cpp_template_to_lean.py
-      - make a theorem or validation claim pass. A backend-specific theorem is valid
-      - tools/bin/agent-canon jit-ir-to-lean --jit-ir <ir.json> --namespace <Lean.Namespace>
-        --module-name <name> --out <Generated.lean>
-      - python3 tools/analysis/proof/cpp_template_to_lean.py --cpp-symbol <path.hpp::qualname>
-        --namespace <Lean.Namespace> --module-name <name> --out <Generated.lean> --record-out
-        <record.json>
-      - lake build
-      - python3 tools/analysis/proof/lean_proof_env.py all-smoke|smoke|agent-smoke|counterexample-smoke|check-file
-        --env-dir reports/formal-proof/lean-proof-env
-      - python3 tools/validation/semantic/proof/check_proof_trace_alignment.py --trace-module <trace.py>
-      - python3 tools/analysis/proof/jit_canonical_ir.py
+      - {"tool_id": "formal-proof", "operation_id": "default"}
+      - {"tool_id": "jit-canonical-ir", "operation_id": "default", "argv_suffix": ["--python-symbol", "<path.py::qualname>", "--input-factory", "<path.py::qualname>", "--out", "<ir.json>", "--stablehlo-out", "<root.stablehlo.mlir>", "--backend-trace-dir", "<dir>", "--backend-trace-out", "<backend.json>"]}
+      - {"tool_id": "cpp-template-to-lean", "operation_id": "default", "argv_suffix": ["--cpp-symbol", "<path.hpp::qualname>", "--namespace", "<Lean.Namespace>", "--out", "<Generated.lean>", "--record-out", "<record.json>"]}
+      - {"tool_id": "jit-ir-to-lean", "operation_id": "default"}
+      - {"tool_id": "cpp-template-to-lean", "operation_id": "default"}
+      - {"executable": "make", "argv": ["a", "theorem", "or", "validation", "claim", "pass.", "A", "backend-specific", "theorem", "is", "valid"]}
+      - {"tool_id": "jit-ir-to-lean", "operation_id": "default", "argv_suffix": ["--jit-ir", "<ir.json>", "--namespace", "<Lean.Namespace>", "--module-name", "<name>", "--out", "<Generated.lean>"]}
+      - {"tool_id": "cpp-template-to-lean", "operation_id": "default", "argv_suffix": ["--cpp-symbol", "<path.hpp::qualname>", "--namespace", "<Lean.Namespace>", "--module-name", "<name>", "--out", "<Generated.lean>", "--record-out", "<record.json>"]}
+      - {"executable": "lake", "argv": ["build"]}
+      - {"tool_id": "lean-proof-env", "operation_id": "default", "argv_suffix": ["all-smoke|smoke|agent-smoke|counterexample-smoke|check-file", "--env-dir", "reports/formal-proof/lean-proof-env"]}
+      - {"tool_id": "check-proof-trace-alignment", "operation_id": "default", "argv_suffix": ["--trace-module", "<trace.py>"]}
+      - {"tool_id": "jit-canonical-ir", "operation_id": "default"}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: lean-algorithm-design
     purpose: Design candidate algorithms directly in Lean before production implementation, prove or refute the mathematical design contract, and hand checked definitions to implementation.
     canonical_doc: agents/skills/lean-algorithm-design.md
@@ -1850,10 +1796,10 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - lake build
+      - {"executable": "lake", "argv": ["build"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: algorithm-proof-exploration
     purpose: Explore algorithm choices under proof obligations by building JIT-canonical IR, theorem graphs, algorithmic blocker frontiers, and algorithm-change handoffs for formal-proof adoption.
     canonical_doc: agents/skills/algorithm-proof-exploration.md
@@ -1864,14 +1810,12 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - tools/bin/agent-canon jit-ir-to-lean
-      - python3 tools/analysis/proof/jit_canonical_ir.py
-      - python3 tools/analysis/proof/jit_canonical_ir.py --python-symbol <path.py::qualname>
-        --input-factory <path.py::factory> --out <ir.json> --stablehlo-out <root.mlir>
-        --backend-trace-dir <dir> --backend-trace-out <backend.json>
+      - {"tool_id": "jit-ir-to-lean", "operation_id": "default"}
+      - {"tool_id": "jit-canonical-ir", "operation_id": "default"}
+      - {"tool_id": "jit-canonical-ir", "operation_id": "default", "argv_suffix": ["--python-symbol", "<path.py::qualname>", "--input-factory", "<path.py::factory>", "--out", "<ir.json>", "--stablehlo-out", "<root.mlir>", "--backend-trace-dir", "<dir>", "--backend-trace-out", "<backend.json>"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: algorithm repair, proof obligations, theorem frontiers, or algorithm-change guidance are in scope
@@ -1896,17 +1840,14 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - tools/bin/agent-canon docs format <artifact.md>
-      - python3 tools/analysis/proof/jit_canonical_ir.py --python-symbol <path.py::qualname>
-        --input-factory <path.py::qualname> --out <ir.json> --stablehlo-out <root.stablehlo.mlir>
-        --backend-trace-dir <dir> --backend-trace-out <backend.json>
-      - tools/bin/agent-canon jit-ir-to-lean --jit-ir <ir.json> --namespace <Namespace>
-        --module-name <Name> --out <Generated.lean>
-      - python3 tools/analysis/proof/jit_canonical_ir.py
-      - tools/bin/agent-canon jit-ir-to-lean
+      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "format", "<artifact.md>"]}
+      - {"tool_id": "jit-canonical-ir", "operation_id": "default", "argv_suffix": ["--python-symbol", "<path.py::qualname>", "--input-factory", "<path.py::qualname>", "--out", "<ir.json>", "--stablehlo-out", "<root.stablehlo.mlir>", "--backend-trace-dir", "<dir>", "--backend-trace-out", "<backend.json>"]}
+      - {"tool_id": "jit-ir-to-lean", "operation_id": "default", "argv_suffix": ["--jit-ir", "<ir.json>", "--namespace", "<Namespace>", "--module-name", "<Name>", "--out", "<Generated.lean>"]}
+      - {"tool_id": "jit-canonical-ir", "operation_id": "default"}
+      - {"tool_id": "jit-ir-to-lean", "operation_id": "default"}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: research-workflow
     purpose: Manage the outer loop of question framing, external research, iterative changes, runs, and explicit review decisions.
     canonical_doc: agents/skills/research-workflow.md
@@ -1917,10 +1858,10 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent/orchestration/route.py --prompt "<user request>" --format json
+      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: research-backed, prior-art, benchmark, or external research workflow is in scope
@@ -1945,10 +1886,10 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/runtime/lifecycle/bootstrap_agent_run.py
+      - {"tool_id": "bootstrap-agent-run", "operation_id": "default"}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: deferred
       reason: repo-wide architecture redesign spans workflow, tools, docs, runtime, or validation
@@ -1975,17 +1916,14 @@ skill_families:
       description: "Define and validate the typed declarative devcontainer dependency design packet before changing mounted developer or agent tools, manifests, bootstrap, or dependency installation order."
     tool_commands:
       required:
-      - python3 tools/runtime/container/devcontainer_dependencies.py validate --workspace .
-        --format text
+      - {"executable": "python3", "argv": ["tools/runtime/container/devcontainer_dependencies.py", "validate", "--workspace", ".", "--format", "text"]}
       conditional:
-      - python3 tools/runtime/container/devcontainer_dependencies.py validate --workspace .
-        --vendor-root . --format text
-      - python3 tools/runtime/container/devcontainer_dependencies.py dry-run --workspace . --vendor-root
-        . --format json
-      - bash tools/validation/dependencies/docker_dependency_validator.sh
+      - {"executable": "python3", "argv": ["tools/runtime/container/devcontainer_dependencies.py", "validate", "--workspace", ".", "--vendor-root", ".", "--format", "text"]}
+      - {"executable": "python3", "argv": ["tools/runtime/container/devcontainer_dependencies.py", "dry-run", "--workspace", ".", "--vendor-root", ".", "--format", "json"]}
+      - {"executable": "bash", "argv": ["tools/validation/dependencies/docker_dependency_validator.sh"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: declarative devcontainer dependency design must precede environment maintenance
@@ -2008,12 +1946,12 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - devcontainer exec --workspace-folder <root> zsh -lc '<command>'
-      - devcontainer exec --workspace-folder <root> zsh -lic '<command>'
-      - devcontainer exec --workspace-folder <root> zsh -l
+      - {"executable": "devcontainer", "argv": ["exec", "--workspace-folder", "<root>", "zsh", "-lc", "<command>"]}
+      - {"executable": "devcontainer", "argv": ["exec", "--workspace-folder", "<root>", "zsh", "-lic", "<command>"]}
+      - {"executable": "devcontainer", "argv": ["exec", "--workspace-folder", "<root>", "zsh", "-l"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: explicit compatibility execution belongs in an already-running project Dev Container; AgentCanon runtime work belongs in agent-canon-bootstrap
@@ -2035,20 +1973,20 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - tools/validation/ci/policies/python_env_policy.py --runtime container --create
-      - bash tools/validation/dependencies/docker_dependency_validator.sh
-      - python3 -m pytest -q tests/tools/test_bootstrap_container_contract.py
-      - python3 -m pytest -q tests/bootstrap/test_bootstrap_runtime.py
-      - make docker-build-check
-      - make docker-build-check-host-docker
-      - python3 tools/validation/ci/runners/run_container_pack.py --print-only
-      - make server-check
-      - make ci-quick
-      - make ci
-      - tools/bin/agent-canon docs check
+      - {"executable": "tools/validation/ci/policies/python_env_policy.py", "argv": ["--runtime", "container", "--create"]}
+      - {"executable": "bash", "argv": ["tools/validation/dependencies/docker_dependency_validator.sh"]}
+      - {"executable": "python3", "argv": ["-m", "pytest", "-q", "tests/tools/test_bootstrap_container_contract.py"]}
+      - {"executable": "python3", "argv": ["-m", "pytest", "-q", "tests/bootstrap/test_bootstrap_runtime.py"]}
+      - {"executable": "make", "argv": ["docker-build-check"]}
+      - {"executable": "make", "argv": ["docker-build-check-host-docker"]}
+      - {"executable": "python3", "argv": ["tools/validation/ci/runners/run_container_pack.py", "--print-only"]}
+      - {"executable": "make", "argv": ["server-check"]}
+      - {"executable": "make", "argv": ["ci-quick"]}
+      - {"executable": "make", "argv": ["ci"]}
+      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "check"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: Docker, CI, dependency, or runtime environment maintenance is in scope
@@ -2076,23 +2014,19 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/runtime/lifecycle/workflow_monitor.py --report-dir reports/agents/<run-id>
-        --behavior-event "..."
-      - python3 tools/runtime/lifecycle/workflow_monitor.py --report-dir reports/agents/<run-id>
-        --runtime-feedback "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval>
-        action=<prompt_repair|eval_update|knowledge_record|no_op>"
-      - python3 eval/producers/evaluate_agent_run.py --report-dir reports/agents/<run-id>
-        --behavior-manifest eval/definitions/agent_behavior_eval.toml --write
-      - agent-canon k search --query <failure-evidence>
-      - agent-canon k add <topic> --stdin
-      - agent-canon f add <topic> --stdin
-      - agent-canon k status
-      - agent-canon f status
-      - python3 eval/producers/evaluate_agent_run.py
-      - python3 tools/runtime/lifecycle/workflow_monitor.py
+      - {"tool_id": "workflow-monitor", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/lifecycle/workflow_monitor.py", "--report-dir", "reports/agents/<run-id>", "--behavior-event", "..."]}
+      - {"tool_id": "workflow-monitor", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/lifecycle/workflow_monitor.py", "--report-dir", "reports/agents/<run-id>", "--runtime-feedback", "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|knowledge_record|no_op>"]}
+      - {"tool_id": "evaluate-agent-run", "operation_id": "default", "argv_suffix": ["--report-dir", "reports/agents/<run-id>", "--behavior-manifest", "eval/definitions/agent_behavior_eval.toml", "--write"]}
+      - {"executable": "agent-canon", "argv": ["k", "search", "--query", "<failure-evidence>"]}
+      - {"executable": "agent-canon", "argv": ["k", "add", "<topic>", "--stdin"]}
+      - {"executable": "agent-canon", "argv": ["f", "add", "<topic>", "--stdin"]}
+      - {"executable": "agent-canon", "argv": ["k", "status"]}
+      - {"executable": "agent-canon", "argv": ["f", "status"]}
+      - {"tool_id": "evaluate-agent-run", "operation_id": "default"}
+      - {"tool_id": "workflow-monitor", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/lifecycle/workflow_monitor.py"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: deferred
       reason: user feedback or recurrence prevention should become durable agent learning
@@ -2127,11 +2061,11 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/repository/github/wiki_publish.py
-      - tools/bin/agent-canon docs format
+      - {"tool_id": "wiki-publish", "operation_id": "default", "argv_suffix": ["python3", "tools/repository/github/wiki_publish.py"]}
+      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "format"]}
       maintenance:
-      - python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
-      - python3 tools/agent/skills/skill_tool_commands.py check
+      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: responsibility-cleanup
     purpose: Route responsibility-unit cleanup from tree observation through owner dispatch, integration, and re-review.
     canonical_doc: agents/skills/responsibility-cleanup.md
@@ -2141,11 +2075,11 @@ skill_families:
       description: "Use when cleanup requires tree observation, source/view/generated/project/personal boundary classification, dependency closure, responsibility-unit dispatch, integration, or re-review."
     tool_commands:
       required:
-      - tree -a -J --noreport
+      - {"executable": "tree", "argv": ["-a", "-J", "--noreport"]}
       conditional:
-      - python3 tools/validation/semantic/structure/repo_structure_contract.py --root . --contract documents/structure/repo-structure-contract.toml
-      - python3 tools/validation/semantic/responsibility/responsibility_scope.py --root .
-      - python3 tools/agent/skills/skill_dependency_map.py check --root .
+      - {"tool_id": "repo-structure-contract", "operation_id": "default", "argv_suffix": ["--root", ".", "--contract", "documents/structure/repo-structure-contract.toml"]}
+      - {"tool_id": "responsibility-scope", "operation_id": "default", "argv_suffix": ["--root", "."]}
+      - {"executable": "python3", "argv": ["tools/agent/skills/skill_dependency_map.py", "check", "--root", "."]}
     routing:
       stage_policy: active
       reason: responsibility-unit cleanup, ownership boundary, dependency closure, or specialist dispatch is in scope
@@ -2159,8 +2093,8 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/runtime/container/devcontainer_dependencies.py validate --workspace . --format text
-      - python3 tools/runtime/container/devcontainer_dependencies.py dry-run --workspace . --vendor-root . --format json
+      - {"executable": "python3", "argv": ["tools/runtime/container/devcontainer_dependencies.py", "validate", "--workspace", ".", "--format", "text"]}
+      - {"executable": "python3", "argv": ["tools/runtime/container/devcontainer_dependencies.py", "dry-run", "--workspace", ".", "--vendor-root", ".", "--format", "json"]}
     routing:
       stage_policy: active
       reason: environment dependency or runtime-capability cleanup is in scope
@@ -2174,9 +2108,9 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed
-      - bash tools/analysis/dependencies/scan_code_dependencies.sh --changed
-      - bash tools/analysis/dependencies/run_repo_dependency_review.sh
+      - {"tool_id": "check-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed"]}
+      - {"tool_id": "scan-code-dependencies", "operation_id": "default", "argv_suffix": ["--changed"]}
+      - {"tool_id": "run-repo-dependency-review", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: public/module responsibility, reachability, or behavior-preserving code cleanup is in scope
@@ -2190,12 +2124,12 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
-      - python3 tools/agent/skills/skill_shim_materializer.py materialize --root . --all
-      - python3 tools/agent/skills/skill_shim_materializer.py readback --root . --all
-      - python3 tools/agent/skills/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>
-      - python3 tools/agent/skills/skill_dependency_map.py graph --root . --output documents/runtime/skill-dependency-graph.md --runtime-root <external-runtime-root> --source-mutation-capability-json <exact-two-path-capability.json>
-      - python3 tools/validation/semantic/skills/check_skill_tool_invocation_graph.py --root .
+      - {"tool_id": "check-agent-runtime-alignment", "operation_id": "default"}
+      - {"executable": "python3", "argv": ["tools/agent/skills/skill_shim_materializer.py", "materialize", "--root", ".", "--all"]}
+      - {"executable": "python3", "argv": ["tools/agent/skills/skill_shim_materializer.py", "readback", "--root", ".", "--all"]}
+      - {"executable": "python3", "argv": ["tools/agent/skills/skill_dependency_map.py", "graph", "--root", ".", "--runtime-root", "<external-runtime-root>"]}
+      - {"executable": "python3", "argv": ["tools/agent/skills/skill_dependency_map.py", "graph", "--root", ".", "--output", "documents/runtime/skill-dependency-graph.md", "--runtime-root", "<external-runtime-root>", "--source-mutation-capability-json", "<exact-two-path-capability.json>"]}
+      - {"executable": "python3", "argv": ["tools/validation/semantic/skills/check_skill_tool_invocation_graph.py", "--root", "."]}
     routing:
       stage_policy: active
       reason: canonical skill, catalog, route, generated shim, host config, graph, or readback cleanup is in scope
