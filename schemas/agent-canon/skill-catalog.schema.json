@@ -10,7 +10,6 @@
     "tool_runtime": { "$ref": "#/$defs/toolRuntime" },
     "skill_families": {
       "type": "array",
-      "minItems": 1,
       "items": { "$ref": "#/$defs/skillFamily" }
     }
   },
@@ -18,7 +17,7 @@
     "nonEmptyString": { "type": "string", "minLength": 1 },
     "identifier": {
       "type": "string",
-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      "pattern": "^_?[a-z0-9]+(?:-[a-z0-9]+)*$"
     },
     "path": {
       "type": "string",
@@ -151,11 +150,11 @@
         "purpose": { "$ref": "#/$defs/nonEmptyString" },
         "canonical_doc": {
           "type": "string",
-          "pattern": "^agents/skills/[a-z0-9]+(?:-[a-z0-9]+)*\\.md$"
+          "pattern": "^agents/skills/_?[a-z0-9]+(?:-[a-z0-9]+)*\\.md$"
         },
         "shim": {
           "type": "string",
-          "pattern": "^\\.codex/personal/skills/[a-z0-9]+(?:-[a-z0-9]+)*/SKILL\\.md$"
+          "pattern": "^\\.codex/personal/skills/_?[a-z0-9]+(?:-[a-z0-9]+)*/SKILL\\.md$"
         },
         "discovery": { "$ref": "#/$defs/discovery" },
         "tool_commands": { "$ref": "#/$defs/toolCommands" },

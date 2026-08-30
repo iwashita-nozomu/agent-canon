@@ -9,17 +9,16 @@
     "version": { "const": 1 },
     "skill_dependencies": {
       "type": "object",
-      "minProperties": 1,
       "additionalProperties": { "$ref": "#/$defs/dependencyRule" },
       "propertyNames": {
-        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        "pattern": "^_?[a-z0-9]+(?:-[a-z0-9]+)*$"
       }
     }
   },
   "$defs": {
     "skillId": {
       "type": "string",
-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      "pattern": "^_?[a-z0-9]+(?:-[a-z0-9]+)*$"
     },
     "nonEmptyString": { "type": "string", "minLength": 1 },
     "skillList": {

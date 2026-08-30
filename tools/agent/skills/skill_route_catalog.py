@@ -934,6 +934,7 @@ def freeze_skill_rule_mapping(
 
 def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
     """Load prompt-routing rules from a natively schema-validated catalog."""
+    validate_catalog_schemas(root)
     data = load_skill_catalog(root)
     families = object_sequence(data.get("skill_families"), "skill_families")
     public_skill_ids = _skill_ids_from_catalog(data)
