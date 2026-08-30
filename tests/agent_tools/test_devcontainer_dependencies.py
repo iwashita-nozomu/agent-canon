@@ -697,10 +697,6 @@ class DependencyModelTests(unittest.TestCase):
                     runner=FakeRunner(),
                 )
 
-    def test_image_verify_never_reaches_mutating_edges(self) -> None:
-        """The immutable image verifier exposes no mutation edge."""
-        self.test_image_install_and_verify_are_immutable_and_read_only()
-
     def test_image_install_requires_root_and_image_safe_method_whitelist(self) -> None:
         unsafe = parse_record(
             record(

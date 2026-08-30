@@ -1203,17 +1203,5 @@ def test_hook_report_requires_parent_capability() -> None:
             assert hook_dispatcher._parent_bound_report(target, "hook-report") is None
 
 
-def test_pointer_targets_reject_missing_and_containment_escapes() -> None:
-    """The focused module node delegates to the existing pointer contract."""
-    with mock.patch.dict(
-        os.environ,
-        {
-            "AGENT_CANON_HOOK_EVENT_SPOOL_DIR": "",
-            "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": "",
-        },
-    ):
-        CodexHooksTest().test_pointer_targets_reject_missing_and_containment_escapes()
-
-
 if __name__ == "__main__":
     unittest.main()
