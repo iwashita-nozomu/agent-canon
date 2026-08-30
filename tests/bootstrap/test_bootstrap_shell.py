@@ -980,13 +980,26 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     stage = tmp_path / "stage"
     codex_stage = tmp_path / "codex-stage"
     volume_root = tmp_path / "volume"
+    fake_install = tmp_path / "fake-install"
     control.mkdir()
     runtime.mkdir()
     stage.mkdir()
     codex_stage.mkdir()
+    (fake_install / ".codex" / "personal" / "skills" / "managed").mkdir(parents=True)
+    (fake_install / ".codex" / "config.toml").write_text("config\n", encoding="utf-8")
+    (fake_install / ".codex" / "personal" / "skills" / "managed" / "SKILL.md").write_text(
+        "skill\n", encoding="utf-8"
+    )
     (volume_root / "exchange").mkdir(parents=True)
     (volume_root / "codex-home").mkdir(parents=True)
-    (volume_root / "codex-home" / "config.toml").symlink_to(ROOT / ".codex" / "config.toml")
+    (volume_root / "codex-home" / "config.toml").symlink_to(
+        fake_install / ".codex" / "config.toml"
+    )
+    (volume_root / "codex-home" / "skills").mkdir()
+    (volume_root / "codex-home" / "skills" / "managed").mkdir()
+    (volume_root / "codex-home" / "skills" / "managed" / "SKILL.md").symlink_to(
+        fake_install / ".codex" / "personal" / "skills" / "managed" / "SKILL.md"
+    )
     (codex_stage / "config.toml").write_text("stale\n", encoding="utf-8")
     source_sync = runtime / "source-sync.json"
     source_sync.write_text("source-sync\n", encoding="utf-8")
@@ -1030,7 +1043,7 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     common = (
         f"source {str(ADAPTER)!r}; "
         f"AGENT_CANON_DOCKER_CMD={str(docker)!r}; "
-        f"AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}; "
+        f"AGENT_CANON_REPOSITORY_ROOT={str(fake_install)!r}; "
         f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
         f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
         f"AGENT_CANON_STATE_ROOT={str(runtime)!r}; "
@@ -1074,11 +1087,16 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     assert codex_export.returncode == 0, codex_export.stderr
     assert codex_stage.is_dir()
     assert (codex_stage / "config.toml").is_symlink()
-    assert (codex_stage / "config.toml").resolve() == (ROOT / ".codex" / "config.toml").resolve()
+    assert (codex_stage / "config.toml").resolve() == (fake_install / ".codex" / "config.toml").resolve()
+    assert (codex_stage / "skills" / "managed" / "SKILL.md").is_symlink()
+    assert (codex_stage / "skills" / "managed" / "SKILL.md").resolve() == (
+        fake_install / ".codex" / "personal" / "skills" / "managed" / "SKILL.md"
+    ).resolve()
     (volume_root / "codex-home" / "agents").mkdir()
     (volume_root / "codex-home" / "agents" / "current.toml").write_text(
         "current\n", encoding="utf-8"
     )
+    (codex_stage / "config.toml").unlink()
     (codex_stage / "config.toml").write_text("old\n", encoding="utf-8")
     (codex_stage / "agents").mkdir()
     (codex_stage / "agents" / "old.toml").write_text("old\n", encoding="utf-8")
@@ -1115,7 +1133,9 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     assert relative_rejected.returncode == 2
     assert json.loads(relative_rejected.stderr)["code"] == "volume_copy_failed"
     (volume_root / "codex-home" / "config.toml").unlink()
-    (volume_root / "codex-home" / "config.toml").symlink_to(ROOT / ".codex" / "config.toml")
+    (volume_root / "codex-home" / "config.toml").symlink_to(
+        fake_install / ".codex" / "config.toml"
+    )
     (volume_root / "codex-home" / "unexpected").symlink_to(tmp_path / "outside")
     rejected = subprocess.run(
         ["bash", "-c", common + f"_agent_canon_volume_copy export codex-home {str(codex_stage)!r}"],
@@ -1501,9 +1521,11 @@ def test_codex_volume_copy_rejects_unexpected_symlink_target(tmp_path: Path) -> 
     control = tmp_path / "control"
     runtime = tmp_path / "runtime"
     stage = tmp_path / "stage"
+    fake_install = tmp_path / "fake-install"
     control.mkdir()
     runtime.mkdir()
     stage.mkdir()
+    (fake_install / ".codex").mkdir(parents=True)
     control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
     volume_name = f"agent-canon-runtime-{control_digest}"
     volume_root = tmp_path / f".fake-volume-{volume_name}"
@@ -1535,7 +1557,7 @@ def test_codex_volume_copy_rejects_unexpected_symlink_target(tmp_path: Path) -> 
             (
                 f"source {str(ADAPTER)!r}; "
                 f"AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}; "
-                f"AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}; "
+                f"AGENT_CANON_REPOSITORY_ROOT={str(fake_install)!r}; "
                 f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
                 f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
                 f"AGENT_CANON_STATE_ROOT={str(runtime)!r}; "
@@ -1558,15 +1580,18 @@ def test_codex_volume_copy_roundtrips_managed_symlink(tmp_path: Path) -> None:
     control = tmp_path / "control"
     runtime = tmp_path / "runtime"
     stage = tmp_path / "stage"
+    fake_install = tmp_path / "fake-install"
     control.mkdir()
     runtime.mkdir()
     stage.mkdir()
+    (fake_install / ".codex").mkdir(parents=True)
+    (fake_install / ".codex" / "config.toml").write_text("config\n", encoding="utf-8")
     control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
     volume_name = f"agent-canon-runtime-{control_digest}"
     volume_root = tmp_path / f".fake-volume-{volume_name}"
     codex_home = volume_root / "codex-home"
     codex_home.mkdir(parents=True)
-    (codex_home / "config.toml").symlink_to(ROOT / ".codex" / "config.toml")
+    (codex_home / "config.toml").symlink_to(fake_install / ".codex" / "config.toml")
     state_path = tmp_path / "docker-state.json"
     state_path.write_text(
         json.dumps(
@@ -1588,7 +1613,7 @@ def test_codex_volume_copy_roundtrips_managed_symlink(tmp_path: Path) -> None:
     common = (
         f"source {str(ADAPTER)!r}; "
         f"AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}; "
-        f"AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}; "
+        f"AGENT_CANON_REPOSITORY_ROOT={str(fake_install)!r}; "
         f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
         f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
         f"AGENT_CANON_STATE_ROOT={str(runtime)!r}; "
@@ -1604,7 +1629,7 @@ def test_codex_volume_copy_roundtrips_managed_symlink(tmp_path: Path) -> None:
     )
     assert exported.returncode == 0, exported.stderr
     assert (stage / "config.toml").is_symlink()
-    assert (stage / "config.toml").resolve() == (ROOT / ".codex" / "config.toml").resolve()
+    assert (stage / "config.toml").resolve() == (fake_install / ".codex" / "config.toml").resolve()
     imported = subprocess.run(
         ["bash", "-c", common + f"_agent_canon_volume_copy import codex-home {str(stage)!r}"],
         check=False,
@@ -1614,7 +1639,7 @@ def test_codex_volume_copy_roundtrips_managed_symlink(tmp_path: Path) -> None:
     )
     assert imported.returncode == 0, imported.stderr
     assert (codex_home / "config.toml").is_symlink()
-    assert (codex_home / "config.toml").resolve() == (ROOT / ".codex" / "config.toml").resolve()
+    assert (codex_home / "config.toml").resolve() == (fake_install / ".codex" / "config.toml").resolve()
 
 
 @pytest.mark.skipif(

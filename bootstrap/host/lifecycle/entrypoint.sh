@@ -836,7 +836,7 @@ _agent_canon_path_digest() {
 }
 
 _agent_canon_validate_codex_home() {
-  local path=$1 allowed link relative_link target invalid
+  local path=$1 allowed link relative_link target expected invalid
   allowed="$AGENT_CANON_REPOSITORY_ROOT/.codex"
   [[ -d "$path" && ! -L "$path" && -d "$allowed" && ! -L "$allowed" ]] || return 1
   invalid=$(find "$path" -type l -print | while IFS= read -r link; do
@@ -845,13 +845,19 @@ _agent_canon_validate_codex_home() {
       config.toml|agents/*|hooks/*|skills/*) ;;
       *) printf 'invalid\n'; continue ;;
     esac
+    case "$relative_link" in
+      *//*|../*|*/../*|*/..|./*|*/./*|.) printf 'invalid\n'; continue ;;
+      config.toml) expected="$allowed/config.toml" ;;
+      agents/*|hooks/*) expected="$allowed/$relative_link" ;;
+      skills/*) expected="$allowed/personal/skills/${relative_link#skills/}" ;;
+    esac
     target=$(readlink -f "$link" 2>/dev/null || true)
     [[ "$target" != *$'\n'* && "$target" != *$'\r'* && "$target" != *$'\t'* ]] || {
       printf 'invalid\n'
       continue
     }
     case "$target" in
-      "$allowed"/*) [ -e "$target" ] || printf 'invalid\n' ;;
+      "$expected") [ -e "$target" ] || printf 'invalid\n' ;;
       *) printf 'invalid\n' ;;
     esac
   done)
@@ -1463,9 +1469,11 @@ validate_codex_links() {
     esac
     case "$relative_link" in
       *//*|../*|*/../*|*/..|./*|*/./*|.) printf "invalid\\n"; continue ;;
+      config.toml) expected="$allowed/config.toml" ;;
+      agents/*|hooks/*) expected="$allowed/$relative_link" ;;
+      skills/*) expected="$allowed/personal/skills/${relative_link#skills/}" ;;
     esac
     target=$(readlink -- "$link" 2>/dev/null || true)
-    expected="$allowed/$relative_link"
     case "$target" in
       /*) [ "$target" = "$expected" ] || printf "invalid\\n" ;;
       *) printf "invalid\\n" ;;
