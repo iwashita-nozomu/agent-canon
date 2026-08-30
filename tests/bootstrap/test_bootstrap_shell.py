@@ -987,7 +987,7 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     (volume_root / "exchange").mkdir(parents=True)
     (volume_root / "codex-home").mkdir(parents=True)
     (volume_root / "codex-home" / "config.toml").write_text("codex = true\n", encoding="utf-8")
-    (codex_stage / "stale.txt").write_text("stale\n", encoding="utf-8")
+    (codex_stage / "config.toml").write_text("stale\n", encoding="utf-8")
     source_sync = runtime / "source-sync.json"
     source_sync.write_text("source-sync\n", encoding="utf-8")
     (volume_root / "exchange" / "mounts.tsv").write_text("target\n", encoding="utf-8")
@@ -999,7 +999,7 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     docker.write_text(
         "#!/bin/sh\n"
         "set -eu\n"
-        "script= input= output= volume=\n"
+        "script= input= volume=\n"
         "while [ \"$#\" -gt 0 ]; do\n"
         "  case \"$1\" in\n"
         "    --mount)\n"
@@ -1008,10 +1008,12 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
         "      case \"$spec\" in\n"
         "        type=volume,src=*,dst=/var/lib/agent-canon)\n"
         "          volume=${spec#type=volume,src=}; volume=${volume%,dst=/var/lib/agent-canon} ;;\n"
+        "        type=volume,src=*,dst=/var/lib/agent-canon,readonly)\n"
+        "          volume=${spec#type=volume,src=}; volume=${volume%,dst=/var/lib/agent-canon,readonly} ;;\n"
         "        type=bind,src=*,dst=/agent-canon-copy-input,readonly)\n"
         "          input=${spec#type=bind,src=}; input=${input%,dst=/agent-canon-copy-input,readonly} ;;\n"
         "        type=bind,src=*,dst=/agent-canon-copy-output)\n"
-        "          output=${spec#type=bind,src=}; output=${output%,dst=/agent-canon-copy-output} ;;\n"
+        "          exit 91 ;;\n"
         "      esac ;;\n"
         "    --env) shift; export \"$1\" ;;\n"
         "    -c) shift; script=$1 ;;\n"
@@ -1020,7 +1022,7 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
         "done\n"
         "[ \"$volume\" = \"$FAKE_VOLUME_NAME\" ]\n"
         "[ -n \"$script\" ]\n"
-        "script=$(printf \"%s\" \"$script\" | sed -e \"s|/var/lib/agent-canon|$FAKE_VOLUME_ROOT|g\" -e \"s|/agent-canon-copy-input|$input|g\" -e \"s|/agent-canon-copy-output|$output|g\")\n"
+        "script=$(printf \"%s\" \"$script\" | sed -e \"s|/var/lib/agent-canon|$FAKE_VOLUME_ROOT|g\" -e \"s|/agent-canon-copy-input|$input|g\")\n"
         "exec /bin/sh -c \"$script\"\n",
         encoding="utf-8",
     )
@@ -1071,7 +1073,6 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     )
     assert codex_export.returncode == 0, codex_export.stderr
     assert codex_stage.is_dir()
-    assert not (codex_stage / "stale.txt").exists()
     assert (codex_stage / "config.toml").read_text(encoding="utf-8") == "codex = true\n"
     (volume_root / "codex-home" / "unexpected").symlink_to(tmp_path / "outside")
     rejected = subprocess.run(
@@ -2700,10 +2701,11 @@ _agent_canon_use_active_image() {{
 _agent_canon_validate_existing_container() {{ return 9; }}
 _agent_canon_write_rollback_plan() {{ :; }}
 _agent_canon_ensure_container() {{ printf 'candidate\\n'; }}
-_agent_canon_run_controller() {{ :; }}
-_agent_canon_record_active_container() {{ :; }}
-_agent_canon_install_global_links() {{ :; }}
-_agent_canon_replace_resident candidate requested
+    _agent_canon_run_controller() {{ :; }}
+    _agent_canon_record_active_container() {{ :; }}
+    _agent_canon_install_global_links() {{ :; }}
+    _agent_canon_publish_controller_projection() {{ :; }}
+    _agent_canon_replace_resident candidate requested
 rc=$?
 printf 'rc=%s\\n' "$rc"
 exit "$rc"

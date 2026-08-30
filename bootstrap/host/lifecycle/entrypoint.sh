@@ -1045,6 +1045,174 @@ printf "marker\\t%s\\ncontent\\tok\\n" "$digest"' ); then
   _agent_canon_drop_legacy_controller_state
 }
 
+_agent_canon_apply_volume_export() (
+  set -e
+  local kind=$1 host_path=$2 relative=$3 stream_path=$4 expected_digest=$5
+  local temporary member relative_path source_digest name staged target
+  [[ -f "$stream_path" && ! -L "$stream_path" && "$expected_digest" =~ ^[0-9a-f]{64}$ ]] ||
+    _agent_canon_json_error volume_export_invalid "volume export stream or digest is invalid"
+  [[ -d "$host_path" && ! -L "$host_path" ]] ||
+    _agent_canon_json_error volume_export_destination_invalid "volume export destination is not a directory"
+  temporary=$(mktemp -d "$AGENT_CANON_RUNTIME_ROOT/.volume-export.XXXXXX") ||
+    _agent_canon_json_error volume_export_failed "volume export staging directory could not be created"
+  chmod 700 "$temporary"
+  while IFS= read -r member; do
+    member=${member#./}
+    member=${member%/}
+    [[ -z "$member" ]] && continue
+    [[ "$member" != /* && "$member" != *$'\n'* &&
+       "$member" != *$'\r'* && "$member" != *$'\t'* && "$member" != ../* &&
+       "$member" != */../* && "$member" != *'/..' ]] || {
+      rm -rf -- "$temporary"
+      _agent_canon_json_error volume_export_invalid "volume export contains an unsafe archive member"
+      return 2
+    }
+  done < <(tar -tf "$stream_path") || {
+    rm -rf -- "$temporary"
+    _agent_canon_json_error volume_export_failed "volume export archive could not be listed"
+  }
+  if ! tar -xpf "$stream_path" --no-same-owner -C "$temporary"; then
+    rm -rf -- "$temporary"
+    _agent_canon_json_error volume_export_failed "volume export archive could not be extracted"
+  fi
+  while IFS= read -r relative_path; do
+    [[ "$relative_path" != *$'\n'* && "$relative_path" != *$'\r'* &&
+       "$relative_path" != *$'\t'* ]] || {
+      rm -rf -- "$temporary"
+      _agent_canon_json_error volume_export_invalid "volume export path contains a control character"
+    }
+  done < <(find "$temporary" -mindepth 1 -printf '%P\n')
+  case "$kind" in
+    projection)
+      for relative_path in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
+        staged="$temporary/$relative_path"
+        [[ ! -e "$staged" && ! -L "$staged" ]] ||
+          [[ -f "$staged" && ! -L "$staged" ]] || {
+            rm -rf -- "$temporary"
+            _agent_canon_json_error volume_export_invalid "controller projection contains an invalid file"
+          }
+      done
+      while IFS= read -r relative_path; do
+        case "$relative_path" in
+          mounts.toml|mounts.tsv|rollback-plan.tsv|rollback-mounts.tsv) ;;
+          *) rm -rf -- "$temporary"; _agent_canon_json_error volume_export_invalid "controller projection contains an unexpected path" ;;
+        esac
+      done < <(find "$temporary" -mindepth 1 -maxdepth 1 -printf '%P\n')
+      source_digest=$(
+        for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
+          if [[ -f "$temporary/$name" && ! -L "$temporary/$name" ]]; then
+            printf '%s\t%s\n' "$name" "$(_agent_canon_sha256 "$temporary/$name")"
+          else
+            printf '%s\tabsent\n' "$name"
+          fi
+        done | sha256sum | awk '{print $1}'
+      )
+      for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
+        staged="$temporary/$name"
+        target="$host_path/$name"
+        if [[ -f "$staged" && ! -L "$staged" ]]; then
+          [[ ! -L "$target" ]] || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_destination_invalid "controller projection target is a symlink"; }
+          mv -f -- "$staged" "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "controller projection file could not be published"; }
+        elif [[ -e "$target" || -L "$target" ]]; then
+          [[ ! -L "$target" ]] || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_destination_invalid "controller projection target is a symlink"; }
+          rm -f -- "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "stale controller projection could not be removed"; }
+        fi
+      done ;;
+    skill)
+      [[ -d "$temporary/skill-projection" && ! -L "$temporary/skill-projection" ]] || {
+        rm -rf -- "$temporary"
+        _agent_canon_json_error volume_export_invalid "skill projection tree is missing"
+      }
+      [[ -z "$(find "$temporary" -mindepth 1 -maxdepth 1 ! -name skill-projection -print -quit)" ]] || {
+        rm -rf -- "$temporary"
+        _agent_canon_json_error volume_export_invalid "skill projection contains an unexpected path"
+      }
+      [[ -z "$(find "$temporary/skill-projection" -type l -print -quit)" ]] || {
+        rm -rf -- "$temporary"
+        _agent_canon_json_error volume_export_invalid "skill projection contains a symlink"
+      }
+      source_digest=$(_agent_canon_path_digest "$temporary/skill-projection") || {
+        rm -rf -- "$temporary"
+        _agent_canon_json_error volume_export_invalid "skill projection digest could not be computed"
+      }
+      target="$host_path/skill-projection"
+      [[ ! -L "$target" ]] || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_destination_invalid "skill projection target is a symlink"; }
+      [[ ! -e "$target" ]] || rm -rf -- "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "stale skill projection could not be removed"; }
+      mv -- "$temporary/skill-projection" "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "skill projection could not be published"; } ;;
+    eval)
+      [[ -d "$temporary/$relative" && ! -L "$temporary/$relative" ]] || {
+        rm -rf -- "$temporary"
+        _agent_canon_json_error volume_export_invalid "evaluation tree is missing"
+      }
+      [[ -z "$(find "$temporary" -mindepth 1 -maxdepth 1 ! -name "$relative" -print -quit)" ]] || {
+        rm -rf -- "$temporary"
+        _agent_canon_json_error volume_export_invalid "evaluation export contains an unexpected path"
+      }
+      [[ -z "$(find "$temporary/$relative" -type l -print -quit)" ]] || {
+        rm -rf -- "$temporary"
+        _agent_canon_json_error volume_export_invalid "evaluation export contains a symlink"
+      }
+      source_digest=$(_agent_canon_path_digest "$temporary/$relative") || {
+        rm -rf -- "$temporary"
+        _agent_canon_json_error volume_export_invalid "evaluation digest could not be computed"
+      }
+      target="$host_path/$relative"
+      [[ ! -L "$target" ]] || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_destination_invalid "evaluation target is a symlink"; }
+      [[ ! -e "$target" ]] || rm -rf -- "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "stale evaluation tree could not be removed"; }
+      mv -- "$temporary/$relative" "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "evaluation tree could not be published"; } ;;
+    private-feedback)
+      [[ -z "$(find "$temporary" -type l -print -quit)" ]] || {
+        rm -rf -- "$temporary"
+        _agent_canon_json_error volume_export_invalid "private feedback contains a symlink"
+      }
+      source_digest=$(
+        cd "$temporary" && find . -type f ! -name .agent-canon-private-log-v1 -exec sha256sum {} + |
+          LC_ALL=C sort | sha256sum | awk '{print $1}'
+      )
+      find "$host_path" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + || {
+        rm -rf -- "$temporary"
+        _agent_canon_json_error volume_export_failed "stale private feedback could not be removed"
+      }
+      while IFS= read -r -d '' staged; do
+        mv -- "$staged" "$host_path/" || {
+          rm -rf -- "$temporary"
+          _agent_canon_json_error volume_export_failed "private feedback could not be published"
+        }
+      done < <(find "$temporary" -mindepth 1 -maxdepth 1 -print0) ;;
+    codex-home)
+      _agent_canon_validate_codex_home "$temporary" || {
+        rm -rf -- "$temporary"
+        _agent_canon_json_error volume_export_invalid "Codex home contains an unmanaged symlink"
+      }
+      for name in config.toml agents hooks skills; do
+        staged="$temporary/$name"
+        target="$host_path/$name"
+        if [[ -e "$staged" || -L "$staged" ]]; then
+          [[ ! -L "$target" ]] || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_destination_invalid "Codex target is a symlink"; }
+          [[ ! -e "$target" ]] || rm -rf -- "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "stale Codex path could not be removed"; }
+          mv -- "$staged" "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "Codex path could not be published"; }
+        elif [[ -e "$target" || -L "$target" ]]; then
+          [[ ! -L "$target" ]] || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_destination_invalid "Codex target is a symlink"; }
+          rm -rf -- "$target" || { rm -rf -- "$temporary"; _agent_canon_json_error volume_export_failed "stale Codex path could not be removed"; }
+        fi
+      done
+      source_digest=$(_agent_canon_codex_digest "$host_path") || {
+        rm -rf -- "$temporary"
+        _agent_canon_json_error volume_export_invalid "Codex home digest could not be computed"
+      } ;;
+    *)
+      rm -rf -- "$temporary"
+      _agent_canon_json_error volume_export_invalid "volume export kind is not supported"
+      ;;
+  esac
+  [[ "$source_digest" == "$expected_digest" ]] || {
+    rm -rf -- "$temporary"
+    _agent_canon_json_error volume_copy_failed "volume export digest readback differs"
+    return 2
+  }
+  rm -rf -- "$temporary"
+)
+
 _agent_canon_volume_copy() {
   local direction=$1 kind=$2 host_path=$3 relative=${4:-}
   local volume=${AGENT_CANON_STATE_VOLUME_NAME:-}
@@ -1071,17 +1239,16 @@ _agent_canon_volume_copy() {
     [[ "$relative" =~ ^[A-Za-z0-9_.-]{1,128}$ ]] ||
       _agent_canon_json_error volume_copy_invalid "volume copy relative ID is invalid"
   fi
-  local -a mounts=(--mount "type=volume,src=$volume,dst=$AGENT_CANON_VOLUME_DESTINATION")
+  local volume_mount="type=volume,src=$volume,dst=$AGENT_CANON_VOLUME_DESTINATION"
+  [[ "$direction" == export ]] && volume_mount+=",readonly"
+  local -a mounts=(--mount "$volume_mount")
   if [[ "$direction" == import ]]; then
     mounts+=(--mount "type=bind,src=$host_path,dst=/agent-canon-copy-input,readonly")
-  elif [[ "$direction" == export ]]; then
-    mounts+=(--mount "type=bind,src=$host_path,dst=/agent-canon-copy-output")
   fi
-  if [[ "$kind" == codex-home ]]; then
+  if [[ "$kind" == codex-home && "$direction" == import ]]; then
     mounts+=(--mount "type=bind,src=$AGENT_CANON_REPOSITORY_ROOT,dst=$AGENT_CANON_REPOSITORY_ROOT,readonly")
   fi
-  local copy_readback
-  if ! copy_readback=$("$AGENT_CANON_DOCKER_CMD" run --rm \
+  local -a copy_command=( "$AGENT_CANON_DOCKER_CMD" run --rm \
     --name "$copy_name" \
     --user 0:0 \
     --read-only \
@@ -1093,7 +1260,7 @@ _agent_canon_volume_copy() {
     --env "AGENT_CANON_COPY_RELATIVE=$relative" \
     --env "AGENT_CANON_COPY_UID=$(id -u)" \
     --env "AGENT_CANON_COPY_GID=$(id -g)" \
-    --env "AGENT_CANON_COPY_INSTALL_ROOT=$AGENT_CANON_REPOSITORY_ROOT" \
+    --env "AGENT_CANON_COPY_INSTALL_ROOT=${AGENT_CANON_REPOSITORY_ROOT:-}" \
     --env "AGENT_CANON_COPY_DIGEST=$([[ "$direction" == import ]] && { if [[ "$kind" == codex-home ]]; then _agent_canon_codex_digest "$host_path"; else _agent_canon_path_digest "$host_path"; fi; } 2>/dev/null || true)" \
     --entrypoint /bin/sh \
     "$AGENT_CANON_IMAGE_REF" \
@@ -1121,7 +1288,7 @@ tree_digest() {
   (cd "$1" && find . -type f ! -name .agent-canon-private-log-v1 -exec sha256sum {} + | LC_ALL=C sort | sha256sum | digest_field)
 }
 codex_digest() {
-  validate_codex_links "$1" || return 1
+  validate_codex_links "$1" "${2:-1}" || return 1
   (
     cd "$1"
     {
@@ -1147,6 +1314,7 @@ projection_digest() {
 }
 validate_codex_links() {
   allowed="$install_root/.codex"
+  require_targets="${2:-1}"
   [ -d "$allowed" ] && [ ! -L "$allowed" ] || return 1
   invalid=$(find "$1" -type l -print | while IFS= read -r link; do
     relative_link=${link#"$1"/}
@@ -1156,7 +1324,7 @@ validate_codex_links() {
     esac
     target=$(readlink -f "$link" 2>/dev/null || true)
     case "$target" in
-      "$allowed"/*) [ -e "$target" ] || printf "invalid\\n" ;;
+      "$allowed"/*) [ "$require_targets" = 0 ] || [ -e "$target" ] || printf "invalid\\n" ;;
       *) printf "invalid\\n" ;;
     esac
   done)
@@ -1228,72 +1396,81 @@ elif [ "$direction" = import ]; then
     printf "volume-copy-digest\t%s\n" "$digest"
   fi
 else
-  output=/agent-canon-copy-output
-  [ -d "$output" ] && [ ! -L "$output" ] || exit 68
   case "$kind" in
     projection)
       source="$root/exchange"; [ -d "$source" ] && [ ! -L "$source" ] || exit 69
+      members=$(mktemp)
       for name in mounts.toml mounts.tsv rollback-plan.tsv rollback-mounts.tsv; do
-        [ ! -L "/agent-canon-copy-output/$name" ] || exit 70
-        rm -f -- "/agent-canon-copy-output/$name"
         if [ -e "$source/$name" ]; then
-          [ -f "$source/$name" ] && [ ! -L "$source/$name" ] || exit 71
-          cp -- "$source/$name" "/agent-canon-copy-output/$name"
+          [ -f "$source/$name" ] && [ ! -L "$source/$name" ] || { rm -f "$members"; exit 70; }
+          printf "%s\n" "$name" >> "$members"
         fi
-      done ;;
+      done
+      source_digest=$(projection_digest "$source")
+      tar -cf - -C "$source" --no-recursion -T "$members"
+      rm -f "$members" ;;
     skill)
-      source="$root/exchange/skill-projection"; [ -d "$source" ] && [ ! -L "$source" ] || exit 72
-      rm -rf -- /agent-canon-copy-output/skill-projection
-      mkdir -p /agent-canon-copy-output
-      cp -a "$source" /agent-canon-copy-output/skill-projection
-      [ -z "$(find /agent-canon-copy-output/skill-projection -type l -print -quit)" ] || exit 73 ;;
-    eval)
-      source="$root/spool/$relative"; [ -d "$source" ] && [ ! -L "$source" ] || exit 74
-      rm -rf -- "/agent-canon-copy-output/$relative"
-      cp -a "$source" "/agent-canon-copy-output/$relative"
-      [ -z "$(find "/agent-canon-copy-output/$relative" -type l -print -quit)" ] || exit 75 ;;
-    private-feedback)
-      source="$root/spool/private-feedback"; [ -d "$source" ] && [ ! -L "$source" ] || exit 76
-      find "$output" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
-      cp -a "$source/." "$output/"
-      [ -z "$(find "$output" -type l -print -quit)" ] || exit 77 ;;
-    codex-home)
-      source="$root/codex-home"; [ -d "$source" ] && [ ! -L "$source" ] || exit 78
-      validate_codex_links "$source" || exit 79
-      find "$output" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
-      cp -a "$source/." "$output/"
-      validate_codex_links "$output" || exit 79 ;;
-    *) exit 80 ;;
-  esac
-  if [ "$kind" = projection ]; then
-    source_digest=$(projection_digest "$source")
-    destination_digest=$(projection_digest "$output")
-  else
-    if [ "$kind" = codex-home ]; then
-      source_digest=$(codex_digest "$source")
-    else
+      source="$root/exchange/skill-projection"; [ -d "$source" ] && [ ! -L "$source" ] || exit 71
+      [ -z "$(find "$source" -type l -print -quit)" ] || exit 72
       source_digest=$(tree_digest "$source")
+      tar -cf - -C "$root/exchange" skill-projection ;;
+    eval)
+      source="$root/spool/$relative"; [ -d "$source" ] && [ ! -L "$source" ] || exit 73
+      [ -z "$(find "$source" -type l -print -quit)" ] || exit 74
+      source_digest=$(tree_digest "$source")
+      tar -cf - -C "$root/spool" "$relative" ;;
+    private-feedback)
+      source="$root/spool/private-feedback"; [ -d "$source" ] && [ ! -L "$source" ] || exit 75
+      [ -z "$(find "$source" -type l -print -quit)" ] || exit 76
+      source_digest=$(tree_digest "$source")
+      tar -cf - -C "$source" . ;;
+    codex-home)
+      source="$root/codex-home"; [ -d "$source" ] && [ ! -L "$source" ] || exit 77
+      validate_codex_links "$source" 0 || exit 78
+      source_digest=$(codex_digest "$source" 0)
+      tar -cf - -C "$source" . ;;
+    *) exit 79 ;;
+  esac
+printf "volume-copy-digest\t%s\n" "$source_digest" >&2
+fi' )
+  if [[ "$direction" == export ]]; then
+    local stream_path digest_path expected_digest copy_readback
+    stream_path=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.volume-export.XXXXXX") ||
+      _agent_canon_json_error volume_copy_failed "volume export stream file could not be created"
+    digest_path=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.volume-export-digest.XXXXXX") || {
+      rm -f -- "$stream_path"
+      _agent_canon_json_error volume_copy_failed "volume export digest file could not be created"
+    }
+    if ! "${copy_command[@]}" >"$stream_path" 2>"$digest_path"; then
+      rm -f -- "$stream_path" "$digest_path"
+      _agent_canon_json_error volume_copy_failed "volume copy failed: $direction/$kind"
     fi
-    if [ "$kind" = eval ]; then
-      destination_digest=$(tree_digest "$output/$relative")
-    elif [ "$kind" = skill ]; then
-      destination_digest=$(tree_digest "$output/skill-projection")
-    else
-      if [ "$kind" = codex-home ]; then
-        destination_digest=$(codex_digest "$output")
-      else
-        destination_digest=$(tree_digest "$output")
-      fi
-    fi
-  fi
-  [ "$source_digest" = "$destination_digest" ] || exit 84
-  printf "volume-copy-digest\t%s\n" "$source_digest"
-fi' ); then
-    _agent_canon_json_error volume_copy_failed "volume copy failed: $direction/$kind"
-  fi
-  if [[ "$direction" == import || "$direction" == export ]]; then
-    [[ "$copy_readback" =~ ^$'volume-copy-digest\t'[0-9a-f]{64}$ ]] ||
+    copy_readback=$(<"$digest_path")
+    [[ "$copy_readback" =~ ^$'volume-copy-digest\t'[0-9a-f]{64}$ ]] || {
+      rm -f -- "$stream_path" "$digest_path"
       _agent_canon_json_error volume_copy_readback_failed "volume export digest readback is invalid"
+    }
+    expected_digest=${copy_readback#*$'\t'}
+    if _agent_canon_apply_volume_export "$kind" "$host_path" "$relative" \
+      "$stream_path" "$expected_digest"; then
+      :
+    else
+      local export_rc=$?
+      rm -f -- "$stream_path" "$digest_path"
+      return "$export_rc"
+    fi
+    rm -f -- "$stream_path" "$digest_path"
+  elif [[ "$direction" == clear ]]; then
+    if ! "${copy_command[@]}" >/dev/null; then
+      _agent_canon_json_error volume_copy_failed "volume copy failed: $direction/$kind"
+    fi
+  else
+    local copy_readback
+    if ! copy_readback=$("${copy_command[@]}" ); then
+      _agent_canon_json_error volume_copy_failed "volume copy failed: $direction/$kind"
+    fi
+    [[ "$copy_readback" =~ ^$'volume-copy-digest\t'[0-9a-f]{64}$ ]] ||
+      _agent_canon_json_error volume_copy_readback_failed "volume import digest readback is invalid"
   fi
 }
 

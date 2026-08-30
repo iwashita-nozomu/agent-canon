@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tarfile
 from pathlib import Path
 
 
@@ -45,7 +46,7 @@ def tree_digest(root: Path) -> str:
                 f"{hashlib.sha256(path.read_bytes()).hexdigest()}  ./"
                 f"{path.relative_to(root).as_posix()}\n"
             )
-    return hashlib.sha256("".join(entries).encode("utf-8")).hexdigest()
+    return hashlib.sha256("".join(sorted(entries)).encode("utf-8")).hexdigest()
 
 
 def projection_digest(root: Path) -> str:
@@ -522,7 +523,6 @@ def main(argv: list[str]) -> int:
         if copy_direction:
             volume_name = ""
             input_source = ""
-            output_source = ""
             for index, item in enumerate(argv):
                 if item != "--mount" or index + 1 >= len(argv):
                     continue
@@ -535,8 +535,6 @@ def main(argv: list[str]) -> int:
                     volume_name = values.get("src", "")
                 elif values.get("type") == "bind" and values.get("dst") == "/agent-canon-copy-input":
                     input_source = values.get("src", "")
-                elif values.get("type") == "bind" and values.get("dst") == "/agent-canon-copy-output":
-                    output_source = values.get("src", "")
             if not volume_name:
                 return 2
             backing = volume_path(volume_name)
@@ -568,7 +566,6 @@ def main(argv: list[str]) -> int:
                         return False
                 return True
             source = Path(input_source) if copy_direction == "import" else None
-            output = Path(output_source) if copy_direction == "export" else None
             if copy_direction == "clear":
                 if kind != "host-mounts":
                     return 1
@@ -620,115 +617,59 @@ def main(argv: list[str]) -> int:
                         )
                     print(f"volume-copy-digest\t{expected_digest}")
             elif copy_direction == "export":
-                if output is None:
-                    return 1
-                output.mkdir(parents=True, exist_ok=True)
+                def emit_tar(source_root: Path, members: list[tuple[Path, str]]) -> None:
+                    with tarfile.open(fileobj=sys.stdout.buffer, mode="w") as archive:
+                        for path, arcname in members:
+                            archive.add(path, arcname=arcname, recursive=path.is_dir())
+
                 if kind == "projection":
                     source_root = backing / "exchange"
                     if not source_root.is_dir() or source_root.is_symlink():
                         return 1
+                    members = []
                     for name in ("mounts.toml", "mounts.tsv", "rollback-plan.tsv", "rollback-mounts.tsv"):
-                        target = output / name
-                        if target.is_symlink():
-                            return 1
-                        target.unlink(missing_ok=True)
                         source_file = source_root / name
                         if source_file.exists():
                             if source_file.is_symlink() or not source_file.is_file():
                                 return 1
-                            shutil.copy2(source_file, target)
+                            members.append((source_file, name))
+                    emit_tar(source_root, members)
+                    readback_digest = projection_digest(source_root)
                 elif kind == "skill":
                     source_root = backing / "exchange" / "skill-projection"
-                    target = output / "skill-projection"
-                    if not source_root.is_dir() or source_root.is_symlink():
+                    if not source_root.is_dir() or source_root.is_symlink() or any(
+                        path.is_symlink() for path in source_root.rglob("*")
+                    ):
                         return 1
-                    if target.exists() or target.is_symlink():
-                        if target.is_symlink():
-                            return 1
-                        shutil.rmtree(target)
-                    shutil.copytree(source_root, target, symlinks=True if kind == "codex-home" else False)
+                    emit_tar(source_root.parent, [(source_root, "skill-projection")])
+                    readback_digest = tree_digest(source_root)
                 elif kind == "eval":
                     source_root = backing / "spool" / relative
-                    target = output / relative
-                    if not source_root.is_dir() or source_root.is_symlink():
+                    if not source_root.is_dir() or source_root.is_symlink() or any(
+                        path.is_symlink() for path in source_root.rglob("*")
+                    ):
                         return 1
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    if target.exists() or target.is_symlink():
-                        if target.is_symlink():
-                            return 1
-                        shutil.rmtree(target)
-                    shutil.copytree(source_root, target)
+                    emit_tar(source_root.parent, [(source_root, relative)])
+                    readback_digest = tree_digest(source_root)
                 elif kind == "private-feedback":
                     source_root = backing / "spool" / "private-feedback"
-                    if not source_root.is_dir() or source_root.is_symlink():
+                    if not source_root.is_dir() or source_root.is_symlink() or any(
+                        path.is_symlink() for path in source_root.rglob("*")
+                    ):
                         return 1
-                    for child in output.iterdir():
-                        if child.is_dir() and not child.is_symlink():
-                            shutil.rmtree(child)
-                        else:
-                            child.unlink()
-                    for child in source_root.iterdir():
-                        if child.is_symlink():
-                            return 1
-                        if child.is_dir():
-                            shutil.copytree(child, output / child.name, symlinks=True)
-                        else:
-                            shutil.copy2(child, output / child.name)
+                    emit_tar(source_root, [(child, child.name) for child in sorted(source_root.iterdir())])
+                    readback_digest = tree_digest(source_root)
                 elif kind == "codex-home":
                     source_root = backing / "codex-home"
-                    if not source_root.is_dir() or source_root.is_symlink():
+                    if not source_root.is_dir() or source_root.is_symlink() or not valid_codex_links(source_root):
                         return 1
-                    if not valid_codex_links(source_root):
-                        return 1
-                    for child in output.iterdir():
-                        if child.is_dir() and not child.is_symlink():
-                            shutil.rmtree(child)
-                        else:
-                            child.unlink()
-                    for child in source_root.iterdir():
-                        if child.is_symlink():
-                            (output / child.name).symlink_to(os.readlink(child))
-                        elif child.is_dir():
-                            shutil.copytree(child, output / child.name, symlinks=True)
-                        else:
-                            shutil.copy2(child, output / child.name)
-                    if not valid_codex_links(output):
-                        return 1
+                    emit_tar(source_root, [(child, child.name) for child in sorted(source_root.iterdir())])
+                    readback_digest = codex_digest(source_root)
                 else:
                     return 1
                 if os.environ.get("FAKE_DOCKER_CORRUPT_COPY") == "1":
-                    corrupted = next(
-                        (
-                            path
-                            for path in sorted(output.rglob("*"))
-                            if path.is_file() and not path.is_symlink()
-                        ),
-                        None,
-                    )
-                    if corrupted is not None:
-                        corrupted.write_bytes(corrupted.read_bytes() + b"corrupt\n")
-                if kind == "projection":
-                    readback_digest = projection_digest(backing / "exchange")
-                    destination_digest = projection_digest(output)
-                else:
-                    if kind == "eval":
-                        source_digest = tree_digest(backing / "spool" / relative)
-                    elif kind == "skill":
-                        source_digest = tree_digest(backing / "exchange" / "skill-projection")
-                    elif kind == "private-feedback":
-                        source_digest = tree_digest(backing / "spool" / "private-feedback")
-                    else:
-                        source_digest = codex_digest(backing / "codex-home")
-                    if kind == "eval":
-                        destination_digest = tree_digest(output / relative)
-                    elif kind == "skill":
-                        destination_digest = tree_digest(output / "skill-projection")
-                    else:
-                        destination_digest = codex_digest(output) if kind == "codex-home" else tree_digest(output)
-                    readback_digest = source_digest
-                if readback_digest != destination_digest:
-                    return 1
-                print(f"volume-copy-digest\t{readback_digest}")
+                    readback_digest = "0" * 64
+                print(f"volume-copy-digest\t{readback_digest}", file=sys.stderr)
             save(state)
             return 0
         volume_name = ""
