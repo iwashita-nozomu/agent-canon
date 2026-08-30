@@ -284,7 +284,7 @@ AgentCanon `reports/`, `.agent-canon/`, `target/`, or another source path.
 Producer code, role configuration, and eval manifests resolve from the
 image-owned AgentCanon snapshot. `--root <project-root>` supplies only the
 observed read-only target identity; the target is not required to copy
-`agents/`, `.codex/`, or `evidence/agent-evals/`. Producer failure is recorded
+`agents/`, `.codex/`, or `eval/`. Producer failure is recorded
 before export, and the Host adapter exports the pre-created output/log trees
 without replacing that failure with a missing-path error.
 

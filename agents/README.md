@@ -58,7 +58,10 @@ Target-State-First と Decision Sufficiency は
 - Workflow-routed internal and compatibility routines: `agents/internal-routines/`
 - Codex runtime config and subagent registry: `.codex/config.toml`
 - Codex role behavior: `.codex/agents/*.toml`
-- Eval manifest source contracts: `evidence/agent-evals/`
+- Eval implementation and source contracts: `eval/` (definitions, producers,
+  checkers, and static fixtures)
+- Eval output and run evidence: external runtime spool, then the
+  `agent-canon-log` archive; no generated result is stored under `agents/`
 
 ## Team Shape
 

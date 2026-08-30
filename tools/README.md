@@ -19,6 +19,12 @@ used by AgentCanon. A parent repository does not vendor this directory, copy it
 into its own `tools/`, or create a symlink view. Parent automation and project
 tests stay parent-owned.
 
+`tools/bin/agent-canon` resolves the repository root from its `BASH_SOURCE`
+script location before dispatching to `bootstrap.sh`. It is therefore
+cwd-independent: invoking the wrapper from any working directory uses the same
+source checkout and bootstrap runtime. Runtime and output roots remain the
+explicit control/runtime arguments supplied to the command.
+
 ## Execution planes
 
 Use the top-level [`bootstrap.sh`](../bootstrap.sh) for the shared AgentCanon

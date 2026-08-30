@@ -20,7 +20,7 @@ downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates 
 ## Authority と設計境界
 
 - canonical design owner: `.codex/README.md` の Hook Context と `.codex/hooks/hook_dispatcher.py` の lifecycle contract
-- canonical non-hook owners: `tools/agent_tools/` の typed tool/checker modules、`tools/runtime/lifecycle/workflow_monitor.py` の monitor projection emitter
+- canonical non-hook owners: `tools/agent/` と `tools/runtime/` の typed tool/checker modules、`tools/runtime/lifecycle/workflow_monitor.py` の monitor projection emitter
 - decision: 3 active dispatcher events、inactive `Stop`、permanent tombstones、retired executable file なし
 - no compatibility surface: 旧 executable、re-export、wrapper、shim、fallback CLI は作らない
 - source checkout: fresh design clone from current `main`; implementation wave は同じ source snapshot を再読込して開始する
@@ -51,7 +51,7 @@ active handler は `record_hook_invocation` を一回、`HookLogContext.append` 
 
 Invalid interpretations:
 
-- no transport relocation (`tools/agent_tools/hook_event_log.py` への新設は不可)
+- no transport relocation（hook transport は `.codex/hooks/hook_event_log.py` に留める）
 - no compatibility wrapper / shim / fallback re-export
 - no count/path semantics changes (`RETIRED_CHILD_TOMBSTONES=23`, `MOVED_SOURCE_ABSENCES=1`, union `24`を維持)
 
@@ -248,7 +248,7 @@ event_id = hashlib.sha256(event_id_preimage).hexdigest()
 
 The single safety owner is `tools/runtime/authority/hook_safety.py`. It receives all pure reusable safety logic from the current `.codex/hooks/hook_safety.py`: `SECRET_PATTERNS`, `SHELL_TOOL_NAMES`, payload extractors, `secret_kind`, `secret_block_payload`, `GitCommand`, `GitIntent`, shell/backtick parsing, protected update/branch/worktree/Git intent classification, authority predicates, `first_block`, `command_sha256`, and `branch_block_payload`. No second `prompt_safety.py`, `destructive_git_safety.py`, or hook-local safety owner exists.
 
-The implementation dispatcher import contract is exact: resolve `Path(__file__).resolve().parents[2]` as source root, prepend `<source-root>/tools/agent_tools` once to `sys.path` if absent, then use this direct-import list exactly once:
+The implementation dispatcher import contract is exact: resolve `Path(__file__).resolve().parents[2]` as source root, prepend `<source-root>` once to `sys.path` if absent, then use this direct-import list exactly once:
 
 ```text
 import hook_safety                              # canonical `tools.runtime.authority.hook_safety`
@@ -295,8 +295,8 @@ The two tuples are type-separated. `RETIRED_CHILD_TOMBSTONES` contains exactly t
 
 `command_or_skill` has one fixed metadata grammar and no old executable path:
 
-- pure owner: `import-only:tools.agent_tools.<module>:<symbol>`;
-- canonical command: `command-only:python3 tools/agent_tools/<owner>.py <subcommand>`;
+- pure owner: `import-only:tools.agent.<module>:<symbol>`;
+- canonical command: `command-only:python3 tools/agent/<owner>.py <subcommand>`;
 - canonical skill: `skill-only:$<skill-id>`;
 - canonical docs command: `docs-only:tools/bin/agent-canon docs check`.
 

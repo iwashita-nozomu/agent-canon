@@ -819,9 +819,11 @@ packet_digest = "sha256-of-the-complete-answer-free-packet"
 bytes から計算します。packet file は prompt、target/dependency paths、scenario、
 requirements、method、report grammar だけを持ち、`expected_*`, `oracle_*`, expected
 command/artifacts、prior result は schema 上禁止します。parent-only oracle の exact path
-は `evidence/agent-evals/skill-runtime-shim/oracles/<packet-id>.json`、measurement
-artifact の exact path は `evidence/agent-evals/skill-runtime-shim/measurements/<run-id>.json`
-とし、evaluator allowlist に oracle path を入れません。oracle JSON は
+は外部 runtime spool の
+`<runtime-root>/spool/skill-runtime-shim/oracles/<packet-id>.json`、measurement
+artifact の exact path は
+`<runtime-root>/spool/skill-runtime-shim/measurements/<run-id>.json` とし、
+evaluator allowlist に oracle path を入れません。oracle JSON は
 `schema, packet_id, scenario_id, baseline_projection, generated_projection,
 expected_route_projection, expected_failure_projection, oracle_digest` の順で保存し、
 fresh packet からは不可視です。

@@ -30,8 +30,9 @@ downstream implementation ../../tools/validation/semantic/documents/check_design
     親 hook 契約を定義します。
   - `tools/runtime/container/devcontainer_dependencies.py` が `pyproject.toml` の
     optional-dependencies extras の名前・順序・重複と存在を検証し、標準 editable
-    install / `pip check` を所有します。`container_config.py` は pack/env の typed
-    extras を Compose 境界へ projection します。
+    install / `pip check` を所有します。pack/env の typed extras は
+    `tools/runtime/container/devcontainer_dependencies.py` から Compose 境界へ
+    projection されます。
 - [experiment_runner.md](experiment_runner.md)
   - `experiment_runner` の契約と実行モデル
 - [experiment-topic-template.md](experiment-topic-template.md)

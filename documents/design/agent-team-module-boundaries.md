@@ -234,7 +234,7 @@ module を top-level import します。`route`, `skill_tool_commands`, `task_au
 
 - package mode は `from agent_tools import agent_team` と owner module の relative
   import を使い、`agent_team.__all__` の承認済み allowlist だけを公開します。
-- direct-script mode は `PYTHONPATH` で `tools/agent_tools` を解決した既存の実行形を
+- direct-script mode は `PYTHONPATH` で repository root を解決した既存の実行形を
   保持します。各 owner の明示 import branch は package と direct の両方で同じ定義を
   参照し、alias、wrapper、module 注入による compatibility wiring は作りません。
 - import は設定ファイルの読み込み、template rendering、report の作成、snapshot の

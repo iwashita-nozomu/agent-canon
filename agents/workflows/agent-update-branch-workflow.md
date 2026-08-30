@@ -37,7 +37,7 @@ the user.
 
 ## Branch Lanes
 
-- `agent-updates/knowledge-eval/<slug>`: private knowledge and eval-only updates.
+- `agent-updates/knowledge-eval/<slug>`: private knowledge and eval source-only updates.
 - `agent-updates/canon-source/<slug>`: qualified standalone AgentCanon source clone and source PR updates.
 - `agent-updates/integration/<slug>`: merges update branches and validates them before `main`.
 
@@ -45,7 +45,11 @@ the user.
 
 1. Reuse the current branch if it already owns this private knowledge/eval lane.
 1. Otherwise request user direction and approval for `agent-updates/knowledge-eval/<slug>` after recording `branch_creation_reason=<reason>`; create it only through the same-segment creation-authority guard contract. Add the destructive authority/reason pair only when the route force-creates or overwrites a ref.
-1. Change only `evidence/agent-evals/`, `.codex/personal/skills/*/SKILL.md`, or run-local evaluation artifacts that document private feedback.
+1. Change only `eval/` source contracts, `.codex/personal/skills/*/SKILL.md`, or
+   run-local evaluation inputs that document private feedback. Producers,
+   checkers, and static fixtures remain under `eval/`; generated reports and
+   packets are written to the explicit external runtime spool and published
+   through the `agent-canon-log` archive.
 1. Run `bash tools/repository/git/agent_update_branch.sh validate knowledge-eval`.
 1. Commit with a message that states this is a private knowledge/eval-only agent update branch.
 1. Push with `bash tools/repository/git/agent_update_branch.sh push knowledge-eval <branch>`.

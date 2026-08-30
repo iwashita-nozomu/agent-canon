@@ -3,12 +3,12 @@
 contract data
 responsibility Documents skill and workflow prompt eval definitions.
 upstream design ../../agents/canonical/skills.md skill canon registry
-downstream implementation ../../eval/producers/evaluate_skill_workflow_prompts.py runs these evals
-downstream implementation ../../eval/producers/evaluate_agent_run.py runs behavior evals
-downstream implementation ../../eval/checkers/eval_accumulation_check.py validates accumulated result evidence
-downstream implementation ../../eval/producers/evaluate_workflow_selection.py runs workflow selection evals
-downstream implementation ../../eval/producers/evaluate_report_quality.py runs report quality evals
-downstream implementation ../../eval/producers/evaluate_codex_agent_roles.py runs Codex subagent role evals
+downstream implementation ../producers/evaluate_skill_workflow_prompts.py runs these evals
+downstream implementation ../producers/evaluate_agent_run.py runs behavior evals
+downstream implementation ../checkers/eval_accumulation_check.py validates accumulated result evidence
+downstream implementation ../producers/evaluate_workflow_selection.py runs workflow selection evals
+downstream implementation ../producers/evaluate_report_quality.py runs report quality evals
+downstream implementation ../producers/evaluate_codex_agent_roles.py runs Codex subagent role evals
 @dependency-end
 -->
 
@@ -19,8 +19,11 @@ run-bundle behavior evidence.
 Prompt evals are frozen checklists for one prompt surface or one glob-expanded prompt family.
 Behavior evals are frozen criteria for observable agent actions recorded in run artifacts.
 
-These manifests stay in `eval/definitions/` as the source-controlled eval
-definition contract. Runtime outputs stay in the mounted archive, and
+Definitions, producers, checkers, and static fixtures are the eval source
+contract. These manifests stay in `eval/definitions/`; runtime outputs do not.
+All measurements, reports, packets, and logs are written to an explicit
+external bootstrap runtime spool and, when retained, the separate
+`agent-canon-log` archive (`<install-root-parent>/agent-canon-log/`).
 `agents/evals/` remains only a legacy path resolver.
 
 ## Reader Map
@@ -71,19 +74,22 @@ details:
 ```bash
 python3 eval/producers/evaluate_skill_workflow_prompts.py \
   --manifest eval/definitions/skill_workflow_prompt_eval.toml \
-  --compact-out reports/agents/<run-id>/skill-workflow-prompt-compact.json
+  --runtime-root <install-root>/.runtime \
+  --compact-out <install-root>/.runtime/spool/<run-id>/skill-workflow-prompt-compact.json
 ```
 
 When a run uses skills, run the same prompt eval with accumulated evidence.
-Detailed reports are tool-written, not agent-authored prose, and are stored in
-the mounted runtime log archive under
-`.agent-canon/log-archive/eval-results/skill-workflow-prompt/` and are never
+Detailed reports are tool-written, not agent-authored prose. They are first
+written to the explicit runtime spool and then published to the external
+`agent-canon-log` archive; they are never written to this source checkout or
 overwritten during normal agent work:
 
 ```bash
 python3 eval/producers/evaluate_skill_workflow_prompts.py \
   --manifest eval/definitions/skill_workflow_prompt_eval.toml \
+  --runtime-root <install-root>/.runtime \
   --accumulate \
+  --results-dir <install-root>/.runtime/spool/<run-id>/eval-results/skill-workflow-prompt \
   --run-id <run-id> \
   --skill-used agent-orchestration
 ```
@@ -120,7 +126,8 @@ The file name convention is:
 
 ```bash
 python3 eval/producers/evaluate_agent_run.py \
-  --report-dir reports/agents/<run-id> \
+  --runtime-root <install-root>/.runtime \
+  --report-dir <install-root>/.runtime/spool/<run-id> \
   --behavior-manifest eval/definitions/agent_behavior_eval.toml \
   --write
 ```
@@ -152,8 +159,8 @@ they are not promoted to canonical evidence.
 | Hook/tool review | `hook_tool_feedback=reviewed` and `protocol_feedback_reason=...`. |
 | Parent update | `parent_protocol_update=<applied|recorded|not_required>`. |
 | Subagent update | `subagent_protocol_update=<applied|recorded|not_required>`. |
-| Archive identity | unique `hook_run_id` values under `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`. |
-| Legacy source-tree result path | `agents/evals/results/` is not a normal read or write location; old results must be imported into the archive and deleted from source. |
+| Archive identity | unique `hook_run_id` values under the external `agent-canon-log` archive's `hook-runs/<repo-key>/<runtime-namespace>/<hook-name>.jsonl`. |
+| Legacy source-tree result path | `agents/evals/results/` is not a normal read or write location; old results must be imported into the external archive and deleted from source. |
 
 The archive boundary is documented in `documents/runtime/runtime-log-archive.md`.
 Run the mechanical producer before using accumulated evidence in a PR or guide:
@@ -161,25 +168,27 @@ Run the mechanical producer before using accumulated evidence in a PR or guide:
 ```bash
 python3 eval/producers/run_accumulated_agent_evals.py \
   --root . \
+  --runtime-root <install-root>/.runtime \
   --run-id <run-id>
-python3 eval/checkers/eval_accumulation_check.py --root .
+python3 eval/checkers/eval_accumulation_check.py --root . \
+  --runtime-root <install-root>/.runtime
 ```
 
 The producer runs the registered role, skill/workflow prompt,
 workflow-selection, and report-quality evals with `--accumulate`; stdout/stderr
-go to `reports/agent-eval-runs/<run-id>/`. Agents do not hand-generate these
-reports. The gate validates directory mounted JSONL readability when available,
+go to the explicit `<install-root>/.runtime/spool/<run-id>/` path. Agents do not
+hand-generate these reports. The gate validates directory mounted JSONL readability when available,
 every family declared in `eval_result_families.toml`, unique run ids,
 non-ignored tracked evidence paths, and intentionally ignored archive paths,
 without compacting or deleting archive results.
 
-Specialized evals share the same source/result boundary: source manifests live
-in this directory, accumulated reports live under `.agent-canon/log-archive/`,
-and bounded run stdout/stderr may live under `reports/agent-eval-runs/<run-id>/`.
-The checked-in shim measurement fixture is
-`skill-runtime-shim/measurements/fixture-measurement.json`; ignored
-`reports/agent-eval-runs/` copies are transient producer output and are not an
-alternate oracle.
+Specialized evals share the same source/result boundary: definitions, producers,
+checkers, and fixtures live under `eval/`; accumulated reports and logs live in
+the external runtime spool and `agent-canon-log` archive.
+The checked-in shim measurement fixture is a static source fixture at
+`eval/fixtures/skill-runtime-shim/measurements/fixture-measurement.json`;
+generated measurements are external runtime artifacts. Runtime spool copies
+are transient producer output and are not an alternate oracle.
 
 | Eval surface | Command | Accumulated evidence and privacy rule |
 | --- | --- | --- |

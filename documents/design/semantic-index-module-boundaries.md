@@ -121,7 +121,7 @@ replaceable unit の根拠にします。
 ### 3.1 対象 tree
 
 ```text
-rust/agent-canon/
+tools/runtime/dispatch/agent-canon/
 ├── Cargo.toml
 ├── src/
 │   ├── main.rs

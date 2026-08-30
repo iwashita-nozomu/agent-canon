@@ -108,7 +108,7 @@ Rust is a development/runtime ergonomics surface owned by `.devcontainer/`.
 ## Canonical Layout
 
 ```text
-rust/
+tools/runtime/dispatch/
   agent-canon/
     Cargo.toml
     src/
@@ -130,11 +130,11 @@ tools/
 
 ## Sequential Migration Policy
 
-Repos that vendor AgentCanon should not invent their own Rust migration order.
-After updating the AgentCanon pin, run:
+Parent repositories should not invent their own Rust migration order. After
+updating the qualified AgentCanon source clone, run:
 
 ```bash
-agent-canon rust-migration-plan --root vendor/agent-canon --limit 12
+agent-canon rust-migration-plan --root <agent-canon-source> --limit 12
 ```
 
 Standalone AgentCanon checkouts use:
@@ -275,5 +275,5 @@ python3 tools/analysis/search/search.py --help
 python3 tools/analysis/search/search_index.py --help
 python3 tools/runtime/manifest/tool_catalog.py
 python3 tools/validation/semantic/tools/tool_drift.py
-python3 tools/ci/container_config.py
+python3 tools/validation/ci/runners/container_runtime.py
 ```
