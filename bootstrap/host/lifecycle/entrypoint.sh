@@ -1243,14 +1243,17 @@ _agent_canon_finish_clean_install() {
   # is no longer part of install state and must not leak into the next run.
   local path rollback_plan rollback_ref rollback_tag_prefix
   rollback_plan="$AGENT_CANON_STATE_ROOT/rollback-plan.tsv"
+  rollback_ref=${AGENT_CANON_CLEAN_INSTALL_ROLLBACK_REF:-}
   if [[ -f "$rollback_plan" && ! -L "$rollback_plan" ]]; then
-    rollback_ref=$(awk -F $'\t' '$1 == "image-ref" { print $2 }' "$rollback_plan")
+    rollback_ref=${rollback_ref:-$(awk -F $'\t' '$1 == "image-ref" { print $2 }' "$rollback_plan")}
+  fi
+  if [[ -n "$rollback_ref" ]]; then
     # The plan owns a generated tag, not the image identity.  Never pass an
     # immutable image ID or an unrelated/foreign tag to ``image rm``: an image
     # ID can be the active candidate when Docker reused the same layers, while
     # a foreign tag is outside this install's lifecycle.
     rollback_tag_prefix="agent-canon-tools:$(_agent_canon_control_digest | cut -c1-16)-rollback-"
-    if [[ -n "$rollback_ref" && "$rollback_ref" == "$rollback_tag_prefix"* ]]; then
+    if [[ "$rollback_ref" == "$rollback_tag_prefix"* ]]; then
       if "$AGENT_CANON_DOCKER_CMD" image inspect "$rollback_ref" >/dev/null 2>&1; then
         "$AGENT_CANON_DOCKER_CMD" image rm "$rollback_ref" >/dev/null ||
           _agent_canon_json_error install_runtime_invalid \
