@@ -65,28 +65,19 @@ Target-State-First と Decision Sufficiency は
 
 ## Team Shape
 
-- Full staged always-on roles:
-  - `manager`, `manager_reviewer`, `designer`, `design_reviewer`, `document_flow_reviewer`, `implementer`, `change_reviewer`, `final_reviewer`, `verifier`, `auditor`
-- Lite scoped always-on roles:
-  - `manager`, `implementer`, `change_reviewer`, `verifier`, `auditor`
-- Specialist roles:
-  - `researcher`, `research_reviewer`, `experimenter`, `experiment_reviewer`, `scheduler`, `schedule_reviewer`, `infra_steward`, `infra_reviewer`, `prompt_config_reviewer`, `project_reviewer`, `notation_definition_reviewer`, `logic_gap_reviewer`, `reproducibility_reviewer`, `scientific_computing_reviewer`, `benchmark_reviewer`, `artifact_reviewer`, `fair_data_reviewer`, `ml_science_reviewer`
-- `manager` は intake、context sweep、library sweep、routing declaration、specialist activation の front door です。
-- `designer` は常に `implementer` より前に走ります。
-- review の直後は、直前の execution role が feedback を反映してから次段へ進みます。
-- `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` は必ず別 instance にします。
-- obligation と一次検証 owner は semantic responsibility contract に実装前に割り当てます。
-  `test_designer` は owning mechanism の確立または修復後に、checker と targeted validation
-  では閉じない test-owned runtime risk が残った場合だけ起動します。contract-only wrapper
-  では checker-owned validation と static contract evidence を使います。
-- 学術文章では `notation_definition_reviewer` と `logic_gap_reviewer` もそれぞれ別 instance にします。
-- repo file edit は parent-managed write scope で割り当て、同一 path / ownership / public API surface を複数 writer に割り当てません。
-- `manager`、reviewer 群、`researcher`、`scheduler`、`infra_steward`、`verifier`、`auditor` は artifact-only です。
+Workflow family, stage, required-role, and child activation are selected from
+the typed records in [task_catalog.yaml](task_catalog.yaml):
+`workflow_activation_policy`, `tasks[].family`,
+`workflow_families[].roles`, and `role_topology_defaults.stage_waves`.
+Role behavior and write authority remain owned by `.codex/agents/*.toml` and
+the canonical workflow/authority documents. The catalog is the positive
+selection source; this hub does not repeat role inventories or activation
+rules.
 
 ## Startup Contract
 
 - 着手時は `workflow=<family>`, `skills=<...>`, `review=<...>` を 1 行で宣言します。
-- repo-changing task では、実装前に run bundle を作り、stage ごとの role / subagent を明示します。
+- run bundle と stage / child handoff は、選択した typed route が要求する場合だけ materialize します。
 - 包括的開発の route は [skills/comprehensive-development.md](skills/comprehensive-development.md) に集約し、この hub では bootstrap command と review stack の入口だけを示します。
 - 包括的開発では、`project_reviewer`、`docs_workflow_steward`、prompt/config surface があれば `prompt_config_reviewer`、言語差分に応じた reviewer を bundle に明示します。
 - planning を含む Codex session では、parent session 側の plan-mode command を使います。official Codex CLI では `/plan` です。
@@ -169,7 +160,7 @@ python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
 ## 運用ルール
 
 - 共通方針は `agents/` 配下に集約し、entrypoint へ重複記述しません。
-- workflow family 選択はこの hub と `workflows/README.md` を正本にし、`canonical/README.md` を第二の hub にしません。
+- workflow family 選択は [task_catalog.yaml](task_catalog.yaml) の typed route を正本にし、この hub は reader entrypoint だけを示します。
 - 新しい workflow や skill を追加するときは、まず `agents/canonical/` の文書を更新します。
 - 実行環境固有の都合がある場合だけ、`AGENTS.md` にその環境で必要な差分を持たせます。
 - 会話だけを根拠に実装へ進めず、`documents/`、`documents/notes/`、`references/`、dependency surface、local implementation を先に探索します。

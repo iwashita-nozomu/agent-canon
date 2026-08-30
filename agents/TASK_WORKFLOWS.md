@@ -30,8 +30,8 @@ task catalog, runtime profile matrix, or closeout tools as policy authority.
 
 | Contract | Owner Surface |
 | -------- | ------------- |
-| workflow family and spawn budget | `agents/task_catalog.yaml` |
-| role topology and same-role instance schema | `agents/task_catalog.yaml` |
+| workflow family, activation, and full-staging route | `agents/task_catalog.yaml` `workflow_activation_policy`; `workflow_families[].id` |
+| stage topology and required roles | `agents/task_catalog.yaml` `role_topology_defaults.stage_waves`; `workflow_families[].roles` |
 | default specialists and review packs | `agents/task_catalog.yaml`; `agents/agents_config.json` |
 | role behavior, stage conditions, and review separation | `.codex/agents/*.toml` |
 | run bundle, declared workflow / skills / review, and dynamic wave ledger | `bootstrap_agent_run.py`; `workflow_monitor.py` |
@@ -119,8 +119,10 @@ reader path.
 | Adaptive Improvement Loop | `agents/task_catalog.yaml` `workflow_families[].id=adaptive_improvement_loop` |
 | IssueWorker Publication | `agents/task_catalog.yaml` `workflow_families[].id=issue_worker_publication`; logical route executes the `publisher` role for explicit candidates |
 
-`documents/runtime/runtime-profiles-and-check-matrix.md` selects the active validation
-matrix for the changed path and risk class.
+`workflow_activation_policy` selects the positive family/stage/child route. Safety,
+authority, and validation prohibitions stay with their canonical owners;
+`documents/runtime/runtime-profiles-and-check-matrix.md` selects the active
+validation matrix for the changed path and risk class.
 
 ## Dynamic Wave Evidence
 

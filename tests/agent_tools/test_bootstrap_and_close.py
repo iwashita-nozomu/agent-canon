@@ -2194,8 +2194,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("agent type selection for implementer must be one of", result.stdout)
             self.assertFalse((report_root / "test-invalid-selection").exists())
 
-    def test_bootstrap_plain_fix_activates_subagent_bootstrap(self) -> None:
-        """Plain fix prompts should match route.py write-capable handoff."""
+    def test_bootstrap_plain_fix_waits_for_typed_route(self) -> None:
+        """Plain fix prompts defer child activation until a typed route is selected."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
@@ -2226,18 +2226,18 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(
-                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap",
+                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow",
                 result.stdout,
             )
             self.assertIn(
-                "ACTIVE_SKILLS=$agent-orchestration,$subagent-bootstrap",
+                "ACTIVE_SKILLS=$agent-orchestration",
                 result.stdout,
             )
             self.assertIn("DEFERRED_SKILLS=$codex-task-workflow", result.stdout)
-            self.assertIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
+            self.assertNotIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
 
-    def test_bootstrap_plain_refactor_activates_subagent_bootstrap(self) -> None:
-        """Plain refactor prompts should match route.py write-capable handoff."""
+    def test_bootstrap_plain_refactor_waits_for_typed_route(self) -> None:
+        """Plain refactor prompts defer child activation until a typed route is selected."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
@@ -2271,14 +2271,13 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("ACTIVE_SKILLS=", result.stdout)
             for skill in (
                 "$agent-orchestration",
-                "$subagent-bootstrap",
                 "$task-routing",
                 "$refactor-loop",
                 "$structure-refactor",
             ):
                 self.assertIn(skill, result.stdout)
             self.assertIn("DEFERRED_SKILLS=$codex-task-workflow", result.stdout)
-            self.assertIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
+            self.assertNotIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
 
     def test_bootstrap_review_only_does_not_activate_subagent_bootstrap(self) -> None:
         """Review-only do-not-edit prompts should not emit implementation handoff."""
@@ -2762,28 +2761,13 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 contract_complete_implementation_policy["scope_basis"],
                 "contract_required_behavior",
             )
-            self.assertEqual(
-                contract_complete_implementation_policy[
-                    "implementation_handoff_required"
-                ],
-                "yes",
+            self.assertNotIn(
+                "implementation_handoff_required",
+                contract_complete_implementation_policy,
             )
-            self.assertEqual(
-                contract_complete_implementation_policy["parent_repo_edits_allowed"],
-                "no",
-            )
-            self.assertEqual(
-                contract_complete_implementation_policy["parent_orchestration_only"],
-                "yes",
-            )
-            self.assertEqual(
-                contract_complete_implementation_policy["write_capable_child_required"],
-                "yes",
-            )
-            self.assertEqual(
-                contract_complete_implementation_policy["parent_blocked_route"],
-                "typed_blocked_retry_or_user_report",
-            )
+            self.assertNotIn("parent_repo_edits_allowed", contract_complete_implementation_policy)
+            self.assertNotIn("parent_orchestration_only", contract_complete_implementation_policy)
+            self.assertNotIn("write_capable_child_required", contract_complete_implementation_policy)
             self.assertEqual(
                 default_quality_check_policy["candidate_roles"],
                 ["change_reviewer"],

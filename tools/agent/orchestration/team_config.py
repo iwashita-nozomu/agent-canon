@@ -361,11 +361,12 @@ def current_stage_skills(
     task_text: str = "",
     *,
     source_root: Path = ROOT,
+    typed_route_required: bool = False,
 ) -> tuple[str, ...]:
     """Return public skills to declare for the current stage only."""
     active_skills = set(CURRENT_STAGE_SKILLS)
     active_skills.update(catalog_active_stage_skills(source_root))
-    if implementation_handoff_required(task_text):
+    if implementation_handoff_required(task_text, typed_route_required=typed_route_required):
         active_skills.add("$subagent-bootstrap")
     return tuple(skill for skill in selected_skills if skill in active_skills)
 
@@ -375,9 +376,17 @@ def deferred_stage_skills(
     task_text: str = "",
     *,
     source_root: Path = ROOT,
+    typed_route_required: bool = False,
 ) -> tuple[str, ...]:
     """Return selected public skills that should wait for dynamic wave triggers."""
-    active = set(current_stage_skills(selected_skills, task_text, source_root=source_root))
+    active = set(
+        current_stage_skills(
+            selected_skills,
+            task_text,
+            source_root=source_root,
+            typed_route_required=typed_route_required,
+        )
+    )
     return tuple(skill for skill in selected_skills if skill not in active)
 
 
@@ -509,6 +518,48 @@ def workflow_always_on_roles(
         f"workflow_families[{workflow_family_id}].roles.always_on",
     )
     return tuple(resolve_role(config, role_id) for role_id in role_ids)
+
+
+def workflow_child_handoff_required(
+    config: TeamConfig,
+    catalog: TaskCatalog | None,
+    workflow_family_id: str | None,
+    issue_worker_candidate: Mapping[str, object] | None = None,
+) -> bool:
+    """Return whether a selected typed family contains a write-capable child."""
+    if catalog is None or not workflow_family_id:
+        return False
+    policy = _as_object_mapping(
+        catalog.raw.get("workflow_activation_policy"),
+        "workflow_activation_policy",
+    )
+    child_handoff = _as_object_mapping(
+        policy.get("child_handoff"),
+        "workflow_activation_policy.child_handoff",
+    )
+    if child_handoff.get("activation") != "selected_typed_route":
+        return False
+    family = resolve_workflow_family(catalog, workflow_family_id)
+    if (
+        workflow_family_id == "issue_worker_publication"
+        and not isinstance(issue_worker_candidate, Mapping)
+    ):
+        return False
+    roles = _as_object_mapping(
+        family.get("roles", {}), f"workflow_families[{workflow_family_id}].roles"
+    )
+    role_ids = _as_string_tuple(
+        roles.get("always_on"),
+        f"workflow_families[{workflow_family_id}].roles.always_on",
+    ) + _as_string_tuple(
+        roles.get("specialists"),
+        f"workflow_families[{workflow_family_id}].roles.specialists",
+    )
+    return any(
+        resolve_role(config, role_id).write_policy.mode
+        not in {"read_only", "artifacts_only"}
+        for role_id in role_ids
+    )
 
 
 def load_codex_agent_configs() -> dict[str, dict[str, object]]:
