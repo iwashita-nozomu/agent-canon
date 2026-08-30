@@ -4497,22 +4497,6 @@
       "surface": "tool"
     },
     {
-      "certainty": "dynamic",
-      "emitter": "key_value_literal",
-      "field": "<dynamic>",
-      "line": 168,
-      "path": "tools/analysis/documents/analysis/find_similar_documents.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "dynamic",
-      "emitter": "key_value_literal",
-      "field": "<dynamic>",
-      "line": 216,
-      "path": "tools/analysis/documents/analysis/tfidf_similar_docs.py",
-      "surface": "tool"
-    },
-    {
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "ACTIVE_ROLES",
@@ -19977,8 +19961,6 @@
     "tools/analysis/documents/analysis/__init__.py",
     "tools/analysis/documents/analysis/find_redundant_designs.py",
     "tools/analysis/documents/analysis/find_similar_designs.py",
-    "tools/analysis/documents/analysis/find_similar_documents.py",
-    "tools/analysis/documents/analysis/tfidf_similar_docs.py",
     "tools/analysis/documents/doc_start.py",
     "tools/analysis/documents/extraction/__init__.py",
     "tools/analysis/documents/extraction/extract_docx.py",

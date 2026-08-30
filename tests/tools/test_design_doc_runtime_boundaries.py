@@ -84,6 +84,38 @@ class DesignDocumentRuntimeBoundaryTest(unittest.TestCase):
             self.assertFalse((source / "reports").exists())
             self.assertTrue(tuple(runtime.rglob("*.txt")))
 
+    def test_similarity_report_contains_matching_design_pair(self) -> None:
+        """The registered similarity route reports a matching design pair."""
+        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as runtime_dir:
+            source = Path(source_dir)
+            runtime = Path(runtime_dir)
+            self.write(
+                source / "documents/design/alpha.md",
+                "# Shared design\nThe same contract and runtime boundary.\n",
+            )
+            self.write(
+                source / "documents/design/beta.md",
+                "# Shared design\nThe same contract and runtime boundary.\n",
+            )
+            self.write(source / "documents/design/unrelated.md", "# Different\nUnique.\n")
+
+            result = self.run_tool(
+                SCRIPTS["similar"],
+                source,
+                runtime,
+                "--min",
+                "0.8",
+                "--output",
+                "similarity.txt",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            report = (runtime / "similarity.txt").read_text(encoding="utf-8")
+            self.assertIn("alpha.md", report)
+            self.assertIn("beta.md", report)
+            self.assertNotIn("unrelated.md", report)
+            self.assertFalse((source / "similarity.txt").exists())
+
     def test_organize_apply_requires_capability(self) -> None:
         """The organization planner cannot mutate source implicitly."""
         with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as runtime_dir:
