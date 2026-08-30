@@ -17,7 +17,8 @@ from __future__ import annotations
 import json
 import os
 import re
-from collections.abc import Mapping
+import shlex
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import cast
 
@@ -494,16 +495,14 @@ DEFAULT_QUALITY_CHECK_POLICY_SOURCE = (
 DEFAULT_QUALITY_CHECK_STAGES = ("selected_stages_only",)
 
 DEFAULT_QUALITY_CHECK_STATIC_COMMANDS = (
-    "tools/bin/agent-canon docs check <changed-markdown-paths>",
-    "python3 tools/validation/semantic/convention/check_convention_compliance.py",
-    "python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed",
-    "bash tools/analysis/dependencies/scan_dependency_headers.sh --changed --fail-missing",
-    "bash tools/validation/semantic/dependencies/check_dependency_header_format.sh --changed --require-header",
+    ("tools/bin/agent-canon", "docs", "check", "<changed-markdown-paths>"),
+    ("python3", "tools/validation/semantic/convention/check_convention_compliance.py"),
+    ("python3", "tools/validation/semantic/dependencies/check_dependency_headers.py", "--changed"),
+    ("bash", "tools/analysis/dependencies/scan_dependency_headers.sh", "--changed", "--fail-missing"),
+    ("bash", "tools/validation/semantic/dependencies/check_dependency_header_format.sh", "--changed", "--require-header"),
 )
 
-CANONICAL_FORMAT_CHECK_ROUTE = (
-    "tools/bin/agent-canon docs check <changed-markdown-paths>"
-)
+CANONICAL_FORMAT_CHECK_ROUTE = DEFAULT_QUALITY_CHECK_STATIC_COMMANDS[0]
 
 OFFICIAL_HOOK_DISPATCHER = ".codex/hooks/hook_dispatcher.py"
 
@@ -936,23 +935,36 @@ def subagent_wave_record_command(
     )
     plan = CommandPlan(json.dumps(list(argv)), ".", ".", (), argv)
     projection = project_public_command_for_layout(plan, layout=layout)
-    return json.dumps(list(projection.public_argv), ensure_ascii=False)
+    return shlex.join(list(projection.public_argv))
 
 
-def public_command_for_layout(logical_command: str, layout: str) -> str:
-    """Render one logical command through the selected public layout."""
+def public_command_for_layout(
+    command: Sequence[str] | CommandPlan | str,
+    layout: str,
+) -> str:
+    """Render structured argv with shell quoting for display only."""
     del layout
-    # Legacy manifest constants are documentation projections. They are not
-    # accepted by the command resolver and are intentionally returned without
-    # shell parsing or shell-string reconstruction.
-    return logical_command
+    if isinstance(command, CommandPlan):
+        argv = command.execution_argv
+    elif isinstance(command, str):
+        # Compatibility callers still provide documentation-only constants;
+        # they are returned verbatim and never parsed or executed.
+        return command
+    else:
+        argv = tuple(command)
+    if any(not isinstance(item, str) for item in argv):
+        raise TypeError("display command argv must contain strings")
+    return shlex.join(argv)
 
 
-def public_command_for_spec(spec: RunBundleSpec, logical_command: str) -> str:
+def public_command_for_spec(
+    spec: RunBundleSpec,
+    command: Sequence[str] | CommandPlan | str,
+) -> str:
     """Render one command through the selected source/public layout owner."""
     roots = spec.repository_roots
     layout = getattr(roots, "layout", "standalone") if roots is not None else "standalone"
-    return public_command_for_layout(logical_command, layout)
+    return public_command_for_layout(command, layout)
 
 
 def language_review_candidates(
@@ -1426,7 +1438,7 @@ def manifest_run_lines(
             "    profile_registry_import: 'tools.agent.orchestration.model_profile_registry'",
             "    dispatch: 'immediate_one_pass'",
             "    same_spark_gap_continuation: 'resume_same_spark_after_gap'",
-            f"    deterministic_search_route: {public_command_for_spec(spec, 'python3 tools/analysis/search/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json')!r}",
+            f"    deterministic_search_route: {public_command_for_spec(spec, ('python3', 'tools/analysis/search/search.py', '--query-file', '<request-or-design-question.txt>', '--providers', 'text,semantic,vector,tool,header-deps,code-deps', '--format', 'json'))!r}",
             "  capacity_request:",
         ]
     )
@@ -1472,10 +1484,10 @@ def manifest_run_lines(
             "    broad_cross_cutting_packet: available_not_default_read",
             "  implementation_gate_defaults:",
             "    implementation_surface_route_status: pending",
-            f"    implementation_surface_route_command: {public_command_for_spec(spec, 'python3 tools/analysis/search/search.py --query-file <request-or-design-question.txt> --providers text,semantic,vector,tool,header-deps,code-deps --format json')!r}",
+            f"    implementation_surface_route_command: {public_command_for_spec(spec, ('python3', 'tools/analysis/search/search.py', '--query-file', '<request-or-design-question.txt>', '--providers', 'text,semantic,vector,tool,header-deps,code-deps', '--format', 'json'))!r}",
             "    tool_reuse_ledger_status: required_before_custom_implementation",
             "    pre_edit_rejection_prediction_status: pending",
-            f"    pre_edit_rejection_command: {public_command_for_spec(spec, 'python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>')!r}",
+            f"    pre_edit_rejection_command: {public_command_for_spec(spec, ('python3', 'tools/validation/semantic/tools/tool_rejection_preflight.py', '--root', '.', '<planned-edit-paths>'))!r}",
             "  standard_wave_sequence:",
             "    activation: candidate_sequence_selected_per_wave",
             f"    source: {STANDARD_AGENT_WAVE_SEQUENCE_SOURCE!r}",
@@ -1502,9 +1514,9 @@ def manifest_run_lines(
             *manifest_repo_tool_routing_policy_lines(spec),
             *manifest_default_quality_check_policy_lines(spec),
             "  agent_report_collection:",
-            f"    status_command: {public_command_for_spec(spec, 'python3 tools/runtime/archive/runtime_log_archive_git.py status')!r}",
-            f"    archive_current_run_command: {public_command_for_spec(spec, f'python3 tools/runtime/archive/runtime_log_archive_git.py archive-agent-report --report-dir {spec.report_dir}')!r}",
-            f"    sync_command: {public_command_for_spec(spec, 'python3 tools/runtime/archive/runtime_log_archive_git.py sync')!r}",
+            f"    status_command: {public_command_for_spec(spec, ('python3', 'tools/runtime/archive/runtime_log_archive_git.py', 'status'))!r}",
+            f"    archive_current_run_command: {public_command_for_spec(spec, ('python3', 'tools/runtime/archive/runtime_log_archive_git.py', 'archive-agent-report', '--report-dir', str(spec.report_dir)))!r}",
+            f"    sync_command: {public_command_for_spec(spec, ('python3', 'tools/runtime/archive/runtime_log_archive_git.py', 'sync'))!r}",
             "    archive_index: '.agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl'",
         ]
     )
@@ -1931,7 +1943,7 @@ def manifest_pre_handoff_gate_status_lines(
     )
     design_plan = CommandPlan(json.dumps(list(design_argv)), ".", ".", (), design_argv)
     design_projection = project_public_command_for_layout(design_plan, layout=layout)
-    design_command = json.dumps(list(design_projection.public_argv), ensure_ascii=False)
+    design_command = shlex.join(list(design_projection.public_argv))
     lines = [
         "  pre_handoff_gate_status:",
         "    enabled: true",

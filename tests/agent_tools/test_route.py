@@ -45,6 +45,14 @@ from tools.agent.orchestration.implementation_dispatch import declared_team_capa
 class RouteToolTest(unittest.TestCase):
     """Exercise route.py output and routing aliases."""
 
+    def test_route_reexports_structured_skill_command_items(self) -> None:
+        """Route consumers receive typed catalog items from the shared loader."""
+        catalog = route_module.load_skill_tool_commands(PROJECT_ROOT)
+        item = catalog["agent-orchestration"].required[0]
+        self.assertIsInstance(item, dict)
+        self.assertIn("tool_id", item)
+        self.assertNotIsInstance(item, str)
+
     def run_route(self, *args: str) -> subprocess.CompletedProcess[str]:
         """Run route.py with arguments."""
         return subprocess.run(

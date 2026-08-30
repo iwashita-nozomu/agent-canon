@@ -306,6 +306,21 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
         }
         self.assertEqual(actual, expected)
 
+    def test_command_identity_uses_structured_root_independent_items(self) -> None:
+        """Graph command identity never captures the checkout's resolved absolute argv."""
+        graph = build_graph(PROJECT_ROOT)
+        command_records = [
+            record
+            for record in graph["identity_records"]
+            if record["kind"] == "command"
+        ]
+        self.assertTrue(command_records)
+        for record in command_records:
+            payload = record["canonical_payload"]
+            self.assertIn("logical_item", payload)
+            self.assertNotIn(str(PROJECT_ROOT.resolve()), json.dumps(payload))
+            self.assertEqual(payload["execution_cwd"], ".")
+
     def test_identity_payloads_are_unique_and_all_projections_are_refs(self) -> None:
         """Each full payload appears once and every envelope resolves through a Ref."""
         graph = build_graph(PROJECT_ROOT)

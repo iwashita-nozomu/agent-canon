@@ -294,6 +294,30 @@ class ToolDispatchTest(unittest.TestCase):
         with self.assertRaisesRegex(tool_dispatch.DispatchError, "shell-string-rejected"):
             tool_dispatch.load_specs(root)
 
+    def test_missing_dispatch_fails_before_execution(self) -> None:
+        """An executable catalog entry must declare an explicit argv route."""
+        root = self._minimal_root(
+            dispatch={"runtime": "python", "argv": ["python3", "tools/echo.py"], "parity": "verified"}
+        )
+        catalog_path = root / "tools/catalog.yaml"
+        catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+        catalog["entries"][0].pop("dispatch")
+        catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+        with self.assertRaisesRegex(tool_dispatch.DispatchError, "missing-dispatch"):
+            tool_dispatch.load_specs(root)
+
+    def test_command_display_metadata_is_never_tokenized(self) -> None:
+        """Shell-looking display metadata cannot alter the explicit argv route."""
+        root = self._minimal_root(
+            dispatch={"runtime": "python", "argv": ["python3", "tools/echo.py"], "parity": "verified"}
+        )
+        catalog_path = root / "tools/catalog.yaml"
+        catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+        catalog["entries"][0]["command"] = "python3 tools/echo.py | touch SHOULD_NOT_EXIST"
+        catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+        specs, _ = tool_dispatch.load_specs(root)
+        self.assertEqual(specs["echo"].argv, ("python3", "tools/echo.py"))
+
     def test_parity_fixture_requires_all_observed_fields(self) -> None:
         """A fixture row without measured I/O/path fields cannot cut over."""
         root = self._minimal_root(

@@ -36,6 +36,7 @@ from tools.agent.orchestration.implementation_dispatch import dispatch_fixed_imp
 from tools.runtime.authority.writer_target import WriterTarget  # noqa: E402
 from tools.runtime.manifest.manifest_rendering import (  # noqa: E402
     language_review_candidates,
+    public_command_for_layout,
     render_code_template,
     render_template,
     suggested_public_skills,
@@ -62,6 +63,16 @@ class AgentTeamTemplateTest(unittest.TestCase):
             ("tests/cpp/CMakeLists.txt", "tests/cpp/adapter.cpp"),
         )
         self.assertEqual(candidates, ("cpp_reviewer", "docs_workflow_steward"))
+
+    def test_public_command_display_quotes_structured_whitespace_and_metacharacters(self) -> None:
+        """Structured argv is shell-quoted only in the human display projection."""
+        value = "path with spaces;$(not-executed)|quoted"
+        rendered = public_command_for_layout(
+            ("python3", "tool.py", "--value", value),
+            "standalone",
+        )
+        self.assertIn("'path with spaces;$(not-executed)|quoted'", rendered)
+        self.assertNotIn("shell=True", rendered)
 
     def test_cppdev_owned_cpp_paths_select_cpp_reviewer(self) -> None:
         """Native production paths retain the C++ review route."""

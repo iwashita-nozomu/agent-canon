@@ -129,22 +129,7 @@
     "dispatch": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "runtime",
-        "argv",
-        "execution_plane",
-        "cwd",
-        "env",
-        "stdin",
-        "stdout",
-        "stderr",
-        "exit",
-        "signal",
-        "side_effect",
-        "output_root",
-        "written_paths",
-        "parity"
-      ],
+      "required": ["argv"],
       "properties": {
         "runtime": { "$ref": "#/$defs/nonEmptyString" },
         "argv": {
@@ -189,7 +174,8 @@
         "writes",
         "default_wiring",
         "docs",
-        "tests"
+        "tests",
+        "dispatch"
       ],
       "properties": {
         "id": {

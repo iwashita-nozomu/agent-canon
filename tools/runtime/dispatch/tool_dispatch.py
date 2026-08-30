@@ -20,7 +20,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import shlex
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -234,52 +233,6 @@ def _is_public_path(path: str) -> bool:
     return path.endswith(".py") or path.endswith(".rs") or path == "tools/bin/agent-canon"
 
 
-def _command_tokens(command: object, *, field: str) -> tuple[str, ...]:
-    """Parse the legacy command only for fixed-route inference.
-
-    This parser is intentionally not used to execute a command.  A malformed
-    command makes the entry legacy-only instead of becoming shell authority.
-    """
-    if not isinstance(command, str):
-        return ()
-    try:
-        return tuple(shlex.split(command, posix=True))
-    except ValueError as error:
-        raise DispatchError("invalid-command-template", f"{field}:{error}") from error
-
-
-def _default_argv(entry: Mapping[str, object], path: str, runtime: str) -> tuple[str, ...]:
-    """Derive a fixed launcher vector from an existing catalog entry."""
-    command = _command_tokens(entry.get("command"), field=f"entry:{path}:command")
-    if runtime == "rust":
-        if command and command[0].endswith("agent-canon"):
-            return command
-        return ("tools/bin/agent-canon",)
-    if command[:2] == ("python3", "-m") and len(command) >= 3:
-        return ("python3", "-m", command[2])
-    return ("python3", path)
-
-
-def _legacy_route_parity(entry: Mapping[str, object], path: str, runtime: str) -> bool:
-    """Return whether the documented legacy route is not this public path.
-
-    A Python compatibility adapter can intentionally document a Rust first-
-    class route (for example ``graph-client``).  Such an entry remains on its
-    old route until an explicit parity record proves the adapter and direct
-    route equivalent.
-    """
-    command = _command_tokens(entry.get("command"), field=f"entry:{path}:command")
-    if not command or runtime != "python":
-        return False
-    if command[0].endswith("agent-canon"):
-        return True
-    if command[0] not in {"python", "python3"}:
-        return True
-    if len(command) >= 3 and command[1] == "-m":
-        return False
-    return len(command) < 2 or command[1] != path
-
-
 def _runtime_for(path: str) -> str:
     """Classify a public path without turning shell helpers into public tools."""
     return "rust" if path.endswith(".rs") or path == "tools/bin/agent-canon" else "python"
@@ -300,9 +253,11 @@ def _spec_from_entry(
     if not _is_public_path(path):
         return None
     explicit = entry.get("dispatch")
-    dispatch = _mapping(explicit, field=f"entry:{raw_id}:dispatch") if explicit is not None else {}
+    if explicit is None:
+        raise DispatchError("missing-dispatch", raw_id)
+    dispatch = _mapping(explicit, field=f"entry:{raw_id}:dispatch")
     runtime = _enum(dispatch.get("runtime", _runtime_for(path)), ALLOWED_RUNTIMES, field=f"entry:{raw_id}:runtime")
-    argv = _string_list(dispatch.get("argv", _default_argv(entry, path, runtime)), field=f"entry:{raw_id}:argv")
+    argv = _string_list(dispatch.get("argv"), field=f"entry:{raw_id}:argv")
     plane = _enum(dispatch.get("execution_plane", "tool-container"), ALLOWED_PLANES, field=f"entry:{raw_id}:execution_plane")
     cwd = _enum(dispatch.get("cwd", "source-root"), ALLOWED_CWDS, field=f"entry:{raw_id}:cwd")
     env = _enum(dispatch.get("env", "allowlisted"), ALLOWED_ENVS, field=f"entry:{raw_id}:env")
@@ -334,7 +289,7 @@ def _spec_from_entry(
         raise DispatchError("output-root-mismatch", raw_id)
     if effect == "read-only" and output != "none":
         raise DispatchError("output-root-mismatch", raw_id)
-    default_parity = "legacy" if _legacy_route_parity(entry, path, runtime) else runtime_schema.get("default_parity", "legacy")
+    default_parity = runtime_schema.get("default_parity", "legacy")
     parity = _enum(dispatch.get("parity", default_parity), ALLOWED_PARITY, field=f"entry:{raw_id}:parity")
     fixture = dispatch.get("parity_fixture", runtime_schema.get("parity_fixture", ""))
     fixture_value = _safe_relative(_string(fixture, field=f"entry:{raw_id}:parity_fixture"), field=f"entry:{raw_id}:parity_fixture")
@@ -393,10 +348,9 @@ def load_specs(root: Path) -> tuple[dict[str, ToolSpec], Mapping[str, object]]:
         command = dict(_mapping(raw_command, field=f"rust_public_commands[{index}]"))
         identifier = _string(command.get("id"), field=f"rust_public_commands[{index}].id")
         selector = _string(command.get("selector"), field=f"rust_public_commands[{index}].selector")
-        selector_tokens = _command_tokens(selector, field=f"rust_public_commands[{index}].selector")
-        if len(selector_tokens) != 1:
+        if any(char.isspace() for char in selector):
             raise DispatchError("invalid-rust-selector", identifier)
-        command["command"] = f"tools/bin/agent-canon {selector_tokens[0]}"
+        command["dispatch"] = {"argv": ["tools/bin/agent-canon", selector]}
         command["runtime"] = "rust"
         spec = _spec_from_entry(command, schema)
         if spec is None:

@@ -285,9 +285,9 @@ class CapabilityRoute:
 class SkillToolCommandSpec:
     """Structured command phases owned by one public skill catalog entry."""
 
-    required: tuple[str, ...] = ()
-    conditional: tuple[str, ...] = ()
-    maintenance: tuple[str, ...] = ()
+    required: tuple[Mapping[str, object], ...] = ()
+    conditional: tuple[Mapping[str, object], ...] = ()
+    maintenance: tuple[Mapping[str, object], ...] = ()
     structured: bool = True
 
 
@@ -482,14 +482,6 @@ def trigger_groups(value: object, field: str) -> tuple[tuple[str, ...], ...]:
     if value is None:
         return ()
     return tuple(tuple(cast(Sequence[str], group)) for group in cast(Sequence[object], value))
-
-
-def optional_string_list(value: object, field: str) -> tuple[str, ...]:
-    """Return an optional schema-validated string list."""
-    del field
-    if value is None:
-        return ()
-    return tuple(cast(Sequence[str], value))
 
 
 def optional_metadata_string(value: object, field: str) -> str:
@@ -1050,7 +1042,7 @@ def load_skill_related_map(root: Path) -> dict[str, tuple[str, ...]]:
     return {rule.skill: rule.related_skills for rule in load_skill_route_rules(root)}
 
 
-def load_skill_required_tool_commands(root: Path) -> dict[str, tuple[str, ...]]:
+def load_skill_required_tool_commands(root: Path) -> dict[str, tuple[Mapping[str, object], ...]]:
     """Return catalog-owned required commands keyed by public skill id."""
     return {
         skill: spec.required for skill, spec in load_skill_tool_commands(root).items()
@@ -1066,43 +1058,20 @@ def load_skill_tool_commands(root: Path) -> dict[str, SkillToolCommandSpec]:
     """
     if not (root / SKILL_CATALOG_PATH).is_file():
         return {}
-    data = load_skill_catalog(root)
-    families = object_sequence(data.get("skill_families"), "skill_families")
-    result: dict[str, SkillToolCommandSpec] = {}
-    for index, entry in enumerate(families):
-        entry_mapping = object_mapping(entry, f"skill_families[{index}]")
-        skill_id = cast(str, entry_mapping["id"])
-        if skill_id in result:
-            raise ValueError(f"duplicate skill catalog id: {skill_id}")
-        commands = entry_mapping.get("tool_commands")
-        if commands is None:
-            result[skill_id] = SkillToolCommandSpec(structured=False)
-            continue
-        command_mapping = object_mapping(commands, f"{skill_id}.tool_commands")
-        phases = {
-            phase: optional_string_list(
-                command_mapping.get(phase),
-                f"{skill_id}.tool_commands.{phase}",
-            )
-            for phase in ("required", "conditional", "maintenance")
-        }
-        commands_seen: set[str] = set()
-        for phase, values in phases.items():
-            duplicate = next(
-                (command for command in values if command in commands_seen),
-                None,
-            )
-            if duplicate is not None:
-                raise ValueError(
-                    f"{skill_id}.tool_commands.duplicate:{phase}:{duplicate}"
-                )
-            commands_seen.update(values)
-        result[skill_id] = SkillToolCommandSpec(
+    from tools.agent.skills.skill_tool_commands import load_skill_command_items
+
+    try:
+        records = load_skill_command_items(root)
+    except ValueError as exc:
+        raise ValueError(f"structured skill command catalog invalid: {exc}") from exc
+    return {
+        skill: SkillToolCommandSpec(
             required=phases["required"],
             conditional=phases["conditional"],
             maintenance=phases["maintenance"],
         )
-    return result
+        for skill, phases in records.items()
+    }
 
 
 def build_capability_index(rules: Sequence[SkillRoutingRule]) -> CapabilityIndex:

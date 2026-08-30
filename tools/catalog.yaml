@@ -215,6 +215,7 @@ entries:
     audience: maintainer
     placement: compatibility_wrapper
     command: python3 tools/validation/documentation/checks/audit_and_fix_links.py --check
+    dispatch: {argv: ["python3", "tools/validation/documentation/checks/audit_and_fix_links.py", "--check"]}
     writes: true
     default_wiring:
       ci: false
@@ -233,6 +234,7 @@ entries:
     audience: maintainer
     placement: workflow_helper
     command: python3 tools/analysis/documents/analysis/find_redundant_designs.py --runtime-root <external-runtime>
+    dispatch: {argv: ["python3", "tools/analysis/documents/analysis/find_redundant_designs.py", "--runtime-root", "<external-runtime>"]}
     writes: true
     default_wiring:
       ci: false
@@ -251,6 +253,7 @@ entries:
     audience: maintainer
     placement: workflow_helper
     command: python3 tools/analysis/documents/analysis/find_similar_designs.py --runtime-root <external-runtime>
+    dispatch: {argv: ["python3", "tools/analysis/documents/analysis/find_similar_designs.py", "--runtime-root", "<external-runtime>"]}
     writes: true
     default_wiring:
       ci: false
@@ -269,6 +272,7 @@ entries:
     audience: maintainer
     placement: workflow_helper
     command: python3 tools/validation/documentation/authoring/organize_designs.py --runtime-root <external-runtime>
+    dispatch: {argv: ["python3", "tools/validation/documentation/authoring/organize_designs.py", "--runtime-root", "<external-runtime>"]}
     writes: true
     default_wiring:
       ci: false
@@ -285,6 +289,7 @@ entries:
     role: catalog
     status: canonical
     command: python3 tools/runtime/manifest/tool_catalog.py
+    dispatch: {argv: ["python3", "tools/runtime/manifest/tool_catalog.py"]}
     writes: false
     default_wiring:
       ci: true
@@ -302,6 +307,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/semantic/tools/tool_drift.py
+    dispatch: {argv: ["python3", "tools/validation/semantic/tools/tool_drift.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -355,6 +361,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/semantic/responsibility/responsibility_scope.py
+    dispatch: {argv: ["python3", "tools/validation/semantic/responsibility/responsibility_scope.py"]}
     writes: false
     default_wiring:
       ci: true
@@ -375,6 +382,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/runtime/manifest/surface_manifest.py --root . --prefix . --manifest documents/runtime/shared-runtime-surfaces.toml normalized-snapshot
+    dispatch: {argv: ["python3", "tools/runtime/manifest/surface_manifest.py", "--root", ".", "--prefix", ".", "--manifest", "documents/runtime/shared-runtime-surfaces.toml", "normalized-snapshot"]}
     writes: false
     default_wiring:
       ci: false
@@ -396,6 +404,7 @@ entries:
     audience: skill
     placement: validation_checker
     command: python3 tools/validation/semantic/tools/visualization_contract.py
+    dispatch: {argv: ["python3", "tools/validation/semantic/tools/visualization_contract.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -414,6 +423,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json
+    dispatch: {argv: ["python3", "tools/analysis/dependencies/render_dependency_manifest_graph.py", "--root", ".", "--scope", "full", "--bundle-dir", "reports/dependency-graph", "--format", "json"]}
     writes: true
     default_wiring:
       ci: false
@@ -435,6 +445,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/analysis/dependencies/git_dependency_diff_summary.py
+    dispatch: {argv: ["python3", "tools/analysis/dependencies/git_dependency_diff_summary.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -452,6 +463,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/semantic/path/classify_path_risk.py
+    dispatch: {argv: ["python3", "tools/validation/semantic/path/classify_path_risk.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -473,6 +485,7 @@ entries:
     audience: skill
     placement: skill_helper
     command: python3 tools/analysis/proof/formal_proof.py
+    dispatch: {argv: ["python3", "tools/analysis/proof/formal_proof.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -496,6 +509,7 @@ entries:
     audience: skill
     placement: skill_helper
     command: python3 tools/analysis/proof/lean_proof_env.py
+    dispatch: {argv: ["python3", "tools/analysis/proof/lean_proof_env.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -518,6 +532,7 @@ entries:
     audience: maintainer
     placement: validation_checker
     command: python3 tools/analysis/proof/tool_proof_coverage.py
+    dispatch: {argv: ["python3", "tools/analysis/proof/tool_proof_coverage.py"]}
     writes: false
     default_wiring:
       ci: true
@@ -540,6 +555,7 @@ entries:
     audience: skill
     placement: skill_helper
     command: python3 tools/analysis/proof/jit_canonical_ir.py
+    dispatch: {argv: ["python3", "tools/analysis/proof/jit_canonical_ir.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -561,6 +577,7 @@ entries:
     audience: skill
     placement: skill_helper
     command: python3 tools/analysis/proof/stablehlo_value_closure.py
+    dispatch: {argv: ["python3", "tools/analysis/proof/stablehlo_value_closure.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -583,6 +600,7 @@ entries:
     audience: internal
     placement: support_library
     command: python3 tools/analysis/code/cpp_source_canonical_ir.py
+    dispatch: {argv: ["python3", "tools/analysis/code/cpp_source_canonical_ir.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -604,6 +622,7 @@ entries:
     audience: skill
     placement: skill_helper
     command: python3 tools/analysis/proof/cpp_template_to_lean.py
+    dispatch: {argv: ["python3", "tools/analysis/proof/cpp_template_to_lean.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -627,6 +646,7 @@ entries:
     audience: internal
     placement: support_library
     command: python3 tools/analysis/proof/operational_ir_to_lean.py
+    dispatch: {argv: ["python3", "tools/analysis/proof/operational_ir_to_lean.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -648,6 +668,7 @@ entries:
     audience: skill
     placement: skill_helper
     command: tools/bin/agent-canon jit-ir-to-lean
+    dispatch: {argv: ["tools/bin/agent-canon", "jit-ir-to-lean"]}
     writes: true
     default_wiring:
       ci: false
@@ -669,6 +690,7 @@ entries:
     audience: skill
     placement: skill_helper
     command: python3 tools/validation/semantic/proof/check_proof_trace_alignment.py
+    dispatch: {argv: ["python3", "tools/validation/semantic/proof/check_proof_trace_alignment.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -688,6 +710,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/semantic/structure/repo_structure_contract.py
+    dispatch: {argv: ["python3", "tools/validation/semantic/structure/repo_structure_contract.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -707,6 +730,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/analysis/code/import_responsibility.py
+    dispatch: {argv: ["python3", "tools/analysis/code/import_responsibility.py"]}
     writes: false
     default_wiring:
       ci: true
@@ -727,6 +751,7 @@ entries:
     role: sync
     status: canonical
     command: python3 tools/repository/github/github_publish.py --help
+    dispatch: {argv: ["python3", "tools/repository/github/github_publish.py", "--help"]}
     writes: true
     default_wiring:
       ci: false
@@ -747,6 +772,7 @@ entries:
     role: sync
     status: canonical
     command: python3 tools/repository/github/wiki_publish.py --help
+    dispatch: {argv: ["python3", "tools/repository/github/wiki_publish.py", "--help"]}
     writes: true
     default_wiring:
       ci: false
@@ -767,6 +793,7 @@ entries:
     role: checker
     status: canonical
     command: python3 eval/checkers/eval_accumulation_check.py
+    dispatch: {argv: ["python3", "eval/checkers/eval_accumulation_check.py"]}
     writes: false
     default_wiring:
       ci: true
@@ -787,6 +814,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/runtime/artifacts/generated_artifact_guard.py
+    dispatch: {argv: ["python3", "tools/runtime/artifacts/generated_artifact_guard.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -875,6 +903,7 @@ entries:
     role: runner
     status: canonical
     command: python3 eval/producers/run_accumulated_agent_evals.py --run-id <run-id>
+    dispatch: {argv: ["python3", "eval/producers/run_accumulated_agent_evals.py", "--run-id", "<run-id>"]}
     writes: true
     default_wiring:
       ci: true
@@ -895,6 +924,7 @@ entries:
     role: sync
     status: canonical
     command: python3 tools/runtime/archive/runtime_log_archive_git.py <append-context-discovery|materialize-runtime-event|check-hook-hot-path|sync>
+    dispatch: {argv: ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "<append-context-discovery|materialize-runtime-event|check-hook-hot-path|sync>"]}
     writes: true
     default_wiring:
       ci: false
@@ -916,6 +946,7 @@ entries:
     role: workflow
     status: canonical
     command: python3 tools/runtime/lifecycle/workflow_monitor.py --report-dir <report-dir>
+    dispatch: {argv: ["python3", "tools/runtime/lifecycle/workflow_monitor.py", "--report-dir", "<report-dir>"]}
     writes: true
     default_wiring:
       ci: false
@@ -933,6 +964,7 @@ entries:
     role: workflow
     status: canonical
     command: python3 tools/validation/semantic/lifecycle/waterfall_gate_check.py --report-dir <report-dir> --gate <gate>
+    dispatch: {argv: ["python3", "tools/validation/semantic/lifecycle/waterfall_gate_check.py", "--report-dir", "<report-dir>", "--gate", "<gate>"]}
     writes: false
     default_wiring:
       ci: false
@@ -950,6 +982,7 @@ entries:
     role: runner
     status: canonical
     command: tools/bin/agent-canon graph <build|status|query|context> --root <repo-root> --format json
+    dispatch: {argv: ["tools/bin/agent-canon", "graph", "<build|status|query|context>", "--root", "<repo-root>", "--format", "json"]}
     writes: true
     default_wiring:
       ci: false
@@ -970,6 +1003,7 @@ entries:
     role: helper
     status: canonical
     command: tools/bin/agent-canon graph <status|query|context> --root <repo-root> --format json
+    dispatch: {argv: ["tools/bin/agent-canon", "graph", "<status|query|context>", "--root", "<repo-root>", "--format", "json"]}
     writes: false
     default_wiring:
       ci: false
@@ -989,6 +1023,7 @@ entries:
     role: checker
     status: canonical
     command: python3 eval/producers/evaluate_workflow_selection.py
+    dispatch: {argv: ["python3", "eval/producers/evaluate_workflow_selection.py"]}
     writes: true
     default_wiring:
       ci: true
@@ -1009,6 +1044,7 @@ entries:
     role: checker
     status: canonical
     command: python3 eval/producers/evaluate_report_quality.py
+    dispatch: {argv: ["python3", "eval/producers/evaluate_report_quality.py"]}
     writes: true
     default_wiring:
       ci: true
@@ -1030,6 +1066,7 @@ entries:
     role: checker
     status: canonical
     command: tools/bin/agent-canon test-design check <test-paths...>
+    dispatch: {argv: ["tools/bin/agent-canon", "test-design", "check", "<test-paths...>"]}
     writes: false
     default_wiring:
       ci: false
@@ -1051,6 +1088,7 @@ entries:
     role: inventory
     status: canonical
     command: python3 tools/analysis/search/search.py --purpose "<goal>"
+    dispatch: {argv: ["python3", "tools/analysis/search/search.py", "--purpose", "<goal>"]}
     writes: false
     default_wiring:
       ci: false
@@ -1069,6 +1107,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/analysis/code/lsp_code_analysis.py analyze --root . --format json
+    dispatch: {argv: ["python3", "tools/analysis/code/lsp_code_analysis.py", "analyze", "--root", ".", "--format", "json"]}
     writes: false
     default_wiring:
       ci: false
@@ -1088,6 +1127,7 @@ entries:
     role: inventory
     status: canonical
     command: python3 tools/analysis/search/search_index.py build
+    dispatch: {argv: ["python3", "tools/analysis/search/search_index.py", "build"]}
     writes: true
     default_wiring:
       ci: false
@@ -1107,6 +1147,7 @@ entries:
     role: inventory
     status: canonical
     command: tools/bin/agent-canon semantic-index build --include documents --include agents
+    dispatch: {argv: ["tools/bin/agent-canon", "semantic-index", "build", "--include", "documents", "--include", "agents"]}
     writes: true
     default_wiring:
       ci: false
@@ -1127,6 +1168,7 @@ entries:
     role: docs
     status: canonical
     command: python3 tools/analysis/search/reporting/semantic_provider_html_report.py --compare-json reports/agents/<run-id>/semantic_provider_compare.json --output reports/agents/<run-id>/semantic_provider_compare.html
+    dispatch: {argv: ["python3", "tools/analysis/search/reporting/semantic_provider_html_report.py", "--compare-json", "reports/agents/<run-id>/semantic_provider_compare.json", "--output", "reports/agents/<run-id>/semantic_provider_compare.html"]}
     writes: true
     default_wiring:
       ci: false
@@ -1148,6 +1190,7 @@ entries:
     role: workflow
     status: canonical
     command: python3 tools/analysis/documents/prose_reasoning_graph.py --help
+    dispatch: {argv: ["python3", "tools/analysis/documents/prose_reasoning_graph.py", "--help"]}
     writes: true
     default_wiring:
       ci: false
@@ -1204,6 +1247,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/semantic/convention/check_convention_compliance.py
+    dispatch: {argv: ["python3", "tools/validation/semantic/convention/check_convention_compliance.py"]}
     writes: false
     default_wiring:
       ci: true
@@ -1221,6 +1265,7 @@ entries:
     role: checker
     status: canonical
     command: bash tools/analysis/dependencies/run_repo_dependency_review.sh
+    dispatch: {argv: ["bash", "tools/analysis/dependencies/run_repo_dependency_review.sh"]}
     writes: false
     default_wiring:
       ci: false
@@ -1239,6 +1284,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/semantic/documents/check_design_doc_claims.py
+    dispatch: {argv: ["python3", "tools/validation/semantic/documents/check_design_doc_claims.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -1260,6 +1306,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py
+    dispatch: {argv: ["python3", "tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -1279,6 +1326,7 @@ entries:
     role: checker
     status: canonical
     command: bash tools/analysis/dependencies/scan_dependency_headers.sh
+    dispatch: {argv: ["bash", "tools/analysis/dependencies/scan_dependency_headers.sh"]}
     writes: false
     default_wiring:
       ci: false
@@ -1296,6 +1344,7 @@ entries:
     role: checker
     status: canonical
     command: bash tools/validation/semantic/dependencies/check_dependency_header_format.sh
+    dispatch: {argv: ["bash", "tools/validation/semantic/dependencies/check_dependency_header_format.sh"]}
     writes: false
     default_wiring:
       ci: true
@@ -1314,6 +1363,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/semantic/dependencies/check_dependency_headers.py
+    dispatch: {argv: ["python3", "tools/validation/semantic/dependencies/check_dependency_headers.py"]}
     writes: false
     default_wiring:
       ci: true
@@ -1332,6 +1382,7 @@ entries:
     role: checker
     status: canonical
     command: bash tools/analysis/dependencies/check_dependency_graph.sh
+    dispatch: {argv: ["bash", "tools/analysis/dependencies/check_dependency_graph.sh"]}
     writes: false
     default_wiring:
       ci: false
@@ -1349,6 +1400,7 @@ entries:
     role: checker
     status: canonical
     command: bash tools/analysis/dependencies/scan_code_dependencies.sh
+    dispatch: {argv: ["bash", "tools/analysis/dependencies/scan_code_dependencies.sh"]}
     writes: false
     default_wiring:
       ci: false
@@ -1366,6 +1418,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/ci/checks/check_github_workflows.py
+    dispatch: {argv: ["python3", "tools/validation/ci/checks/check_github_workflows.py"]}
     writes: false
     default_wiring:
       ci: true
@@ -1386,6 +1439,7 @@ entries:
     audience: skill
     placement: skill_helper
     command: bash tools/validation/ci/runners/run_gpu_container.sh --image <image> -- <argv...>
+    dispatch: {argv: ["bash", "tools/validation/ci/runners/run_gpu_container.sh", "--image", "<image>", "--", "<argv...>"]}
     writes: true
     default_wiring:
       ci: false
@@ -1407,6 +1461,7 @@ entries:
     audience: agent
     placement: workflow_helper
     command: python3 tools/repository/git/orphan_lifecycle.py
+    dispatch: {argv: ["python3", "tools/repository/git/orphan_lifecycle.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -1426,6 +1481,7 @@ entries:
     audience: skill
     placement: skill_helper
     command: python3 tools/repository/workspace/repository_topic_clone.py
+    dispatch: {argv: ["python3", "tools/repository/workspace/repository_topic_clone.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -1447,6 +1503,7 @@ entries:
     audience: skill
     placement: skill_helper
     command: python3 tools/repository/git/conflict_preservation.py
+    dispatch: {argv: ["python3", "tools/repository/git/conflict_preservation.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -1468,6 +1525,7 @@ entries:
     audience: skill
     placement: skill_helper
     command: python3 tools/repository/workspace/dependency_module_change.py
+    dispatch: {argv: ["python3", "tools/repository/workspace/dependency_module_change.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -1487,6 +1545,7 @@ entries:
     role: runner
     status: canonical
     command: tools/bin/agent-canon --version
+    dispatch: {argv: ["tools/bin/agent-canon", "--version"]}
     writes: false
     default_wiring:
       ci: false
@@ -1509,6 +1568,7 @@ entries:
     audience: workflow
     placement: workflow_helper
     command: python3 tools/validation/ci/checks/check_agent_canon_pr.py --g1-bundle <path> --source-root .
+    dispatch: {argv: ["python3", "tools/validation/ci/checks/check_agent_canon_pr.py", "--g1-bundle", "<path>", "--source-root", "."]}
     writes: true
     default_wiring:
       ci: false
@@ -1526,6 +1586,7 @@ entries:
     role: checker
     status: canonical
     command: bash tools/validation/ci/checks/check_agent_canon_pr.sh
+    dispatch: {argv: ["bash", "tools/validation/ci/checks/check_agent_canon_pr.sh"]}
     writes: false
     default_wiring:
       ci: false
@@ -1544,6 +1605,7 @@ entries:
     role: checker
     status: canonical
     command: bash tools/validation/ci/checks/scan_secrets.sh
+    dispatch: {argv: ["bash", "tools/validation/ci/checks/scan_secrets.sh"]}
     writes: false
     default_wiring:
       ci: false
@@ -1562,6 +1624,7 @@ entries:
     role: runner
     status: canonical
     command: bash tools/validation/ci/runners/run_all_checks.sh
+    dispatch: {argv: ["bash", "tools/validation/ci/runners/run_all_checks.sh"]}
     writes: false
     default_wiring:
       ci: false
@@ -1579,6 +1642,7 @@ entries:
     role: runner
     status: canonical
     command: bash tools/validation/ci/checks/run_python_quality_checks.sh
+    dispatch: {argv: ["bash", "tools/validation/ci/checks/run_python_quality_checks.sh"]}
     writes: false
     default_wiring:
       ci: false
@@ -1597,6 +1661,7 @@ entries:
     role: checker
     status: canonical
     command: tools/bin/agent-canon pydocstyle-review --target <repo-relative.py>
+    dispatch: {argv: ["tools/bin/agent-canon", "pydocstyle-review", "--target", "<repo-relative.py>"]}
     writes: false
     default_wiring:
       ci: false
@@ -1615,6 +1680,7 @@ entries:
     role: workflow
     status: canonical
     command: python3 tools/agent/orchestration/agent_canon_update_todos.py
+    dispatch: {argv: ["python3", "tools/agent/orchestration/agent_canon_update_todos.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -1633,6 +1699,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+    dispatch: {argv: ["python3", "tools/validation/semantic/runtime/check_agent_runtime_alignment.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -1651,6 +1718,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py --root .
+    dispatch: {argv: ["python3", "tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py", "--root", "."]}
     writes: false
     default_wiring:
       ci: false
@@ -1669,6 +1737,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/semantic/skills/check_skill_frontmatter.py
+    dispatch: {argv: ["python3", "tools/validation/semantic/skills/check_skill_frontmatter.py"]}
     writes: false
     default_wiring:
       ci: true
@@ -1687,6 +1756,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/agent/skills/skill_tool_commands.py check
+    dispatch: {argv: ["python3", "tools/agent/skills/skill_tool_commands.py", "check"]}
     writes: false
     default_wiring:
       ci: false
@@ -1776,6 +1846,7 @@ entries:
     role: sync
     status: canonical
     command: python3 tools/analysis/documents/reference_materializer.py
+    dispatch: {argv: ["python3", "tools/analysis/documents/reference_materializer.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -1794,6 +1865,7 @@ entries:
     role: checker
     status: canonical
     command: python3 eval/checkers/smoke_test_research_perspective_pack.py
+    dispatch: {argv: ["python3", "eval/checkers/smoke_test_research_perspective_pack.py"]}
     writes: false
     default_wiring:
       ci: true
@@ -1811,6 +1883,7 @@ entries:
     role: checker
     status: canonical
     command: python3 eval/producers/evaluate_codex_agent_roles.py
+    dispatch: {argv: ["python3", "eval/producers/evaluate_codex_agent_roles.py"]}
     writes: false
     default_wiring:
       ci: true
@@ -1830,6 +1903,7 @@ entries:
     role: checker
     status: canonical
     command: python3 -m tools.validation.ci.checks.check_experiment_registry
+    dispatch: {argv: ["python3", "-m", "tools.validation.ci.checks.check_experiment_registry"]}
     writes: false
     default_wiring:
       ci: true
@@ -1848,6 +1922,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/semantic/code/check_hardcoded_numbers.py
+    dispatch: {argv: ["python3", "tools/validation/semantic/code/check_hardcoded_numbers.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -1865,6 +1940,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/semantic/code/check_static_any.py
+    dispatch: {argv: ["python3", "tools/validation/semantic/code/check_static_any.py"]}
     writes: false
     default_wiring:
       ci: true
@@ -1882,6 +1958,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/semantic/code/check_solid_evidence.py --changed --evidence <oop-readability-report>
+    dispatch: {argv: ["python3", "tools/validation/semantic/code/check_solid_evidence.py", "--changed", "--evidence", "<oop-readability-report>"]}
     writes: false
     default_wiring:
       ci: false
@@ -1900,6 +1977,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/semantic/logging/check_log_helper_names.py
+    dispatch: {argv: ["python3", "tools/validation/semantic/logging/check_log_helper_names.py"]}
     writes: false
     default_wiring:
       ci: true
@@ -1917,6 +1995,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/semantic/logging/check_run_log_contract.py
+    dispatch: {argv: ["python3", "tools/validation/semantic/logging/check_run_log_contract.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -1934,6 +2013,7 @@ entries:
     role: checker
     status: canonical
     command: tools/bin/agent-canon python-algorithm-contract-check
+    dispatch: {argv: ["tools/bin/agent-canon", "python-algorithm-contract-check"]}
     writes: false
     default_wiring:
       ci: true
@@ -1954,6 +2034,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/code/oop/python/readability.py
+    dispatch: {argv: ["python3", "tools/validation/code/oop/python/readability.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -1971,6 +2052,7 @@ entries:
     role: inventory
     status: canonical
     command: python3 tools/validation/code/oop/python/rule_inventory.py
+    dispatch: {argv: ["python3", "tools/validation/code/oop/python/rule_inventory.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -1988,6 +2070,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/code/oop/cpp/readability.py
+    dispatch: {argv: ["python3", "tools/validation/code/oop/cpp/readability.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -2005,6 +2088,7 @@ entries:
     role: inventory
     status: canonical
     command: python3 tools/validation/code/oop/cpp/rule_inventory.py
+    dispatch: {argv: ["python3", "tools/validation/code/oop/cpp/rule_inventory.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -2022,6 +2106,7 @@ entries:
     role: runner
     status: canonical
     command: bash tools/repository/github/review_backlog_scan.sh --report-dir <external-runtime>/reports/<run-id>/cross_repo_inspection
+    dispatch: {argv: ["bash", "tools/repository/github/review_backlog_scan.sh", "--report-dir", "<external-runtime>/reports/<run-id>/cross_repo_inspection"]}
     writes: true
     default_wiring:
       ci: false
@@ -2039,6 +2124,7 @@ entries:
     role: inventory
     status: canonical
     command: python3 tools/analysis/search/vector_search.py
+    dispatch: {argv: ["python3", "tools/analysis/search/vector_search.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -2056,6 +2142,7 @@ entries:
     role: inventory
     status: canonical
     command: python3 tools/analysis/code/file_surface_inventory.py
+    dispatch: {argv: ["python3", "tools/analysis/code/file_surface_inventory.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -2073,6 +2160,7 @@ entries:
     role: inventory
     status: canonical
     command: tools/bin/agent-canon structured-analysis build --root . --profile manual
+    dispatch: {argv: ["tools/bin/agent-canon", "structured-analysis", "build", "--root", ".", "--profile", "manual"]}
     writes: true
     default_wiring:
       ci: false
@@ -2096,6 +2184,7 @@ entries:
     role: inventory
     status: canonical
     command: python3 tools/analysis/code/helper_function_inventory.py
+    dispatch: {argv: ["python3", "tools/analysis/code/helper_function_inventory.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -2114,6 +2203,7 @@ entries:
     role: inventory
     status: canonical
     command: python3 tools/runtime/archive/log_surface_inventory.py
+    dispatch: {argv: ["python3", "tools/runtime/archive/log_surface_inventory.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -2132,6 +2222,7 @@ entries:
     role: workflow
     status: canonical
     command: python3 tools/validation/semantic/tools/tool_rejection_preflight.py
+    dispatch: {argv: ["python3", "tools/validation/semantic/tools/tool_rejection_preflight.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -2152,6 +2243,7 @@ entries:
     role: workflow
     status: canonical
     command: python3 tools/runtime/lifecycle/bootstrap_agent_run.py
+    dispatch: {argv: ["python3", "tools/runtime/lifecycle/bootstrap_agent_run.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -2170,6 +2262,7 @@ entries:
     role: workflow
     status: canonical
     command: python3 tools/runtime/lifecycle/task_close.py
+    dispatch: {argv: ["python3", "tools/runtime/lifecycle/task_close.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -2188,6 +2281,7 @@ entries:
     role: checker
     status: canonical
     command: python3 eval/producers/evaluate_agent_run.py
+    dispatch: {argv: ["python3", "eval/producers/evaluate_agent_run.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -2205,6 +2299,7 @@ entries:
     role: checker
     status: canonical
     command: python3 eval/producers/evaluate_skill_workflow_prompts.py
+    dispatch: {argv: ["python3", "eval/producers/evaluate_skill_workflow_prompts.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -2292,6 +2387,7 @@ entries:
     role: checker
     status: canonical
     command: python3 eval/checkers/compare_agent_run_paths.py
+    dispatch: {argv: ["python3", "eval/checkers/compare_agent_run_paths.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -2309,6 +2405,7 @@ entries:
     role: checker
     status: canonical
     command: python3 eval/checkers/compare_codex_token_footprints.py
+    dispatch: {argv: ["python3", "eval/checkers/compare_codex_token_footprints.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -2326,6 +2423,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/repository/workspace/worktree_scope_lint.py
+    dispatch: {argv: ["python3", "tools/repository/workspace/worktree_scope_lint.py"]}
     writes: false
     default_wiring:
       ci: true
@@ -2343,6 +2441,7 @@ entries:
     role: helper
     status: canonical
     command: python3 tools/analysis/documents/formatting/jsonl_to_md.py
+    dispatch: {argv: ["python3", "tools/analysis/documents/formatting/jsonl_to_md.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -2361,6 +2460,7 @@ entries:
     role: helper
     status: canonical
     command: python3 tools/analysis/hlo/summarization/summarize_hlo_jsonl.py
+    dispatch: {argv: ["python3", "tools/analysis/hlo/summarization/summarize_hlo_jsonl.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -2379,6 +2479,7 @@ entries:
     role: audit
     status: canonical
     command: python3 tools/audit/logging/audit_log_schema.py
+    dispatch: {argv: ["python3", "tools/audit/logging/audit_log_schema.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -2396,6 +2497,7 @@ entries:
     role: audit
     status: canonical
     command: python3 tools/audit/logging/audit_logger.py
+    dispatch: {argv: ["python3", "tools/audit/logging/audit_logger.py"]}
     writes: true
     default_wiring:
       ci: false
@@ -2413,6 +2515,7 @@ entries:
     role: experiment
     status: canonical
     command: python3 -m tools.experiments.execution.run_managed_experiment
+    dispatch: {argv: ["python3", "-m", "tools.experiments.execution.run_managed_experiment"]}
     writes: true
     default_wiring:
       ci: false
@@ -2431,6 +2534,7 @@ entries:
     role: helper
     status: canonical
     command: python3 tools/experiments/artifacts/html_artifact_access.py
+    dispatch: {argv: ["python3", "tools/experiments/artifacts/html_artifact_access.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -2450,6 +2554,7 @@ entries:
     role: experiment
     status: canonical
     command: python3 -m tools.experiments.artifacts.update_latest_result
+    dispatch: {argv: ["python3", "-m", "tools.experiments.artifacts.update_latest_result"]}
     writes: true
     default_wiring:
       ci: false
@@ -2468,6 +2573,7 @@ entries:
     role: experiment
     status: canonical
     command: python3 -m tools.experiments.artifacts.save_experiment_result_annex
+    dispatch: {argv: ["python3", "-m", "tools.experiments.artifacts.save_experiment_result_annex"]}
     writes: true
     default_wiring:
       ci: false
@@ -2487,6 +2593,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/documentation/checks/triplet_validator.py
+    dispatch: {argv: ["python3", "tools/validation/documentation/checks/triplet_validator.py"]}
     writes: false
     default_wiring:
       ci: false
@@ -2504,6 +2611,7 @@ entries:
     role: checker
     status: canonical
     command: python3 tools/validation/notebooks/notebook_quality.py --all
+    dispatch: {argv: ["python3", "tools/validation/notebooks/notebook_quality.py", "--all"]}
     writes: false
     default_wiring:
       ci: true
@@ -2523,6 +2631,7 @@ entries:
     audience: user
     placement: user_entrypoint
     command: python3 tools/analysis/documents/extraction/extract_docx.py INPUT.docx --output-dir OUTPUT_DIR
+    dispatch: {argv: ["python3", "tools/analysis/documents/extraction/extract_docx.py", "INPUT.docx", "--output-dir", "OUTPUT_DIR"]}
     writes: true
     default_wiring:
       ci: false

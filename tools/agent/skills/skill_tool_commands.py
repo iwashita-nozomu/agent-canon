@@ -138,6 +138,7 @@ class SkillCommandPacket:
     resolved_maintenance_commands: tuple[tuple[str, str, str, tuple[tuple[str, str], ...], tuple[str, ...]], ...]
     validation_commands: tuple[str, ...]
     command_tool_ids: tuple[tuple[str, ...], ...] = ()
+    command_items: tuple[tuple[Mapping[str, object], ...], ...] = ()
 
 
 def _mapping(value: object, field: str) -> Mapping[str, object]:
@@ -213,6 +214,22 @@ def _skill_items(root: Path, skill: str) -> dict[str, tuple[Mapping[str, object]
             result[phase] = tuple(items)
         return result
     raise StructuredCommandError("invalid-input", f"unknown skill: {skill}")
+
+
+def load_skill_command_items(
+    root: Path,
+) -> dict[str, dict[str, tuple[Mapping[str, object], ...]]]:
+    """Load every typed Skill command item through one shared projection."""
+    data = _catalog(root, CATALOG_PATH)
+    families = data.get("skill_families")
+    if not isinstance(families, list):
+        raise StructuredCommandError("invalid-input", "skill_families must be a list")
+    return {
+        cast(str, _mapping(entry, "skill_families[]")["id"]): _skill_items(
+            root, cast(str, _mapping(entry, "skill_families[]")["id"])
+        )
+        for entry in families
+    }
 
 
 def _relative_path(root: Path, value: object, field: str) -> str:
@@ -295,6 +312,18 @@ def _pathify(root: Path, argv: list[str]) -> list[str]:
     return argv
 
 
+def _logical_argv(item: Mapping[str, object]) -> list[str]:
+    """Return catalog/native tokens before execution-root path resolution."""
+    if "tool_id" in item:
+        return [
+            "catalog",
+            cast(str, item["tool_id"]),
+            cast(str, item.get("operation_id", "default")),
+            *_strings(item.get("argv_suffix", []), "argv_suffix"),
+        ]
+    return [cast(str, item["executable"]), *_strings(item.get("argv"), "argv", required=True)]
+
+
 def _binding_values(item: Mapping[str, object], dispatch: Mapping[str, object], inputs: Mapping[str, object], root: Path, *, allow_unbound: bool = False) -> list[str]:
     specs = dict(_mapping(dispatch.get("arguments", {}), "dispatch.arguments"))
     bindings = _mapping(item.get("bindings", {}), "command.bindings")
@@ -367,7 +396,7 @@ def _resolve_item(root: Path, skill: str, command_id: str, item: Mapping[str, ob
     environment: tuple[tuple[str, str], ...] = ()
     fields = {"skill": skill, "command": command_id, "argv": argv, "cwd": cwd, "env": [], "tool": item.get("tool_id", "native")}
     digest = hashlib.sha256(json.dumps(fields, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    return CommandPlan(json.dumps(argv, ensure_ascii=False), str(root.resolve()), cwd, environment, tuple(argv), skill, command_id, cast(str, item.get("tool_id", "")), cast(str, item.get("operation_id", "default")), "forbidden", "read-only", digest)
+    return CommandPlan(json.dumps(_logical_argv(item), ensure_ascii=False), str(root.resolve()), cwd, environment, tuple(argv), skill, command_id, cast(str, item.get("tool_id", "")), cast(str, item.get("operation_id", "default")), "forbidden", "read-only", digest)
 
 
 def resolve_command(root: Path, skill: str, command_id: str, inputs: Mapping[str, object] | None = None) -> CommandPlan:
@@ -501,7 +530,10 @@ def packet_for_skill(resolution: RootResolution, skill: str) -> SkillCommandPack
         tuple(cast(str, item.get("tool_id", "")) for item in items[phase])
         for phase in PHASES
     )
-    return SkillCommandPacket(skill, _relative(root, root / RUNTIME_SKILL_ROOT / skill / "SKILL.md"), _relative(root, root / HUMAN_SKILL_ROOT / f"{skill}.md"), load_skill_related_map(root).get(skill, ()), examples["required"], examples["conditional"], examples["conditional"], examples["maintenance"], resolved["required"], resolved["conditional"], resolved["conditional"], resolved["maintenance"], examples["maintenance"], command_tool_ids)
+    command_items = tuple(
+        tuple(dict(item) for item in items[phase]) for phase in PHASES
+    )
+    return SkillCommandPacket(skill, _relative(root, root / RUNTIME_SKILL_ROOT / skill / "SKILL.md"), _relative(root, root / HUMAN_SKILL_ROOT / f"{skill}.md"), load_skill_related_map(root).get(skill, ()), examples["required"], examples["conditional"], examples["conditional"], examples["maintenance"], resolved["required"], resolved["conditional"], resolved["conditional"], resolved["maintenance"], examples["maintenance"], command_tool_ids, command_items)
 
 
 def runtime_skill_paths(root: Path) -> list[Path]:
