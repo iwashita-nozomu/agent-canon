@@ -810,23 +810,40 @@ def test_fake_marked_volume_adopts_divergent_legacy_state(tmp_path: Path) -> Non
     volume_name = f"agent-canon-runtime-{control_digest}"
     volume_root = tmp_path / f".fake-volume-{volume_name}"
     (volume_root / "runtime" / "receipts").mkdir(parents=True)
-    (volume_root / "runtime" / "receipts" / "current.json").write_text(
-        "volume-owned\n", encoding="utf-8"
-    )
+    preserved_files = {
+        "runtime/state.json": "state-owned\n",
+        "runtime/receipts/current.json": "receipts-owned\n",
+        "runtime/generations/current.tsv": "generations-owned\n",
+        "runtime/tasks/current.json": "tasks-owned\n",
+        "spool/owned.txt": "spool-owned\n",
+        "archive/owned.txt": "archive-owned\n",
+        "cache/owned.txt": "cache-owned\n",
+        "codex-home/owned.txt": "codex-owned\n",
+    }
     for directory in (
         "runtime/generations",
         "runtime/tasks",
-        "exchange",
         "spool",
         "archive",
         "cache",
         "codex-home",
-        "private-log",
     ):
         (volume_root / directory).mkdir(parents=True)
+    for relative, content in preserved_files.items():
+        (volume_root / relative).write_text(content, encoding="utf-8")
+    for directory in (
+        volume_root,
+        volume_root / "runtime",
+        volume_root / "spool",
+        volume_root / "archive",
+        volume_root / "cache",
+        volume_root / "codex-home",
+    ):
+        directory.chmod(0o755)
     (volume_root / ".agent-canon-controller-volume-v1").write_text(
         f"agent-canon-controller-volume/v1\n{control_digest}\n", encoding="utf-8"
     )
+    (volume_root / ".agent-canon-controller-volume-v1").chmod(0o640)
     state_path = tmp_path / "docker-state.json"
     state_path.write_text(
         json.dumps(
@@ -870,14 +887,94 @@ def test_fake_marked_volume_adopts_divergent_legacy_state(tmp_path: Path) -> Non
         env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
     )
     assert result.returncode == 0, result.stderr
-    assert (volume_root / "runtime" / "receipts" / "current.json").read_text(
-        encoding="utf-8"
-    ) == "volume-owned\n"
+    for relative, content in preserved_files.items():
+        assert (volume_root / relative).read_text(encoding="utf-8") == content
+    assert (volume_root / "exchange").is_dir()
+    assert (volume_root / "private-log").is_dir()
+    for directory in (
+        volume_root,
+        volume_root / "runtime",
+        volume_root / "exchange",
+        volume_root / "private-log",
+    ):
+        assert directory.stat().st_mode & 0o777 == 0o700
+    assert (
+        volume_root / ".agent-canon-controller-volume-v1"
+    ).stat().st_mode & 0o777 == 0o600
     assert (legacy / "spool" / "host-only").read_text(encoding="utf-8") == "preserve\n"
     state = json.loads(state_path.read_text(encoding="utf-8"))
     assert state["volumes"][volume_name]["Mode"] == "0700"
     assert state["volumes"][volume_name]["UID"] == os.getuid()
     assert state["volumes"][volume_name]["GID"] == os.getgid()
+
+
+def test_fake_marked_volume_rejects_invalid_marker(tmp_path: Path) -> None:
+    """A marked volume with an invalid marker fails without creating paths."""
+    control = tmp_path / "control"
+    runtime = tmp_path / "runtime"
+    control.mkdir()
+    runtime.mkdir()
+    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{control_digest}"
+    volume_root = tmp_path / f".fake-volume-{volume_name}"
+    (volume_root / "runtime" / "receipts").mkdir(parents=True)
+    (volume_root / "runtime" / "generations").mkdir(parents=True)
+    (volume_root / "runtime" / "tasks").mkdir(parents=True)
+    for directory in ("spool", "archive", "cache", "codex-home"):
+        (volume_root / directory).mkdir()
+    marker = volume_root / ".agent-canon-controller-volume-v1"
+    marker.write_text(
+        "agent-canon-controller-volume/v1\nwrong-digest\n", encoding="utf-8"
+    )
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {},
+                "containers": {},
+                "volumes": {
+                    volume_name: {
+                        "Name": volume_name,
+                        "Labels": {
+                            "io.agent-canon.runtime": "shared-v1",
+                            "io.agent-canon.control-root-digest": control_digest,
+                            "io.agent-canon.state": "controller-v1",
+                        },
+                        "Mountpoint": str(volume_root),
+                    }
+                },
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            (
+                f"source {str(ADAPTER)!r}; "
+                f"AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}; "
+                f"FAKE_DOCKER_STATE={str(state_path)!r}; export FAKE_DOCKER_STATE; "
+                f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
+                f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}; "
+                f"AGENT_CANON_STATE_ROOT={str(runtime)!r}; "
+                f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
+                "AGENT_CANON_IMAGE_REF=image; _agent_canon_init_state_volume"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
+    )
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["code"] == "state_volume_init_failed"
+    assert marker.read_text(encoding="utf-8") == (
+        "agent-canon-controller-volume/v1\nwrong-digest\n"
+    )
+    assert not (volume_root / "exchange").exists()
+    assert not (volume_root / "private-log").exists()
 
 
 def test_target_add_init_failure_restores_previous_fake_resident(tmp_path: Path) -> None:
