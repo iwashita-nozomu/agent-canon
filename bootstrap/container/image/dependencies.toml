@@ -13,6 +13,39 @@ schema_version = 2
 # CLI, editor integrations, GPU tooling, and lifecycle helpers.
 
 [[records]]
+id = "pipx"
+package = "pipx"
+method = "apt-package"
+version = "1.0.0-1"
+source = "ubuntu:22.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = ["pipx"]
+failure_policy = "fail"
+
+[[records]]
+id = "check-jsonschema"
+package = "check-jsonschema"
+method = "pipx"
+version = "0.31.0"
+source = "https://pypi.org/simple"
+verification = { kind = "pipx-package", executable = "check-jsonschema", args = ["--version"], output_contains = "0.31.0" }
+deps = ["pipx"]
+provides = ["check-jsonschema"]
+failure_policy = "fail"
+
+[[records]]
+id = "yamllint"
+package = "yamllint"
+method = "pipx"
+version = "1.35.1"
+source = "https://pypi.org/simple"
+verification = { kind = "pipx-package", executable = "yamllint", args = ["--version"], output_contains = "1.35.1" }
+deps = ["pipx"]
+provides = ["yamllint"]
+failure_policy = "fail"
+
+[[records]]
 id = "pyright-language-server"
 package = "pyright"
 method = "npm-global"

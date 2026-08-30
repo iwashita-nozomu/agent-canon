@@ -195,6 +195,7 @@ IMAGE_INSTALL_METHODS = frozenset(
         "apt-package",
         "apt-repository",
         "npm-global",
+        "pipx",
         "release-asset",
         "rust-toolchain",
         "cargo-source-build",

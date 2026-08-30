@@ -89,6 +89,15 @@ def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     assert "COPY eval/definitions /usr/local/share/agent-canon/runtime/eval/definitions" in text
     assert "COPY AGENTS.md ROOT_AGENTS.md /usr/local/share/agent-canon/runtime/" in text
     assert "COPY agents /usr/local/share/agent-canon/runtime/agents" in text
+    assert "COPY schemas /usr/local/share/agent-canon/runtime/schemas" in text
+    assert "PIPX_HOME=/usr/local/share/agent-canon/pipx" in text
+    assert "PIPX_BIN_DIR=/usr/local/bin" in text
+    assert "command -v yamllint" in text
+    assert "command -v check-jsonschema" in text
+    materializer_offset = text.index("skill_shim_materializer.py")
+    assert text.index("command -v yamllint") < materializer_offset
+    assert text.index("command -v check-jsonschema") < materializer_offset
+    assert "runtime/schemas/agent-canon/skill-catalog.schema.json" in text
     assert "tools/catalog.yaml" in text
     assert "tools/runtime/dispatch/tool_dispatch.py" in text
     assert (
@@ -242,6 +251,9 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
     records = document["records"]
     ids = {record["id"] for record in records}
     assert ids == {
+        "pipx",
+        "check-jsonschema",
+        "yamllint",
         "pyright-language-server",
         "bash-language-server",
         "jq",
@@ -256,6 +268,7 @@ def test_dependency_manifest_is_python_rust_lsp_only() -> None:
         "apt-package",
         "apt-repository",
         "npm-global",
+        "pipx",
         "rust-toolchain",
         "cargo-source-build",
     }

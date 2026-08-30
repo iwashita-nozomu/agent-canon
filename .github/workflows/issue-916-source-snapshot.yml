@@ -1,0 +1,29 @@
+name: Issue 916 source snapshot
+
+on:
+  push:
+    branches:
+      - refactor/916-json-schema-catalogs
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Package exact checkout
+        run: |
+          git status --short --branch
+          tar --exclude=.git -czf "${RUNNER_TEMP}/agent-canon-916-source.tar.gz" .
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-canon-916-source
+          path: ${{ runner.temp }}/agent-canon-916-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1

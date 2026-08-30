@@ -15,12 +15,16 @@
 from __future__ import annotations
 
 import json
+import copy
+import shutil
 import subprocess
 import sys
 import tempfile
 import tomllib
 import unittest
 from pathlib import Path
+
+import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROUTE = PROJECT_ROOT / "tools" / "agent" / "orchestration" / "route.py"
@@ -64,6 +68,62 @@ class RouteToolTest(unittest.TestCase):
             capture_output=True,
             text=True,
         )
+
+    def provide_catalog_schema_inputs(self, root: Path) -> None:
+        """Provide explicit local schemas and catalog sources to a fixture root."""
+        schema_root = root / "schemas" / "agent-canon"
+        schema_root.mkdir(parents=True, exist_ok=True)
+        for schema in (
+            "skill-catalog.schema.json",
+            "skill-dependencies.schema.json",
+            "tool-catalog.schema.json",
+            "yamllint.yaml",
+        ):
+            shutil.copyfile(
+                PROJECT_ROOT / "schemas" / "agent-canon" / schema,
+                schema_root / schema,
+            )
+        tools_root = root / "tools"
+        tools_root.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(
+            PROJECT_ROOT / "tools" / "catalog.yaml",
+            tools_root / "catalog.yaml",
+        )
+
+    def write_canonical_skill_fixture(
+        self,
+        root: Path,
+        skill_ids: tuple[str, ...] = ("task-routing",),
+    ) -> None:
+        """Write schema-valid selected catalog/dependency records to a fixture root."""
+        source_catalog = yaml.safe_load(
+            (PROJECT_ROOT / "agents/skills/catalog.yaml").read_text(encoding="utf-8")
+        )
+        entries = {
+            entry["id"]: entry for entry in source_catalog["skill_families"]
+        }
+        source_catalog["skill_families"] = [
+            copy.deepcopy(entries[skill]) for skill in skill_ids
+        ]
+        catalog_path = root / "agents" / "skills" / "catalog.yaml"
+        catalog_path.parent.mkdir(parents=True, exist_ok=True)
+        catalog_path.write_text(
+            yaml.safe_dump(source_catalog, sort_keys=False), encoding="utf-8"
+        )
+        source_dependencies = yaml.safe_load(
+            (PROJECT_ROOT / "agents/skills/skill-dependencies.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
+        source_dependencies["skill_dependencies"] = {
+            skill: copy.deepcopy(source_dependencies["skill_dependencies"][skill])
+            for skill in skill_ids
+        }
+        dependency_path = root / "agents" / "skills" / "skill-dependencies.yaml"
+        dependency_path.write_text(
+            yaml.safe_dump(source_dependencies, sort_keys=False), encoding="utf-8"
+        )
+        self.provide_catalog_schema_inputs(root)
 
     def visualization_tool_call(
         self,
@@ -139,15 +199,7 @@ class RouteToolTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / ".git").touch()
-            (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
-            (root / "agents" / "skills" / "catalog.yaml").write_text(
-                "version: 1\nskill_families: []\n",
-                encoding="utf-8",
-            )
-            (root / "agents" / "skills" / "skill-dependencies.yaml").write_text(
-                "version: 1\nskill_dependencies: {}\n",
-                encoding="utf-8",
-            )
+            self.write_canonical_skill_fixture(root, ())
             child = root / "workspace" / "subdir"
             child.mkdir(parents=True, exist_ok=True)
             standalone_child = root / "agents" / "standalone" / "child"
@@ -168,15 +220,7 @@ class RouteToolTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / ".git").touch()
-            (root / "agents" / "skills").mkdir(parents=True, exist_ok=True)
-            (root / "agents" / "skills" / "catalog.yaml").write_text(
-                "version: 1\nskill_families: []\n",
-                encoding="utf-8",
-            )
-            (root / "agents" / "skills" / "skill-dependencies.yaml").write_text(
-                "version: 1\nskill_dependencies: {}\n",
-                encoding="utf-8",
-            )
+            self.write_canonical_skill_fixture(root, ())
             parent_child = root / "workspace" / "subdir"
             parent_child.mkdir(parents=True, exist_ok=True)
             standalone_child = root / "agents" / "standalone" / "child"
@@ -1436,20 +1480,20 @@ class RouteToolTest(unittest.TestCase):
         """Underscore-prefixed skills are private and stay out of public routing."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            catalog = root / "agents" / "skills" / "catalog.yaml"
-            catalog.parent.mkdir(parents=True)
-            catalog.write_text(
-                "\n".join(
-                    [
-                        "version: 1",
-                        "skill_families:",
-                        "  - id: _private-skill",
-                        "    purpose: Private skill.",
-                        "    canonical_doc: agents/skills/_private-skill.md",
-                        "    shim: .codex/personal/skills/_private-skill/SKILL.md",
-                    ]
-                ),
-                encoding="utf-8",
+            self.write_canonical_skill_fixture(root)
+            catalog = root / "agents/skills/catalog.yaml"
+            data = yaml.safe_load(catalog.read_text(encoding="utf-8"))
+            entry = data["skill_families"][0]
+            entry["id"] = "_private-skill"
+            entry["canonical_doc"] = "agents/skills/_private-skill.md"
+            entry["shim"] = ".codex/personal/skills/_private-skill/SKILL.md"
+            entry["discovery"]["name"] = "_private-skill"
+            catalog.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+            dependencies = root / "agents/skills/skill-dependencies.yaml"
+            dependency_data = yaml.safe_load(dependencies.read_text(encoding="utf-8"))
+            dependency_data["skill_dependencies"]["_private-skill"] = dependency_data["skill_dependencies"].pop("task-routing")
+            dependencies.write_text(
+                yaml.safe_dump(dependency_data, sort_keys=False), encoding="utf-8"
             )
 
             result = self.run_route(
@@ -2197,6 +2241,10 @@ class RouteToolTest(unittest.TestCase):
             root = Path(tmp_dir)
             catalog = root / "agents" / "skills" / "catalog.yaml"
             catalog.parent.mkdir(parents=True)
+            self.provide_catalog_schema_inputs(root)
+            (root / "agents/skills/skill-dependencies.yaml").write_text(
+                "version: 1\nskill_dependencies: {}\n", encoding="utf-8"
+            )
             catalog.write_text("skill_families: [unterminated\n", encoding="utf-8")
             result = self.run_route(
                 "--root",
@@ -2209,26 +2257,14 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 2)
         self.assertIn("SKILL_ROUTER_ERROR=", result.stderr)
-        self.assertIn("YAML parse failed", result.stderr)
+        self.assertIn("catalog-yaml-invalid", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
 
     def test_prompt_route_duplicate_catalog_skill_fails_structured(self) -> None:
         """Duplicate catalog skill IDs should fail before route selection."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            catalog = root / "agents" / "skills" / "catalog.yaml"
-            catalog.parent.mkdir(parents=True)
-            catalog.write_text(
-                "\n".join(
-                    [
-                        "version: 1",
-                        "skill_families:",
-                        "  - id: task-routing",
-                        "  - id: task-routing",
-                    ]
-                ),
-                encoding="utf-8",
-            )
+            self.write_canonical_skill_fixture(root, ("task-routing", "task-routing"))
             result = self.run_route(
                 "--root",
                 str(root),
@@ -2248,18 +2284,7 @@ class RouteToolTest(unittest.TestCase):
         """Dependency metadata should reference public catalog entries."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            catalog = root / "agents" / "skills" / "catalog.yaml"
-            catalog.parent.mkdir(parents=True)
-            catalog.write_text(
-                "\n".join(
-                    [
-                        "version: 1",
-                        "skill_families:",
-                        "  - id: task-routing",
-                    ]
-                ),
-                encoding="utf-8",
-            )
+            self.write_canonical_skill_fixture(root)
             dependency_map = root / "agents" / "skills" / "skill-dependencies.yaml"
             dependency_map.write_text(
                 "\n".join(
@@ -2269,12 +2294,13 @@ class RouteToolTest(unittest.TestCase):
                         "  task-routing:",
                         "    responsibility_group: orchestration",
                         "    required_prerequisites: []",
+                        "    routing_candidates: []",
                         "    successors:",
                         "      - missing-skill",
                         "    order_constraints: []",
                         "    parallel_independent: []",
                     ]
-                ),
+                ) + "\n",
                 encoding="utf-8",
             )
             result = self.run_route(
@@ -2488,14 +2514,28 @@ class CapabilityRouteTest(unittest.TestCase):
         """Write a minimal capability catalog fixture."""
         path = root / "agents" / "skills" / "catalog.yaml"
         path.parent.mkdir(parents=True, exist_ok=True)
+        runtime = "\n".join(
+            [
+                "tool_runtime:",
+                "  schema_version: 2",
+                "  catalog: tools/catalog.yaml",
+                "  command: agent-canon tool run <catalog-id> -- <args...>",
+                "  execution: bootstrap exec typed request into the shared tool container",
+                "  environment: exact allowlist only",
+                "  parity_fields: [argv, cwd, stdin, stdout, stderr, exit, signal, written_paths]",
+                "  parity_policy: verified-only",
+                "  legacy_policy: retain-until-parity",
+            ]
+        )
         path.write_text(
             "\n".join(
                 [
                     "version: 1",
+                    runtime,
                     "skill_families:",
                     entries,
                 ]
-            ),
+            ) + "\n",
             encoding="utf-8",
         )
         skill_ids = [
@@ -2510,12 +2550,25 @@ class CapabilityRouteTest(unittest.TestCase):
                     f"  {skill_id}:",
                     "    responsibility_group: fixture",
                     "    required_prerequisites: []",
+                    "    routing_candidates: []",
                     "    successors: []",
                     "    order_constraints: []",
                     "    parallel_independent: []",
                 ]
             )
         self.write_dependency_map(root, "\n".join(dependency_lines[2:]))
+        schema_root = root / "schemas" / "agent-canon"
+        schema_root.mkdir(parents=True, exist_ok=True)
+        for schema in (
+            "skill-catalog.schema.json",
+            "skill-dependencies.schema.json",
+            "tool-catalog.schema.json",
+            "yamllint.yaml",
+        ):
+            shutil.copyfile(PROJECT_ROOT / "schemas" / "agent-canon" / schema, schema_root / schema)
+        tools_root = root / "tools"
+        tools_root.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(PROJECT_ROOT / "tools" / "catalog.yaml", tools_root / "catalog.yaml")
         return path
 
     def write_dependency_map(self, root: Path, body: str) -> Path:
@@ -2523,7 +2576,7 @@ class CapabilityRouteTest(unittest.TestCase):
         path = root / "agents" / "skills" / "skill-dependencies.yaml"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
-            "\n".join(["version: 1", "skill_dependencies:", body]),
+            "\n".join(["version: 1", "skill_dependencies:", body]) + "\n",
             encoding="utf-8",
         )
         return path
@@ -2543,6 +2596,12 @@ class CapabilityRouteTest(unittest.TestCase):
                 "    purpose: Capability fixture.",
                 f"    canonical_doc: agents/skills/{skill}.md",
                 f"    shim: .codex/personal/skills/{skill}/SKILL.md",
+                "    discovery:",
+                f"      name: {skill}",
+                "      description: Capability fixture.",
+                "    tool_commands:",
+                "      required: []",
+                "      conditional: []",
                 "    routing:",
                 "      stage_policy: active",
                 "      reason: capability fixture",
@@ -2599,6 +2658,12 @@ class CapabilityRouteTest(unittest.TestCase):
                         "    purpose: Fixture.",
                         "    canonical_doc: agents/skills/task-routing.md",
                         "    shim: .codex/personal/skills/task-routing/SKILL.md",
+                        "    discovery:",
+                        "      name: task-routing",
+                        "      description: Fixture.",
+                        "    tool_commands:",
+                        "      required: []",
+                        "      conditional: []",
                         "    routing:",
                         "      stage_policy: explicit_only",
                         "      reason: fixture",
@@ -2607,8 +2672,12 @@ class CapabilityRouteTest(unittest.TestCase):
                     ]
                 ),
             )
-            with self.assertRaisesRegex(ValueError, "routing.stage_policy"):
+            with self.assertRaises(catalog_module.CapabilityRootError) as raised:
                 catalog_module.load_skill_route_rules(root)
+            self.assertEqual(
+                raised.exception.code,
+                "catalog-schema-invalid:agents/skills/catalog.yaml",
+            )
 
     def test_skill_routing_schema_rejects_non_string_reason(self) -> None:
         """Catalog owner rejects non-string routing reasons."""
@@ -2622,6 +2691,12 @@ class CapabilityRouteTest(unittest.TestCase):
                         "    purpose: Fixture.",
                         "    canonical_doc: agents/skills/task-routing.md",
                         "    shim: .codex/personal/skills/task-routing/SKILL.md",
+                        "    discovery:",
+                        "      name: task-routing",
+                        "      description: Fixture.",
+                        "    tool_commands:",
+                        "      required: []",
+                        "      conditional: []",
                         "    routing:",
                         "      stage_policy: active",
                         "      reason: 3",
@@ -2630,8 +2705,12 @@ class CapabilityRouteTest(unittest.TestCase):
                     ]
                 ),
             )
-            with self.assertRaisesRegex(ValueError, "routing.reason"):
+            with self.assertRaises(catalog_module.CapabilityRootError) as raised:
                 catalog_module.load_skill_route_rules(root)
+            self.assertEqual(
+                raised.exception.code,
+                "catalog-schema-invalid:agents/skills/catalog.yaml",
+            )
 
     def test_skill_dependency_schema_rejects_unknown_skill(self) -> None:
         """Dependency owner rejects references absent from the catalog."""
@@ -2645,6 +2724,12 @@ class CapabilityRouteTest(unittest.TestCase):
                         "    purpose: Fixture.",
                         "    canonical_doc: agents/skills/task-routing.md",
                         "    shim: .codex/personal/skills/task-routing/SKILL.md",
+                        "    discovery:",
+                        "      name: task-routing",
+                        "      description: Fixture.",
+                        "    tool_commands:",
+                        "      required: []",
+                        "      conditional: []",
                     ]
                 ),
             )
@@ -2655,6 +2740,7 @@ class CapabilityRouteTest(unittest.TestCase):
                         "  task-routing:",
                         "    responsibility_group: fixture",
                         "    required_prerequisites: []",
+                        "    routing_candidates: []",
                         "    successors:",
                         "      - missing-skill",
                         "    order_constraints: []",
@@ -2679,6 +2765,12 @@ class CapabilityRouteTest(unittest.TestCase):
                         "    purpose: Fixture.",
                         "    canonical_doc: agents/skills/task-routing.md",
                         "    shim: .codex/personal/skills/task-routing/SKILL.md",
+                        "    discovery:",
+                        "      name: task-routing",
+                        "      description: Fixture.",
+                        "    tool_commands:",
+                        "      required: []",
+                        "      conditional: []",
                     ]
                 ),
             )
@@ -2689,6 +2781,7 @@ class CapabilityRouteTest(unittest.TestCase):
                         "  task-routing:",
                         "    responsibility_group: fixture",
                         "    required_prerequisites: []",
+                        "    routing_candidates: []",
                         "    successors: []",
                         "    order_constraints: []",
                         "    parallel_independent:",
@@ -2867,9 +2960,7 @@ class CapabilityRouteTest(unittest.TestCase):
             result = self.run_route(
                 "--root", str(root), "--capability", "oop_type_design"
             )
-        self.assert_failure_code(
-            result, "duplicate-capability-definition:oop_type_design"
-        )
+        self.assert_failure_code(result, "capability-root-catalog-invalid")
 
     def test_capability_route_rejects_multiple_capabilities(self) -> None:
         """The first capability version does not arbitrate multiple IDs."""

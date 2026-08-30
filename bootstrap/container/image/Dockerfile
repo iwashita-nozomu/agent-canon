@@ -93,6 +93,9 @@ COPY tools/runtime/dispatch/agent-canon /opt/agent-canon/tools/runtime/dispatch/
 ENV CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo \
     RUSTUP_HOME=/usr/local/share/agent-canon/toolchains/rustup \
     AGENT_CANON_CARGO_TARGET_DIR=/usr/local/share/agent-canon/toolchains/cargo-target \
+    PIPX_HOME=/usr/local/share/agent-canon/pipx \
+    PIPX_BIN_DIR=/usr/local/bin \
+    PIPX_MAN_DIR=/usr/local/share/man \
     AGENT_CANON_IMAGE_DEPENDENCIES_ROOT=/usr/local/share/agent-canon/image-dependencies \
     PATH=/usr/local/share/agent-canon/toolchains/cargo/bin:/usr/local/bin:/usr/bin:/bin
 
@@ -119,11 +122,17 @@ RUN python3 /opt/agent-canon/tools/analysis/dependencies/dependency_plan.py \
 COPY tools /usr/local/share/agent-canon/runtime/tools
 COPY agents /usr/local/share/agent-canon/runtime/agents
 COPY documents /usr/local/share/agent-canon/runtime/documents
+COPY schemas /usr/local/share/agent-canon/runtime/schemas
 COPY bootstrap/host/manifest.toml /usr/local/share/agent-canon/runtime/bootstrap/host/manifest.toml
 # The generated host view is intentionally excluded from the build context.
 # Reuse the canonical materializer in the image layer so this path is derived
 # from the tracked catalog and canonical skill documents at build time.
 RUN install -d -m 0755 /usr/local/share/agent-canon/runtime/.codex/personal \
+    && command -v yamllint \
+    && command -v check-jsonschema \
+    && test -f /usr/local/share/agent-canon/runtime/schemas/agent-canon/skill-catalog.schema.json \
+    && test -f /usr/local/share/agent-canon/runtime/schemas/agent-canon/skill-dependencies.schema.json \
+    && test -f /usr/local/share/agent-canon/runtime/schemas/agent-canon/tool-catalog.schema.json \
     && AGENT_CANON_IMAGE_BUILD=1 python3 \
       /usr/local/share/agent-canon/runtime/tools/agent/skills/skill_shim_materializer.py \
       materialize --root /usr/local/share/agent-canon/runtime --all --image-build --format text

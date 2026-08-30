@@ -52,6 +52,7 @@ from tools.agent.skills.skill_route_catalog import (
     load_skill_catalog,
     load_skill_dependency_map,
     load_skill_route_rules,
+    validate_catalog_schemas,
 )
 from tools.agent.skills.skill_tool_commands import SkillCommandPacket, packet_for_skill
 
@@ -343,22 +344,18 @@ def _string(value: object, field: str) -> str:
 def _catalog_entries(
     root: Path,
 ) -> tuple[tuple[str, ...], dict[str, Mapping[str, object]]]:
-    """Load the complete public catalog and its discovery source."""
+    """Project the complete public catalog after native schema validation."""
     data = load_skill_catalog(root)
-    families = data.get("skill_families")
-    if not isinstance(families, list):
-        raise MaterializerError("catalog_invalid", "skill_families")
+    families = cast(Sequence[object], data["skill_families"])
     ids: list[str] = []
     entries: dict[str, Mapping[str, object]] = {}
-    for index, raw in enumerate(cast(list[object], families)):
-        entry = _mapping(raw, f"skill_families[{index}]")
-        skill = _string(entry.get("id"), f"skill_families[{index}].id")
-        _normalize_string(skill, identifier=True)
+    for raw in families:
+        entry = cast(Mapping[str, object], raw)
+        skill = cast(str, entry["id"])
         if skill in entries:
             raise MaterializerError("catalog_duplicate", skill)
-        discovery = _mapping(entry.get("discovery"), f"{skill}.discovery")
-        discovery_name = _string(discovery.get("name"), f"{skill}.discovery.name")
-        _string(discovery.get("description"), f"{skill}.discovery.description")
+        discovery = cast(Mapping[str, object], entry["discovery"])
+        discovery_name = cast(str, discovery["name"])
         if discovery_name != skill:
             raise MaterializerError("discovery_name_mismatch", skill)
         ids.append(skill)
@@ -506,6 +503,10 @@ def build_context(root: Path, *, output_root: Path | None = None) -> BuildContex
     """Load and validate the complete canonical input universe."""
     root = root.resolve()
     output = (output_root or root).resolve()
+    try:
+        validate_catalog_schemas(root)
+    except ValueError as exc:
+        raise MaterializerError("catalog_schema_invalid", str(exc)) from exc
     skill_ids, entries = _catalog_entries(root)
     try:
         routes = {rule.skill: rule for rule in load_skill_route_rules(root)}
@@ -536,18 +537,16 @@ def build_context(root: Path, *, output_root: Path | None = None) -> BuildContex
 
 
 def _catalog_discovery(entry: Mapping[str, object]) -> tuple[str, str]:
-    discovery = _mapping(entry["discovery"], "discovery")
-    return _string(discovery["name"], "discovery.name"), _string(
-        discovery["description"], "discovery.description"
-    )
+    discovery = cast(Mapping[str, object], entry["discovery"])
+    return cast(str, discovery["name"]), cast(str, discovery["description"])
 
 
 def build_record(context: BuildContext, skill: str) -> dict[str, object]:
     """Build one fixed-order v3 SkillRuntimeShimRecord."""
     entry = context.catalog_entries[skill]
     name, description = _catalog_discovery(entry)
-    canonical_doc = _string(entry.get("canonical_doc"), f"{skill}.canonical_doc")
-    shim_path = _string(entry.get("shim"), f"{skill}.shim")
+    canonical_doc = cast(str, entry["canonical_doc"])
+    shim_path = cast(str, entry["shim"])
     if shim_path != f".codex/personal/skills/{skill}/SKILL.md":
         raise MaterializerError("shim_path_mismatch", skill)
     if canonical_doc != f"agents/skills/{skill}.md":
@@ -566,7 +565,7 @@ def build_record(context: BuildContext, skill: str) -> dict[str, object]:
         "agent-canon.skill-runtime-shim.owner.catalog.v1",
         {
             "id": skill,
-            "purpose": _string(entry.get("purpose"), f"{skill}.purpose"),
+            "purpose": cast(str, entry["purpose"]),
             "canonical_doc": canonical_doc,
             "shim": shim_path,
             "discovery": {"name": name, "description": description},

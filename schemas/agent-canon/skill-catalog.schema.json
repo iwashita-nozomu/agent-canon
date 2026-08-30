@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-canon.local/schemas/agent-canon/skill-catalog.schema.json",
+  "title": "AgentCanon public skill catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "tool_runtime", "skill_families"],
+  "properties": {
+    "version": { "const": 1 },
+    "tool_runtime": { "$ref": "#/$defs/toolRuntime" },
+    "skill_families": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/skillFamily" }
+    }
+  },
+  "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "identifier": {
+      "type": "string",
+      "pattern": "^_?[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\s]+$"
+    },
+    "stringList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nonEmptyString" },
+      "uniqueItems": true
+    },
+    "triggerGroups": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description"],
+      "properties": {
+        "name": { "$ref": "#/$defs/identifier" },
+        "description": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "owner", "phase", "activation", "exclusive"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$"
+        },
+        "owner": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$"
+        },
+        "phase": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$"
+        },
+        "activation": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$"
+        },
+        "exclusive": { "type": "boolean" }
+      }
+    },
+    "routing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage_policy", "reason"],
+      "properties": {
+        "stage_policy": { "enum": ["active", "deferred"] },
+        "reason": { "$ref": "#/$defs/nonEmptyString" },
+        "triggers": { "$ref": "#/$defs/triggerGroups" },
+        "capabilities": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/capability" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "toolCommands": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "conditional"],
+      "properties": {
+        "required": { "$ref": "#/$defs/stringList" },
+        "conditional": { "$ref": "#/$defs/stringList" },
+        "maintenance": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "toolRuntime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "catalog",
+        "command",
+        "execution",
+        "environment",
+        "parity_fields",
+        "parity_policy",
+        "legacy_policy"
+      ],
+      "properties": {
+        "schema_version": { "const": 2 },
+        "catalog": { "const": "tools/catalog.yaml" },
+        "command": { "$ref": "#/$defs/nonEmptyString" },
+        "execution": { "$ref": "#/$defs/nonEmptyString" },
+        "environment": { "$ref": "#/$defs/nonEmptyString" },
+        "parity_fields": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "argv",
+              "cwd",
+              "stdin",
+              "stdout",
+              "stderr",
+              "exit",
+              "signal",
+              "written_paths"
+            ]
+          }
+        },
+        "parity_policy": { "const": "verified-only" },
+        "legacy_policy": { "const": "retain-until-parity" }
+      }
+    },
+    "skillFamily": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "purpose",
+        "canonical_doc",
+        "shim",
+        "discovery",
+        "tool_commands"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "purpose": { "$ref": "#/$defs/nonEmptyString" },
+        "canonical_doc": {
+          "type": "string",
+          "pattern": "^agents/skills/_?[a-z0-9]+(?:-[a-z0-9]+)*\\.md$"
+        },
+        "shim": {
+          "type": "string",
+          "pattern": "^\\.codex/personal/skills/_?[a-z0-9]+(?:-[a-z0-9]+)*/SKILL\\.md$"
+        },
+        "discovery": { "$ref": "#/$defs/discovery" },
+        "tool_commands": { "$ref": "#/$defs/toolCommands" },
+        "routing": { "$ref": "#/$defs/routing" },
+        "visualization_owner": { "$ref": "#/$defs/nonEmptyString" },
+        "visualization_role": { "enum": ["owner", "adapter"] },
+        "tool_id": { "$ref": "#/$defs/nonEmptyString" },
+        "argument_schema": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    }
+  }
+}
