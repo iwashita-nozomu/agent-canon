@@ -149,15 +149,11 @@ RUN test -f /usr/local/share/agent-canon/runtime/tools/catalog.yaml \
     && test -f /usr/local/share/agent-canon/runtime/eval/checkers/eval_accumulation_check.py \
     && test -f /usr/local/share/agent-canon/runtime/eval/fixtures/skill-runtime-shim/measurements/fixture-measurement.json \
     && test -f /usr/local/share/agent-canon/runtime/ROOT_AGENTS.md \
-    && test -f /usr/local/share/agent-canon/runtime/documents/runtime/runtime-profiles-and-check-matrix.json \
-    && chown -R root:root /usr/local/share/agent-canon/runtime/tools /usr/local/share/agent-canon/runtime/agents /usr/local/share/agent-canon/runtime/documents
+    && test -f /usr/local/share/agent-canon/runtime/documents/runtime/runtime-profiles-and-check-matrix.json
 
 COPY bootstrap/container/lifecycle/entrypoint.sh /usr/local/bin/agent-canon-container-entrypoint
 COPY bootstrap/container/dispatch/tool-wrapper.sh /usr/local/bin/agent-canon-tool
-RUN chmod 0555 /usr/local/bin/agent-canon-container-entrypoint /usr/local/bin/agent-canon-tool \
-    && chown -R root:root /usr/local/bin/agent-canon-container-entrypoint \
-    && chown -R root:root /usr/local/bin/agent-canon-tool \
-    && chown -R root:root /usr/local/share/agent-canon /var/lib/agent-canon /workspace
+RUN chmod 0555 /usr/local/bin/agent-canon-container-entrypoint /usr/local/bin/agent-canon-tool
 
 ENV AGENT_CANON_CONTROL_PARENT_ROOT=/var/lib/agent-canon \
     AGENT_CANON_RUNTIME_ROOT=/var/lib/agent-canon/runtime \
