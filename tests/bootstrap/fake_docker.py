@@ -834,6 +834,14 @@ def main(argv: list[str]) -> int:
             operations = {"install", "update", "start", "stop", "uninstall"}
             operation = next((item for item in command[2:] if item in operations), "")
             if operation == "install" and runtime_mount is not None:
+                for name in ("generations", "tasks"):
+                    directory = Path(runtime_mount["Source"]) / name
+                    if directory.is_dir():
+                        for child in directory.iterdir():
+                            if child.is_dir() and not child.is_symlink():
+                                shutil.rmtree(child)
+                            else:
+                                child.unlink()
                 state_path = Path(runtime_mount["Source"]) / "state.json"
                 if state_path.is_file():
                     lifecycle = json.loads(state_path.read_text(encoding="utf-8"))

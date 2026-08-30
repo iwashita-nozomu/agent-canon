@@ -5793,6 +5793,18 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
                 # A clean install reconstructs controller-owned lifecycle
                 # state, while host-consumed spool/archive/cache/Codex
                 # surfaces remain on their explicitly mounted host roots.
+                for directory in (self.paths.generations, self.paths.tasks):
+                    if directory.is_symlink():
+                        raise BootstrapError(
+                            "symlink_path_rejected",
+                            f"controller state directory is a symlink: {directory}",
+                        )
+                    if directory.is_dir():
+                        for child in directory.iterdir():
+                            if child.is_symlink() or child.is_file():
+                                child.unlink()
+                            elif child.is_dir():
+                                shutil.rmtree(child)
                 state.update(
                     {
                         "targets": {},
