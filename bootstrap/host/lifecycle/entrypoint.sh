@@ -483,7 +483,7 @@ _agent_canon_sync_operation() (
   # remote before asking Git to detach at the candidate. The live checkout is
   # not touched by this fetch and remains unchanged until candidate validation
   # has completed.
-  if ! git -C "$staging_root" fetch --no-tags "$remote_url" \
+  if ! git -C "$staging_root" fetch --no-tags -- "$remote_url" \
     "+refs/heads/$branch:refs/remotes/$remote/$branch" >/dev/null; then
     rm -rf -- "$staging_root"
     _agent_canon_source_sync_failure source_sync_candidate_fetch_failed \

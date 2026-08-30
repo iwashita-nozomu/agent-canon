@@ -2522,8 +2522,18 @@ def test_source_sync_transports_remote_candidate_from_shallow_source(
         capture_output=True,
         text=True,
     ).stdout.strip()
+    assert (
+        subprocess.run(
+            ["git", "-C", str(install), "rev-parse", "--is-shallow-repository"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        == "true"
+    )
 
-    script = f"""
+    def run_sync(candidate_rc: int = 0) -> subprocess.CompletedProcess[str]:
+        script = f"""
 source {str(ADAPTER)!r}
 set +e
 AGENT_CANON_REPOSITORY_ROOT={str(install)!r}
@@ -2531,21 +2541,44 @@ AGENT_CANON_CONTROL_ROOT={str(tmp_path)!r}
 AGENT_CANON_RUNTIME_ROOT={str(tmp_path / "runtime")!r}
 command_args=(sync --install-root {str(install)!r} --remote origin --branch main)
 bootstrap_host_entrypoint() {{
-  printf '%s\\n' "$(git -C {str(install)!r} rev-parse HEAD)" > {str(observed)!r}
-  printf '%s\\n' "$(git -C "$1" rev-parse HEAD)" >> {str(observed)!r}
+  printf 'live:%s\\n' "$(git -C {str(install)!r} rev-parse HEAD)" > {str(observed)!r}
+  printf 'staging:%s\\n' "$(git -C "$1" rev-parse HEAD)" >> {str(observed)!r}
+  test "$(git -C "$1" rev-parse HEAD)" = {candidate_head!r}
   test "$(git -C "$1" show HEAD:tracked.txt)" = two
+  return {candidate_rc}
 }}
 _agent_canon_install_global_links() {{ return 0; }}
 _agent_canon_sync_operation
 """
-    completed = subprocess.run(
-        ["bash", "-c", script], check=False, capture_output=True, text=True
+        return subprocess.run(
+            ["bash", "-c", script], check=False, capture_output=True, text=True
+        )
+
+    failed = run_sync(candidate_rc=7)
+    assert failed.returncode == 7, failed.stderr
+    failed_observed = dict(
+        line.split(":", 1)
+        for line in observed.read_text(encoding="utf-8").splitlines()
     )
+    assert failed_observed == {"live": source_head, "staging": candidate_head}
+    assert (
+        subprocess.run(
+            ["git", "-C", str(install), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        == source_head
+    )
+    assert (install / "tracked.txt").read_text(encoding="utf-8") == "one\n"
+
+    completed = run_sync()
     assert completed.returncode == 0, completed.stderr
-    assert observed.read_text(encoding="utf-8").splitlines() == [
-        source_head,
-        candidate_head,
-    ]
+    observed_heads = dict(
+        line.split(":", 1)
+        for line in observed.read_text(encoding="utf-8").splitlines()
+    )
+    assert observed_heads == {"live": source_head, "staging": candidate_head}
     assert (
         subprocess.run(
             ["git", "-C", str(install), "rev-parse", "HEAD"],
