@@ -145,6 +145,13 @@ ADMISSION_STATES = frozenset({"ready", "running"})
 SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 MAX_RECEIPT_IO_BYTES = 512
 MAX_EMBEDDING_RESPONSE_BYTES = 16 * 1024 * 1024
+
+
+def _container_control() -> bool:
+    """Return whether this process runs behind the host container adapter."""
+    return os.environ.get("AGENT_CANON_CONTAINER_CONTROL") == "1"
+
+
 _SECRET_OUTPUT = re.compile(
     r"(?i)(\b(?:password|passwd|secret|token|api[_-]?key|authorization)\b\s*[=:]\s*)([^\s,;]+)"
 )
@@ -1188,7 +1195,7 @@ class DockerAdapter:
             raise BootstrapError(
                 "argv_required", "container exec requires a non-empty argv list"
             )
-        if os.environ.get("AGENT_CANON_CONTAINER_CONTROL") == "1":
+        if _container_control():
             # Container-side tool execution is local to the resident image.
             # Lifecycle Docker operations are not available on this path.
             try:
@@ -1302,7 +1309,7 @@ class DockerAdapter:
             raise BootstrapError(
                 "docker_copy_rejected", f"unsafe container export: {source}"
             )
-        if os.environ.get("AGENT_CANON_CONTAINER_CONTROL") == "1":
+        if _container_control():
             source_local = Path(source)
             if source_local.is_symlink() or not source_local.exists():
                 raise BootstrapError("docker_copy_rejected", f"container export is missing: {source}")
@@ -1360,7 +1367,7 @@ class RuntimePaths:
     @property
     def mounts(self) -> Path:
         """Return the mount registry path."""
-        if self._container_control():
+        if _container_control():
             return Path(REGISTRY_DESTINATION)
         return self.runtime_root / "mounts.toml"
 
@@ -1405,7 +1412,7 @@ class RuntimePaths:
     @staticmethod
     def _host_surface(name: str) -> Path | None:
         """Resolve an explicitly mounted host surface in container control."""
-        if os.environ.get("AGENT_CANON_CONTAINER_CONTROL") != "1":
+        if not _container_control():
             return None
         value = os.environ.get(f"AGENT_CANON_HOST_{name}_ROOT", "").strip()
         return Path(value) if value else None
@@ -1413,7 +1420,7 @@ class RuntimePaths:
     @property
     def container_runtime(self) -> Path:
         """Return the writable, credential-free container exchange directory."""
-        if os.environ.get("AGENT_CANON_CONTAINER_CONTROL") == "1":
+        if _container_control():
             exchange = os.environ.get("AGENT_CANON_EXCHANGE_ROOT", "").strip()
             if exchange:
                 return Path(exchange)
@@ -1422,7 +1429,7 @@ class RuntimePaths:
     @property
     def source_sync(self) -> Path:
         """Return source/image correspondence state."""
-        if self._container_control():
+        if _container_control():
             return Path(SOURCE_SYNC_DESTINATION)
         return self.runtime_root / "source-sync.json"
 
@@ -1581,7 +1588,7 @@ class BootstrapRuntime:
     @staticmethod
     def _container_control() -> bool:
         """Return whether this controller is running behind the host adapter."""
-        return os.environ.get("AGENT_CANON_CONTAINER_CONTROL") == "1"
+        return _container_control()
 
     @property
     def default_runtime_root(self) -> bool:
