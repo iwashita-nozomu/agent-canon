@@ -1296,7 +1296,7 @@ class DockerAdapter:
         """Export one exact task subtree through Docker's UID normalization."""
         source_path = Path(source)
         if (
-            not source.startswith("/var/lib/agent-canon/runtime/tasks/")
+            not source.startswith("/var/lib/agent-canon/exchange/tasks/")
             or ".." in source_path.parts
         ):
             raise BootstrapError(
@@ -1360,6 +1360,8 @@ class RuntimePaths:
     @property
     def mounts(self) -> Path:
         """Return the mount registry path."""
+        if self._container_control():
+            return Path(REGISTRY_DESTINATION)
         return self.runtime_root / "mounts.toml"
 
     @property
@@ -1380,16 +1382,48 @@ class RuntimePaths:
     @property
     def codex_home(self) -> Path:
         """Return the isolated managed Codex home."""
+        surface = self._host_surface("CODEX_HOME")
+        if surface is not None:
+            return surface
         return self.runtime_root / "codex-home"
+
+    @property
+    def spool(self) -> Path:
+        """Return the host-consumed eval spool surface."""
+        return self._host_surface("SPOOL") or self.runtime_root / "spool"
+
+    @property
+    def archive(self) -> Path:
+        """Return the host-consumed archive cache surface."""
+        return self._host_surface("ARCHIVE") or self.runtime_root / "archive"
+
+    @property
+    def cache(self) -> Path:
+        """Return the host-consumed runtime cache surface."""
+        return self._host_surface("CACHE") or self.runtime_root / "cache"
+
+    @staticmethod
+    def _host_surface(name: str) -> Path | None:
+        """Resolve an explicitly mounted host surface in container control."""
+        if os.environ.get("AGENT_CANON_CONTAINER_CONTROL") != "1":
+            return None
+        value = os.environ.get(f"AGENT_CANON_HOST_{name}_ROOT", "").strip()
+        return Path(value) if value else None
 
     @property
     def container_runtime(self) -> Path:
         """Return the writable, credential-free container exchange directory."""
+        if os.environ.get("AGENT_CANON_CONTAINER_CONTROL") == "1":
+            exchange = os.environ.get("AGENT_CANON_EXCHANGE_ROOT", "").strip()
+            if exchange:
+                return Path(exchange)
         return self.runtime_root / CONTAINER_RUNTIME_DIR
 
     @property
     def source_sync(self) -> Path:
         """Return source/image correspondence state."""
+        if self._container_control():
+            return Path(SOURCE_SYNC_DESTINATION)
         return self.runtime_root / "source-sync.json"
 
     @property
@@ -1562,18 +1596,39 @@ class BootstrapRuntime:
     def _ensure_layout(self) -> None:
         _ensure_directory(self.paths.runtime_root)
         self._enforce_private_directory(self.paths.runtime_root)
-        for name in KNOWN_SUBDIRS:
+        controller_dirs = (RECEIPT_DIR, GENERATION_DIR, TASK_DIR)
+        for name in controller_dirs:
             path = self.paths.runtime_root / name
             _ensure_directory(path)
             self._enforce_private_directory(path)
-        _ensure_directory(self.paths.container_runtime, mode=0o1777)
-        try:
-            os.chmod(self.paths.container_runtime, 0o1777, follow_symlinks=False)
-        except OSError as exc:
-            raise BootstrapError(
-                "exchange_directory_invalid",
-                "cannot set container runtime exchange mode 01777",
-            ) from exc
+        for path in (self.paths.spool, self.paths.archive, self.paths.cache, self.paths.codex_home):
+            _ensure_directory(path)
+            self._enforce_private_directory(path)
+        exchange_mode = 0o700 if self._container_control() else 0o1777
+        _ensure_directory(self.paths.container_runtime, mode=exchange_mode)
+        if self._container_control():
+            try:
+                exchange_mode = stat.S_IMODE(
+                    os.stat(self.paths.container_runtime, follow_symlinks=False).st_mode
+                )
+            except OSError as exc:
+                raise BootstrapError(
+                    "exchange_directory_invalid",
+                    "cannot inspect container runtime exchange mode",
+                ) from exc
+            if exchange_mode != 0o700:
+                raise BootstrapError(
+                    "exchange_directory_invalid",
+                    "container runtime exchange mode is not 0700",
+                )
+        else:
+            try:
+                os.chmod(self.paths.container_runtime, exchange_mode, follow_symlinks=False)
+            except OSError as exc:
+                raise BootstrapError(
+                    "exchange_directory_invalid",
+                    "cannot set container runtime exchange mode 01777",
+                ) from exc
         if not self.paths.lock.exists():
             try:
                 fd = os.open(
@@ -3365,11 +3420,20 @@ class BootstrapRuntime:
         # file bind at REGISTRY_DESTINATION is read-only and is only a host
         # readback surface; replacing that inode from inside the container
         # would fail and leave a stale registry visible to the tool process.
-        _atomic_bytes(self.paths.mounts, "\n".join(lines).encode("utf-8"), mode=0o444)
+        destination = (
+            self.paths.container_runtime / "mounts.toml"
+            if self._container_control()
+            else self.paths.mounts
+        )
+        _atomic_bytes(destination, "\n".join(lines).encode("utf-8"), mode=0o444)
 
     def _write_mount_manifest(self, state: Mapping[str, Any]) -> None:
         """Write the strict host-readable target mount manifest."""
-        path = self.paths.runtime_root / "mounts.tsv"
+        path = (
+            self.paths.container_runtime / "mounts.tsv"
+            if self._container_control()
+            else self.paths.runtime_root / "mounts.tsv"
+        )
         lines: list[str] = []
         targets = state.get("targets", {})
         if isinstance(targets, Mapping):
@@ -3388,7 +3452,11 @@ class BootstrapRuntime:
                         "only read-only targets may be projected into the resident mount manifest",
                     )
                 lines.append(f"target\t{digest}\t{source}\t/targets/{digest}\tread-only")
-        _atomic_bytes(path, ("\n".join(lines) + ("\n" if lines else "")).encode("utf-8"))
+        _atomic_bytes(
+            path,
+            ("\n".join(lines) + ("\n" if lines else "")).encode("utf-8"),
+            mode=0o444 if self._container_control() else 0o600,
+        )
 
     def target_add(
         self,
@@ -4415,7 +4483,7 @@ class BootstrapRuntime:
                     "GIT_CONFIG_COUNT": "1",
                     "GIT_CONFIG_KEY_0": "safe.directory",
                     "GIT_CONFIG_VALUE_0": f"/targets/{target['digest']}",
-                    "AGENT_CANON_MOUNT_REGISTRY": f"{CONTAINER_RUNTIME_DESTINATION}/mounts.toml",
+                    "AGENT_CANON_MOUNT_REGISTRY": REGISTRY_DESTINATION,
                     # Runtime log readers use the existing explicit archive
                     # override. The host-owned private-log bind is the sole
                     # accumulated archive; runtime/ is only task exchange.
@@ -4621,7 +4689,7 @@ class BootstrapRuntime:
         """Run every registered eval producer inside the resident tool image."""
         _slug(run_id)
         source = _existing_no_symlink(root, field="eval source root")
-        spool = self.paths.runtime_root / "spool" / run_id
+        spool = self.paths.spool / run_id
         if spool.exists():
             if spool.is_symlink():
                 raise BootstrapError("symlink_path_rejected", f"eval spool is a symlink: {spool}")
@@ -4701,7 +4769,7 @@ class BootstrapRuntime:
                 collection["tool_image_digest"] = image.get("id")
                 target_path = f"/targets/{target['digest']}"
                 canon_root = "/usr/local/share/agent-canon/runtime"
-                container_runtime = "/var/lib/agent-canon/runtime"
+                container_runtime = "/var/lib/agent-canon/exchange"
                 exchange_runtime = (
                     f"{container_runtime}/tasks/{task_id}/{exchange_nonce}"
                 )
@@ -4766,13 +4834,13 @@ class BootstrapRuntime:
                     str(container["id"]),
                     source=f"{exchange_runtime}/eval-results",
                     destination=eval_export,
-                    allowed_root=self.paths.runtime_root,
+                    allowed_root=self.paths.spool,
                 )
                 self.docker.copy_from_container(
                     str(container["id"]),
                     source=f"{exchange_runtime}/tasks/{run_id}/logs",
                     destination=log_export,
-                    allowed_root=self.paths.runtime_root,
+                    allowed_root=self.paths.spool,
                 )
                 for producer in matrix:
                     for stream in ("stdout", "stderr"):
@@ -4880,7 +4948,7 @@ class BootstrapRuntime:
         remain exclusively on the host side of the bootstrap boundary.
         """
         _slug(run_id)
-        spool = self.paths.runtime_root / "spool" / run_id
+        spool = self.paths.spool / run_id
         if not spool.is_dir() or spool.is_symlink():
             raise BootstrapError("eval_spool_missing", f"eval spool does not exist: {run_id}")
         collection_path = spool / "collection.json"
@@ -5002,25 +5070,31 @@ class BootstrapRuntime:
                 quota and _dir_bytes(self.paths.runtime_root) >= quota * 0.8
             )
             cache_quota = int(self.manifest["container"].get("cache_quota_bytes", 0))
-            cache_bytes = _dir_bytes(self.paths.runtime_root / "cache")
+            cache_bytes = _dir_bytes(self.paths.cache)
             cache_high_water = bool(cache_quota and cache_bytes >= cache_quota * 0.8)
             archive_quota = int(
                 self.manifest["container"].get("archive_lease_quota_bytes", 0)
             )
-            archive_bytes = _dir_bytes(self.paths.runtime_root / "archive")
+            archive_bytes = _dir_bytes(self.paths.archive)
             archive_high_water = bool(
                 archive_quota and archive_bytes >= archive_quota * 0.8
             )
             idle_seconds = int(self.manifest["container"].get("idle_stop_seconds", 0))
             idle_age = max(0.0, time.time() - self.paths.state.stat().st_mtime)
-            idle_stop = bool(
-                idle_seconds
-                and idle_age >= idle_seconds
-                and not state.get("active_task_count", 0)
-                and state.get("resources", {}).get("container", {}).get("state") == "running"
-            )
+            idle_stop = False
+            if not self._container_control():
+                idle_stop = bool(
+                    idle_seconds
+                    and idle_age >= idle_seconds
+                    and not state.get("active_task_count", 0)
+                    and state.get("resources", {}).get("container", {}).get("state") == "running"
+                )
             current_image = state.get("resources", {}).get("image", {}).get("id")
-            owned_images = self.docker.owned_image_ids(self.control_digest)
+            owned_images = (
+                []
+                if self._container_control()
+                else self.docker.owned_image_ids(self.control_digest)
+            )
             max_images = int(self.manifest["container"].get("max_image_generations", 2))
             stale_images = [image for image in owned_images if image != current_image][
                 : max(0, len(owned_images) - max_images)
@@ -5070,7 +5144,7 @@ class BootstrapRuntime:
                     state["state"] = "stopped"
                     details["deleted"].append("idle-container")
                 if cache_high_water and not state.get("active_task_count", 0):
-                    cache_root = self.paths.runtime_root / "cache"
+                    cache_root = self.paths.cache
                     for child in sorted(cache_root.iterdir()) if cache_root.is_dir() else ():
                         if child.is_symlink():
                             raise BootstrapError("symlink_path_rejected", f"cache path is a symlink: {child}")
@@ -5080,14 +5154,14 @@ class BootstrapRuntime:
                             child.unlink()
                         details["deleted"].append(f"cache:{child.name}")
                 if archive_high_water and not state.get("active_task_count", 0):
-                    spool_root = self.paths.runtime_root / "spool"
+                    spool_root = self.paths.spool
                     spool_has_entries = bool(
                         spool_root.is_dir() and next(spool_root.iterdir(), None)
                     )
                     if spool_has_entries:
                         details["archive_cleanup_blocked_by_spool"] = True
                     else:
-                        archive_root = self.paths.runtime_root / "archive"
+                        archive_root = self.paths.archive
                         for child in (
                             sorted(archive_root.iterdir())
                             if archive_root.is_dir()
@@ -5365,7 +5439,11 @@ def _container_materialize_rollback_plan(
     the shell adapter.  The target source paths are carried as opaque host
     metadata and are revalidated by the host when the plan is consumed.
     """
-    plan = runtime.paths.runtime_root / "rollback-plan.tsv"
+    plan = (
+        runtime.paths.container_runtime / "rollback-plan.tsv"
+        if runtime._container_control()
+        else runtime.paths.runtime_root / "rollback-plan.tsv"
+    )
     rollback_id = state.get("rollback_generation")
     generations = state.get("generations", {})
     if not isinstance(rollback_id, str) or not isinstance(generations, Mapping):
@@ -5414,7 +5492,11 @@ def _container_materialize_rollback_plan(
         ):
             raise BootstrapError("rollback_plan_invalid", "rollback target mount is invalid")
         lines.append(f"mount\tmount\t{source}\t{destination}\ttrue")
-    _atomic_bytes(plan, ("\n".join(lines) + "\n").encode("utf-8"), mode=0o600)
+    _atomic_bytes(
+        plan,
+        ("\n".join(lines) + "\n").encode("utf-8"),
+        mode=0o444 if runtime._container_control() else 0o600,
+    )
 
 
 def _container_target_manifest(
@@ -5476,6 +5558,16 @@ def _container_target_manifest(
 
 def _container_previous_target_manifest(runtime: BootstrapRuntime) -> dict[str, Any]:
     """Read the host-provided previous target set without touching Docker."""
+    supplied = os.environ.get("AGENT_CANON_ROLLBACK_MOUNTS_FILE", "").strip()
+    if supplied:
+        if not Path(supplied).exists() and not Path(supplied).is_symlink():
+            return {}
+        return _container_target_manifest(
+            runtime,
+            Path(supplied),
+            missing_code="rollback_target_manifest_missing",
+            invalid_code="rollback_target_manifest_invalid",
+        )
     return _container_target_manifest(
         runtime,
         runtime.paths.runtime_root / "rollback-mounts.tsv",
@@ -5661,7 +5753,7 @@ def _container_request_environment(
             if key in {"AGENT_CANON_TARGET_ROOT", "AGENT_CANON_TASK_ROOT"} and Path(value).resolve(strict=False) != host_target:
                 raise BootstrapError("invalid_exec_request", f"target path does not match request: {key}")
             if key == "AGENT_CANON_MOUNT_REGISTRY":
-                result[key] = f"{CONTAINER_RUNTIME_DESTINATION}/mounts.toml"
+                result[key] = REGISTRY_DESTINATION
                 continue
             if key in {"AGENT_CANON_HOOK_ARCHIVE_DIR", "AGENT_CANON_LOG_ROOT"}:
                 if host_private_log is None or Path(value).resolve(strict=False) != host_private_log:
@@ -5711,6 +5803,32 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
             if operation in {"install", "update"}:
                 runtime._materialize_skill_view()
             if operation == "install":
+                # A clean install reconstructs controller-owned lifecycle
+                # state, while host-consumed spool/archive/cache/Codex
+                # surfaces remain on their explicitly mounted host roots.
+                for directory in (runtime.paths.generations, runtime.paths.tasks):
+                    if directory.is_symlink():
+                        raise BootstrapError(
+                            "symlink_path_rejected",
+                            f"controller state directory is a symlink: {directory}",
+                        )
+                    if directory.is_dir():
+                        for child in directory.iterdir():
+                            if child.is_symlink() or child.is_file():
+                                child.unlink()
+                            elif child.is_dir():
+                                shutil.rmtree(child)
+                state.update(
+                    {
+                        "targets": {},
+                        "generations": {},
+                        "current_generation": None,
+                        "rollback_generation": None,
+                        "generation_counter": 0,
+                        "active_task_count": 0,
+                        "tasks": {},
+                    }
+                )
                 state["state"] = "ready"
                 state["managed_paths"] = [
                     STATE_FILE,
