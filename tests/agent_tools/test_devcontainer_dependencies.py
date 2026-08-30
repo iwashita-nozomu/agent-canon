@@ -703,7 +703,13 @@ class DependencyModelTests(unittest.TestCase):
 
     def test_image_install_requires_root_and_image_safe_method_whitelist(self) -> None:
         unsafe = parse_record(
-            record("unsafe", method="pipx", source="https://pypi.example.test/simple"),
+            record(
+                "unsafe",
+                method="browser-install",
+                package="chromium",
+                browser="chromium",
+                browser_cache_path="/usr/local/share/agent-canon-browser-cache",
+            ),
             path=Path("fixture.toml"),
             index=0,
         )
@@ -731,7 +737,16 @@ class DependencyModelTests(unittest.TestCase):
             self.assertFalse(image_root.exists())
 
     def test_image_safe_gate_accepts_only_immutable_rust_and_cargo_records(self) -> None:
-        """Image installs admit pinned Rust and canonical Cargo snapshots only."""
+        """Image installs admit pinned pipx, Rust, and Cargo records only."""
+        pipx = parse_record(
+            record(
+                "python-tool",
+                method="pipx",
+                source="https://pypi.example.test/simple",
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
         rust = parse_record(
             record(
                 "rust-toolchain",
@@ -741,7 +756,7 @@ class DependencyModelTests(unittest.TestCase):
                 components=["rust-analyzer"],
             ),
             path=Path("fixture.toml"),
-            index=0,
+            index=1,
         )
         cargo = parse_record(
             record(
@@ -755,7 +770,7 @@ class DependencyModelTests(unittest.TestCase):
                 locked=True,
             ),
             path=Path("fixture.toml"),
-            index=1,
+            index=2,
         )
         active = parse_record(
             record(
@@ -767,9 +782,10 @@ class DependencyModelTests(unittest.TestCase):
                 locked=True,
             ),
             path=Path("fixture.toml"),
-            index=2,
+            index=3,
         )
 
+        self.assertTrue(dependency_module._image_record_is_safe(pipx))
         self.assertTrue(dependency_module._image_record_is_safe(rust))
         self.assertTrue(dependency_module._image_record_is_safe(cargo))
         self.assertFalse(dependency_module._image_record_is_safe(active))

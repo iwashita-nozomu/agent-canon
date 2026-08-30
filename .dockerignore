@@ -26,6 +26,8 @@
 !references/**
 !templates/
 !templates/**
+!schemas/
+!schemas/**
 !tools/
 !tools/**
 tools/ci/**
