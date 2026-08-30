@@ -18,6 +18,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
+import subprocess
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -80,13 +82,23 @@ __all__ = (
     "build_capability_index",
     "ordered_unique",
     "related_skill_candidates",
+    "validate_catalog_schemas",
 )
 
 JsonMapping = Mapping[str, object]
 CapabilityId = str
 SKILL_CATALOG_PATH = Path("agents/skills/catalog.yaml")
 SKILL_DEPENDENCY_MAP_PATH = Path("agents/skills/skill-dependencies.yaml")
-STAGE_POLICY_VALUES = ("active", "deferred")
+TOOL_CATALOG_PATH = Path("tools/catalog.yaml")
+CATALOG_SCHEMA_ROOT = Path("schemas/agent-canon")
+CATALOG_SCHEMA_PATHS = {
+    SKILL_CATALOG_PATH: CATALOG_SCHEMA_ROOT / "skill-catalog.schema.json",
+    SKILL_DEPENDENCY_MAP_PATH: CATALOG_SCHEMA_ROOT / "skill-dependencies.schema.json",
+    TOOL_CATALOG_PATH: CATALOG_SCHEMA_ROOT / "tool-catalog.schema.json",
+}
+_SCHEMA_PREFLIGHT_CACHE: dict[
+    Path, tuple[tuple[tuple[str, int, int], ...], tuple[Mapping[str, object], ...]]
+] = {}
 PRIVATE_SKILL_PREFIX = "_"
 CAPABILITY_ID_RE = re.compile(r"^[a-z0-9_]+$")
 VisualizationOwnerSkill = Literal["code-visualization"]
@@ -342,6 +354,71 @@ class CapabilityRootError(ValueError):
         self.code = code
 
 
+def validate_catalog_schemas(root: Path) -> tuple[Mapping[str, object], ...]:
+    """Run pinned native YAML and JSON Schema validation for catalog sources.
+
+    This is an admission/preflight operation.  The loaders below intentionally
+    consume its typed-compatible YAML values and retain only cross-document
+    relations and projection checks.
+    """
+    root = root.resolve()
+    fingerprint = tuple(
+        (
+            path.as_posix(),
+            path.stat().st_mtime_ns,
+            path.stat().st_size,
+        )
+        for path in tuple(root / path for path in CATALOG_SCHEMA_PATHS)
+    )
+    cached = _SCHEMA_PREFLIGHT_CACHE.get(root)
+    if cached is not None and cached[0] == fingerprint:
+        return cached[1]
+    yamllint = shutil.which("yamllint")
+    check_jsonschema = shutil.which("check-jsonschema")
+    if yamllint is None or check_jsonschema is None:
+        missing = "yamllint" if yamllint is None else "check-jsonschema"
+        raise CapabilityRootError(f"catalog-schema-tool-unavailable:{missing}")
+    documents = tuple(root / path for path in CATALOG_SCHEMA_PATHS)
+    config = root / CATALOG_SCHEMA_ROOT / "yamllint.yaml"
+    if not config.is_file():
+        raise CapabilityRootError("catalog-schema-config-missing")
+    yaml_result = subprocess.run(
+        [yamllint, "--strict", "--config-file", str(config), *(str(path) for path in documents)],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if yaml_result.returncode != 0:
+        raise CapabilityRootError("catalog-yaml-invalid")
+    results: list[Mapping[str, object]] = []
+    for document, schema in zip(documents, CATALOG_SCHEMA_PATHS.values()):
+        schema_path = root / schema
+        result = subprocess.run(
+            [check_jsonschema, "--schemafile", str(schema_path), str(document)],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise CapabilityRootError(
+                f"catalog-schema-invalid:{document.relative_to(root).as_posix()}"
+            )
+        results.append(
+            {
+                "tool": "check-jsonschema",
+                "schema": schema.as_posix(),
+                "document": document.relative_to(root).as_posix(),
+                "argv": ["--schemafile", schema.as_posix(), document.relative_to(root).as_posix()],
+                "exit_code": result.returncode,
+            }
+        )
+    validated = tuple(results)
+    _SCHEMA_PREFLIGHT_CACHE[root] = (fingerprint, validated)
+    return validated
+
+
 @dataclass(frozen=True)
 class CapabilityIndex:
     """Catalog-ordered immutable capability index and diagnostics."""
@@ -366,16 +443,20 @@ class CapabilityIndex:
 
 
 def object_mapping(value: object, field: str) -> JsonMapping:
-    """Return one string-keyed mapping from parsed catalog data."""
-    if not isinstance(value, Mapping):
-        raise ValueError(f"{field} must be a mapping")
+    """Return one schema-validated mapping from parsed catalog data.
+
+    Structural shape validation is owned by the local Draft 2020-12 schemas
+    and ``check-jsonschema``.  This conversion deliberately performs no
+    duplicate type/required/property checks; callers are the relational and
+    typed-projection owners after native validation has completed.
+    """
+    del field
     return cast(JsonMapping, value)
 
 
 def object_sequence(value: object, field: str) -> Sequence[object]:
-    """Return one sequence from parsed catalog data."""
-    if not isinstance(value, list):
-        raise ValueError(f"{field} must be a list")
+    """Return one schema-validated sequence from parsed catalog data."""
+    del field
     return cast(Sequence[object], value)
 
 
@@ -390,50 +471,42 @@ def load_skill_catalog(root: Path) -> JsonMapping:
 
 
 def string_list(value: object, field: str) -> tuple[str, ...]:
-    """Return a tuple of non-empty strings from one YAML sequence."""
-    result: list[str] = []
-    for item in object_sequence(value, field):
-        if not isinstance(item, str) or not item.strip():
-            raise ValueError(f"{field} entries must be non-empty strings")
-        result.append(item)
-    return tuple(result)
+    """Return one schema-validated string sequence as an immutable tuple."""
+    del field
+    return tuple(cast(Sequence[str], value))
 
 
 def trigger_groups(value: object, field: str) -> tuple[tuple[str, ...], ...]:
-    """Return normalized trigger term groups from YAML."""
+    """Return schema-validated trigger term groups from YAML."""
+    del field
     if value is None:
         return ()
-    groups: list[tuple[str, ...]] = []
-    for index, group in enumerate(object_sequence(value, field)):
-        groups.append(string_list(group, f"{field}[{index}]"))
-    return tuple(groups)
+    return tuple(tuple(cast(Sequence[str], group)) for group in cast(Sequence[object], value))
 
 
 def optional_string_list(value: object, field: str) -> tuple[str, ...]:
-    """Return a tuple of strings from an optional YAML list."""
+    """Return an optional schema-validated string list."""
+    del field
     if value is None:
         return ()
-    return string_list(value, field)
+    return tuple(cast(Sequence[str], value))
 
 
 def optional_metadata_string(value: object, field: str) -> str:
-    """Return one optional non-empty catalog metadata string."""
+    """Return one optional schema-validated metadata string."""
+    del field
     if value is None:
         return ""
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{field} must be a non-empty string")
-    return value
+    return cast(str, value)
 
 
 def _skill_ids_from_catalog(data: JsonMapping) -> tuple[str, ...]:
-    """Return the complete public skill identity sequence from the catalog."""
+    """Return public skill identities; uniqueness is a residual relation."""
     families = object_sequence(data.get("skill_families"), "skill_families")
     ids: list[str] = []
     for index, entry in enumerate(families):
         mapping = object_mapping(entry, f"skill_families[{index}]")
-        skill_id = mapping.get("id")
-        if not isinstance(skill_id, str) or not skill_id.strip():
-            raise ValueError(f"skill_families[{index}].id must be a non-empty string")
+        skill_id = cast(str, mapping["id"])
         if skill_id.startswith(PRIVATE_SKILL_PREFIX):
             raise ValueError(f"skill_families[{index}].id must be public: {skill_id}")
         if skill_id in ids:
@@ -442,42 +515,25 @@ def _skill_ids_from_catalog(data: JsonMapping) -> tuple[str, ...]:
     return tuple(ids)
 
 
-def _dependency_error(skill: str, field: str) -> ValueError:
-    """Return one stable dependency-map schema error."""
-    return ValueError(f"skill-dependency-map-invalid:{skill}:{field}")
-
-
 def _dependency_string_list(value: object, field: str) -> tuple[str, ...]:
-    """Parse one required dependency-map string list."""
-    try:
-        return string_list(value, field)
-    except ValueError as exc:
-        raise ValueError(f"skill-dependency-map-invalid:{field}") from exc
+    """Project one schema-validated dependency string list."""
+    del field
+    return tuple(cast(Sequence[str], value))
 
 
 def _dependency_order_constraints(
     value: object, skill: str
 ) -> tuple[SkillOrderConstraint, ...]:
-    """Parse explicit before/after constraints from the canonical map."""
-    if not isinstance(value, list):
-        raise _dependency_error(skill, "order_constraints")
-    result: list[SkillOrderConstraint] = []
-    for index, raw in enumerate(value):
-        if not isinstance(raw, Mapping):
-            raise _dependency_error(skill, f"order_constraints[{index}]")
-        before = raw.get("before")
-        after = raw.get("after")
-        reason = raw.get("reason", "")
-        if (
-            not isinstance(before, str)
-            or not before.strip()
-            or not isinstance(after, str)
-            or not after.strip()
-            or not isinstance(reason, str)
-        ):
-            raise _dependency_error(skill, f"order_constraints[{index}]")
-        result.append(SkillOrderConstraint(before, after, reason))
-    return tuple(result)
+    """Project schema-validated ordering constraints for graph checks."""
+    del skill
+    return tuple(
+        SkillOrderConstraint(
+            cast(str, cast(Mapping[str, object], item)["before"]),
+            cast(str, cast(Mapping[str, object], item)["after"]),
+            cast(str, cast(Mapping[str, object], item)["reason"]),
+        )
+        for item in cast(Sequence[object], value)
+    )
 
 
 def _dependency_edges(
@@ -582,9 +638,7 @@ def load_skill_dependency_map(
     rules: dict[str, SkillDependencyRule] = {}
     for skill in expected_ids:
         mapping = object_mapping(dependency_data[skill], f"skill_dependencies.{skill}")
-        group = mapping.get("responsibility_group")
-        if not isinstance(group, str) or not group.strip():
-            raise _dependency_error(skill, "responsibility_group")
+        group = cast(str, mapping["responsibility_group"])
         rules[skill] = SkillDependencyRule(
             skill=skill,
             responsibility_group=group,
@@ -879,7 +933,7 @@ def freeze_skill_rule_mapping(
 
 
 def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
-    """Load prompt-routing rules from the public skill catalog."""
+    """Load prompt-routing rules from a natively schema-validated catalog."""
     data = load_skill_catalog(root)
     families = object_sequence(data.get("skill_families"), "skill_families")
     public_skill_ids = _skill_ids_from_catalog(data)
@@ -888,9 +942,7 @@ def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
     observed_skill_ids: set[str] = set()
     for index, entry in enumerate(families):
         entry_mapping = object_mapping(entry, f"skill_families[{index}]")
-        skill_id = entry_mapping.get("id")
-        if not isinstance(skill_id, str) or not skill_id.strip():
-            raise ValueError(f"skill_families[{index}].id must be a non-empty string")
+        skill_id = cast(str, entry_mapping["id"])
         if skill_id.startswith(PRIVATE_SKILL_PREFIX):
             raise ValueError(f"skill_families[{index}].id must be public: {skill_id}")
         if skill_id in observed_skill_ids:
@@ -902,18 +954,13 @@ def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
                 f"{SKILL_DEPENDENCY_MAP_PATH}"
             )
         routing = entry_mapping.get("routing")
-        if routing is None:
-            routing_mapping: JsonMapping = {}
-        else:
-            routing_mapping = object_mapping(routing, f"{skill_id}.routing")
+        routing_mapping: JsonMapping = (
+            {} if routing is None else object_mapping(routing, f"{skill_id}.routing")
+        )
         reason = routing_mapping.get("reason", "prompt explicitly names public skill")
-        if not isinstance(reason, str) or not reason.strip():
-            raise ValueError(f"{skill_id}.routing.reason must be a non-empty string")
+        reason = cast(str, reason)
         stage_policy = routing_mapping.get("stage_policy", "deferred")
-        if stage_policy not in STAGE_POLICY_VALUES:
-            raise ValueError(
-                f"{skill_id}.routing.stage_policy must be one of {STAGE_POLICY_VALUES}"
-            )
+        stage_policy = cast(str, stage_policy)
         visualization_owner = optional_metadata_string(
             entry_mapping.get("visualization_owner"),
             f"{skill_id}.visualization_owner",
@@ -937,7 +984,7 @@ def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
             SkillRoutingRule(
                 skill=skill_id,
                 reason=reason,
-                stage_policy=str(stage_policy),
+                stage_policy=stage_policy,
                 triggers=trigger_groups(
                     routing_mapping.get("triggers"),
                     f"{skill_id}.routing.triggers",
@@ -1023,9 +1070,7 @@ def load_skill_tool_commands(root: Path) -> dict[str, SkillToolCommandSpec]:
     result: dict[str, SkillToolCommandSpec] = {}
     for index, entry in enumerate(families):
         entry_mapping = object_mapping(entry, f"skill_families[{index}]")
-        skill_id = entry_mapping.get("id")
-        if not isinstance(skill_id, str) or not skill_id.strip():
-            raise ValueError(f"skill_families[{index}].id must be a non-empty string")
+        skill_id = cast(str, entry_mapping["id"])
         if skill_id in result:
             raise ValueError(f"duplicate skill catalog id: {skill_id}")
         commands = entry_mapping.get("tool_commands")

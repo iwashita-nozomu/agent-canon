@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-canon.local/schemas/agent-canon/skill-dependencies.schema.json",
+  "title": "AgentCanon public skill dependency map",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "skill_dependencies"],
+  "properties": {
+    "version": { "const": 1 },
+    "skill_dependencies": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/dependencyRule" },
+      "propertyNames": {
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      }
+    }
+  },
+  "$defs": {
+    "skillId": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "skillList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/skillId" },
+      "uniqueItems": true
+    },
+    "orderConstraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["before", "after", "reason"],
+      "properties": {
+        "before": { "$ref": "#/$defs/skillId" },
+        "after": { "$ref": "#/$defs/skillId" },
+        "reason": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "dependencyRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "responsibility_group",
+        "required_prerequisites",
+        "routing_candidates",
+        "successors",
+        "order_constraints",
+        "parallel_independent"
+      ],
+      "properties": {
+        "responsibility_group": { "$ref": "#/$defs/nonEmptyString" },
+        "required_prerequisites": { "$ref": "#/$defs/skillList" },
+        "routing_candidates": { "$ref": "#/$defs/skillList" },
+        "successors": { "$ref": "#/$defs/skillList" },
+        "order_constraints": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/orderConstraint" },
+          "uniqueItems": true
+        },
+        "parallel_independent": { "$ref": "#/$defs/skillList" }
+      }
+    }
+  }
+}
